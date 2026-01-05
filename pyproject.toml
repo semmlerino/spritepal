@@ -259,6 +259,22 @@ ignore = [
     "FIX",      # fixmes
     "T20",      # print statements (debug in tests is fine)
 ]
+"ui/sprite_editor/tests/**/*.py" = [
+    "S",        # security (test code)
+    "PLR2004",  # magic values
+    "B017",     # assert raises
+    "B018",     # useless expression
+    "RUF",      # ruff rules
+    "F401",     # unused imports (fixtures)
+    "F821",     # undefined names (skipped test files may have stale refs)
+    "ARG",      # unused arguments (fixtures)
+    "PT",       # pytest style
+    "ERA001",   # commented code
+    "N",        # naming
+    "TD",       # todos (test code often has TODOs)
+    "FIX",      # fixmes
+    "T20",      # print statements (debug in tests is fine)
+]
 "benchmarks/**/*.py" = [
     "T20",      # print statements (benchmark output)
     "TD",       # todos
@@ -313,6 +329,7 @@ exclude = [
     "build",
     "dist",
     "tests",
+    "ui/sprite_editor/tests",
     "mesen2_integration",
     "scripts",
 ]

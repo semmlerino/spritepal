@@ -56,6 +56,12 @@ class MainController(QObject):
         self.editing_controller.set_view(window.edit_tab)
         self.injection_controller.set_view(window.inject_tab)
 
+        # Connect canvas signals to main window status bar
+        edit_tab = window.edit_tab
+        canvas = edit_tab.get_canvas()
+        if canvas:
+            window._connect_canvas_signals(canvas)
+
         # Connect multi-palette tab to extraction controller
         self.extraction_controller.set_multi_palette_view(window.multi_palette_tab)
 
@@ -68,36 +74,20 @@ class MainController(QObject):
             return
 
         # File menu actions
-        self._main_window.action_open_vram.triggered.connect(
-            self.extraction_controller.browse_vram_file
-        )
-        self._main_window.action_open_cgram.triggered.connect(
-            self.extraction_controller.browse_cgram_file
-        )
-        self._main_window.action_open_png.triggered.connect(
-            self.injection_controller.browse_png_file
-        )
+        self._main_window.action_open_vram.triggered.connect(self.extraction_controller.browse_vram_file)
+        self._main_window.action_open_cgram.triggered.connect(self.extraction_controller.browse_cgram_file)
+        self._main_window.action_open_png.triggered.connect(self.injection_controller.browse_png_file)
         self._main_window.action_save.triggered.connect(self._on_save)
         self._main_window.action_save_as.triggered.connect(self._on_save_as)
 
         # Edit menu - Undo/Redo
-        self._main_window.action_undo.triggered.connect(
-            self.editing_controller.undo
-        )
-        self._main_window.action_redo.triggered.connect(
-            self.editing_controller.redo
-        )
+        self._main_window.action_undo.triggered.connect(self.editing_controller.undo)
+        self._main_window.action_redo.triggered.connect(self.editing_controller.redo)
 
         # Tools menu
-        self._main_window.action_pencil.triggered.connect(
-            lambda: self.editing_controller.set_tool("pencil")
-        )
-        self._main_window.action_fill.triggered.connect(
-            lambda: self.editing_controller.set_tool("fill")
-        )
-        self._main_window.action_picker.triggered.connect(
-            lambda: self.editing_controller.set_tool("picker")
-        )
+        self._main_window.action_pencil.triggered.connect(lambda: self.editing_controller.set_tool("pencil"))
+        self._main_window.action_fill.triggered.connect(lambda: self.editing_controller.set_tool("fill"))
+        self._main_window.action_picker.triggered.connect(lambda: self.editing_controller.set_tool("picker"))
 
         # Controller state → UI sync
         self.editing_controller.undoStateChanged.connect(self._update_undo_state)
@@ -246,11 +236,28 @@ class MainController(QObject):
         self.injection_controller.browse_png_file()
 
     def save_current_state(self) -> None:
-        """Save current application state."""
-        # TODO: Implement settings persistence
+        """Save current application state.
+
+        TODO: Implement settings persistence via ApplicationStateManager.
+        Should save:
+        - Last VRAM/CGRAM/PNG file paths
+        - Extraction parameters (offset, size, palette index)
+        - Tool settings (zoom level, current tool)
+        - Recent files list
+
+        Implementation: Get ApplicationStateManager via get_app_context(),
+        collect state from extraction/editing/injection controllers,
+        save to 'session' category.
+        """
         pass
 
     def load_saved_state(self) -> None:
-        """Load saved application state."""
-        # TODO: Implement settings loading
+        """Load saved application state.
+
+        TODO: Implement settings loading via ApplicationStateManager.
+        Should restore state saved by save_current_state().
+
+        Implementation: Load from ApplicationStateManager 'session' category,
+        restore to controllers, emit signals to update UI.
+        """
         pass

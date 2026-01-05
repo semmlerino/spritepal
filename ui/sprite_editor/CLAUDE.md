@@ -56,5 +56,7 @@ Don't rewrite these:
 
 ## Current State
 
-- **Tests:** Minimal. `tests/` contains only `__init__.py`.
-- **Coverage:** Services are more complete than controllers.
+- **Tests:** 48 tests across 5 test files covering controller signals, widget validation, and panel synchronization.
+  - Located in `ui/sprite_editor/tests/` (collected automatically by pytest via `pyproject.toml`)
+  - Run with: `uv run pytest ui/sprite_editor/tests/`
+- **Coverage:** Services are more complete than controllers; tests focus on behavioral verification of signals and widget state.

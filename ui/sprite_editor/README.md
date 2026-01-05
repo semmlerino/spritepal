@@ -55,7 +55,6 @@ ui/sprite_editor/
 ├── models/                        # Data models
 │   ├── image_model.py             # Pixel grid management
 │   ├── palette_model.py           # Palette data
-│   ├── vram_model.py              # VRAM file handling
 │   └── project_model.py           # Project state
 ├── services/                      # Business logic
 │   ├── sprite_renderer.py         # Sprite extraction
@@ -64,8 +63,7 @@ ui/sprite_editor/
 │   └── oam_palette_mapper.py      # OAM palette assignment
 ├── managers/                      # Qt managers
 │   ├── tool_manager.py            # Drawing tools
-│   ├── undo_manager.py            # Undo/Redo
-│   └── settings_manager.py        # Persistent settings
+│   └── undo_manager.py            # Undo/Redo
 ├── controllers/                   # MVC controllers
 │   ├── main_controller.py         # Workflow orchestration
 │   ├── extraction_controller.py   # Extract tab logic
@@ -108,13 +106,6 @@ model = ImageModel()
 model.set_data(numpy_array)  # Set 2D index array
 pixel = model.get_pixel(x, y)
 model.set_pixel(x, y, color_index)
-```
-
-**VRAMModel** - Handles VRAM/CGRAM/OAM file operations
-```python
-vram = VRAMModel()
-vram.set_vram_file("dump.bin")
-data = vram.read_vram_data(offset, size)
 ```
 
 **PaletteModel** - Palette data with multiple format support
@@ -163,11 +154,21 @@ undo.undo()
 undo.redo()
 ```
 
-**SettingsManager** - Persistent settings
+### Settings Management
+
+Settings are managed by **ApplicationStateManager** (from `core/managers/`), injected via AppContext.
+
+- MainWindow, ExtractTab, InjectTab receive ApplicationStateManager during initialization
+- Used for: ROM paths, recent files, window geometry persistence
+- See `core/managers/application_state_manager.py` for full API
+
+Access via AppContext:
 ```python
-settings = SettingsManager()
-settings.set("zoom_level", 4)
-settings.save_settings()
+from core.app_context import get_app_context
+
+context = get_app_context()
+state_mgr = context.application_state_manager
+state_mgr.set_rom_path("path/to/rom.sfc")
 ```
 
 ### Controllers
@@ -230,16 +231,20 @@ Raw binary file containing color RAM (512 bytes = 16 palettes × 16 colors × 2 
 
 ## Running Tests
 
-```bash
-# Unit tests
-uv run pytest tests/ -v
+All commands run from the `spritepal/` project root:
 
-# Integration tests
-uv run pytest tests/ -k "integration" -v
+```bash
+# Run sprite_editor tests only
+uv run pytest ui/sprite_editor/tests/ -v
 
 # With coverage
-uv run pytest tests/ --cov=ui/sprite_editor --cov-report=html
+uv run pytest ui/sprite_editor/tests/ --cov=ui/sprite_editor --cov-report=html
+
+# Run all tests (including sprite_editor)
+uv run pytest  # Collects from both tests/ and ui/sprite_editor/tests/
 ```
+
+**Note:** `pyproject.toml` automatically collects tests from both `tests/` and `ui/sprite_editor/tests/` directories.
 
 ## Configuration
 

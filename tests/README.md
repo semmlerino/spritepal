@@ -62,6 +62,11 @@ tests/
     └── timeouts.py         # Semantic timeout functions
 ```
 
+**Additional Test Location:**
+- `ui/sprite_editor/tests/` - Subsystem-specific tests for the sprite editor (48 tests)
+  - Automatically collected by pytest via `testpaths = ["tests", "ui/sprite_editor/tests"]` in `pyproject.toml`
+  - Run with: `uv run pytest ui/sprite_editor/tests/`
+
 ### Where Does My Test Go?
 
 | Test Type | Directory | Criteria |

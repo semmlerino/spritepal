@@ -48,12 +48,8 @@ class InjectWorker(BaseWorker):
     def run(self) -> None:
         """Execute the injection in background thread."""
         try:
-            # Validate PNG
-            self.emit_progress(10, "Validating PNG file...")
-            valid, issues = self.converter.validate_png(self.png_file)
-            if not valid:
-                self.emit_error("PNG validation failed:\n" + "\n".join(issues))
-                return
+            # PNG validation already performed by controller at system boundary
+            # Worker trusts controller's validation and proceeds directly to conversion
 
             if self.is_cancelled():
                 return
