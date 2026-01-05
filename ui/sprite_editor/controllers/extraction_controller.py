@@ -273,18 +273,33 @@ class ExtractionController(QObject):
 
     def _deliver_multi_palette_results(self, palette_images: dict[str, "Image.Image"], tile_count: int) -> None:
         """Send multi-palette results to view."""
-        if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "set_single_image_all_palettes"):
-            # Extract base image and palette list from dict
+        if self._multi_palette_view is None:
+            return
+
+        # Use new direct image method (efficient, no re-rendering)
+        if hasattr(self._multi_palette_view, "set_palette_images"):
+            self._multi_palette_view.set_palette_images(palette_images)  # type: ignore[attr-defined]
+            stats = {"tile_count": tile_count, "palettes": len(palette_images)}
+            self._multi_palette_view.set_oam_statistics(stats)  # type: ignore[attr-defined]
+
+        # Fallback to old method for backward compatibility
+        elif hasattr(self._multi_palette_view, "set_single_image_all_palettes"):
             base_img = palette_images.get("palette_0")
-            if base_img:
-                palette_list = [palette_images.get(f"palette_{i}") for i in range(16)]
-                palette_list = [p for p in palette_list if p is not None]
+            if base_img and base_img.mode == "P":
+                # Extract palette data from pre-rendered images
+                palettes: list[list[tuple[int, int, int]]] = []
+                for i in range(16):
+                    img = palette_images.get(f"palette_{i}")
+                    if img and img.mode == "P":
+                        flat_pal = img.getpalette()
+                        if flat_pal:
+                            palette = [(flat_pal[j], flat_pal[j + 1], flat_pal[j + 2]) for j in range(0, 48, 3)]
+                            palettes.append(palette)
 
-                # Type ignore needed for dynamic view assignment
-                self._multi_palette_view.set_single_image_all_palettes(base_img, palette_list)  # type: ignore[attr-defined]
-
-                stats = {"tile_count": tile_count, "palettes": len(palette_list)}
-                self._multi_palette_view.set_oam_statistics(stats)  # type: ignore[attr-defined]
+                if palettes:
+                    self._multi_palette_view.set_single_image_all_palettes(base_img, palettes)  # type: ignore[attr-defined]
+                    stats = {"tile_count": tile_count, "palettes": len(palettes)}
+                    self._multi_palette_view.set_oam_statistics(stats)  # type: ignore[attr-defined]
 
     def _on_worker_finished(self) -> None:
         """Handle worker completion."""

@@ -68,8 +68,10 @@ class ExtractWorker(BaseWorker):
             # Apply palette if requested
             cgram_path = Path(self.cgram_file) if self.cgram_file else None
             if self.palette_num is not None and cgram_path and cgram_path.exists():
-                self.emit_progress(70, f"Applying palette {self.palette_num}...")
-                palette = read_cgram_palette(str(cgram_path), self.palette_num)
+                # OAM palette numbers (0-7) map to CGRAM sprite palettes (8-15)
+                cgram_palette_num = self.palette_num + 8 if self.palette_num < 8 else self.palette_num
+                self.emit_progress(70, f"Applying palette {self.palette_num} (CGRAM {cgram_palette_num})...")
+                palette = read_cgram_palette(str(cgram_path), cgram_palette_num)
                 if palette:
                     image.putpalette(palette)
 

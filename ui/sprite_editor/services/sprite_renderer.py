@@ -288,16 +288,19 @@ class SpriteRenderer:
 
             cgram_path_check = Path(cgram_file) if cgram_file else None
             for pal_num in active_palettes:
-                pal_num = max(0, min(15, pal_num))
+                # OAM palette numbers (0-7) map to CGRAM sprite palettes (8-15)
+                cgram_palette_num = pal_num + 8 if pal_num < 8 else pal_num
+                cgram_palette_num = max(8, min(15, cgram_palette_num))
                 img = base_img.copy()
 
                 if cgram_path_check and cgram_path_check.exists():
-                    palette = read_cgram_palette(cgram_file, pal_num)
+                    palette = read_cgram_palette(cgram_file, cgram_palette_num)
                     if palette:
                         img.putpalette(palette)
                 else:
                     img.putpalette(get_grayscale_palette())
 
+                # Use original OAM palette number in dict key for consistency
                 palette_images[f"palette_{pal_num}"] = img
 
             return palette_images, total_tiles

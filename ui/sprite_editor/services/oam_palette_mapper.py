@@ -103,6 +103,7 @@ class OAMPaletteMapper:
             }
 
             from typing import cast
+
             self.oam_entries.append(cast(SpriteEntry, sprite_entry))
             self.tile_palette_map[actual_tile] = palette
 
@@ -193,8 +194,17 @@ class OAMPaletteMapper:
 
 
 def create_tile_palette_map(oam_file: str, vram_base: int = KIRBY_VRAM_BASE) -> OAMPaletteMapper:
-    """Convenience function to create palette mapping from OAM file."""
+    """Convenience function to create palette mapping from OAM file.
+
+    Args:
+        oam_file: Path to OAM dump file
+        vram_base: VRAM base word address (default: KIRBY_VRAM_BASE = 0x6000).
+                  Do NOT divide by 2 - build_vram_palette_map handles conversion.
+
+    Returns:
+        Configured OAMPaletteMapper with tile→palette mappings
+    """
     mapper = OAMPaletteMapper()
     mapper.parse_oam_dump(oam_file)
-    mapper.build_vram_palette_map(vram_base // 2)
+    mapper.build_vram_palette_map(vram_base)  # Pass word address directly
     return mapper

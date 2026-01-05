@@ -199,15 +199,23 @@ class EditingController(QObject):
         if not line_points:
             return
 
-        # Draw each point and record for undo
+        # Draw each line point with brush size applied
         any_changed = False
-        for px, py in line_points:
-            old_color = self.image_model.get_pixel(px, py)
-            if self.image_model.set_pixel(px, py, self._selected_color):
-                any_changed = True
-                if self._current_stroke is not None:
-                    cmd = DrawPixelCommand(x=px, y=py, old_color=old_color, new_color=self._selected_color)
-                    self._current_stroke.add_command(cmd)
+        for center_x, center_y in line_points:
+            # Get all pixels affected by brush at this point
+            brush_pixels = self.tool_manager.get_brush_pixels(center_x, center_y)
+
+            for px, py in brush_pixels:
+                # Bounds check
+                if not (0 <= px < self.image_model.width and 0 <= py < self.image_model.height):
+                    continue
+
+                old_color = self.image_model.get_pixel(px, py)
+                if self.image_model.set_pixel(px, py, self._selected_color):
+                    any_changed = True
+                    if self._current_stroke is not None:
+                        cmd = DrawPixelCommand(x=px, y=py, old_color=old_color, new_color=self._selected_color)
+                        self._current_stroke.add_command(cmd)
 
         if any_changed:
             self.imageChanged.emit()

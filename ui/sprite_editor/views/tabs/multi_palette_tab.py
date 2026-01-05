@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSpinBox,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -139,6 +140,60 @@ class MultiPaletteViewer(QWidget):
             self._grid_layout.addWidget(container, row, col)
             self._palette_labels.append(label)
 
+    def set_palette_images(self, palette_images: dict[str, Image.Image]) -> None:
+        """Display pre-rendered palette images directly.
+
+        Args:
+            palette_images: Dict mapping 'palette_0'..'palette_15' to PIL images
+        """
+        self._clear_previews()
+
+        # Sort palette numbers
+        palette_nums = []
+        for key in palette_images:
+            if key.startswith("palette_"):
+                try:
+                    num = int(key.split("_")[1])
+                    if 0 <= num < 16:
+                        palette_nums.append(num)
+                except (ValueError, IndexError):
+                    continue
+        palette_nums.sort()
+
+        # Display each palette image in grid (4 columns)
+        for i in palette_nums:
+            img = palette_images.get(f"palette_{i}")
+            if not img:
+                continue
+
+            pixmap = self._pil_to_pixmap(img)
+            label = ClickableLabel(i)
+            label.setPixmap(
+                pixmap.scaled(
+                    128,
+                    128,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.FastTransformation,
+                )
+            )
+            label.setToolTip(f"Palette {i}")
+            label.setStyleSheet(
+                "QLabel { border: 2px solid #444; padding: 4px; }QLabel:hover { border: 2px solid #888; }"
+            )
+            label.clicked.connect(self._on_palette_clicked)
+
+            palette_label = QLabel(f"Palette {i}")
+            palette_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            container = QWidget()
+            container_layout = QVBoxLayout(container)
+            container_layout.addWidget(label)
+            container_layout.addWidget(palette_label)
+
+            row, col = i // 4, i % 4
+            self._grid_layout.addWidget(container, row, col)
+            self._palette_labels.append(label)
+
     def _clear_previews(self) -> None:
         """Clear all palette previews."""
         # Disconnect signals to prevent memory leaks
@@ -186,6 +241,10 @@ class MultiPaletteTab(QWidget):
     palette_selected = Signal(int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        # Store controller reference before calling super
+        from ...controllers.extraction_controller import ExtractionController
+
+        self.extraction_controller: ExtractionController | None = None
         super().__init__(parent)
         self._setup_ui()
 
@@ -229,13 +288,36 @@ class MultiPaletteTab(QWidget):
         self.multi_palette_viewer.palette_selected.connect(self._on_palette_selected)
         layout.addWidget(self.multi_palette_viewer)
 
+        # Output area for status messages
+        output_group = QGroupBox("Output")
+        output_layout = QVBoxLayout()
+        self.output_area = QTextEdit()
+        self.output_area.setReadOnly(True)
+        self.output_area.setMaximumHeight(100)
+        output_layout.addWidget(self.output_area)
+        output_group.setLayout(output_layout)
+        layout.addWidget(output_group)
+
+        # Initialize with validation check
+        self._validate_prerequisites()
+
     def _on_palette_selected(self, palette_num: int) -> None:
         """Handle palette selection."""
+        # Update border styles for all palette previews
+        for label in self.multi_palette_viewer._palette_labels:
+            if label._palette_idx == palette_num:
+                # Selected: green border
+                label.setStyleSheet("border: 3px solid #00FF00;")
+            else:
+                # Others: gray border
+                label.setStyleSheet("border: 1px solid #999;")
+
         self.palette_selected.emit(palette_num)
 
     def set_oam_file(self, file_path: str) -> None:
-        """Set the OAM file path."""
+        """Set the OAM file path and validate prerequisites."""
         self.oam_file_edit.setText(file_path)
+        self._validate_prerequisites()
 
     def get_preview_size(self) -> int:
         """Get the preview size in tiles."""
@@ -249,6 +331,10 @@ class MultiPaletteTab(QWidget):
         """Set single image with all palettes."""
         self.multi_palette_viewer.set_single_image_all_palettes(base_img, palettes)
 
+    def set_palette_images(self, palette_images: dict[str, Image.Image]) -> None:
+        """Set palette images directly."""
+        self.multi_palette_viewer.set_palette_images(palette_images)
+
     def set_oam_statistics(self, stats: dict[str, Any]) -> None:  # type: ignore[reportExplicitAny]
         """Set OAM statistics."""
         self.multi_palette_viewer.set_oam_statistics(stats)
@@ -256,3 +342,51 @@ class MultiPaletteTab(QWidget):
     def get_multi_palette_viewer(self) -> MultiPaletteViewer:
         """Get the multi-palette viewer widget."""
         return self.multi_palette_viewer
+
+    def append_output(self, text: str) -> None:
+        """Append text to output area."""
+        self.output_area.append(text)
+
+    def clear_output(self) -> None:
+        """Clear output area."""
+        self.output_area.clear()
+
+    def set_extraction_controller(self, controller: Any) -> None:  # type: ignore[reportExplicitAny]
+        """Set the extraction controller reference for prerequisite validation.
+
+        Args:
+            controller: ExtractionController instance (typed as Any to avoid circular import)
+        """
+        self.extraction_controller = controller
+        # Re-validate prerequisites with controller now available
+        self._validate_prerequisites()
+
+    def _validate_prerequisites(self) -> None:
+        """Validate that all prerequisites are met for multi-palette generation."""
+        # Check for OAM file
+        has_oam = bool(self.oam_file_edit.text())
+
+        # Check for VRAM and CGRAM files via controller
+        has_vram = False
+        has_cgram = False
+        if self.extraction_controller is not None:
+            has_vram = bool(self.extraction_controller.vram_file)
+            has_cgram = bool(self.extraction_controller.cgram_file)
+
+        # Enable generate button only if all three are present
+        all_present = has_oam and has_vram and has_cgram
+        self.generate_multi_btn.setEnabled(all_present)
+
+        # Show warning messages for missing prerequisites
+        if not all_present:
+            missing = []
+            if not has_oam:
+                missing.append("OAM file")
+            if not has_vram:
+                missing.append("VRAM file")
+            if not has_cgram:
+                missing.append("CGRAM file")
+
+            if missing:
+                warning = f"Prerequisites missing: {', '.join(missing)}. Load all files to enable generation."
+                self.append_output(warning)
