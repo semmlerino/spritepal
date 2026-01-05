@@ -279,7 +279,13 @@ class ExtractionController(QObject):
         # Use new direct image method (efficient, no re-rendering)
         if hasattr(self._multi_palette_view, "set_palette_images"):
             self._multi_palette_view.set_palette_images(palette_images)  # type: ignore[attr-defined]
-            stats = {"tile_count": tile_count, "palettes": len(palette_images)}
+            # Use correct field names expected by viewer
+            stats = {"sprite_count": tile_count}
+            # Add palette_usage if OAM mapper available
+            if self.renderer.oam_mapper:
+                palette_usage = self.renderer.oam_mapper.get_active_palettes()
+                if palette_usage:
+                    stats["palette_usage"] = dict.fromkeys(palette_usage, 1)
             self._multi_palette_view.set_oam_statistics(stats)  # type: ignore[attr-defined]
 
         # Fallback to old method for backward compatibility
@@ -298,7 +304,13 @@ class ExtractionController(QObject):
 
                 if palettes:
                     self._multi_palette_view.set_single_image_all_palettes(base_img, palettes)  # type: ignore[attr-defined]
-                    stats = {"tile_count": tile_count, "palettes": len(palettes)}
+                    # Use correct field names expected by viewer
+                    stats = {"sprite_count": tile_count}
+                    # Add palette_usage if OAM mapper available
+                    if self.renderer.oam_mapper:
+                        palette_usage = self.renderer.oam_mapper.get_active_palettes()
+                        if palette_usage:
+                            stats["palette_usage"] = dict.fromkeys(palette_usage, 1)
                     self._multi_palette_view.set_oam_statistics(stats)  # type: ignore[attr-defined]
 
     def _on_worker_finished(self) -> None:

@@ -154,6 +154,13 @@ class EditTab(QWidget):
         safe_disconnect(self.options_panel.zoomChanged)
         safe_disconnect(self.options_panel.zoomToFit)
 
+        # Disconnect controller signals (bidirectional sync)
+        if self.controller is not None:
+            safe_disconnect(self.controller.toolChanged)
+            safe_disconnect(self.controller.colorChanged)
+            safe_disconnect(self.controller.paletteChanged)
+            safe_disconnect(self.controller.imageChanged)
+
     def set_controller(self, controller: "EditingController") -> None:
         """Set the editing controller, create canvas, and connect signals."""
         # Disconnect any existing signals to prevent accumulation
@@ -176,6 +183,20 @@ class EditTab(QWidget):
 
         # Connect palette panel signals
         self.palette_panel.colorSelected.connect(controller.set_selected_color)
+
+        # Connect controller→panel signals (bidirectional sync)
+        controller.toolChanged.connect(self.tool_panel.set_tool)
+        controller.colorChanged.connect(self.palette_panel.set_selected_color)
+        controller.paletteChanged.connect(self._update_palette)
+
+        # Connect preview panel to controller
+        self.preview_panel.controller = controller
+        controller.imageChanged.connect(self.preview_panel.update_preview)
+        controller.paletteChanged.connect(self.preview_panel.update_preview)
+        controller.colorChanged.connect(self.preview_panel.update_color_preview)
+
+        # Connect palette selection to color preview
+        self.palette_panel.colorSelected.connect(self.preview_panel.update_color_preview)
 
         # Connect options panel signals to canvas
         # Capture canvas in local var to avoid None type issues in lambda
@@ -220,6 +241,18 @@ class EditTab(QWidget):
         self.tool_panel.setEnabled(loaded)
         self.options_panel.setEnabled(loaded)
         self.inject_btn.setEnabled(loaded)
+
+    def _update_palette(self) -> None:
+        """Update palette panel when controller palette changes.
+
+        Called when controller.paletteChanged signal emits.
+        """
+        if not self.controller:
+            return
+
+        colors = self.controller.get_current_colors()
+        palette_name = self.controller.palette_model.name
+        self.palette_panel.set_palette(colors, palette_name)
 
     def _on_zoom_to_fit(self) -> None:
         """Calculate and apply zoom to fit image in viewport."""

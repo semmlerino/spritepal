@@ -79,7 +79,6 @@ class SpriteEditorMainWindow(QMainWindow):
         self._setup_toolbar()
         self._setup_statusbar()
 
-
     def _setup_menus(self) -> None:
         """Setup the menu bar."""
         menubar = self.menuBar()
@@ -201,6 +200,26 @@ class SpriteEditorMainWindow(QMainWindow):
 
         self.coords_label = QLabel("")
         self.statusbar.addPermanentWidget(self.coords_label)
+
+    def _connect_canvas_signals(self, canvas) -> None:  # type: ignore[reportExplicitAny]
+        """Connect canvas signals to status bar updates.
+
+        Args:
+            canvas: The PixelCanvas instance to connect
+        """
+        canvas.hoverPositionChanged.connect(self._on_canvas_hover)
+
+    def _on_canvas_hover(self, x: int, y: int) -> None:
+        """Handle canvas hover position changes.
+
+        Args:
+            x: X coordinate (-1 if no position)
+            y: Y coordinate (-1 if no position)
+        """
+        if x >= 0 and y >= 0:
+            self.set_coords(x, y)
+        else:
+            self.clear_coords()
 
     def _on_tab_changed(self, index: int) -> None:
         """Handle tab change."""

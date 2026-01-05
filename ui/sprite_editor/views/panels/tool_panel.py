@@ -4,7 +4,7 @@ Tool selection panel for the pixel editor.
 Provides UI for selecting drawing tools.
 """
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSignalBlocker, Signal
 from PySide6.QtWidgets import (
     QButtonGroup,
     QGroupBox,
@@ -100,7 +100,10 @@ class ToolPanel(QWidget):
         return tool_map.get(checked_id, "pencil")
 
     def set_tool(self, tool_name: str) -> None:
-        """Set the current tool by name."""
+        """Set the current tool by name (programmatic update from controller).
+
+        Uses QSignalBlocker to prevent re-emitting the signal that triggered this update.
+        """
         tool_buttons = {
             "pencil": self.pencil_btn,
             "fill": self.fill_btn,
@@ -108,9 +111,10 @@ class ToolPanel(QWidget):
         }
 
         if tool_name in tool_buttons:
+            # Block signals during programmatic update
+            blocker = QSignalBlocker(self.tool_group)  # noqa: F841  # pyright: ignore[reportUnusedVariable]
             tool_buttons[tool_name].setChecked(True)
-            # Emit the signal to notify controller
-            self.toolChanged.emit(tool_name)
+            # Signal blocking ends automatically when blocker goes out of scope
 
     def get_brush_size(self) -> int:
         """Get the current brush size."""

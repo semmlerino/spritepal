@@ -146,11 +146,7 @@ def auto_skip_without_real_sprites(test_rom_with_sprites):
     if the ROM fixture fell back to synthetic data.
     """
     if not test_rom_with_sprites.get("sprites"):
-        pytest.skip(
-            test_rom_with_sprites.get(
-                "skip_reason", "No real sprites available"
-            )
-        )
+        pytest.skip(test_rom_with_sprites.get("skip_reason", "No real sprites available"))
     return test_rom_with_sprites
 
 

@@ -74,15 +74,14 @@ class ImageConverter:
             RuntimeError: If file operations fail
         """
         try:
-            img = Image.open(png_file)
+            with Image.open(png_file) as img:
+                if img.mode != "P":
+                    raise ValueError(f"Image must be in indexed color mode (current: {img.mode})")
 
-            if img.mode != "P":
-                raise ValueError(f"Image must be in indexed color mode (current: {img.mode})")
+                width, height = img.size
+                tiles_x, tiles_y, total_tiles = calculate_tile_grid_padded(width, height)
 
-            width, height = img.size
-            tiles_x, tiles_y, total_tiles = calculate_tile_grid_padded(width, height)
-
-            pixels = list(cast(Iterable[int], img.getdata()))
+                pixels = list(cast(Iterable[int], img.getdata()))
 
             output_data = bytearray()
             padded_count = [0]
@@ -117,32 +116,31 @@ class ImageConverter:
             Tuple of (is_valid, list_of_issues)
         """
         try:
-            img = Image.open(png_file)
+            with Image.open(png_file) as img:
+                issues: list[str] = []
 
-            issues: list[str] = []
+                if img.mode != "P":
+                    issues.append(f"Image is in {img.mode} mode, must be indexed (P) mode")
 
-            if img.mode != "P":
-                issues.append(f"Image is in {img.mode} mode, must be indexed (P) mode")
+                width, height = img.size
+                if width % TILE_WIDTH != 0:
+                    issues.append(f"Width ({width}) must be multiple of {TILE_WIDTH}")
+                if height % TILE_HEIGHT != 0:
+                    issues.append(f"Height ({height}) must be multiple of {TILE_HEIGHT}")
 
-            width, height = img.size
-            if width % TILE_WIDTH != 0:
-                issues.append(f"Width ({width}) must be multiple of {TILE_WIDTH}")
-            if height % TILE_HEIGHT != 0:
-                issues.append(f"Height ({height}) must be multiple of {TILE_HEIGHT}")
+                if img.mode == "P":
+                    colors_used = len(set(cast(Iterable[int], img.getdata())))
+                    if colors_used > 16:
+                        issues.append(f"Too many colors ({colors_used}), maximum is 16")
+                elif img.mode in ("RGB", "RGBA", "L", "LA"):
+                    colors_used = len(set(cast(Iterable[object], img.getdata())))
+                    if colors_used > 16:
+                        issues.append(
+                            f"Too many unique colors ({colors_used}), maximum is 16 for SNES 4bpp. "
+                            f"Convert to indexed (P) mode first."
+                        )
 
-            if img.mode == "P":
-                colors_used = len(set(cast(Iterable[int], img.getdata())))
-                if colors_used > 16:
-                    issues.append(f"Too many colors ({colors_used}), maximum is 16")
-            elif img.mode in ("RGB", "RGBA", "L", "LA"):
-                colors_used = len(set(cast(Iterable[object], img.getdata())))
-                if colors_used > 16:
-                    issues.append(
-                        f"Too many unique colors ({colors_used}), maximum is 16 for SNES 4bpp. "
-                        f"Convert to indexed (P) mode first."
-                    )
-
-            return len(issues) == 0, issues
+                return len(issues) == 0, issues
 
         except ValueError:
             raise

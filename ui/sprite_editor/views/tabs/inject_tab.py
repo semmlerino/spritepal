@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSignalBlocker, Signal
 from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
@@ -142,12 +142,27 @@ class InjectTab(QWidget):
         return (True, "") if not errors else (False, "\n".join(errors))
 
     def set_png_file(self, file_path: str) -> None:
-        """Set the PNG file path."""
-        self.png_drop.set_file(file_path)
+        """Set the PNG file path and reset validation state."""
+        # Reset validation state - will be re-validated by controller
+        self.inject_btn.setEnabled(False)
+        self.set_validation_text("Validating...", is_valid=False)
+
+        # Block signals to prevent feedback loop (signal → set → emit → signal)
+        _blocker = QSignalBlocker(self.png_drop)
+        if file_path:
+            self.png_drop.set_file(file_path)
+        else:
+            self.png_drop.clear()
+            self.set_validation_text("No PNG selected", is_valid=False)
 
     def set_vram_file(self, file_path: str) -> None:
         """Set the VRAM file path."""
-        self.vram_drop.set_file(file_path)
+        # Block signals to prevent feedback loop (signal → set → emit → signal)
+        _blocker = QSignalBlocker(self.vram_drop)
+        if file_path:
+            self.vram_drop.set_file(file_path)
+        else:
+            self.vram_drop.clear()
 
     def set_validation_text(self, text: str, is_valid: bool = True) -> None:
         """Set validation message with appropriate styling."""
@@ -168,3 +183,25 @@ class InjectTab(QWidget):
     def set_inject_enabled(self, enabled: bool) -> None:
         """Enable/disable the inject button."""
         self.inject_btn.setEnabled(enabled)
+
+    def set_controller(self, controller: object) -> None:
+        """Set the injection controller and connect signals.
+
+        Args:
+            controller: InjectionController instance (typed as object to avoid circular import)
+        """
+        # Import locally to avoid circular dependency
+        from ...controllers.injection_controller import InjectionController
+
+        if isinstance(controller, InjectionController):
+            controller.validation_completed.connect(self._on_validation_result)
+
+    def _on_validation_result(self, is_valid: bool, message: str) -> None:
+        """Handle validation result from controller.
+
+        Args:
+            is_valid: Whether validation passed
+            message: Validation message to display
+        """
+        self.set_validation_text(message, is_valid)
+        self.inject_btn.setEnabled(is_valid)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSignalBlocker, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -93,7 +93,7 @@ class ExtractTab(QWidget):
 
         self.cgram_drop = DropZone("CGRAM", settings_manager=self.settings_manager, required=False)  # type: ignore[arg-type]
         self.cgram_drop.file_dropped.connect(lambda p: self.set_cgram_file(p))
-        
+
         self.palette_combo = QComboBox()
         for i in range(16):
             self.palette_combo.addItem(f"Palette {i}")
@@ -167,11 +167,21 @@ class ExtractTab(QWidget):
 
     def set_vram_file(self, file_path: str) -> None:
         """Set the VRAM file path."""
-        self.vram_drop.set_file(file_path)
+        # Block signals to prevent feedback loop (signal → set → emit → signal)
+        _blocker = QSignalBlocker(self.vram_drop)
+        if file_path:
+            self.vram_drop.set_file(file_path)
+        else:
+            self.vram_drop.clear()
 
     def set_cgram_file(self, file_path: str) -> None:
         """Set the CGRAM file path."""
-        self.cgram_drop.set_file(file_path)
+        # Block signals to prevent feedback loop (signal → set → emit → signal)
+        _blocker = QSignalBlocker(self.cgram_drop)
+        if file_path:
+            self.cgram_drop.set_file(file_path)
+        else:
+            self.cgram_drop.clear()
 
     def append_output(self, text: str) -> None:
         """Append text to the output area."""

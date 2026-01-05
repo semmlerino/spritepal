@@ -25,7 +25,7 @@ uv run python launch_editor.py
 
 - **Edit Tab**: Pixel-level sprite editing
   - Drawing tools: Pencil, Fill, Color Picker
-  - Adjustable brush size
+  - Fixed brush size (1x1 pixel)
   - Undo/Redo system
   - Real-time grid overlay
 
@@ -50,8 +50,7 @@ ui/sprite_editor/
 ├── constants.py                   # SNES format constants
 ├── core/                          # Shared utilities
 │   ├── tile_utils.py              # 4bpp tile encoding/decoding
-│   ├── palette_utils.py           # BGR555 ↔ RGB888 conversion
-│   └── file_validators.py         # File validation helpers
+│   └── palette_utils.py           # BGR555 ↔ RGB888 conversion
 ├── models/                        # Data models
 │   ├── image_model.py             # Pixel grid management
 │   ├── palette_model.py           # Palette data
@@ -85,12 +84,9 @@ ui/sprite_editor/
 │   ├── panels/                    # UI panels
 │   │   ├── tool_panel.py
 │   │   ├── palette_panel.py
-│   │   ├── preview_panel.py
-│   │   └── options_panel.py
+│   │   └── preview_panel.py
 │   ├── widgets/                   # Custom widgets
-│   │   ├── pixel_canvas.py        # Sprite editing canvas
-│   │   ├── color_palette_widget.py
-│   │   └── zoomable_scroll_area.py
+│   │   └── pixel_canvas.py        # Sprite editing canvas
 │   └── dialogs/                   # Dialog windows
 │       └── palette_switcher_dialog.py
 └── tests/                         # Unit tests

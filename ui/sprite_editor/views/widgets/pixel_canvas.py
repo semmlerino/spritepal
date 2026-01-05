@@ -7,7 +7,7 @@ Uses controller's models and managers instead of maintaining its own state.
 from typing import TYPE_CHECKING, override
 
 import numpy as np
-from PySide6.QtCore import QEvent, QPoint, QPointF, QRect, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, Qt, Signal
 from PySide6.QtGui import QColor, QEnterEvent, QImage, QMouseEvent, QPainter, QPaintEvent, QPen, QWheelEvent
 from PySide6.QtWidgets import QWidget
 
@@ -23,6 +23,7 @@ class PixelCanvas(QWidget):
     pixelMoved = Signal(int, int)  # x, y in image space
     pixelReleased = Signal(int, int)  # x, y in image space
     zoomRequested = Signal(int)  # new zoom level
+    hoverPositionChanged = Signal(int, int)  # x, y in image space (-1, -1 when no position)
 
     def __init__(self, controller: "EditingController", parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -37,12 +38,10 @@ class PixelCanvas(QWidget):
 
         # Interaction state
         self.drawing = False
-        self.panning = False
-        self.pan_offset = QPointF(0.0, 0.0)
-        self.pan_last_point: QPointF | None = None
         self.hover_pos: QPoint | None = None
         self.temporary_picker = False  # Track if we're temporarily using picker with right-click
         self.previous_tool: str | None = None  # Store previous tool when using temporary picker
+        self.last_draw_pos: QPoint | None = None  # Track last known position during drawing
 
         # Performance caches
         self._qcolor_cache: dict[int, QColor] = {}
@@ -57,6 +56,7 @@ class PixelCanvas(QWidget):
         self._qimage_buffer: QImage | None = None  # QImage buffer for efficient rendering
         self._qimage_scaled: QImage | None = None  # Cached scaled version of the image
         self._cached_zoom = 0  # Last zoom level used for scaled image
+        self._cached_scaled_palette_version = -1  # Last palette version used for scaled image
         self._dirty_rect = QRect()  # Rectangle that needs repainting
         self._image_version = 0  # Track image data changes
         self._cached_image_version = -1
@@ -69,6 +69,10 @@ class PixelCanvas(QWidget):
         self.controller.imageChanged.connect(self._on_image_changed)
         self.controller.paletteChanged.connect(self._on_palette_changed)
         self.controller.toolChanged.connect(self._on_tool_changed)
+
+        # Install event filter to catch mouse release outside widget
+        if parent:
+            parent.installEventFilter(self)
 
         # Set initial cursor for current tool
         current_tool = self.controller.get_current_tool_name()
@@ -94,10 +98,6 @@ class PixelCanvas(QWidget):
 
     def _update_cursor_for_tool(self, tool_name: str) -> None:
         """Update cursor based on the current tool."""
-        if self.panning:
-            # Don't change cursor while panning
-            return
-
         if tool_name == "pencil":
             self.setCursor(Qt.CursorShape.CrossCursor)
         elif tool_name == "fill":
@@ -113,36 +113,23 @@ class PixelCanvas(QWidget):
         size = self.controller.get_image_size()
         if size:
             width, height = size
-            self.setFixedSize(width * self.zoom, height * self.zoom)
+            new_width = width * self.zoom
+            new_height = height * self.zoom
+            self.setMinimumSize(new_width, new_height)
+            self.setMaximumSize(new_width, new_height)
+            self.updateGeometry()
 
     def set_zoom(self, zoom: int, center_on_canvas: bool = True) -> None:
         """Set zoom level.
 
         Args:
             zoom: New zoom level
-            center_on_canvas: If True, zoom centered on canvas; if False, preserve pan
+            center_on_canvas: Unused (kept for API compatibility)
         """
         new_zoom = max(1, min(64, zoom))
         if new_zoom != self.zoom:
-            if center_on_canvas and self.controller.get_image_size():
-                # Get canvas center point
-                canvas_center = QPointF(self.width() / 2, self.height() / 2)
-
-                # Calculate the point in image space that's at center
-                old_image_point = (canvas_center - self.pan_offset) * (1.0 / self.zoom)
-
-                # Update zoom
-                self.zoom = new_zoom
-                self._update_size()
-
-                # Calculate new position to keep the same image point at center
-                new_canvas_point = old_image_point * new_zoom
-                self.pan_offset = canvas_center - new_canvas_point
-            else:
-                # Simple zoom without adjusting pan
-                self.zoom = new_zoom
-                self._update_size()
-
+            self.zoom = new_zoom
+            self._update_size()
             # Invalidate scaled image cache since zoom changed
             self._invalidate_scaled_cache()
             self.update()
@@ -242,6 +229,7 @@ class PixelCanvas(QWidget):
         """Invalidate only the scaled image cache."""
         self._qimage_scaled = None
         self._cached_zoom = 0
+        self._cached_scaled_palette_version = -1
 
     def _update_qimage_buffer(self) -> None:
         """Update QImage buffer from current image data using vectorized numpy operations."""
@@ -293,7 +281,12 @@ class PixelCanvas(QWidget):
 
     def _get_scaled_qimage(self) -> QImage | None:
         """Get scaled QImage for current zoom level using optimized numpy scaling."""
-        if self._qimage_scaled is not None and self._cached_zoom == self.zoom:
+        # Check if cached scaled image is still valid (zoom and palette haven't changed)
+        if (
+            self._qimage_scaled is not None
+            and self._cached_zoom == self.zoom
+            and self._cached_scaled_palette_version == self._palette_version
+        ):
             return self._qimage_scaled
 
         image_model = self.controller.image_model
@@ -332,6 +325,7 @@ class PixelCanvas(QWidget):
         buffer_ptr[: len(argb_bytes)] = argb_bytes  # type: ignore[reportIndexIssue]
 
         self._cached_zoom = self.zoom
+        self._cached_scaled_palette_version = self._palette_version
         return self._qimage_scaled
 
     def _scale_image_data_numpy(self, image_data: np.ndarray, zoom: int) -> np.ndarray:
@@ -383,9 +377,8 @@ class PixelCanvas(QWidget):
             )
             regions_to_update.append(update_rect)
 
-        # Apply pan offset to regions
+        # Update the regions
         for rect in regions_to_update:
-            rect.translate(int(self.pan_offset.x()), int(self.pan_offset.y()))
             self.update(rect)
 
     def _draw_checkerboard(self, painter: QPainter, width: int, height: int) -> None:
@@ -421,9 +414,6 @@ class PixelCanvas(QWidget):
 
         # Get the visible region for viewport-based rendering
         visible_rect = event.rect()
-
-        # Apply pan offset
-        painter.translate(self.pan_offset)
 
         # Calculate the visible region in image coordinates
         image_rect = self._calculate_visible_image_region(visible_rect)
@@ -464,14 +454,6 @@ class PixelCanvas(QWidget):
         # Caller (paintEvent) checks has_image() before calling this method.
         image_model = self.controller.image_model
 
-        # Adjust for pan offset
-        adjusted_rect = QRect(
-            widget_rect.x() - int(self.pan_offset.x()),
-            widget_rect.y() - int(self.pan_offset.y()),
-            widget_rect.width(),
-            widget_rect.height(),
-        )
-
         # Get image dimensions
         height, width = image_model.data.shape
         scaled_width = width * self.zoom
@@ -479,7 +461,7 @@ class PixelCanvas(QWidget):
 
         # Intersect with actual image bounds
         image_bounds = QRect(0, 0, scaled_width, scaled_height)
-        visible_region = adjusted_rect.intersected(image_bounds)
+        visible_region = widget_rect.intersected(image_bounds)
 
         return visible_region
 
@@ -573,13 +555,8 @@ class PixelCanvas(QWidget):
             pos = self._get_pixel_pos(event.position())
             if pos:
                 self.drawing = True
+                self.last_draw_pos = pos
                 self.pixelPressed.emit(pos.x(), pos.y())
-
-        elif event.button() == Qt.MouseButton.MiddleButton:
-            # Start panning
-            self.panning = True
-            self.pan_last_point = event.position()
-            self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
         elif event.button() == Qt.MouseButton.RightButton:
             # Temporary color picker
@@ -594,14 +571,6 @@ class PixelCanvas(QWidget):
     @override
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Handle mouse move with optimized hover updates."""
-        # Handle panning
-        if self.panning and self.pan_last_point:
-            delta = event.position() - self.pan_last_point
-            self.pan_last_point = event.position()
-            self.pan_offset += delta
-            self.update()
-            return
-
         # Update hover position with optimized partial repaints
         pos = self._get_pixel_pos(event.position())
         if pos != self.hover_pos:
@@ -611,8 +580,13 @@ class PixelCanvas(QWidget):
             # Only update the regions that need repainting
             self._update_hover_regions(old_hover_pos, pos)
 
+        # Emit hover position changed signal
+        if self.hover_pos:
+            self.hoverPositionChanged.emit(self.hover_pos.x(), self.hover_pos.y())
+
         # Handle drawing
         if self.drawing and pos:
+            self.last_draw_pos = pos
             self.pixelMoved.emit(pos.x(), pos.y())
 
     @override
@@ -622,15 +596,12 @@ class PixelCanvas(QWidget):
             if self.drawing:
                 self.drawing = False
                 pos = self._get_pixel_pos(event.position())
+                # Use last known position if release is outside canvas
+                if not pos and self.last_draw_pos:
+                    pos = self.last_draw_pos
                 if pos:
                     self.pixelReleased.emit(pos.x(), pos.y())
-
-        elif event.button() == Qt.MouseButton.MiddleButton:
-            self.panning = False
-            self.pan_last_point = None
-            # Restore cursor for current tool
-            current_tool = self.controller.get_current_tool_name()
-            self._update_cursor_for_tool(current_tool)
+                self.last_draw_pos = None
 
         elif event.button() == Qt.MouseButton.RightButton and self.temporary_picker and self.previous_tool:
             # Restore previous tool after temporary picker
@@ -663,19 +634,9 @@ class PixelCanvas(QWidget):
         new_zoom = zoom_levels[new_index]
 
         if new_zoom != self.zoom:
-            # Store the mouse position before zoom for cursor-focused zooming
-            mouse_pos = event.position()
-
-            # Calculate the point in image space that's under the cursor
-            old_image_point = (mouse_pos - self.pan_offset) * (1.0 / self.zoom)
-
             # Update zoom
             self.zoom = new_zoom
             self._update_size()
-
-            # Calculate new position to keep the same image point under cursor
-            new_canvas_point = old_image_point * new_zoom
-            self.pan_offset = mouse_pos - new_canvas_point
 
             # Emit signal for UI update
             self.zoomRequested.emit(new_zoom)
@@ -689,17 +650,15 @@ class PixelCanvas(QWidget):
         old_hover_pos = self.hover_pos
         self.hover_pos = None
         self._update_hover_regions(old_hover_pos, None)
+        self.hoverPositionChanged.emit(-1, -1)
 
     def _get_pixel_pos(self, pos: QPointF) -> QPoint | None:
         """Convert mouse position to pixel coordinates."""
         if not self.controller.has_image():
             return None
 
-        # Adjust for pan offset
-        adjusted_pos = pos - self.pan_offset
-
-        x = int(adjusted_pos.x() // self.zoom)
-        y = int(adjusted_pos.y() // self.zoom)
+        x = int(pos.x() // self.zoom)
+        y = int(pos.y() // self.zoom)
 
         size = self.controller.get_image_size()
         if size:
@@ -711,9 +670,23 @@ class PixelCanvas(QWidget):
     @override
     def enterEvent(self, event: QEnterEvent) -> None:
         """Show tooltip on enter and update cursor."""
-        self.setToolTip("Left click: Draw • Right click: Pick color • Middle click + drag: Pan • Wheel: Zoom")
+        self.setToolTip("Left click: Draw • Right click: Pick color • Wheel: Zoom")
         # Update cursor for current tool
-        if not self.panning:
-            current_tool = self.controller.get_current_tool_name()
-            self._update_cursor_for_tool(current_tool)
+        current_tool = self.controller.get_current_tool_name()
+        self._update_cursor_for_tool(current_tool)
         super().enterEvent(event)
+
+    @override
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        """Event filter to catch mouse release outside widget during drawing."""
+        if event.type() == QEvent.Type.MouseButtonRelease:
+            mouse_event = event
+            if isinstance(mouse_event, QMouseEvent) and mouse_event.button() == Qt.MouseButton.LeftButton:
+                if self.drawing:
+                    # Mouse released outside canvas during drawing - finalize stroke
+                    self.drawing = False
+                    # Use last known position
+                    if self.last_draw_pos:
+                        self.pixelReleased.emit(self.last_draw_pos.x(), self.last_draw_pos.y())
+                    self.last_draw_pos = None
+        return super().eventFilter(obj, event)

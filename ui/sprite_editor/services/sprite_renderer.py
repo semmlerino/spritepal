@@ -4,10 +4,16 @@ Sprite rendering service.
 Handles extraction of sprites from VRAM and palette application.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PIL import Image
+
+if TYPE_CHECKING:
+    import numpy as np
 
 from ..constants import (
     BYTES_PER_TILE_4BPP,
@@ -94,6 +100,13 @@ class SpriteRenderer:
                 f.seek(offset)
                 data = f.read(size)
 
+            # Warn if short read occurred
+            if len(data) < size:
+                logger.warning(
+                    f"Short read: requested {size} bytes but only read {len(data)} bytes. "
+                    f"File may be shorter than expected or offset too large."
+                )
+
             total_tiles, tiles_x, tiles_y, width, height = calculate_dimensions_from_tile_data(len(data), tiles_per_row)
 
             img = Image.new("P", (width, height))
@@ -165,9 +178,9 @@ class SpriteRenderer:
                 return pal
         return 0
 
-    def _draw_tile_to_rgba_image(
+    def _draw_tile_to_rgba_array(
         self,
-        img: Image.Image,
+        img_array: np.ndarray,
         tile_data: list[int],
         palette: list[int],
         tile_x: int,
@@ -176,31 +189,55 @@ class SpriteRenderer:
         height: int,
         clamped_pixels: list[int] | None = None,
     ) -> None:
-        """Draw a single tile to RGBA image using specified palette."""
-        for y in range(TILE_HEIGHT):
-            for x in range(TILE_WIDTH):
-                pixel_idx = y * TILE_WIDTH + x
-                if pixel_idx < len(tile_data):
-                    color_idx = tile_data[pixel_idx]
-                    if color_idx > 0:  # Skip transparent pixels
-                        if color_idx > 15:
-                            if clamped_pixels is not None:
-                                clamped_pixels.append(color_idx)
-                            color_idx = 15
+        """Draw a single tile to RGBA numpy array using specified palette (vectorized)."""
+        import numpy as np
 
-                        palette_idx = color_idx * 3
-                        if palette_idx + 2 < len(palette):
-                            r = palette[palette_idx]
-                            g = palette[palette_idx + 1]
-                            b = palette[palette_idx + 2]
-                        else:
-                            gray = (color_idx * 255) // 15
-                            r = g = b = gray
+        # Convert tile_data to numpy array for vectorized operations
+        tile_array = np.array(tile_data, dtype=np.uint8).reshape((TILE_HEIGHT, TILE_WIDTH))
 
-                        px = tile_x * TILE_WIDTH + x
-                        py = tile_y * TILE_HEIGHT + y
-                        if px < width and py < height:
-                            img.putpixel((px, py), (r, g, b, 255))
+        # Check for out-of-range pixels
+        if clamped_pixels is not None:
+            invalid_mask = tile_array > 15
+            if invalid_mask.any():
+                invalid_values = tile_array[invalid_mask]
+                clamped_pixels.extend(invalid_values.tolist())
+                tile_array = np.clip(tile_array, 0, 15)
+
+        # Create RGBA tile (8x8x4)
+        tile_rgba = np.zeros((TILE_HEIGHT, TILE_WIDTH, 4), dtype=np.uint8)
+
+        # Build palette lookup table (16 colors x 4 RGBA channels)
+        palette_lut = np.zeros((16, 4), dtype=np.uint8)
+        for i in range(16):
+            palette_idx = i * 3
+            if palette_idx + 2 < len(palette):
+                palette_lut[i] = [palette[palette_idx], palette[palette_idx + 1], palette[palette_idx + 2], 255]
+            else:
+                gray = (i * 255) // 15
+                palette_lut[i] = [gray, gray, gray, 255]
+
+        # Vectorized palette lookup for all pixels
+        tile_rgba[:, :] = palette_lut[tile_array]
+
+        # Set transparent pixels (color_idx == 0) to alpha=0
+        tile_rgba[tile_array == 0, 3] = 0
+
+        # Calculate target region in image
+        target_x = tile_x * TILE_WIDTH
+        target_y = tile_y * TILE_HEIGHT
+
+        # Ensure we don't write outside image bounds
+        if target_x >= width or target_y >= height:
+            return
+
+        # Calculate actual region to copy (handle edge tiles)
+        copy_width = min(TILE_WIDTH, width - target_x)
+        copy_height = min(TILE_HEIGHT, height - target_y)
+
+        # Copy tile data directly to image array (very fast)
+        img_array[target_y : target_y + copy_height, target_x : target_x + copy_width] = tile_rgba[
+            :copy_height, :copy_width
+        ]
 
     def extract_with_correct_palettes(
         self,
@@ -215,13 +252,17 @@ class SpriteRenderer:
         Returns RGBA image where each tile is rendered with its correct palette.
         """
         try:
+            import numpy as np
+
             with Path(vram_file).open("rb") as f:
                 f.seek(offset)
                 data = f.read(size)
 
             total_tiles, tiles_x, _, width, height = calculate_dimensions_from_tile_data(len(data), tiles_per_row)
 
-            img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            # Create numpy array for image (much faster than PIL putpixel)
+            img_array = np.zeros((height, width, 4), dtype=np.uint8)
+
             palettes = self._load_palettes_from_cgram(cgram_file)
             clamped_pixels: list[int] = []
 
@@ -237,8 +278,8 @@ class SpriteRenderer:
                     tile_x = tile_idx % tiles_x
                     tile_y = tile_idx // tiles_x
 
-                    self._draw_tile_to_rgba_image(
-                        img, tile_data, palette, tile_x, tile_y, width, height, clamped_pixels
+                    self._draw_tile_to_rgba_array(
+                        img_array, tile_data, palette, tile_x, tile_y, width, height, clamped_pixels
                     )
 
             if clamped_pixels:
@@ -248,6 +289,8 @@ class SpriteRenderer:
                     f"(values: {sorted(unique_clamped)}) and were clamped."
                 )
 
+            # Convert numpy array to PIL Image once at the end (very fast)
+            img = Image.fromarray(img_array, mode="RGBA")
             return img, total_tiles
 
         except (OSError, IndexError) as e:

@@ -4,6 +4,8 @@ SNES tile encoding/decoding utilities
 Consolidated from various sprite editor modules
 """
 
+import logging
+
 from ..constants import (
     BYTES_PER_TILE_4BPP,
     PIXELS_PER_TILE,
@@ -11,6 +13,8 @@ from ..constants import (
     TILE_HEIGHT,
     TILE_WIDTH,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def decode_4bpp_tile(data: bytes, offset: int) -> list[int]:
@@ -127,6 +131,17 @@ def calculate_dimensions_from_tile_data(data_size: int, tiles_per_row: int) -> t
     """
     if tiles_per_row <= 0:
         raise ValueError(f"tiles_per_row must be positive, got {tiles_per_row}")
+
+    # Check for partial tiles and warn
+    remainder = data_size % BYTES_PER_TILE_4BPP
+    if remainder != 0:
+        bytes_truncated = remainder
+        next_aligned_size = data_size + (BYTES_PER_TILE_4BPP - remainder)
+        logger.warning(
+            f"Data size ({data_size} bytes) is not tile-aligned. "
+            f"{bytes_truncated} bytes will be truncated. "
+            f"Consider using {next_aligned_size} bytes ({next_aligned_size // BYTES_PER_TILE_4BPP} tiles) instead."
+        )
 
     total_tiles = data_size // BYTES_PER_TILE_4BPP
     tiles_x = tiles_per_row

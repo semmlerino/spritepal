@@ -37,6 +37,9 @@ class InjectionController(QObject):
         self.png_file: str = ""
         self.vram_file: str = ""
 
+        # Validation state
+        self._png_validation_passed: bool = False
+
     def _cleanup_worker(self) -> None:
         """Clean up existing worker before creating new one."""
         if self._worker is not None:
@@ -58,6 +61,8 @@ class InjectionController(QObject):
         """Set the inject tab view."""
         self._view = view
         self._connect_view_signals()
+        # Connect validation signal to view
+        view.set_controller(self)
 
     def _connect_view_signals(self) -> None:
         """Connect view signals to controller methods."""
@@ -77,6 +82,8 @@ class InjectionController(QObject):
             "PNG Files (*.png);;All Files (*)",
         )
         if file_path:
+            # Reset validation state before setting new file
+            self._png_validation_passed = False
             self.png_file = file_path
             if self._view:
                 self._view.set_png_file(file_path)
@@ -97,6 +104,8 @@ class InjectionController(QObject):
 
     def set_source_image(self, png_path: str) -> None:
         """Set the source PNG file (called from edit workflow)."""
+        # Reset validation state before setting new file
+        self._png_validation_passed = False
         self.png_file = png_path
         if self._view:
             self._view.set_png_file(png_path)
@@ -105,6 +114,9 @@ class InjectionController(QObject):
     def _validate_png(self, file_path: str) -> None:
         """Validate PNG file for SNES compatibility."""
         is_valid, issues = self.converter.validate_png(file_path)
+
+        # Store validation result
+        self._png_validation_passed = is_valid
 
         message_lines = []
         if is_valid:
@@ -125,7 +137,14 @@ class InjectionController(QObject):
         if not self._view:
             return
 
-        # Validate parameters first
+        # Check PNG validation status first
+        if not self._png_validation_passed:
+            error_msg = "Cannot inject: PNG validation has not passed"
+            self._view.append_output(f"ERROR: {error_msg}")
+            self.injection_failed.emit(error_msg)
+            return
+
+        # Validate parameters
         is_valid, error_msg = self._view.validate_params()
         if not is_valid:
             self._view.append_output(f"Validation failed:\n{error_msg}")

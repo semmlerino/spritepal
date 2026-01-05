@@ -330,10 +330,7 @@ class TestMultiPaletteTabClickableLabelFix:
         test_image = Image.new("P", (16, 16))
 
         # Create palette data (16 colors RGB)
-        palettes = [
-            [(255, 0, 0), (0, 255, 0), (0, 0, 255)] + [(i, i, i) for i in range(13)]
-            for _ in range(4)
-        ]
+        palettes = [[(255, 0, 0), (0, 255, 0), (0, 0, 255)] + [(i, i, i) for i in range(13)] for _ in range(4)]
 
         # Set images - this should create ClickableLabel instances
         viewer.set_single_image_all_palettes(test_image, palettes)

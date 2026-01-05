@@ -103,8 +103,13 @@ class HexLineEdit(QLineEdit):
         Returns:
             The hex value if valid, None if invalid.
         """
+        text = self.text().strip()
+        # Empty input returns None
+        if not text:
+            return None
+
         try:
-            return self._parse_value(self.text())
+            return self._parse_value(text)
         except ValueError:
             return None
 
@@ -122,8 +127,13 @@ class HexLineEdit(QLineEdit):
         Returns:
             True if valid hex, False otherwise
         """
+        text = self.text().strip()
+        # Empty input is valid (value = 0)
+        if not text:
+            return True
+
         try:
-            self._parse_value(self.text())
+            self._parse_value(text)
             return True
         except ValueError:
             return False

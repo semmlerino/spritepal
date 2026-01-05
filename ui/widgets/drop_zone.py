@@ -274,6 +274,10 @@ class DropZone(QWidget):
         Args:
             file_path: Path to the file to load
         """
+        # Idempotence check: return early if already set to this path
+        if file_path == self.file_path:
+            return
+
         if Path(file_path).exists():
             self.file_path = file_path
             if self.label:
@@ -300,6 +304,10 @@ class DropZone(QWidget):
 
     def clear(self) -> None:
         """Clear the current file."""
+        # Idempotence check: return early if already empty
+        if not self.file_path:
+            return
+
         old_path = self.file_path
         self.file_path = ""
         if self.label:

@@ -69,6 +69,7 @@ class TestHexLineEditSignals:
         qtbot.addWidget(widget)
 
         from PySide6.QtTest import QSignalSpy
+
         spy = QSignalSpy(widget.value_changed)
 
         widget.setText("0x1000")

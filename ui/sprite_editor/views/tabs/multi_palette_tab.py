@@ -256,10 +256,12 @@ class MultiPaletteTab(QWidget):
         controls_group = QGroupBox("Multi-Palette Controls")
         controls_layout = QHBoxLayout()
 
-        # OAM file selection
+        # OAM file selection (optional - enables palette filtering)
         self.oam_file_edit = QLineEdit()
         self.oam_file_edit.setReadOnly(True)
-        self.oam_browse_btn = QPushButton("Load OAM")
+        self.oam_file_edit.setPlaceholderText("Optional: OAM enables palette filtering")
+        self.oam_browse_btn = QPushButton("Load OAM (Optional)")
+        self.oam_browse_btn.setToolTip("OAM file enables palette filtering.\nWithout it, all 16 palettes will be shown.")
         self.oam_browse_btn.clicked.connect(self.browse_oam_requested.emit)
 
         controls_layout.addWidget(QLabel("OAM:"))
@@ -298,6 +300,9 @@ class MultiPaletteTab(QWidget):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
 
+        # Track if we've already shown the OAM info message
+        self._oam_info_shown = False
+
         # Initialize with validation check
         self._validate_prerequisites()
 
@@ -317,6 +322,8 @@ class MultiPaletteTab(QWidget):
     def set_oam_file(self, file_path: str) -> None:
         """Set the OAM file path and validate prerequisites."""
         self.oam_file_edit.setText(file_path)
+        # Reset the info flag so we can show new info if OAM is loaded
+        self._oam_info_shown = False
         self._validate_prerequisites()
 
     def get_preview_size(self) -> int:
@@ -362,31 +369,37 @@ class MultiPaletteTab(QWidget):
         self._validate_prerequisites()
 
     def _validate_prerequisites(self) -> None:
-        """Validate that all prerequisites are met for multi-palette generation."""
-        # Check for OAM file
+        """Validate that prerequisites are met for multi-palette generation.
+
+        OAM file is optional - if not provided, all 16 palettes will be shown.
+        """
+        # Check for OAM file (optional)
         has_oam = bool(self.oam_file_edit.text())
 
-        # Check for VRAM and CGRAM files via controller
+        # Check for VRAM and CGRAM files via controller (required)
         has_vram = False
         has_cgram = False
         if self.extraction_controller is not None:
             has_vram = bool(self.extraction_controller.vram_file)
             has_cgram = bool(self.extraction_controller.cgram_file)
 
-        # Enable generate button only if all three are present
-        all_present = has_oam and has_vram and has_cgram
-        self.generate_multi_btn.setEnabled(all_present)
+        # Enable generate button if VRAM and CGRAM are present (OAM is optional)
+        required_present = has_vram and has_cgram
+        self.generate_multi_btn.setEnabled(required_present)
 
-        # Show warning messages for missing prerequisites
-        if not all_present:
+        # Show info about OAM being optional (only once)
+        if not has_oam and not self._oam_info_shown and required_present:
+            self.append_output("Info: OAM file not loaded. All 16 palettes will be shown.")
+            self._oam_info_shown = True
+
+        # Show warning for missing required files
+        if not required_present:
             missing = []
-            if not has_oam:
-                missing.append("OAM file")
             if not has_vram:
                 missing.append("VRAM file")
             if not has_cgram:
                 missing.append("CGRAM file")
 
             if missing:
-                warning = f"Prerequisites missing: {', '.join(missing)}. Load all files to enable generation."
+                warning = f"Required files missing: {', '.join(missing)}."
                 self.append_output(warning)

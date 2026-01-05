@@ -294,15 +294,28 @@ class EditingController(QObject):
         if data is None:
             return False
 
-        from PIL import Image
+        try:
+            from PIL import Image
 
-        # Create PIL image with palette
-        img = Image.fromarray(data, mode="P")
-        img.putpalette(self.get_flat_palette())
-        img.save(path, "PNG")
+            # Create PIL image with palette
+            img = Image.fromarray(data, mode="P")
+            img.putpalette(self.get_flat_palette())
+            img.save(path, "PNG")
 
-        self._last_save_path = path
-        return True
+            self._last_save_path = path
+            return True
+
+        except (OSError, ValueError, RuntimeError) as e:
+            # Show error to user via view dialog
+            if self._view:
+                from PySide6.QtWidgets import QMessageBox
+
+                QMessageBox.critical(
+                    self._view,
+                    "Save Error",
+                    f"Failed to save image:\n{e}",
+                )
+            return False
 
     def save_image_as(self) -> str | None:
         """Show save dialog and save. Returns path if successful, None if cancelled."""

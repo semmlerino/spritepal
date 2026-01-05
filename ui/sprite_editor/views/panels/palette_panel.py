@@ -4,7 +4,7 @@ Palette panel for the pixel editor.
 Displays the color palette and handles color selection.
 """
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import QSignalBlocker, Signal
 from PySide6.QtWidgets import QGroupBox, QVBoxLayout, QWidget
 
 from ..widgets import ColorPaletteWidget
@@ -45,11 +45,15 @@ class PalettePanel(QWidget):
         return self.palette_widget.selected_index
 
     def set_selected_color(self, index: int) -> None:
-        """Set the selected color by index."""
+        """Set the selected color by index (programmatic update from controller).
+
+        Uses QSignalBlocker to prevent re-emitting the signal that triggered this update.
+        """
+        # Block signals during programmatic update
+        blocker = QSignalBlocker(self.palette_widget)  # noqa: F841  # pyright: ignore[reportUnusedVariable]
         self.palette_widget.selected_index = index
         self.palette_widget.update()
-        # Emit signal to notify controller
-        self.colorSelected.emit(index)
+        # Signal blocking ends automatically when blocker goes out of scope
 
     def set_palette(self, colors: list[tuple[int, int, int]], name: str = "") -> None:
         """Update the displayed palette."""

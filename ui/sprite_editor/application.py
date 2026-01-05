@@ -32,6 +32,7 @@ class SpriteEditorApplication:
 
         # Initialize AppContext for settings/state management
         from core.app_context import create_app_context, get_app_context, is_context_initialized
+
         if not is_context_initialized():
             create_app_context("SpritePalEditor")
         context = get_app_context()
