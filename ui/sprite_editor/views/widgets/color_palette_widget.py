@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QMenu, QWidget
 
 def _validate_rgb_color(color: Any) -> tuple[int, int, int]:
     """Validate and normalize RGB color to tuple of ints."""
-    if isinstance(color, (list, tuple)) and len(color) >= 3:
+    if isinstance(color, list | tuple) and len(color) >= 3:
         return (int(color[0]), int(color[1]), int(color[2]))
     return (0, 0, 0)
 
@@ -28,20 +28,20 @@ def _should_use_white_text(color: tuple[int, int, int]) -> bool:
 
 # Default color palette for the editor
 DEFAULT_COLOR_PALETTE: list[tuple[int, int, int]] = [
-    (0, 0, 0),        # 0: Black (transparent)
+    (0, 0, 0),  # 0: Black (transparent)
     (255, 255, 255),  # 1: White
-    (255, 0, 0),      # 2: Red
-    (0, 255, 0),      # 3: Green
-    (0, 0, 255),      # 4: Blue
-    (255, 255, 0),    # 5: Yellow
-    (255, 0, 255),    # 6: Magenta
-    (0, 255, 255),    # 7: Cyan
-    (128, 0, 0),      # 8: Dark Red
-    (0, 128, 0),      # 9: Dark Green
-    (0, 0, 128),      # 10: Dark Blue
-    (128, 128, 0),    # 11: Olive
-    (128, 0, 128),    # 12: Purple
-    (0, 128, 128),    # 13: Teal
+    (255, 0, 0),  # 2: Red
+    (0, 255, 0),  # 3: Green
+    (0, 0, 255),  # 4: Blue
+    (255, 255, 0),  # 5: Yellow
+    (255, 0, 255),  # 6: Magenta
+    (0, 255, 255),  # 7: Cyan
+    (128, 0, 0),  # 8: Dark Red
+    (0, 128, 0),  # 9: Dark Green
+    (0, 0, 128),  # 10: Dark Blue
+    (128, 128, 0),  # 11: Olive
+    (128, 0, 128),  # 12: Purple
+    (0, 128, 128),  # 13: Teal
     (192, 192, 192),  # 14: Silver
     (128, 128, 128),  # 15: Gray
 ]
@@ -55,9 +55,7 @@ class ColorPaletteWidget(QWidget):
     def __init__(self) -> None:
         super().__init__()
         # Use default palettes from utilities
-        self.default_grayscale: list[tuple[int, int, int]] = [
-            (i * 17, i * 17, i * 17) for i in range(16)
-        ]
+        self.default_grayscale: list[tuple[int, int, int]] = [(i * 17, i * 17, i * 17) for i in range(16)]
         self.default_colors = DEFAULT_COLOR_PALETTE.copy()
 
         # Start with grayscale palette by default
@@ -80,9 +78,7 @@ class ColorPaletteWidget(QWidget):
         # Set initial tooltip
         self._update_tooltip()
 
-    def set_palette(
-        self, colors: list[tuple[int, int, int]], source: str = "External Palette"
-    ) -> None:
+    def set_palette(self, colors: list[tuple[int, int, int]], source: str = "External Palette") -> None:
         """Set the palette colors."""
         if len(colors) >= 16:
             # Ensure we have valid tuples
@@ -159,10 +155,7 @@ class ColorPaletteWidget(QWidget):
     def _update_tooltip(self) -> None:
         """Update the tooltip to show current palette information."""
         if self.is_external_palette:
-            tooltip = (
-                f"External Palette: {self.palette_source}\n"
-                "Right-click to reset to default"
-            )
+            tooltip = f"External Palette: {self.palette_source}\nRight-click to reset to default"
         else:
             tooltip = "Default Editor Palette\n16 colors for sprite editing"
         self.setToolTip(tooltip)
@@ -222,11 +215,7 @@ class ColorPaletteWidget(QWidget):
 
             # Draw index number
             if i < len(self.colors):
-                painter.setPen(
-                    Qt.GlobalColor.white
-                    if _should_use_white_text(self.colors[i])
-                    else Qt.GlobalColor.black
-                )
+                painter.setPen(Qt.GlobalColor.white if _should_use_white_text(self.colors[i]) else Qt.GlobalColor.black)
             else:
                 painter.setPen(Qt.GlobalColor.white)
             painter.drawText(

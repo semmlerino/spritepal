@@ -5,6 +5,7 @@ Handles PNG to SNES tile data conversion and validation.
 """
 
 import logging
+from typing import Any, Iterable, cast
 
 from PIL import Image
 
@@ -75,23 +76,19 @@ class ImageConverter:
             img = Image.open(png_file)
 
             if img.mode != "P":
-                raise ValueError(
-                    f"Image must be in indexed color mode (current: {img.mode})"
-                )
+                raise ValueError(f"Image must be in indexed color mode (current: {img.mode})")
 
             width, height = img.size
             tiles_x, tiles_y, total_tiles = calculate_tile_grid_padded(width, height)
 
-            pixels = list(img.getdata())
+            pixels = list(cast(Iterable[Any], img.getdata()))
 
             output_data = bytearray()
             padded_count = [0]
 
             for tile_y_idx in range(tiles_y):
                 for tile_x_idx in range(tiles_x):
-                    tile_pixels = self._extract_tile_from_image(
-                        pixels, tile_x_idx, tile_y_idx, width, padded_count
-                    )
+                    tile_pixels = self._extract_tile_from_image(pixels, tile_x_idx, tile_y_idx, width, padded_count)
                     tile_data = encode_4bpp_tile(tile_pixels)
                     output_data.extend(tile_data)
 
@@ -133,11 +130,11 @@ class ImageConverter:
                 issues.append(f"Height ({height}) must be multiple of {TILE_HEIGHT}")
 
             if img.mode == "P":
-                colors_used = len(set(img.getdata()))
+                colors_used = len(set(cast(Iterable[Any], img.getdata())))
                 if colors_used > 16:
                     issues.append(f"Too many colors ({colors_used}), maximum is 16")
             elif img.mode in ("RGB", "RGBA", "L", "LA"):
-                colors_used = len(set(img.getdata()))
+                colors_used = len(set(cast(Iterable[Any], img.getdata())))
                 if colors_used > 16:
                     issues.append(
                         f"Too many unique colors ({colors_used}), maximum is 16 for SNES 4bpp. "

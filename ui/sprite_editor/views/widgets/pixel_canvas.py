@@ -129,7 +129,7 @@ class PixelCanvas(QWidget):
                 canvas_center = QPointF(self.width() / 2, self.height() / 2)
 
                 # Calculate the point in image space that's at center
-                old_image_point = (canvas_center - self.pan_offset) / self.zoom
+                old_image_point = (canvas_center - self.pan_offset) * (1.0 / self.zoom)
 
                 # Update zoom
                 self.zoom = new_zoom
@@ -284,11 +284,10 @@ class PixelCanvas(QWidget):
 
         # Copy data directly to QImage buffer for maximum speed
         buffer_ptr = self._qimage_buffer.bits()
-        buffer_ptr.setsize(height * width * 4)  # 4 bytes per pixel
 
         # Convert to bytes and copy to QImage buffer
         argb_bytes = argb_data.tobytes()
-        buffer_ptr[: len(argb_bytes)] = argb_bytes
+        buffer_ptr[: len(argb_bytes)] = argb_bytes  # type: ignore[reportIndexIssue]
 
         self._cached_image_version = self._image_version
 
@@ -329,9 +328,8 @@ class PixelCanvas(QWidget):
 
         # Copy to QImage buffer
         buffer_ptr = self._qimage_scaled.bits()
-        buffer_ptr.setsize(scaled_height * scaled_width * 4)
         argb_bytes = argb_data.tobytes()
-        buffer_ptr[: len(argb_bytes)] = argb_bytes
+        buffer_ptr[: len(argb_bytes)] = argb_bytes  # type: ignore[reportIndexIssue]
 
         self._cached_zoom = self.zoom
         return self._qimage_scaled
@@ -461,6 +459,10 @@ class PixelCanvas(QWidget):
 
     def _calculate_visible_image_region(self, widget_rect: QRect) -> QRect:
         """Calculate the visible region in image coordinates."""
+        # Note: controller.image_model is typed as always non-None.
+        # Caller (paintEvent) checks has_image() before calling this method.
+        image_model = self.controller.image_model
+
         # Adjust for pan offset
         adjusted_rect = QRect(
             widget_rect.x() - int(self.pan_offset.x()),
@@ -470,7 +472,6 @@ class PixelCanvas(QWidget):
         )
 
         # Get image dimensions
-        image_model = self.controller.image_model
         height, width = image_model.data.shape
         scaled_width = width * self.zoom
         scaled_height = height * self.zoom
@@ -627,11 +628,7 @@ class PixelCanvas(QWidget):
             current_tool = self.controller.get_current_tool_name()
             self._update_cursor_for_tool(current_tool)
 
-        elif (
-            event.button() == Qt.MouseButton.RightButton
-            and self.temporary_picker
-            and self.previous_tool
-        ):
+        elif event.button() == Qt.MouseButton.RightButton and self.temporary_picker and self.previous_tool:
             # Restore previous tool after temporary picker
             self.controller.set_tool(self.previous_tool)
             self.temporary_picker = False
@@ -665,7 +662,7 @@ class PixelCanvas(QWidget):
             mouse_pos = event.position()
 
             # Calculate the point in image space that's under the cursor
-            old_image_point = (mouse_pos - self.pan_offset) / self.zoom
+            old_image_point = (mouse_pos - self.pan_offset) * (1.0 / self.zoom)
 
             # Update zoom
             self.zoom = new_zoom
@@ -707,10 +704,7 @@ class PixelCanvas(QWidget):
 
     def enterEvent(self, event: Any) -> None:
         """Show tooltip on enter and update cursor."""
-        self.setToolTip(
-            "Left click: Draw • Right click: Pick color • "
-            "Middle click + drag: Pan • Wheel: Zoom"
-        )
+        self.setToolTip("Left click: Draw • Right click: Pick color • Middle click + drag: Pan • Wheel: Zoom")
         # Update cursor for current tool
         if not self.panning:
             current_tool = self.controller.get_current_tool_name()

@@ -4,6 +4,8 @@ Worker thread for sprite injection operations.
 Handles background injection of sprites into VRAM dumps.
 """
 
+from typing import override
+
 from PySide6.QtCore import QObject, Signal
 
 from ..services.image_converter import ImageConverter
@@ -42,6 +44,7 @@ class InjectWorker(BaseWorker):
         self.converter = ImageConverter()
         self.vram_service = VRAMService()
 
+    @override
     def run(self) -> None:
         """Execute the injection in background thread."""
         try:
@@ -64,9 +67,7 @@ class InjectWorker(BaseWorker):
 
             # Inject into VRAM
             self.emit_progress(60, f"Injecting {tile_count} tiles into VRAM...")
-            output = self.vram_service.inject(
-                tile_data, self.vram_file, self.offset, self.output_file
-            )
+            output = self.vram_service.inject(tile_data, self.vram_file, self.offset, self.output_file)
 
             if self.is_cancelled():
                 return

@@ -14,7 +14,7 @@ import zlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import numpy as np
 
@@ -82,9 +82,7 @@ class UndoCommand(ABC):
             "timestamp": self.timestamp.isoformat(),
             "compressed": self.compressed,
             "data": self._get_compress_data() if not self.compressed else None,
-            "compressed_data": (
-                self._compressed_data.hex() if self._compressed_data else None
-            ),
+            "compressed_data": (self._compressed_data.hex() if self._compressed_data else None),
         }
 
     @classmethod
@@ -106,34 +104,41 @@ class DrawPixelCommand(UndoCommand):
         """Initialize parent class after dataclass initialization."""
         super().__init__()
 
+    @override
     def execute(self, model: ImageModel) -> None:
         """Apply pixel color change."""
         if 0 <= self.x < model.data.shape[1] and 0 <= self.y < model.data.shape[0]:
             model.data[self.y, self.x] = self.new_color
 
+    @override
     def unexecute(self, model: ImageModel) -> None:
         """Restore original pixel color."""
         if 0 <= self.x < model.data.shape[1] and 0 <= self.y < model.data.shape[0]:
             model.data[self.y, self.x] = self.old_color
 
+    @override
     def get_memory_size(self) -> int:
         """Calculate memory usage."""
         if self.compressed and self._compressed_data:
             return len(self._compressed_data) + 64
         return 4 * 4 + 64  # ~80 bytes
 
+    @override
     def _get_compress_data(self) -> tuple[int, int, int, int]:
         """Get pixel data for compression."""
         return (self.x, self.y, self.old_color, self.new_color)
 
+    @override
     def _clear_uncompressed_data(self) -> None:
         """No need to clear primitive types."""
 
+    @override
     def _restore_from_compressed(self, data: tuple[int, int, int, int]) -> None:
         """Restore pixel data from compressed format."""
         self.x, self.y, self.old_color, self.new_color = data
 
     @classmethod
+    @override
     def from_dict(cls, data: dict[str, Any]) -> DrawPixelCommand:
         """Create command from dictionary."""
         cmd = cls()
@@ -185,9 +190,7 @@ class DrawLineCommand(UndoCommand):
         """Clear pixel list after compression."""
         self.pixels = []
 
-    def _restore_from_compressed(
-        self, data: tuple[list[tuple[int, int, int]], int]
-    ) -> None:
+    def _restore_from_compressed(self, data: tuple[list[tuple[int, int, int]], int]) -> None:
         """Restore line data from compressed format."""
         self.pixels, self.new_color = data
 
@@ -240,10 +243,7 @@ class FloodFillCommand(UndoCommand):
         for dy in range(h):
             for dx in range(w):
                 px, py = x + dx, y + dy
-                if (
-                    0 <= px < model.data.shape[1]
-                    and 0 <= py < model.data.shape[0]
-                ) and self.old_data[dy, dx] != 255:
+                if (0 <= px < model.data.shape[1] and 0 <= py < model.data.shape[0]) and self.old_data[dy, dx] != 255:
                     model.data[py, px] = self.old_data[dy, dx]
 
     def _perform_flood_fill(self, model: ImageModel) -> None:
@@ -251,20 +251,13 @@ class FloodFillCommand(UndoCommand):
         if self.old_color == self.new_color:
             return
 
-        if (
-            self.x < 0
-            or self.x >= model.data.shape[1]
-            or self.y < 0
-            or self.y >= model.data.shape[0]
-        ):
+        if self.x < 0 or self.x >= model.data.shape[1] or self.y < 0 or self.y >= model.data.shape[0]:
             return
 
         if model.data[self.y, self.x] != self.old_color:
             return
 
-        filled_pixels = self._flood_fill_pixels(
-            model, self.x, self.y, self.old_color
-        )
+        filled_pixels = self._flood_fill_pixels(model, self.x, self.y, self.old_color)
 
         if not filled_pixels:
             return
@@ -293,10 +286,7 @@ class FloodFillCommand(UndoCommand):
         for dy in range(h):
             for dx in range(w):
                 px, py = x + dx, y + dy
-                if (
-                    0 <= px < model.data.shape[1]
-                    and 0 <= py < model.data.shape[0]
-                ) and self.old_data[dy, dx] != 255:
+                if (0 <= px < model.data.shape[1] and 0 <= py < model.data.shape[0]) and self.old_data[dy, dx] != 255:
                     model.data[py, px] = self.new_color
 
     def _flood_fill_pixels(
@@ -313,12 +303,7 @@ class FloodFillCommand(UndoCommand):
             if (x, y) in visited:
                 continue
 
-            if (
-                x < 0
-                or x >= model.data.shape[1]
-                or y < 0
-                or y >= model.data.shape[0]
-            ):
+            if x < 0 or x >= model.data.shape[1] or y < 0 or y >= model.data.shape[0]:
                 continue
 
             if model.data[y, x] != target_color:
@@ -359,9 +344,7 @@ class FloodFillCommand(UndoCommand):
 
     def _restore_from_compressed(
         self,
-        data: tuple[
-            int, int, int, int, tuple[int, int, int, int], np.ndarray | None, bool
-        ],
+        data: tuple[int, int, int, int, tuple[int, int, int, int], np.ndarray | None, bool],
     ) -> None:
         """Restore flood fill data from compressed format."""
         (
@@ -384,9 +367,7 @@ class FloodFillCommand(UndoCommand):
         if data["compressed"]:
             cmd._compressed_data = bytes.fromhex(data["compressed_data"])
         else:
-            x, y, old_color, new_color, region, old_data_list, fill_executed = data[
-                "data"
-            ]
+            x, y, old_color, new_color, region, old_data_list, fill_executed = data["data"]
             cmd.x = x
             cmd.y = y
             cmd.old_color = old_color

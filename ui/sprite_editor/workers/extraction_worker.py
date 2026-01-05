@@ -5,6 +5,7 @@ Handles background extraction of sprites from VRAM dumps.
 """
 
 from pathlib import Path
+from typing import override
 
 from PySide6.QtCore import QObject, Signal
 
@@ -49,6 +50,7 @@ class ExtractWorker(BaseWorker):
         self.cgram_file = cgram_file
         self.renderer = SpriteRenderer()
 
+    @override
     def run(self) -> None:
         """Execute the extraction in background thread."""
         try:
@@ -58,20 +60,14 @@ class ExtractWorker(BaseWorker):
                 return
 
             # Extract sprites
-            image, tile_count = self.renderer.extract(
-                self.vram_file, self.offset, self.size, self.tiles_per_row
-            )
+            image, tile_count = self.renderer.extract(self.vram_file, self.offset, self.size, self.tiles_per_row)
 
             if self.is_cancelled():
                 return
 
             # Apply palette if requested
             cgram_path = Path(self.cgram_file) if self.cgram_file else None
-            if (
-                self.palette_num is not None
-                and cgram_path
-                and cgram_path.exists()
-            ):
+            if self.palette_num is not None and cgram_path and cgram_path.exists():
                 self.emit_progress(70, f"Applying palette {self.palette_num}...")
                 palette = read_cgram_palette(str(cgram_path), self.palette_num)
                 if palette:
@@ -124,6 +120,7 @@ class MultiPaletteExtractWorker(BaseWorker):
         self.oam_file = oam_file
         self.renderer = SpriteRenderer()
 
+    @override
     def run(self) -> None:
         """Execute the multi-palette extraction in background thread."""
         try:
@@ -136,6 +133,7 @@ class MultiPaletteExtractWorker(BaseWorker):
             oam_path = Path(self.oam_file) if self.oam_file else None
             if oam_path and oam_path.exists():
                 from ..services.oam_palette_mapper import create_tile_palette_map
+
                 oam_mapper = create_tile_palette_map(str(oam_path))
                 self.renderer.set_oam_mapper(oam_mapper)
 

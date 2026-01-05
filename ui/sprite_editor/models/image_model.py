@@ -14,15 +14,15 @@ from PIL import Image
 
 def _sanitize_for_json(obj: Any) -> Any:
     """Convert non-JSON-serializable objects to JSON-safe types."""
-    if isinstance(obj, (str, int, float, bool, type(None))):
+    if isinstance(obj, str | int | float | bool | type(None)):
         return obj
-    if isinstance(obj, (Path, WindowsPath, PosixPath)):
+    if isinstance(obj, Path | WindowsPath | PosixPath):
         return str(obj)
     if isinstance(obj, bytes):
         return obj.decode("utf-8", errors="ignore")
     if isinstance(obj, dict):
         return {k: _sanitize_for_json(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, list | tuple):
         return [_sanitize_for_json(item) for item in obj]
     # Fallback: convert to string
     return str(obj)
@@ -60,9 +60,7 @@ class ImageModel:
         Returns metadata including palette information.
         """
         if pil_image.mode != "P":
-            raise ValueError(
-                f"Expected indexed image (mode 'P'), got mode '{pil_image.mode}'"
-            )
+            raise ValueError(f"Expected indexed image (mode 'P'), got mode '{pil_image.mode}'")
 
         self.width = pil_image.width
         self.height = pil_image.height
@@ -107,12 +105,7 @@ class ImageModel:
         Set pixel value at coordinates.
         Returns True if pixel was changed.
         """
-        if (
-            0 <= x < self.width
-            and 0 <= y < self.height
-            and 0 <= value <= 15
-            and self.data[y, x] != value
-        ):
+        if 0 <= x < self.width and 0 <= y < self.height and 0 <= value <= 15 and self.data[y, x] != value:
             self.data[y, x] = value
             self.modified = True
             return True
@@ -135,11 +128,7 @@ class ImageModel:
 
         while stack:
             cx, cy = stack.pop()
-            if (
-                0 <= cx < self.width
-                and 0 <= cy < self.height
-                and self.data[cy, cx] == target_value
-            ):
+            if 0 <= cx < self.width and 0 <= cy < self.height and self.data[cy, cx] == target_value:
                 self.data[cy, cx] = new_value
                 changed_pixels.append((cx, cy))
                 self.modified = True

@@ -8,7 +8,7 @@ import json
 import logging
 import traceback
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import numpy as np
 from PIL import Image
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def _sanitize_for_json(obj: Any) -> Any:
     """Convert non-JSON-serializable objects to JSON-safe types."""
-    if isinstance(obj, (str, int, float, bool, type(None))):
+    if isinstance(obj, str | int | float | bool | type(None)):
         return obj
     if isinstance(obj, Path):
         return str(obj)
@@ -29,7 +29,7 @@ def _sanitize_for_json(obj: Any) -> Any:
         return obj.decode("utf-8", errors="ignore")
     if isinstance(obj, dict):
         return {k: _sanitize_for_json(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, list | tuple):
         return [_sanitize_for_json(item) for item in obj]
     return str(obj)
 
@@ -39,9 +39,7 @@ class FileLoadWorker(BaseWorker):
 
     result = Signal(object, dict)  # Image array, metadata
 
-    def __init__(
-        self, file_path: str | Path, parent: QObject | None = None
-    ) -> None:
+    def __init__(self, file_path: str | Path, parent: QObject | None = None) -> None:
         """Initialize the file load worker.
 
         Args:
@@ -50,15 +48,14 @@ class FileLoadWorker(BaseWorker):
         """
         super().__init__(file_path, parent)
 
+    @override
     def run(self) -> None:
         """Load the image file in background thread."""
         try:
             if not self.validate_file_path(must_exist=True):
                 return
 
-            self.emit_progress(
-                0, f"Loading {self.file_path.name if self.file_path else 'file'}..."
-            )
+            self.emit_progress(0, f"Loading {self.file_path.name if self.file_path else 'file'}...")
             if self.is_cancelled():
                 return
 
@@ -143,6 +140,7 @@ class FileSaveWorker(BaseWorker):
         self.image_array = image_array
         self.palette = palette
 
+    @override
     def run(self) -> None:
         """Save the image file in background thread."""
         try:
@@ -193,9 +191,7 @@ class FileSaveWorker(BaseWorker):
                 ".tif": "TIFF",
             }
 
-            file_format = format_map.get(
-                self.file_path.suffix.lower() if self.file_path else ".png", "PNG"
-            )
+            file_format = format_map.get(self.file_path.suffix.lower() if self.file_path else ".png", "PNG")
 
             # Save with appropriate options
             save_kwargs: dict[str, Any] = {}
@@ -223,9 +219,7 @@ class PaletteLoadWorker(BaseWorker):
 
     result = Signal(dict)  # Palette data dictionary
 
-    def __init__(
-        self, file_path: str | Path, parent: QObject | None = None
-    ) -> None:
+    def __init__(self, file_path: str | Path, parent: QObject | None = None) -> None:
         """Initialize the palette load worker.
 
         Args:
@@ -234,6 +228,7 @@ class PaletteLoadWorker(BaseWorker):
         """
         super().__init__(file_path, parent)
 
+    @override
     def run(self) -> None:
         """Load the palette file in background thread."""
         try:
@@ -279,9 +274,7 @@ class PaletteLoadWorker(BaseWorker):
 
         except Exception as e:
             logger.exception("Error loading palette")
-            self.emit_error(
-                f"Unexpected error loading palette: {e}\n{traceback.format_exc()}"
-            )
+            self.emit_error(f"Unexpected error loading palette: {e}\n{traceback.format_exc()}")
 
     def _load_json_palette(self) -> dict[str, Any] | None:
         """Load JSON palette file."""
@@ -323,9 +316,7 @@ class PaletteLoadWorker(BaseWorker):
             self.emit_progress(60, "Converting binary palette data...")
 
             if len(raw_data) < 768:
-                self.emit_error(
-                    f"Invalid palette file: expected 768 bytes, got {len(raw_data)}"
-                )
+                self.emit_error(f"Invalid palette file: expected 768 bytes, got {len(raw_data)}")
                 return None
 
             colors = []
