@@ -240,9 +240,7 @@ class CorrelationPipeline:
                 )
 
                 # Track staging → ROM mapping
-                results.staging_to_rom_mapping.setdefault(
-                    corr.staging_addr, set()
-                ).add(best.rom_offset)
+                results.staging_to_rom_mapping.setdefault(corr.staging_addr, set()).add(best.rom_offset)
             else:
                 results.unmatched_tiles.append(corr)
 
@@ -251,10 +249,7 @@ class CorrelationPipeline:
         matched = len(results.rom_matches)
         results.rom_match_rate = (matched / total * 100) if total > 0 else 0
 
-        logger.info(
-            f"ROM matching: {matched}/{total} tiles "
-            f"({results.rom_match_rate:.1f}% match rate)"
-        )
+        logger.info(f"ROM matching: {matched}/{total} tiles ({results.rom_match_rate:.1f}% match rate)")
 
         return results
 
@@ -317,10 +312,7 @@ def format_pipeline_report(results: PipelineResults) -> str:
         lines.append("=" * 70)
         lines.append("SAMPLE MATCHES (first 10):")
         lines.append("-" * 70)
-        lines.append(
-            f"  {'Sprite':>6s} {'VRAM':>8s} {'Staging':>10s} "
-            f"{'ROM':>8s} {'Description':<20s}"
-        )
+        lines.append(f"  {'Sprite':>6s} {'VRAM':>8s} {'Staging':>10s} {'ROM':>8s} {'Description':<20s}")
 
         for match in results.rom_matches[:10]:
             staging_bank = (match.staging_addr >> 16) & 0xFF

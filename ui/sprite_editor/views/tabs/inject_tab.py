@@ -107,7 +107,7 @@ class InjectTab(QWidget):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
 
-    def get_injection_params(self) -> dict:
+    def get_injection_params(self) -> dict[str, object]:
         """Get the current injection parameters."""
         return {
             "png_file": self.png_file_edit.text(),
@@ -115,6 +115,28 @@ class InjectTab(QWidget):
             "offset": self.inject_offset_edit.value(),
             "output_file": self.output_file_edit.text(),
         }
+
+    def validate_params(self) -> tuple[bool, str]:
+        """Validate injection parameters.
+
+        Returns:
+            Tuple of (is_valid, error_message). Error message is empty if valid.
+        """
+        errors: list[str] = []
+
+        if not self.png_file_edit.text().strip():
+            errors.append("PNG file is required")
+
+        if not self.inject_vram_edit.text().strip():
+            errors.append("VRAM file is required")
+
+        if not self.inject_offset_edit.isValid():
+            errors.append("Invalid injection offset")
+
+        if not self.output_file_edit.text().strip():
+            errors.append("Output file name is required")
+
+        return (True, "") if not errors else (False, "\n".join(errors))
 
     def set_png_file(self, file_path: str) -> None:
         """Set the PNG file path."""

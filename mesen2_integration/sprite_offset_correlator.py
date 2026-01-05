@@ -2,6 +2,7 @@
 """
 Correlate Mesen2 runtime sprite offsets with exhal-validated ROM offsets
 """
+
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,12 +11,14 @@ from pathlib import Path
 @dataclass
 class SpriteOffset:
     """Represents a sprite offset with metadata"""
+
     offset: int
     source: str  # 'mesen2' or 'exhal'
     hits: int = 0
     confidence: float = 0.0
     size: int = 0
     tiles: int = 0
+
 
 class SpriteOffsetCorrelator:
     """Correlates sprite offsets between Mesen2 runtime and exhal validation"""
@@ -38,27 +41,23 @@ class SpriteOffsetCorrelator:
 
         # Parse ROM offsets section
         rom_section = False
-        for line in content.split('\n'):
+        for line in content.split("\n"):
             line = line.strip()
 
-            if '--- ROM Offsets ---' in line:
+            if "--- ROM Offsets ---" in line:
                 rom_section = True
                 continue
-            if line.startswith('---') and rom_section:
+            if line.startswith("---") and rom_section:
                 break
 
             if rom_section and line:
                 # Parse format: $373E00: 47 hits
-                match = re.match(r'\$([0-9A-Fa-f]+):\s*(\d+)\s*hits?', line)
+                match = re.match(r"\$([0-9A-Fa-f]+):\s*(\d+)\s*hits?", line)
                 if match:
                     offset = int(match.group(1), 16)
                     hits = int(match.group(2))
 
-                    sprite_offset = SpriteOffset(
-                        offset=offset,
-                        source='mesen2',
-                        hits=hits
-                    )
+                    sprite_offset = SpriteOffset(offset=offset, source="mesen2", hits=hits)
                     self.mesen2_offsets.append(sprite_offset)
 
         print(f"  Loaded {len(self.mesen2_offsets)} Mesen2 offsets")
@@ -75,14 +74,14 @@ class SpriteOffsetCorrelator:
         with open(offsets_path) as f:
             content = f.read()
 
-        for line in content.split('\n'):
+        for line in content.split("\n"):
             line = line.strip()
 
-            if line.startswith('#') or not line:
+            if line.startswith("#") or not line:
                 continue
 
             # Parse format: 0x0CC100  # 58624 bytes, 1832 tiles, score=1.000
-            match = re.match(r'0x([0-9A-Fa-f]+)\s+#\s+(\d+)\s+bytes,\s+(\d+)\s+tiles,\s+score=([0-9.]+)', line)
+            match = re.match(r"0x([0-9A-Fa-f]+)\s+#\s+(\d+)\s+bytes,\s+(\d+)\s+tiles,\s+score=([0-9.]+)", line)
             if match:
                 offset = int(match.group(1), 16)
                 size = int(match.group(2))
@@ -90,11 +89,7 @@ class SpriteOffsetCorrelator:
                 confidence = float(match.group(4))
 
                 sprite_offset = SpriteOffset(
-                    offset=offset,
-                    source='exhal',
-                    size=size,
-                    tiles=tiles,
-                    confidence=confidence
+                    offset=offset, source="exhal", size=size, tiles=tiles, confidence=confidence
                 )
                 self.exhal_offsets.append(sprite_offset)
 
@@ -145,7 +140,7 @@ class SpriteOffsetCorrelator:
             print(f"\nMesen2 offset 0x{original:06X} ({mesen2_sprite.hits} hits):")
 
             best_match = None
-            best_diff = float('inf')
+            best_diff = float("inf")
 
             for translation_name, translated in translations.items():
                 if translated < 0:
@@ -180,11 +175,13 @@ class SpriteOffsetCorrelator:
 
         print("\nTop exhal offsets (by confidence):")
         for i, sprite in enumerate(top_exhal, 1):
-            print(f"  {i:2d}. 0x{sprite.offset:06X} (score={sprite.confidence:.3f}, {sprite.size:5d} bytes, {sprite.tiles:4d} tiles)")
+            print(
+                f"  {i:2d}. 0x{sprite.offset:06X} (score={sprite.confidence:.3f}, {sprite.size:5d} bytes, {sprite.tiles:4d} tiles)"
+            )
 
     def export_correlation_report(self, output_file: str) -> None:
         """Export comprehensive correlation report"""
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             f.write("# Sprite Offset Correlation Report\\n")
             f.write(f"# Mesen2 runtime offsets: {len(self.mesen2_offsets)}\\n")
             f.write(f"# Exhal validated offsets: {len(self.exhal_offsets)}\\n\\n")
@@ -196,8 +193,10 @@ class SpriteOffsetCorrelator:
 
             for mesen2, exhal in direct_matches:
                 diff = abs(mesen2.offset - exhal.offset)
-                f.write(f"0x{mesen2.offset:06X} → 0x{exhal.offset:06X} "
-                       f"(diff: 0x{diff:X}, hits: {mesen2.hits}, score: {exhal.confidence:.3f})\\n")
+                f.write(
+                    f"0x{mesen2.offset:06X} → 0x{exhal.offset:06X} "
+                    f"(diff: 0x{diff:X}, hits: {mesen2.hits}, score: {exhal.confidence:.3f})\\n"
+                )
 
             # High-activity offsets for further investigation
             f.write("\\n## High-Activity Mesen2 Offsets\\n")
@@ -207,9 +206,13 @@ class SpriteOffsetCorrelator:
             # High-confidence exhal offsets
             f.write("\\n## High-Confidence Exhal Offsets\\n")
             top_exhal = sorted(self.exhal_offsets, key=lambda s: s.confidence, reverse=True)[:20]
-            f.writelines(f"0x{sprite.offset:06X}  # score={sprite.confidence:.3f}, {sprite.size} bytes\\n" for sprite in top_exhal)
+            f.writelines(
+                f"0x{sprite.offset:06X}  # score={sprite.confidence:.3f}, {sprite.size} bytes\\n"
+                for sprite in top_exhal
+            )
 
         print(f"\\n✓ Correlation report exported to: {output_file}")
+
 
 def main():
     """Main correlation analysis"""
@@ -249,6 +252,7 @@ def main():
         print("\\n🤔 ADDRESS MAPPING INSIGHT:")
         print("   No direct matches found - this suggests address translation is needed")
         print("   Mesen2 uses runtime/banked addresses while exhal uses linear ROM addresses")
+
 
 if __name__ == "__main__":
     main()

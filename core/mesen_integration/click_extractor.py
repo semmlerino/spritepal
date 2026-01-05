@@ -46,6 +46,7 @@ class OAMEntry:
     flip_h: bool
     flip_v: bool
     palette: int
+    rom_offset: int | None = None
     priority: int = 0
     name_table: int = 0
     size_large: bool = False
@@ -75,6 +76,16 @@ class OBSELConfig:
     oam_addr_offset: int
 
 
+@dataclass(frozen=True)
+class CaptureBoundingBox:
+    """Bounding box for all entries in a capture."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+
 @dataclass
 class CaptureResult:
     """Complete capture result from Mesen 2 Lua script."""
@@ -91,13 +102,38 @@ class CaptureResult:
         """Check if any entries were captured."""
         return len(self.entries) > 0
 
+    @property
+    def oam_entries(self) -> list[OAMEntry]:
+        """Compatibility alias for sprite reassembly code."""
+        return self.entries
+
+    @property
+    def bounding_box(self) -> CaptureBoundingBox:
+        """Calculate bounding box for all entries."""
+        if not self.entries:
+            return CaptureBoundingBox(0, 0, 0, 0)
+
+        min_x = min(entry.x for entry in self.entries)
+        min_y = min(entry.y for entry in self.entries)
+        max_x = max(entry.x + entry.width for entry in self.entries)
+        max_y = max(entry.y + entry.height for entry in self.entries)
+        return CaptureBoundingBox(min_x, min_y, max_x - min_x, max_y - min_y)
+
+    @property
+    def unique_rom_offsets(self) -> list[int]:
+        """Get unique ROM offsets referenced by the capture."""
+        offsets = {entry.rom_offset for entry in self.entries if entry.rom_offset is not None}
+        return sorted(offsets)
+
+    def get_entries_for_rom_offset(self, rom_offset: int) -> list[OAMEntry]:
+        """Filter entries by ROM offset."""
+        return [entry for entry in self.entries if entry.rom_offset == rom_offset]
+
     def get_entries_by_palette(self, palette: int) -> list[OAMEntry]:
         """Get all OAM entries using a specific palette."""
         return [e for e in self.entries if e.palette == palette]
 
-    def get_entries_in_region(
-        self, x: int, y: int, width: int, height: int
-    ) -> list[OAMEntry]:
+    def get_entries_in_region(self, x: int, y: int, width: int, height: int) -> list[OAMEntry]:
         """Get all OAM entries within a screen region."""
         result = []
         for entry in self.entries:
@@ -191,6 +227,15 @@ class MesenCaptureParser:
 
             tile_page = entry_data.get("tile_page")
             name_table = tile_page if tile_page is not None else entry_data.get("name_table", 0)
+            rom_offset_raw = entry_data.get("rom_offset")
+            if rom_offset_raw is None:
+                rom_offset = None
+            else:
+                try:
+                    rom_offset = int(rom_offset_raw)
+                except (TypeError, ValueError):
+                    logger.warning("Invalid rom_offset value for entry %s: %r", entry_data.get("id"), rom_offset_raw)
+                    rom_offset = None
             entry = OAMEntry(
                 id=entry_data.get("id", 0),
                 x=entry_data.get("x", 0),
@@ -201,6 +246,7 @@ class MesenCaptureParser:
                 flip_h=entry_data.get("flip_h", False),
                 flip_v=entry_data.get("flip_v", False),
                 palette=entry_data.get("palette", 0),
+                rom_offset=rom_offset,
                 priority=entry_data.get("priority", 0),
                 name_table=name_table,
                 size_large=entry_data.get("size_large", False),
@@ -227,9 +273,6 @@ class MesenCaptureParser:
             timestamp=data.get("timestamp", 0),
         )
 
-        logger.info(
-            f"Parsed capture: {result.visible_count} visible sprites, "
-            f"{len(palettes)} palettes"
-        )
+        logger.info(f"Parsed capture: {result.visible_count} visible sprites, {len(palettes)} palettes")
 
         return result

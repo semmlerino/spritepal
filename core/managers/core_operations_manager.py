@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
 from PIL import Image
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QObject, QThread, Signal, SignalInstance
 
 from core.exceptions import (
     ExtractionError,
@@ -973,19 +973,24 @@ class CoreOperationsManager(BaseManager):
             return
 
         worker = self._current_worker
-        # Signal attributes checked via hasattr but not visible to static analysis (BaseWorker defines these)
-        if hasattr(worker, "progress"):
-            worker.progress.connect(self._on_worker_progress_adapter)  # type: ignore[attr-defined] - Signal from BaseWorker
-        if hasattr(worker, "injection_finished"):
-            worker.injection_finished.connect(self._on_worker_finished)  # type: ignore[attr-defined] - Signal from BaseWorker
+        progress_signal = getattr(worker, "progress", None)
+        if isinstance(progress_signal, SignalInstance):
+            progress_signal.connect(self._on_worker_progress_adapter)
+
+        injection_finished_signal = getattr(worker, "injection_finished", None)
+        if isinstance(injection_finished_signal, SignalInstance):
+            injection_finished_signal.connect(self._on_worker_finished)
         else:
             worker.finished.connect(lambda: self._on_worker_finished(True, "Completed"))
 
         # ROM-specific signals
-        if hasattr(worker, "progress_percent"):
-            worker.progress_percent.connect(self.progress_percent.emit)  # type: ignore[attr-defined] - Signal from BaseWorker
-        if hasattr(worker, "compression_info"):
-            worker.compression_info.connect(self.compression_info.emit)  # type: ignore[attr-defined] - Signal from BaseWorker
+        progress_percent_signal = getattr(worker, "progress_percent", None)
+        if isinstance(progress_percent_signal, SignalInstance):
+            progress_percent_signal.connect(self.progress_percent.emit)
+
+        compression_info_signal = getattr(worker, "compression_info", None)
+        if isinstance(compression_info_signal, SignalInstance):
+            compression_info_signal.connect(self.compression_info.emit)
 
     @override
     def _on_worker_progress(self, message: str) -> None:

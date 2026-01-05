@@ -91,7 +91,7 @@ class AccessibilityHelper:
         # Enable keyboard focus for interactive widgets
         if isinstance(
             widget,
-            (QPushButton, QLineEdit, QSpinBox, QComboBox, QSlider, QCheckBox, QRadioButton, QTextEdit, QPlainTextEdit),
+            QPushButton | QLineEdit | QSpinBox | QComboBox | QSlider | QCheckBox | QRadioButton | QTextEdit | QPlainTextEdit,
         ):
             widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 

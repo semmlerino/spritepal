@@ -3,6 +3,7 @@
 Exhal-based sprite validation system
 Uses exhal tool to validate sprite offsets by attempting decompression
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -14,29 +15,34 @@ from typing import NamedTuple
 
 # Known ROM sprite areas from constants.py
 ROM_SPRITE_AREAS = [
-    (0x80000, 0x100000),   # Area 1
+    (0x80000, 0x100000),  # Area 1
     (0x100000, 0x180000),  # Area 2
     (0x180000, 0x200000),  # Area 3
     (0x200000, 0x280000),  # Area 4
     (0x280000, 0x300000),  # Area 5
 ]
 
+
 class DecompressionResult(NamedTuple):
     """Result of exhal decompression attempt"""
+
     offset: int
     success: bool
     size: int
     error_message: str | None = None
     data_preview: bytes | None = None
 
+
 @dataclass
 class SpriteCandidate:
     """Validated sprite candidate"""
+
     rom_offset: int
     decompressed_size: int
     complexity_score: float
     tile_estimate: int
     data_preview: str
+
 
 class ExhalSpriteValidator:
     """Validates sprite offsets using exhal decompression"""
@@ -57,54 +63,31 @@ class ExhalSpriteValidator:
 
     def test_decompression(self, offset: int) -> DecompressionResult:
         """Test decompression at specific ROM offset using exhal"""
-        with tempfile.NamedTemporaryFile(suffix='.bin', delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as tmp_file:
             tmp_path = tmp_file.name
 
         try:
             # Run exhal: romfile offset outfile
             cmd = [str(self.exhal_path), str(self.rom_path), f"0x{offset:X}", tmp_path]
 
-            result = subprocess.run(
-                cmd,
-                check=False, capture_output=True,
-                text=True,
-                timeout=10
-            )
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=10)
 
             if result.returncode == 0 and Path(tmp_path).exists():
                 # Successfully decompressed
-                with open(tmp_path, 'rb') as f:
+                with open(tmp_path, "rb") as f:
                     data = f.read()
 
                 return DecompressionResult(
-                    offset=offset,
-                    success=True,
-                    size=len(data),
-                    data_preview=data[:64] if data else None
+                    offset=offset, success=True, size=len(data), data_preview=data[:64] if data else None
                 )
             # Decompression failed
             error_msg = result.stderr.strip() if result.stderr else f"Return code: {result.returncode}"
-            return DecompressionResult(
-                offset=offset,
-                success=False,
-                size=0,
-                error_message=error_msg
-            )
+            return DecompressionResult(offset=offset, success=False, size=0, error_message=error_msg)
 
         except subprocess.TimeoutExpired:
-            return DecompressionResult(
-                offset=offset,
-                success=False,
-                size=0,
-                error_message="Timeout"
-            )
+            return DecompressionResult(offset=offset, success=False, size=0, error_message="Timeout")
         except Exception as e:
-            return DecompressionResult(
-                offset=offset,
-                success=False,
-                size=0,
-                error_message=str(e)
-            )
+            return DecompressionResult(offset=offset, success=False, size=0, error_message=str(e))
         finally:
             # Clean up temp file
             if Path(tmp_path).exists():
@@ -183,13 +166,15 @@ class ExhalSpriteValidator:
                         decompressed_size=result.size,
                         complexity_score=complexity,
                         tile_estimate=tiles,
-                        data_preview=preview
+                        data_preview=preview,
                     )
                     candidates.append(candidate)
 
                     print(f"  ✓ Found sprite candidate at 0x{offset:06X} ({result.size} bytes, {tiles} tiles)")
 
-        print(f"  Scan complete: {successful_decompressions} successful decompressions, {len(candidates)} sprite candidates")
+        print(
+            f"  Scan complete: {successful_decompressions} successful decompressions, {len(candidates)} sprite candidates"
+        )
         return candidates
 
     def validate_all_areas(self, step: int = 0x100) -> dict[tuple[int, int], list[SpriteCandidate]]:
@@ -218,14 +203,16 @@ class ExhalSpriteValidator:
 
         print("\nTop 10 candidates:")
         for i, candidate in enumerate(all_candidates[:10], 1):
-            print(f"{i:2d}. 0x{candidate.rom_offset:06X}: {candidate.decompressed_size:5d} bytes, "
-                  f"{candidate.tile_estimate:3d} tiles, score={candidate.complexity_score:.3f}")
+            print(
+                f"{i:2d}. 0x{candidate.rom_offset:06X}: {candidate.decompressed_size:5d} bytes, "
+                f"{candidate.tile_estimate:3d} tiles, score={candidate.complexity_score:.3f}"
+            )
 
         return all_results
 
     def export_results(self, results: dict[tuple[int, int], list[SpriteCandidate]], output_file: str) -> None:
         """Export results to file for use with existing extraction tools"""
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             f.write("# Exhal-Validated Sprite Offsets for Kirby Super Star\n")
             f.write("# Generated using exhal tool validation\n")
             f.write(f"# ROM: {self.rom_path}\n\n")
@@ -236,9 +223,13 @@ class ExhalSpriteValidator:
             for (start, end), candidates in results.items():
                 f.write(f"# Area 0x{start:06X} - 0x{end:06X}: {len(candidates)} candidates\n")
 
-                f.writelines(f"0x{candidate.rom_offset:06X}  # {candidate.decompressed_size} bytes, "
-                            f"{candidate.tile_estimate} tiles, score={candidate.complexity_score:.3f}\n" for candidate in sorted(candidates, key=lambda c: c.rom_offset))
+                f.writelines(
+                    f"0x{candidate.rom_offset:06X}  # {candidate.decompressed_size} bytes, "
+                    f"{candidate.tile_estimate} tiles, score={candidate.complexity_score:.3f}\n"
+                    for candidate in sorted(candidates, key=lambda c: c.rom_offset)
+                )
                 f.write("\n")
+
 
 def main():
     """Test the exhal sprite validator"""
@@ -269,6 +260,7 @@ def main():
         return 0
     print("✗ Test failed - no sprite candidates found")
     return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

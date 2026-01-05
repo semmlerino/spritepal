@@ -116,7 +116,7 @@ class UndoManager:
             if not self.command_stack[i].compressed:
                 self.command_stack[i].compress()
 
-    def get_memory_usage(self) -> dict[str, Any]:
+    def get_memory_usage(self) -> dict[str, int | float | bool]:
         """Get current memory usage statistics."""
         total = sum(cmd.get_memory_size() for cmd in self.command_stack)
         compressed = sum(1 for cmd in self.command_stack if cmd.compressed)
@@ -144,13 +144,11 @@ class UndoManager:
         self.command_stack.clear()
         self.current_index = -1
 
-    def save_history(self) -> list[dict[str, Any]]:
+    def save_history(self) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny]
         """Serialize command history for saving."""
         return [cmd.to_dict() for cmd in self.command_stack]
 
-    def load_history(
-        self, history: list[dict[str, Any]], model: ImageModel
-    ) -> None:
+    def load_history(self, history: list[dict[str, Any]], model: ImageModel) -> None:  # pyright: ignore[reportExplicitAny]
         """Load command history from serialized data."""
         self.clear()
 

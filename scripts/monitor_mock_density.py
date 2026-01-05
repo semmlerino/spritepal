@@ -204,7 +204,7 @@ class MockDensityAnalyzer:
                             )
 
             # Look for mock imports
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
+            if isinstance(node, ast.Import | ast.ImportFrom):
                 for alias in node.names:
                     if any(mock_import in (alias.name or "") for mock_import in self.MOCK_IMPORTS):
                         mock_details.append(

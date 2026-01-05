@@ -466,9 +466,7 @@ def create_gfx_offset_map(rom_path: str | Path) -> dict[str, object]:
     }
 
     # 3. Analyze known offsets
-    result["known_offsets"] = {
-        f"${k:06X}": v for k, v in parser.analyze_known_offsets().items()
-    }
+    result["known_offsets"] = {f"${k:06X}": v for k, v in parser.analyze_known_offsets().items()}
 
     # 4. Dump raw pointer table region
     result["pointer_table_hex"] = parser.dump_table_region(GFX_POINTER_TABLE_OFFSET, 128)
@@ -476,8 +474,7 @@ def create_gfx_offset_map(rom_path: str | Path) -> dict[str, object]:
     # 5. Scan for graphics headers
     discovered = parser.scan_for_graphics_headers()
     result["discovered_headers"] = [
-        {"offset": f"${h.rom_offset:06X}", "header": h.raw_bytes[:4].hex()}
-        for h in discovered
+        {"offset": f"${h.rom_offset:06X}", "header": h.raw_bytes[:4].hex()} for h in discovered
     ]
 
     return result

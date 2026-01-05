@@ -3,6 +3,7 @@
 DMA-based sprite offset finder using Mesen2 automation
 Launches Mesen2 with DMA monitoring Lua script to discover ROM sprite offsets
 """
+
 from __future__ import annotations
 
 import re
@@ -20,11 +21,13 @@ from mesen2_integration.mesen2_config import MesenConfig
 
 class DMATransfer(NamedTuple):
     """Represents a DMA transfer discovered by Mesen2"""
+
     rom_offset: int
     snes_address: int | None = None
     length: int | None = None
     channel: int | None = None
     is_wram: bool = False
+
 
 class DMASpriteFinder:
     """Finds sprite offsets using Mesen2 DMA monitoring"""
@@ -66,9 +69,10 @@ class DMASpriteFinder:
             start_time = time.time()
             result = subprocess.run(
                 wsl_cmd,
-                check=False, capture_output=True,
+                check=False,
+                capture_output=True,
                 text=True,
-                timeout=max_runtime_seconds + 10  # Extra buffer for shutdown
+                timeout=max_runtime_seconds + 10,  # Extra buffer for shutdown
             )
             end_time = time.time()
 
@@ -131,9 +135,9 @@ class DMASpriteFinder:
                 content = f.read()
 
             # Parse ROM offset entries
-            rom_pattern = r'ROM_OFFSET:0x([0-9A-Fa-f]+)'
-            detail_pattern = r'SNES_ADDR:0x([0-9A-Fa-f]+)\s+LENGTH:(\d+)\s+CHANNEL:(\d+)'
-            wram_pattern = r'WRAM_TRANSFER:0x([0-9A-Fa-f]+)'
+            rom_pattern = r"ROM_OFFSET:0x([0-9A-Fa-f]+)"
+            detail_pattern = r"SNES_ADDR:0x([0-9A-Fa-f]+)\s+LENGTH:(\d+)\s+CHANNEL:(\d+)"
+            wram_pattern = r"WRAM_TRANSFER:0x([0-9A-Fa-f]+)"
 
             lines = content.splitlines()
             i = 0
@@ -159,13 +163,11 @@ class DMASpriteFinder:
                             channel = int(detail_match.group(3))
                             i += 1  # Skip detail line
 
-                    transfers.append(DMATransfer(
-                        rom_offset=rom_offset,
-                        snes_address=snes_addr,
-                        length=length,
-                        channel=channel,
-                        is_wram=False
-                    ))
+                    transfers.append(
+                        DMATransfer(
+                            rom_offset=rom_offset, snes_address=snes_addr, length=length, channel=channel, is_wram=False
+                        )
+                    )
 
                 # Check for WRAM transfer
                 wram_match = re.search(wram_pattern, line)
@@ -173,10 +175,12 @@ class DMASpriteFinder:
                     wram_addr = int(wram_match.group(1), 16)
 
                     # WRAM transfers indicate compressed sprites - record for future analysis
-                    transfers.append(DMATransfer(
-                        rom_offset=wram_addr,  # Store WRAM address in rom_offset field
-                        is_wram=True
-                    ))
+                    transfers.append(
+                        DMATransfer(
+                            rom_offset=wram_addr,  # Store WRAM address in rom_offset field
+                            is_wram=True,
+                        )
+                    )
 
                 i += 1
 
@@ -194,6 +198,7 @@ class DMASpriteFinder:
         except Exception as e:
             print(f"Error parsing DMA log: {e}")
             return []
+
 
 def main():
     """Test the DMA sprite finder"""
@@ -238,6 +243,7 @@ def main():
         return 0
     print("No DMA transfers found")
     return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

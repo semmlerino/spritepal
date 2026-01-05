@@ -4,11 +4,11 @@ Sprite reassembler for composing multi-OAM sprites.
 Takes capture data from Mesen 2 and extracts + composes complete sprites
 using OAM layout information (positions, flips, etc.).
 
-NOTE: This module is a work-in-progress. It assumes the CaptureResult has
-`rom_offset` attributes that don't exist yet. Use CaptureRenderer for
-rendering captured tiles, and CaptureToROMMapper for ROM offset mapping.
+NOTE: This module is a work-in-progress. It expects CaptureResult entries to
+include optional `rom_offset` values populated by a mapping step.
+Use CaptureRenderer for rendering captured tiles, and CaptureToROMMapper for
+ROM offset mapping.
 """
-# pyright: reportAttributeAccessIssue=false
 
 from __future__ import annotations
 
@@ -128,9 +128,7 @@ class SpriteReassembler:
 
                 # Ensure we're within canvas bounds
                 if paste_x < 0 or paste_y < 0:
-                    logger.warning(
-                        f"OAM entry {entry.id} at ({paste_x}, {paste_y}) is outside canvas"
-                    )
+                    logger.warning(f"OAM entry {entry.id} at ({paste_x}, {paste_y}) is outside canvas")
                     continue
 
                 # Composite onto canvas (using alpha mask)
@@ -257,14 +255,9 @@ class SpriteReassembler:
         rows = (tile_count + tiles_per_row - 1) // tiles_per_row
         actual_width = min(tile_count, tiles_per_row)
 
-        logger.info(
-            f"Rendering {tile_count} tiles from 0x{rom_offset:X} "
-            f"as {actual_width}x{rows} grid"
-        )
+        logger.info(f"Rendering {tile_count} tiles from 0x{rom_offset:X} as {actual_width}x{rows} grid")
 
-        return self.tile_renderer.render_tiles(
-            tiles_data, actual_width, rows, palette_index
-        )
+        return self.tile_renderer.render_tiles(tiles_data, actual_width, rows, palette_index)
 
     def _render_oam_entry(
         self,
@@ -297,8 +290,7 @@ class SpriteReassembler:
 
         if end_offset > len(tiles_data):
             logger.warning(
-                f"OAM entry {entry.id} tile range exceeds decompressed data "
-                f"(need {end_offset}, have {len(tiles_data)})"
+                f"OAM entry {entry.id} tile range exceeds decompressed data (need {end_offset}, have {len(tiles_data)})"
             )
             # Try to render what we have
             available_tiles = (len(tiles_data) - start_offset) // BYTES_PER_TILE
@@ -311,9 +303,7 @@ class SpriteReassembler:
         tile_bytes = tiles_data[start_offset:end_offset]
 
         # Render tiles
-        img = self.tile_renderer.render_tiles(
-            tile_bytes, tiles_wide, tiles_high, palette_index
-        )
+        img = self.tile_renderer.render_tiles(tile_bytes, tiles_wide, tiles_high, palette_index)
 
         if img is None:
             return None
@@ -332,13 +322,9 @@ class SpriteReassembler:
             return self._decompression_cache[rom_offset]
 
         try:
-            data = self.hal_compressor.decompress_from_rom(
-                str(self.rom_path), rom_offset
-            )
+            data = self.hal_compressor.decompress_from_rom(str(self.rom_path), rom_offset)
             self._decompression_cache[rom_offset] = data
-            logger.debug(
-                f"Decompressed {len(data)} bytes from ROM offset 0x{rom_offset:X}"
-            )
+            logger.debug(f"Decompressed {len(data)} bytes from ROM offset 0x{rom_offset:X}")
             return data
         except Exception as e:
             logger.error(f"Failed to decompress from 0x{rom_offset:X}: {e}")

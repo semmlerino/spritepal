@@ -44,9 +44,7 @@ class PreviewPanel(QWidget):
 
         self.color_preview_label = QLabel()
         self.color_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.color_preview_label.setStyleSheet(
-            "QLabel { background-color: #202020; border: 2px solid #666; }"
-        )
+        self.color_preview_label.setStyleSheet("QLabel { background-color: #202020; border: 2px solid #666; }")
         self.color_preview_label.setMinimumHeight(100)
         preview_layout.addWidget(self.color_preview_label)
 

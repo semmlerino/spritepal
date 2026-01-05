@@ -335,10 +335,7 @@ class ROMTileMatcher:
                 logger.debug(f"Failed to index ${offset:06X}: {e}")
 
         self._unique_hashes = len(self._hash_to_locations)
-        logger.info(
-            f"Database built: {self._total_tiles} tiles, "
-            f"{self._unique_hashes} unique hashes"
-        )
+        logger.info(f"Database built: {self._total_tiles} tiles, {self._unique_hashes} unique hashes")
 
         # Optionally build two-plane index for raw ROM pattern matching
         if build_two_plane:
@@ -540,11 +537,7 @@ class ROMTileMatcher:
             "blocks_indexed": len(self._blocks),
             "total_tiles": self._total_tiles,
             "unique_hashes": self._unique_hashes,
-            "collision_rate": (
-                1 - self._unique_hashes / self._total_tiles
-                if self._total_tiles > 0
-                else 0
-            ),
+            "collision_rate": (1 - self._unique_hashes / self._total_tiles if self._total_tiles > 0 else 0),
             "two_plane_indexed": self._two_plane_indexed,
             "two_plane_tiles": self._two_plane_tiles,
         }
@@ -556,9 +549,7 @@ class ROMTileMatcher:
                 combo_str = f"planes_{combo[0]}_{combo[1]}"
                 combo_stats[combo_str] = count
             stats["two_plane_matches_by_combo"] = combo_stats
-            stats["total_two_plane_matches"] = sum(
-                self._two_plane_matches_by_combo.values()
-            )
+            stats["total_two_plane_matches"] = sum(self._two_plane_matches_by_combo.values())
 
         return stats
 
@@ -649,9 +640,6 @@ class ROMTileMatcher:
         instance._total_tiles = sum(b.tile_count for b in instance._blocks)
         instance._unique_hashes = len(instance._hash_to_locations)
 
-        logger.info(
-            f"Database loaded: {instance._total_tiles} tiles, "
-            f"{instance._unique_hashes} hashes"
-        )
+        logger.info(f"Database loaded: {instance._total_tiles} tiles, {instance._unique_hashes} hashes")
 
         return instance

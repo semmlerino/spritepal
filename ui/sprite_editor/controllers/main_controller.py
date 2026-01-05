@@ -4,6 +4,7 @@ Main controller for coordinating all sub-controllers.
 Acts as the central coordinator for the unified sprite editor.
 """
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -39,6 +40,9 @@ class MainController(QObject):
         # Current workflow state
         self._workflow_state = "extract"
 
+        # Track temp files for cleanup
+        self._temp_files: list[str] = []
+
         # Connect cross-controller signals
         self._connect_cross_controller_signals()
 
@@ -70,14 +74,10 @@ class MainController(QObject):
     def _connect_cross_controller_signals(self) -> None:
         """Connect signals between controllers for workflow coordination."""
         # When extraction completes, load into editor
-        self.extraction_controller.extraction_completed.connect(
-            self._on_extraction_completed
-        )
+        self.extraction_controller.extraction_completed.connect(self._on_extraction_completed)
 
         # When injection completes, show success
-        self.injection_controller.injection_completed.connect(
-            self._on_injection_completed
-        )
+        self.injection_controller.injection_completed.connect(self._on_injection_completed)
 
     def _on_tab_changed(self, tab_index: int) -> None:
         """Handle tab change."""
@@ -134,6 +134,9 @@ class MainController(QObject):
         img.putpalette(self.editing_controller.get_flat_palette())
         img.save(temp_path, "PNG")
 
+        # Track temp file for cleanup
+        self._temp_files.append(temp_path)
+
         # Set as source for injection
         self.injection_controller.set_source_image(temp_path)
 
@@ -145,7 +148,28 @@ class MainController(QObject):
 
     def _on_injection_completed(self, output_path: str) -> None:
         """Handle injection completion."""
+        self._cleanup_temp_files()
         self.status_message.emit(f"Injection complete: {output_path}")
+
+    def _cleanup_temp_files(self) -> None:
+        """Remove temp files created during workflow."""
+        for path in self._temp_files:
+            try:
+                temp_path = Path(path)
+                if temp_path.exists():
+                    temp_path.unlink()
+            except OSError:
+                pass  # Best effort cleanup
+        self._temp_files.clear()
+
+    def cleanup(self) -> None:
+        """Clean up all sub-controllers and resources."""
+        self._cleanup_temp_files()
+        self.extraction_controller.cleanup()
+        self.injection_controller.cleanup()
+        # EditingController doesn't have cleanup method yet
+        # if hasattr(self.editing_controller, "cleanup"):
+        #     self.editing_controller.cleanup()
 
     # Public workflow methods
 

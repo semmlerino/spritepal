@@ -120,9 +120,7 @@ class ROMExtractionPanel(QWidget):
             settings_manager=self.state_manager,
         )
         self._offset_dialog_manager = OffsetDialogManager(parent_widget=self, parent=self)
-        self._scan_controller = ScanController(
-            parent=self, cache=self.rom_cache, state_manager=self.state_manager
-        )
+        self._scan_controller = ScanController(parent=self, cache=self.rom_cache, state_manager=self.state_manager)
         self._scan_controller.sprite_selected.connect(self._add_selected_sprite)
         self.scan_worker = None
 

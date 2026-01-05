@@ -19,7 +19,7 @@ from .base_worker import BaseWorker
 logger = logging.getLogger(__name__)
 
 
-def _sanitize_for_json(obj: Any) -> Any:
+def _sanitize_for_json(obj: Any) -> Any:  # type: ignore[reportExplicitAny]
     """Convert non-JSON-serializable objects to JSON-safe types."""
     if isinstance(obj, str | int | float | bool | type(None)):
         return obj
@@ -89,7 +89,7 @@ class FileLoadWorker(BaseWorker):
 
             # Prepare metadata
             self.emit_progress(80, "Preparing metadata...")
-            metadata: dict[str, Any] = {
+            metadata: dict[str, Any] = {  # type: ignore[reportExplicitAny]
                 "width": image.width,
                 "height": image.height,
                 "mode": image.mode,
@@ -194,7 +194,7 @@ class FileSaveWorker(BaseWorker):
             file_format = format_map.get(self.file_path.suffix.lower() if self.file_path else ".png", "PNG")
 
             # Save with appropriate options
-            save_kwargs: dict[str, Any] = {}
+            save_kwargs: dict[str, Any] = {}  # type: ignore[reportExplicitAny]
             if file_format == "PNG":
                 save_kwargs["optimize"] = True
                 save_kwargs["transparency"] = 0
@@ -245,7 +245,7 @@ class PaletteLoadWorker(BaseWorker):
             self.emit_progress(30, "Reading palette file...")
 
             suffix = self.file_path.suffix.lower()
-            palette_data: dict[str, Any] | None = None
+            palette_data: dict[str, Any] | None = None  # type: ignore[reportExplicitAny]
 
             if suffix == ".json":
                 palette_data = self._load_json_palette()
@@ -276,7 +276,7 @@ class PaletteLoadWorker(BaseWorker):
             logger.exception("Error loading palette")
             self.emit_error(f"Unexpected error loading palette: {e}\n{traceback.format_exc()}")
 
-    def _load_json_palette(self) -> dict[str, Any] | None:
+    def _load_json_palette(self) -> dict[str, Any] | None:  # type: ignore[reportExplicitAny]
         """Load JSON palette file."""
         try:
             if not self.file_path:
@@ -302,7 +302,7 @@ class PaletteLoadWorker(BaseWorker):
             self.emit_error(f"Failed to load JSON palette: {e}")
             return None
 
-    def _load_binary_palette(self) -> dict[str, Any] | None:
+    def _load_binary_palette(self) -> dict[str, Any] | None:  # type: ignore[reportExplicitAny]
         """Load ACT/PAL palette file (raw RGB data)."""
         try:
             if not self.file_path:
@@ -336,7 +336,7 @@ class PaletteLoadWorker(BaseWorker):
             self.emit_error(f"Failed to load PAL/ACT palette: {e}")
             return None
 
-    def _load_gimp_palette(self) -> dict[str, Any] | None:
+    def _load_gimp_palette(self) -> dict[str, Any] | None:  # type: ignore[reportExplicitAny]
         """Load GIMP palette file (.gpl format)."""
         try:
             if not self.file_path:

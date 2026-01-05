@@ -2,6 +2,7 @@
 """
 Test discovered sprite offsets using the existing ROMExtractor
 """
+
 import sys
 from pathlib import Path
 
@@ -22,9 +23,7 @@ def test_offset_extraction(rom_path: str, offset: int, output_dir: str, test_nam
         print(f"Testing offset 0x{offset:06X}...")
 
         # Attempt extraction
-        output_path, extraction_info = extractor.extract_sprite_from_rom(
-            rom_path, offset, str(output_base), test_name
-        )
+        output_path, extraction_info = extractor.extract_sprite_from_rom(rom_path, offset, str(output_base), test_name)
 
         # Check if output file exists
         output_file = Path(output_path)
@@ -37,7 +36,7 @@ def test_offset_extraction(rom_path: str, offset: int, output_dir: str, test_nam
                 "output_path": output_path,
                 "file_size": file_size,
                 "extraction_info": extraction_info,
-                "error": None
+                "error": None,
             }
         else:
             print("  ✗ No output file created")
@@ -46,7 +45,7 @@ def test_offset_extraction(rom_path: str, offset: int, output_dir: str, test_nam
                 "output_path": None,
                 "file_size": 0,
                 "extraction_info": extraction_info,
-                "error": "No output file created"
+                "error": "No output file created",
             }
 
     except HALCompressionError as e:
@@ -56,17 +55,12 @@ def test_offset_extraction(rom_path: str, offset: int, output_dir: str, test_nam
             "output_path": None,
             "file_size": 0,
             "extraction_info": None,
-            "error": f"HAL Compression: {e}"
+            "error": f"HAL Compression: {e}",
         }
     except Exception as e:
         print(f"  ✗ Error: {e}")
-        return {
-            "success": False,
-            "output_path": None,
-            "file_size": 0,
-            "extraction_info": None,
-            "error": str(e)
-        }
+        return {"success": False, "output_path": None, "file_size": 0, "extraction_info": None, "error": str(e)}
+
 
 def main():
     """Test high-priority offsets from our correlation analysis"""
@@ -84,20 +78,18 @@ def main():
     # These are the translated offsets (Mesen2 - 0x300000)
     test_offsets = [
         # Direct address translations from Mesen2
-        (0x073E00, "mesen2_top_hit_1"),        # 47 runtime hits
-        (0x073F00, "mesen2_top_hit_2"),        # 45 runtime hits
-        (0x074700, "mesen2_medium_hit_1"),     # 35 runtime hits
-        (0x074500, "mesen2_medium_hit_2"),     # 34 runtime hits
-
+        (0x073E00, "mesen2_top_hit_1"),  # 47 runtime hits
+        (0x073F00, "mesen2_top_hit_2"),  # 45 runtime hits
+        (0x074700, "mesen2_medium_hit_1"),  # 35 runtime hits
+        (0x074500, "mesen2_medium_hit_2"),  # 34 runtime hits
         # Top exhal candidates for comparison
-        (0x0CC100, "exhal_perfect_score_1"),   # score=1.000, 58624 bytes
-        (0x0E1300, "exhal_perfect_score_2"),   # score=1.000, 56096 bytes
-        (0x07B500, "exhal_perfect_score_3"),   # score=1.000, 49056 bytes
-        (0x087200, "exhal_perfect_score_4"),   # score=1.000, 36160 bytes
-
+        (0x0CC100, "exhal_perfect_score_1"),  # score=1.000, 58624 bytes
+        (0x0E1300, "exhal_perfect_score_2"),  # score=1.000, 56096 bytes
+        (0x07B500, "exhal_perfect_score_3"),  # score=1.000, 49056 bytes
+        (0x087200, "exhal_perfect_score_4"),  # score=1.000, 36160 bytes
         # High confidence exhal candidates
-        (0x0C0000, "exhal_high_conf_1"),       # score=0.950, 42472 bytes
-        (0x0C0100, "exhal_high_conf_2"),       # score=0.950, 41893 bytes
+        (0x0C0000, "exhal_high_conf_1"),  # score=0.950, 42472 bytes
+        (0x0C0100, "exhal_high_conf_2"),  # score=0.950, 41893 bytes
     ]
 
     print(f"Testing {len(test_offsets)} sprite offsets with ROMExtractor...")
@@ -163,6 +155,7 @@ def main():
         print("Need to investigate extraction process or offset calculation")
 
     return 0 if successful_extractions > 0 else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

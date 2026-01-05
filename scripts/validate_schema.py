@@ -112,9 +112,7 @@ def validate_file(path: Path) -> ValidationResult:
     # Check schema version
     version = data.get("schema_version", 1)
     if version < 2:
-        result.add_error(
-            f"Schema version {version} < 2. Run: python scripts/migrate_v1_to_v2.py {path}"
-        )
+        result.add_error(f"Schema version {version} < 2. Run: python scripts/migrate_v1_to_v2.py {path}")
 
     # Collect all field names
     all_fields = collect_all_fields(data)
@@ -123,9 +121,7 @@ def validate_file(path: Path) -> ValidationResult:
     # Check for deprecated fields
     for field in unique_fields:
         if field in DEPRECATED_FIELDS:
-            result.add_error(
-                f"Deprecated field '{field}': {DEPRECATED_FIELDS[field]}"
-            )
+            result.add_error(f"Deprecated field '{field}': {DEPRECATED_FIELDS[field]}")
 
     # Check address field suffixes
     for field in unique_fields:
@@ -147,9 +143,7 @@ def find_json_files(target: Path) -> list[Path]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Validate sprite extraction JSON files against schema v2."
-    )
+    parser = argparse.ArgumentParser(description="Validate sprite extraction JSON files against schema v2.")
     parser.add_argument(
         "targets",
         type=Path,

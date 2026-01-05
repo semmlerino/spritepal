@@ -82,15 +82,22 @@ def analyze_log(log_path: Path) -> dict[str, object]:
             # Collect sample entries (first 5 char_conv=Y, first 5 char_conv=N)
             sample_entries = results["sample_entries"]
             if isinstance(sample_entries, list):
-                if char_conv and sum(1 for e in sample_entries if e.get("char_conv")) < 5 or not char_conv and sum(1 for e in sample_entries if not e.get("char_conv")) < 5:
-                    sample_entries.append({
-                        "line": line_no,
-                        "reason": reason,
-                        "ctrl": ctrl_hex,
-                        "char_conv": char_conv,
-                        "enabled": enabled,
-                        "raw": line.strip()[:120],
-                    })
+                if (
+                    char_conv
+                    and sum(1 for e in sample_entries if e.get("char_conv")) < 5
+                    or not char_conv
+                    and sum(1 for e in sample_entries if not e.get("char_conv")) < 5
+                ):
+                    sample_entries.append(
+                        {
+                            "line": line_no,
+                            "reason": reason,
+                            "ctrl": ctrl_hex,
+                            "char_conv": char_conv,
+                            "enabled": enabled,
+                            "raw": line.strip()[:120],
+                        }
+                    )
 
     return results
 
@@ -99,7 +106,7 @@ def determine_hypothesis_outcome(results: dict[str, object]) -> str:
     """Determine the SA-1 hypothesis outcome based on analysis results."""
     total = results.get("total_sa1_entries", 0)
     char_conv_enabled = results.get("char_conv_enabled", 0)
-    char_conv_disabled = results.get("char_conv_disabled", 0)
+    results.get("char_conv_disabled", 0)
 
     if total == 0:
         return "INCONCLUSIVE - No SA-1 DMA entries found"
@@ -147,7 +154,7 @@ def print_report(results: dict[str, object]) -> None:
     char_conv_disabled = results["char_conv_disabled"]
     ratio = char_conv_enabled / total if total > 0 else 0
     print(f"  char_conv=Y (enabled):  {char_conv_enabled:5d} ({ratio:.1%})")
-    print(f"  char_conv=N (disabled): {char_conv_disabled:5d} ({1-ratio:.1%})")
+    print(f"  char_conv=N (disabled): {char_conv_disabled:5d} ({1 - ratio:.1%})")
     print()
 
     print("DMA STATUS:")
@@ -209,9 +216,7 @@ def print_report(results: dict[str, object]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Analyze SA-1 hypothesis data from mesen2_dma_probe.lua output."
-    )
+    parser = argparse.ArgumentParser(description="Analyze SA-1 hypothesis data from mesen2_dma_probe.lua output.")
     parser.add_argument(
         "target",
         type=Path,
@@ -235,6 +240,7 @@ def main() -> int:
 
     if args.json:
         import json
+
         # Convert Counter objects to dicts for JSON serialization
         output = dict(results)
         if isinstance(output.get("reasons"), Counter):

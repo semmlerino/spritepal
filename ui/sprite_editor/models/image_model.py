@@ -12,7 +12,7 @@ import numpy as np
 from PIL import Image
 
 
-def _sanitize_for_json(obj: Any) -> Any:
+def _sanitize_for_json(obj: Any) -> Any:  # type: ignore[reportExplicitAny]
     """Convert non-JSON-serializable objects to JSON-safe types."""
     if isinstance(obj, str | int | float | bool | type(None)):
         return obj
@@ -54,7 +54,7 @@ class ImageModel:
         self.modified = True
         self.file_path = None
 
-    def load_from_pil(self, pil_image: Image.Image) -> dict[str, Any]:
+    def load_from_pil(self, pil_image: Image.Image) -> dict[str, Any]:  # type: ignore[reportExplicitAny]
         """
         Load image data from a PIL Image.
         Returns metadata including palette information.
@@ -68,7 +68,7 @@ class ImageModel:
         self.modified = False
 
         # Extract metadata
-        metadata: dict[str, Any] = {
+        metadata: dict[str, Any] = {  # type: ignore[reportExplicitAny]
             "width": self.width,
             "height": self.height,
             "mode": pil_image.mode,

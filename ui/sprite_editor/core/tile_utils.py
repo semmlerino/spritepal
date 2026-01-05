@@ -4,7 +4,6 @@ SNES tile encoding/decoding utilities
 Consolidated from various sprite editor modules
 """
 
-
 from ..constants import (
     BYTES_PER_TILE_4BPP,
     PIXELS_PER_TILE,
@@ -44,10 +43,7 @@ def decode_4bpp_tile(data: bytes, offset: int) -> list[int]:
         for x in range(TILE_WIDTH):
             bit = 7 - x
             pixel = (
-                ((bp0 >> bit) & 1)
-                | (((bp1 >> bit) & 1) << 1)
-                | (((bp2 >> bit) & 1) << 2)
-                | (((bp3 >> bit) & 1) << 3)
+                ((bp0 >> bit) & 1) | (((bp1 >> bit) & 1) << 1) | (((bp2 >> bit) & 1) << 2) | (((bp3 >> bit) & 1) << 3)
             )
             row.append(pixel)
         tile.extend(row)
@@ -69,10 +65,7 @@ def encode_4bpp_tile(tile_pixels: list[int]) -> bytes:
         ValueError: If tile_pixels doesn't contain exactly 64 values
     """
     if len(tile_pixels) != PIXELS_PER_TILE:
-        raise ValueError(
-            f"Expected {PIXELS_PER_TILE} pixels, got {
-                len(tile_pixels)}"
-        )
+        raise ValueError(f"Expected {PIXELS_PER_TILE} pixels, got {len(tile_pixels)}")
 
     output = bytearray(BYTES_PER_TILE_4BPP)
 
@@ -179,9 +172,7 @@ def calculate_tile_grid_padded(width: int, height: int) -> tuple[int, int, int]:
     return tiles_x, tiles_y, tiles_x * tiles_y
 
 
-def calculate_dimensions_from_tile_data(
-    data_size: int, tiles_per_row: int
-) -> tuple[int, int, int, int, int]:
+def calculate_dimensions_from_tile_data(data_size: int, tiles_per_row: int) -> tuple[int, int, int, int, int]:
     """
     Calculate sprite layout dimensions from tile data size.
 

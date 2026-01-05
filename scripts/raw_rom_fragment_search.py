@@ -73,10 +73,10 @@ def main() -> int:
     for frag_size in fragment_sizes:
         print(f"\n{frag_size}-byte fragments:")
         for i in range(0, 32, frag_size):
-            fragment = tile_bytes[i:i + frag_size]
+            fragment = tile_bytes[i : i + frag_size]
             offsets = search_bytes_in_file(rom_data, fragment)
             status = f"FOUND at {len(offsets)} locations" if offsets else "NOT FOUND"
-            print(f"  Bytes {i:2d}-{i+frag_size-1:2d}: {fragment.hex().upper():32s} → {status}")
+            print(f"  Bytes {i:2d}-{i + frag_size - 1:2d}: {fragment.hex().upper():32s} → {status}")
             if offsets and len(offsets) <= 3:
                 print(f"            Offsets: {', '.join(f'0x{o:06X}' for o in offsets)}")
 

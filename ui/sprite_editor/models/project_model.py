@@ -77,9 +77,7 @@ class ProjectModel:
         """Check if an image is loaded for editing."""
         return bool(self.image_file)
 
-    def set_extraction_params(
-        self, offset: int, size: int, tiles_per_row: int
-    ) -> None:
+    def set_extraction_params(self, offset: int, size: int, tiles_per_row: int) -> None:
         """Set extraction parameters."""
         self.extraction_offset = offset
         self.extraction_size = size

@@ -2,6 +2,7 @@
 """
 Test debug DMA logger to diagnose issues
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -29,12 +30,7 @@ def test_debug_dma():
     print(f"Executing: {' '.join(cmd[:2])} <ROM> <debug_script>")
 
     # Run with timeout
-    result = subprocess.run(
-        wsl_cmd,
-        capture_output=True,
-        text=True,
-        timeout=30
-    )
+    result = subprocess.run(wsl_cmd, capture_output=True, text=True, timeout=30)
 
     print(f"Return code: {result.returncode}")
 
@@ -54,6 +50,7 @@ def test_debug_dma():
             print(f.read())
     else:
         print("Debug log not found")
+
 
 if __name__ == "__main__":
     test_debug_dma()

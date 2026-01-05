@@ -19,9 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.logging_config import setup_logging
 
-ARM_RE = re.compile(
-    r"ROM trace armed: frame=(\d+)\s+label=([^\s]+)(?:\s+prg_size=([^\s]+)\s+prg_end=([^\s]+))?"
-)
+ARM_RE = re.compile(r"ROM trace armed: frame=(\d+)\s+label=([^\s]+)(?:\s+prg_size=([^\s]+)\s+prg_end=([^\s]+))?")
 READ_RE = re.compile(r"ROM read \(([^)]+)\): frame=(\d+)\s+addr=0x([0-9A-Fa-f]+)")
 COMPLETE_RE = re.compile(r"ROM trace (?:complete|expired|frame limit reached)\b")
 

@@ -45,10 +45,7 @@ class VRAMService:
                 data = f.read(size)
 
             if len(data) < size:
-                raise RuntimeError(
-                    f"Incomplete read at offset {hex(offset)}: "
-                    f"requested {size} bytes, got {len(data)}"
-                )
+                raise RuntimeError(f"Incomplete read at offset {hex(offset)}: requested {size} bytes, got {len(data)}")
 
             return data
 
@@ -91,18 +88,13 @@ class VRAMService:
                 raise ValueError(f"VRAM file too large: {len(vram_data)} bytes")
 
             if offset >= len(vram_data):
-                raise ValueError(
-                    f"Offset {hex(offset)} is at or beyond VRAM size ({len(vram_data)} bytes)"
-                )
+                raise ValueError(f"Offset {hex(offset)} is at or beyond VRAM size ({len(vram_data)} bytes)")
 
             if len(tile_data) > TILE_DATA_MAX_SIZE:
                 raise ValueError(f"Tile data too large: {len(tile_data)} bytes")
 
             if offset + len(tile_data) > len(vram_data):
-                raise ValueError(
-                    f"Tile data ({len(tile_data)} bytes) would exceed "
-                    f"VRAM size at offset {hex(offset)}"
-                )
+                raise ValueError(f"Tile data ({len(tile_data)} bytes) would exceed VRAM size at offset {hex(offset)}")
 
             vram_data[offset : offset + len(tile_data)] = tile_data
 

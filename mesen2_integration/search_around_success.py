@@ -2,6 +2,7 @@
 """
 Search systematically around successful sprite finds for larger character data
 """
+
 import sys
 from pathlib import Path
 
@@ -18,15 +19,13 @@ def test_offset_extraction(rom_path: str, offset: int, output_dir: str, test_nam
         output_base = Path(output_dir) / f"search_{test_name}_0x{offset:06X}"
 
         # Attempt extraction
-        output_path, extraction_info = extractor.extract_sprite_from_rom(
-            rom_path, offset, str(output_base), test_name
-        )
+        output_path, extraction_info = extractor.extract_sprite_from_rom(rom_path, offset, str(output_base), test_name)
 
         # Check results
         output_file = Path(output_path)
         if output_file.exists():
             file_size = output_file.stat().st_size
-            tiles = extraction_info.get('tile_count', 0) if extraction_info else 0
+            tiles = extraction_info.get("tile_count", 0) if extraction_info else 0
 
             # Score based on size and tiles (larger = more likely to be character)
             score = tiles + (file_size / 100)  # Favor more tiles and larger files
@@ -37,14 +36,17 @@ def test_offset_extraction(rom_path: str, offset: int, output_dir: str, test_nam
                 "file_size": file_size,
                 "tiles": tiles,
                 "score": score,
-                "extraction_info": extraction_info
+                "extraction_info": extraction_info,
             }
         return {"success": False, "error": "No output file"}
 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-def search_region(rom_path: str, start_offset: int, end_offset: int, step: int, output_dir: str, region_name: str) -> list:
+
+def search_region(
+    rom_path: str, start_offset: int, end_offset: int, step: int, output_dir: str, region_name: str
+) -> list:
     """Search a ROM region systematically"""
     print(f"\\n🔍 SEARCHING REGION: {region_name}")
     print(f"   Range: 0x{start_offset:06X} - 0x{end_offset:06X} (step: 0x{step:X})")
@@ -72,6 +74,7 @@ def search_region(rom_path: str, start_offset: int, end_offset: int, step: int, 
     print(f"   → Found {successful} extractable sprites in {region_name}")
     return results
 
+
 def main():
     """Search around successful areas for larger character sprites"""
     rom_path = "../Kirby Super Star (USA).sfc"
@@ -92,16 +95,13 @@ def main():
     search_regions = [
         # Around the successful enemy sprite (0x302238)
         (0x302000, 0x302800, 0x40, "green_greens_enemy_area"),
-
         # Around the successful main sprite areas (0x280000-0x2A0000)
         (0x280000, 0x285000, 0x100, "main_sprite_area_detailed"),
         (0x290000, 0x295000, 0x100, "main_sprite_area_2_detailed"),
         (0x2A0000, 0x2A5000, 0x100, "main_sprite_area_3_detailed"),
-
         # Expand search into adjacent areas
         (0x270000, 0x280000, 0x200, "pre_main_sprite_area"),
         (0x2A5000, 0x2B0000, 0x200, "post_main_sprite_area"),
-
         # Check if there's a pattern every 64KB (common in SNES ROMs)
         (0x1C0000, 0x1C5000, 0x200, "potential_sprite_bank_1"),
         (0x240000, 0x245000, 0x200, "potential_sprite_bank_2"),
@@ -132,22 +132,26 @@ def main():
         print("\\n🎯 LARGE SPRITE CANDIDATES (50+ tiles, likely characters):")
         if large_sprites:
             for i, result in enumerate(large_sprites[:10], 1):  # Top 10
-                print(f"  {i:2d}. 0x{result['offset']:06X}: {result['tiles']:3d} tiles, "
-                      f"score={result['score']:6.1f} ({result['name']})")
+                print(
+                    f"  {i:2d}. 0x{result['offset']:06X}: {result['tiles']:3d} tiles, "
+                    f"score={result['score']:6.1f} ({result['name']})"
+                )
         else:
             print("     None found - need to expand search or look in different regions")
 
         print("\\n⚔️  MEDIUM SPRITE CANDIDATES (20-49 tiles, likely enemies):")
         for i, result in enumerate(medium_sprites[:15], 1):  # Top 15
-            print(f"  {i:2d}. 0x{result['offset']:06X}: {result['tiles']:3d} tiles, "
-                  f"score={result['score']:6.1f} ({result['name']})")
+            print(
+                f"  {i:2d}. 0x{result['offset']:06X}: {result['tiles']:3d} tiles, "
+                f"score={result['score']:6.1f} ({result['name']})"
+            )
 
         print("\\n📊 SIZE DISTRIBUTION:")
         tile_ranges = {
             "Tiny (1-9)": len([r for r in successful_results if r["tiles"] < 10]),
             "Small (10-19)": len([r for r in successful_results if 10 <= r["tiles"] < 20]),
             "Medium (20-49)": len([r for r in successful_results if 20 <= r["tiles"] < 50]),
-            "Large (50+)": len([r for r in successful_results if r["tiles"] >= 50])
+            "Large (50+)": len([r for r in successful_results if r["tiles"] >= 50]),
         }
 
         for size_range, count in tile_ranges.items():
@@ -176,6 +180,7 @@ def main():
         print("This suggests character sprites may be in different ROM areas or use different compression")
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

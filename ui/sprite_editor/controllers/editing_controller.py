@@ -158,9 +158,7 @@ class EditingController(QObject):
             result = tool.on_press(x, y, self._selected_color, self.image_model)
             if result:
                 # Record fill command with old/new color info
-                cmd = FloodFillCommand(
-                    x=x, y=y, old_color=old_color, new_color=self._selected_color
-                )
+                cmd = FloodFillCommand(x=x, y=y, old_color=old_color, new_color=self._selected_color)
                 self.undo_manager.record_command(cmd)
                 self.imageChanged.emit()
                 self._emit_undo_state()
@@ -173,9 +171,7 @@ class EditingController(QObject):
         if result:
             # Start new batch for this stroke
             self._current_stroke = BatchCommand()
-            cmd = DrawPixelCommand(
-                x=x, y=y, old_color=old_color, new_color=self._selected_color
-            )
+            cmd = DrawPixelCommand(x=x, y=y, old_color=old_color, new_color=self._selected_color)
             self._current_stroke.add_command(cmd)
             self.imageChanged.emit()
 
@@ -207,9 +203,7 @@ class EditingController(QObject):
             if self.image_model.set_pixel(px, py, self._selected_color):
                 any_changed = True
                 if self._current_stroke is not None:
-                    cmd = DrawPixelCommand(
-                        x=px, y=py, old_color=old_color, new_color=self._selected_color
-                    )
+                    cmd = DrawPixelCommand(x=px, y=py, old_color=old_color, new_color=self._selected_color)
                     self._current_stroke.add_command(cmd)
 
         if any_changed:

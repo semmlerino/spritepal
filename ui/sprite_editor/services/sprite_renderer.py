@@ -94,17 +94,13 @@ class SpriteRenderer:
                 f.seek(offset)
                 data = f.read(size)
 
-            total_tiles, tiles_x, tiles_y, width, height = (
-                calculate_dimensions_from_tile_data(len(data), tiles_per_row)
-            )
+            total_tiles, tiles_x, tiles_y, width, height = calculate_dimensions_from_tile_data(len(data), tiles_per_row)
 
             img = Image.new("P", (width, height))
             img.putpalette(get_grayscale_palette())
 
             pixels = self._decode_all_tiles(data)
-            img_pixels = self._arrange_tiles_in_indexed_image(
-                pixels, total_tiles, tiles_x, tiles_y, width, height
-            )
+            img_pixels = self._arrange_tiles_in_indexed_image(pixels, total_tiles, tiles_x, tiles_y, width, height)
 
             img.putdata(img_pixels)
             return img, total_tiles
@@ -223,9 +219,7 @@ class SpriteRenderer:
                 f.seek(offset)
                 data = f.read(size)
 
-            total_tiles, tiles_x, _, width, height = (
-                calculate_dimensions_from_tile_data(len(data), tiles_per_row)
-            )
+            total_tiles, tiles_x, _, width, height = calculate_dimensions_from_tile_data(len(data), tiles_per_row)
 
             img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
             palettes = self._load_palettes_from_cgram(cgram_file)
@@ -238,18 +232,13 @@ class SpriteRenderer:
                     tile_offset = offset + (tile_idx * BYTES_PER_TILE_4BPP)
                     assigned_palette = self._get_tile_palette_assignment(tile_offset)
 
-                    palette = (
-                        palettes[assigned_palette]
-                        if assigned_palette < len(palettes)
-                        else palettes[0]
-                    )
+                    palette = palettes[assigned_palette] if assigned_palette < len(palettes) else palettes[0]
 
                     tile_x = tile_idx % tiles_x
                     tile_y = tile_idx // tiles_x
 
                     self._draw_tile_to_rgba_image(
-                        img, tile_data, palette, tile_x, tile_y, width, height,
-                        clamped_pixels
+                        img, tile_data, palette, tile_x, tile_y, width, height, clamped_pixels
                     )
 
             if clamped_pixels:
@@ -262,9 +251,7 @@ class SpriteRenderer:
             return img, total_tiles
 
         except (OSError, IndexError) as e:
-            raise RuntimeError(
-                f"Error extracting sprites with correct palettes: {e}"
-            ) from e
+            raise RuntimeError(f"Error extracting sprites with correct palettes: {e}") from e
 
     def extract_multi_palette(
         self,

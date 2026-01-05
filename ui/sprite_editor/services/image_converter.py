@@ -5,7 +5,8 @@ Handles PNG to SNES tile data conversion and validation.
 """
 
 import logging
-from typing import Any, Iterable, cast
+from collections.abc import Iterable
+from typing import cast
 
 from PIL import Image
 
@@ -81,7 +82,7 @@ class ImageConverter:
             width, height = img.size
             tiles_x, tiles_y, total_tiles = calculate_tile_grid_padded(width, height)
 
-            pixels = list(cast(Iterable[Any], img.getdata()))
+            pixels = list(cast(Iterable[int], img.getdata()))
 
             output_data = bytearray()
             padded_count = [0]
@@ -130,11 +131,11 @@ class ImageConverter:
                 issues.append(f"Height ({height}) must be multiple of {TILE_HEIGHT}")
 
             if img.mode == "P":
-                colors_used = len(set(cast(Iterable[Any], img.getdata())))
+                colors_used = len(set(cast(Iterable[int], img.getdata())))
                 if colors_used > 16:
                     issues.append(f"Too many colors ({colors_used}), maximum is 16")
             elif img.mode in ("RGB", "RGBA", "L", "LA"):
-                colors_used = len(set(cast(Iterable[Any], img.getdata())))
+                colors_used = len(set(cast(Iterable[object], img.getdata())))
                 if colors_used > 16:
                     issues.append(
                         f"Too many unique colors ({colors_used}), maximum is 16 for SNES 4bpp. "

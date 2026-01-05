@@ -144,7 +144,9 @@ def main() -> int:
         choices=["lorom", "hirom", "sa1"],
         help="Mapping types to try (repeatable)",
     )
-    parser.add_argument("--force-raw", action="store_true", help="Include raw file-offset candidate even for banked seeds")
+    parser.add_argument(
+        "--force-raw", action="store_true", help="Include raw file-offset candidate even for banked seeds"
+    )
     parser.add_argument("--prg-size", help="PRG size from rom trace (hex ok)")
     parser.add_argument("--min-tiles", type=int, default=32, help="Minimum tiles for plausibility")
     parser.add_argument(

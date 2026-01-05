@@ -79,11 +79,7 @@ def main():
     # Paths
     base_dir = Path(__file__).parent.parent
     rom_path = base_dir / "roms" / "Kirby Super Star (USA).sfc"
-    capture_path = (
-        Path(sys.argv[1])
-        if len(sys.argv) > 1
-        else base_dir / "mesen2_exchange" / "test_capture.json"
-    )
+    capture_path = Path(sys.argv[1]) if len(sys.argv) > 1 else base_dir / "mesen2_exchange" / "test_capture.json"
     discovered_offsets_path = base_dir / "mesen2_integration" / "discovered_sprite_offsets.txt"
     database_output = base_dir / "mesen2_exchange" / "tile_hash_database.json"
 
@@ -215,9 +211,7 @@ def main():
             print("    Sample indexed tiles:")
             for tile_hash, matches in test_matches:
                 sample = matches[0]
-                print(
-                    f"      Hash: {tile_hash[:16]}... -> ROM 0x{sample.rom_offset:06X} tile #{sample.tile_index}"
-                )
+                print(f"      Hash: {tile_hash[:16]}... -> ROM 0x{sample.rom_offset:06X} tile #{sample.tile_index}")
                 if len(matches) > 1:
                     print(f"        (+{len(matches) - 1} more candidates)")
 

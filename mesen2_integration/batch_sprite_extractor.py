@@ -28,12 +28,12 @@ class BatchExtractor:
         Each entry should have: {name, address, [notes]}
         """
         print(f"Processing {len(addresses)} sprite addresses...")
-        print("="*60)
+        print("=" * 60)
 
         for idx, entry in enumerate(addresses, 1):
-            name = entry.get('name', f'sprite_{idx}')
-            addr = entry['address']
-            notes = entry.get('notes', '')
+            name = entry.get("name", f"sprite_{idx}")
+            addr = entry["address"]
+            notes = entry.get("notes", "")
 
             print(f"\n[{idx}/{len(addresses)}] {name}")
             print(f"  Address: {addr}")
@@ -46,45 +46,38 @@ class BatchExtractor:
                 rom_offset = self.extractor.snes_to_rom_offset(bank, offset)
 
                 # Extract data
-                output_name = name.replace(' ', '_').lower()
+                output_name = name.replace(" ", "_").lower()
                 bin_path = self.extractor.extract_compressed_data(rom_offset, output_name)
 
                 if bin_path:
                     png_path = self.extractor.convert_to_png(bin_path)
 
                     result = {
-                        'name': name,
-                        'snes_address': f"${bank:02X}:{offset:04X}",
-                        'rom_offset': f"0x{rom_offset:06X}",
-                        'size': bin_path.stat().st_size,
-                        'tiles': bin_path.stat().st_size // 32,
-                        'files': {
-                            'bin': str(bin_path),
-                            'png': str(png_path) if png_path else None
-                        },
-                        'status': 'success',
-                        'notes': notes
+                        "name": name,
+                        "snes_address": f"${bank:02X}:{offset:04X}",
+                        "rom_offset": f"0x{rom_offset:06X}",
+                        "size": bin_path.stat().st_size,
+                        "tiles": bin_path.stat().st_size // 32,
+                        "files": {"bin": str(bin_path), "png": str(png_path) if png_path else None},
+                        "status": "success",
+                        "notes": notes,
                     }
                 else:
                     result = {
-                        'name': name,
-                        'snes_address': f"${bank:02X}:{offset:04X}",
-                        'rom_offset': f"0x{rom_offset:06X}",
-                        'status': 'failed',
-                        'notes': notes
+                        "name": name,
+                        "snes_address": f"${bank:02X}:{offset:04X}",
+                        "rom_offset": f"0x{rom_offset:06X}",
+                        "status": "failed",
+                        "notes": notes,
                     }
 
                 self.results.append(result)
 
             except Exception as e:
                 print(f"  ERROR: {e}")
-                self.results.append({
-                    'name': name,
-                    'snes_address': addr,
-                    'status': 'error',
-                    'error': str(e),
-                    'notes': notes
-                })
+                self.results.append(
+                    {"name": name, "snes_address": addr, "status": "error", "error": str(e), "notes": notes}
+                )
 
     def save_report(self, filename: str | None = None) -> Path:
         """Save extraction report as JSON and HTML."""
@@ -97,7 +90,7 @@ class BatchExtractor:
 
         # Save JSON
         json_path = report_dir / f"{filename}.json"
-        with open(json_path, 'w') as f:
+        with open(json_path, "w") as f:
             json.dump(self.results, f, indent=2)
 
         # Save HTML report
@@ -232,10 +225,10 @@ class BatchExtractor:
 
         # Summary stats
         total = len(self.results)
-        successful = sum(1 for r in self.results if r['status'] == 'success')
+        successful = sum(1 for r in self.results if r["status"] == "success")
         total - successful
-        total_tiles = sum(r.get('tiles', 0) for r in self.results)
-        total_bytes = sum(r.get('size', 0) for r in self.results)
+        total_tiles = sum(r.get("tiles", 0) for r in self.results)
+        total_bytes = sum(r.get("size", 0) for r in self.results)
 
         html += f"""
     <div class="summary">
@@ -261,56 +254,56 @@ class BatchExtractor:
 
         # Individual sprite cards
         for result in self.results:
-            status_class = result['status']
+            status_class = result["status"]
             status_badge_class = f"status-{status_class}"
 
             html += f"""
     <div class="sprite-card {status_class}">
         <div class="sprite-header">
-            <div class="sprite-name">{result['name']}</div>
-            <div class="sprite-status {status_badge_class}">{result['status'].upper()}</div>
+            <div class="sprite-name">{result["name"]}</div>
+            <div class="sprite-status {status_badge_class}">{result["status"].upper()}</div>
         </div>
         <div class="sprite-details">
             <span class="detail-label">SNES Address:</span>
-            <span class="detail-value">{result.get('snes_address', 'N/A')}</span>
+            <span class="detail-value">{result.get("snes_address", "N/A")}</span>
             <span class="detail-label">ROM Offset:</span>
-            <span class="detail-value">{result.get('rom_offset', 'N/A')}</span>
+            <span class="detail-value">{result.get("rom_offset", "N/A")}</span>
             """
 
-            if result['status'] == 'success':
+            if result["status"] == "success":
                 html += f"""
             <span class="detail-label">Size:</span>
-            <span class="detail-value">{result['size']:,} bytes</span>
+            <span class="detail-value">{result["size"]:,} bytes</span>
             <span class="detail-label">Tiles:</span>
-            <span class="detail-value">{result['tiles']} tiles</span>
+            <span class="detail-value">{result["tiles"]} tiles</span>
                 """
 
                 # Add preview if PNG exists
-                if result['files'].get('png'):
-                    png_path = Path(result['files']['png'])
+                if result["files"].get("png"):
+                    png_path = Path(result["files"]["png"])
                     if png_path.exists():
                         # Use relative path from report location
                         rel_path = f"../{png_path.name}"
                         html += f"""
         </div>
         <div class="sprite-preview">
-            <img src="{rel_path}" alt="{result['name']} sprite">
+            <img src="{rel_path}" alt="{result["name"]} sprite">
         </div>
                         """
                 else:
                     html += "</div>"
             else:
-                if 'error' in result:
+                if "error" in result:
                     html += f"""
             <span class="detail-label">Error:</span>
-            <span class="detail-value">{result['error']}</span>
+            <span class="detail-value">{result["error"]}</span>
                     """
                 html += "</div>"
 
-            if result.get('notes'):
+            if result.get("notes"):
                 html += f"""
         <div class="notes">
-            📝 {result['notes']}
+            📝 {result["notes"]}
         </div>
                 """
 
@@ -324,12 +317,13 @@ class BatchExtractor:
 </html>
 """
 
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.write(html)
+
 
 def load_address_file(filepath: Path) -> list[dict[str, Any]]:
     """Load addresses from JSON or text file."""
-    if filepath.suffix == '.json':
+    if filepath.suffix == ".json":
         with open(filepath) as f:
             return json.load(f)
     else:
@@ -338,25 +332,22 @@ def load_address_file(filepath: Path) -> list[dict[str, Any]]:
         with open(filepath) as f:
             for line in f:
                 line = line.strip()
-                if not line or line.startswith('#'):
+                if not line or line.startswith("#"):
                     continue
 
                 # Format: "address [name] [# notes]"
-                parts = line.split('#', 1)
+                parts = line.split("#", 1)
                 main = parts[0].strip()
-                notes = parts[1].strip() if len(parts) > 1 else ''
+                notes = parts[1].strip() if len(parts) > 1 else ""
 
                 tokens = main.split(None, 1)
                 addr = tokens[0]
                 name = tokens[1] if len(tokens) > 1 else f"sprite_{addr.replace(':', '_')}"
 
-                addresses.append({
-                    'address': addr,
-                    'name': name,
-                    'notes': notes
-                })
+                addresses.append({"address": addr, "name": name, "notes": notes})
 
         return addresses
+
 
 def main():
     import argparse
@@ -380,11 +371,11 @@ $C0:0000 Kirby # Main character
 Example usage:
   %(prog)s sprite_addresses.txt
   %(prog)s addresses.json --report my_sprites
-"""
+""",
     )
 
-    parser.add_argument('input_file', help='File containing sprite addresses')
-    parser.add_argument('--report', help='Report filename (without extension)')
+    parser.add_argument("input_file", help="File containing sprite addresses")
+    parser.add_argument("--report", help="Report filename (without extension)")
 
     args = parser.parse_args()
 
@@ -411,17 +402,19 @@ Example usage:
         report_path = extractor.save_report(args.report)
 
         # Summary
-        successful = sum(1 for r in extractor.results if r['status'] == 'success')
-        print(f"\n{'='*60}")
+        successful = sum(1 for r in extractor.results if r["status"] == "success")
+        print(f"\n{'=' * 60}")
         print(f"  Extraction Complete: {successful}/{len(addresses)} sprites extracted")
         print(f"  Open report: {report_path}")
-        print('='*60)
+        print("=" * 60)
 
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QFileDialog
 
+from ui.common.signal_utils import safe_disconnect
+
 from ..services import SpriteRenderer
 from ..workers import ExtractWorker, MultiPaletteExtractWorker
 
@@ -36,6 +38,30 @@ class ExtractionController(QObject):
         # File paths
         self.vram_file: str = ""
         self.cgram_file: str = ""
+
+    def _cleanup_worker(self) -> None:
+        """Clean up existing workers before creating new ones."""
+        if self._worker is not None:
+            safe_disconnect(self._worker.progress)
+            safe_disconnect(self._worker.error)
+            safe_disconnect(self._worker.result)
+            safe_disconnect(self._worker.finished_signal)
+            self._worker = None
+
+        if self._multi_worker is not None:
+            safe_disconnect(self._multi_worker.progress)
+            safe_disconnect(self._multi_worker.error)
+            safe_disconnect(self._multi_worker.result)
+            safe_disconnect(self._multi_worker.finished_signal)
+            self._multi_worker = None
+
+    def cleanup(self) -> None:
+        """Clean up resources before destruction."""
+        self._cleanup_worker()
+        if self._view is not None:
+            safe_disconnect(self._view.extract_requested)
+            safe_disconnect(self._view.browse_vram_requested)
+            safe_disconnect(self._view.browse_cgram_requested)
 
     def set_view(self, view: "ExtractTab") -> None:
         """Set the extract tab view."""
@@ -82,31 +108,38 @@ class ExtractionController(QObject):
         if not self._view:
             return
 
-        params = self._view.get_extraction_params()
-
-        if not params["vram_file"]:
-            self._view.append_output("Error: No VRAM file selected")
+        # Validate parameters first
+        is_valid, error_msg = self._view.validate_params()
+        if not is_valid:
+            self._view.append_output(f"Validation failed:\n{error_msg}")
             return
+
+        params = self._view.get_extraction_params()
 
         # Clear output
         self._view.clear_output()
         self._view.set_extract_enabled(False)
         self._view.append_output(f"Extracting from: {params['vram_file']}")
 
+        # Clean up any existing worker before creating new one
+        self._cleanup_worker()
+
         # Create and start worker
+        from typing import cast
+
         self._worker = ExtractWorker(
-            vram_file=params["vram_file"],
-            offset=params["offset"],
-            size=params["size"],
-            tiles_per_row=params["tiles_per_row"],
-            palette_num=params["palette_num"] if params["use_palette"] else None,
-            cgram_file=params["cgram_file"] if params["use_palette"] else None,
+            vram_file=cast(str, params["vram_file"]),
+            offset=cast(int, params["offset"]),
+            size=cast(int, params["size"]),
+            tiles_per_row=cast(int, params["tiles_per_row"]),
+            palette_num=cast(int | None, params.get("palette_num")),
+            cgram_file=cast(str | None, params.get("cgram_file")),
         )
 
         self._worker.progress.connect(self._on_progress)
         self._worker.error.connect(self._on_error)
         self._worker.result.connect(self._on_extraction_complete)
-        self._worker.finished.connect(self._on_worker_finished)
+        self._worker.finished_signal.connect(self._on_worker_finished)
 
         self._worker.start()
 
@@ -120,6 +153,9 @@ class ExtractionController(QObject):
         oam_file: str | None = None,
     ) -> None:
         """Start multi-palette extraction."""
+        # Clean up any existing worker before creating new one
+        self._cleanup_worker()
+
         self._multi_worker = MultiPaletteExtractWorker(
             vram_file=vram_file,
             offset=offset,
@@ -132,7 +168,7 @@ class ExtractionController(QObject):
         self._multi_worker.progress.connect(self._on_progress)
         self._multi_worker.error.connect(self._on_error)
         self._multi_worker.result.connect(self._on_multi_palette_complete)
-        self._multi_worker.finished.connect(self._on_worker_finished)
+        self._multi_worker.finished_signal.connect(self._on_worker_finished)
 
         self._multi_worker.start()
 
@@ -155,7 +191,7 @@ class ExtractionController(QObject):
             self._view.append_output(f"Extracted {tile_count} tiles successfully!")
         self.extraction_completed.emit(image, tile_count)
 
-    def _on_multi_palette_complete(self, palette_images: dict, tile_count: int) -> None:
+    def _on_multi_palette_complete(self, palette_images: dict[str, "Image.Image"], tile_count: int) -> None:
         """Handle successful multi-palette extraction."""
         self.multi_palette_completed.emit(palette_images, tile_count)
 

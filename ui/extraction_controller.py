@@ -56,8 +56,8 @@ class ExtractionController(QObject):
     preview_cleared = Signal()  # Clear preview request
 
     # Palette signals
-    palettes_ready = Signal(object)  # dict[str, list[tuple[int,int,int]]]
-    active_palettes_ready = Signal(object)  # list[int]
+    palettes_ready = Signal(object)  # dict[int, list[list[int]]]
+    active_palettes_ready = Signal(list)  # list[int]
 
     # Extraction state signals
     extraction_completed = Signal(object)  # list[str] of extracted files
@@ -219,7 +219,7 @@ class ExtractionController(QObject):
         """Handle preview PIL image ready"""
         self.grayscale_image_ready.emit(pil_image)
 
-    def _on_palettes_ready(self, palettes: dict[str, list[tuple[int, int, int]]]) -> None:
+    def _on_palettes_ready(self, palettes: dict[int, list[list[int]]]) -> None:
         """Handle palettes ready"""
         self.palettes_ready.emit(palettes)
 

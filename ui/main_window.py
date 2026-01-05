@@ -4,6 +4,7 @@ Main window for SpritePal application
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -53,6 +54,9 @@ from ui.palette_preview import PalettePreviewWidget
 from ui.rom_extraction_panel import ROMExtractionPanel
 from ui.styles.components import get_action_zone_style
 from ui.zoomable_preview import PreviewPanel
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # Layout constants for consistent sizing and spacing
 MAIN_WINDOW_MIN_SIZE = (800, 500)  # Responsive for small screens
@@ -1038,12 +1042,69 @@ class MainWindow(QMainWindow):
     def _on_controller_palettes_ready(self, palettes: object) -> None:
         """Handle palettes ready signal from controller."""
         if hasattr(self, "palette_preview") and self.palette_preview:
-            self.palette_preview.set_all_palettes(palettes)  # type: ignore[arg-type]
+            normalized = self._normalize_palettes(palettes)
+            if normalized is not None:
+                self.palette_preview.set_all_palettes(normalized)
 
     def _on_controller_active_palettes_ready(self, palettes: object) -> None:
         """Handle active palettes highlight signal from controller."""
         if hasattr(self, "palette_preview") and self.palette_preview:
-            self.palette_preview.highlight_active_palettes(palettes)  # type: ignore[arg-type]
+            active_indices = self._normalize_active_palettes(palettes)
+            if active_indices is not None:
+                self.palette_preview.highlight_active_palettes(active_indices)
+
+    @staticmethod
+    def _normalize_palettes(palettes: object) -> dict[int, list[tuple[int, int, int]]] | None:
+        """Normalize palette data into palette_index -> list[(r, g, b)]."""
+        if not isinstance(palettes, Mapping):
+            logger.warning("Palettes payload is not a mapping: %s", type(palettes).__name__)
+            return None
+
+        normalized: dict[int, list[tuple[int, int, int]]] = {}
+        for key, colors in palettes.items():
+            try:
+                palette_index = int(key)
+            except (TypeError, ValueError):
+                logger.warning("Skipping palette with non-numeric key: %r", key)
+                continue
+
+            if not isinstance(colors, Sequence):
+                logger.warning("Palette %s colors are not a sequence", palette_index)
+                continue
+
+            converted: list[tuple[int, int, int]] = []
+            for color in colors:
+                if not isinstance(color, Sequence) or len(color) != 3:
+                    logger.warning("Palette %s has invalid color entry: %r", palette_index, color)
+                    continue
+                try:
+                    r, g, b = (int(channel) for channel in color)
+                except (TypeError, ValueError):
+                    logger.warning("Palette %s has non-numeric color: %r", palette_index, color)
+                    continue
+                converted.append((r, g, b))
+
+            if converted:
+                normalized[palette_index] = converted
+
+        return normalized
+
+    @staticmethod
+    def _normalize_active_palettes(active_palettes: object) -> list[int] | None:
+        """Normalize active palette indices to a list of ints."""
+        if not isinstance(active_palettes, Sequence) or isinstance(active_palettes, str | bytes):
+            logger.warning("Active palettes payload is not a sequence: %s", type(active_palettes).__name__)
+            return None
+
+        normalized: list[int] = []
+        for value in active_palettes:
+            try:
+                normalized.append(int(value))
+            except (TypeError, ValueError):
+                logger.warning("Skipping invalid active palette index: %r", value)
+                continue
+
+        return normalized
 
     @controller.setter
     def controller(self, value: ExtractionController) -> None:

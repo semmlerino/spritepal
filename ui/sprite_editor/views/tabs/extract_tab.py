@@ -24,12 +24,13 @@ from ..widgets import HexLineEdit
 
 
 class ExtractTab(QWidget):
-    """Tab widget for sprite extraction functionality."""
+    """Tab for extracting sprites from ROM."""
 
     # Signals
-    extract_requested = Signal()
     browse_vram_requested = Signal()
     browse_cgram_requested = Signal()
+    extract_requested = Signal()
+    extractionRequested = Signal(str, dict)  # oam_path, settings
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -122,7 +123,7 @@ class ExtractTab(QWidget):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
 
-    def get_extraction_params(self) -> dict:
+    def get_extraction_params(self) -> dict[str, object]:
         """Get the current extraction parameters."""
         return {
             "vram_file": self.vram_file_edit.text(),
@@ -133,6 +134,32 @@ class ExtractTab(QWidget):
             "cgram_file": self.cgram_file_edit.text(),
             "palette_num": self.palette_combo.currentIndex(),
         }
+
+    def validate_params(self) -> tuple[bool, str]:
+        """Validate extraction parameters.
+
+        Returns:
+            Tuple of (is_valid, error_message). Error message is empty if valid.
+        """
+        errors: list[str] = []
+
+        if not self.vram_file_edit.text().strip():
+            errors.append("VRAM file is required")
+
+        if not self.extract_offset_edit.isValid():
+            errors.append("Invalid extraction offset")
+
+        if not self.extract_size_edit.isValid():
+            errors.append("Invalid extraction size")
+        elif self.extract_size_edit.value() <= 0:
+            errors.append("Extraction size must be greater than 0")
+
+        # Check CGRAM file if palette is enabled
+        if self.use_palette_check.isChecked():
+            if not self.cgram_file_edit.text().strip():
+                errors.append("CGRAM file required when using palette")
+
+        return (True, "") if not errors else (False, "\n".join(errors))
 
     def set_vram_file(self, file_path: str) -> None:
         """Set the VRAM file path."""

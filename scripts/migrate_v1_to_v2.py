@@ -37,10 +37,7 @@ NESTED_FIELD_RENAMES: dict[str, str] = {
 def rename_fields(obj: Any, renames: dict[str, str]) -> Any:
     """Recursively rename fields in a JSON structure."""
     if isinstance(obj, dict):
-        return {
-            renames.get(k, k): rename_fields(v, renames)
-            for k, v in obj.items()
-        }
+        return {renames.get(k, k): rename_fields(v, renames) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [rename_fields(item, renames) for item in obj]
     else:
@@ -100,9 +97,7 @@ def find_json_files(target: Path) -> list[Path]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Migrate sprite extraction JSON files from schema v1 to v2."
-    )
+    parser = argparse.ArgumentParser(description="Migrate sprite extraction JSON files from schema v1 to v2.")
     parser.add_argument(
         "target",
         type=Path,

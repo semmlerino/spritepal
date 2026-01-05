@@ -38,9 +38,7 @@ from core.mesen_integration.full_correlation_pipeline import (
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Full sprite correlation: VRAM → Staging → ROM"
-    )
+    parser = argparse.ArgumentParser(description="Full sprite correlation: VRAM → Staging → ROM")
     parser.add_argument(
         "--rom",
         type=Path,
@@ -190,9 +188,7 @@ def main() -> int:
     if args.json:
         # Apply configurable limits (0 = unlimited)
         rom_matches = (
-            results.rom_matches
-            if args.json_max_matches == 0
-            else results.rom_matches[: args.json_max_matches]
+            results.rom_matches if args.json_max_matches == 0 else results.rom_matches[: args.json_max_matches]
         )
         staging_items = list(results.staging_to_rom_mapping.items())
         if args.json_max_mapping != 0:
@@ -216,8 +212,7 @@ def main() -> int:
                 for m in rom_matches
             ],
             "staging_to_rom": {
-                f"0x{staging:06X}": [f"0x{rom:06X}" for rom in rom_offsets]
-                for staging, rom_offsets in staging_items
+                f"0x{staging:06X}": [f"0x{rom:06X}" for rom in rom_offsets] for staging, rom_offsets in staging_items
             },
         }
         output = json.dumps(output_data, indent=2)

@@ -2,6 +2,7 @@
 """
 Extract the largest sprite candidates found in systematic search
 """
+
 import sys
 from pathlib import Path
 
@@ -21,15 +22,13 @@ def extract_candidate(rom_path: str, offset: int, output_dir: str, expected_tile
         print(f"🎯 EXTRACTING: 0x{offset:06X} (expected {expected_tiles} tiles)")
 
         # Attempt extraction
-        output_path, extraction_info = extractor.extract_sprite_from_rom(
-            rom_path, offset, str(output_base), test_name
-        )
+        output_path, extraction_info = extractor.extract_sprite_from_rom(rom_path, offset, str(output_base), test_name)
 
         # Check results
         output_file = Path(output_path)
         if output_file.exists():
             file_size = output_file.stat().st_size
-            actual_tiles = extraction_info.get('tile_count', 0) if extraction_info else 0
+            actual_tiles = extraction_info.get("tile_count", 0) if extraction_info else 0
 
             print(f"   ✅ SUCCESS: {Path(output_path).name}")
             print(f"   📊 Size: {file_size} bytes, Actual tiles: {actual_tiles}")
@@ -39,7 +38,7 @@ def extract_candidate(rom_path: str, offset: int, output_dir: str, expected_tile
                 "output_path": output_path,
                 "file_size": file_size,
                 "actual_tiles": actual_tiles,
-                "expected_tiles": expected_tiles
+                "expected_tiles": expected_tiles,
             }
         print("   ❌ FAILED: No output file created")
         return {"success": False, "error": "No output file"}
@@ -47,6 +46,7 @@ def extract_candidate(rom_path: str, offset: int, output_dir: str, expected_tile
     except Exception as e:
         print(f"   ❌ ERROR: {e}")
         return {"success": False, "error": str(e)}
+
 
 def main():
     """Extract the highest-priority large sprite candidates"""
@@ -73,7 +73,7 @@ def main():
         (0x2A3C00, 130),  # Large
         (0x293700, 109),  # Medium-large
         (0x2A2E00, 112),  # Medium-large
-        (0x2A0E00, 88),   # Medium (for comparison)
+        (0x2A0E00, 88),  # Medium (for comparison)
     ]
 
     print(f"Extracting {len(large_candidates)} high-priority candidates...")
@@ -108,8 +108,7 @@ def main():
 
         print("\\n👑 POTENTIAL CHARACTER SPRITES (100+ tiles):")
         for i, result in enumerate(character_candidates, 1):
-            print(f"  {i}. 0x{result['offset']:06X}: {result['actual_tiles']} tiles "
-                  f"({result['file_size']} bytes)")
+            print(f"  {i}. 0x{result['offset']:06X}: {result['actual_tiles']} tiles ({result['file_size']} bytes)")
             print(f"     → {Path(result['output_path']).name}")
 
         if character_candidates:
@@ -141,6 +140,7 @@ def main():
         print("or the extraction process failed for these specific offsets")
 
     return 0 if successful > 0 else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

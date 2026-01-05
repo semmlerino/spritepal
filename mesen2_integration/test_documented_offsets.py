@@ -2,6 +2,7 @@
 """
 Test documented Kirby Super Star sprite offsets from ROM hacking community
 """
+
 import sys
 from pathlib import Path
 
@@ -20,9 +21,7 @@ def test_documented_offset(rom_path: str, offset: int, output_dir: str, test_nam
         print(f"Testing documented offset 0x{offset:06X} ({test_name})...")
 
         # Attempt extraction
-        output_path, extraction_info = extractor.extract_sprite_from_rom(
-            rom_path, offset, str(output_base), test_name
-        )
+        output_path, extraction_info = extractor.extract_sprite_from_rom(rom_path, offset, str(output_base), test_name)
 
         # Check results
         output_file = Path(output_path)
@@ -33,7 +32,7 @@ def test_documented_offset(rom_path: str, offset: int, output_dir: str, test_nam
                 "success": True,
                 "output_path": output_path,
                 "file_size": file_size,
-                "extraction_info": extraction_info
+                "extraction_info": extraction_info,
             }
         else:
             print("  ✗ Failed: No output file created")
@@ -42,6 +41,7 @@ def test_documented_offset(rom_path: str, offset: int, output_dir: str, test_nam
     except Exception as e:
         print(f"  ✗ Error: {e}")
         return {"success": False, "error": str(e)}
+
 
 def main():
     """Test documented ROM offsets for actual character sprites"""
@@ -62,24 +62,21 @@ def main():
     # Documented offsets from ROM hacking community research
     documented_offsets = [
         # From TCRF/Data Crystal documentation
-        (0x302238, "flying_bird_enemy"),      # Enemy sprite from Green Greens first room
-        (0x3020EF, "green_greens_music"),     # Music header - might be near sprite data
-        (0x302125, "green_greens_door"),      # Door exit data - level data often has sprites
-
+        (0x302238, "flying_bird_enemy"),  # Enemy sprite from Green Greens first room
+        (0x3020EF, "green_greens_music"),  # Music header - might be near sprite data
+        (0x302125, "green_greens_door"),  # Door exit data - level data often has sprites
         # Try areas around documented addresses (sprite data often clustered)
-        (0x302000, "green_greens_area_start"), # Start of Green Greens area
-        (0x302300, "green_greens_area_mid"),   # Middle of area
-        (0x302500, "green_greens_area_end"),   # End of area
-
+        (0x302000, "green_greens_area_start"),  # Start of Green Greens area
+        (0x302300, "green_greens_area_mid"),  # Middle of area
+        (0x302500, "green_greens_area_end"),  # End of area
         # Try different compression boundaries (HAL uses specific patterns)
-        (0x300000, "hal_boundary_300k"),       # Common HAL boundary
-        (0x301000, "hal_boundary_301k"),       # 4KB after
-        (0x304000, "hal_boundary_304k"),       # 16KB after
-
+        (0x300000, "hal_boundary_300k"),  # Common HAL boundary
+        (0x301000, "hal_boundary_301k"),  # 4KB after
+        (0x304000, "hal_boundary_304k"),  # 16KB after
         # Try areas that might contain Kirby's main sprite data
-        (0x280000, "main_sprite_area_1"),      # ROM region often used for main sprites
-        (0x290000, "main_sprite_area_2"),      # Adjacent area
-        (0x2A0000, "main_sprite_area_3"),      # Next area
+        (0x280000, "main_sprite_area_1"),  # ROM region often used for main sprites
+        (0x290000, "main_sprite_area_2"),  # Adjacent area
+        (0x2A0000, "main_sprite_area_3"),  # Next area
     ]
 
     print(f"Testing {len(documented_offsets)} documented/inferred offsets:")
@@ -132,6 +129,7 @@ def main():
         print("4. Try different ROM dumps or versions")
 
     return 0 if successful > 0 else 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

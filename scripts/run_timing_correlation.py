@@ -42,9 +42,7 @@ from core.mesen_integration.timing_correlator import (
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Correlate sprite captures with DMA events for ROM tracing."
-    )
+    parser = argparse.ArgumentParser(description="Correlate sprite captures with DMA events for ROM tracing.")
     parser.add_argument(
         "--capture",
         type=Path,

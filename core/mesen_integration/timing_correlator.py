@@ -474,10 +474,7 @@ def format_correlation_report(results: CorrelationResults) -> str:
     lines.append("=" * 70)
     lines.append("SAMPLE CORRELATIONS (first 10):")
     lines.append("-" * 70)
-    lines.append(
-        f"  {'Sprite':>6s} {'Tile':>4s} {'VRAM Addr':>10s} "
-        f"{'DMA Frame':>9s} {'Staging':>14s} {'Offset':>8s}"
-    )
+    lines.append(f"  {'Sprite':>6s} {'Tile':>4s} {'VRAM Addr':>10s} {'DMA Frame':>9s} {'Staging':>14s} {'Offset':>8s}")
 
     for corr in results.correlations[:10]:
         staging = corr.staging_addr
@@ -508,8 +505,7 @@ def generate_correlation_json(results: CorrelationResults) -> dict[str, object]:
         },
         "staging_by_region": results.staging_summary(),
         "top_staging_buffers": [
-            {"addr": f"0x{addr:06X}", "count": count}
-            for addr, count in results.staging_buffer_usage.most_common(20)
+            {"addr": f"0x{addr:06X}", "count": count} for addr, count in results.staging_buffer_usage.most_common(20)
         ],
         "bank_registers": {
             "cxb": f"0x{results.bank_registers.cxb:02X}",

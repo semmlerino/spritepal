@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QFileDialog
 
+from ui.common.signal_utils import safe_disconnect
+
 from ..services import ImageConverter
 from ..workers import InjectWorker
 
@@ -34,6 +36,23 @@ class InjectionController(QObject):
         # File paths
         self.png_file: str = ""
         self.vram_file: str = ""
+
+    def _cleanup_worker(self) -> None:
+        """Clean up existing worker before creating new one."""
+        if self._worker is not None:
+            safe_disconnect(self._worker.progress)
+            safe_disconnect(self._worker.error)
+            safe_disconnect(self._worker.result)
+            safe_disconnect(self._worker.finished_signal)
+            self._worker = None
+
+    def cleanup(self) -> None:
+        """Clean up resources before destruction."""
+        self._cleanup_worker()
+        if self._view is not None:
+            safe_disconnect(self._view.inject_requested)
+            safe_disconnect(self._view.browse_png_requested)
+            safe_disconnect(self._view.browse_vram_requested)
 
     def set_view(self, view: "InjectTab") -> None:
         """Set the inject tab view."""
@@ -106,15 +125,13 @@ class InjectionController(QObject):
         if not self._view:
             return
 
+        # Validate parameters first
+        is_valid, error_msg = self._view.validate_params()
+        if not is_valid:
+            self._view.append_output(f"Validation failed:\n{error_msg}")
+            return
+
         params = self._view.get_injection_params()
-
-        if not params["png_file"]:
-            self._view.append_output("Error: No PNG file selected")
-            return
-
-        if not params["vram_file"]:
-            self._view.append_output("Error: No VRAM file selected")
-            return
 
         # Clear output
         self._view.clear_output()
@@ -122,25 +139,30 @@ class InjectionController(QObject):
         self._view.append_output(f"Injecting: {params['png_file']}")
         self._view.append_output(f"Into: {params['vram_file']}")
 
+        from typing import cast
+
         # Determine output path
-        output_file = params["output_file"]
+        output_file = cast(str, params["output_file"])
         if not Path(output_file).is_absolute():
             # Make relative to VRAM file directory
-            vram_dir = Path(params["vram_file"]).parent
+            vram_dir = Path(cast(str, params["vram_file"])).parent
             output_file = str(vram_dir / output_file)
+
+        # Clean up any existing worker before creating new one
+        self._cleanup_worker()
 
         # Create and start worker
         self._worker = InjectWorker(
-            png_file=params["png_file"],
-            vram_file=params["vram_file"],
-            offset=params["offset"],
+            png_file=cast(str, params["png_file"]),
+            vram_file=cast(str, params["vram_file"]),
+            offset=cast(int, params["offset"]),
             output_file=output_file,
         )
 
         self._worker.progress.connect(self._on_progress)
         self._worker.error.connect(self._on_error)
         self._worker.result.connect(self._on_injection_complete)
-        self._worker.finished.connect(self._on_worker_finished)
+        self._worker.finished_signal.connect(self._on_worker_finished)
 
         self._worker.start()
 

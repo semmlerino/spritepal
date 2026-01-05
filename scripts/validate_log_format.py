@@ -188,8 +188,7 @@ def validate_log(log_path: Path) -> ValidationResult:
         if header.version not in SUPPORTED_VERSIONS:
             result.valid = False
             result.errors.append(
-                f"Unsupported log version: {header.version}. "
-                f"Supported: {', '.join(sorted(SUPPORTED_VERSIONS))}"
+                f"Unsupported log version: {header.version}. Supported: {', '.join(sorted(SUPPORTED_VERSIONS))}"
             )
 
         # Warn about missing SHA256

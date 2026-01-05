@@ -10,7 +10,7 @@ from pathlib import Path
 
 def search_rom_for_pattern(rom_path, pattern, max_results=10):
     """Search ROM for a specific byte pattern"""
-    with open(rom_path, 'rb') as f:
+    with open(rom_path, "rb") as f:
         rom_data = f.read()
 
     results = []
@@ -29,9 +29,10 @@ def search_rom_for_pattern(rom_path, pattern, max_results=10):
 
     return results
 
+
 def search_for_compressed_sprite(rom_path):
     """Search for HAL compressed sprite data that could decompress to mushroom"""
-    with open(rom_path, 'rb') as f:
+    with open(rom_path, "rb") as f:
         rom_data = f.read()
 
     # HAL compression signatures
@@ -44,13 +45,14 @@ def search_for_compressed_sprite(rom_path):
         # Check for potential compressed data markers
         if rom_data[offset] == 0xE3:  # Common HAL compression marker
             # Check if this could be a sprite
-            size_bytes = rom_data[offset+1:offset+3]
-            size = struct.unpack('<H', size_bytes)[0]
+            size_bytes = rom_data[offset + 1 : offset + 3]
+            size = struct.unpack("<H", size_bytes)[0]
 
             if 0x20 <= size <= 0x200:  # Reasonable sprite size
                 potential_sprites.append((offset, size))
 
     return potential_sprites
+
 
 def analyze_vram_region(rom_path, savestate_data):
     """Analyze what might have written to VRAM $6A00"""
@@ -77,16 +79,17 @@ def analyze_vram_region(rom_path, savestate_data):
         print(f"\nFound '87 7E 87 7E' pattern at {len(results)} locations")
         print(f"First few offsets: {[f'${r:06X}' for r in results[:5]]}")
 
+
 def main():
-    base_dir = Path('/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master')
-    rom_path = base_dir / 'Kirby Super Star (USA).sfc'
-    sprite_data_path = base_dir / 'spritepal' / 'mushroom_sprite_candidate_006A00.bin'
+    base_dir = Path("/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master")
+    rom_path = base_dir / "Kirby Super Star (USA).sfc"
+    sprite_data_path = base_dir / "spritepal" / "mushroom_sprite_candidate_006A00.bin"
 
     print("Searching ROM for mushroom sprite data...")
     print("-" * 60)
 
     # Load the sprite data from savestate
-    with open(sprite_data_path, 'rb') as f:
+    with open(sprite_data_path, "rb") as f:
         sprite_data = f.read()
 
     print(f"Sprite data from VRAM $6A00: {len(sprite_data)} bytes")
@@ -120,13 +123,13 @@ def main():
         print(f"\nSearching {description} (${start:06X}-${end:06X})...")
 
         # Look for non-zero, non-repeating data that could be sprites
-        with open(rom_path, 'rb') as f:
+        with open(rom_path, "rb") as f:
             f.seek(start)
             data = f.read(end - start)
 
         # Find regions with high entropy (likely graphics data)
         for offset in range(0, len(data) - 0x80, 0x80):
-            chunk = data[offset:offset + 0x80]
+            chunk = data[offset : offset + 0x80]
 
             # Check if this looks like sprite data
             non_zero = sum(1 for b in chunk if b != 0)
@@ -139,5 +142,6 @@ def main():
                     print(f"  Potential sprite at ${rom_offset:06X}: {non_zero} non-zero bytes, {unique} unique values")
                     print(f"    First 16 bytes: {' '.join(f'{b:02X}' for b in chunk[:16])}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

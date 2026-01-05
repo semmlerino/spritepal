@@ -10,18 +10,18 @@ from pathlib import Path
 
 def extract_vram_from_savestate(savestate_path):
     """Extract VRAM data from a Mesen2 savestate"""
-    with open(savestate_path, 'rb') as f:
+    with open(savestate_path, "rb") as f:
         data = f.read()
 
     # Check for MSS header
-    if data[:3] != b'MSS':
+    if data[:3] != b"MSS":
         print(f"Invalid savestate header in {savestate_path}")
         return None, None
 
     # Find the start of zlib data (starts with 0x78)
     zlib_start = None
     for i in range(4, min(100, len(data))):
-        if data[i] == 0x78 and data[i+1] in [0x01, 0x5E, 0x9C, 0xDA]:  # Common zlib headers
+        if data[i] == 0x78 and data[i + 1] in [0x01, 0x5E, 0x9C, 0xDA]:  # Common zlib headers
             zlib_start = i
             print(f"Found zlib data at offset {i}")
             break
@@ -64,10 +64,10 @@ def extract_vram_from_savestate(savestate_path):
 
     # Common offsets where VRAM might be in the savestate
     possible_offsets = [
-        0x1000,   # After header
-        0x2000,   # After CPU state
-        0x4000,   # After PPU state
-        0x8000,   # After APU state
+        0x1000,  # After header
+        0x2000,  # After CPU state
+        0x4000,  # After PPU state
+        0x8000,  # After APU state
         0x10000,  # Common location
         0x20000,  # Another common location
     ]
@@ -76,9 +76,10 @@ def extract_vram_from_savestate(savestate_path):
     vram_sections = {}
     for offset in possible_offsets:
         if offset + vram_size <= len(decompressed):
-            vram_sections[offset] = decompressed[offset:offset + vram_size]
+            vram_sections[offset] = decompressed[offset : offset + vram_size]
 
     return decompressed, vram_sections
+
 
 def compare_vram_regions(before_data, sprite_data, vram_offset=0x6A00, size=0x80):
     """Compare VRAM regions between two savestates at the mushroom sprite location"""
@@ -90,12 +91,13 @@ def compare_vram_regions(before_data, sprite_data, vram_offset=0x6A00, size=0x80
 
     return differences
 
+
 def find_sprite_pattern(vram_data, start_offset=0x6A00, size=0x80):
     """Look for sprite patterns in VRAM data"""
     # SNES sprites use 4bpp format (32 bytes per 8x8 tile)
     # Look for non-zero data in our target range
 
-    sprite_data = vram_data[start_offset:start_offset + size]
+    sprite_data = vram_data[start_offset : start_offset + size]
 
     # Check if there's significant data here
     non_zero_bytes = sum(1 for b in sprite_data if b != 0)
@@ -107,18 +109,19 @@ def find_sprite_pattern(vram_data, start_offset=0x6A00, size=0x80):
         # Show first 32 bytes (one tile)
         print("  First tile data:")
         for i in range(0, min(32, len(sprite_data)), 16):
-            hex_str = ' '.join(f'{b:02X}' for b in sprite_data[i:i+16])
+            hex_str = " ".join(f"{b:02X}" for b in sprite_data[i : i + 16])
             print(f"    {hex_str}")
 
         return True
     return False
 
-def main():
-    base_dir = Path('/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal')
 
-    before_path = base_dir / 'Before.mss'
-    base_dir / 'Entering.mss'
-    sprite_path = base_dir / 'Sprite.mss'
+def main():
+    base_dir = Path("/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal")
+
+    before_path = base_dir / "Before.mss"
+    base_dir / "Entering.mss"
+    sprite_path = base_dir / "Sprite.mss"
 
     print("Analyzing savestates to find mushroom sprite data...")
     print("-" * 60)
@@ -148,8 +151,8 @@ def main():
             print(f"\nChecking {offset_name} (offset ${offset_value:06X})...")
 
             # Get the data at this offset
-            before_region = before_data[offset_value:offset_value + 0x80]
-            sprite_region = sprite_data[offset_value:offset_value + 0x80]
+            before_region = before_data[offset_value : offset_value + 0x80]
+            sprite_region = sprite_data[offset_value : offset_value + 0x80]
 
             # Count differences
             differences = sum(1 for i in range(0x80) if before_region[i] != sprite_region[i])
@@ -163,12 +166,12 @@ def main():
                     print(f"  Sprite.mss has {non_zero} non-zero bytes in this region")
                     print("  First 32 bytes of sprite data:")
                     for i in range(0, 32, 16):
-                        hex_str = ' '.join(f'{b:02X}' for b in sprite_region[i:i+16])
+                        hex_str = " ".join(f"{b:02X}" for b in sprite_region[i : i + 16])
                         print(f"    {hex_str}")
 
                     # Save the sprite data for analysis
-                    output_path = base_dir / f'mushroom_sprite_candidate_{offset_value:06X}.bin'
-                    with open(output_path, 'wb') as f:
+                    output_path = base_dir / f"mushroom_sprite_candidate_{offset_value:06X}.bin"
+                    with open(output_path, "wb") as f:
                         f.write(bytes(sprite_region))
                     print(f"  Saved candidate sprite data to {output_path.name}")
 
@@ -177,18 +180,19 @@ def main():
     # Search for specific patterns that might indicate sprite data
     # Look for sequences of non-zero bytes that could be tiles
     for search_offset in range(0, min(len(sprite_data) - 0x80, 0x80000), 0x1000):
-        region = sprite_data[search_offset:search_offset + 0x80]
+        region = sprite_data[search_offset : search_offset + 0x80]
         non_zero = sum(1 for b in region if b != 0)
 
         if non_zero > 32:  # At least one full tile
             # Check if this region is different between savestates
             if search_offset + 0x80 <= len(before_data):
-                before_region = before_data[search_offset:search_offset + 0x80]
+                before_region = before_data[search_offset : search_offset + 0x80]
                 if before_region != region:
                     differences = sum(1 for i in range(0x80) if before_region[i] != region[i])
                     if differences > 32:
                         print(f"\nFound significant difference at offset ${search_offset:06X}:")
                         print(f"  {differences} bytes differ, {non_zero} non-zero bytes in Sprite.mss")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

@@ -112,9 +112,7 @@ def find_high_info_tiles_anywhere(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Compare WRAM staging dumps to VRAM capture tiles and ROM DB hashes."
-    )
+    parser = argparse.ArgumentParser(description="Compare WRAM staging dumps to VRAM capture tiles and ROM DB hashes.")
     parser.add_argument("--capture", required=True, type=Path, help="Path to test_capture_*.json")
     parser.add_argument("--wram", required=True, type=Path, help="Path to wram_dump_*.bin")
     parser.add_argument("--database", type=Path, help="Path to tile_hash_database.json")
@@ -179,9 +177,7 @@ def main() -> None:
     if db_path:
         db_hashes = _load_db_hashes(db_path)
 
-    vram_low_info = [
-        idx for idx, tile in enumerate(vram_tiles) if _unique_count(tile) <= LOW_INFO_UNIQUE_BYTES
-    ]
+    vram_low_info = [idx for idx, tile in enumerate(vram_tiles) if _unique_count(tile) <= LOW_INFO_UNIQUE_BYTES]
     vram_high_info = [idx for idx in range(len(vram_tiles)) if idx not in set(vram_low_info)]
 
     vram_hits_in_wram = sum(1 for h in vram_hashes if h in wram_hash_set)
@@ -231,9 +227,7 @@ def main() -> None:
         print("High-info VRAM tiles found as substring in WRAM: 0")
 
     if args.emit_range:
-        range_matches = find_high_info_tiles_anywhere(
-            wram_data, vram_tiles, wram_start_value, find_all=True
-        )
+        range_matches = find_high_info_tiles_anywhere(wram_data, vram_tiles, wram_start_value, find_all=True)
         if range_matches:
             min_addr = min(addr for _, _, addr in range_matches)
             max_addr = max(addr for _, _, addr in range_matches) + BYTES_PER_TILE - 1
@@ -244,10 +238,7 @@ def main() -> None:
                 min_addr = (min_addr // BYTES_PER_TILE) * BYTES_PER_TILE
                 max_addr = ((max_addr + BYTES_PER_TILE) // BYTES_PER_TILE) * BYTES_PER_TILE - 1
             size = max_addr - min_addr + 1
-            print(
-                "Suggested WRAM watch range: "
-                f"start=0x{min_addr:06X} end=0x{max_addr:06X} size=0x{size:05X}"
-            )
+            print(f"Suggested WRAM watch range: start=0x{min_addr:06X} end=0x{max_addr:06X} size=0x{size:05X}")
             print(f"WRAM_WATCH_START=0x{min_addr:06X} WRAM_WATCH_END=0x{max_addr:06X}")
         else:
             print("Suggested WRAM watch range: none (no substring matches)")

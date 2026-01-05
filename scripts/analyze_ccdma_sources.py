@@ -222,9 +222,7 @@ def print_report(results: AnalysisResults) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Analyze CCDMA source types from dma_probe_log.txt output."
-    )
+    parser = argparse.ArgumentParser(description="Analyze CCDMA source types from dma_probe_log.txt output.")
     parser.add_argument(
         "target",
         type=Path,

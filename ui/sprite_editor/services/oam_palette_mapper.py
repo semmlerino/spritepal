@@ -5,6 +5,7 @@ Extracts sprite-to-palette assignments from OAM dumps.
 """
 
 import logging
+from typing import TypedDict
 
 from ..constants import (
     BYTES_PER_OAM_ENTRY,
@@ -20,11 +21,25 @@ from ..constants import (
 logger = logging.getLogger(__name__)
 
 
+class SpriteEntry(TypedDict):
+    """OAM sprite entry structure."""
+
+    index: int
+    x: int
+    y: int
+    tile: int
+    palette: int
+    priority: int
+    h_flip: int
+    v_flip: int
+    size: str
+
+
 class OAMPaletteMapper:
     """Parse OAM data to map sprites to their assigned palettes."""
 
     def __init__(self) -> None:
-        self.oam_entries: list[dict] = []
+        self.oam_entries: list[SpriteEntry] = []
         self.tile_palette_map: dict[int, int] = {}  # tile_number -> palette_number
         self.vram_palette_map: dict[int, int] = {}  # vram_offset -> palette_number
         # Sorted list for efficient range queries: (start_offset, end_offset, palette)
@@ -36,15 +51,10 @@ class OAMPaletteMapper:
             oam_data = f.read()
 
         if len(oam_data) < BYTES_PER_OAM_ENTRY:
-            raise ValueError(
-                f"OAM dump too small: {len(oam_data)} bytes "
-                f"(need at least {BYTES_PER_OAM_ENTRY})"
-            )
+            raise ValueError(f"OAM dump too small: {len(oam_data)} bytes (need at least {BYTES_PER_OAM_ENTRY})")
 
         if len(oam_data) < OAM_SIZE:
-            logger.warning(
-                f"Partial OAM data: {len(oam_data)} bytes (full size is {OAM_SIZE})"
-            )
+            logger.warning(f"Partial OAM data: {len(oam_data)} bytes (full size is {OAM_SIZE})")
 
         # Parse main OAM table
         for i in range(OAM_ENTRIES):
@@ -92,7 +102,8 @@ class OAMPaletteMapper:
                 "size": "large" if size_bit else "small",
             }
 
-            self.oam_entries.append(sprite_entry)
+            from typing import cast
+            self.oam_entries.append(cast(SpriteEntry, sprite_entry))
             self.tile_palette_map[actual_tile] = palette
 
             # For large sprites, map multiple tiles
@@ -159,7 +170,7 @@ class OAMPaletteMapper:
         """Get list of palette numbers actually used by sprites."""
         return sorted(set(self.tile_palette_map.values()))
 
-    def get_palette_usage_stats(self) -> dict:
+    def get_palette_usage_stats(self) -> dict[str, dict[int, int] | list[int] | int]:
         """Get statistics about palette usage."""
         palette_counts: dict[int, int] = {}
         for palette in self.tile_palette_map.values():
@@ -172,18 +183,13 @@ class OAMPaletteMapper:
             "visible_sprites": len([s for s in self.oam_entries if s["y"] < 224]),
         }
 
-    def find_sprites_using_palette(self, palette_num: int) -> list[dict]:
+    def find_sprites_using_palette(self, palette_num: int) -> list[SpriteEntry]:
         """Find all sprite entries using a specific palette."""
         return [s for s in self.oam_entries if s["palette"] == palette_num]
 
-    def find_sprites_in_region(
-        self, x_start: int, y_start: int, x_end: int, y_end: int
-    ) -> list[dict]:
+    def find_sprites_in_region(self, x_start: int, y_start: int, x_end: int, y_end: int) -> list[SpriteEntry]:
         """Find sprites within a screen region."""
-        return [
-            s for s in self.oam_entries
-            if x_start <= s["x"] <= x_end and y_start <= s["y"] <= y_end
-        ]
+        return [s for s in self.oam_entries if x_start <= s["x"] <= x_end and y_start <= s["y"] <= y_end]
 
 
 def create_tile_palette_map(oam_file: str, vram_base: int = KIRBY_VRAM_BASE) -> OAMPaletteMapper:

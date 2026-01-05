@@ -365,10 +365,7 @@ class CanonicalRange:
         """Check if two ranges overlap."""
         if self.region != other.region:
             return False
-        return not (
-            self.end_offset <= other.start_offset
-            or other.end_offset <= self.start_offset
-        )
+        return not (self.end_offset <= other.start_offset or other.end_offset <= self.start_offset)
 
     @classmethod
     def from_dma(

@@ -244,7 +244,7 @@ class CacheStatusController(QObject):
 
             # Format cache size
             size_bytes_val = stats.get("total_size_bytes", 0)
-            size_bytes = int(size_bytes_val) if isinstance(size_bytes_val, (int, float)) else 0
+            size_bytes = int(size_bytes_val) if isinstance(size_bytes_val, int | float) else 0
             if size_bytes > 1024 * 1024:
                 size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
             elif size_bytes > 1024:

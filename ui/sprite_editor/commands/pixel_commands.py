@@ -64,7 +64,7 @@ class UndoCommand(ABC):
             self.compressed = False
 
     @abstractmethod
-    def _get_compress_data(self) -> Any:
+    def _get_compress_data(self) -> Any:  # type: ignore[reportExplicitAny]
         """Get data to be compressed."""
 
     @abstractmethod
@@ -72,10 +72,10 @@ class UndoCommand(ABC):
         """Clear uncompressed data after compression."""
 
     @abstractmethod
-    def _restore_from_compressed(self, data: Any) -> None:
+    def _restore_from_compressed(self, data: Any) -> None:  # type: ignore[reportExplicitAny]
         """Restore state from compressed data."""
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:  # type: ignore[reportExplicitAny]
         """Serialize command to dictionary for save/load support."""
         return {
             "type": self.__class__.__name__,
@@ -86,7 +86,7 @@ class UndoCommand(ABC):
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> UndoCommand:
+    def from_dict(cls, data: dict[str, Any]) -> UndoCommand:  # type: ignore[reportExplicitAny]
         """Deserialize command from dictionary."""
         raise NotImplementedError("Subclasses must implement from_dict")
 
@@ -139,7 +139,7 @@ class DrawPixelCommand(UndoCommand):
 
     @classmethod
     @override
-    def from_dict(cls, data: dict[str, Any]) -> DrawPixelCommand:
+    def from_dict(cls, data: dict[str, Any]) -> DrawPixelCommand:  # type: ignore[reportExplicitAny]
         """Create command from dictionary."""
         cmd = cls()
         cmd.timestamp = datetime.fromisoformat(data["timestamp"])
@@ -164,38 +164,45 @@ class DrawLineCommand(UndoCommand):
         """Initialize parent class after dataclass initialization."""
         super().__init__()
 
+    @override
     def execute(self, model: ImageModel) -> None:
         """Apply new color to all line pixels."""
         for x, y, _ in self.pixels:
             if 0 <= x < model.data.shape[1] and 0 <= y < model.data.shape[0]:
                 model.data[y, x] = self.new_color
 
+    @override
     def unexecute(self, model: ImageModel) -> None:
         """Restore original colors for all line pixels."""
         for x, y, old_color in self.pixels:
             if 0 <= x < model.data.shape[1] and 0 <= y < model.data.shape[0]:
                 model.data[y, x] = old_color
 
+    @override
     def get_memory_size(self) -> int:
         """Calculate memory usage."""
         if self.compressed and self._compressed_data:
             return len(self._compressed_data) + 64
         return len(self.pixels) * 12 + 64
 
+    @override
     def _get_compress_data(self) -> tuple[list[tuple[int, int, int]], int]:
         """Get line data for compression."""
         return (self.pixels, self.new_color)
 
+    @override
     def _clear_uncompressed_data(self) -> None:
         """Clear pixel list after compression."""
         self.pixels = []
 
+    @override
     def _restore_from_compressed(self, data: tuple[list[tuple[int, int, int]], int]) -> None:
         """Restore line data from compressed format."""
         self.pixels, self.new_color = data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DrawLineCommand:
+    @override
+    def from_dict(cls, data: dict[str, Any]) -> DrawLineCommand:  # type: ignore[reportExplicitAny]
         """Create command from dictionary."""
         cmd = cls()
         cmd.timestamp = datetime.fromisoformat(data["timestamp"])
@@ -225,6 +232,7 @@ class FloodFillCommand(UndoCommand):
         """Initialize parent class after dataclass initialization."""
         super().__init__()
 
+    @override
     def execute(self, model: ImageModel) -> None:
         """Apply flood fill operation."""
         if not self._fill_executed:
@@ -233,6 +241,7 @@ class FloodFillCommand(UndoCommand):
         else:
             self._apply_stored_changes(model)
 
+    @override
     def unexecute(self, model: ImageModel) -> None:
         """Restore original data in affected region."""
         if self.old_data is None:
@@ -316,6 +325,7 @@ class FloodFillCommand(UndoCommand):
 
         return filled
 
+    @override
     def get_memory_size(self) -> int:
         """Calculate memory usage."""
         if self.compressed and self._compressed_data:
@@ -324,6 +334,7 @@ class FloodFillCommand(UndoCommand):
             return self.old_data.nbytes + 64
         return 64
 
+    @override
     def _get_compress_data(
         self,
     ) -> tuple[int, int, int, int, tuple[int, int, int, int], np.ndarray | None, bool]:
@@ -338,10 +349,12 @@ class FloodFillCommand(UndoCommand):
             self._fill_executed,
         )
 
+    @override
     def _clear_uncompressed_data(self) -> None:
         """Clear numpy array after compression."""
         self.old_data = None
 
+    @override
     def _restore_from_compressed(
         self,
         data: tuple[int, int, int, int, tuple[int, int, int, int], np.ndarray | None, bool],
@@ -358,7 +371,8 @@ class FloodFillCommand(UndoCommand):
         ) = data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> FloodFillCommand:
+    @override
+    def from_dict(cls, data: dict[str, Any]) -> FloodFillCommand:  # type: ignore[reportExplicitAny]
         """Create command from dictionary."""
         cmd = cls()
         cmd.timestamp = datetime.fromisoformat(data["timestamp"])
@@ -372,7 +386,7 @@ class FloodFillCommand(UndoCommand):
             cmd.y = y
             cmd.old_color = old_color
             cmd.new_color = new_color
-            cmd.affected_region = tuple(region)  # type: ignore[assignment]
+            cmd.affected_region = tuple(region)
             cmd._fill_executed = fill_executed
             if old_data_list is not None:
                 _, _, w, h = cmd.affected_region
@@ -393,6 +407,7 @@ class BatchCommand(UndoCommand):
         """Add a command to the batch."""
         self.commands.append(command)
 
+    @override
     def execute(self, model: ImageModel) -> None:
         """Execute all commands in order."""
         for cmd in self.commands:
@@ -400,6 +415,7 @@ class BatchCommand(UndoCommand):
                 cmd.decompress()
             cmd.execute(model)
 
+    @override
     def unexecute(self, model: ImageModel) -> None:
         """Undo all commands in reverse order."""
         for cmd in reversed(self.commands):
@@ -407,10 +423,12 @@ class BatchCommand(UndoCommand):
                 cmd.decompress()
             cmd.unexecute(model)
 
+    @override
     def get_memory_size(self) -> int:
         """Calculate total memory usage of all commands."""
         return sum(cmd.get_memory_size() for cmd in self.commands) + 64
 
+    @override
     def compress(self) -> None:
         """Compress all individual commands."""
         for cmd in self.commands:
@@ -418,18 +436,22 @@ class BatchCommand(UndoCommand):
                 cmd.compress()
         super().compress()
 
+    @override
     def _get_compress_data(self) -> list[UndoCommand]:
         """Get command list for compression."""
         return self.commands
 
+    @override
     def _clear_uncompressed_data(self) -> None:
         """Commands are already compressed individually."""
 
+    @override
     def _restore_from_compressed(self, data: list[UndoCommand]) -> None:
         """Restore command list from compressed format."""
         self.commands = data
 
-    def to_dict(self) -> dict[str, Any]:
+    @override
+    def to_dict(self) -> dict[str, Any]:  # type: ignore[reportExplicitAny]
         """Serialize batch command to dictionary."""
         base_dict = super().to_dict()
         if not self.compressed:
@@ -437,7 +459,8 @@ class BatchCommand(UndoCommand):
         return base_dict
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> BatchCommand:
+    @override
+    def from_dict(cls, data: dict[str, Any]) -> BatchCommand:  # type: ignore[reportExplicitAny]
         """Create batch command from dictionary."""
         cmd = cls()
         cmd.timestamp = datetime.fromisoformat(data["timestamp"])

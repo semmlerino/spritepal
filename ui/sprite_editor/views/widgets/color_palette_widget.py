@@ -4,14 +4,16 @@ Color palette widget for the pixel editor.
 Displays and manages 16-color palettes for indexed pixel editing.
 """
 
-from typing import Any
+from typing import override
 
 from PySide6.QtCore import QPoint, QRect, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QMouseEvent, QPainter, QPen, QPolygon
+from PySide6.QtGui import QBrush, QColor, QMouseEvent, QPainter, QPaintEvent, QPen, QPolygon
 from PySide6.QtWidgets import QMenu, QWidget
 
+from .pixel_canvas import PixelCanvas
 
-def _validate_rgb_color(color: Any) -> tuple[int, int, int]:
+
+def _validate_rgb_color(color: object) -> tuple[int, int, int]:
     """Validate and normalize RGB color to tuple of ints."""
     if isinstance(color, list | tuple) and len(color) >= 3:
         return (int(color[0]), int(color[1]), int(color[2]))
@@ -69,7 +71,7 @@ class ColorPaletteWidget(QWidget):
         self.palette_source = "Default Grayscale Palette"
 
         # Connected canvas for automatic updates
-        self._connected_canvas: Any | None = None
+        self._connected_canvas: PixelCanvas | None = None
 
         self.setFixedSize(4 * self.cell_size + 10, 4 * self.cell_size + 10)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -148,7 +150,7 @@ class ColorPaletteWidget(QWidget):
             self._connected_canvas._palette_version += 1
             self._connected_canvas.update()
 
-    def connect_canvas(self, canvas: Any) -> None:
+    def connect_canvas(self, canvas: PixelCanvas) -> None:
         """Connect a canvas widget to receive palette updates."""
         self._connected_canvas = canvas
 
@@ -176,7 +178,8 @@ class ColorPaletteWidget(QWidget):
         if menu.actions():
             menu.exec(self.mapToGlobal(position))
 
-    def paintEvent(self, event: Any) -> None:
+    @override
+    def paintEvent(self, event: QPaintEvent) -> None:
         """Paint the palette widget."""
         painter = QPainter(self)
 
@@ -224,7 +227,8 @@ class ColorPaletteWidget(QWidget):
                 str(i),
             )
 
-    def mousePressEvent(self, event: QMouseEvent | None) -> None:
+    @override
+    def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse press to select color."""
         if event and event.button() == Qt.MouseButton.LeftButton:
             x = int((event.position().x() - 5) // self.cell_size)

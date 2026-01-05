@@ -480,7 +480,7 @@ class TestHammingDistance:
         hash2 = np.array([1, 1, 0, 0], dtype=np.uint8)
 
         distance = engine._hamming_distance(hash1, hash2)
-        assert isinstance(distance, (int, np.integer))
+        assert isinstance(distance, int | np.integer)
 
     def test_hamming_distance_large_arrays(self, engine: VisualSimilarityEngine) -> None:
         """Should work with 64-bit or larger arrays."""
@@ -735,7 +735,7 @@ class TestFindSimilar:
         assert isinstance(match, SimilarityMatch)
         assert match.offset == 0x2000
         assert 0.0 <= match.similarity_score <= 1.0
-        assert isinstance(match.hash_distance, (int, np.integer))
+        assert isinstance(match.hash_distance, int | np.integer)
         assert match.metadata == {"name": "red2"}
 
     def test_find_similar_threshold_zero(

@@ -78,7 +78,7 @@ def main() -> int:
     found_count = 0
     not_found_count = 0
 
-    for sprite_id, tile_idx, tile_hex in tiles_to_search[:args.max_tiles]:
+    for sprite_id, tile_idx, tile_hex in tiles_to_search[: args.max_tiles]:
         tile_bytes = bytes.fromhex(tile_hex)
 
         # Search in ROM

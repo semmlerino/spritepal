@@ -19,12 +19,10 @@ class PaletteModel:
     Handles multiple palettes and format conversions.
     """
 
-    colors: list[tuple[int, int, int]] = field(
-        default_factory=lambda: [(i * 17, i * 17, i * 17) for i in range(16)]
-    )
+    colors: list[tuple[int, int, int]] = field(default_factory=lambda: [(i * 17, i * 17, i * 17) for i in range(16)])
     name: str = "Default"
     index: int = 0
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)  # type: ignore[reportExplicitAny]
 
     def from_rgb_list(self, rgb_list: list[tuple[int, int, int]]) -> None:
         """Load palette from RGB tuples."""
@@ -66,7 +64,7 @@ class PaletteModel:
 
             if "palette" in data and "colors" in data["palette"]:
                 colors_data = data["palette"]["colors"]
-                self.colors = [tuple(c) for c in colors_data]  # type: ignore[misc]
+                self.colors = [tuple(c) for c in colors_data]
                 self.name = data["palette"].get("name", Path(file_path).stem)
                 self.metadata = data
                 return True

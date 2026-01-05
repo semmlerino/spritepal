@@ -436,6 +436,7 @@ spritepal/
 │   ├── protocols/         # Protocol definitions
 │   └── *.py               # Core logic
 ├── ui/                    # Qt UI components
+│   ├── sprite_editor/     # Unified sprite editor (Extract → Edit → Inject)
 │   ├── components/        # Reusable widgets
 │   ├── dialogs/           # Dialog windows
 │   ├── workers/           # Background workers
@@ -451,6 +452,9 @@ spritepal/
 
 | Looking for... | Location |
 |----------------|----------|
+| **Unified Sprite Editor** | `ui/sprite_editor/` (Extract/Edit/Inject workflow with full documentation) |
+| Sprite Editor Quick Start | Run: `python launch_editor.py` from spritepal directory |
+| Sprite Editor Docs | `ui/sprite_editor/README.md` (architecture, formats, components) |
 | CoreOperationsManager | `core/managers/core_operations_manager.py` (handles extraction and injection) |
 | ApplicationStateManager | `core/managers/application_state_manager.py` (session, settings, state) |
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
@@ -509,4 +513,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: January 4, 2026 (Added mesen_integration documentation, updated Lua scripts, fixed batch file references)*
+*Last updated: January 5, 2026 (Added unified sprite editor documentation, created launch_editor.py)*

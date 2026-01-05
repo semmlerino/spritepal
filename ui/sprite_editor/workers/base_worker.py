@@ -35,9 +35,7 @@ class BaseWorker(QThread):
         self._file_path: Path | None = None
 
         if file_path is not None:
-            self._file_path = (
-                Path(file_path) if not isinstance(file_path, Path) else file_path
-            )
+            self._file_path = Path(file_path) if not isinstance(file_path, Path) else file_path
 
     def cancel(self) -> None:
         """Request cancellation of the worker thread."""
@@ -95,3 +93,4 @@ class BaseWorker(QThread):
     def handle_exception(self, exception: Exception) -> None:
         """Handle an exception by emitting it as an error."""
         self.emit_error(str(exception))
+        self.emit_finished()

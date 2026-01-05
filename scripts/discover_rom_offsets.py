@@ -104,9 +104,7 @@ def get_pointer_table_offsets(rom_path: Path) -> list[tuple[int, int, str]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Discover HAL-compressed graphics offsets in ROM"
-    )
+    parser = argparse.ArgumentParser(description="Discover HAL-compressed graphics offsets in ROM")
     parser.add_argument(
         "--rom",
         type=Path,
@@ -187,18 +185,15 @@ def main() -> int:
     if args.json:
         output = {
             "rom": str(args.rom),
-            "offsets": [
-                {"rom_offset": f"0x{o:06X}", "tiles": t, "description": d}
-                for o, t, d in all_offsets
-            ],
+            "offsets": [{"rom_offset": f"0x{o:06X}", "tiles": t, "description": d} for o, t, d in all_offsets],
             "total_tiles": sum(t for _, t, _ in all_offsets),
             "total_blocks": len(all_offsets),
         }
         print(json.dumps(output, indent=2))
     else:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"DISCOVERED HAL BLOCKS: {len(all_offsets)}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         total_tiles = 0
         for offset, tiles, desc in all_offsets:

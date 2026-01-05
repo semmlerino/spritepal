@@ -7,7 +7,7 @@ Provides drawing tools and manages tool state.
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from enum import Enum, auto
-from typing import Any
+from typing import Any, override
 
 from PySide6.QtCore import QObject, Signal
 
@@ -26,15 +26,15 @@ class Tool(ABC):
     """Abstract base class for drawing tools."""
 
     @abstractmethod
-    def on_press(self, x: int, y: int, color: int, image_model: ImageModel) -> Any:
+    def on_press(self, x: int, y: int, color: int, image_model: ImageModel) -> Any:  # type: ignore[reportExplicitAny]
         """Handle mouse press event."""
 
     @abstractmethod
-    def on_move(self, x: int, y: int, color: int, image_model: ImageModel) -> Any:
+    def on_move(self, x: int, y: int, color: int, image_model: ImageModel) -> Any:  # type: ignore[reportExplicitAny]
         """Handle mouse move event."""
 
     @abstractmethod
-    def on_release(self, x: int, y: int, color: int, image_model: ImageModel) -> Any:
+    def on_release(self, x: int, y: int, color: int, image_model: ImageModel) -> Any:  # type: ignore[reportExplicitAny]
         """Handle mouse release event."""
 
 
@@ -45,15 +45,15 @@ class PencilTool(Tool):
         self.last_x: int | None = None
         self.last_y: int | None = None
 
+    @override
     def on_press(self, x: int, y: int, color: int, image_model: ImageModel) -> bool:
         """Draw a single pixel and start tracking position."""
         self.last_x = x
         self.last_y = y
         return image_model.set_pixel(x, y, color)
 
-    def on_move(
-        self, x: int, y: int, color: int, image_model: ImageModel
-    ) -> list[tuple[int, int]]:
+    @override
+    def on_move(self, x: int, y: int, color: int, image_model: ImageModel) -> list[tuple[int, int]]:
         """Continue drawing with line interpolation."""
         if self.last_x is None or self.last_y is None:
             self.last_x = x
@@ -65,16 +65,13 @@ class PencilTool(Tool):
         self.last_y = y
         return line_points
 
-    def on_release(
-        self, x: int, y: int, color: int, image_model: ImageModel
-    ) -> None:
+    @override
+    def on_release(self, x: int, y: int, color: int, image_model: ImageModel) -> None:
         """Clear tracking state."""
         self.last_x = None
         self.last_y = None
 
-    def _get_line_points(
-        self, x0: int, y0: int, x1: int, y1: int
-    ) -> list[tuple[int, int]]:
+    def _get_line_points(self, x0: int, y0: int, x1: int, y1: int) -> list[tuple[int, int]]:
         """Get all points on a line using Bresenham's algorithm."""
         points: list[tuple[int, int]] = []
 
@@ -109,15 +106,16 @@ class PencilTool(Tool):
 class FillTool(Tool):
     """Flood fill tool."""
 
-    def on_press(
-        self, x: int, y: int, color: int, image_model: ImageModel
-    ) -> list[tuple[int, int]]:
+    @override
+    def on_press(self, x: int, y: int, color: int, image_model: ImageModel) -> list[tuple[int, int]]:
         """Perform flood fill."""
         return image_model.fill(x, y, color)
 
+    @override
     def on_move(self, x: int, y: int, color: int, image_model: ImageModel) -> None:
         """No action on move."""
 
+    @override
     def on_release(self, x: int, y: int, color: int, image_model: ImageModel) -> None:
         """Nothing to do on release."""
 
@@ -128,6 +126,7 @@ class ColorPickerTool(Tool):
     def __init__(self) -> None:
         self.picked_callback: Callable[[int], None] | None = None
 
+    @override
     def on_press(self, x: int, y: int, color: int, image_model: ImageModel) -> int:
         """Pick color at position."""
         picked_color = image_model.get_color_at(x, y)
@@ -135,9 +134,11 @@ class ColorPickerTool(Tool):
             self.picked_callback(picked_color)
         return picked_color
 
+    @override
     def on_move(self, x: int, y: int, color: int, image_model: ImageModel) -> None:
         """No action on move."""
 
+    @override
     def on_release(self, x: int, y: int, color: int, image_model: ImageModel) -> None:
         """Nothing to do on release."""
 
@@ -235,9 +236,7 @@ class ToolManager(QObject):
         """Get current brush size."""
         return self.current_brush_size
 
-    def get_brush_pixels(
-        self, center_x: int, center_y: int
-    ) -> list[tuple[int, int]]:
+    def get_brush_pixels(self, center_x: int, center_y: int) -> list[tuple[int, int]]:
         """Calculate pixels affected by brush at given position."""
         pixels: list[tuple[int, int]] = []
         size = self.current_brush_size

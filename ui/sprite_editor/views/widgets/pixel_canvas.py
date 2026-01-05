@@ -4,11 +4,11 @@ Optimized canvas widget for the pixel editor.
 Uses controller's models and managers instead of maintaining its own state.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, override
 
 import numpy as np
-from PySide6.QtCore import QPoint, QPointF, QRect, Qt, Signal
-from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QPen, QWheelEvent
+from PySide6.QtCore import QEvent, QPoint, QPointF, QRect, Qt, Signal
+from PySide6.QtGui import QColor, QEnterEvent, QImage, QMouseEvent, QPainter, QPaintEvent, QPen, QWheelEvent
 from PySide6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
@@ -411,7 +411,8 @@ class PixelCanvas(QWidget):
                     color,
                 )
 
-    def paintEvent(self, event: Any) -> None:
+    @override
+    def paintEvent(self, event: QPaintEvent) -> None:
         """Paint the canvas using optimized viewport-based rendering."""
         if not self.controller.has_image():
             return
@@ -565,6 +566,7 @@ class PixelCanvas(QWidget):
                 # Draw the pixel area (subtract 1 from width/height for correct Qt rectangle)
                 painter.drawRect(px * self.zoom, py * self.zoom, self.zoom - 1, self.zoom - 1)
 
+    @override
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse press."""
         if event.button() == Qt.MouseButton.LeftButton:
@@ -589,6 +591,7 @@ class PixelCanvas(QWidget):
                 self.controller.set_tool("picker")
                 self.pixelPressed.emit(pos.x(), pos.y())
 
+    @override
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Handle mouse move with optimized hover updates."""
         # Handle panning
@@ -612,6 +615,7 @@ class PixelCanvas(QWidget):
         if self.drawing and pos:
             self.pixelMoved.emit(pos.x(), pos.y())
 
+    @override
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         """Handle mouse release."""
         if event.button() == Qt.MouseButton.LeftButton:
@@ -634,6 +638,7 @@ class PixelCanvas(QWidget):
             self.temporary_picker = False
             self.previous_tool = None
 
+    @override
     def wheelEvent(self, event: QWheelEvent) -> None:
         """Handle mouse wheel for zooming."""
         delta = event.angleDelta().y()
@@ -678,7 +683,8 @@ class PixelCanvas(QWidget):
 
         event.accept()
 
-    def leaveEvent(self, event: Any) -> None:
+    @override
+    def leaveEvent(self, event: QEvent) -> None:
         """Handle mouse leave event."""
         old_hover_pos = self.hover_pos
         self.hover_pos = None
@@ -702,7 +708,8 @@ class PixelCanvas(QWidget):
                 return QPoint(x, y)
         return None
 
-    def enterEvent(self, event: Any) -> None:
+    @override
+    def enterEvent(self, event: QEnterEvent) -> None:
         """Show tooltip on enter and update cursor."""
         self.setToolTip("Left click: Draw • Right click: Pick color • Middle click + drag: Pan • Wheel: Zoom")
         # Update cursor for current tool

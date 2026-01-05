@@ -1,0 +1,38 @@
+{
+  "frame": 3543,
+  "sprites": [
+    {"oam_id": 0, "x": 169, "y": 153, "width": 8, "height": 8, "tile": 158, "palette": 1, "vram_addr": 13248},
+    {"oam_id": 1, "x": 192, "y": 147, "width": 16, "height": 16, "tile": 202, "palette": 1, "vram_addr": 14656},
+    {"oam_id": 2, "x": 159, "y": 149, "width": 8, "height": 8, "tile": 19, "palette": 0, "vram_addr": 608},
+    {"oam_id": 3, "x": 151, "y": 149, "width": 8, "height": 8, "tile": 4, "palette": 0, "vram_addr": 128},
+    {"oam_id": 4, "x": 143, "y": 149, "width": 8, "height": 8, "tile": 3, "palette": 0, "vram_addr": 96},
+    {"oam_id": 5, "x": 159, "y": 141, "width": 8, "height": 8, "tile": 18, "palette": 0, "vram_addr": 576},
+    {"oam_id": 6, "x": 159, "y": 133, "width": 8, "height": 8, "tile": 2, "palette": 0, "vram_addr": 64},
+    {"oam_id": 7, "x": 143, "y": 133, "width": 16, "height": 16, "tile": 0, "palette": 0, "vram_addr": 0},
+    {"oam_id": 8, "x": 152, "y": 96, "width": 8, "height": 8, "tile": 51, "palette": 2, "vram_addr": 1632},
+    {"oam_id": 9, "x": 144, "y": 96, "width": 8, "height": 8, "tile": 36, "palette": 2, "vram_addr": 1152},
+    {"oam_id": 10, "x": 136, "y": 96, "width": 8, "height": 8, "tile": 35, "palette": 2, "vram_addr": 1120},
+    {"oam_id": 11, "x": 152, "y": 88, "width": 8, "height": 8, "tile": 50, "palette": 2, "vram_addr": 1600},
+    {"oam_id": 12, "x": 152, "y": 80, "width": 8, "height": 8, "tile": 34, "palette": 2, "vram_addr": 1088},
+    {"oam_id": 13, "x": 136, "y": 80, "width": 16, "height": 16, "tile": 32, "palette": 2, "vram_addr": 1024},
+    {"oam_id": 14, "x": 176, "y": 103, "width": 8, "height": 8, "tile": 136, "palette": 1, "vram_addr": 12544},
+    {"oam_id": 15, "x": 184, "y": 103, "width": 8, "height": 8, "tile": 135, "palette": 1, "vram_addr": 12512},
+    {"oam_id": 16, "x": 168, "y": 95, "width": 8, "height": 8, "tile": 153, "palette": 1, "vram_addr": 13088},
+    {"oam_id": 17, "x": 176, "y": 87, "width": 16, "height": 16, "tile": 135, "palette": 1, "vram_addr": 12512},
+    {"oam_id": 18, "x": 196, "y": 99, "width": 16, "height": 16, "tile": 200, "palette": 4, "vram_addr": 6400},
+    {"oam_id": 19, "x": 204, "y": 115, "width": 8, "height": 8, "tile": 225, "palette": 4, "vram_addr": 7200},
+    {"oam_id": 20, "x": 188, "y": 123, "width": 8, "height": 8, "tile": 242, "palette": 4, "vram_addr": 7744},
+    {"oam_id": 21, "x": 196, "y": 123, "width": 8, "height": 8, "tile": 241, "palette": 4, "vram_addr": 7712},
+    {"oam_id": 22, "x": 204, "y": 123, "width": 8, "height": 8, "tile": 240, "palette": 4, "vram_addr": 7680},
+    {"oam_id": 23, "x": 188, "y": 107, "width": 16, "height": 16, "tile": 210, "palette": 4, "vram_addr": 6720},
+    {"oam_id": 24, "x": 189, "y": 101, "width": 8, "height": 8, "tile": 192, "palette": 4, "vram_addr": 6144},
+    {"oam_id": 25, "x": 208, "y": 130, "width": 8, "height": 8, "tile": 114, "palette": 4, "vram_addr": 3648},
+    {"oam_id": 26, "x": 192, "y": 122, "width": 16, "height": 16, "tile": 96, "palette": 4, "vram_addr": 3072},
+    {"oam_id": 27, "x": 188, "y": 135, "width": 16, "height": 16, "tile": 130, "palette": 4, "vram_addr": 4160},
+    {"oam_id": 28, "x": 209, "y": 133, "width": 8, "height": 8, "tile": 98, "palette": 4, "vram_addr": 3136},
+    {"oam_id": 29, "x": 201, "y": 117, "width": 16, "height": 16, "tile": 99, "palette": 4, "vram_addr": 3168}
+  ],
+  "active_indices": [
+    {"idx": 38, "ptr": "E9:B299", "last_frame": 3542, "sessions": 2}
+  ]
+}

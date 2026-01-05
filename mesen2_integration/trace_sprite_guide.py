@@ -20,9 +20,9 @@ class SpriteTraceGuide:
 
     def print_header(self, text: str):
         """Print a formatted header."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  {text}")
-        print('='*60)
+        print("=" * 60)
 
     def print_step(self, number: int, title: str):
         """Print a step header."""
@@ -83,7 +83,7 @@ Tips:
 """)
 
         vram_input = self.get_input("Enter the VRAM address of the sprite tile (e.g., $1E00)")
-        self.vram_address = vram_input.replace('$', '').replace('0x', '').upper()
+        self.vram_address = vram_input.replace("$", "").replace("0x", "").upper()
 
         # Calculate range for multi-tile sprites
         num_tiles = self.get_input("How many tiles does the sprite use?", "4")
@@ -184,7 +184,7 @@ This will:
 """)
 
         run_now = self.get_input("Run extractor now? (y/n)", "y")
-        if run_now.lower() == 'y':
+        if run_now.lower() == "y":
             self.run_extractor()
 
         # Save notes
@@ -199,8 +199,7 @@ This will:
 
         print(f"\nRunning: python {script_path.name} {self.snes_address}")
         result = subprocess.run(
-            [sys.executable, str(script_path), self.snes_address, "--scan"],
-            check=False, capture_output=False
+            [sys.executable, str(script_path), self.snes_address, "--scan"], check=False, capture_output=False
         )
 
         if result.returncode == 0:
@@ -215,7 +214,7 @@ This will:
 
         log_file = log_dir / f"{self.sprite_name.replace(' ', '_').lower()}_trace.txt"
 
-        with open(log_file, 'w') as f:
+        with open(log_file, "w") as f:
             f.write(f"Sprite Trace Log: {self.sprite_name}\n")
             f.write("=" * 40 + "\n\n")
             f.write(f"Sprite Name: {self.sprite_name}\n")
@@ -230,20 +229,23 @@ This will:
 
         print(f"\n✓ Trace log saved to: {log_file}")
 
+
 def main():
     guide = SpriteTraceGuide()
 
     try:
         guide.run_guide()
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("  Sprite tracing complete!")
-        print("="*60)
+        print("=" * 60)
     except KeyboardInterrupt:
         print("\n\nGuide interrupted by user.")
     except Exception as e:
         print(f"\nError: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

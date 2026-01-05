@@ -14,8 +14,8 @@ class BaseController(QObject):
 
     def __init__(
         self,
-        model: Any | None = None,
-        view: Any | None = None,
+        model: Any | None = None,  # type: ignore[reportExplicitAny]
+        view: Any | None = None,  # type: ignore[reportExplicitAny]
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -25,13 +25,13 @@ class BaseController(QObject):
         if model and view:
             self.connect_signals()
 
-    def set_model(self, model: Any) -> None:
+    def set_model(self, model: Any) -> None:  # type: ignore[reportExplicitAny]
         """Set the model for this controller."""
         self._model = model
         if self._model and self._view:
             self.connect_signals()
 
-    def set_view(self, view: Any) -> None:
+    def set_view(self, view: Any) -> None:  # type: ignore[reportExplicitAny]
         """Set the view for this controller."""
         self._view = view
         if self._model and self._view:
@@ -42,11 +42,11 @@ class BaseController(QObject):
         pass
 
     @property
-    def model(self) -> Any:
+    def model(self) -> Any:  # type: ignore[reportExplicitAny]
         """Get the associated model."""
         return self._model
 
     @property
-    def view(self) -> Any:
+    def view(self) -> Any:  # type: ignore[reportExplicitAny]
         """Get the associated view."""
         return self._view

@@ -24,12 +24,7 @@ class MushroomSpriteFinder:
 
     def wsl_to_windows_path(self, wsl_path: Path) -> str:
         """Convert WSL path to Windows path"""
-        result = subprocess.run(
-            ["wslpath", "-w", str(wsl_path)],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        result = subprocess.run(["wslpath", "-w", str(wsl_path)], capture_output=True, text=True, check=True)
         return result.stdout.strip()
 
     def run_transition_test(self) -> dict | None:
@@ -55,10 +50,14 @@ class MushroomSpriteFinder:
         cmd = [
             mesen_win,
             rom_win,
-            "--testrunner", "300",
-            "--loadstate", before_win,
-            "--script", lua_win,
-            "--input", input_str
+            "--testrunner",
+            "300",
+            "--loadstate",
+            before_win,
+            "--script",
+            lua_win,
+            "--input",
+            input_str,
         ]
 
         print("Starting Mesen2 with mushroom tracker...")
@@ -73,11 +72,11 @@ class MushroomSpriteFinder:
         # Need to quote arguments properly for Windows
         cmd_parts = []
         for arg in cmd:
-            if ' ' in arg or ',' in arg or '|' in arg:
+            if " " in arg or "," in arg or "|" in arg:
                 cmd_parts.append(f'"{arg}"')
             else:
                 cmd_parts.append(arg)
-        cmd_str = ' '.join(cmd_parts)
+        cmd_str = " ".join(cmd_parts)
         full_cmd = ["cmd.exe", "/c", cmd_str]
 
         try:
@@ -108,7 +107,9 @@ class MushroomSpriteFinder:
             content = f.read()
 
         # Look for mushroom DMA detections
-        pattern = r"MUSHROOM SPRITE DMA DETECTED.*?ROM Offset: \$([0-9A-F]+).*?VRAM Target: \$([0-9A-F]+).*?Size: (\d+) bytes"
+        pattern = (
+            r"MUSHROOM SPRITE DMA DETECTED.*?ROM Offset: \$([0-9A-F]+).*?VRAM Target: \$([0-9A-F]+).*?Size: (\d+) bytes"
+        )
         matches = re.findall(pattern, content, re.DOTALL)
 
         if not matches:
@@ -127,11 +128,7 @@ class MushroomSpriteFinder:
 
             print(f"{i}. ROM ${rom_offset} -> VRAM ${vram_addr} ({size_int} bytes)")
 
-            transfers.append({
-                'rom_offset': rom_offset_int,
-                'vram_addr': vram_addr_int,
-                'size': size_int
-            })
+            transfers.append({"rom_offset": rom_offset_int, "vram_addr": vram_addr_int, "size": size_int})
 
         # Return the first transfer (likely the main sprite data)
         if transfers:
@@ -193,6 +190,7 @@ class MushroomSpriteFinder:
 
         # Import SpritePal components
         import sys
+
         sys.path.insert(0, str(self.base_dir / ".."))
 
         from core.rom_extractor import ROMExtractor
@@ -223,7 +221,7 @@ class MushroomSpriteFinder:
             return
 
         # Step 2: Extract the sprite
-        rom_offset = transfer['rom_offset']
+        rom_offset = transfer["rom_offset"]
         success = self.extract_sprite(rom_offset)
 
         if success:
@@ -234,6 +232,7 @@ class MushroomSpriteFinder:
             print("\nWorkflow validated: We can trace visible sprites to ROM offsets!")
         else:
             print(f"\nPartial success - found ROM offset ${rom_offset:06X} but extraction needs refinement")
+
 
 if __name__ == "__main__":
     finder = MushroomSpriteFinder()

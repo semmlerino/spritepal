@@ -120,9 +120,7 @@ class AnalysisResults:
     errors: list[str] = field(default_factory=list)
 
     # VRAM coverage map: vmadd -> list of (frame, src_addr)
-    vram_to_staging: dict[int, list[tuple[int, int]]] = field(
-        default_factory=lambda: defaultdict(list)
-    )
+    vram_to_staging: dict[int, list[tuple[int, int]]] = field(default_factory=lambda: defaultdict(list))
 
     # VRAM region analysis (2KB buckets)
     vram_regions: dict[int, VRAMRegion] = field(default_factory=dict)
@@ -191,16 +189,12 @@ def analyze_log(log_path: Path) -> AnalysisResults:
                 results.entries.append(entry)
 
                 # Build VRAM → staging mapping
-                results.vram_to_staging[entry.vmadd].append(
-                    (entry.frame, entry.full_src_addr)
-                )
+                results.vram_to_staging[entry.vmadd].append((entry.frame, entry.full_src_addr))
 
                 # Build VRAM region analysis
                 region_start = get_vram_region(entry.vmadd)
                 if region_start not in results.vram_regions:
-                    results.vram_regions[region_start] = VRAMRegion(
-                        region_start=region_start
-                    )
+                    results.vram_regions[region_start] = VRAMRegion(region_start=region_start)
                 region = results.vram_regions[region_start]
                 region.update_count += 1
                 region.unique_frames.add(entry.frame)
@@ -264,9 +258,7 @@ def print_report(results: AnalysisResults, verbose: bool = False) -> None:
         offset = addr & 0xFFFF
         pct = (count / total * 100) if total > 0 else 0
         region = classify_bank(bank)
-        print(
-            f"  ${bank:02X}:{offset:04X} ({region:8s}): {count:7d} ({pct:5.1f}%)"
-        )
+        print(f"  ${bank:02X}:{offset:04X} ({region:8s}): {count:7d} ({pct:5.1f}%)")
     print()
 
     # Top VRAM destinations
@@ -276,9 +268,7 @@ def print_report(results: AnalysisResults, verbose: bool = False) -> None:
     for vmadd, count in results.vram_dest_counts.most_common(15):
         byte_addr = vmadd << 1
         pct = (count / total * 100) if total > 0 else 0
-        print(
-            f"  word ${vmadd:04X} (byte ${byte_addr:04X}): {count:7d} ({pct:5.1f}%)"
-        )
+        print(f"  word ${vmadd:04X} (byte ${byte_addr:04X}): {count:7d} ({pct:5.1f}%)")
     print()
 
     # Size statistics
@@ -338,8 +328,7 @@ def print_report(results: AnalysisResults, verbose: bool = False) -> None:
 
         print("Region breakdown (top 10 by updates):")
         print(
-            f"  {'Region':12s} {'Updates':>8s} {'Frames':>8s} {'Freq':>6s} "
-            f"{'Bytes':>10s} {'Type':>6s} {'Top Source'}"
+            f"  {'Region':12s} {'Updates':>8s} {'Frames':>8s} {'Freq':>6s} {'Bytes':>10s} {'Type':>6s} {'Top Source'}"
         )
         print("-" * 70)
 
@@ -375,7 +364,7 @@ def print_report(results: AnalysisResults, verbose: bool = False) -> None:
                 for src_addr, count in region.source_buffers.most_common(3):
                     src_bank = (src_addr >> 16) & 0xFF
                     src_off = src_addr & 0xFFFF
-                    pct = (count / region.update_count * 100)
+                    pct = count / region.update_count * 100
                     print(f"    ← ${src_bank:02X}:{src_off:04X} ({count:5d}, {pct:.1f}%)")
             print()
 
@@ -405,12 +394,8 @@ def print_report(results: AnalysisResults, verbose: bool = False) -> None:
     print("CORRELATION POTENTIAL:")
     print("-" * 70)
 
-    wram_pct = (
-        (results.bank_counts.get(0x7E, 0) / total * 100) if total > 0 else 0
-    )
-    low_bank_pct = (
-        (results.bank_counts.get(0x00, 0) / total * 100) if total > 0 else 0
-    )
+    wram_pct = (results.bank_counts.get(0x7E, 0) / total * 100) if total > 0 else 0
+    low_bank_pct = (results.bank_counts.get(0x00, 0) / total * 100) if total > 0 else 0
 
     if wram_pct > 90:
         print(f"  ✅ WRAM staging dominant ({wram_pct:.1f}%)")
@@ -433,9 +418,7 @@ def print_report(results: AnalysisResults, verbose: bool = False) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Analyze SNES DMA staging patterns from dma_probe_log.txt."
-    )
+    parser = argparse.ArgumentParser(description="Analyze SNES DMA staging patterns from dma_probe_log.txt.")
     parser.add_argument(
         "target",
         type=Path,
@@ -468,14 +451,8 @@ def main() -> int:
 
         # Build JSON output
         bank_counts_str = {f"0x{k:02X}": v for k, v in results.bank_counts.items()}
-        top_sources = [
-            {"addr": f"0x{a:06X}", "count": c}
-            for a, c in results.src_addr_counts.most_common(20)
-        ]
-        top_vram = [
-            {"vmadd": f"0x{v:04X}", "count": c}
-            for v, c in results.vram_dest_counts.most_common(20)
-        ]
+        top_sources = [{"addr": f"0x{a:06X}", "count": c} for a, c in results.src_addr_counts.most_common(20)]
+        top_vram = [{"vmadd": f"0x{v:04X}", "count": c} for v, c in results.vram_dest_counts.most_common(20)]
 
         output = {
             "log_file": results.log_file,

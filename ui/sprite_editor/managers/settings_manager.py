@@ -85,11 +85,11 @@ class SettingsManager:
             logger.error(f"Could not save settings: {e}")
             return False
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: Any = None) -> Any:  # pyright: ignore[reportExplicitAny]
         """Get a setting value."""
         return getattr(self.settings, key, default)
 
-    def set(self, key: str, value: Any) -> None:
+    def set(self, key: str, value: Any) -> None:  # pyright: ignore[reportExplicitAny]
         """Set a setting value."""
         if hasattr(self.settings, key):
             setattr(self.settings, key, value)

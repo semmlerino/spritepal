@@ -43,17 +43,16 @@ def format_addr(addr: int) -> str:
 def parse_staging_line(line: str) -> dict | None:
     """Parse a STAGING_SUMMARY line into components."""
     m = re.search(
-        r'frame=(\d+).*src=(0x[0-9A-Fa-f]+).*size=(\d+).*payload_hash=(0x[0-9A-Fa-f]+).*vram=(0x[0-9A-Fa-f]+)',
-        line
+        r"frame=(\d+).*src=(0x[0-9A-Fa-f]+).*size=(\d+).*payload_hash=(0x[0-9A-Fa-f]+).*vram=(0x[0-9A-Fa-f]+)", line
     )
     if m:
         return {
-            'frame': int(m.group(1)),
-            'src': m.group(2),
-            'size': int(m.group(3)),
-            'hash': m.group(4),
-            'vram': m.group(5),
-            'key': f"{m.group(1)}_{m.group(2)}_{m.group(3)}_{m.group(5)}"
+            "frame": int(m.group(1)),
+            "src": m.group(2),
+            "size": int(m.group(3)),
+            "hash": m.group(4),
+            "vram": m.group(5),
+            "key": f"{m.group(1)}_{m.group(2)}_{m.group(3)}_{m.group(5)}",
         }
     return None
 
@@ -63,13 +62,13 @@ def load_staging(filepath: Path, vram_filter: list[str] | None = None) -> dict:
     entries = {}
     with open(filepath) as f:
         for line in f:
-            if 'STAGING_SUMMARY' not in line:
+            if "STAGING_SUMMARY" not in line:
                 continue
             p = parse_staging_line(line)
             if p:
-                if vram_filter and not any(p['vram'].startswith(pf) for pf in vram_filter):
+                if vram_filter and not any(p["vram"].startswith(pf) for pf in vram_filter):
                     continue
-                entries[p['key']] = p
+                entries[p["key"]] = p
     return entries
 
 
@@ -78,7 +77,7 @@ def extract_hits(filepath: Path) -> list[tuple[int, int]]:
     hits = []
     with open(filepath) as f:
         for line in f:
-            m = re.search(r'ABLATION_HIT.*addr=(0x[0-9A-Fa-f]+).*frame=(\d+)', line)
+            m = re.search(r"ABLATION_HIT.*addr=(0x[0-9A-Fa-f]+).*frame=(\d+)", line)
             if m:
                 hits.append((parse_addr(m.group(1)), int(m.group(2))))
     return hits
@@ -89,14 +88,14 @@ def compare_logs(baseline_path: Path, ablation_path: Path) -> tuple[int, int, in
     Compare baseline and ablation logs.
     Returns: (flip_count, common_count, baseline_count)
     """
-    baseline = load_staging(baseline_path, ['0x4', '0x5'])
-    ablation = load_staging(ablation_path, ['0x4', '0x5'])
+    baseline = load_staging(baseline_path, ["0x4", "0x5"])
+    ablation = load_staging(ablation_path, ["0x4", "0x5"])
 
     common = set(baseline.keys()) & set(ablation.keys())
 
     flips = 0
     for key in common:
-        if baseline[key]['hash'] != ablation[key]['hash']:
+        if baseline[key]["hash"] != ablation[key]["hash"]:
             flips += 1
 
     return flips, len(common), len(baseline)
@@ -104,18 +103,17 @@ def compare_logs(baseline_path: Path, ablation_path: Path) -> tuple[int, int, in
 
 def run_ablation(start: int, end: int) -> bool:
     """Run ablation test for given range. Returns True on success."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Running ablation: {format_addr(start)} - {format_addr(end)}")
     print(f"Range size: {end - start + 1} bytes")
-    print('='*60)
+    print("=" * 60)
 
     # Run the batch file
     result = subprocess.run(
-        [str(BATCH_FILE), format_addr(start), format_addr(end)],
+        ["cmd", "/c", str(BATCH_FILE), format_addr(start), format_addr(end)],
         cwd=str(SPRITEPAL_DIR),
-        shell=True,
         capture_output=True,
-        text=True
+        text=True,
     )
 
     if result.returncode != 0:
@@ -141,7 +139,7 @@ def bisect(target: int, start: int, end: int, baseline_path: Path) -> list[dict]
 
     while end > start:
         step += 1
-        range_size = end - start + 1
+        end - start + 1
 
         # Determine which half contains the target
         mid = start + (end - start) // 2
@@ -169,15 +167,15 @@ def bisect(target: int, start: int, end: int, baseline_path: Path) -> list[dict]
         common_pct = (common / baseline_count * 100) if baseline_count > 0 else 0
 
         result = {
-            'step': step,
-            'start': test_start,
-            'end': test_end,
-            'size': test_end - test_start + 1,
-            'flips': flips,
-            'common': common,
-            'common_pct': common_pct,
-            'hits': hits,
-            'causal': flips > 0
+            "step": step,
+            "start": test_start,
+            "end": test_end,
+            "size": test_end - test_start + 1,
+            "flips": flips,
+            "common": common,
+            "common_pct": common_pct,
+            "hits": hits,
+            "causal": flips > 0,
         }
         results.append(result)
 
@@ -219,28 +217,28 @@ def bisect(target: int, start: int, end: int, baseline_path: Path) -> list[dict]
             common_pct = (common / baseline_count * 100) if baseline_count > 0 else 0
 
             result = {
-                'step': step,
-                'start': start,
-                'end': start,
-                'size': 1,
-                'flips': flips,
-                'common': common,
-                'common_pct': common_pct,
-                'hits': hits,
-                'causal': flips > 0
+                "step": step,
+                "start": start,
+                "end": start,
+                "size": 1,
+                "flips": flips,
+                "common": common,
+                "common_pct": common_pct,
+                "hits": hits,
+                "causal": flips > 0,
             }
             results.append(result)
 
             print(f"  Flips: {flips}, Common: {common}/{baseline_count} ({common_pct:.1f}%)")
 
             if flips > 0:
-                print(f"\n{'='*60}")
+                print(f"\n{'=' * 60}")
                 print(f"SUCCESS: Minimal causal read address: {format_addr(start)}")
-                print(f"{'='*60}")
+                print(f"{'=' * 60}")
             else:
-                print(f"\n{'='*60}")
+                print(f"\n{'=' * 60}")
                 print("WARNING: Final byte shows no flips - may need investigation")
-                print(f"{'='*60}")
+                print(f"{'=' * 60}")
 
     return results
 
@@ -250,11 +248,13 @@ def generate_documentation(target: int, initial_start: int, initial_end: int, re
     lines = []
     lines.append(f"REM === {format_addr(target)} BISECTION CHAIN (AUTO-GENERATED) ===")
     lines.append(f"REM Target: {format_addr(target)}")
-    lines.append(f"REM Initial range: {format_addr(initial_start)} - {format_addr(initial_end)} ({initial_end - initial_start + 1} bytes)")
+    lines.append(
+        f"REM Initial range: {format_addr(initial_start)} - {format_addr(initial_end)} ({initial_end - initial_start + 1} bytes)"
+    )
     lines.append("REM")
 
     final = results[-1] if results else None
-    if final and final['causal']:
+    if final and final["causal"]:
         lines.append(f"REM RESULT: Minimal causal read address: {format_addr(final['start'])}")
         lines.append(f"REM   - {final['flips']} payload_hash flips")
         lines.append(f"REM   - Reduction: {initial_end - initial_start + 1} bytes -> 1 byte")
@@ -262,21 +262,21 @@ def generate_documentation(target: int, initial_start: int, initial_end: int, re
 
     lines.append("REM Bisection chain:")
     for r in results:
-        status = "CAUSAL" if r['causal'] else "NOT CAUSAL"
-        lines.append(f"REM   {format_addr(r['start'])}-{format_addr(r['end'])} ({r['size']}B): {status} - {r['flips']} flips")
+        status = "CAUSAL" if r["causal"] else "NOT CAUSAL"
+        lines.append(
+            f"REM   {format_addr(r['start'])}-{format_addr(r['end'])} ({r['size']}B): {status} - {r['flips']} flips"
+        )
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Automated PRG ablation bisection')
-    parser.add_argument('target', help='Target address to bisect toward (e.g., 0xE9E667)')
-    parser.add_argument('start', help='Start of initial range (e.g., 0xE9E000)')
-    parser.add_argument('end', help='End of initial range (e.g., 0xE9FFFF)')
-    parser.add_argument('--baseline', default=str(DEFAULT_BASELINE),
-                        help='Path to baseline log file')
-    parser.add_argument('--dry-run', action='store_true',
-                        help='Print plan without running')
+    parser = argparse.ArgumentParser(description="Automated PRG ablation bisection")
+    parser.add_argument("target", help="Target address to bisect toward (e.g., 0xE9E667)")
+    parser.add_argument("start", help="Start of initial range (e.g., 0xE9E000)")
+    parser.add_argument("end", help="End of initial range (e.g., 0xE9FFFF)")
+    parser.add_argument("--baseline", default=str(DEFAULT_BASELINE), help="Path to baseline log file")
+    parser.add_argument("--dry-run", action="store_true", help="Print plan without running")
 
     args = parser.parse_args()
 
@@ -286,12 +286,12 @@ def main():
     baseline_path = Path(args.baseline)
 
     print("Auto-Bisection Tool")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Target address:  {format_addr(target)}")
     print(f"Initial range:   {format_addr(start)} - {format_addr(end)}")
     print(f"Range size:      {end - start + 1} bytes")
     print(f"Baseline:        {baseline_path}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Validate target is in range
     if not (start <= target <= end):
@@ -305,6 +305,7 @@ def main():
 
     # Calculate number of steps
     import math
+
     steps = math.ceil(math.log2(end - start + 1)) + 1
     print(f"Estimated steps: {steps}")
 
@@ -317,10 +318,10 @@ def main():
             mid = s + (e - s) // 2
             if target <= mid:
                 test_s, test_e = s, mid
-                s, e = s, mid
+                e = mid
             else:
                 test_s, test_e = mid + 1, e
-                s, e = mid + 1, e
+                s = mid + 1
             print(f"  Step {step}: {format_addr(test_s)} - {format_addr(test_e)} ({test_e - test_s + 1} bytes)")
         print(f"  Step {step + 1}: {format_addr(s)} (1 byte)")
         sys.exit(0)
@@ -338,18 +339,18 @@ def main():
     results = bisect(target, start, end, baseline_path)
 
     # Generate documentation
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DOCUMENTATION BLOCK (copy to batch file):")
-    print("="*60)
+    print("=" * 60)
     doc = generate_documentation(target, start, end, results)
     print(doc)
 
     # Save documentation to file
     doc_file = SPRITEPAL_DIR / f"bisect_{format_addr(target)}_results.txt"
-    with open(doc_file, 'w') as f:
+    with open(doc_file, "w") as f:
         f.write(doc)
     print(f"\nSaved to: {doc_file}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -2,6 +2,7 @@
 """
 Analyze decompression quality and investigate alignment warnings
 """
+
 import sys
 import tempfile
 from pathlib import Path
@@ -22,7 +23,7 @@ def test_raw_decompression(rom_path: str, offset: int) -> dict:
         # Create temporary file for ROM data
         with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
             # Copy ROM to temp file for exhal
-            with open(rom_path, 'rb') as rom:
+            with open(rom_path, "rb") as rom:
                 tmp_file.write(rom.read())
             tmp_rom_path = tmp_file.name
 
@@ -32,11 +33,7 @@ def test_raw_decompression(rom_path: str, offset: int) -> dict:
         Path(tmp_rom_path).unlink()  # Clean up temp file
 
         if not decompressed_data:
-            return {
-                "success": False,
-                "error": "No data decompressed",
-                "size": 0
-            }
+            return {"success": False, "error": "No data decompressed", "size": 0}
 
         # Analyze the decompressed data
         size = len(decompressed_data)
@@ -52,7 +49,7 @@ def test_raw_decompression(rom_path: str, offset: int) -> dict:
         pattern_score = 0
         if len(decompressed_data) >= 4:
             for i in range(0, min(len(decompressed_data) - 3, 1000), 2):  # Sample first 1000 bytes
-                if decompressed_data[i:i+2] == decompressed_data[i+2:i+4]:
+                if decompressed_data[i : i + 2] == decompressed_data[i + 2 : i + 4]:
                     pattern_score += 1
 
         # Header/padding analysis
@@ -71,15 +68,12 @@ def test_raw_decompression(rom_path: str, offset: int) -> dict:
             "pattern_score": pattern_score,
             "first_32_hex": " ".join(f"{b:02X}" for b in first_32_bytes),
             "last_32_hex": " ".join(f"{b:02X}" for b in last_32_bytes),
-            "data_preview": decompressed_data[:64]  # First 64 bytes for analysis
+            "data_preview": decompressed_data[:64],  # First 64 bytes for analysis
         }
 
     except Exception as e:
-        return {
-            "success": False,
-            "error": str(e),
-            "size": 0
-        }
+        return {"success": False, "error": str(e), "size": 0}
+
 
 def analyze_alignment_issues(results: list) -> dict:
     """Analyze patterns in alignment issues"""
@@ -103,8 +97,9 @@ def analyze_alignment_issues(results: list) -> dict:
         "aligned_count": aligned_count,
         "misaligned_count": total_successful - aligned_count,
         "alignment_rate": alignment_rate,
-        "extra_bytes_distribution": extra_bytes_distribution
+        "extra_bytes_distribution": extra_bytes_distribution,
     }
+
 
 def check_sprite_validity(data_preview: bytes) -> dict:
     """Check if decompressed data looks like valid sprite data"""
@@ -138,7 +133,7 @@ def check_sprite_validity(data_preview: bytes) -> dict:
     # Check for incrementing patterns (common in tile indices)
     increment_count = 0
     for i in range(len(data_preview) - 1):
-        if data_preview[i+1] == data_preview[i] + 1:
+        if data_preview[i + 1] == data_preview[i] + 1:
             increment_count += 1
 
     if increment_count > 3:
@@ -152,8 +147,9 @@ def check_sprite_validity(data_preview: bytes) -> dict:
         "density": density,
         "ff_density": ff_density,
         "unique_ratio": unique_ratio,
-        "increment_patterns": increment_count
+        "increment_patterns": increment_count,
     }
+
 
 def main():
     """Main decompression analysis"""
@@ -165,12 +161,12 @@ def main():
 
     # Test the same offsets we validated before
     test_offsets = [
-        (0x073E00, "mesen2_top_hit_1"),        # Had 6 extra bytes
-        (0x073F00, "mesen2_top_hit_2"),        # Had 29 extra bytes (significant misalignment)
-        (0x074500, "mesen2_medium_hit_2"),     # Worked fine
-        (0x0CC100, "exhal_perfect_score_1"),   # Perfect score
-        (0x0E1300, "exhal_perfect_score_2"),   # Perfect score
-        (0x07B500, "exhal_perfect_score_3"),   # Perfect score
+        (0x073E00, "mesen2_top_hit_1"),  # Had 6 extra bytes
+        (0x073F00, "mesen2_top_hit_2"),  # Had 29 extra bytes (significant misalignment)
+        (0x074500, "mesen2_medium_hit_2"),  # Worked fine
+        (0x0CC100, "exhal_perfect_score_1"),  # Perfect score
+        (0x0E1300, "exhal_perfect_score_2"),  # Perfect score
+        (0x07B500, "exhal_perfect_score_3"),  # Perfect score
     ]
 
     print("=== DECOMPRESSION QUALITY ANALYSIS ===")
@@ -212,9 +208,9 @@ def main():
         print(f"Properly aligned: {alignment_analysis['aligned_count']}/{alignment_analysis['total_successful']}")
         print(f"Alignment rate: {alignment_analysis['alignment_rate']:.1f}%")
 
-        if alignment_analysis['extra_bytes_distribution']:
+        if alignment_analysis["extra_bytes_distribution"]:
             print("\\nExtra bytes distribution:")
-            for extra_bytes, count in sorted(alignment_analysis['extra_bytes_distribution'].items()):
+            for extra_bytes, count in sorted(alignment_analysis["extra_bytes_distribution"].items()):
                 print(f"  +{extra_bytes} bytes: {count} offsets")
 
     # Quality assessment
@@ -222,15 +218,19 @@ def main():
     sprite_validations = [check_sprite_validity(r["data_preview"]) for r in successful_results]
 
     valid_sprites = sum(1 for v in sprite_validations if v["is_sprite"])
-    avg_confidence = sum(v["confidence"] for v in sprite_validations) / len(sprite_validations) if sprite_validations else 0
+    avg_confidence = (
+        sum(v["confidence"] for v in sprite_validations) / len(sprite_validations) if sprite_validations else 0
+    )
 
     print("\\n=== SPRITE DATA QUALITY ===")
-    print(f"Valid sprite data: {valid_sprites}/{len(successful_results)} ({(valid_sprites/len(successful_results)*100):.1f}%)")
+    print(
+        f"Valid sprite data: {valid_sprites}/{len(successful_results)} ({(valid_sprites / len(successful_results) * 100):.1f}%)"
+    )
     print(f"Average confidence: {avg_confidence:.3f}")
 
     print("\\n=== CONCLUSIONS ===")
 
-    if alignment_analysis.get('alignment_rate', 0) >= 50:
+    if alignment_analysis.get("alignment_rate", 0) >= 50:
         print("✅ DECOMPRESSION APPEARS CORRECT")
         print("   • Majority of offsets produce properly aligned data")
         print("   • Misalignment is likely due to headers/padding, not decompression errors")
@@ -257,7 +257,7 @@ def main():
         print("🔧 OFFSET ADJUSTMENT NEEDED:")
         for offset, extra in misaligned_offsets:
             if extra <= 8:
-                print(f"   • 0x{offset:06X}: Try 0x{offset-extra:06X} (subtract {extra} bytes)")
+                print(f"   • 0x{offset:06X}: Try 0x{offset - extra:06X} (subtract {extra} bytes)")
             else:
                 print(f"   • 0x{offset:06X}: Significant misalignment (+{extra}) - may be wrong offset")
 
@@ -267,6 +267,7 @@ def main():
     print("   • Use tile viewers to inspect raw decompressed data")
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

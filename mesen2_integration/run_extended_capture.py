@@ -2,6 +2,7 @@
 """
 Launch extended Mesen2 sprite capture session
 """
+
 import subprocess
 import sys
 from pathlib import Path
@@ -38,12 +39,7 @@ def run_extended_capture():
     print("• Output: Timestamped capture file")
 
     # Build command
-    cmd = [
-        mesen_exe,
-        "--testrunner",
-        rom_path,
-        "--testScript", lua_script_path
-    ]
+    cmd = [mesen_exe, "--testrunner", rom_path, "--testScript", lua_script_path]
 
     print("\\n🚀 Starting extended capture...")
     print("This will run for 5 minutes with automated gameplay")
@@ -52,20 +48,23 @@ def run_extended_capture():
     try:
         # Run with real-time output
         process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            universal_newlines=True
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True
         )
 
         for line_count, line in enumerate(process.stdout, 1):
             # Print important progress lines
-            if any(keyword in line for keyword in [
-                "PHASE", "PROGRESS", "NEW ROM SPRITE", "NEW WRAM SPRITE",
-                "EXTENDED CAPTURE", "ROM offsets found", "✓"
-            ]):
+            if any(
+                keyword in line
+                for keyword in [
+                    "PHASE",
+                    "PROGRESS",
+                    "NEW ROM SPRITE",
+                    "NEW WRAM SPRITE",
+                    "EXTENDED CAPTURE",
+                    "ROM offsets found",
+                    "✓",
+                ]
+            ):
                 print(f"[{line_count:4d}] {line.strip()}")
             elif line_count % 50 == 0:  # Print every 50th line to show activity
                 print(f"[{line_count:4d}] {line.strip()[:80]}...")
@@ -76,7 +75,9 @@ def run_extended_capture():
             print("\\n✅ EXTENDED CAPTURE COMPLETED SUCCESSFULLY")
 
             # Check for output file
-            capture_files = list(Path("/mnt/c/Users/gabri/OneDrive/Dokumente/Mesen2/LuaScriptData/Example").glob("sprite_capture_*.txt"))
+            capture_files = list(
+                Path("/mnt/c/Users/gabri/OneDrive/Dokumente/Mesen2/LuaScriptData/Example").glob("sprite_capture_*.txt")
+            )
             if capture_files:
                 latest_file = max(capture_files, key=lambda x: Path(x).stat().st_mtime)
                 print(f"📄 Latest capture file: {Path(latest_file).name}")
@@ -87,9 +88,10 @@ def run_extended_capture():
                         content = f.read()
 
                     import re
-                    capture_time = re.search(r'Capture Time: ([0-9.]+) seconds', content)
-                    rom_offsets = re.search(r'ROM Offsets Found: (\\d+)', content)
-                    sprites_captured = re.search(r'Sprites Captured: (\\d+)/(\\d+)', content)
+
+                    capture_time = re.search(r"Capture Time: ([0-9.]+) seconds", content)
+                    rom_offsets = re.search(r"ROM Offsets Found: (\\d+)", content)
+                    sprites_captured = re.search(r"Sprites Captured: (\\d+)/(\\d+)", content)
 
                     if capture_time:
                         print(f"⏱️  Actual capture time: {capture_time.group(1)} seconds")
@@ -109,6 +111,7 @@ def run_extended_capture():
     except Exception as e:
         print(f"\\n❌ ERROR RUNNING CAPTURE: {e}")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(run_extended_capture())

@@ -212,9 +212,7 @@ def hash_bitmap_as_snes(bitmap: bytes) -> str:
 # =============================================================================
 
 
-def convert_tileset_to_snes(
-    bitmap_data: bytes, tiles_per_row: int = 16
-) -> bytes:
+def convert_tileset_to_snes(bitmap_data: bytes, tiles_per_row: int = 16) -> bytes:
     """
     Convert a tileset from bitmap format to SNES format.
 
@@ -226,9 +224,7 @@ def convert_tileset_to_snes(
         Converted tileset in SNES 4bpp format.
     """
     if len(bitmap_data) % 32 != 0:
-        raise ValueError(
-            f"Bitmap data must be multiple of 32 bytes, got {len(bitmap_data)}"
-        )
+        raise ValueError(f"Bitmap data must be multiple of 32 bytes, got {len(bitmap_data)}")
 
     num_tiles = len(bitmap_data) // 32
     result = bytearray()
@@ -252,9 +248,7 @@ def convert_tileset_to_bitmap(snes_data: bytes) -> bytes:
         Converted tileset in bitmap format.
     """
     if len(snes_data) % 32 != 0:
-        raise ValueError(
-            f"SNES data must be multiple of 32 bytes, got {len(snes_data)}"
-        )
+        raise ValueError(f"SNES data must be multiple of 32 bytes, got {len(snes_data)}")
 
     num_tiles = len(snes_data) // 32
     result = bytearray()
@@ -309,8 +303,8 @@ def packed_2bpp_to_snes_4bpp(packed: bytes) -> bytes:
     result = bytearray(32)
 
     for row in range(8):
-        bp0 = packed[row]       # Bitplane 0 from first half
-        bp2 = packed[8 + row]   # Bitplane 2 from second half
+        bp0 = packed[row]  # Bitplane 0 from first half
+        bp2 = packed[8 + row]  # Bitplane 2 from second half
 
         # Low bitplanes (0-15): bp0=actual, bp1=0x00
         result[row * 2] = bp0
@@ -374,9 +368,9 @@ def is_packed_2bpp_candidate(snes_tile: bytes) -> bool:
 
     # Check that all odd bytes (bp1, bp3) are zero
     for row in range(8):
-        if snes_tile[row * 2 + 1] != 0:          # bp1
+        if snes_tile[row * 2 + 1] != 0:  # bp1
             return False
-        if snes_tile[16 + row * 2 + 1] != 0:     # bp3
+        if snes_tile[16 + row * 2 + 1] != 0:  # bp3
             return False
 
     # Check that at least some data exists in even bytes
@@ -421,9 +415,7 @@ def hash_packed_as_snes(packed: bytes) -> str:
 #   bp2 = tile[16+r*2]   bp3 = tile[16+r*2+1]
 
 # All 6 combinations of 2 planes from 4
-TWO_PLANE_COMBOS: list[tuple[int, int]] = [
-    (0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)
-]
+TWO_PLANE_COMBOS: list[tuple[int, int]] = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]
 
 
 def _get_plane_byte_indices(plane: int) -> list[int]:
@@ -437,11 +429,11 @@ def _get_plane_byte_indices(plane: int) -> list[int]:
         List of 8 byte indices within a 32-byte SNES tile.
     """
     if plane == 0:
-        return [r * 2 for r in range(8)]      # even bytes in first half
+        return [r * 2 for r in range(8)]  # even bytes in first half
     elif plane == 1:
         return [r * 2 + 1 for r in range(8)]  # odd bytes in first half
     elif plane == 2:
-        return [16 + r * 2 for r in range(8)]      # even bytes in second half
+        return [16 + r * 2 for r in range(8)]  # even bytes in second half
     elif plane == 3:
         return [16 + r * 2 + 1 for r in range(8)]  # odd bytes in second half
     else:

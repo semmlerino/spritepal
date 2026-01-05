@@ -22,9 +22,7 @@ from core.mesen_integration.rom_tile_matcher import ROMTileMatcher
 def main() -> int:
     parser = argparse.ArgumentParser(description="Direct VRAM tile → ROM matching")
     parser.add_argument("--rom", type=Path, required=True, help="Path to ROM file")
-    parser.add_argument(
-        "--capture", type=Path, nargs="+", required=True, help="Capture JSON files"
-    )
+    parser.add_argument("--capture", type=Path, nargs="+", required=True, help="Capture JSON files")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--output", type=Path, help="Output file (default: stdout)")
 
@@ -110,9 +108,7 @@ def main() -> int:
         }
         output = json.dumps(output_data, indent=2)
     else:
-        lines = [
-            f"Direct Tile Matching: {matched_tiles}/{total_tiles} ({match_rate:.1f}%)"
-        ]
+        lines = [f"Direct Tile Matching: {matched_tiles}/{total_tiles} ({match_rate:.1f}%)"]
         lines.append(f"Unique ROM offsets: {len(unique_offsets)}")
         lines.append("")
         for r in results[:50]:

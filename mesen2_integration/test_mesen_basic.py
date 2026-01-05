@@ -2,6 +2,7 @@
 """
 Basic test to verify Mesen2 testrunner mode works from Python/WSL
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -17,7 +18,7 @@ from mesen2_integration.mesen2_config import MesenConfig
 
 def test_mesen_basic() -> bool:
     """Test basic Mesen2 execution with simple Lua script
-    
+
     Returns:
         True if test passed, False otherwise
     """
@@ -49,7 +50,7 @@ def test_mesen_basic() -> bool:
             wsl_cmd,
             capture_output=True,
             text=True,
-            timeout=30  # 30 second timeout
+            timeout=30,  # 30 second timeout
         )
         end_time = time.time()
 
@@ -93,6 +94,7 @@ def test_mesen_basic() -> bool:
     except Exception as e:
         print(f"Error running Mesen2: {e}")
         return False
+
 
 if __name__ == "__main__":
     success = test_mesen_basic()

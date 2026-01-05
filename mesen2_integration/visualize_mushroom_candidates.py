@@ -23,10 +23,10 @@ def snes_4bpp_to_image(data: bytes, width: int = 8, height: int = 8) -> Image.Im
             offset = (y * (width // 8) * 4) + ((x // 8) * 32)
 
             if offset + 3 < len(data):
-                bp0 = data[offset + 0]       # Bitplane 0
-                bp1 = data[offset + 1]       # Bitplane 1
-                bp2 = data[offset + 16]      # Bitplane 2
-                bp3 = data[offset + 17]      # Bitplane 3
+                bp0 = data[offset + 0]  # Bitplane 0
+                bp1 = data[offset + 1]  # Bitplane 1
+                bp2 = data[offset + 16]  # Bitplane 2
+                bp3 = data[offset + 17]  # Bitplane 3
 
                 # Extract 8 pixels from the bitplanes
                 for bit in range(8):
@@ -49,9 +49,10 @@ def snes_4bpp_to_image(data: bytes, width: int = 8, height: int = 8) -> Image.Im
         pixels.extend(row)
 
     # Create image
-    img = Image.new('L', (width, height))
+    img = Image.new("L", (width, height))
     img.putdata(pixels)
     return img
+
 
 def visualize_16x16_sprite(data: bytes) -> Image.Image:
     """Convert 128 bytes of SNES sprite data to a 16x16 image"""
@@ -61,25 +62,26 @@ def visualize_16x16_sprite(data: bytes) -> Image.Image:
 
     if len(data) < 128:
         print(f"Warning: Data too short ({len(data)} bytes), expected 128")
-        data = data + b'\x00' * (128 - len(data))
+        data = data + b"\x00" * (128 - len(data))
 
     # Extract the 4 tiles
     tiles = []
     for i in range(4):
-        tile_data = data[i * 32:(i + 1) * 32]
+        tile_data = data[i * 32 : (i + 1) * 32]
         tile_img = snes_4bpp_to_image(tile_data)
         tiles.append(tile_img)
 
     # Combine into 16x16 image
     # Tile arrangement: 0 1
     #                   2 3
-    combined = Image.new('L', (16, 16))
+    combined = Image.new("L", (16, 16))
     combined.paste(tiles[0], (0, 0))
     combined.paste(tiles[1], (8, 0))
     combined.paste(tiles[2], (0, 8))
     combined.paste(tiles[3], (8, 8))
 
     return combined
+
 
 def main():
     """Visualize all mushroom sprite candidates"""
@@ -99,11 +101,11 @@ def main():
         # Create large canvas for all sprites
         canvas_width = cols * (16 + 4) + 4  # 16px sprite + 4px padding
         canvas_height = rows * (16 + 4) + 4
-        canvas = Image.new('RGB', (canvas_width, canvas_height), (64, 64, 64))
+        canvas = Image.new("RGB", (canvas_width, canvas_height), (64, 64, 64))
 
         for idx, candidate_file in enumerate(candidates):
             # Load sprite data
-            with open(candidate_file, 'rb') as f:
+            with open(candidate_file, "rb") as f:
                 sprite_data = f.read()
 
             # Convert to image
@@ -113,7 +115,7 @@ def main():
             sprite_img = sprite_img.resize((16, 16), Image.NEAREST)
 
             # Convert to RGB and apply a palette for better visibility
-            sprite_rgb = Image.new('RGB', (16, 16))
+            sprite_rgb = Image.new("RGB", (16, 16))
             for y in range(16):
                 for x in range(16):
                     val = sprite_img.getpixel((x, y))
@@ -152,7 +154,7 @@ def main():
         # Analyze which candidates look most like sprites
         print("\n=== Analysis ===")
         for idx, candidate_file in enumerate(candidates[:5]):  # Check first 5
-            with open(candidate_file, 'rb') as f:
+            with open(candidate_file, "rb") as f:
                 data = f.read()
 
             # Check for sprite characteristics
@@ -163,6 +165,7 @@ def main():
 
             # Show first 16 bytes
             print(f"  First 16 bytes: {' '.join(f'{b:02x}' for b in data[:16])}")
+
 
 if __name__ == "__main__":
     main()

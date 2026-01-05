@@ -2,6 +2,7 @@
 """
 Comprehensive verification of address translation hypotheses
 """
+
 import re
 import sys
 from pathlib import Path
@@ -20,16 +21,16 @@ def load_mesen2_offsets() -> set[int]:
                 content = f.read()
 
             rom_section = False
-            for line in content.split('\n'):
+            for line in content.split("\n"):
                 line = line.strip()
-                if '--- ROM Offsets ---' in line:
+                if "--- ROM Offsets ---" in line:
                     rom_section = True
                     continue
-                if line.startswith('---') and rom_section:
+                if line.startswith("---") and rom_section:
                     break
 
                 if rom_section and line:
-                    match = re.match(r'\$([0-9A-Fa-f]+):\s*(\d+)\s*hits?', line)
+                    match = re.match(r"\$([0-9A-Fa-f]+):\s*(\d+)\s*hits?", line)
                     if match:
                         offset = int(match.group(1), 16)
                         all_offsets.add(offset)
@@ -37,6 +38,7 @@ def load_mesen2_offsets() -> set[int]:
             print(f"Error processing {file_path}: {e}")
 
     return all_offsets
+
 
 def load_exhal_offsets() -> set[int]:
     """Load all exhal static offsets"""
@@ -49,27 +51,28 @@ def load_exhal_offsets() -> set[int]:
     with open(offsets_file) as f:
         for line in f:
             line = line.strip()
-            if line.startswith('#') or not line:
+            if line.startswith("#") or not line:
                 continue
 
-            match = re.match(r'0x([0-9A-Fa-f]+)', line)
+            match = re.match(r"0x([0-9A-Fa-f]+)", line)
             if match:
                 offset = int(match.group(1), 16)
                 offsets.add(offset)
 
     return offsets
 
+
 def test_address_translations(mesen2_offsets: set[int], exhal_offsets: set[int]) -> dict:
     """Test various address translation hypotheses"""
 
     translations = {
-        "direct": lambda x: x,                           # No translation
-        "subtract_300000": lambda x: x - 0x300000,       # Our current hypothesis
-        "subtract_200000": lambda x: x - 0x200000,       # Alternative
-        "subtract_400000": lambda x: x - 0x400000,       # Alternative
+        "direct": lambda x: x,  # No translation
+        "subtract_300000": lambda x: x - 0x300000,  # Our current hypothesis
+        "subtract_200000": lambda x: x - 0x200000,  # Alternative
+        "subtract_400000": lambda x: x - 0x400000,  # Alternative
         "lorom_mapping": lambda x: (x & 0x3FFFFF) if x >= 0x800000 else x,  # LoROM
         "hirom_mapping": lambda x: (x - 0xC00000) if x >= 0xC00000 else x,  # HiROM
-        "bank_stripping": lambda x: x & 0xFFFF,          # Strip bank bits
+        "bank_stripping": lambda x: x & 0xFFFF,  # Strip bank bits
         "snes_to_pc": lambda x: ((x & 0x7F0000) >> 1) + (x & 0x7FFF),  # SNES -> PC addr
     }
 
@@ -96,13 +99,14 @@ def test_address_translations(mesen2_offsets: set[int], exhal_offsets: set[int])
                 "matches": len(matches),
                 "match_percentage": (len(matches) / len(translated_offsets)) * 100 if translated_offsets else 0,
                 "coverage_percentage": (len(matches) / len(exhal_offsets)) * 100 if exhal_offsets else 0,
-                "matching_offsets": sorted(matches)[:10]  # First 10 matches for inspection
+                "matching_offsets": sorted(matches)[:10],  # First 10 matches for inspection
             }
 
         except Exception as e:
             results[name] = {"error": str(e)}
 
     return results
+
 
 def analyze_offset_patterns(mesen2_offsets: set[int], exhal_offsets: set[int]) -> dict:
     """Analyze patterns in offset distributions"""
@@ -147,18 +151,17 @@ def analyze_offset_patterns(mesen2_offsets: set[int], exhal_offsets: set[int]) -
         closest_matches.sort(key=lambda x: x[1])
 
         if closest_matches:
-            relationships.append({
-                "mesen2_offset": f"0x{m_offset:06X}",
-                "closest_exhal": f"0x{closest_matches[0][0]:06X}",
-                "difference": closest_matches[0][2],
-                "diff_hex": f"0x{abs(closest_matches[0][2]):06X}"
-            })
+            relationships.append(
+                {
+                    "mesen2_offset": f"0x{m_offset:06X}",
+                    "closest_exhal": f"0x{closest_matches[0][0]:06X}",
+                    "difference": closest_matches[0][2],
+                    "diff_hex": f"0x{abs(closest_matches[0][2]):06X}",
+                }
+            )
 
-    return {
-        "mesen2_regions": mesen2_regions,
-        "exhal_regions": exhal_regions,
-        "closest_relationships": relationships
-    }
+    return {"mesen2_regions": mesen2_regions, "exhal_regions": exhal_regions, "closest_relationships": relationships}
+
 
 def find_validation_candidates(translation_results: dict, mesen2_offsets: set[int]) -> list[tuple[str, int, int]]:
     """Find the best translation candidates for validation"""
@@ -167,22 +170,25 @@ def find_validation_candidates(translation_results: dict, mesen2_offsets: set[in
 
     # Find translation method with most matches
     best_method = max(
-        [k for k in translation_results if 'error' not in translation_results[k]],
-        key=lambda k: translation_results[k]['matches'],
-        default=None
+        [k for k in translation_results if "error" not in translation_results[k]],
+        key=lambda k: translation_results[k]["matches"],
+        default=None,
     )
 
-    if best_method and translation_results[best_method]['matches'] > 0:
-        matching_offsets = translation_results[best_method]['matching_offsets']
+    if best_method and translation_results[best_method]["matches"] > 0:
+        matching_offsets = translation_results[best_method]["matching_offsets"]
 
         # Find original Mesen2 offsets that led to these matches
         for match_offset in matching_offsets[:5]:  # Top 5
             for original_offset in mesen2_offsets:
-                if (best_method == "subtract_300000" and original_offset - 0x300000 == match_offset) or (best_method == "direct" and original_offset == match_offset):
+                if (best_method == "subtract_300000" and original_offset - 0x300000 == match_offset) or (
+                    best_method == "direct" and original_offset == match_offset
+                ):
                     candidates.append((best_method, original_offset, match_offset))
                 # Add other translation methods as needed
 
     return candidates
+
 
 def main():
     """Main address translation verification"""
@@ -208,14 +214,14 @@ def main():
     print("-" * 80)
 
     for method, result in translation_results.items():
-        if 'error' in result:
+        if "error" in result:
             print(f"{method:<20} ERROR: {result['error']}")
             continue
 
-        matches = result['matches']
-        match_pct = result['match_percentage']
-        coverage_pct = result['coverage_percentage']
-        samples = ', '.join(f"0x{x:06X}" for x in result['matching_offsets'][:3])
+        matches = result["matches"]
+        match_pct = result["match_percentage"]
+        coverage_pct = result["coverage_percentage"]
+        samples = ", ".join(f"0x{x:06X}" for x in result["matching_offsets"][:3])
 
         print(f"{method:<20} {matches:<8} {match_pct:<8.1f} {coverage_pct:<10.2f} {samples}")
 
@@ -224,22 +230,22 @@ def main():
     patterns = analyze_offset_patterns(mesen2_offsets, exhal_offsets)
 
     print("Mesen2 offset distribution:")
-    for region, count in sorted(patterns['mesen2_regions'].items()):
+    for region, count in sorted(patterns["mesen2_regions"].items()):
         print(f"  {region}: {count}")
 
     print("\\nExhal offset distribution:")
-    for region, count in sorted(patterns['exhal_regions'].items()):
+    for region, count in sorted(patterns["exhal_regions"].items()):
         print(f"  {region}: {count}")
 
     print("\\nClosest relationships (first 5):")
-    for rel in patterns['closest_relationships'][:5]:
+    for rel in patterns["closest_relationships"][:5]:
         print(f"  {rel['mesen2_offset']} → {rel['closest_exhal']} (diff: {rel['diff_hex']})")
 
     # Find best translation method
     best_results = [
-        (method, result['matches'])
+        (method, result["matches"])
         for method, result in translation_results.items()
-        if 'matches' in result and result['matches'] > 0
+        if "matches" in result and result["matches"] > 0
     ]
 
     if best_results:
@@ -263,6 +269,7 @@ def main():
         print("   • Mesen2 and exhal use different address spaces")
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

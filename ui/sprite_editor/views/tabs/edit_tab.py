@@ -17,6 +17,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.signal_utils import safe_disconnect
+
 from ..panels import OptionsPanel, PalettePanel, PreviewPanel, ToolPanel
 from ..widgets import PixelCanvas
 
@@ -95,9 +97,7 @@ class EditTab(QWidget):
         # Right side: Canvas in scroll area
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(False)
-        self.scroll_area.setStyleSheet(
-            "QScrollArea { background-color: #303030; border: none; }"
-        )
+        self.scroll_area.setStyleSheet("QScrollArea { background-color: #303030; border: none; }")
 
         # Canvas placeholder (will be set by controller)
         self._canvas_placeholder = QWidget()
@@ -128,8 +128,35 @@ class EditTab(QWidget):
         """Get the pixel canvas widget."""
         return self._canvas
 
+    def _disconnect_signals(self) -> None:
+        """Disconnect all controller signals before reconnection.
+
+        This prevents signal accumulation when set_controller() is called
+        multiple times (e.g., when switching between sprites).
+        """
+        # Disconnect canvas signals (canvas is created in set_controller)
+        if self._canvas is not None:
+            safe_disconnect(self._canvas.pixelPressed)
+            safe_disconnect(self._canvas.pixelMoved)
+            safe_disconnect(self._canvas.pixelReleased)
+
+        # Disconnect tool panel signals (panels created in _setup_ui, always exist)
+        safe_disconnect(self.tool_panel.toolChanged)
+        safe_disconnect(self.tool_panel.brushSizeChanged)
+
+        # Disconnect palette panel signals
+        safe_disconnect(self.palette_panel.colorSelected)
+
+        # Disconnect options panel signals
+        safe_disconnect(self.options_panel.gridToggled)
+        safe_disconnect(self.options_panel.paletteToggled)
+        safe_disconnect(self.options_panel.zoomChanged)
+
     def set_controller(self, controller: "EditingController") -> None:
         """Set the editing controller, create canvas, and connect signals."""
+        # Disconnect any existing signals to prevent accumulation
+        self._disconnect_signals()
+
         self.controller = controller
 
         # Create the canvas (moved from MainController)
@@ -152,9 +179,7 @@ class EditTab(QWidget):
         # Capture canvas in local var to avoid None type issues in lambda
         canvas = self._canvas
         self.options_panel.gridToggled.connect(canvas.set_grid_visible)
-        self.options_panel.paletteToggled.connect(
-            lambda visible: canvas.set_greyscale_mode(not visible)
-        )
+        self.options_panel.paletteToggled.connect(lambda visible: canvas.set_greyscale_mode(not visible))
         self.options_panel.zoomChanged.connect(canvas.set_zoom)
 
     def update_from_controller(self) -> None:

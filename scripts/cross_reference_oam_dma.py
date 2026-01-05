@@ -243,9 +243,7 @@ def cross_reference(
             if tile.data_hex == "0" * 64:
                 continue
 
-            dma = find_dma_for_tile(
-                tile, dma_events, capture.frame, frame_window
-            )
+            dma = find_dma_for_tile(tile, dma_events, capture.frame, frame_window)
 
             if dma:
                 offset = tile.vram_addr - dma.vram_byte_start
@@ -308,19 +306,14 @@ def print_report(results: CrossReferenceResults) -> None:
         byte_start = region
         byte_end = region + 0x800
         pct = (count / matched * 100) if matched > 0 else 0
-        print(
-            f"  ${byte_start:04X}-${byte_end:04X}: {count:5d} tiles ({pct:.1f}%)"
-        )
+        print(f"  ${byte_start:04X}-${byte_end:04X}: {count:5d} tiles ({pct:.1f}%)")
     print()
 
     # Sample matches
     print("=" * 70)
     print("SAMPLE MATCHES (first 10):")
     print("-" * 70)
-    print(
-        f"  {'Sprite':>6s} {'Tile':>4s} {'VRAM Addr':>10s} "
-        f"{'DMA Frame':>9s} {'Staging Addr':>14s}"
-    )
+    print(f"  {'Sprite':>6s} {'Tile':>4s} {'VRAM Addr':>10s} {'DMA Frame':>9s} {'Staging Addr':>14s}")
 
     for match in results.matches[:10]:
         staging = match.staging_addr
@@ -341,19 +334,14 @@ def print_report(results: CrossReferenceResults) -> None:
         print("-" * 70)
 
         for tile in results.unmatched_tiles[:10]:
-            print(
-                f"  Sprite {tile.sprite_id}, Tile {tile.tile_index}, "
-                f"VRAM ${tile.vram_addr:04X}"
-            )
+            print(f"  Sprite {tile.sprite_id}, Tile {tile.tile_index}, VRAM ${tile.vram_addr:04X}")
         print()
 
     print("=" * 70)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Cross-reference OAM sprite captures with SNES DMA events."
-    )
+    parser = argparse.ArgumentParser(description="Cross-reference OAM sprite captures with SNES DMA events.")
     parser.add_argument(
         "--capture",
         type=Path,
@@ -421,8 +409,7 @@ def main() -> int:
             "matched_tiles": len(results.matches),
             "unmatched_tiles": len(results.unmatched_tiles),
             "staging_buffers": [
-                {"addr": f"0x{a:06X}", "count": c}
-                for a, c in results.staging_buffer_usage.most_common(20)
+                {"addr": f"0x{a:06X}", "count": c} for a, c in results.staging_buffer_usage.most_common(20)
             ],
             "sample_matches": [
                 {

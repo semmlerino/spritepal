@@ -2,6 +2,7 @@
 """
 Test enhanced DMA logger to capture detailed transfer information
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -34,7 +35,7 @@ def test_enhanced_dma():
         wsl_cmd,
         capture_output=True,
         text=True,
-        timeout=45  # Give more time for detailed logging
+        timeout=45,  # Give more time for detailed logging
     )
 
     print(f"Return code: {result.returncode}")
@@ -79,7 +80,8 @@ def test_enhanced_dma():
             print(f"\n✓ SUCCESS: Found {rom_successes} ROM sprite offsets!")
             # Extract ROM offsets
             import re
-            rom_offsets = re.findall(r'ROM_OFFSET: \$([0-9A-Fa-f]+)', content)
+
+            rom_offsets = re.findall(r"ROM_OFFSET: \$([0-9A-Fa-f]+)", content)
             if rom_offsets:
                 unique_offsets = sorted(set(rom_offsets))[:10]  # First 10 unique
                 print("First ROM offsets found:")
@@ -91,6 +93,7 @@ def test_enhanced_dma():
                 print("However, compressed sprites via WRAM were detected")
     else:
         print("Enhanced log file not found")
+
 
 if __name__ == "__main__":
     test_enhanced_dma()

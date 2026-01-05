@@ -364,9 +364,7 @@ class SpriteConfigLoader:
                 ("SUPER DELUXE", "FUN PAK"),
             ]
             for equiv1, equiv2 in equivalents:
-                if (equiv1 in game_upper and equiv2 in title_upper) or (
-                    equiv2 in game_upper and equiv1 in title_upper
-                ):
+                if (equiv1 in game_upper and equiv2 in title_upper) or (equiv2 in game_upper and equiv1 in title_upper):
                     return 25
 
         return 0

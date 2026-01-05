@@ -53,9 +53,7 @@ def _iter_capture_files(paths: list[Path]) -> list[Path]:
 
 
 def _parse_wram_dumps(directory: Path) -> dict[int, list[WramDump]]:
-    pattern = re.compile(
-        r"wram_dump_(\d+)_([^_]+)(?:_f(\d+))?_start_([0-9A-Fa-f]+)_size_([0-9A-Fa-f]+)\.bin$"
-    )
+    pattern = re.compile(r"wram_dump_(\d+)_([^_]+)(?:_f(\d+))?_start_([0-9A-Fa-f]+)_size_([0-9A-Fa-f]+)\.bin$")
     by_source_frame: dict[int, list[WramDump]] = {}
     for path in directory.glob("wram_dump_*.bin"):
         match = pattern.match(path.name)

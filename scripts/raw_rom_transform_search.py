@@ -114,6 +114,7 @@ def rebuild_from_planes(planes: tuple[bytes, ...]) -> bytes:
 
 def flip_horizontal(tile_bytes: bytes) -> bytes:
     """Horizontal flip: bit-reverse each byte."""
+
     def reverse_bits(b: int) -> int:
         result = 0
         for i in range(8):
@@ -233,18 +234,14 @@ def main() -> int:
             offsets = search_in_data(rom_data, rebuilt)
             if offsets:
                 found_any = True
-                print(
-                    f"  [FOUND] PLANE PERM {perm} at {', '.join(f'0x{o:06X}' for o in offsets)}"
-                )
+                print(f"  [FOUND] PLANE PERM {perm} at {', '.join(f'0x{o:06X}' for o in offsets)}")
 
         # Transform 5: Byte-pair swap on bitmap
         swapped_bitmap = byte_pair_swap(bitmap_high)
         offsets = search_in_data(rom_data, swapped_bitmap)
         if offsets:
             found_any = True
-            print(
-                f"  [FOUND] BITMAP+SWAP at {', '.join(f'0x{o:06X}' for o in offsets)}"
-            )
+            print(f"  [FOUND] BITMAP+SWAP at {', '.join(f'0x{o:06X}' for o in offsets)}")
 
         if not found_any:
             print("  [NOT FOUND] No transforms matched")

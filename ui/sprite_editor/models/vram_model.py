@@ -236,16 +236,12 @@ class VRAMModel:
                 f.seek(offset)
                 data = f.read(size)
             if len(data) < size:
-                raise RuntimeError(
-                    f"Incomplete read: got {len(data)} bytes, expected {size}"
-                )
+                raise RuntimeError(f"Incomplete read: got {len(data)} bytes, expected {size}")
             return data
         except OSError as e:
             raise RuntimeError(f"Failed to read VRAM: {e}") from e
 
-    def write_vram_data(
-        self, data: bytes, offset: int, output_file: str | None = None
-    ) -> str:
+    def write_vram_data(self, data: bytes, offset: int, output_file: str | None = None) -> str:
         """
         Write data to VRAM file at specified offset.
         If output_file is None, modifies original file.
@@ -274,8 +270,7 @@ class VRAMModel:
             # Validate bounds
             if offset + len(data) > len(vram_data):
                 raise ValueError(
-                    f"Data ({len(data)} bytes) at offset {offset} exceeds "
-                    f"VRAM size ({len(vram_data)} bytes)"
+                    f"Data ({len(data)} bytes) at offset {offset} exceeds VRAM size ({len(vram_data)} bytes)"
                 )
 
             # Write data at offset

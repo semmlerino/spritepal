@@ -66,11 +66,7 @@ def rgb888_to_bgr555(r: int, g: int, b: int) -> int:
     b5 = (b * BGR555_MAX_VALUE) // RGB888_MAX_VALUE
 
     # Pack into BGR555
-    return (
-        (b5 << BGR555_BLUE_SHIFT)
-        | (g5 << BGR555_GREEN_SHIFT)
-        | (r5 << BGR555_RED_SHIFT)
-    )
+    return (b5 << BGR555_BLUE_SHIFT) | (g5 << BGR555_GREEN_SHIFT) | (r5 << BGR555_RED_SHIFT)
 
 
 def read_cgram_palette(cgram_file: str, palette_num: int) -> list[int] | None:
@@ -105,9 +101,7 @@ def read_cgram_palette(cgram_file: str, palette_num: int) -> list[int] | None:
         palette = []
         for i in range(COLORS_PER_PALETTE):
             # Read BGR555 color
-            color_bytes = palette_data[
-                i * BYTES_PER_COLOR : i * BYTES_PER_COLOR + BYTES_PER_COLOR
-            ]
+            color_bytes = palette_data[i * BYTES_PER_COLOR : i * BYTES_PER_COLOR + BYTES_PER_COLOR]
             if len(color_bytes) == BYTES_PER_COLOR:
                 bgr555 = struct.unpack("<H", color_bytes)[0]
                 r, g, b = bgr555_to_rgb888(bgr555)
@@ -194,11 +188,7 @@ def write_cgram_palette(palette: list[int], palette_num: int) -> bytes:
         ValueError: If palette doesn't have enough colors
     """
     if len(palette) < COLORS_PER_PALETTE * 3:
-        raise ValueError(
-            f"Palette must have at least {
-                COLORS_PER_PALETTE *
-                3} values"
-        )
+        raise ValueError(f"Palette must have at least {COLORS_PER_PALETTE * 3} values")
 
     cgram_data = bytearray()
 

@@ -218,6 +218,7 @@ def create_app_context(
 
         logger.info("Creating AppContext...")
 
+        from PySide6.QtCore import QCoreApplication
         from PySide6.QtWidgets import QApplication
 
         from core.configuration_service import ConfigurationService as ConfigService
@@ -283,8 +284,9 @@ def create_app_context(
 
         # Register cleanup hooks
         if not _cleanup_registered:
-            if qt_parent is not None:
-                qt_parent.aboutToQuit.connect(_cleanup_app_context)  # type: ignore[union-attr]
+            qt_app = qt_parent if isinstance(qt_parent, QCoreApplication) else None
+            if qt_app is not None:
+                qt_app.aboutToQuit.connect(_cleanup_app_context)
             atexit.register(_cleanup_app_context)
             _cleanup_registered = True
             logger.debug("Cleanup hooks registered")

@@ -300,13 +300,13 @@ class SettingsDialog(DialogBase):
 
             # Update file count
             total_files_val = stats.get("total_files", 0)
-            total_files = int(total_files_val) if isinstance(total_files_val, (int, float)) else 0
+            total_files = int(total_files_val) if isinstance(total_files_val, int | float) else 0
             sprite_caches_val = stats.get("sprite_location_caches", 0)
-            sprite_caches = int(sprite_caches_val) if isinstance(sprite_caches_val, (int, float)) else 0
+            sprite_caches = int(sprite_caches_val) if isinstance(sprite_caches_val, int | float) else 0
             rom_caches_val = stats.get("rom_info_caches", 0)
-            rom_caches = int(rom_caches_val) if isinstance(rom_caches_val, (int, float)) else 0
+            rom_caches = int(rom_caches_val) if isinstance(rom_caches_val, int | float) else 0
             scan_caches_val = stats.get("scan_progress_caches", 0)
-            scan_caches = int(scan_caches_val) if isinstance(scan_caches_val, (int, float)) else 0
+            scan_caches = int(scan_caches_val) if isinstance(scan_caches_val, int | float) else 0
 
             file_text = f"{total_files} files"
             if total_files > 0:
@@ -315,7 +315,7 @@ class SettingsDialog(DialogBase):
 
             # Update size
             size_bytes_val = stats.get("total_size_bytes", 0)
-            size_bytes = int(size_bytes_val) if isinstance(size_bytes_val, (int, float)) else 0
+            size_bytes = int(size_bytes_val) if isinstance(size_bytes_val, int | float) else 0
             size_mb = size_bytes / (1024 * 1024)
             self.cache_size_label.setText(f"{size_mb:.1f} MB")
 

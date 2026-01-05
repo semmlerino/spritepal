@@ -8,7 +8,7 @@ from typing import Any
 
 from PIL import Image
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QImage, QMouseEvent, QPixmap
 from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
@@ -22,6 +22,24 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.signal_utils import safe_disconnect
+
+
+class ClickableLabel(QLabel):
+    """QLabel subclass that emits clicked signal with palette index."""
+
+    clicked = Signal(int)
+
+    def __init__(self, palette_idx: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._palette_idx = palette_idx
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
+        """Override to emit clicked signal with palette index."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit(self._palette_idx)
+        super().mousePressEvent(event)
+
 
 class MultiPaletteViewer(QWidget):
     """Widget for viewing sprites with multiple palettes applied."""
@@ -31,7 +49,7 @@ class MultiPaletteViewer(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._setup_ui()
-        self._palette_labels: list[QLabel] = []
+        self._palette_labels: list[ClickableLabel] = []
         self._current_palettes: list[list[tuple[int, int, int]]] = []
 
     def _setup_ui(self) -> None:
@@ -88,19 +106,22 @@ class MultiPaletteViewer(QWidget):
             # Convert to QPixmap
             pixmap = self._pil_to_pixmap(img_copy)
 
-            # Create label for this palette
-            label = QLabel()
-            label.setPixmap(pixmap.scaled(
-                128, 128,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            ))
+            # Create clickable label for this palette
+            label = ClickableLabel(i)
+            label.setPixmap(
+                pixmap.scaled(
+                    128,
+                    128,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.FastTransformation,
+                )
+            )
             label.setToolTip(f"Palette {i}")
             label.setStyleSheet(
-                "QLabel { border: 2px solid #444; padding: 4px; }"
-                "QLabel:hover { border: 2px solid #888; }"
+                "QLabel { border: 2px solid #444; padding: 4px; }QLabel:hover { border: 2px solid #888; }"
             )
-            label.mousePressEvent = lambda e, idx=i: self._on_palette_clicked(idx)
+            # Connect signal instead of monkey-patching mousePressEvent
+            label.clicked.connect(self._on_palette_clicked)
 
             # Add palette number label
             palette_label = QLabel(f"Palette {i}")
@@ -120,6 +141,10 @@ class MultiPaletteViewer(QWidget):
 
     def _clear_previews(self) -> None:
         """Clear all palette previews."""
+        # Disconnect signals to prevent memory leaks
+        for label in self._palette_labels:
+            safe_disconnect(label.clicked)
+
         for i in reversed(range(self._grid_layout.count())):
             item = self._grid_layout.itemAt(i)
             if item and (widget := item.widget()):
@@ -140,7 +165,7 @@ class MultiPaletteViewer(QWidget):
         qimage = QImage(data, img.width, img.height, QImage.Format.Format_RGBA8888)
         return QPixmap.fromImage(qimage)
 
-    def set_oam_statistics(self, stats: dict[str, Any]) -> None:
+    def set_oam_statistics(self, stats: dict[str, Any]) -> None:  # type: ignore[reportExplicitAny]
         """Set OAM statistics display."""
         if stats:
             text = f"OAM: {stats.get('sprite_count', 0)} sprites"
@@ -224,7 +249,7 @@ class MultiPaletteTab(QWidget):
         """Set single image with all palettes."""
         self.multi_palette_viewer.set_single_image_all_palettes(base_img, palettes)
 
-    def set_oam_statistics(self, stats: dict[str, Any]) -> None:
+    def set_oam_statistics(self, stats: dict[str, Any]) -> None:  # type: ignore[reportExplicitAny]
         """Set OAM statistics."""
         self.multi_palette_viewer.set_oam_statistics(stats)
 
