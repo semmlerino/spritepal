@@ -5,7 +5,6 @@ Command pattern implementation for undo/redo operations.
 
 from .pixel_commands import (
     BatchCommand,
-    DrawLineCommand,
     DrawPixelCommand,
     FloodFillCommand,
     UndoCommand,
@@ -13,7 +12,6 @@ from .pixel_commands import (
 
 __all__ = [
     "BatchCommand",
-    "DrawLineCommand",
     "DrawPixelCommand",
     "FloodFillCommand",
     "UndoCommand",

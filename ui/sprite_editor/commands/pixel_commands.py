@@ -12,7 +12,7 @@ from __future__ import annotations
 import pickle
 import zlib
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, override
 
@@ -149,69 +149,6 @@ class DrawPixelCommand(UndoCommand):
             cmd._compressed_data = bytes.fromhex(data["compressed_data"])
         else:
             cmd.x, cmd.y, cmd.old_color, cmd.new_color = data["data"]
-
-        return cmd
-
-
-@dataclass
-class DrawLineCommand(UndoCommand):
-    """Command for line drawing operations."""
-
-    pixels: list[tuple[int, int, int]] = field(default_factory=list)
-    new_color: int = 0
-
-    def __post_init__(self) -> None:
-        """Initialize parent class after dataclass initialization."""
-        super().__init__()
-
-    @override
-    def execute(self, model: ImageModel) -> None:
-        """Apply new color to all line pixels."""
-        for x, y, _ in self.pixels:
-            if 0 <= x < model.data.shape[1] and 0 <= y < model.data.shape[0]:
-                model.data[y, x] = self.new_color
-
-    @override
-    def unexecute(self, model: ImageModel) -> None:
-        """Restore original colors for all line pixels."""
-        for x, y, old_color in self.pixels:
-            if 0 <= x < model.data.shape[1] and 0 <= y < model.data.shape[0]:
-                model.data[y, x] = old_color
-
-    @override
-    def get_memory_size(self) -> int:
-        """Calculate memory usage."""
-        if self.compressed and self._compressed_data:
-            return len(self._compressed_data) + 64
-        return len(self.pixels) * 12 + 64
-
-    @override
-    def _get_compress_data(self) -> tuple[list[tuple[int, int, int]], int]:
-        """Get line data for compression."""
-        return (self.pixels, self.new_color)
-
-    @override
-    def _clear_uncompressed_data(self) -> None:
-        """Clear pixel list after compression."""
-        self.pixels = []
-
-    @override
-    def _restore_from_compressed(self, data: tuple[list[tuple[int, int, int]], int]) -> None:
-        """Restore line data from compressed format."""
-        self.pixels, self.new_color = data
-
-    @classmethod
-    @override
-    def from_dict(cls, data: dict[str, Any]) -> DrawLineCommand:  # type: ignore[reportExplicitAny]
-        """Create command from dictionary."""
-        cmd = cls()
-        cmd.timestamp = datetime.fromisoformat(data["timestamp"])
-        cmd.compressed = data["compressed"]
-
-        if data["compressed"]:
-            cmd._compressed_data = bytes.fromhex(data["compressed_data"])
-        else:
-            cmd.pixels, cmd.new_color = data["data"]
 
         return cmd
 
@@ -474,8 +411,6 @@ class BatchCommand(UndoCommand):
                 cmd_type = cmd_data["type"]
                 if cmd_type == "DrawPixelCommand":
                     cmd.commands.append(DrawPixelCommand.from_dict(cmd_data))
-                elif cmd_type == "DrawLineCommand":
-                    cmd.commands.append(DrawLineCommand.from_dict(cmd_data))
                 elif cmd_type == "FloodFillCommand":
                     cmd.commands.append(FloodFillCommand.from_dict(cmd_data))
                 elif cmd_type == "BatchCommand":

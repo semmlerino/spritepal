@@ -78,15 +78,16 @@ class ExtractionController(QObject):
         """
         self._multi_palette_view = view
 
+        # Set controller reference in view for prerequisite validation
+        if hasattr(view, "set_extraction_controller"):
+            view.set_extraction_controller(self)  # type: ignore[attr-defined]
+
         # Check if view has the required signals before connecting
-        if hasattr(view, 'browse_oam_requested'):
+        if hasattr(view, "browse_oam_requested"):
             view.browse_oam_requested.connect(self.browse_oam_file)  # type: ignore[attr-defined]
 
-        if hasattr(view, 'generate_preview_requested'):
+        if hasattr(view, "generate_preview_requested"):
             view.generate_preview_requested.connect(self._on_generate_multi_preview)  # type: ignore[attr-defined]
-
-        if hasattr(view, 'palette_selected'):
-            view.palette_selected.connect(self._on_palette_selected)  # type: ignore[attr-defined]
 
         # Controller → Tab: connect completion signal
         self.multi_palette_completed.connect(self._deliver_multi_palette_results)
@@ -95,21 +96,10 @@ class ExtractionController(QObject):
         """Handle preview generation request from tab."""
         # Get preview size from view (default 128 tiles if method doesn't exist)
         preview_size = 128
-        if self._multi_palette_view is not None and hasattr(self._multi_palette_view, 'get_preview_size'):
+        if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "get_preview_size"):
             preview_size = self._multi_palette_view.get_preview_size()  # type: ignore[attr-defined]
 
         self.generate_multi_palette_preview(preview_size)
-
-    def _on_palette_selected(self, palette_num: int) -> None:
-        """Handle palette selection from tab.
-
-        Args:
-            palette_num: Selected palette number (0-15)
-        """
-        # Store for potential use in subsequent operations
-        if not hasattr(self, 'selected_palette'):
-            self.selected_palette = 0
-        self.selected_palette = palette_num
 
     def _connect_view_signals(self) -> None:
         """Connect view signals to controller methods."""
@@ -132,6 +122,9 @@ class ExtractionController(QObject):
             self.vram_file = file_path
             if self._view:
                 self._view.set_vram_file(file_path)
+            # Trigger validation in multi-palette tab
+            if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "_validate_prerequisites"):
+                self._multi_palette_view._validate_prerequisites()  # type: ignore[attr-defined]
 
     def browse_cgram_file(self) -> None:
         """Open file dialog to select CGRAM dump."""
@@ -145,6 +138,9 @@ class ExtractionController(QObject):
             self.cgram_file = file_path
             if self._view:
                 self._view.set_cgram_file(file_path)
+            # Trigger validation in multi-palette tab
+            if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "_validate_prerequisites"):
+                self._multi_palette_view._validate_prerequisites()  # type: ignore[attr-defined]
 
     def browse_oam_file(self) -> None:
         """Open file dialog to select OAM dump."""
@@ -156,6 +152,9 @@ class ExtractionController(QObject):
         )
         if file_path:
             self.oam_file = file_path
+            # Update multi-palette view if it exists
+            if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "set_oam_file"):
+                self._multi_palette_view.set_oam_file(file_path)  # type: ignore[attr-defined]
 
     def extract_sprites(self) -> None:
         """Start sprite extraction."""
@@ -252,7 +251,13 @@ class ExtractionController(QObject):
     def _on_error(self, error: str) -> None:
         """Handle extraction error."""
         self.extraction_failed.emit(error)
-        if self._view:
+
+        # Route multi-palette errors to multi-palette tab
+        if "multi-palette" in error.lower():
+            if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "append_output"):
+                self._multi_palette_view.append_output(f"ERROR: {error}")  # type: ignore[attr-defined]
+        elif self._view:
+            # Route to extract tab
             self._view.append_output(f"ERROR: {error}")
             self._view.set_extract_enabled(True)
 
@@ -266,11 +271,9 @@ class ExtractionController(QObject):
         """Handle successful multi-palette extraction."""
         self.multi_palette_completed.emit(palette_images, tile_count)
 
-    def _deliver_multi_palette_results(
-        self, palette_images: dict[str, "Image.Image"], tile_count: int
-    ) -> None:
+    def _deliver_multi_palette_results(self, palette_images: dict[str, "Image.Image"], tile_count: int) -> None:
         """Send multi-palette results to view."""
-        if self._multi_palette_view is not None and hasattr(self._multi_palette_view, 'set_single_image_all_palettes'):
+        if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "set_single_image_all_palettes"):
             # Extract base image and palette list from dict
             base_img = palette_images.get("palette_0")
             if base_img:

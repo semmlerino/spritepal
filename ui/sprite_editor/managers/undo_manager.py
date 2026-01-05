@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 
 from ..commands.pixel_commands import (
     BatchCommand,
-    DrawLineCommand,
     DrawPixelCommand,
     FloodFillCommand,
     UndoCommand,
@@ -157,8 +156,6 @@ class UndoManager:
 
             if cmd_type == "DrawPixelCommand":
                 cmd = DrawPixelCommand.from_dict(cmd_data)
-            elif cmd_type == "DrawLineCommand":
-                cmd = DrawLineCommand.from_dict(cmd_data)
             elif cmd_type == "FloodFillCommand":
                 cmd = FloodFillCommand.from_dict(cmd_data)
             elif cmd_type == "BatchCommand":

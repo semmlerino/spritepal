@@ -5,27 +5,8 @@ Handles indexed images with 4bpp format using numpy arrays.
 """
 
 from dataclasses import dataclass, field
-from pathlib import Path, PosixPath, WindowsPath
-from typing import Any
 
 import numpy as np
-from PIL import Image
-
-
-def _sanitize_for_json(obj: Any) -> Any:  # type: ignore[reportExplicitAny]
-    """Convert non-JSON-serializable objects to JSON-safe types."""
-    if isinstance(obj, str | int | float | bool | type(None)):
-        return obj
-    if isinstance(obj, Path | WindowsPath | PosixPath):
-        return str(obj)
-    if isinstance(obj, bytes):
-        return obj.decode("utf-8", errors="ignore")
-    if isinstance(obj, dict):
-        return {k: _sanitize_for_json(v) for k, v in obj.items()}
-    if isinstance(obj, list | tuple):
-        return [_sanitize_for_json(item) for item in obj]
-    # Fallback: convert to string
-    return str(obj)
 
 
 @dataclass
@@ -45,54 +26,6 @@ class ImageModel:
         """Ensure data array matches dimensions."""
         if self.data.shape != (self.height, self.width):
             self.data = np.zeros((self.height, self.width), dtype=np.uint8)
-
-    def new_image(self, width: int, height: int) -> None:
-        """Create a new blank image."""
-        self.width = width
-        self.height = height
-        self.data = np.zeros((height, width), dtype=np.uint8)
-        self.modified = True
-        self.file_path = None
-
-    def load_from_pil(self, pil_image: Image.Image) -> dict[str, Any]:  # type: ignore[reportExplicitAny]
-        """
-        Load image data from a PIL Image.
-        Returns metadata including palette information.
-        """
-        if pil_image.mode != "P":
-            raise ValueError(f"Expected indexed image (mode 'P'), got mode '{pil_image.mode}'")
-
-        self.width = pil_image.width
-        self.height = pil_image.height
-        self.data = np.array(pil_image, dtype=np.uint8)
-        self.modified = False
-
-        # Extract metadata
-        metadata: dict[str, Any] = {  # type: ignore[reportExplicitAny]
-            "width": self.width,
-            "height": self.height,
-            "mode": pil_image.mode,
-        }
-
-        # Get palette if available
-        palette_data = pil_image.getpalette()
-        if palette_data:
-            metadata["palette"] = palette_data
-
-        # Get any custom info
-        if hasattr(pil_image, "info"):
-            metadata["info"] = _sanitize_for_json(pil_image.info)
-
-        return metadata
-
-    def to_pil_image(self, palette: list[int] | None = None) -> Image.Image:
-        """Convert to PIL Image with optional palette."""
-        img = Image.fromarray(self.data, mode="P")
-
-        if palette:
-            img.putpalette(palette)
-
-        return img
 
     def get_pixel(self, x: int, y: int) -> int:
         """Get pixel value at coordinates."""

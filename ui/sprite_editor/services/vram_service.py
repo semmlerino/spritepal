@@ -108,32 +108,3 @@ class VRAMService:
             raise
         except OSError as e:
             raise RuntimeError(f"Error injecting into VRAM: {e}") from e
-
-    def get_info(self, vram_file: str) -> dict[str, str | int] | None:
-        """
-        Get information about VRAM dump file.
-
-        Args:
-            vram_file: Path to VRAM dump file
-
-        Returns:
-            Dictionary with file info, or None on error
-        """
-        try:
-            file_size = Path(vram_file).stat().st_size
-
-            if file_size == 65536:
-                vram_size = "64KB (Standard)"
-            elif file_size == 32768:
-                vram_size = "32KB"
-            else:
-                vram_size = f"{file_size} bytes"
-
-            return {
-                "file": vram_file,
-                "size": file_size,
-                "size_text": vram_size,
-                "max_offset": file_size - 1,
-            }
-        except OSError:
-            return None

@@ -92,67 +92,6 @@ def encode_4bpp_tile(tile_pixels: list[int]) -> bytes:
     return bytes(output)
 
 
-def decode_tiles(data: bytes, num_tiles: int, start_offset: int = 0) -> list[list[int]]:
-    """
-    Decode multiple 4bpp tiles from data.
-
-    Args:
-        data: Raw tile data bytes
-        num_tiles: Number of tiles to decode
-        start_offset: Starting offset in the data
-
-    Returns:
-        List of decoded tiles (each tile is a list of 64 pixels)
-    """
-    tiles = []
-    for i in range(num_tiles):
-        offset = start_offset + (i * BYTES_PER_TILE_4BPP)
-        if offset + BYTES_PER_TILE_4BPP <= len(data):
-            tile = decode_4bpp_tile(data, offset)
-            tiles.append(tile)
-        else:
-            break
-
-    return tiles
-
-
-def encode_tiles(tiles: list[list[int]]) -> bytes:
-    """
-    Encode multiple tiles to SNES 4bpp format.
-
-    Args:
-        tiles: List of tiles (each tile is a list of 64 pixels)
-
-    Returns:
-        Encoded tile data
-    """
-    output = bytearray()
-    for tile in tiles:
-        encoded = encode_4bpp_tile(tile)
-        output.extend(encoded)
-
-    return bytes(output)
-
-
-def calculate_tile_grid_exact(width: int, height: int) -> tuple[int, int, int]:
-    """
-    Calculate tile grid dimensions using exact division (truncate).
-
-    Use this for encoding: only count complete tiles that fit within dimensions.
-    Partial tiles at edges are excluded.
-
-    Args:
-        width: Image width in pixels
-        height: Image height in pixels
-
-    Returns:
-        Tuple of (tiles_x, tiles_y, total_tiles)
-    """
-    tiles_x = width // TILE_WIDTH
-    tiles_y = height // TILE_HEIGHT
-    return tiles_x, tiles_y, tiles_x * tiles_y
-
-
 def calculate_tile_grid_padded(width: int, height: int) -> tuple[int, int, int]:
     """
     Calculate tile grid dimensions using ceiling division (round up).
