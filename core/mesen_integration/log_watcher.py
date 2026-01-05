@@ -11,7 +11,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from PySide6.QtCore import QFileSystemWatcher, QObject, QTimer, Signal
@@ -230,9 +230,9 @@ class LogWatcher(QObject):
 
                 # Convert Unix timestamp to datetime
                 if timestamp_unix:
-                    timestamp = datetime.fromtimestamp(timestamp_unix)
+                    timestamp = datetime.fromtimestamp(timestamp_unix, tz=UTC)
                 else:
-                    timestamp = datetime.now()
+                    timestamp = datetime.now(tz=UTC)
 
                 captures.append(
                     CapturedOffset(
@@ -385,6 +385,6 @@ class LogWatcher(QObject):
         return CapturedOffset(
             offset=offset,
             frame=frame,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(tz=UTC),
             raw_line=line.strip(),
         )

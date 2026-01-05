@@ -443,8 +443,6 @@ filterwarnings = [
     "ignore:.*QMouseEvent.*deprecated:DeprecationWarning",
     # multiprocessing fork warning in multi-threaded process (expected in tests)
     "ignore:.*multi-threaded.*use of fork.*:DeprecationWarning",
-    # pytest-benchmark warning when running with xdist (expected)
-    "ignore:Benchmarks are automatically disabled:pytest_benchmark.logger.PytestBenchmarkWarning",
 ]
 
 # Markers used in the test suite (consolidated from 65 to 16 based on actual usage)

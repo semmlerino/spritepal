@@ -184,9 +184,6 @@ def get_button_style(style_type: str = "primary", min_height: int | None = None,
     Returns:
         CSS string for button styling
     """
-    if min_height is None:
-        min_height = DIMENSIONS["button_height"]
-
     if font_size is None:
         font_size = FONTS["medium_size"]
 
@@ -254,13 +251,15 @@ def get_button_style(style_type: str = "primary", min_height: int | None = None,
     # Secondary outline uses explicit border color
     border_color = colors.get("border", colors["bg"])
 
+    min_height_css = f"min-height: {min_height}px;" if min_height is not None else ""
+
     return f"""
     QPushButton {{
         background-color: {colors["bg"]};
         color: {text_color};
         font-weight: {FONTS["bold_weight"]};
         font-size: {font_size};
-        min-height: {min_height}px;
+        {min_height_css}
         border: {DIMENSIONS["border_width"]}px solid {border_color};
         border-radius: {DIMENSIONS["border_radius"]}px;
         padding: {DIMENSIONS["spacing_xs"]}px {DIMENSIONS["spacing_sm"]}px;
@@ -298,7 +297,6 @@ def get_input_style(input_type: str = "text", min_width: int | None = None) -> s
     padding: {DIMENSIONS["spacing_sm"]}px {DIMENSIONS["spacing_md"]}px;
     font-size: {FONTS["default_size"]};
     min-width: {min_width}px;
-    min-height: {DIMENSIONS["input_height"]}px;
     """
 
     focus_style = f"""

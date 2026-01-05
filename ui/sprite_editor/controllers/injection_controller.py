@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QFileDialog
 
+from core.rom_injector import ROMInjector
 from ui.common.signal_utils import safe_disconnect
 
 from ..services import ImageConverter
@@ -32,10 +33,13 @@ class InjectionController(QObject):
         self._view: InjectTab | None = None
         self._worker: InjectWorker | None = None
         self.converter = ImageConverter()
+        self.rom_injector = ROMInjector()
+        self._mode = "vram"
 
         # File paths
         self.png_file: str = ""
         self.vram_file: str = ""
+        self.rom_file: str = ""
 
         # Validation state
         self._png_validation_passed: bool = False
@@ -70,8 +74,70 @@ class InjectionController(QObject):
             return
 
         self._view.inject_requested.connect(self.inject_sprites)
+        self._view.save_rom_requested.connect(self.inject_sprite_to_rom)
         self._view.browse_png_requested.connect(self.browse_png_file)
         self._view.browse_vram_requested.connect(self.browse_vram_file)
+        if hasattr(self._view, "browse_rom_requested"):
+            self._view.browse_rom_requested.connect(self.browse_rom_file)
+
+    def set_mode(self, mode: str) -> None:
+        """Set the injection mode ('vram' or 'rom')."""
+        self._mode = mode
+        if self._view:
+            self._view.set_mode(mode)
+
+    def browse_rom_file(self) -> None:
+        """Open file dialog to select ROM file."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self._view,
+            "Open ROM File",
+            "",
+            "SNES ROMs (*.sfc *.smc);;All Files (*)",
+        )
+        if file_path:
+            self.rom_file = file_path
+            if self._view and hasattr(self._view, "set_rom_file"):
+                self._view.set_rom_file(file_path)
+
+    def inject_sprite_to_rom(self) -> None:
+        """Inject sprite directly to ROM."""
+        if not self._view:
+            return
+
+        params = self._view.get_injection_params()
+        rom_file = str(params.get("rom_file", ""))
+        png_file = str(params.get("png_file", ""))
+        offset = int(params["offset"]) # type: ignore
+
+        if not rom_file or not png_file:
+            self._view.append_output("ERROR: ROM and PNG files required")
+            return
+
+        # Output to same file (or backup handled by injector)
+        # Using same file for 'Save to ROM' logic
+        
+        self._view.append_output(f"Saving to ROM: {rom_file} at 0x{offset:X}")
+        
+        try:
+            success, message = self.rom_injector.inject_sprite_to_rom(
+                sprite_path=png_file,
+                rom_path=rom_file,
+                output_path=rom_file, # Overwrite
+                sprite_offset=offset,
+                create_backup=True
+            )
+            
+            if success:
+                self._view.append_output("Success!")
+                self._view.append_output(message)
+                self.injection_completed.emit(rom_file)
+            else:
+                self._view.append_output(f"Failed: {message}")
+                self.injection_failed.emit(message)
+                
+        except Exception as e:
+            self._view.append_output(f"ERROR: {e}")
+            self.injection_failed.emit(str(e))
 
     def browse_png_file(self) -> None:
         """Open file dialog to select PNG file."""

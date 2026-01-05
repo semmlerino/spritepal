@@ -101,6 +101,9 @@ class UICoordinator(QObject):
         self.toolbar_manager = toolbar_manager
         self.actions_handler = actions_handler
 
+        # Layout state
+        self._saved_splitter_sizes: list[int] = []
+
         self._connect_signals()
 
     def _connect_signals(self) -> None:
@@ -299,6 +302,10 @@ class UICoordinator(QObject):
 
     def _configure_rom_extraction_tab(self) -> None:
         """Configure UI for ROM extraction tab"""
+        # Restore layout if coming from sprite editor
+        self._restore_layout_if_needed()
+        self._restore_toolbar_state()
+
         # Check extraction readiness
         params = self.actions_handler.get_rom_extraction_params()
         if params is not None:
@@ -315,6 +322,10 @@ class UICoordinator(QObject):
 
     def _configure_vram_extraction_tab(self) -> None:
         """Configure UI for VRAM extraction tab"""
+        # Restore layout if coming from sprite editor
+        self._restore_layout_if_needed()
+        self._restore_toolbar_state()
+
         # Check extraction readiness based on mode
         ready = self.actions_handler.is_vram_extraction_ready()
         if ready:
@@ -336,6 +347,37 @@ class UICoordinator(QObject):
         """Configure UI for Sprite Editor tab"""
         # Disable main Extract button - the editor has its own extract controls
         self.toolbar_manager.set_extract_enabled(False, "Use editor's Extract")
+
+        # Clarify workflow: Rename Open Editor -> Open External, Disable Inject
+        self.toolbar_manager.set_open_editor_button_label("Open External")
+        self.toolbar_manager.set_inject_button_enabled(False)
+
+        # Maximize editor space by collapsing the right preview panel
+        self._maximize_editor_layout()
+
+    def _restore_toolbar_state(self) -> None:
+        """Restore toolbar state when leaving editor tab"""
+        self.toolbar_manager.set_open_editor_button_label("Open Editor")
+        # Restore inject button state to match open editor button (both enabled after extraction)
+        is_enabled = self.toolbar_manager.open_editor_button.isEnabled()
+        self.toolbar_manager.set_inject_button_enabled(is_enabled)
+
+    def _maximize_editor_layout(self) -> None:
+        """Collapse right panel to give editor more space"""
+        splitter = self.main_window.main_splitter
+        current_sizes = splitter.sizes()
+
+        # Only save if right panel is visible (size > 0)
+        if len(current_sizes) >= 2 and current_sizes[1] > 0:
+            self._saved_splitter_sizes = current_sizes
+            # Collapse right panel (index 1)
+            splitter.setSizes([99999, 0])
+
+    def _restore_layout_if_needed(self) -> None:
+        """Restore layout if it was modified for editor"""
+        if self._saved_splitter_sizes:
+            self.main_window.main_splitter.setSizes(self._saved_splitter_sizes)
+            self._saved_splitter_sizes = []
 
     def get_current_tab_index(self) -> int:
         """Get current active tab index"""

@@ -14,7 +14,9 @@ from PySide6.QtWidgets import (
     QComboBox,
     QGridLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QSpinBox,
     QTextEdit,
@@ -36,7 +38,9 @@ class ExtractTab(QWidget):
     # Signals
     browse_vram_requested = Signal()
     browse_cgram_requested = Signal()
+    browse_rom_requested = Signal()
     extract_requested = Signal()
+    load_rom_requested = Signal()
     extractionRequested = Signal(str, dict)  # oam_path, settings
 
     def __init__(
@@ -58,6 +62,18 @@ class ExtractTab(QWidget):
         self.vram_drop.file_dropped.connect(lambda p: self.set_vram_file(p))
         layout.addWidget(self.vram_drop)
 
+        # ROM Selection (Hidden by default)
+        self.rom_group = QGroupBox("ROM File")
+        rom_layout = QHBoxLayout()
+        self.rom_path_edit = QLineEdit()
+        self.browse_rom_btn = QPushButton("Browse...")
+        self.browse_rom_btn.clicked.connect(self.browse_rom_requested.emit)
+        rom_layout.addWidget(self.rom_path_edit)
+        rom_layout.addWidget(self.browse_rom_btn)
+        self.rom_group.setLayout(rom_layout)
+        self.rom_group.hide()
+        layout.addWidget(self.rom_group)
+
         # Extraction settings group
         settings_group = QGroupBox("Extraction Settings")
         settings_layout = QGridLayout()
@@ -66,13 +82,19 @@ class ExtractTab(QWidget):
         self.extract_offset_edit = HexLineEdit("0xC000")
         settings_layout.addWidget(QLabel("Offset:"), 0, 0)
         settings_layout.addWidget(self.extract_offset_edit, 0, 1)
-        settings_layout.addWidget(QLabel("(VRAM $6000)"), 0, 2)
+
+        offset_hint = QLabel("(VRAM $6000)")
+        offset_hint.setWordWrap(True)
+        settings_layout.addWidget(offset_hint, 0, 2)
 
         # Size
         self.extract_size_edit = HexLineEdit("0x4000")
         settings_layout.addWidget(QLabel("Size:"), 1, 0)
         settings_layout.addWidget(self.extract_size_edit, 1, 1)
-        settings_layout.addWidget(QLabel("(16KB)"), 1, 2)
+
+        size_hint = QLabel("(16KB)")
+        size_hint.setWordWrap(True)
+        settings_layout.addWidget(size_hint, 1, 2)
 
         # Tiles per row
         self.tiles_per_row_spin = QSpinBox()
@@ -80,6 +102,9 @@ class ExtractTab(QWidget):
         self.tiles_per_row_spin.setValue(16)
         settings_layout.addWidget(QLabel("Tiles/Row:"), 2, 0)
         settings_layout.addWidget(self.tiles_per_row_spin, 2, 1)
+
+        # Allow column 2 (hints) to wrap and take available space
+        settings_layout.setColumnStretch(2, 1)
 
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
@@ -115,6 +140,12 @@ class ExtractTab(QWidget):
         self.extract_btn.clicked.connect(self.extract_requested.emit)
         layout.addWidget(self.extract_btn)
 
+        # Load from ROM button (Hidden by default)
+        self.load_rom_btn = QPushButton("Load from ROM")
+        self.load_rom_btn.clicked.connect(self.load_rom_requested.emit)
+        self.load_rom_btn.hide()
+        layout.addWidget(self.load_rom_btn)
+
         # Output group
         output_group = QGroupBox("Output")
         output_layout = QVBoxLayout()
@@ -127,10 +158,29 @@ class ExtractTab(QWidget):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
 
+    def set_mode(self, mode: str) -> None:
+        """Set the extraction mode ('vram' or 'rom')."""
+        is_rom = mode == "rom"
+        self.vram_drop.setVisible(not is_rom)
+        self.rom_group.setVisible(is_rom)
+        self.extract_btn.setVisible(not is_rom)
+        self.load_rom_btn.setVisible(is_rom)
+
+        # Update hints if needed (could be improved)
+        if is_rom:
+            self.vram_drop.set_required(False)
+        else:
+            self.vram_drop.set_required(True)
+
+    def set_rom_file(self, path: str) -> None:
+        """Set the ROM file path."""
+        self.rom_path_edit.setText(path)
+
     def get_extraction_params(self) -> dict[str, object]:
         """Get the current extraction parameters."""
         return {
             "vram_file": self.vram_drop.get_file_path(),
+            "rom_file": self.rom_path_edit.text(),
             "offset": self.extract_offset_edit.value(),
             "size": self.extract_size_edit.value(),
             "tiles_per_row": self.tiles_per_row_spin.value(),
@@ -164,6 +214,17 @@ class ExtractTab(QWidget):
                 errors.append("CGRAM file required when using palette")
 
         return (True, "") if not errors else (False, "\n".join(errors))
+
+    def set_offset(self, offset: int | str) -> None:
+        """Set the extraction offset.
+
+        Args:
+            offset: Offset value (int or hex string)
+        """
+        if isinstance(offset, int):
+            self.extract_offset_edit.setValue(offset)
+        else:
+            self.extract_offset_edit.setText(str(offset))
 
     def set_vram_file(self, file_path: str) -> None:
         """Set the VRAM file path."""

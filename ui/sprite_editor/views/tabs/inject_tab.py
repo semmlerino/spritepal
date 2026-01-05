@@ -12,6 +12,7 @@ from PySide6.QtCore import QSignalBlocker, Signal
 from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -33,8 +34,10 @@ class InjectTab(QWidget):
 
     # Signals
     inject_requested = Signal()
+    save_rom_requested = Signal()
     browse_png_requested = Signal()
     browse_vram_requested = Signal()
+    browse_rom_requested = Signal()
 
     def __init__(
         self,
@@ -76,6 +79,19 @@ class InjectTab(QWidget):
         self.vram_drop.file_dropped.connect(lambda p: self.set_vram_file(p))
         target_layout.addWidget(self.vram_drop, 0, 0, 1, 3)
 
+        # ROM File (Hidden by default)
+        self.rom_group = QWidget()
+        rom_layout = QHBoxLayout(self.rom_group)
+        rom_layout.setContentsMargins(0, 0, 0, 0)
+        rom_layout.addWidget(QLabel("ROM:"))
+        self.rom_path_edit = QLineEdit()
+        self.browse_rom_btn = QPushButton("Browse...")
+        self.browse_rom_btn.clicked.connect(self.browse_rom_requested.emit)
+        rom_layout.addWidget(self.rom_path_edit)
+        rom_layout.addWidget(self.browse_rom_btn)
+        self.rom_group.hide()
+        target_layout.addWidget(self.rom_group, 0, 0, 1, 3)
+
         # Offset
         self.inject_offset_edit = HexLineEdit("0xC000")
         target_layout.addWidget(QLabel("Offset:"), 1, 0)
@@ -87,8 +103,9 @@ class InjectTab(QWidget):
         target_layout.addWidget(self.output_file_edit, 2, 1)
 
         self.output_hint = QLabel("Relative paths saved next to VRAM file")
+        self.output_hint.setWordWrap(True)
         self.output_hint.setStyleSheet("color: #888888; font-size: 11px;")
-        target_layout.addWidget(self.output_hint, 2, 2)
+        target_layout.addWidget(self.output_hint, 3, 1, 1, 2)
 
         target_group.setLayout(target_layout)
         layout.addWidget(target_group)
@@ -97,6 +114,12 @@ class InjectTab(QWidget):
         self.inject_btn = QPushButton("Inject Sprites")
         self.inject_btn.clicked.connect(self.inject_requested.emit)
         layout.addWidget(self.inject_btn)
+
+        # Save to ROM button (Hidden by default)
+        self.save_rom_btn = QPushButton("Save to ROM")
+        self.save_rom_btn.clicked.connect(self.save_rom_requested.emit)
+        self.save_rom_btn.hide()
+        layout.addWidget(self.save_rom_btn)
 
         # Output group
         output_group = QGroupBox("Output")
@@ -110,11 +133,31 @@ class InjectTab(QWidget):
         output_group.setLayout(output_layout)
         layout.addWidget(output_group)
 
+    def set_mode(self, mode: str) -> None:
+        """Set the injection mode ('vram' or 'rom')."""
+        is_rom = mode == "rom"
+        self.vram_drop.setVisible(not is_rom)
+        self.rom_group.setVisible(is_rom)
+        self.inject_btn.setVisible(not is_rom)
+        self.save_rom_btn.setVisible(is_rom)
+
+        if is_rom:
+            self.vram_drop.set_required(False)
+            self.output_hint.setText("Updates ROM checksum automatically")
+        else:
+            self.vram_drop.set_required(True)
+            self.output_hint.setText("Relative paths saved next to VRAM file")
+
+    def set_rom_file(self, path: str) -> None:
+        """Set the ROM file path."""
+        self.rom_path_edit.setText(path)
+
     def get_injection_params(self) -> dict[str, object]:
         """Get the current injection parameters."""
         return {
             "png_file": self.png_drop.get_file_path(),
             "vram_file": self.vram_drop.get_file_path(),
+            "rom_file": self.rom_path_edit.text(),
             "offset": self.inject_offset_edit.value(),
             "output_file": self.output_file_edit.text(),
         }

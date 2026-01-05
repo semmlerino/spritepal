@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QFileDialog
 
+from core.app_context import get_app_context
+from core.rom_extractor import ROMExtractor
 from ui.common.signal_utils import safe_disconnect
 
 from ..services import SpriteRenderer
@@ -36,10 +38,17 @@ class ExtractionController(QObject):
         self._multi_worker: MultiPaletteExtractWorker | None = None
         self.renderer = SpriteRenderer()
 
+        # ROM Extractor
+        context = get_app_context()
+        self.rom_cache = context.rom_cache
+        self.rom_extractor = ROMExtractor(self.rom_cache)
+        self._mode = "vram"
+
         # File paths
         self.vram_file: str = ""
         self.cgram_file: str = ""
         self.oam_file: str = ""
+        self.rom_file: str = ""
 
     def _cleanup_worker(self) -> None:
         """Clean up existing workers before creating new ones."""
@@ -107,8 +116,30 @@ class ExtractionController(QObject):
             return
 
         self._view.extract_requested.connect(self.extract_sprites)
+        self._view.load_rom_requested.connect(self.extract_from_rom)
         self._view.browse_vram_requested.connect(self.browse_vram_file)
         self._view.browse_cgram_requested.connect(self.browse_cgram_file)
+        if hasattr(self._view, "browse_rom_requested"):
+            self._view.browse_rom_requested.connect(self.browse_rom_file)
+
+    def set_mode(self, mode: str) -> None:
+        """Set the extraction mode ('vram' or 'rom')."""
+        self._mode = mode
+        if self._view:
+            self._view.set_mode(mode)
+
+    def browse_rom_file(self) -> None:
+        """Open file dialog to select ROM file."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self._view,
+            "Open ROM File",
+            "",
+            "SNES ROMs (*.sfc *.smc);;All Files (*)",
+        )
+        if file_path:
+            self.rom_file = file_path
+            if self._view and hasattr(self._view, "set_rom_file"):
+                self._view.set_rom_file(file_path)
 
     def browse_vram_file(self) -> None:
         """Open file dialog to select VRAM dump."""
@@ -155,6 +186,49 @@ class ExtractionController(QObject):
             # Update multi-palette view if it exists
             if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "set_oam_file"):
                 self._multi_palette_view.set_oam_file(file_path)  # type: ignore[attr-defined]
+
+    def extract_from_rom(self) -> None:
+        """Extract sprite directly from ROM."""
+        if not self._view:
+            return
+
+        params = self._view.get_extraction_params()
+        rom_file = str(params.get("rom_file", ""))
+        offset = int(params["offset"]) # type: ignore
+
+        if not rom_file:
+            self._view.append_output("ERROR: ROM file required")
+            return
+
+        self._view.append_output(f"Loading from ROM: {rom_file} at 0x{offset:X}")
+        
+        # Use temp dir for output
+        import tempfile
+        from PIL import Image
+        from pathlib import Path
+        
+        try:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                output_base = str(Path(tmp_dir) / "rom_extract")
+                
+                # Run extraction (synchronous for now, could be threaded)
+                png_path, info = self.rom_extractor.extract_sprite_from_rom(
+                    rom_file, offset, output_base, sprite_name=f"sprite_{offset:X}"
+                )
+                
+                # Load the result image
+                image = Image.open(png_path)
+                # Force load to ensure file can be closed/deleted if needed (though temp dir handles it)
+                image.load()
+                
+                tile_count = int(info["tile_count"]) # type: ignore
+                
+                self._view.append_output(f"Loaded {tile_count} tiles.")
+                self.extraction_completed.emit(image, tile_count)
+                
+        except Exception as e:
+            self._view.append_output(f"ERROR: {e}")
+            self.extraction_failed.emit(str(e))
 
     def extract_sprites(self) -> None:
         """Start sprite extraction."""

@@ -199,3 +199,19 @@ class ToolbarManager(QObject):
         """Reset all buttons to initial state"""
         self.extract_button.setEnabled(False)
         self.set_post_extraction_buttons_enabled(False)
+
+    def set_open_editor_button_label(self, text: str) -> None:
+        """Set label for open editor button.
+
+        Args:
+            text: New button label
+        """
+        self.open_editor_button.setText(text)
+
+    def set_inject_button_enabled(self, enabled: bool) -> None:
+        """Set enabled state for inject button.
+
+        Args:
+            enabled: Whether button should be enabled
+        """
+        self.inject_button.setEnabled(enabled)

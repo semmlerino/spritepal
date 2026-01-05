@@ -223,6 +223,11 @@ class MainController(QObject):
 
     # Public workflow methods
 
+    def set_mode(self, mode: str) -> None:
+        """Set the editor mode ('vram' or 'rom')."""
+        self.extraction_controller.set_mode(mode)
+        self.injection_controller.set_mode(mode)
+
     def quick_extract(self) -> None:
         """Perform quick extraction with current settings."""
         if self._main_window:

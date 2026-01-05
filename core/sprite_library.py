@@ -13,13 +13,9 @@ import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +25,11 @@ def _datetime_to_iso(dt: datetime | None) -> str | None:
     return dt.isoformat() if dt is not None else None
 
 
-def _iso_to_datetime(s: str | None) -> datetime | None:
+def _iso_to_datetime(s: object | None) -> datetime | None:
     """Convert ISO format string to datetime."""
-    return datetime.fromisoformat(s) if s else None
+    if isinstance(s, str):
+        return datetime.fromisoformat(s)
+    return None
 
 
 @dataclass
@@ -78,11 +76,22 @@ class LibrarySprite:
     @classmethod
     def from_dict(cls, d: dict[str, object]) -> LibrarySprite:
         """Create from dictionary (JSON deserialization)."""
-        d = d.copy()
-        d["created_at"] = _iso_to_datetime(d.get("created_at")) or datetime.now()
-        d["last_edited"] = _iso_to_datetime(d.get("last_edited"))
-        d.setdefault("tags", [])
-        return cls(**d)
+        created_at = _iso_to_datetime(d.get("created_at")) or datetime.now()
+        last_edited = _iso_to_datetime(d.get("last_edited"))
+
+        tags_obj = d.get("tags", [])
+        tags = [str(t) for t in tags_obj] if isinstance(tags_obj, list) else []
+
+        return cls(
+            rom_offset=int(str(d["rom_offset"])),
+            rom_hash=str(d["rom_hash"]),
+            name=str(d["name"]),
+            thumbnail_path=str(d.get("thumbnail_path", "")),
+            notes=str(d.get("notes", "")),
+            created_at=created_at,
+            last_edited=last_edited,
+            tags=tags,
+        )
 
 
 class SpriteLibrary(QObject):

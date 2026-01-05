@@ -7,7 +7,7 @@ Supports both embedded and detached editing modes.
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
@@ -96,13 +96,21 @@ class EditTab(QWidget):
 
         # Right side: Canvas in scroll area
         self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(False)
+        self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setStyleSheet("QScrollArea { background-color: #303030; border: none; }")
+
+        # Container for canvas to allow centering/resizing
+        self.canvas_container = QWidget()
+        self.canvas_layout = QVBoxLayout(self.canvas_container)
+        self.canvas_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.canvas_layout.setContentsMargins(0, 0, 0, 0)
 
         # Canvas placeholder (will be set by controller)
         self._canvas_placeholder = QWidget()
         self._canvas_placeholder.setMinimumSize(400, 400)
-        self.scroll_area.setWidget(self._canvas_placeholder)
+        self.canvas_layout.addWidget(self._canvas_placeholder)
+
+        self.scroll_area.setWidget(self.canvas_container)
 
         splitter.addWidget(self.scroll_area)
 
@@ -122,7 +130,13 @@ class EditTab(QWidget):
     def set_canvas(self, canvas: PixelCanvas) -> None:
         """Set the pixel canvas widget."""
         self._canvas = canvas
-        self.scroll_area.setWidget(canvas)
+        # Clear previous items
+        while self.canvas_layout.count():
+            item = self.canvas_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        self.canvas_layout.addWidget(canvas)
 
     def get_canvas(self) -> PixelCanvas | None:
         """Get the pixel canvas widget."""
@@ -170,7 +184,14 @@ class EditTab(QWidget):
 
         # Create the canvas (moved from MainController)
         self._canvas = PixelCanvas(controller)
-        self.scroll_area.setWidget(self._canvas)
+
+        # Clear previous items from container
+        while self.canvas_layout.count():
+            item = self.canvas_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        self.canvas_layout.addWidget(self._canvas)
 
         # Connect canvas signals to controller
         self._canvas.pixelPressed.connect(controller.handle_pixel_press)

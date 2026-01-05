@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -44,6 +45,7 @@ class SpriteEditTab(QWidget):
 
     # Signals
     status_message = Signal(str)
+    mode_changed = Signal(str)  # 'vram' or 'rom'
 
     def __init__(
         self,
@@ -92,6 +94,10 @@ class SpriteEditTab(QWidget):
         self._tab_widget.addTab(self._inject_tab, "Inject")
         self._tab_widget.addTab(self._multi_palette_tab, "Multi-Palette")
 
+        # Hide "Pop Out Editor" button in embedded mode (workflow clarity)
+        if hasattr(self._edit_tab, "detach_btn"):
+            self._edit_tab.detach_btn.hide()
+
         layout.addWidget(self._tab_widget)
 
     def _create_header(self) -> QWidget:
@@ -106,6 +112,13 @@ class SpriteEditTab(QWidget):
         label.setStyleSheet("font-weight: bold;")
         layout.addWidget(label)
 
+        # Mode Switcher
+        self._mode_combo = QComboBox()
+        self._mode_combo.addItem("VRAM Mode", "vram")
+        self._mode_combo.addItem("ROM Mode", "rom")
+        self._mode_combo.currentIndexChanged.connect(self._on_mode_changed)
+        layout.addWidget(self._mode_combo)
+
         layout.addStretch()
 
         # Undo/Redo buttons
@@ -118,29 +131,6 @@ class SpriteEditTab(QWidget):
         self._redo_btn.setEnabled(False)
         self._redo_btn.clicked.connect(self._controller.editing_controller.redo)
         layout.addWidget(self._redo_btn)
-
-        # Tool buttons
-        self._pencil_btn = QPushButton("Pencil")
-        self._pencil_btn.setCheckable(True)
-        self._pencil_btn.setChecked(True)
-        self._pencil_btn.clicked.connect(
-            lambda: self._controller.editing_controller.set_tool("pencil")
-        )
-        layout.addWidget(self._pencil_btn)
-
-        self._fill_btn = QPushButton("Fill")
-        self._fill_btn.setCheckable(True)
-        self._fill_btn.clicked.connect(
-            lambda: self._controller.editing_controller.set_tool("fill")
-        )
-        layout.addWidget(self._fill_btn)
-
-        self._picker_btn = QPushButton("Picker")
-        self._picker_btn.setCheckable(True)
-        self._picker_btn.clicked.connect(
-            lambda: self._controller.editing_controller.set_tool("picker")
-        )
-        layout.addWidget(self._picker_btn)
 
         return header
 
@@ -159,11 +149,11 @@ class SpriteEditTab(QWidget):
             self._update_undo_state
         )
 
-        # Connect tool state updates
-        self._controller.editing_controller.toolChanged.connect(self._update_tool_state)
-
         # Connect edit tab workflow signals
         self._edit_tab.ready_for_inject.connect(self._on_ready_for_inject)
+
+        # Connect mode change
+        self.mode_changed.connect(self._controller.set_mode)
 
         logger.debug("Controllers wired to embedded tabs")
 
@@ -171,12 +161,6 @@ class SpriteEditTab(QWidget):
         """Sync undo/redo button state from editing controller."""
         self._undo_btn.setEnabled(can_undo)
         self._redo_btn.setEnabled(can_redo)
-
-    def _update_tool_state(self, tool_name: str) -> None:
-        """Sync tool button checkmarks from editing controller."""
-        self._pencil_btn.setChecked(tool_name == "pencil")
-        self._fill_btn.setChecked(tool_name == "fill")
-        self._picker_btn.setChecked(tool_name == "picker")
 
     def _on_internal_tab_changed(self, index: int) -> None:
         """Handle internal tab change."""
@@ -191,6 +175,17 @@ class SpriteEditTab(QWidget):
         # Switch to inject tab
         self._tab_widget.setCurrentIndex(2)
 
+    def _on_mode_changed(self, index: int) -> None:
+        """Handle mode change."""
+        mode = self._mode_combo.itemData(index)
+        self.mode_changed.emit(mode)
+
+    def set_mode(self, mode: str) -> None:
+        """Set the editor mode ('vram' or 'rom')."""
+        index = self._mode_combo.findData(mode)
+        if index >= 0:
+            self._mode_combo.setCurrentIndex(index)
+
     # Public API
 
     def jump_to_offset(self, offset: int) -> None:
@@ -204,18 +199,15 @@ class SpriteEditTab(QWidget):
         """
         logger.info("SpriteEditTab.jump_to_offset: 0x%06X", offset)
 
+        # Switch to ROM mode
+        self.set_mode("rom")
+
         # Switch to extract tab
         self._tab_widget.setCurrentIndex(0)
 
         # Set the offset in the extract tab
-        # The ExtractTab has an offset input field we can populate
-        offset_hex = f"0x{offset:06X}"
-        offset_input = getattr(self._extract_tab, "_offset_input", None)
-        if offset_input is not None:
-            offset_input.setText(offset_hex)
-            self.status_message.emit(f"Offset set to {offset_hex}")
-        else:
-            logger.warning("ExtractTab doesn't have _offset_input attribute")
+        self._extract_tab.set_offset(offset)
+        self.status_message.emit(f"Offset set to 0x{offset:06X}")
 
     def switch_to_extract(self) -> None:
         """Switch to Extract tab."""

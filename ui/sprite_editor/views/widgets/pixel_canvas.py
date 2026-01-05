@@ -7,7 +7,7 @@ Uses controller's models and managers instead of maintaining its own state.
 from typing import TYPE_CHECKING, override
 
 import numpy as np
-from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QEnterEvent, QImage, QMouseEvent, QPainter, QPaintEvent, QPen, QWheelEvent
 from PySide6.QtWidgets import QWidget
 
@@ -116,8 +116,19 @@ class PixelCanvas(QWidget):
             new_width = width * self.zoom
             new_height = height * self.zoom
             self.setMinimumSize(new_width, new_height)
-            self.setMaximumSize(new_width, new_height)
             self.updateGeometry()
+
+    @override
+    def sizeHint(self) -> QSize:
+        """Return the size of the canvas based on image and zoom."""
+        if not self.controller or not self.controller.has_image():
+            return super().sizeHint()
+
+        size = self.controller.get_image_size()
+        if size:
+            width, height = size
+            return QSize(width * self.zoom, height * self.zoom)
+        return super().sizeHint()
 
     def set_zoom(self, zoom: int, center_on_canvas: bool = True) -> None:
         """Set zoom level.
