@@ -351,6 +351,42 @@ $ ls extracted_sprites/
 cappy.bin  cappy.png  cappy_metadata.json
 ```
 
+## 🎮 Using Captured Offsets with SpritePal's Embedded Editor
+
+Once you have a ROM offset from sprite_rom_finder.lua, you can open it directly in SpritePal's embedded Sprite Editor:
+
+### Quick Workflow
+
+1. **Run sprite_rom_finder.lua** in Mesen 2 (click on sprite, get offset)
+2. **Open SpritePal** - the Mesen 2 captures are loaded automatically
+3. **See Recent Captures panel** - shows last 5 clicked offsets
+4. **Double-click an offset** → Sprite Editor tab opens with that offset loaded
+5. **Edit sprites directly** - Extract, Edit, Inject all in one place
+
+### Features
+
+- **Keyboard shortcut F6**: Jump to last Mesen 2 capture in Sprite Editor
+- **Ctrl+3**: Quick switch to Sprite Editor tab
+- **Status bar indicator**: Green dot shows when Mesen 2 log watcher is active
+
+### Example
+
+```
+┌─────────────────────────────────────────┐
+│  SpritePal Main Window                  │
+├─────────────────────────────────────────┤
+│  Tabs: [ROM] [VRAM] [Sprite Editor]     │
+│                                         │
+│  Recent Captures:                       │
+│  ├─ 0x3C6EF1  ← Double-click here       │
+│  ├─ 0x3C5200                            │
+│  └─ ...                                 │
+│                                         │
+│  (Double-click jumps to Sprite Editor   │
+│   with offset pre-loaded)               │
+└─────────────────────────────────────────┘
+```
+
 ---
 
 *Toolkit for Kirby Super Star sprite extraction via Mesen 2 debugging*
