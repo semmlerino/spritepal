@@ -45,6 +45,9 @@ class EditingController(QObject):
         # Current stroke batch for undo (accumulated during press/move/release)
         self._current_stroke: BatchCommand | None = None
 
+        # Last save path for Save operation
+        self._last_save_path: str = ""
+
         # Connect tool manager signals
         self.tool_manager.tool_changed.connect(self._on_tool_changed)
 
@@ -269,3 +272,42 @@ class EditingController(QObject):
     def get_flat_palette(self) -> list[int]:
         """Get the palette as a flat list for PIL."""
         return self.palette_model.to_flat_list()
+
+    # File operations
+
+    def save_image(self, file_path: str | None = None) -> bool:
+        """Save current image to file. Returns True if successful."""
+        if file_path is None and not self._last_save_path:
+            # No path known - delegate to save_as
+            return self.save_image_as() is not None
+
+        path = file_path or self._last_save_path
+        data = self.get_image_data()
+        if data is None:
+            return False
+
+        from PIL import Image
+
+        # Create PIL image with palette
+        img = Image.fromarray(data, mode="P")
+        img.putpalette(self.get_flat_palette())
+        img.save(path, "PNG")
+
+        self._last_save_path = path
+        return True
+
+    def save_image_as(self) -> str | None:
+        """Show save dialog and save. Returns path if successful, None if cancelled."""
+        from PySide6.QtWidgets import QFileDialog
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self._view,
+            "Save Sprite Image",
+            "sprite.png",
+            "PNG Images (*.png);;All Files (*)",
+        )
+
+        if file_path:
+            if self.save_image(file_path):
+                return file_path
+        return None

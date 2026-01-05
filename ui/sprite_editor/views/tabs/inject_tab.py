@@ -12,7 +12,6 @@ from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -52,18 +51,28 @@ class InjectTab(QWidget):
         layout = QVBoxLayout(self)
 
         # PNG file selection (Drop Zone)
-        self.png_drop = DropZone("PNG", settings_manager=self.settings_manager, required=True)
+        self.png_drop = DropZone("PNG", settings_manager=self.settings_manager, required=True)  # type: ignore[arg-type]
         self.png_drop.file_dropped.connect(lambda p: self.set_png_file(p))
         layout.addWidget(self.png_drop)
 
         # Validation group
----
+        validation_group = QGroupBox("PNG Validation")
+        validation_layout = QVBoxLayout()
+
+        self.validation_text = QLabel("No PNG selected")
+        self.validation_text.setWordWrap(True)
+        self.validation_text.setStyleSheet("color: #888888;")
+        validation_layout.addWidget(self.validation_text)
+
+        validation_group.setLayout(validation_layout)
+        layout.addWidget(validation_group)
+
         # Target settings group
         target_group = QGroupBox("Target Settings")
         target_layout = QGridLayout()
 
         # VRAM file (Drop Zone)
-        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)
+        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)  # type: ignore[arg-type]
         self.vram_drop.file_dropped.connect(lambda p: self.set_vram_file(p))
         target_layout.addWidget(self.vram_drop, 0, 0, 1, 3)
 
@@ -76,6 +85,10 @@ class InjectTab(QWidget):
         self.output_file_edit = QLineEdit("VRAM_edited.dmp")
         target_layout.addWidget(QLabel("Output:"), 2, 0)
         target_layout.addWidget(self.output_file_edit, 2, 1)
+
+        self.output_hint = QLabel("Relative paths saved next to VRAM file")
+        self.output_hint.setStyleSheet("color: #888888; font-size: 11px;")
+        target_layout.addWidget(self.output_hint, 2, 2)
 
         target_group.setLayout(target_layout)
         layout.addWidget(target_group)

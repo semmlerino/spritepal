@@ -14,9 +14,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QGridLayout,
     QGroupBox,
-    QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QSpinBox,
     QTextEdit,
@@ -56,7 +54,7 @@ class ExtractTab(QWidget):
         layout = QVBoxLayout(self)
 
         # File selection (Drop Zones for consistency)
-        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)
+        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)  # type: ignore[arg-type]
         self.vram_drop.file_dropped.connect(lambda p: self.set_vram_file(p))
         layout.addWidget(self.vram_drop)
 
@@ -91,8 +89,9 @@ class ExtractTab(QWidget):
         palette_layout = QGridLayout()
 
         self.use_palette_check = QCheckBox("Apply CGRAM Palette")
-        
-        self.cgram_drop = DropZone("CGRAM", settings_manager=self.settings_manager, required=False)
+        self.use_palette_check.toggled.connect(self._on_palette_toggle)
+
+        self.cgram_drop = DropZone("CGRAM", settings_manager=self.settings_manager, required=False)  # type: ignore[arg-type]
         self.cgram_drop.file_dropped.connect(lambda p: self.set_cgram_file(p))
         
         self.palette_combo = QComboBox()
@@ -107,6 +106,9 @@ class ExtractTab(QWidget):
 
         palette_group.setLayout(palette_layout)
         layout.addWidget(palette_group)
+
+        # Initialize palette control states
+        self._on_palette_toggle(self.use_palette_check.isChecked())
 
         # Extract button
         self.extract_btn = QPushButton("Extract Sprites")
@@ -182,3 +184,12 @@ class ExtractTab(QWidget):
     def set_extract_enabled(self, enabled: bool) -> None:
         """Enable/disable the extract button."""
         self.extract_btn.setEnabled(enabled)
+
+    def _on_palette_toggle(self, checked: bool) -> None:
+        """Enable/disable CGRAM widgets based on checkbox state.
+
+        Args:
+            checked: Whether the "Apply CGRAM Palette" checkbox is checked.
+        """
+        self.cgram_drop.setEnabled(checked)
+        self.palette_combo.setEnabled(checked)

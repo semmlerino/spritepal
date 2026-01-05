@@ -139,6 +139,7 @@ class EditTab(QWidget):
             safe_disconnect(self._canvas.pixelPressed)
             safe_disconnect(self._canvas.pixelMoved)
             safe_disconnect(self._canvas.pixelReleased)
+            safe_disconnect(self._canvas.zoomRequested)
 
         # Disconnect tool panel signals (panels created in _setup_ui, always exist)
         safe_disconnect(self.tool_panel.toolChanged)
@@ -151,6 +152,7 @@ class EditTab(QWidget):
         safe_disconnect(self.options_panel.gridToggled)
         safe_disconnect(self.options_panel.paletteToggled)
         safe_disconnect(self.options_panel.zoomChanged)
+        safe_disconnect(self.options_panel.zoomToFit)
 
     def set_controller(self, controller: "EditingController") -> None:
         """Set the editing controller, create canvas, and connect signals."""
@@ -182,6 +184,12 @@ class EditTab(QWidget):
         self.options_panel.paletteToggled.connect(lambda visible: canvas.set_greyscale_mode(not visible))
         self.options_panel.zoomChanged.connect(canvas.set_zoom)
 
+        # Bidirectional zoom sync: canvas → slider
+        canvas.zoomRequested.connect(self.options_panel.set_zoom)
+
+        # Fit button handler
+        self.options_panel.zoomToFit.connect(self._on_zoom_to_fit)
+
     def update_from_controller(self) -> None:
         """Update UI state from controller."""
         if not self.controller:
@@ -212,3 +220,25 @@ class EditTab(QWidget):
         self.tool_panel.setEnabled(loaded)
         self.options_panel.setEnabled(loaded)
         self.inject_btn.setEnabled(loaded)
+
+    def _on_zoom_to_fit(self) -> None:
+        """Calculate and apply zoom to fit image in viewport."""
+        if not self._canvas or not self.controller:
+            return
+
+        # Get viewport visible area
+        viewport_size = self.scroll_area.viewport().size()
+
+        # Get image dimensions
+        img_width, img_height = self.controller.get_image_size()
+        if img_width == 0 or img_height == 0:
+            return
+
+        # Calculate zoom that fits entire image
+        zoom_x = max(1, viewport_size.width() // img_width)
+        zoom_y = max(1, viewport_size.height() // img_height)
+        fit_zoom = min(zoom_x, zoom_y, 64)  # Clamp to valid range
+
+        # Apply zoom to both canvas and slider
+        self._canvas.set_zoom(fit_zoom)
+        self.options_panel.set_zoom(fit_zoom)

@@ -19,6 +19,7 @@ from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
     QToolButton,
@@ -815,11 +816,8 @@ class ROMExtractionPanel(QWidget):
             is_manual: Whether manual offset mode is active
         """
         # Update sprite selector state
+        # When manual mode is active, disable sprite selector (visual indication is sufficient)
         self.sprite_selector_widget.setEnabled(not is_manual)
-        if is_manual:
-            self.sprite_selector_widget.set_info_text("Manual Offset Active")
-        else:
-            self.sprite_selector_widget.set_info_text("")
 
         # Update manual offset indicator
         if hasattr(self, "manual_offset_display"):

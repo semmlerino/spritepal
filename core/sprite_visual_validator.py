@@ -90,7 +90,7 @@ class SpriteVisualValidator:
         Calculate how coherent the shapes in the image are.
         Uses connected component analysis.
         """
-        if cv2 is None:  # pyright: ignore[reportUnnecessaryComparison]
+        if cv2 is None:
             # Fallback: simple coherence based on non-zero pixels
             non_zero = np.count_nonzero(img_array > 0)
             total = img_array.size
@@ -173,7 +173,7 @@ class SpriteVisualValidator:
         """
         Calculate edge score - sprites have clear outlines.
         """
-        if cv2 is None:  # pyright: ignore[reportUnnecessaryComparison]
+        if cv2 is None:
             # Fallback: use simple gradient
             dy, dx = np.gradient(img_array.astype(float))
             edge_strength = np.sqrt(dx**2 + dy**2)
@@ -243,7 +243,7 @@ class SpriteVisualValidator:
         """
         Calculate pattern regularity using autocorrelation.
         """
-        if cv2 is None:  # pyright: ignore[reportUnnecessaryComparison]
+        if cv2 is None:
             # Fallback: simple tile-based analysis
             h, w = img_array.shape
             tile_scores = []

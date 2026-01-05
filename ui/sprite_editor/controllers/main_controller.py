@@ -56,6 +56,9 @@ class MainController(QObject):
         self.editing_controller.set_view(window.edit_tab)
         self.injection_controller.set_view(window.inject_tab)
 
+        # Connect multi-palette tab to extraction controller
+        self.extraction_controller.set_multi_palette_view(window.multi_palette_tab)
+
         # Connect main window signals
         self._connect_main_window_signals()
 
@@ -64,12 +67,69 @@ class MainController(QObject):
         if not self._main_window:
             return
 
+        # File menu actions
+        self._main_window.action_open_vram.triggered.connect(
+            self.extraction_controller.browse_vram_file
+        )
+        self._main_window.action_open_cgram.triggered.connect(
+            self.extraction_controller.browse_cgram_file
+        )
+        self._main_window.action_open_png.triggered.connect(
+            self.injection_controller.browse_png_file
+        )
+        self._main_window.action_save.triggered.connect(self._on_save)
+        self._main_window.action_save_as.triggered.connect(self._on_save_as)
+
+        # Edit menu - Undo/Redo
+        self._main_window.action_undo.triggered.connect(
+            self.editing_controller.undo
+        )
+        self._main_window.action_redo.triggered.connect(
+            self.editing_controller.redo
+        )
+
+        # Tools menu
+        self._main_window.action_pencil.triggered.connect(
+            lambda: self.editing_controller.set_tool("pencil")
+        )
+        self._main_window.action_fill.triggered.connect(
+            lambda: self.editing_controller.set_tool("fill")
+        )
+        self._main_window.action_picker.triggered.connect(
+            lambda: self.editing_controller.set_tool("picker")
+        )
+
+        # Controller state → UI sync
+        self.editing_controller.undoStateChanged.connect(self._update_undo_state)
+        self.editing_controller.toolChanged.connect(self._update_tool_state)
+
         # Tab changed
         if hasattr(self._main_window, "tab_changed"):
             self._main_window.tab_changed.connect(self._on_tab_changed)
 
         # Edit tab workflow signals
         self._main_window.edit_tab.ready_for_inject.connect(self._on_ready_for_inject)
+
+    def _update_undo_state(self, can_undo: bool, can_redo: bool) -> None:
+        """Sync undo/redo button state from editing controller."""
+        if self._main_window:
+            self._main_window.action_undo.setEnabled(can_undo)
+            self._main_window.action_redo.setEnabled(can_redo)
+
+    def _update_tool_state(self, tool_name: str) -> None:
+        """Sync tool menu checkmarks from editing controller."""
+        if self._main_window:
+            self._main_window.action_pencil.setChecked(tool_name == "pencil")
+            self._main_window.action_fill.setChecked(tool_name == "fill")
+            self._main_window.action_picker.setChecked(tool_name == "picker")
+
+    def _on_save(self) -> None:
+        """Handle save action."""
+        self.editing_controller.save_image()
+
+    def _on_save_as(self) -> None:
+        """Handle save as action."""
+        self.editing_controller.save_image_as()
 
     def _connect_cross_controller_signals(self) -> None:
         """Connect signals between controllers for workflow coordination."""

@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
 
 from .tabs import EditTab, ExtractTab, InjectTab, MultiPaletteTab
 
-
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
 
@@ -64,6 +63,21 @@ class SpriteEditorMainWindow(QMainWindow):
         self.extract_tab = ExtractTab(settings_manager=self.settings_manager)
         self.edit_tab = EditTab()
         self.inject_tab = InjectTab(settings_manager=self.settings_manager)
+        self.multi_palette_tab = MultiPaletteTab()
+
+        # Add tabs to tab widget
+        self.tab_widget.addTab(self.extract_tab, "Extract")
+        self.tab_widget.addTab(self.edit_tab, "Edit")
+        self.tab_widget.addTab(self.inject_tab, "Inject")
+        self.tab_widget.addTab(self.multi_palette_tab, "Multi-Palette")
+
+        # Add tab widget to layout
+        layout.addWidget(self.tab_widget)
+
+        # Setup menus, toolbar, and status bar
+        self._setup_menus()
+        self._setup_toolbar()
+        self._setup_statusbar()
 
 
     def _setup_menus(self) -> None:
@@ -141,14 +155,18 @@ class SpriteEditorMainWindow(QMainWindow):
 
         self.action_pencil = QAction("&Pencil", self)
         self.action_pencil.setShortcut("P")
+        self.action_pencil.setCheckable(True)
+        self.action_pencil.setChecked(True)  # Default tool
         tools_menu.addAction(self.action_pencil)
 
         self.action_fill = QAction("&Fill", self)
         self.action_fill.setShortcut("F")
+        self.action_fill.setCheckable(True)
         tools_menu.addAction(self.action_fill)
 
         self.action_picker = QAction("Color &Picker", self)
         self.action_picker.setShortcut("I")
+        self.action_picker.setCheckable(True)
         tools_menu.addAction(self.action_picker)
 
         # Help menu
