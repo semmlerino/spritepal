@@ -282,15 +282,17 @@ class UICoordinator(QObject):
     # =========================================================================
 
     def _on_extraction_tab_changed(self, index: int) -> None:
-        """Handle tab change between VRAM and ROM extraction.
+        """Handle tab change between extraction tabs.
 
         Args:
-            index: New tab index (0=ROM, 1=VRAM)
+            index: New tab index (0=ROM, 1=VRAM, 2=Sprite Editor)
         """
         if index == 0:
             self._configure_rom_extraction_tab()
-        else:
+        elif index == 1:
             self._configure_vram_extraction_tab()
+        elif index == 2:
+            self._configure_sprite_editor_tab()
 
         # Emit signal for other components
         self.tab_changed.emit(index)
@@ -330,6 +332,11 @@ class UICoordinator(QObject):
         # Configure output settings for VRAM mode
         self.output_settings_manager.set_vram_extraction_mode()
 
+    def _configure_sprite_editor_tab(self) -> None:
+        """Configure UI for Sprite Editor tab"""
+        # Disable main Extract button - the editor has its own extract controls
+        self.toolbar_manager.set_extract_enabled(False, "Use editor's Extract")
+
     def get_current_tab_index(self) -> int:
         """Get current active tab index"""
         return self.extraction_tabs.currentIndex()
@@ -342,6 +349,10 @@ class UICoordinator(QObject):
         """Check if VRAM extraction tab is active"""
         return self.get_current_tab_index() == 1
 
+    def is_sprite_editor_tab_active(self) -> bool:
+        """Check if Sprite Editor tab is active"""
+        return self.get_current_tab_index() == 2
+
     def switch_to_rom_tab(self) -> None:
         """Switch to ROM extraction tab"""
         if self.extraction_tabs:
@@ -351,3 +362,8 @@ class UICoordinator(QObject):
         """Switch to VRAM extraction tab"""
         if self.extraction_tabs:
             self.extraction_tabs.setCurrentIndex(1)
+
+    def switch_to_sprite_editor_tab(self) -> None:
+        """Switch to Sprite Editor tab"""
+        if self.extraction_tabs:
+            self.extraction_tabs.setCurrentIndex(2)

@@ -52,6 +52,7 @@ from ui.managers import (
 )
 from ui.palette_preview import PalettePreviewWidget
 from ui.rom_extraction_panel import ROMExtractionPanel
+from ui.sprite_edit_tab import SpriteEditTab
 from ui.styles.components import get_action_zone_style
 from ui.zoomable_preview import PreviewPanel
 from utils.logging_config import get_logger
@@ -214,6 +215,14 @@ class MainWindow(QMainWindow):
         self.extraction_panel = ExtractionPanel(settings_manager=self.settings_manager)
         self.extraction_tabs.addTab(self.extraction_panel, "VRAM Extraction")
         self.extraction_tabs.setTabToolTip(1, "Extract from emulator memory dumps (VRAM/CGRAM/OAM)")
+
+        # Sprite Editor tab (embedded)
+        self.sprite_edit_tab = SpriteEditTab(
+            parent=self,
+            settings_manager=self.settings_manager,
+        )
+        self.extraction_tabs.addTab(self.sprite_edit_tab, "Sprite Editor")
+        self.extraction_tabs.setTabToolTip(2, "Edit sprites: Extract, Edit, Inject workflow")
 
         content_layout.addWidget(self.extraction_tabs)
         content_layout.addStretch()  # Push content to top, keep compact
@@ -655,6 +664,21 @@ class MainWindow(QMainWindow):
         self.rom_extraction_panel.extraction_ready.connect(self._on_rom_extraction_ready)
         self.rom_extraction_panel.output_name_changed.connect(self._on_rom_output_name_changed)
 
+        # Connect sprite editor status messages to main status bar
+        self.sprite_edit_tab.status_message.connect(
+            lambda msg: self.status_bar_manager.show_message(msg, 3000)
+        )
+
+        # Connect ROM panel's "open in sprite editor" signal
+        self.rom_extraction_panel.open_in_sprite_editor.connect(
+            self._on_open_in_sprite_editor
+        )
+
+        # Connect ROM panel's Mesen2 watching status to status bar
+        self.rom_extraction_panel.mesen2_watching_changed.connect(
+            self.status_bar_manager.set_mesen2_watching
+        )
+
         # Note: Output settings are now shown in a dialog on Extract click
         # The output_settings_manager just tracks the suggested output name
 
@@ -704,6 +728,20 @@ class MainWindow(QMainWindow):
         """Handle ROM panel output name change"""
         # Update main output field without triggering sync back
         self.output_settings_manager.set_output_name(text)
+
+    def _on_open_in_sprite_editor(self, offset: int) -> None:
+        """Handle request to open offset in sprite editor.
+
+        Called when user double-clicks a Mesen2 capture offset.
+
+        Args:
+            offset: ROM offset to open in sprite editor
+        """
+        logger.info("Opening offset 0x%06X in sprite editor", offset)
+        # Switch to sprite editor tab
+        self.extraction_tabs.setCurrentIndex(2)
+        # Jump to offset in sprite editor
+        self.sprite_edit_tab.jump_to_offset(offset)
 
     # Tab change handling now managed by UICoordinator
 
@@ -860,6 +898,7 @@ class MainWindow(QMainWindow):
         panels: list[object] = [
             self.rom_extraction_panel,
             self.extraction_panel,
+            self.sprite_edit_tab,
         ]
         for panel in panels:
             cleanup_fn = getattr(panel, "cleanup", None)
@@ -878,6 +917,19 @@ class MainWindow(QMainWindow):
                 self._navigate_to_next_tab()
                 event.accept()
                 return
+            # Ctrl+1/2/3: Direct tab switching
+            if event.key() == Qt.Key.Key_1:
+                self.extraction_tabs.setCurrentIndex(0)  # ROM Extraction
+                event.accept()
+                return
+            if event.key() == Qt.Key.Key_2:
+                self.extraction_tabs.setCurrentIndex(1)  # VRAM Extraction
+                event.accept()
+                return
+            if event.key() == Qt.Key.Key_3:
+                self.extraction_tabs.setCurrentIndex(2)  # Sprite Editor
+                event.accept()
+                return
         elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
             if event.key() == Qt.Key.Key_Backtab:
                 self._navigate_to_previous_tab()
@@ -889,6 +941,14 @@ class MainWindow(QMainWindow):
             self.on_extract_clicked()
             event.accept()
             return
+
+        # F6: Jump to last Mesen2 capture in Sprite Editor
+        if event.key() == Qt.Key.Key_F6:
+            offset = self.rom_extraction_panel._recent_captures_widget.get_selected_offset()
+            if offset is not None:
+                self._on_open_in_sprite_editor(offset)
+                event.accept()
+                return
 
         # Ctrl+M: Open Manual Offset Control (if in ROM extraction mode)
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:

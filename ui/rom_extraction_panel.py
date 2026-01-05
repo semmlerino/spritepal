@@ -87,6 +87,8 @@ class ROMExtractionPanel(QWidget):
     extraction_ready = Signal(bool, str)  # (ready, reason_if_not_ready)
     rom_extraction_requested = Signal(str, int, str, str)  # rom_path, offset, output_base, sprite_name
     output_name_changed = Signal(str)  # Emit when output name changes in ROM panel
+    open_in_sprite_editor = Signal(int)  # Emitted when user wants to open offset in sprite editor
+    mesen2_watching_changed = Signal(bool)  # Emitted when log watcher status changes
 
     def __init__(
         self,
@@ -259,6 +261,9 @@ class ROMExtractionPanel(QWidget):
             log_watcher.offset_discovered.connect(self._on_mesen2_offset_discovered)
             log_watcher.watch_started.connect(lambda: self._recent_captures_widget.set_watching(True))
             log_watcher.watch_stopped.connect(lambda: self._recent_captures_widget.set_watching(False))
+            # Also emit signal for main window status bar
+            log_watcher.watch_started.connect(lambda: self.mesen2_watching_changed.emit(True))
+            log_watcher.watch_stopped.connect(lambda: self.mesen2_watching_changed.emit(False))
 
             # Start watching if log file exists
             log_watcher.start_watching()
@@ -297,19 +302,14 @@ class ROMExtractionPanel(QWidget):
     def _on_mesen2_offset_activated(self, offset: int) -> None:
         """Handle offset activation (double-click) from captures widget.
 
-        Opens the manual offset dialog at the specified offset.
+        Opens the offset in the Sprite Editor tab.
 
         Args:
             offset: ROM offset to jump to
         """
-        logger.info("Mesen2 offset activated: 0x%06X", offset)
-        # Open manual offset dialog and jump to offset
-        self._open_manual_offset_dialog()
-        dialog = self._offset_dialog_manager._dialog
-        if dialog is not None:
-            logger.debug("Setting dialog offset to: 0x%06X", offset)
-            result = dialog.set_offset(offset)
-            logger.debug("set_offset returned: %s, current offset now: 0x%06X", result, dialog.get_current_offset())
+        logger.info("Mesen2 offset activated: 0x%06X - opening in sprite editor", offset)
+        # Emit signal for MainWindow to switch to sprite editor tab
+        self.open_in_sprite_editor.emit(offset)
 
     def _add_mode_controls(self, layout: QVBoxLayout):
         """Add sprite selector controls to the layout (always visible, preset mode is default).

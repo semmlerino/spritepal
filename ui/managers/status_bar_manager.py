@@ -42,6 +42,11 @@ class StatusBarManager:
         self.cache_info_label: QLabel | None = None
         self.cache_operation_badge: QLabel | None = None
 
+        # Mesen2 status widgets
+        self.mesen2_status_widget: QWidget | None = None
+        self.mesen2_icon_label: QLabel | None = None
+        self.mesen2_info_label: QLabel | None = None
+
     def setup_status_bar_indicators(self) -> None:
         """Set up permanent status bar indicators"""
 
@@ -83,6 +88,9 @@ class StatusBarManager:
 
         # Update cache status
         self.update_cache_status()
+
+        # Setup Mesen2 status indicator
+        self._setup_mesen2_indicator()
 
     def update_cache_status(self) -> None:
         """Update cache status indicator"""
@@ -197,3 +205,47 @@ class StatusBarManager:
             self.cache_icon_label = None
             self.cache_info_label = None
             self.cache_operation_badge = None
+
+    def _setup_mesen2_indicator(self) -> None:
+        """Set up Mesen2 watching status indicator"""
+        self.mesen2_status_widget = QWidget()
+        mesen2_layout = QHBoxLayout()
+        mesen2_layout.setContentsMargins(0, 0, 0, 0)
+        mesen2_layout.setSpacing(SPACING_TINY)
+
+        # Mesen2 icon (dot indicator)
+        self.mesen2_icon_label = QLabel("●")
+        self.mesen2_icon_label.setStyleSheet("color: gray;")
+        self.mesen2_icon_label.setToolTip("Mesen2 log watcher status")
+        mesen2_layout.addWidget(self.mesen2_icon_label)
+
+        # Mesen2 label
+        self.mesen2_info_label = QLabel("Mesen2")
+        self.mesen2_info_label.setStyleSheet(get_muted_text_style())
+        mesen2_layout.addWidget(self.mesen2_info_label)
+
+        self.mesen2_status_widget.setLayout(mesen2_layout)
+
+        # Add to status bar as permanent widget (before cache widget)
+        self.status_bar.addPermanentWidget(self.mesen2_status_widget)
+
+        # Initialize as not watching
+        self.set_mesen2_watching(False)
+
+    def set_mesen2_watching(self, watching: bool) -> None:
+        """Update Mesen2 watching indicator
+
+        Args:
+            watching: True if log watcher is active
+        """
+        if self.mesen2_icon_label is None:
+            return
+
+        if watching:
+            self.mesen2_icon_label.setStyleSheet(f"color: {COLORS['success']};")
+            if self.mesen2_status_widget is not None:
+                self.mesen2_status_widget.setToolTip("Mesen2: Watching for sprite clicks")
+        else:
+            self.mesen2_icon_label.setStyleSheet("color: gray;")
+            if self.mesen2_status_widget is not None:
+                self.mesen2_status_widget.setToolTip("Mesen2: Not watching")
