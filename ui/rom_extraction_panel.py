@@ -263,6 +263,12 @@ class ROMExtractionPanel(QWidget):
             # Start watching if log file exists
             log_watcher.start_watching()
 
+            # Load persistent clicks from previous Mesen2 sessions
+            persistent_clicks = log_watcher.load_persistent_clicks()
+            if persistent_clicks:
+                self._recent_captures_widget.load_persistent(persistent_clicks)
+                logger.debug("Loaded %d persistent clicks", len(persistent_clicks))
+
     def _on_mesen2_offset_discovered(self, capture: object) -> None:
         """Handle new offset discovered from Mesen2 log.
 

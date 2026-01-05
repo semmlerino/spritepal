@@ -69,6 +69,7 @@ setmetatable(_G, {
 local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
 local LOG_FILE = OUTPUT_DIR .. "sprite_rom_finder.log"
 local OFFSET_FILE = OUTPUT_DIR .. "last_offset.txt"  -- Simple file for SpritePal to watch
+local CLICKS_FILE = OUTPUT_DIR .. "recent_clicks.json"  -- Persistent last 5 clicks
 
 local ROM_HEADER = 0  -- Set to 0x200 if your .sfc has a copier header
 
@@ -99,6 +100,71 @@ local function write_offset_file(offset, frame)
         f:close()
     end
 end
+
+-- Persistent recent clicks (last 5)
+local recent_clicks = {}
+
+local function load_recent_clicks()
+    local f = io.open(CLICKS_FILE, "r")
+    if not f then return end
+    local content = f:read("*all")
+    f:close()
+    if not content or content == "" then return end
+
+    -- Simple JSON array parser for our format
+    recent_clicks = {}
+    for offset_str, frame_str, ts_str in content:gmatch('{"offset":(%d+),"frame":(%d+),"timestamp":(%d+)}') do
+        table.insert(recent_clicks, {
+            offset = tonumber(offset_str),
+            frame = tonumber(frame_str),
+            timestamp = tonumber(ts_str)
+        })
+    end
+end
+
+local function save_recent_clicks()
+    local f = io.open(CLICKS_FILE, "w")
+    if not f then return end
+
+    -- Write as JSON array
+    f:write("[\n")
+    for i, click in ipairs(recent_clicks) do
+        f:write(string.format('  {"offset":%d,"frame":%d,"timestamp":%d}',
+            click.offset, click.frame, click.timestamp))
+        if i < #recent_clicks then f:write(",") end
+        f:write("\n")
+    end
+    f:write("]\n")
+    f:close()
+end
+
+local function add_recent_click(offset, frame)
+    -- Remove duplicates of same offset
+    local new_clicks = {}
+    for _, click in ipairs(recent_clicks) do
+        if click.offset ~= offset then
+            table.insert(new_clicks, click)
+        end
+    end
+    recent_clicks = new_clicks
+
+    -- Add to front
+    table.insert(recent_clicks, 1, {
+        offset = offset,
+        frame = frame,
+        timestamp = os.time()
+    })
+
+    -- Keep only last 5
+    while #recent_clicks > 5 do
+        table.remove(recent_clicks)
+    end
+
+    save_recent_clicks()
+end
+
+-- Load persistent clicks on script start
+load_recent_clicks()
 
 local function log_fatal(context, err)
     if fatal_error then return end
@@ -1716,6 +1782,8 @@ local function on_left_click(mouse, coord_debug)
                 log(string.format(">>> --offset 0x%06X <<<", display_file_offset))
                 -- Write to simple file for SpritePal integration
                 write_offset_file(display_file_offset, frame_count)
+                -- Add to persistent recent clicks (last 5)
+                add_recent_click(display_file_offset, frame_count)
             end
             if display_override then
                 log(string.format("OVERRIDE: closest session (age=%d)", override_age or -1))

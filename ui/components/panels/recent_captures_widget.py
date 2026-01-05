@@ -174,6 +174,28 @@ class RecentCapturesWidget(QWidget):
         self._update_empty_state()
         logger.debug("Added capture: %s", capture.offset_hex)
 
+    def load_persistent(self, captures: list[CapturedOffset]) -> None:
+        """
+        Load persistent captures from file.
+
+        This is called on startup to restore the last 5 clicked sprites
+        from previous Mesen2 sessions.
+
+        Args:
+            captures: List of captured offsets to load.
+        """
+        if not captures:
+            return
+
+        logger.debug("Loading %d persistent captures", len(captures))
+
+        # Add each capture (they're already sorted by recency)
+        for capture in captures:
+            # Avoid duplicates
+            if any(c.offset == capture.offset for c in self._captures):
+                continue
+            self.add_capture(capture)
+
     def set_watching(self, watching: bool) -> None:
         """Update the status indicator to show whether log is being watched."""
         self._update_status_indicator(watching)

@@ -7,6 +7,7 @@ and emits signals when offsets are found.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -75,6 +76,7 @@ class LogWatcher(QObject):
 
         self._log_path: Path | None = None
         self._offset_file: Path | None = None  # Simple last_offset.txt file
+        self._clicks_file: Path | None = None  # Persistent recent_clicks.json
         self._watching_dir: Path | None = None
         self._last_position: int = 0
         self._last_offset_mtime: float = 0.0  # For polling last_offset.txt
@@ -120,6 +122,7 @@ class LogWatcher(QObject):
 
         self._log_path = log_path
         self._offset_file = log_path.parent / "last_offset.txt"
+        self._clicks_file = log_path.parent / "recent_clicks.json"
         self._watching_dir = log_path.parent
         self._seen_offsets.clear()
         self._last_offset_mtime = 0.0
@@ -194,6 +197,54 @@ class LogWatcher(QObject):
         except OSError as e:
             logger.error("Error scanning log file: %s", e)
             self.error_occurred.emit(f"Read error: {e}")
+
+        return captures
+
+    def load_persistent_clicks(self) -> list[CapturedOffset]:
+        """
+        Load persistent recent clicks from recent_clicks.json.
+
+        This file is written by sprite_rom_finder.lua and contains
+        the last 5 clicked sprites across Mesen2 sessions.
+
+        Returns:
+            List of captured offsets from the persistent file.
+        """
+        if self._clicks_file is None or not self._clicks_file.exists():
+            return []
+
+        captures: list[CapturedOffset] = []
+        try:
+            content = self._clicks_file.read_text(encoding="utf-8")
+            data = json.loads(content)
+
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                offset = item.get("offset")
+                if offset is None:
+                    continue
+
+                frame = item.get("frame")
+                timestamp_unix = item.get("timestamp")
+
+                # Convert Unix timestamp to datetime
+                if timestamp_unix:
+                    timestamp = datetime.fromtimestamp(timestamp_unix)
+                else:
+                    timestamp = datetime.now()
+
+                captures.append(
+                    CapturedOffset(
+                        offset=offset,
+                        frame=frame,
+                        timestamp=timestamp,
+                        raw_line=f"persistent: 0x{offset:06X}",
+                    )
+                )
+
+        except (OSError, json.JSONDecodeError) as e:
+            logger.debug("Error loading persistent clicks: %s", e)
 
         return captures
 
