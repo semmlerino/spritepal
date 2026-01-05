@@ -453,8 +453,10 @@ spritepal/
 | Looking for... | Location |
 |----------------|----------|
 | **Unified Sprite Editor** | `ui/sprite_editor/` (Extract/Edit/Inject workflow with full documentation) |
+| **Embedded Editor Tab** | `ui/sprite_edit_tab.py` (Sprite Editor as 3rd tab in main window) |
 | Sprite Editor Quick Start | Run: `python launch_editor.py` from spritepal directory |
 | Sprite Editor Docs | `ui/sprite_editor/README.md` (architecture, formats, components) |
+| Keyboard Shortcuts | Ctrl+1/2/3 for tabs, F6 for last Mesen2 capture |
 | CoreOperationsManager | `core/managers/core_operations_manager.py` (handles extraction and injection) |
 | ApplicationStateManager | `core/managers/application_state_manager.py` (session, settings, state) |
 | DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
@@ -513,4 +515,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: January 5, 2026 (Added unified sprite editor documentation, created launch_editor.py)*
+*Last updated: January 6, 2026 (Added embedded Sprite Editor tab, keyboard shortcuts, and Mesen2 integration)*
