@@ -220,6 +220,63 @@ class SmartPreviewCoordinator(QObject):
         # Request preview for immediate response
         self.request_preview(offset)
 
+    def request_background_preload(self, offset: int) -> None:
+        """
+        Request background preloading of an offset without affecting current display.
+
+        This method caches previews for adjacent offsets but does NOT:
+        - Update _current_offset (preserves the user's current position)
+        - Emit UI signals (no visual feedback)
+        - Affect the current preview display
+
+        Args:
+            offset: ROM offset to preload
+        """
+        # Check if already cached
+        if self._rom_data_provider:
+            try:
+                provider_result = self._rom_data_provider()
+                if provider_result:
+                    rom_path, _ = provider_result
+                    cache_key = self._cache.make_key(rom_path, offset)
+                    if self._cache.get(cache_key):
+                        logger.debug(f"[PRELOAD] Already cached: 0x{offset:06X}")
+                        return
+            except Exception:
+                pass
+
+        # Request worker preview directly without updating _current_offset
+        self._request_background_worker_preview(offset)
+
+    def _request_background_worker_preview(self, offset: int) -> None:
+        """Request background worker preview for caching only."""
+        try:
+            provider_result = self._rom_data_provider() if self._rom_data_provider else None
+            if provider_result is None:
+                return
+            rom_path, extractor_obj = provider_result
+            extractor: ROMExtractor | None = cast("ROMExtractor | None", extractor_obj)
+
+            if not rom_path or not rom_path.strip() or not extractor:
+                return
+
+            # Use a separate request ID counter space (negative) to differentiate preloads
+            with QMutexLocker(self._mutex):
+                request_id = -(self._request_counter + 1000)  # Negative IDs for preloads
+
+            logger.debug(f"[PRELOAD] Creating background request: offset=0x{offset:06X}")
+
+            # Create and submit background request
+            request = PendingPreviewRequest(
+                request_id=request_id,
+                offset=offset,
+                rom_path=rom_path,
+            )
+            self._worker_pool.submit_request(request, extractor)
+
+        except Exception as e:
+            logger.debug(f"Error in background preload for 0x{offset:06X}: {e}")
+
     def _on_drag_start(self) -> None:
         """Handle start of slider dragging."""
         logger.debug("Drag start detected")
@@ -354,6 +411,10 @@ class SmartPreviewCoordinator(QObject):
                 offset = self._current_offset
                 request_id = self._request_counter
 
+            logger.debug(
+                f"[COORD] Creating preview request: offset=0x{offset:06X}, request_id={request_id}"
+            )
+
             # Create preview request
             request = PendingPreviewRequest(
                 request_id=request_id,
@@ -372,9 +433,14 @@ class SmartPreviewCoordinator(QObject):
         self, request_id: int, tile_data: bytes, width: int, height: int, sprite_name: str
     ) -> None:
         """Handle preview ready from worker."""
+        logger.debug(
+            f"[COORD] Received worker preview: request_id={request_id}, sprite_name={sprite_name}, "
+            f"current_counter={self._request_counter}"
+        )
         # Check if this is still the current request
         with QMutexLocker(self._mutex):
             if request_id < self._request_counter - 1:  # Allow some lag
+                logger.debug(f"[COORD] Ignoring stale request {request_id} (current={self._request_counter})")
                 return
 
         # Cache the result if data is valid
@@ -395,6 +461,7 @@ class SmartPreviewCoordinator(QObject):
             except Exception as e:
                 logger.warning(f"Error caching preview: {e}")
 
+        logger.debug(f"[COORD] Forwarding preview_ready: sprite_name={sprite_name}")
         self.preview_ready.emit(tile_data, width, height, sprite_name)
 
     def _on_worker_preview_error(self, request_id: int, error_msg: str) -> None:

@@ -33,9 +33,11 @@ if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.managers.sprite_preset_manager import SpritePresetManager
+    from core.mesen_integration.log_watcher import LogWatcher
     from core.rom_extractor import ROMExtractor
     from core.services.preview_generator import PreviewGenerator
     from core.services.rom_cache import ROMCache
+    from core.sprite_library import SpriteLibrary
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,8 @@ class AppContext:
         rom_cache: ROM caching service (created on first access)
         rom_extractor: ROM extraction service (created on first access)
         preview_generator: Preview image generation service (created on first access)
+        log_watcher: Mesen2 log file watcher for sprite offset discovery (created on first access)
+        sprite_library: Persistent storage for discovered sprites (created on first access)
     """
 
     configuration_service: ConfigurationService
@@ -69,6 +73,8 @@ class AppContext:
     _rom_cache: ROMCache | None = field(default=None, repr=False)
     _rom_extractor: ROMExtractor | None = field(default=None, repr=False)
     _preview_generator: PreviewGenerator | None = field(default=None, repr=False)
+    _log_watcher: LogWatcher | None = field(default=None, repr=False)
+    _sprite_library: SpriteLibrary | None = field(default=None, repr=False)
 
     # Thread safety for lazy initialization
     _lazy_lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
@@ -114,11 +120,54 @@ class AppContext:
                 logger.debug("Created PreviewGenerator via lazy initialization")
             return self._preview_generator
 
+    @property
+    def log_watcher(self) -> LogWatcher:
+        """Lazy-initialize LogWatcher on first access.
+
+        Watches Mesen2's sprite_rom_finder.log for discovered ROM offsets.
+        """
+        with self._lazy_lock:
+            if self._log_watcher is None:
+                from core.mesen_integration.log_watcher import LogWatcher
+
+                self._log_watcher = LogWatcher()
+                logger.debug("Created LogWatcher via lazy initialization")
+            return self._log_watcher
+
+    @property
+    def sprite_library(self) -> SpriteLibrary:
+        """Lazy-initialize SpriteLibrary on first access.
+
+        Provides persistent storage for discovered sprites.
+        """
+        with self._lazy_lock:
+            if self._sprite_library is None:
+                from core.sprite_library import SpriteLibrary
+
+                self._sprite_library = SpriteLibrary()
+                self._sprite_library.load()
+                logger.debug("Created SpriteLibrary via lazy initialization")
+            return self._sprite_library
+
     def cleanup(self) -> None:
         """Cleanup all managers in reverse initialization order."""
         logger.info("Cleaning up AppContext...")
 
         # Cleanup lazy services first (they depend on managers)
+        if self._sprite_library is not None:
+            try:
+                self._sprite_library.cleanup()
+                logger.debug("Cleaned up SpriteLibrary")
+            except Exception:
+                logger.warning("Error cleaning up SpriteLibrary", exc_info=True)
+
+        if self._log_watcher is not None:
+            try:
+                self._log_watcher.cleanup()
+                logger.debug("Cleaned up LogWatcher")
+            except Exception:
+                logger.warning("Error cleaning up LogWatcher", exc_info=True)
+
         if self._preview_generator is not None:
             try:
                 self._preview_generator.cleanup()

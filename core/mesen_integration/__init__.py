@@ -42,6 +42,10 @@ from core.mesen_integration.gfx_pointer_table import (
     rom_to_sa1_cpu,
     sa1_cpu_to_rom,
 )
+from core.mesen_integration.log_watcher import (
+    CapturedOffset,
+    LogWatcher,
+)
 from core.mesen_integration.rom_tile_matcher import (
     ROMTileMatcher,
     TileLocation,
@@ -87,10 +91,12 @@ __all__ = [
     "CanonicalRange",
     "CaptureRenderer",
     "CaptureResult",
+    "CapturedOffset",
     "CorrelationPipeline",
     "CorrelationResults",
     "DMAEvent",
     "GFXPointerTableParser",
+    "LogWatcher",
     "MesenCaptureParser",
     "OAMEntry",
     "OBSELConfig",

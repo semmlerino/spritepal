@@ -64,7 +64,9 @@ class PooledPreviewWorker(SpritePreviewWorker):
         self.rom_path = request.rom_path
         self.offset = request.offset
         self.sprite_name = f"manual_0x{request.offset:X}"
-        logger.debug(f"Worker setup: offset=0x{request.offset:X}, request_id={request.request_id}")
+        logger.debug(
+            f"[WORKER] setup_request: offset=0x{request.offset:X}, request_id={request.request_id}, sprite_name={self.sprite_name}"
+        )
         self.extractor = extractor
         self.sprite_config = None
         # Thread-safe state updates
@@ -318,10 +320,9 @@ class PooledPreviewWorker(SpritePreviewWorker):
 
         # Emit success
         logger.debug(
-            f"[TRACE] PoolWorker emitting preview_ready: request_id={request_id}, "
+            f"[WORKER] Emitting preview_ready: request_id={request_id}, "
             f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}, sprite_name={self.sprite_name}"
         )
-        logger.debug(f"[TRACE] Preview data first 20 bytes: {tile_data[:20].hex() if tile_data else 'None'}")
         self.preview_ready.emit(request_id, tile_data, width, height, self.sprite_name)
         logger.debug("[TRACE] PoolWorker emitted preview_ready signal")
 

@@ -166,6 +166,7 @@ class OffsetDialogManager(QObject):
         dialog.set_rom_data(rom_path, rom_size, extraction_manager)
 
         if initial_offset is not None:
+            logger.info("open_dialog: setting initial_offset to 0x%06X", initial_offset)
             dialog.set_offset(initial_offset)
 
         # Connect signals if not already connected

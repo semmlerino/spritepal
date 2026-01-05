@@ -899,6 +899,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     def set_offset(self, offset: int) -> bool:
         """Set current offset."""
+        logger.debug("ManualOffsetDialog.set_offset called: 0x%06X", offset)
         if self.browse_tab is not None:
             self.browse_tab.set_offset(offset)
             # The browse_tab.set_offset now emits offset_changed signal
@@ -976,8 +977,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             return
 
         try:
-            # Use SmartPreviewCoordinator's worker pool for background preloading
-            self._smart_preview_coordinator.request_preview(offset)
+            # Use background preload to avoid updating current offset
+            self._smart_preview_coordinator.request_background_preload(offset)
 
         except Exception as e:
             logger.debug(f"Error preloading offset 0x{offset:06X}: {e}")

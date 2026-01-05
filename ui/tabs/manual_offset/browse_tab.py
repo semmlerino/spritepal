@@ -227,11 +227,18 @@ class SimpleBrowseTab(QWidget):
         self.next_button.clicked.connect(self.find_next_clicked.emit)
         nav_row.addWidget(self.next_button)
 
-        # Clipboard paste button
+        # Clipboard paste button - supports system clipboard and Mesen2 file
         self.paste_button = QPushButton("📋 Paste")
         if self.paste_button:
             self.paste_button.setStyleSheet(button_style)
-        self.paste_button.setToolTip("Paste offset from Mesen2 (Key 0 in Lua script)")
+        self.paste_button.setToolTip(
+            "Paste offset from clipboard\n\n"
+            "Supports:\n"
+            "• Mesen2 log format: 'FILE OFFSET: 0x3C6EF1'\n"
+            "• SNES addresses: $98:8000 or $988000\n"
+            "• Hex: 0x0C3000\n"
+            "• Mesen2 clipboard file (Key 0 in Lua script)"
+        )
         self.paste_button.clicked.connect(self._paste_from_clipboard)
         nav_row.addWidget(self.paste_button)
 
@@ -417,6 +424,7 @@ class SimpleBrowseTab(QWidget):
         Args:
             offset: New offset value
         """
+        logger.debug("BrowseTab.set_offset called: 0x%06X (current: 0x%06X)", offset, self._current_offset)
         if offset != self._current_offset:
             self._current_offset = offset
 
@@ -435,9 +443,12 @@ class SimpleBrowseTab(QWidget):
             # Emit the offset_changed signal for programmatic changes
             # This ensures the dialog gets notified
             self.offset_changed.emit(offset)
+            logger.debug("BrowseTab.set_offset: emitted offset_changed for 0x%06X", offset)
 
             # Note: Preview will be requested by the dialog's _on_offset_changed handler
             # No need to request it here to avoid duplicates
+        else:
+            logger.debug("BrowseTab.set_offset: offset unchanged, skipping update")
 
     def get_step_size(self) -> int:
         """
@@ -529,15 +540,47 @@ class SimpleBrowseTab(QWidget):
         logger.debug(f"Advanced search selected sprite at offset 0x{offset:06X}")
 
     def _paste_from_clipboard(self) -> None:
-        """Read offset from Mesen2 clipboard file and navigate to it.
+        """Read offset from system clipboard or Mesen2 clipboard file.
 
         Supports multiple address formats from emulators:
+        - Mesen2 log format: "FILE OFFSET: 0x3C6EF1" (parsed from sprite_rom_finder.lua output)
         - SNES bank:offset: $98:8000 or 98:8000 (auto-converted to file offset)
         - SNES combined: $988000
         - Hex: 0x0C3000 or 0C3000
         - Decimal: 123456
         """
-        # Try multiple possible locations for the clipboard file
+        import re
+
+        from PySide6.QtWidgets import QApplication
+
+        # First, try the system clipboard for Mesen2 log format
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:  # type: ignore[reportUnnecessaryComparison]
+            text = clipboard.text().strip()
+            if text:
+                # Try Mesen2 "FILE OFFSET: 0xNNNNNN" format first
+                mesen2_pattern = re.compile(r"FILE OFFSET:\s*0x([0-9A-Fa-f]{6})")
+                match = mesen2_pattern.search(text)
+                if match:
+                    offset = int(match.group(1), 16)
+                    logger.info(f"Pasted Mesen2 offset from clipboard: 0x{offset:06X}")
+                    self.set_offset(offset)
+                    return
+
+                # Try other address formats from clipboard
+                try:
+                    raw_value, fmt = parse_address_string(text)
+                    offset = normalize_address(raw_value, self._rom_size)
+                    if fmt.startswith("snes"):
+                        logger.info(f"Converted SNES ${raw_value:06X} → File 0x{offset:06X}")
+                    else:
+                        logger.info(f"Pasting offset from clipboard: 0x{offset:06X}")
+                    self.set_offset(offset)
+                    return
+                except ValueError:
+                    pass  # Fall through to file-based clipboard
+
+        # Fall back to file-based clipboard locations
         possible_paths = [
             Path.home() / "Mesen2" / "sprite_clipboard.txt",
             Path.home() / "Documents" / "Mesen2" / "sprite_clipboard.txt",
@@ -560,7 +603,7 @@ class SimpleBrowseTab(QWidget):
                     if fmt.startswith("snes"):
                         logger.info(f"Converted SNES ${raw_value:06X} → File 0x{offset:06X}")
                     else:
-                        logger.info(f"Pasting offset from clipboard: 0x{offset:06X}")
+                        logger.info(f"Pasting offset from clipboard file: 0x{offset:06X}")
 
                     self.set_offset(offset)
                     return
@@ -568,7 +611,7 @@ class SimpleBrowseTab(QWidget):
                 except (OSError, ValueError) as e:
                     logger.error(f"Error reading clipboard file: {e}")
 
-        logger.warning("No clipboard file found. Press 0 in Mesen2 to copy sprite offset.")
+        logger.warning("No valid offset found in clipboard. Copy 'FILE OFFSET: 0xNNNNNN' from Mesen2 log.")
 
     def _on_find_sprites(self) -> None:
         """Handle Find Sprites button click - emit signal for parent to handle."""

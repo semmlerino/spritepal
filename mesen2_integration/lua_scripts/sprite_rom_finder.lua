@@ -68,6 +68,7 @@ setmetatable(_G, {
 
 local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
 local LOG_FILE = OUTPUT_DIR .. "sprite_rom_finder.log"
+local OFFSET_FILE = OUTPUT_DIR .. "last_offset.txt"  -- Simple file for SpritePal to watch
 
 local ROM_HEADER = 0  -- Set to 0x200 if your .sfc has a copier header
 
@@ -79,13 +80,24 @@ local fatal_error = nil
 
 local function log(msg)
     if not log_handle then
-        log_handle = io.open(LOG_FILE, "w")
+        log_handle = io.open(LOG_FILE, "a")  -- Append mode to preserve history
     end
     if log_handle then
         log_handle:write(msg .. "\n")
         log_handle:flush()
     end
     emu.log(msg)
+end
+
+-- Write offset to a simple file for SpritePal integration
+local function write_offset_file(offset, frame)
+    local f = io.open(OFFSET_FILE, "w")
+    if f then
+        f:write(string.format("FILE OFFSET: 0x%06X\n", offset))
+        f:write(string.format("frame=%d\n", frame or 0))
+        f:write(string.format("timestamp=%d\n", os.time()))
+        f:close()
+    end
 end
 
 local function log_fatal(context, err)
@@ -1702,6 +1714,8 @@ local function on_left_click(mouse, coord_debug)
                 log(string.format("FILE OFFSET: 0x%06X", display_file_offset))
                 log("")
                 log(string.format(">>> --offset 0x%06X <<<", display_file_offset))
+                -- Write to simple file for SpritePal integration
+                write_offset_file(display_file_offset, frame_count)
             end
             if display_override then
                 log(string.format("OVERRIDE: closest session (age=%d)", override_age or -1))

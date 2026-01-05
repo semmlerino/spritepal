@@ -39,13 +39,14 @@ if TYPE_CHECKING:
     from core.types import SpritePreset
 
 from core.managers.workflow_state_manager import ExtractionState
+
+# Import extracted components
+from ui.components.panels import RecentCapturesWidget
 from ui.controllers import (
     ExtractionParamsController,
     ROMSessionController,
     format_sprite_list,
 )
-
-# Import extracted components
 from ui.rom_extraction import OffsetDialogManager, ROMWorkerOrchestrator, ScanController
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
@@ -205,6 +206,7 @@ class ROMExtractionPanel(QWidget):
 
         # Add all widget groups
         self._add_rom_controls(layout)
+        self._add_mesen2_captures(layout)  # Mesen2 offset discovery
         self._add_mode_controls(layout)
         self._add_manual_offset_controls(layout)
         self._add_output_controls(layout)
@@ -230,6 +232,78 @@ class ROMExtractionPanel(QWidget):
         self.output_hint_label.setStyleSheet(f"color: {COLORS['warning']}; font-size: 11px; font-style: italic;")
         self.output_hint_label.setVisible(False)
         layout.addWidget(self.output_hint_label)
+
+    def _add_mesen2_captures(self, layout: QVBoxLayout) -> None:
+        """Add Mesen2 captures widget for offset discovery.
+
+        This widget shows recently discovered ROM offsets from Mesen2's
+        sprite_rom_finder.lua script. Users can click on captures to
+        jump directly to those offsets.
+
+        Args:
+            layout: Layout to add the widget to
+        """
+        from core.app_context import get_app_context_optional
+
+        self._recent_captures_widget = RecentCapturesWidget(self)
+        layout.addWidget(self._recent_captures_widget)
+
+        # Connect capture signals
+        self._recent_captures_widget.offset_selected.connect(self._on_mesen2_offset_selected)
+        self._recent_captures_widget.offset_activated.connect(self._on_mesen2_offset_activated)
+
+        # Connect to log watcher if available
+        context = get_app_context_optional()
+        if context is not None:
+            log_watcher = context.log_watcher
+            log_watcher.offset_discovered.connect(self._on_mesen2_offset_discovered)
+            log_watcher.watch_started.connect(lambda: self._recent_captures_widget.set_watching(True))
+            log_watcher.watch_stopped.connect(lambda: self._recent_captures_widget.set_watching(False))
+
+            # Start watching if log file exists
+            log_watcher.start_watching()
+
+    def _on_mesen2_offset_discovered(self, capture: object) -> None:
+        """Handle new offset discovered from Mesen2 log.
+
+        Args:
+            capture: CapturedOffset from log watcher
+        """
+        from core.mesen_integration.log_watcher import CapturedOffset
+
+        if isinstance(capture, CapturedOffset):
+            self._recent_captures_widget.add_capture(capture)
+            logger.debug("Added Mesen2 capture: 0x%06X", capture.offset)
+
+    def _on_mesen2_offset_selected(self, offset: int) -> None:
+        """Handle offset selection (single-click) from captures widget.
+
+        Shows preview at the selected offset.
+
+        Args:
+            offset: ROM offset that was selected
+        """
+        logger.debug("Mesen2 offset selected: 0x%06X", offset)
+        # Update the offset dialog if it's open
+        if self._offset_dialog_manager._dialog is not None:
+            self._offset_dialog_manager._dialog.set_offset(offset)
+
+    def _on_mesen2_offset_activated(self, offset: int) -> None:
+        """Handle offset activation (double-click) from captures widget.
+
+        Opens the manual offset dialog at the specified offset.
+
+        Args:
+            offset: ROM offset to jump to
+        """
+        logger.info("Mesen2 offset activated: 0x%06X", offset)
+        # Open manual offset dialog and jump to offset
+        self._open_manual_offset_dialog()
+        dialog = self._offset_dialog_manager._dialog
+        if dialog is not None:
+            logger.debug("Setting dialog offset to: 0x%06X", offset)
+            result = dialog.set_offset(offset)
+            logger.debug("set_offset returned: %s, current offset now: 0x%06X", result, dialog.get_current_offset())
 
     def _add_mode_controls(self, layout: QVBoxLayout):
         """Add sprite selector controls to the layout (always visible, preset mode is default).
