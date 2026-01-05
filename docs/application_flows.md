@@ -360,6 +360,87 @@ User modifies sprite
 
 ---
 
+## 5. Sprite Editor Tab and Mesen2 Integration
+
+### 5.1 Embedded Sprite Editor Tab
+
+The main SpritePal window has 3 extraction tabs:
+- **Tab 0**: ROM Extraction
+- **Tab 1**: VRAM Extraction
+- **Tab 2**: Sprite Editor (embedded)
+
+The Sprite Editor tab embeds the full 4-step workflow without menus/toolbar/statusbar:
+1. Extract tab - Load sprites from ROM offset
+2. Edit tab - Modify sprite pixels and palettes
+3. Inject tab - Repack modified sprites back to ROM
+4. Multi-Palette tab - Manage alternative palettes
+
+```
+SpriteEditTab (ui/sprite_edit_tab.py)
+├── MainController (from sprite_editor subsystem)
+│   ├── ExtractionController
+│   ├── EditingController
+│   ├── InjectionController
+│   └── PaletteController
+└── Internal QTabWidget
+    ├── ExtractTab
+    ├── EditTab
+    ├── InjectTab
+    └── MultiPaletteTab
+```
+
+### 5.2 Jump-to-Offset from Mesen2 Captures
+
+```
+User double-clicks ROM offset in Recent Captures
+         │
+         ▼
+ROMExtractionPanel._on_mesen2_offset_activated()
+         │
+         ▼
+ROMExtractionPanel.open_in_sprite_editor.emit(offset)
+         │
+         ▼
+MainWindow._on_open_in_sprite_editor(offset)
+         │
+         ├── Switch to Sprite Editor tab (index 2)
+         │
+         └── SpriteEditTab.jump_to_offset(offset)
+             ├── Switch to Extract subtab
+             ├── Set offset in ExtractTab._offset_input
+             └── Emit status_message signal
+```
+
+### 5.3 Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+1` | Switch to ROM Extraction tab |
+| `Ctrl+2` | Switch to VRAM Extraction tab |
+| `Ctrl+3` | Switch to Sprite Editor tab |
+| `F6` | Jump to last Mesen2 capture in Sprite Editor |
+
+Implemented in `MainWindow.keyPressEvent()`.
+
+### 5.4 Status Bar Mesen2 Indicator
+
+The status bar shows Mesen2 watch status:
+- Green dot `●` when log watcher is active
+- Gray dot `●` when inactive
+
+Updated via:
+```
+ROMExtractionPanel.mesen2_watching_changed.emit(bool)
+       │
+       ▼
+MainWindow._connect_signals()
+       │
+       ▼
+StatusBarManager.set_mesen2_watching(bool)
+```
+
+---
+
 ## Quick Reference
 
 | Task | Primary File | Key Method |
@@ -373,7 +454,9 @@ User modifies sprite
 | Manager access | `core/app_context.py` | `get_app_context()` |
 | Dump file detection | `core/services/dump_file_detection_service.py` | `detect_related_files()`, `auto_detect_all()` |
 | Extraction readiness | `core/services/extraction_readiness_service.py` | `check_vram_readiness()`, `check_rom_extraction_readiness()` |
+| Sprite Editor embedding | `ui/sprite_edit_tab.py` | `SpriteEditTab.jump_to_offset()` |
+| Mesen2 offset handling | `ui/rom_extraction_panel.py` | `ROMExtractionPanel._on_mesen2_offset_activated()` |
 
 ---
 
-*Last updated: December 27, 2025 (Removed obsolete ManagerRegistry references)*
+*Last updated: January 6, 2026 (Added Sprite Editor Tab and Mesen2 integration flows)*

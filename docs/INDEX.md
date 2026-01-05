@@ -58,6 +58,8 @@ This is the central entry point for all SpritePal documentation.
 | Find sprite ROM offset | [mesen2_integration/README.md](../mesen2_integration/README.md) → Click-to-Find |
 | Understand Mesen integration | [architecture.md](architecture.md) → Mesen Integration Subsystem |
 | Run Mesen2 capture pipeline | [docs/mesen2/01_BUILD_SPECIFIC_CONTRACT.md](mesen2/01_BUILD_SPECIFIC_CONTRACT.md) → Runbook |
+| Use embedded Sprite Editor | [application_flows.md](application_flows.md) → Section 5 (Sprite Editor Tab) |
+| Keyboard shortcuts | [README.md](../README.md) → Keyboard Shortcuts |
 
 ### Key Commands
 
@@ -84,4 +86,4 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
 ---
 
-*Last updated: January 4, 2026 (Added Mesen 2 Integration section)*
+*Last updated: January 6, 2026 (Added Sprite Editor Tab, keyboard shortcuts, and Mesen2 integration features)*
