@@ -48,6 +48,7 @@ class ImageModel:
         """
         Flood fill from coordinates.
         Returns list of changed pixels.
+        Uses visited set to prevent revisiting pixels (robust algorithm).
         """
         if not (0 <= x < self.width and 0 <= y < self.height and 0 <= new_value <= 15):
             return []
@@ -58,16 +59,27 @@ class ImageModel:
 
         changed_pixels: list[tuple[int, int]] = []
         stack = [(x, y)]
+        visited: set[tuple[int, int]] = set()
 
         while stack:
             cx, cy = stack.pop()
-            if 0 <= cx < self.width and 0 <= cy < self.height and self.data[cy, cx] == target_value:
-                self.data[cy, cx] = new_value
-                changed_pixels.append((cx, cy))
-                self.modified = True
 
-                # Add neighbors
-                stack.extend([(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)])
+            if (cx, cy) in visited:
+                continue
+
+            if not (0 <= cx < self.width and 0 <= cy < self.height):
+                continue
+
+            if self.data[cy, cx] != target_value:
+                continue
+
+            visited.add((cx, cy))
+            self.data[cy, cx] = new_value
+            changed_pixels.append((cx, cy))
+            self.modified = True
+
+            # Add neighbors
+            stack.extend([(cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1)])
 
         return changed_pixels
 

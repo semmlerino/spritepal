@@ -123,26 +123,6 @@ class SpriteRenderer:
         except (OSError, IndexError, MemoryError) as e:
             raise RuntimeError(f"Error extracting sprites: {e}") from e
 
-    def extract_with_palette(
-        self,
-        vram_file: str,
-        offset: int,
-        size: int,
-        cgram_file: str,
-        palette_num: int,
-        tiles_per_row: int = 16,
-    ) -> tuple[Image.Image, int]:
-        """Extract sprites and apply a specific palette."""
-        img, total_tiles = self.extract(vram_file, offset, size, tiles_per_row)
-
-        cgram_path = Path(cgram_file) if cgram_file else None
-        if cgram_path and cgram_path.exists():
-            palette = read_cgram_palette(cgram_file, palette_num)
-            if palette:
-                img.putpalette(palette)
-
-        return img, total_tiles
-
     def _load_palettes_from_cgram(self, cgram_file: str) -> list[list[int]]:
         """Load all 16 palettes from CGRAM file or use grayscale fallback."""
         palettes: list[list[int]] = []
