@@ -288,7 +288,30 @@ class MyTab(QWidget):
 
 ## Integration with SpritePal
 
-The unified editor is integrated into the main SpritePal application:
+### Embedded in Main Window (Recommended)
+
+The editor is embedded in SpritePal's main window as the **3rd tab** alongside ROM and VRAM extraction:
+
+1. Open SpritePal main application
+2. Click the **"Sprite Editor"** tab
+3. Use the full Extract → Edit → Inject workflow
+
+The embedded version provides:
+- Direct integration with MainWindow status bar and toolbar
+- Mesen 2 integration for quick jump-to-offset
+- Session persistence (last accessed offset)
+- Status messages routed to main window
+
+### Standalone Editor
+
+For standalone use (useful for testing or development):
+
+```bash
+cd spritepal
+python launch_editor.py
+```
+
+Or programmatically:
 
 ```python
 from ui.sprite_editor import SpriteEditorApplication
@@ -297,10 +320,22 @@ app = SpriteEditorApplication()
 app.run()
 ```
 
-Can also be used as standalone:
+### Embedding as Custom Tab
 
-```bash
-python launch_editor.py
+To embed the editor in another Qt application, use `SpriteEditTab`:
+
+```python
+from ui.sprite_edit_tab import SpriteEditTab
+from PySide6.QtWidgets import QMainWindow
+
+class MyApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.editor_tab = SpriteEditTab(parent=self)
+        self.setCentralWidget(self.editor_tab)
+
+        # Connect status messages to your status bar
+        self.editor_tab.status_message.connect(self.statusBar().showMessage)
 ```
 
 ## Known Limitations
@@ -324,3 +359,7 @@ python launch_editor.py
 - SNES Development Manual: Tile format and color space
 - Mesen-X Documentation: Debugger and memory dumping
 - SpritePal Docs: ROM structure and sprite layout
+
+---
+
+*Last updated: January 6, 2026 (Added SpriteEditTab embedding documentation)*
