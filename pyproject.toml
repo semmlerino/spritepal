@@ -388,7 +388,7 @@ reportUntypedNamedTuple = false
 # Pytest Configuration
 # ============================================================================
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "ui/sprite_editor/tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"

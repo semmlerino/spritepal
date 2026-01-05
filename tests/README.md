@@ -111,14 +111,124 @@ Benefits:
 | `qtbot` | Qt widget testing |
 | `tmp_path` | Temporary files |
 
+## Test Data Sources
+
+SpritePal has three test data generation systems. Use the right one for your needs:
+
+| System | Location | When to Use |
+|--------|----------|------------|
+| **`test_data_fixtures.py`** | `tests/fixtures/` | **Single file needed (PREFERRED)** - use `test_rom_file` or `test_vram_file` fixtures |
+| **`TestDataFactory`** | `tests/fixtures/test_data_factory.py` | Complete test setup (ROM + VRAM + CGRAM + OAM + sprite + palette) for integration tests |
+| **`DataRepository`** | `tests/infrastructure/data_repository.py` | Session-scoped shared test data, real test data lookup, centralized management |
+
+### Recommendation
+
+**Use `test_data_fixtures.py` for 90% of tests.** It's the simplest, most reliable, and has zero overhead:
+
+```python
+# Most tests look like this
+def test_extraction(test_rom_file, tmp_path):
+    rom_path = test_rom_file(size="default")
+    result = validate_extraction(rom_path)
+    assert result is not None
+```
+
+### When to Use Each System
+
+#### 1. Single File Tests (PREFERRED) - `test_data_fixtures.py`
+
+Use the pytest fixtures `test_rom_file` and `test_vram_file` when you need just one or two files:
+
+```python
+def test_rom_validation(test_rom_file):
+    """Simple test with default 1MB ROM."""
+    rom_path = test_rom_file()  # Creates in tmp_path automatically
+    assert Path(rom_path).exists()
+
+def test_various_sizes(test_rom_file, test_vram_file):
+    """Test with different sizes."""
+    small_rom = test_rom_file(size="small")  # 32KB
+    large_rom = test_rom_file(size="large")  # 2MB
+    vram = test_vram_file(size=32 * 1024)    # Custom 32KB
+```
+
+**Presets:** `"tiny"` (13KB), `"small"` (32KB), `"medium"` (512KB), `"default"` (1MB), `"large"` (2MB)
+
+#### 2. Complete Test Setups - `TestDataFactory`
+
+Use `TestDataFactory` for integration tests needing the full pipeline (ROM + VRAM + CGRAM + OAM + sprite + palette):
+
+```python
+from tests.fixtures.test_data_factory import TestDataFactory
+
+def test_full_extraction_workflow(tmp_path):
+    """Complete extraction test with all file types."""
+    paths = TestDataFactory.create_test_files(tmp_path)
+
+    # Now you have:
+    # paths.rom_path, paths.vram_path, paths.cgram_path, paths.oam_path
+    # paths.sprite_path, paths.palette_path, paths.metadata_path
+    # paths.output_dir
+
+    result = manager.extract_sprite(paths.rom_path, output_dir=paths.output_dir)
+    assert result.success
+```
+
+**For injection tests:**
+```python
+def test_injection_workflow(tmp_path):
+    """Injection-specific setup (zeroed ROM/VRAM)."""
+    paths = TestDataFactory.create_injection_test_files(tmp_path)
+    result = manager.inject_sprite(paths.sprite_path, paths.rom_path)
+    assert result.success
+```
+
+#### 3. Centralized Data - `DataRepository`
+
+Use `DataRepository` when you need **session-scoped shared data** or **real test data lookup**:
+
+```python
+from tests.infrastructure.data_repository import get_test_data_repository
+
+@pytest.mark.shared_state_safe
+def test_with_repository(session_app_context):
+    """Access centralized test data repository."""
+    repo = get_test_data_repository()
+
+    # Get pre-configured extraction params
+    params = repo.get_vram_extraction_data("medium")
+    # Returns dict with: vram_path, cgram_path, oam_path, output_base, etc.
+
+    result = session_app_context.core_operations_manager.extract(**params)
+```
+
+**When to use:**
+- Multiple tests need the **same files** (avoid duplication)
+- Tests access **real Kirby ROM data** (DataRepository finds it)
+- You need **consistent parameters** across tests (e.g., offset, size)
+
+**Isolation:** Use `get_isolated_data_repository(tmp_path)` for parallel-safe DataRepository:
+
+```python
+from tests.infrastructure.data_repository import get_isolated_data_repository
+
+def test_isolated_repo(tmp_path):
+    """Isolated DataRepository (no conflicts in parallel tests)."""
+    repo = get_isolated_data_repository(tmp_path)  # Fresh instance
+    params = repo.get_vram_extraction_data("small")
+    # Files live in tmp_path, auto-cleaned
+```
+
 ### Test Data Patterns
 
 | Need | Use |
 |------|-----|
-| Single ROM file | `test_rom_file` fixture |
-| Single VRAM file | `test_vram_file` fixture |
-| Complete test setup (all files) | `TestDataFactory.create_test_files(tmp_path)` |
+| Single ROM file | `test_rom_file(size="...")` fixture |
+| Single VRAM file | `test_vram_file(size=...)` fixture |
+| Complete test setup | `TestDataFactory.create_test_files(tmp_path)` |
 | Injection test files | `TestDataFactory.create_injection_test_files(tmp_path)` |
+| Shared data (session-scoped) | `get_test_data_repository()` |
+| Parallel-safe shared data | `get_isolated_data_repository(tmp_path)` |
 
 **Note:** `app_context` and `session_app_context` can safely coexist in the same test run. When `app_context` detects an existing session context, it uses `suspend_app_context()` to temporarily hide it, creates an isolated context for the test, then restores the session context afterward. This prevents function-scoped tests from destroying session-scoped contexts.
 
@@ -209,4 +319,4 @@ def test_with_workers(app_context):
 
 ---
 
-*Last updated: December 27, 2025*
+*Last updated: January 5, 2026 (Added Test Data Sources section with consolidation guidance)*

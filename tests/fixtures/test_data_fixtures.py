@@ -110,17 +110,31 @@ def _add_sprite_patterns(data: bytearray, offsets: list[int] | None = None) -> N
 
 
 def _add_incrementing_pattern(data: bytearray, offset: int = 0x1000, length: int = 256) -> None:
-    """Add simple incrementing byte pattern for testing.
+    """Add unique byte pattern for testing.
+
+    Injects UUID bytes to guarantee unique SHA-256 hash per test ROM,
+    preventing ROMCache collision in parallel execution.
 
     Args:
         data: Mutable bytearray to modify in-place
         offset: Starting offset
         length: Number of bytes
     """
+    import uuid
+
     if offset + length > len(data):
         return
-    for i in range(length):
-        data[offset + i] = i % 256
+
+    # Inject UUID for uniqueness (first 16 bytes)
+    unique_bytes = uuid.uuid4().bytes
+    for i, byte_val in enumerate(unique_bytes):
+        if offset + i < len(data):
+            data[offset + i] = byte_val
+
+    # Fill remaining with incrementing pattern
+    for i in range(16, length):
+        if offset + i < len(data):
+            data[offset + i] = i % 256
 
 
 @pytest.fixture

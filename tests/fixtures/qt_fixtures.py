@@ -414,6 +414,8 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
         "cleanup_singleton",
         "real_factory",
         "real_extraction_manager",
+        "app_context",
+        "session_app_context",
     }
     if not (qt_fixtures & set(getattr(request, "fixturenames", []))):
         yield

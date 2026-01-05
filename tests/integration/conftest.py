@@ -87,12 +87,15 @@ def test_rom_with_sprites(tmp_path, test_rom_data, real_kirby_rom):
     """Create a test ROM for integration tests.
 
     PRIORITY: Uses real Kirby ROM if available (has real HAL-compressed sprites).
-    FALLBACK: Uses synthetic test data (no valid HAL sprites - tests will skip).
+    FALLBACK: Uses synthetic test data (no valid HAL sprites).
 
-    Tests that require HAL decompression should check `if not rom_info['sprites']`
-    and skip appropriately.
+    Returned dict contains:
+    - path: Path to ROM file
+    - sprites: List of sprite metadata (empty if synthetic)
+    - is_synthetic: True if using fallback data (only present in fallback case)
+    - skip_reason: Human-readable skip message (only present in fallback case)
 
-    For tests that MUST have real sprites, use the test_rom_with_real_sprites
+    For tests that MUST have real sprites, use the auto_skip_without_real_sprites
     fixture instead (it calls pytest.skip() automatically if ROM unavailable).
     """
     rom_path = tmp_path / "test_rom.sfc"
@@ -122,14 +125,33 @@ def test_rom_with_sprites(tmp_path, test_rom_data, real_kirby_rom):
         }
     else:
         # Use synthetic data - NO valid HAL-compressed sprites
-        # Tests that need HAL decompression should skip via:
-        #   if not rom_info['sprites']: pytest.skip("No sprites...")
         rom_path.write_bytes(test_rom_data)
 
         return {
             "path": rom_path,
             "sprites": [],  # Empty: synthetic data has no valid HAL sprites
+            "is_synthetic": True,  # Flag for tests to check
+            "skip_reason": "No real ROM available - synthetic data has no HAL sprites",
         }
+
+
+@pytest.fixture
+def auto_skip_without_real_sprites(test_rom_with_sprites):
+    """Fixture that auto-skips if no real sprites available.
+
+    Use this instead of test_rom_with_sprites when your test
+    requires actual HAL-compressed sprite data.
+
+    Automatically calls pytest.skip() with a descriptive message
+    if the ROM fixture fell back to synthetic data.
+    """
+    if not test_rom_with_sprites.get("sprites"):
+        pytest.skip(
+            test_rom_with_sprites.get(
+                "skip_reason", "No real sprites available"
+            )
+        )
+    return test_rom_with_sprites
 
 
 @pytest.fixture

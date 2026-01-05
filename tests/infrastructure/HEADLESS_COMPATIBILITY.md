@@ -2,19 +2,19 @@
 
 > **IMPORTANT: PySide6 is Required for Running Tests**
 >
-> The headless fallbacks provide **import-time compatibility only**. They allow
-> code to import without errors, but:
+> The test infrastructure uses conditional imports for headless compatibility:
 >
-> - All Qt-dependent operations raise `HeadlessModeError` at runtime
-> - Tests that create real Qt components WILL fail without PySide6
-> - This is **intentional** - tests should fail loudly, not silently pass
+> - Qt-independent APIs (DataRepository, signals, environment detection) always available
+> - Qt-dependent APIs (RealComponentFactory, ThreadSafeTestImage) require PySide6
+> - This is **intentional** - tests fail loudly without dependencies, not silently pass
 >
-> For running tests, PySide6 **is required**. The stubs exist only for:
-> - Static analysis tools (basedpyright, ruff)
-> - Module loading in CI environments before test collection
-> - Documentation generation
+> **For running tests:** PySide6 is **required**: `uv sync --extra dev`
 >
-> If you see `HeadlessModeError`, install PySide6: `uv sync --extra dev`
+> **For static analysis only** (no tests):
+> - basedpyright and ruff can analyze code without PySide6
+> - Module loading succeeds due to conditional imports
+>
+> If you see `ImportError` on Qt infrastructure imports, install PySide6 with `uv sync --extra dev`
 
 The test infrastructure has conditional imports to support headless static analysis environments.
 
@@ -25,15 +25,12 @@ The test infrastructure has conditional imports to support headless static analy
 - Supports CI environments, GitHub Actions, and systems without display
 - Provides comprehensive environment information for debugging
 
-### Conditional Imports
-- `__init__.py`: Uses conditional imports based on Qt availability
+### Conditional Import Strategy
+- `__init__.py`: Uses conditional imports based on `is_pyside6_available()` check
 - Qt-dependent modules only imported when PySide6 is available
-- Fallback stubs allow imports to succeed (for static analysis) but fail at runtime
-
-### Fallback Implementations
-- `headless_fallbacks.py`: Provides stub implementations for Qt features
-- **All stubs raise `HeadlessModeError` at runtime** - they do NOT silently pass
-- Maintains the same public API for import compatibility only
+- **When PySide6 is unavailable**: Attempting to import Qt-dependent APIs raises `ImportError` or `RuntimeWarning`
+- Real test infrastructure is only available when PySide6 is installed
+- No fallback stubs exist - this is intentional to fail loudly, not silently
 
 ## Features
 
@@ -41,55 +38,72 @@ The test infrastructure has conditional imports to support headless static analy
 - `DataRepository`: Centralized test data management
 - `get_environment_info()`: Environment detection information
 - `is_pyside6_available()`: PySide6 availability check
+- `TestSignal` and `TestSignalBlocker`: Safe signal utilities for testing
 
 ### Conditionally Available (Qt-Dependent)
 When PySide6 is available:
-- `ApplicationFactory`: Qt application management
-- `QtTestingFramework`: Qt component testing utilities  
-- `RealComponentFactory`: Real Qt component instances
-- All Qt testing context managers and helpers
+- `RealComponentFactory`: Real manager instances and Qt component factories
+- `ThreadSafeTestImage`: Thread-safe QImage for worker thread tests
+- `WorkerThreadAdapter` and `run_worker_to_completion()`: Background worker utilities
+- Helper functions: `create_main_window()`, `create_extraction_worker()`, `create_injection_worker()`, `create_tile_renderer()`
 
 When PySide6 is not available:
-- Same imports work but raise `HeadlessModeError` with helpful messages
-- Clear indication of what's needed to enable Qt features
+- Qt-dependent exports are not added to `__all__`
+- Attempting to import them raises `ImportError` or `RuntimeWarning`
+- Use only Qt-independent APIs in headless environments
 
 ## Usage
 
-### Headless Environment
+### Headless Environment (PySide6 not available)
 ```python
-from tests.infrastructure import DataRepository, get_environment_info
+from tests.infrastructure import DataRepository, get_environment_info, TestSignal
 
-# This works - Qt-independent
+# These work - Qt-independent
 repo = DataRepository()
 env_info = get_environment_info()
+signal = TestSignal()
 
-# This raises HeadlessModeError with helpful message
-from tests.infrastructure import ApplicationFactory
-ApplicationFactory.get_application()  # Error with guidance
+# These raise ImportError or RuntimeWarning
+# (PySide6 not installed)
+# from tests.infrastructure import RealComponentFactory  # ❌ ImportError
+# from tests.infrastructure import ThreadSafeTestImage  # ❌ ImportError
 ```
 
-### Qt Environment  
+### Qt Environment (PySide6 available)
 ```python
-from tests.infrastructure import DataRepository, ApplicationFactory
+from tests.infrastructure import DataRepository, RealComponentFactory, ThreadSafeTestImage
+from core.app_context import get_app_context
 
-# Both work when PySide6 is available
+# All work when PySide6 is available
 repo = DataRepository()
-app = ApplicationFactory.get_application()
+factory = RealComponentFactory()
+test_image = ThreadSafeTestImage(32, 32)
+
+# Create components for testing
+with factory:
+    extraction_worker = factory.create_extraction_worker()
+    main_window = factory.create_main_window()
+
+# Access managers via app_context (preferred)
+app_context = get_app_context()
+state_manager = app_context.application_state_manager
+operations_manager = app_context.core_operations_manager
 ```
 
 ## Error Handling
 
-### HeadlessModeError
-Custom exception that provides clear guidance:
-- Explains what Qt feature was accessed
-- Suggests installing PySide6 and ensuring display availability
-- Recommends using non-Qt testing alternatives
+### ImportError (Missing PySide6)
+When attempting to import Qt-dependent infrastructure without PySide6:
+- `ImportError` is raised when trying to import conditional modules
+- Clear indication that PySide6 is required for those features
+- Solution: Install PySide6 with `uv sync --extra dev`
 
-### Import Warnings
-When PySide6 is detected but Qt modules fail to import:
-- Issues RuntimeWarning with details
-- Falls back to headless mode automatically
-- Provides debugging information in logs
+### RuntimeWarning (PySide6 Available but Qt Import Failed)
+When PySide6 is installed but Qt modules fail to import:
+- `RuntimeWarning` is issued with details about the import failure
+- Qt-dependent exports are not added to `__all__`
+- Suggests checking display availability or Qt library issues
+- Use only Qt-independent APIs as fallback
 
 ## Benefits
 

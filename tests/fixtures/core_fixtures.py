@@ -230,7 +230,8 @@ def isolated_data_repository(tmp_path: Path) -> Generator[Any, None, None]:
 
     repo = get_isolated_data_repository(tmp_path)
     yield repo
-    # Cleanup handled automatically by tmp_path fixture
+    # Explicit cleanup of temp files/dirs created by DataRepository
+    repo.cleanup()
 
 
 @pytest.fixture(scope="session")

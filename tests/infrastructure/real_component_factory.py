@@ -40,6 +40,7 @@ from PySide6.QtCore import QObject, QThread
 from PySide6.QtWidgets import QApplication, QWidget
 
 from core.app_context import is_context_initialized
+from core.managers import is_initialized
 from core.services.rom_cache import ROMCache
 from ui.common import WorkerManager
 from ui.main_window import MainWindow

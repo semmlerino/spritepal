@@ -56,7 +56,7 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 def test_worker_with_image():
     # QPixmap in worker = CRASH. Use this instead:
-    image = ThreadSafeTestImage.create(100, 100)
+    image = ThreadSafeTestImage(100, 100)  # Constructor, not .create()
     worker = ImageWorker(image)
 ```
 
