@@ -180,6 +180,12 @@ class ExtractionPanel(QGroupBox):
 
         offset_layout.addLayout(offset_controls_layout)
 
+        # Advanced helper label
+        self.advanced_helper = QLabel("Adjust step size for navigation or jump to key offsets")
+        self.advanced_helper.setStyleSheet(get_muted_text_style(italic=True, color_level="dark"))
+        self.advanced_helper.setVisible(False)
+        offset_layout.addWidget(self.advanced_helper)
+
         # Advanced controls section (hidden by default)
         self.advanced_controls = QWidget(self)
         advanced_layout = QHBoxLayout(self.advanced_controls)
@@ -254,6 +260,11 @@ class ExtractionPanel(QGroupBox):
         self.oam_toggle.setToolTip("OAM improves palette selection but is not required")
         layout.addWidget(self.oam_toggle)
 
+        self.oam_helper = QLabel("Provide OAM dump to help associate sprites with palettes")
+        self.oam_helper.setStyleSheet(get_muted_text_style(italic=True, color_level="dark"))
+        self.oam_helper.setVisible(False)
+        layout.addWidget(self.oam_helper)
+
         self.oam_drop = DropZone("OAM", settings_manager=self.settings_manager, required=False)
         self.oam_drop.setToolTip("Shows active sprites and palettes (optional - improves palette selection)")
         self.oam_drop.setVisible(False)
@@ -263,6 +274,12 @@ class ExtractionPanel(QGroupBox):
         self.auto_detect_button = QPushButton("Auto-detect Files")
         _ = self.auto_detect_button.clicked.connect(self._auto_detect_files)
         layout.addWidget(self.auto_detect_button)
+
+        # Auto-detect status label
+        self.auto_detect_status = QLabel("")
+        self.auto_detect_status.setStyleSheet(get_muted_text_style(italic=True))
+        self.auto_detect_status.setWordWrap(True)
+        layout.addWidget(self.auto_detect_status)
 
         self.setLayout(layout)
 
@@ -355,6 +372,15 @@ class ExtractionPanel(QGroupBox):
             self.files_changed.emit()
             self._check_extraction_ready()
 
+            # Feedback
+            count = sum(1 for f in [detected.vram_path, detected.cgram_path, detected.oam_path] if f)
+            dir_names = [d.name for d in search_dirs]
+            self.auto_detect_status.setText(f"Found {count} files in: {', '.join(dir_names)}")
+            self.auto_detect_status.setStyleSheet(get_success_text_style())
+        else:
+            self.auto_detect_status.setText(f"No files found in {len(search_dirs)} searched directories.")
+            self.auto_detect_status.setStyleSheet(get_muted_text_style(italic=True, color_level="dark"))
+
     def _on_preset_changed(self, index: int) -> None:
         """Handle preset change - delegate to controller"""
         try:
@@ -411,6 +437,7 @@ class ExtractionPanel(QGroupBox):
     def _toggle_advanced_controls(self, checked: bool) -> None:
         """Toggle visibility of advanced offset controls"""
         self.advanced_controls.setVisible(checked)
+        self.advanced_helper.setVisible(checked)
         if checked:
             self.advanced_toggle.setText("Hide Advanced")
         else:
@@ -419,6 +446,7 @@ class ExtractionPanel(QGroupBox):
     def _toggle_oam_input(self, checked: bool) -> None:
         """Toggle visibility of OAM drop zone"""
         self.oam_drop.setVisible(checked)
+        self.oam_helper.setVisible(checked)
         if checked:
             self.oam_toggle.setText("▼ OAM input (optional)")
         else:
@@ -433,13 +461,16 @@ class ExtractionPanel(QGroupBox):
         info = self._offset_controller.get_display_info(value)
 
         if self.offset_hex_label:
-            self.offset_hex_label.setText(info.hex_text)
+            step_size = self._offset_controller.step_size
+            self.offset_hex_label.setText(f"{info.hex_text} (step: 0x{step_size:X})")
             self.offset_hex_label.setToolTip(info.tooltip)
 
     def _on_step_changed(self, index: int) -> None:
         """Handle step size change - delegate to controller"""
         # Delegate to controller (will emit step_changed signal)
         self._offset_controller.set_step_index(index)
+        # Update display to show new step size
+        self._update_offset_display(self.offset_spinbox.value())
 
     def _on_jump_selected(self, index: int) -> None:
         """Handle quick jump selection - delegate to controller"""

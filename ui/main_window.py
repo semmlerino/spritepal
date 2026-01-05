@@ -619,6 +619,7 @@ class MainWindow(QMainWindow):
         <tr><td><b>Ctrl+Tab</b></td><td>Next tab</td></tr>
         <tr><td><b>Ctrl+Shift+Tab</b></td><td>Previous tab</td></tr>
         <tr><td><b>Alt+N</b></td><td>Focus output name field</td></tr>
+        <tr><td><b>Ctrl+F</b></td><td>Find Sprites in ROM</td></tr>
         <tr><td><b>F1</b></td><td>Show this help</td></tr>
         </table>
 
@@ -900,10 +901,18 @@ class MainWindow(QMainWindow):
         # Alt+N: Focus output name field
         if event.modifiers() == Qt.KeyboardModifier.AltModifier:
             if event.key() == Qt.Key.Key_N:
-                output_edit = getattr(self.output_settings_manager, "output_name_edit", None)
+                # Try active panel's output field first
+                active_panel = self.extraction_tabs.currentWidget()
+                output_edit = getattr(active_panel, "output_name_edit", None)
+
+                # Fallback to output settings manager (legacy/shared)
+                if output_edit is None:
+                    output_edit = getattr(self.output_settings_manager, "output_name_edit", None)
+
                 if output_edit is not None:
                     output_edit.setFocus()
-                    output_edit.selectAll()
+                    if hasattr(output_edit, "selectAll"):
+                        output_edit.selectAll()
                     event.accept()
                     return
 

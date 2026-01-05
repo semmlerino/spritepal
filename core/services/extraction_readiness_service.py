@@ -88,7 +88,7 @@ def check_vram_readiness(
 def check_rom_extraction_readiness(
     has_rom: bool,
     has_sprite: bool,
-    has_output_name: bool,
+    has_output_name: bool = True,  # Default to True to make it optional for readiness
     mode: ROMExtractionMode = ROMExtractionMode.PRESET,
 ) -> ReadinessResult:
     """Check readiness for ROM sprite extraction.
@@ -96,7 +96,7 @@ def check_rom_extraction_readiness(
     Args:
         has_rom: Whether ROM file is loaded
         has_sprite: Whether a sprite is selected (preset mode only)
-        has_output_name: Whether output name is set
+        has_output_name: Whether output name is set (currently optional for UI enabling)
         mode: Current extraction mode (preset or manual)
 
     Returns:
@@ -111,10 +111,6 @@ def check_rom_extraction_readiness(
     # Sprite selection required in preset mode
     if mode == ROMExtractionMode.PRESET and not has_sprite:
         reasons.append("Select a sprite preset")
-
-    # Output name always required
-    if not has_output_name:
-        reasons.append("Enter an output name")
 
     if reasons:
         return ReadinessResult(ready=False, reasons=reasons)

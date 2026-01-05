@@ -4,6 +4,10 @@ Extract tab for the sprite editor.
 Handles sprite extraction from VRAM dumps.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -20,7 +24,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.widgets.drop_zone import DropZone
+
 from ..widgets import HexLineEdit
+
+if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
 
 
 class ExtractTab(QWidget):
@@ -32,28 +41,24 @@ class ExtractTab(QWidget):
     extract_requested = Signal()
     extractionRequested = Signal(str, dict)  # oam_path, settings
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        settings_manager: ApplicationStateManager | None = None,
+    ) -> None:
         super().__init__(parent)
+        self.settings_manager = settings_manager
         self._setup_ui()
 
     def _setup_ui(self) -> None:
         """Create the extraction tab UI."""
         layout = QVBoxLayout(self)
 
-        # File selection group
-        file_group = QGroupBox("VRAM File")
-        file_layout = QHBoxLayout()
-
-        self.vram_file_edit = QLineEdit()
-        self.vram_file_edit.setReadOnly(True)
-        self.vram_file_btn = QPushButton("Browse...")
-        self.vram_file_btn.clicked.connect(self.browse_vram_requested.emit)
-
-        file_layout.addWidget(QLabel("File:"))
-        file_layout.addWidget(self.vram_file_edit)
-        file_layout.addWidget(self.vram_file_btn)
-        file_group.setLayout(file_layout)
-        layout.addWidget(file_group)
+        # File selection (Drop Zones for consistency)
+        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)
+        self.vram_drop.file_dropped.connect(lambda p: self.set_vram_file(p))
+        layout.addWidget(self.vram_drop)
 
         # Extraction settings group
         settings_group = QGroupBox("Extraction Settings")
@@ -86,20 +91,17 @@ class ExtractTab(QWidget):
         palette_layout = QGridLayout()
 
         self.use_palette_check = QCheckBox("Apply CGRAM Palette")
-        self.cgram_file_edit = QLineEdit()
-        self.cgram_file_edit.setReadOnly(True)
-        self.cgram_browse_btn = QPushButton("Browse...")
-        self.cgram_browse_btn.clicked.connect(self.browse_cgram_requested.emit)
-
+        
+        self.cgram_drop = DropZone("CGRAM", settings_manager=self.settings_manager, required=False)
+        self.cgram_drop.file_dropped.connect(lambda p: self.set_cgram_file(p))
+        
         self.palette_combo = QComboBox()
         for i in range(16):
             self.palette_combo.addItem(f"Palette {i}")
         self.palette_combo.setCurrentIndex(8)
 
         palette_layout.addWidget(self.use_palette_check, 0, 0, 1, 3)
-        palette_layout.addWidget(QLabel("CGRAM:"), 1, 0)
-        palette_layout.addWidget(self.cgram_file_edit, 1, 1)
-        palette_layout.addWidget(self.cgram_browse_btn, 1, 2)
+        palette_layout.addWidget(self.cgram_drop, 1, 0, 1, 3)
         palette_layout.addWidget(QLabel("Palette:"), 2, 0)
         palette_layout.addWidget(self.palette_combo, 2, 1)
 
@@ -126,12 +128,12 @@ class ExtractTab(QWidget):
     def get_extraction_params(self) -> dict[str, object]:
         """Get the current extraction parameters."""
         return {
-            "vram_file": self.vram_file_edit.text(),
+            "vram_file": self.vram_drop.get_file_path(),
             "offset": self.extract_offset_edit.value(),
             "size": self.extract_size_edit.value(),
             "tiles_per_row": self.tiles_per_row_spin.value(),
             "use_palette": self.use_palette_check.isChecked(),
-            "cgram_file": self.cgram_file_edit.text(),
+            "cgram_file": self.cgram_drop.get_file_path(),
             "palette_num": self.palette_combo.currentIndex(),
         }
 
@@ -143,7 +145,7 @@ class ExtractTab(QWidget):
         """
         errors: list[str] = []
 
-        if not self.vram_file_edit.text().strip():
+        if not self.vram_drop.has_file():
             errors.append("VRAM file is required")
 
         if not self.extract_offset_edit.isValid():
@@ -156,18 +158,18 @@ class ExtractTab(QWidget):
 
         # Check CGRAM file if palette is enabled
         if self.use_palette_check.isChecked():
-            if not self.cgram_file_edit.text().strip():
+            if not self.cgram_drop.has_file():
                 errors.append("CGRAM file required when using palette")
 
         return (True, "") if not errors else (False, "\n".join(errors))
 
     def set_vram_file(self, file_path: str) -> None:
         """Set the VRAM file path."""
-        self.vram_file_edit.setText(file_path)
+        self.vram_drop.set_file(file_path)
 
     def set_cgram_file(self, file_path: str) -> None:
         """Set the CGRAM file path."""
-        self.cgram_file_edit.setText(file_path)
+        self.cgram_drop.set_file(file_path)
 
     def append_output(self, text: str) -> None:
         """Append text to the output area."""

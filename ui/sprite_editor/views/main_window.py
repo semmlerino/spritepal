@@ -4,6 +4,10 @@ Main window for the unified sprite editor.
 Combines extract, edit, inject, and multi-palette tabs.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
@@ -19,6 +23,10 @@ from PySide6.QtWidgets import (
 from .tabs import EditTab, ExtractTab, InjectTab, MultiPaletteTab
 
 
+if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
+
+
 class SpriteEditorMainWindow(QMainWindow):
     """Main window for the unified sprite editor application."""
 
@@ -27,15 +35,18 @@ class SpriteEditorMainWindow(QMainWindow):
     file_open_requested = Signal()
     file_save_requested = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        settings_manager: ApplicationStateManager | None = None,
+    ) -> None:
         super().__init__(parent)
+        self.settings_manager = settings_manager
         self.setWindowTitle("SpritePal Unified Editor")
         self.setMinimumSize(1000, 700)
 
         self._setup_ui()
-        self._setup_menus()
-        self._setup_toolbar()
-        self._setup_statusbar()
 
     def _setup_ui(self) -> None:
         """Setup the main UI layout."""
@@ -50,18 +61,10 @@ class SpriteEditorMainWindow(QMainWindow):
         self.tab_widget.currentChanged.connect(self._on_tab_changed)
 
         # Create tabs
-        self.extract_tab = ExtractTab()
+        self.extract_tab = ExtractTab(settings_manager=self.settings_manager)
         self.edit_tab = EditTab()
-        self.inject_tab = InjectTab()
-        self.multi_palette_tab = MultiPaletteTab()
+        self.inject_tab = InjectTab(settings_manager=self.settings_manager)
 
-        # Add tabs
-        self.tab_widget.addTab(self.extract_tab, "1. Extract")
-        self.tab_widget.addTab(self.edit_tab, "2. Edit")
-        self.tab_widget.addTab(self.inject_tab, "3. Inject")
-        self.tab_widget.addTab(self.multi_palette_tab, "Multi-Palette")
-
-        layout.addWidget(self.tab_widget)
 
     def _setup_menus(self) -> None:
         """Setup the menu bar."""

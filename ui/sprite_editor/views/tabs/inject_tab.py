@@ -4,6 +4,10 @@ Inject tab for the sprite editor.
 Handles sprite injection into VRAM dumps.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QGridLayout,
@@ -17,7 +21,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.widgets.drop_zone import DropZone
+
 from ..widgets import HexLineEdit
+
+if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
 
 
 class InjectTab(QWidget):
@@ -28,54 +37,35 @@ class InjectTab(QWidget):
     browse_png_requested = Signal()
     browse_vram_requested = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        settings_manager: ApplicationStateManager | None = None,
+    ) -> None:
         super().__init__(parent)
+        self.settings_manager = settings_manager
         self._setup_ui()
 
     def _setup_ui(self) -> None:
         """Create the injection tab UI."""
         layout = QVBoxLayout(self)
 
-        # PNG file group
-        png_group = QGroupBox("PNG File to Inject")
-        png_layout = QHBoxLayout()
-
-        self.png_file_edit = QLineEdit()
-        self.png_file_edit.setReadOnly(True)
-        self.png_browse_btn = QPushButton("Browse...")
-        self.png_browse_btn.clicked.connect(self.browse_png_requested.emit)
-
-        png_layout.addWidget(QLabel("File:"))
-        png_layout.addWidget(self.png_file_edit)
-        png_layout.addWidget(self.png_browse_btn)
-        png_group.setLayout(png_layout)
-        layout.addWidget(png_group)
+        # PNG file selection (Drop Zone)
+        self.png_drop = DropZone("PNG", settings_manager=self.settings_manager, required=True)
+        self.png_drop.file_dropped.connect(lambda p: self.set_png_file(p))
+        layout.addWidget(self.png_drop)
 
         # Validation group
-        validation_group = QGroupBox("PNG Validation")
-        validation_layout = QVBoxLayout()
-
-        self.validation_text = QTextEdit()
-        self.validation_text.setReadOnly(True)
-        self.validation_text.setMinimumHeight(80)
-        validation_layout.addWidget(self.validation_text)
-
-        validation_group.setLayout(validation_layout)
-        layout.addWidget(validation_group)
-
+---
         # Target settings group
         target_group = QGroupBox("Target Settings")
         target_layout = QGridLayout()
 
-        # VRAM file
-        self.inject_vram_edit = QLineEdit()
-        self.inject_vram_edit.setReadOnly(True)
-        self.inject_vram_btn = QPushButton("Browse...")
-        self.inject_vram_btn.clicked.connect(self.browse_vram_requested.emit)
-
-        target_layout.addWidget(QLabel("VRAM:"), 0, 0)
-        target_layout.addWidget(self.inject_vram_edit, 0, 1)
-        target_layout.addWidget(self.inject_vram_btn, 0, 2)
+        # VRAM file (Drop Zone)
+        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)
+        self.vram_drop.file_dropped.connect(lambda p: self.set_vram_file(p))
+        target_layout.addWidget(self.vram_drop, 0, 0, 1, 3)
 
         # Offset
         self.inject_offset_edit = HexLineEdit("0xC000")
@@ -110,8 +100,8 @@ class InjectTab(QWidget):
     def get_injection_params(self) -> dict[str, object]:
         """Get the current injection parameters."""
         return {
-            "png_file": self.png_file_edit.text(),
-            "vram_file": self.inject_vram_edit.text(),
+            "png_file": self.png_drop.get_file_path(),
+            "vram_file": self.vram_drop.get_file_path(),
             "offset": self.inject_offset_edit.value(),
             "output_file": self.output_file_edit.text(),
         }
@@ -124,10 +114,10 @@ class InjectTab(QWidget):
         """
         errors: list[str] = []
 
-        if not self.png_file_edit.text().strip():
+        if not self.png_drop.has_file():
             errors.append("PNG file is required")
 
-        if not self.inject_vram_edit.text().strip():
+        if not self.vram_drop.has_file():
             errors.append("VRAM file is required")
 
         if not self.inject_offset_edit.isValid():
@@ -140,11 +130,11 @@ class InjectTab(QWidget):
 
     def set_png_file(self, file_path: str) -> None:
         """Set the PNG file path."""
-        self.png_file_edit.setText(file_path)
+        self.png_drop.set_file(file_path)
 
     def set_vram_file(self, file_path: str) -> None:
         """Set the VRAM file path."""
-        self.inject_vram_edit.setText(file_path)
+        self.vram_drop.set_file(file_path)
 
     def set_validation_text(self, text: str, is_valid: bool = True) -> None:
         """Set validation message with appropriate styling."""

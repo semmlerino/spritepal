@@ -136,6 +136,7 @@ class ROMExtractionPanel(QWidget):
 
         # Connect controller signals
         self._params_controller.readiness_changed.connect(self.extraction_ready.emit)
+        self._params_controller.mode_changed.connect(self._on_mode_changed)
 
         self._setup_ui()
         self._load_last_rom()
@@ -165,6 +166,10 @@ class ROMExtractionPanel(QWidget):
             name: The current output name string
         """
         self._output_name = name
+        if hasattr(self, "output_name_edit") and self.output_name_edit:
+            self.output_name_edit.blockSignals(True)
+            self.output_name_edit.setText(name)
+            self.output_name_edit.blockSignals(False)
 
     def _get_output_name(self) -> str:
         """Get the current output name.
@@ -265,6 +270,13 @@ class ROMExtractionPanel(QWidget):
         )
         self.advanced_toggle.toggled.connect(self._on_advanced_toggled)
         advanced_row.addWidget(self.advanced_toggle)
+
+        # Persistent manual offset indicator
+        self.manual_offset_display = QLabel("")
+        self.manual_offset_display.setStyleSheet(f"color: {COLORS['highlight']}; font-weight: bold;")
+        self.manual_offset_display.setVisible(False)
+        advanced_row.addWidget(self.manual_offset_display)
+
         advanced_row.addStretch()
 
         layout.addLayout(advanced_row)
@@ -289,17 +301,30 @@ class ROMExtractionPanel(QWidget):
         return button
 
     def _add_output_controls(self, layout: QVBoxLayout):
-        """Add CGRAM controls to the layout.
-
-        Note: Output name is now handled by shared OutputSettingsManager in main window.
+        """Add output and CGRAM controls to the layout.
 
         Args:
             layout: Layout to add controls to
         """
+        # Output Name row (reintroduced for better discoverability)
+        output_row = QHBoxLayout()
+        output_row.addWidget(QLabel("Output Name:"))
+        self.output_name_edit = QLineEdit()
+        self.output_name_edit.setPlaceholderText("e.g. kirby_sprites")
+        self.output_name_edit.textChanged.connect(self._on_output_name_text_changed)
+        output_row.addWidget(self.output_name_edit)
+        layout.addLayout(output_row)
+
         # CGRAM selector widget
         self.cgram_selector_widget = CGRAMSelectorWidget()
         self.cgram_selector_widget.browse_clicked.connect(self._browse_cgram)
         layout.addWidget(self.cgram_selector_widget)
+
+    def _on_output_name_text_changed(self, text: str) -> None:
+        """Handle output name text change from inline field."""
+        self._output_name = text
+        self.output_name_changed.emit(text)
+        self._check_extraction_ready()
 
     def _browse_rom(self):
         """Browse for ROM file"""
@@ -639,7 +664,9 @@ class ROMExtractionPanel(QWidget):
 
                     # Auto-suggest output name based on sprite
                     if not self._get_output_name():
-                        self.output_name_changed.emit(f"{sprite_name}_sprites")
+                        suggested_name = f"{sprite_name}_sprites"
+                        self.output_name_edit.setText(suggested_name)
+                        self.output_name_changed.emit(suggested_name)
                 else:
                     logger.warning("No data found for selected sprite")
             else:
@@ -780,6 +807,26 @@ class ROMExtractionPanel(QWidget):
 
         # Show/hide manual offset button
         self.manual_offset_button.setVisible(expanded)
+
+    def _on_mode_changed(self, is_manual: bool) -> None:
+        """Handle extraction mode change.
+
+        Args:
+            is_manual: Whether manual offset mode is active
+        """
+        # Update sprite selector state
+        self.sprite_selector_widget.setEnabled(not is_manual)
+        if is_manual:
+            self.sprite_selector_widget.set_info_text("Manual Offset Active")
+        else:
+            self.sprite_selector_widget.set_info_text("")
+
+        # Update manual offset indicator
+        if hasattr(self, "manual_offset_display"):
+            self.manual_offset_display.setVisible(is_manual)
+            if is_manual:
+                offset = self._params_controller.manual_offset
+                self.manual_offset_display.setText(f"Manual offset: 0x{offset:06X}")
 
     def _on_state_changed(self, old_state: ExtractionState, new_state: ExtractionState):
         """Handle state changes to update UI accordingly"""
