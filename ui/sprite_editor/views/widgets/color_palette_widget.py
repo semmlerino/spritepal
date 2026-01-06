@@ -8,7 +8,7 @@ from typing import override
 
 from PySide6.QtCore import QPoint, QRect, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QMouseEvent, QPainter, QPaintEvent, QPen, QPolygon
-from PySide6.QtWidgets import QMenu, QWidget
+from PySide6.QtWidgets import QMenu, QSizePolicy, QWidget
 
 from .pixel_canvas import PixelCanvas
 
@@ -73,7 +73,8 @@ class ColorPaletteWidget(QWidget):
         # Connected canvas for automatic updates
         self._connected_canvas: PixelCanvas | None = None
 
-        self.setFixedSize(4 * self.cell_size + 10, 4 * self.cell_size + 10)
+        self.setMinimumSize(4 * self.cell_size + 10, 4 * self.cell_size + 10)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
 

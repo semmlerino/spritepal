@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QTabWidget,
     QVBoxLayout,
     QWidget,
+    QSizePolicy,
 )
 
 from ui.sprite_editor.controllers.main_controller import MainController
@@ -71,6 +72,7 @@ class SpriteEditTab(QWidget):
 
     def _setup_ui(self) -> None:
         """Setup the embedded editor UI."""
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
@@ -81,6 +83,7 @@ class SpriteEditTab(QWidget):
 
         # Internal tab widget
         self._tab_widget = QTabWidget()
+        self._tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._tab_widget.currentChanged.connect(self._on_internal_tab_changed)
 
         # Create tabs
@@ -169,7 +172,7 @@ class SpriteEditTab(QWidget):
 
         if is_rom:
             # Move EditTab to ROM workflow container
-            self._rom_workflow_tab.edit_tab_layout.addWidget(self._edit_tab)
+            self._rom_workflow_tab.edit_tab_layout.addWidget(self._edit_tab, 1)  # Stretch to fill
 
             # Hide VRAM tabs, show ROM Workflow
             for i in range(4):

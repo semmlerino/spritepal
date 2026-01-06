@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, override
 import numpy as np
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QEnterEvent, QImage, QMouseEvent, QPainter, QPaintEvent, QPen, QWheelEvent
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QSizePolicy, QWidget
 
 if TYPE_CHECKING:
     from ...controllers.editing_controller import EditingController
@@ -64,6 +64,7 @@ class PixelCanvas(QWidget):
         # Setup
         self.setMouseTracking(True)
         self.setMinimumSize(200, 200)
+        self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
         # Connect to controller signals
         self.controller.imageChanged.connect(self._on_image_changed)

@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
     QStatusBar,
     QTabWidget,
@@ -140,14 +141,16 @@ class MainWindow(QMainWindow):
 
         # Create central widget
         central_widget = QWidget(self)
+        central_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setCentralWidget(central_widget)
 
         # Main horizontal splitter (stored as instance for session persistence)
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS)
         main_layout.setSpacing(0)  # Splitter handles spacing
-        main_layout.addWidget(self.main_splitter)
+        main_layout.addWidget(self.main_splitter, 1)
 
         # Left panel - Input and controls
         self.left_panel = self._create_left_panel()
@@ -182,14 +185,13 @@ class MainWindow(QMainWindow):
         or the action zone.
         """
         left_panel = QWidget(self)
+        left_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         main_layout = QVBoxLayout(left_panel)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
         # Create tab widget for extraction methods
         self.extraction_tabs = QTabWidget(self)
-        from PySide6.QtWidgets import QSizePolicy
-
         self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.extraction_tabs.currentChanged.connect(self._on_tab_changed)
 
@@ -248,6 +250,7 @@ class MainWindow(QMainWindow):
         self.action_zone = QWidget()
         self.action_zone.setObjectName("actionZone")
         self.action_zone.setStyleSheet(get_action_zone_style())
+        self.action_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         action_zone_layout = QVBoxLayout(self.action_zone)
         # Tight top margin - CSS border-top provides visual separation
         action_zone_layout.setContentsMargins(LAYOUT_MARGINS, SPACING_COMPACT_SMALL, LAYOUT_MARGINS, LAYOUT_MARGINS)

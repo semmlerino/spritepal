@@ -9,9 +9,11 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QFrame,
     QHBoxLayout,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -47,17 +49,23 @@ class EditTab(QWidget):
         self.controller = controller
         self._canvas: PixelCanvas | None = None
         self._setup_ui()
+        # Ensure EditTab expands to fill parent (critical for ROM mode container)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def _setup_ui(self) -> None:
         """Create the edit tab UI."""
         main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
         # Create splitter for resizable layout
         splitter = QSplitter()
         splitter.setChildrenCollapsible(False)
+        splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        # Left side: Tool panels
+        # Left side: Tool panels in scroll area
         left_panel = QWidget()
+        left_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -91,19 +99,33 @@ class EditTab(QWidget):
         actions_layout.addWidget(self.inject_btn)
 
         left_layout.addLayout(actions_layout)
+        left_layout.addStretch()
 
-        splitter.addWidget(left_panel)
+        # Wrap in scroll area for small screens
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        left_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        left_scroll.setWidget(left_panel)
+        # Constrain left panel width so canvas gets most space
+        left_scroll.setMinimumWidth(200)
+        left_scroll.setMaximumWidth(300)
+        left_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+
+        splitter.addWidget(left_scroll)
 
         # Right side: Canvas in scroll area
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.scroll_area.setStyleSheet("QScrollArea { background-color: #303030; border: none; }")
 
-        # Container for canvas to allow centering/resizing
+        # Container for canvas - must expand to fill scroll area
         self.canvas_container = QWidget()
+        self.canvas_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.canvas_layout = QVBoxLayout(self.canvas_container)
-        self.canvas_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.canvas_layout.setContentsMargins(0, 0, 0, 0)
+        self.canvas_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center canvas when smaller than viewport
 
         # Canvas placeholder (will be set by controller)
         self._canvas_placeholder = QWidget()
@@ -119,7 +141,7 @@ class EditTab(QWidget):
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
 
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(splitter, 1)  # Stretch factor 1 ensures splitter fills available space
 
         # Connect panel signals
         self._connect_signals()
