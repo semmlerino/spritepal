@@ -121,15 +121,15 @@ class TestCheckRomExtractionReadiness:
         )
         assert result.ready is True
 
-    def test_requires_output_name(self) -> None:
-        """Should require output name."""
+    def test_output_name_is_optional(self) -> None:
+        """Output name is optional for readiness (can be set at extraction time)."""
         result = check_rom_extraction_readiness(
             has_rom=True,
             has_sprite=True,
             has_output_name=False,
         )
-        assert result.ready is False
-        assert "Enter an output name" in result.reasons
+        # Output name is optional - readiness depends only on ROM and sprite
+        assert result.ready is True
 
     def test_ready_with_all_requirements_preset(self) -> None:
         """Should be ready with all requirements in preset mode."""
@@ -152,7 +152,7 @@ class TestCheckRomExtractionReadiness:
         assert result.ready is True
 
     def test_multiple_missing_requirements(self) -> None:
-        """Should report all missing requirements."""
+        """Should report all missing requirements (ROM and sprite in preset mode)."""
         result = check_rom_extraction_readiness(
             has_rom=False,
             has_sprite=False,
@@ -160,7 +160,8 @@ class TestCheckRomExtractionReadiness:
             mode=ROMExtractionMode.PRESET,
         )
         assert result.ready is False
-        assert len(result.reasons) == 3
+        # Only ROM and sprite are required (output_name is optional)
+        assert len(result.reasons) == 2
 
 
 class TestCheckGenericReadiness:

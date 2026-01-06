@@ -107,7 +107,7 @@ class InjectionController(QObject):
         params = self._view.get_injection_params()
         rom_file = str(params.get("rom_file", ""))
         png_file = str(params.get("png_file", ""))
-        offset = int(params["offset"]) # type: ignore
+        offset = int(params["offset"])  # type: ignore
 
         if not rom_file or not png_file:
             self._view.append_output("ERROR: ROM and PNG files required")
@@ -115,18 +115,18 @@ class InjectionController(QObject):
 
         # Output to same file (or backup handled by injector)
         # Using same file for 'Save to ROM' logic
-        
+
         self._view.append_output(f"Saving to ROM: {rom_file} at 0x{offset:X}")
-        
+
         try:
             success, message = self.rom_injector.inject_sprite_to_rom(
                 sprite_path=png_file,
                 rom_path=rom_file,
-                output_path=rom_file, # Overwrite
+                output_path=rom_file,  # Overwrite
                 sprite_offset=offset,
-                create_backup=True
+                create_backup=True,
             )
-            
+
             if success:
                 self._view.append_output("Success!")
                 self._view.append_output(message)
@@ -134,7 +134,7 @@ class InjectionController(QObject):
             else:
                 self._view.append_output(f"Failed: {message}")
                 self.injection_failed.emit(message)
-                
+
         except Exception as e:
             self._view.append_output(f"ERROR: {e}")
             self.injection_failed.emit(str(e))

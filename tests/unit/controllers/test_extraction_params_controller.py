@@ -198,8 +198,8 @@ class TestReadinessChecking:
         assert result.ready is True
         assert blocker.args == [True, ""]
 
-    def test_not_ready_without_output_name(self, qtbot) -> None:
-        """Should not be ready without output name."""
+    def test_output_name_optional_for_readiness(self, qtbot) -> None:
+        """Output name is optional - can be set at extraction time."""
         controller = ExtractionParamsController()
 
         with qtbot.waitSignal(controller.readiness_changed, timeout=1000) as blocker:
@@ -209,9 +209,9 @@ class TestReadinessChecking:
                 has_output_name=False,
             )
 
-        assert result.ready is False
-        assert "Enter an output name" in result.reasons
-        assert blocker.args[0] is False
+        # Output name is optional - readiness depends only on ROM and sprite
+        assert result.ready is True
+        assert blocker.args[0] is True
 
     def test_no_signal_when_readiness_unchanged(self, qtbot) -> None:
         """Should not emit signal when readiness doesn't change."""

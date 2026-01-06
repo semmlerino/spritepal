@@ -123,6 +123,23 @@ class SpriteRenderer:
         except (OSError, IndexError, MemoryError) as e:
             raise RuntimeError(f"Error extracting sprites: {e}") from e
 
+    def render_4bpp(self, tile_data: bytes, width: int, height: int) -> Image.Image:
+        """Render raw 4bpp tile data into a grayscale indexed PIL image."""
+        if width <= 0 or height <= 0:
+            _, _, _, width, height = calculate_dimensions_from_tile_data(len(tile_data), tiles_per_row=16)
+
+        tiles_x = max(1, width // TILE_WIDTH)
+        tiles_y = max(1, height // TILE_HEIGHT)
+        total_tiles = len(tile_data) // BYTES_PER_TILE_4BPP
+
+        img = Image.new("P", (width, height))
+        img.putpalette(get_grayscale_palette())
+
+        pixels = self._decode_all_tiles(tile_data)
+        img_pixels = self._arrange_tiles_in_indexed_image(pixels, total_tiles, tiles_x, tiles_y, width, height)
+        img.putdata(img_pixels)
+        return img
+
     def _load_palettes_from_cgram(self, cgram_file: str) -> list[list[int]]:
         """Load all 16 palettes from CGRAM file or use grayscale fallback."""
         palettes: list[list[int]] = []

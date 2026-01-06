@@ -45,6 +45,7 @@ from ui.common.spacing_constants import (
 )
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
+    KeyboardShortcutManager,
     OutputSettingsManager,
     StatusBarManager,
     ToolbarManager,
@@ -113,6 +114,7 @@ class MainWindow(QMainWindow):
         self.status_bar_manager: StatusBarManager
         self.output_settings_manager: OutputSettingsManager
         self.ui_coordinator: UICoordinator
+        self.keyboard_shortcut_manager: KeyboardShortcutManager
 
         self._output_path = ""
         self._extracted_files = []
@@ -167,56 +169,71 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage("Ready to extract sprites")
 
     def _create_left_panel(self) -> QWidget:
-        """Create the left panel with scrollable tabs and pinned action zone.
+        """Create the left panel with tabs and action zone.
 
         Structure:
-        - Content Zone (top, scrollable): Contains extraction tabs
-        - Action Zone (bottom, fixed): Contains output settings + action buttons
+        - Tabs (top, takes available space):
+          - ROM Extraction: Wrapped in ScrollArea
+          - VRAM Extraction: Wrapped in ScrollArea
+          - Sprite Editor: Direct widget (no scroll wrapper, full height)
+        - Action Zone (bottom, fixed): Shared buttons for extraction tabs
 
-        This ensures action buttons are always visible regardless of tab content height.
+        This ensures the Sprite Editor is not constrained by the extraction scroll area
+        or the action zone.
         """
         left_panel = QWidget(self)
         main_layout = QVBoxLayout(left_panel)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # CONTENT ZONE: Scrollable area for extraction tabs
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
-
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS, 0)
-        content_layout.setSpacing(LAYOUT_SPACING)
-
         # Create tab widget for extraction methods
         self.extraction_tabs = QTabWidget(self)
         from PySide6.QtWidgets import QSizePolicy
 
-        self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.extraction_tabs.currentChanged.connect(self._on_tab_changed)
 
-        # ROM extraction tab (first tab, selected by default)
+        # ROM extraction tab (wrapped in scroll area)
         from core.app_context import get_app_context
 
         extraction_manager = get_app_context().core_operations_manager
+
+        # Create Mesen2Module for log watcher lifecycle management
+        from ui.rom_extraction.modules import Mesen2Module
+
+        log_watcher = get_app_context().log_watcher
+        mesen2_module = Mesen2Module(log_watcher=log_watcher, parent=self)
+
         self.rom_extraction_panel = ROMExtractionPanel(
             parent=self,
             extraction_manager=extraction_manager,
             state_manager=self.settings_manager,
             rom_cache=self.rom_cache,
+            mesen2_module=mesen2_module,
         )
-        self.extraction_tabs.addTab(self.rom_extraction_panel, "ROM Extraction")
+
+        rom_scroll = QScrollArea()
+        rom_scroll.setWidgetResizable(True)
+        rom_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        rom_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        rom_scroll.setWidget(self.rom_extraction_panel)
+
+        self.extraction_tabs.addTab(rom_scroll, "ROM Extraction")
         self.extraction_tabs.setTabToolTip(0, "Extract sprites directly from game ROM files")
 
-        # VRAM extraction tab
+        # VRAM extraction tab (wrapped in scroll area)
         self.extraction_panel = ExtractionPanel(settings_manager=self.settings_manager)
-        self.extraction_tabs.addTab(self.extraction_panel, "VRAM Extraction")
+
+        vram_scroll = QScrollArea()
+        vram_scroll.setWidgetResizable(True)
+        vram_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        vram_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        vram_scroll.setWidget(self.extraction_panel)
+
+        self.extraction_tabs.addTab(vram_scroll, "VRAM Extraction")
         self.extraction_tabs.setTabToolTip(1, "Extract from emulator memory dumps (VRAM/CGRAM/OAM)")
 
-        # Sprite Editor tab (embedded)
+        # Sprite Editor tab (direct, no scroll wrapper)
         self.sprite_edit_tab = SpriteEditTab(
             parent=self,
             settings_manager=self.settings_manager,
@@ -224,11 +241,8 @@ class MainWindow(QMainWindow):
         self.extraction_tabs.addTab(self.sprite_edit_tab, "Sprite Editor")
         self.extraction_tabs.setTabToolTip(2, "Edit sprites: Extract, Edit, Inject workflow")
 
-        content_layout.addWidget(self.extraction_tabs)
-        content_layout.addStretch()  # Push content to top, keep compact
-
-        scroll_area.setWidget(content_widget)
-        main_layout.addWidget(scroll_area, stretch=1)  # Takes all available vertical space
+        # Add tabs to layout
+        main_layout.addWidget(self.extraction_tabs, 1)
 
         # ACTION ZONE: Fixed height, pinned to bottom
         self.action_zone = QWidget()
@@ -237,13 +251,30 @@ class MainWindow(QMainWindow):
         action_zone_layout = QVBoxLayout(self.action_zone)
         # Tight top margin - CSS border-top provides visual separation
         action_zone_layout.setContentsMargins(LAYOUT_MARGINS, SPACING_COMPACT_SMALL, LAYOUT_MARGINS, LAYOUT_MARGINS)
-        action_zone_layout.setSpacing(SPACING_COMPACT_SMALL)  # 6px - tighter for cohesion
+        action_zone_layout.setSpacing(SPACING_COMPACT_SMALL)
 
         # Output settings and buttons will be added by managers in _setup_managers()
 
         main_layout.addWidget(self.action_zone)  # No stretch = fixed size based on content
 
         return left_panel
+
+    def _on_tab_changed(self, index: int) -> None:
+        """Handle tab changes to update UI visibility.
+
+        Args:
+            index: New tab index
+        """
+        # Guard against early calls before action_zone is created during init
+        if not hasattr(self, "action_zone"):
+            return
+
+        # Hide action zone for Sprite Editor (index 2) as it has its own controls
+        # and needs full vertical space
+        if index == 2:
+            self.action_zone.hide()
+        else:
+            self.action_zone.show()
 
     def _setup_managers(self) -> None:
         """Set up all UI managers"""
@@ -255,10 +286,15 @@ class MainWindow(QMainWindow):
 
         # Connect ROM panel to shared output name via signals (decoupled communication)
         self.output_settings_manager.output_name_changed.connect(self.rom_extraction_panel.set_output_name)
+        # Set provider for ROM panel to read current output name from OutputSettingsManager
+        self.rom_extraction_panel.set_output_name_provider(self.output_settings_manager.get_output_name)
         # Initialize with current value
         self.rom_extraction_panel.set_output_name(self.output_settings_manager.get_output_name())
 
         self.toolbar_manager = ToolbarManager(self, self)
+
+        # Keyboard shortcut manager
+        self.keyboard_shortcut_manager = KeyboardShortcutManager(self)
 
         # Consolidated UI coordinator handles preview, session, and tab operations
         self.ui_coordinator = UICoordinator(
@@ -313,6 +349,9 @@ class MainWindow(QMainWindow):
         """Update initial UI state after setup"""
         # Update extraction mode (for VRAM panel)
         self._on_extraction_mode_changed(self.extraction_panel.mode_combo.currentIndex())
+
+        # Sync action_zone visibility with current tab
+        self._on_tab_changed(self.extraction_tabs.currentIndex())
 
     def _setup_status_bar_indicators(self) -> None:
         """Set up permanent status bar indicators"""
@@ -467,7 +506,7 @@ class MainWindow(QMainWindow):
 
     def open_manual_offset_dialog(self) -> None:
         """Open manual offset dialog"""
-        self.rom_extraction_panel._open_manual_offset_dialog()
+        self.rom_extraction_panel.open_manual_offset_dialog()
 
     def _handle_rom_extraction(self, output_name: str) -> None:
         """Handle ROM extraction
@@ -665,19 +704,25 @@ class MainWindow(QMainWindow):
         self.rom_extraction_panel.output_name_changed.connect(self._on_rom_output_name_changed)
 
         # Connect sprite editor status messages to main status bar
-        self.sprite_edit_tab.status_message.connect(
-            lambda msg: self.status_bar_manager.show_message(msg, 3000)
-        )
+        self.sprite_edit_tab.status_message.connect(lambda msg: self.status_bar_manager.show_message(msg, 3000))
 
         # Connect ROM panel's "open in sprite editor" signal
-        self.rom_extraction_panel.open_in_sprite_editor.connect(
-            self._on_open_in_sprite_editor
-        )
+        self.rom_extraction_panel.open_in_sprite_editor.connect(self._on_open_in_sprite_editor)
+
+        # Sync ROM path to sprite editor
+        self.rom_extraction_panel.rom_loaded.connect(self.sprite_edit_tab.load_rom)
 
         # Connect ROM panel's Mesen2 watching status to status bar
-        self.rom_extraction_panel.mesen2_watching_changed.connect(
-            self.status_bar_manager.set_mesen2_watching
-        )
+        self.rom_extraction_panel.mesen2_watching_changed.connect(self.status_bar_manager.set_mesen2_watching)
+
+        # Connect keyboard shortcut manager signals
+        self.keyboard_shortcut_manager.tab_switch_requested.connect(self._on_tab_switch_requested)
+        self.keyboard_shortcut_manager.tab_next_requested.connect(self._navigate_to_next_tab)
+        self.keyboard_shortcut_manager.tab_previous_requested.connect(self._navigate_to_previous_tab)
+        self.keyboard_shortcut_manager.extract_requested.connect(self._on_extract_shortcut)
+        self.keyboard_shortcut_manager.mesen_capture_requested.connect(self._on_mesen_capture_shortcut)
+        self.keyboard_shortcut_manager.manual_offset_requested.connect(self._on_manual_offset_shortcut)
+        self.keyboard_shortcut_manager.focus_output_requested.connect(self._on_focus_output_shortcut)
 
         # Note: Output settings are now shown in a dialog on Extract click
         # The output_settings_manager just tracks the suggested output name
@@ -738,6 +783,8 @@ class MainWindow(QMainWindow):
             offset: ROM offset to open in sprite editor
         """
         logger.info("Opening offset 0x%06X in sprite editor", offset)
+        if self.rom_extraction_panel.rom_path:
+            self.sprite_edit_tab.load_rom(self.rom_extraction_panel.rom_path)
         # Switch to sprite editor tab
         self.extraction_tabs.setCurrentIndex(2)
         # Jump to offset in sprite editor
@@ -905,76 +952,64 @@ class MainWindow(QMainWindow):
             if callable(cleanup_fn):
                 cleanup_fn()
 
+    # Keyboard shortcut handlers (called by KeyboardShortcutManager signals)
+
+    def _on_tab_switch_requested(self, index: int) -> None:
+        """Handle request to switch to specific tab.
+
+        Args:
+            index: Tab index (0=ROM, 1=VRAM, 2=Sprite Editor)
+        """
+        self.extraction_tabs.setCurrentIndex(index)
+
+    def _on_extract_shortcut(self) -> None:
+        """Handle F5 extract shortcut."""
+        if self.toolbar_manager.extract_button.isEnabled():
+            self.on_extract_clicked()
+
+    def _on_mesen_capture_shortcut(self) -> None:
+        """Handle F6 Mesen capture shortcut."""
+        offset = self.rom_extraction_panel.get_last_mesen_offset()
+        if offset is not None:
+            self._on_open_in_sprite_editor(offset)
+
+    def _on_manual_offset_shortcut(self) -> None:
+        """Handle Ctrl+M manual offset shortcut."""
+        if self.can_open_manual_offset_dialog():
+            self.open_manual_offset_dialog()
+
+    def _on_focus_output_shortcut(self) -> None:
+        """Handle Alt+N focus output name shortcut."""
+        # Try active panel's output field first
+        active_widget = self.extraction_tabs.currentWidget()
+
+        # Check if wrapped in ScrollArea (new structure)
+        if isinstance(active_widget, QScrollArea):
+            active_panel = active_widget.widget()
+        else:
+            active_panel = active_widget
+
+        output_edit = getattr(active_panel, "output_name_edit", None)
+
+        # Fallback to output settings manager (legacy/shared)
+        if output_edit is None:
+            output_edit = getattr(self.output_settings_manager, "output_name_edit", None)
+
+        if output_edit is not None:
+            output_edit.setFocus()
+            if hasattr(output_edit, "selectAll"):
+                output_edit.selectAll()
+
     @override
     def keyPressEvent(self, event: QKeyEvent | None) -> None:
-        """Handle keyboard shortcuts (inlined from KeyboardShortcutHandler)"""
+        """Handle keyboard shortcuts via KeyboardShortcutManager."""
         if not event:
             return
 
-        # Tab navigation: Ctrl+Tab / Ctrl+Shift+Tab
-        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            if event.key() == Qt.Key.Key_Tab:
-                self._navigate_to_next_tab()
-                event.accept()
-                return
-            # Ctrl+1/2/3: Direct tab switching
-            if event.key() == Qt.Key.Key_1:
-                self.extraction_tabs.setCurrentIndex(0)  # ROM Extraction
-                event.accept()
-                return
-            if event.key() == Qt.Key.Key_2:
-                self.extraction_tabs.setCurrentIndex(1)  # VRAM Extraction
-                event.accept()
-                return
-            if event.key() == Qt.Key.Key_3:
-                self.extraction_tabs.setCurrentIndex(2)  # Sprite Editor
-                event.accept()
-                return
-        elif event.modifiers() == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
-            if event.key() == Qt.Key.Key_Backtab:
-                self._navigate_to_previous_tab()
-                event.accept()
-                return
-
-        # F5 as alternative to Extract
-        if event.key() == Qt.Key.Key_F5 and self.toolbar_manager.extract_button.isEnabled():
-            self.on_extract_clicked()
+        # Delegate to keyboard shortcut manager
+        if self.keyboard_shortcut_manager.handle_key_press(event):
             event.accept()
             return
-
-        # F6: Jump to last Mesen2 capture in Sprite Editor
-        if event.key() == Qt.Key.Key_F6:
-            offset = self.rom_extraction_panel._recent_captures_widget.get_selected_offset()
-            if offset is not None:
-                self._on_open_in_sprite_editor(offset)
-                event.accept()
-                return
-
-        # Ctrl+M: Open Manual Offset Control (if in ROM extraction mode)
-        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
-            if event.key() == Qt.Key.Key_M:
-                if self.can_open_manual_offset_dialog():
-                    self.open_manual_offset_dialog()
-                    event.accept()
-                    return
-
-        # Alt+N: Focus output name field
-        if event.modifiers() == Qt.KeyboardModifier.AltModifier:
-            if event.key() == Qt.Key.Key_N:
-                # Try active panel's output field first
-                active_panel = self.extraction_tabs.currentWidget()
-                output_edit = getattr(active_panel, "output_name_edit", None)
-
-                # Fallback to output settings manager (legacy/shared)
-                if output_edit is None:
-                    output_edit = getattr(self.output_settings_manager, "output_name_edit", None)
-
-                if output_edit is not None:
-                    output_edit.setFocus()
-                    if hasattr(output_edit, "selectAll"):
-                        output_edit.selectAll()
-                    event.accept()
-                    return
 
         super().keyPressEvent(event)
 

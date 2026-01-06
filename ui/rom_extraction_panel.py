@@ -10,19 +10,17 @@ This panel coordinates ROM-based sprite extraction using:
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
-    QPushButton,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -37,11 +35,11 @@ if TYPE_CHECKING:
     from core.rom_validator import ROMHeader
     from core.services.rom_cache import ROMCache
     from core.types import SpritePreset
+    from ui.rom_extraction.modules import Mesen2Module
 
 from core.managers.workflow_state_manager import ExtractionState
 
 # Import extracted components
-from ui.components.panels import RecentCapturesWidget
 from ui.controllers import (
     ExtractionParamsController,
     ROMSessionController,
@@ -50,10 +48,11 @@ from ui.controllers import (
 from ui.rom_extraction import OffsetDialogManager, ROMWorkerOrchestrator, ScanController
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
+    ManualOffsetSection,
+    MesenCapturesSection,
     ROMFileWidget,
     SpriteSelectorWidget,
 )
-from ui.styles.components import get_manual_offset_button_style
 from ui.styles.theme import COLORS
 from utils.constants import (
     ROM_SIZE_4MB,
@@ -66,7 +65,6 @@ logger = get_logger(__name__)
 
 # UI Spacing Constants (imported from centralized module)
 from ui.common.spacing_constants import (
-    BUTTON_HEIGHT,
     SPACING_COMPACT_MEDIUM,
     SPACING_COMPACT_SMALL,
 )
@@ -84,6 +82,7 @@ class ROMExtractionPanel(QWidget):
 
     # Signals
     files_changed = Signal()
+    rom_loaded = Signal(str)  # Emitted when a ROM is successfully loaded
     extraction_ready = Signal(bool, str)  # (ready, reason_if_not_ready)
     rom_extraction_requested = Signal(str, int, str, str)  # rom_path, offset, output_base, sprite_name
     output_name_changed = Signal(str)  # Emit when output name changes in ROM panel
@@ -97,6 +96,7 @@ class ROMExtractionPanel(QWidget):
         extraction_manager: CoreOperationsManager,
         state_manager: ApplicationStateManager,
         rom_cache: ROMCache,
+        mesen2_module: Mesen2Module | None = None,
     ) -> None:
         super().__init__(parent)
 
@@ -106,6 +106,7 @@ class ROMExtractionPanel(QWidget):
         self.extraction_manager = extraction_manager
         self.state_manager = state_manager
         self.rom_cache = rom_cache
+        self._mesen2_module = mesen2_module
         self.rom_extractor: ROMExtractor = self.extraction_manager.get_rom_extractor()
         self.rom_size = 0  # Track ROM size for slider limits
         self._current_header: ROMHeader | None = None  # Stored header for preset matching
@@ -135,8 +136,8 @@ class ROMExtractionPanel(QWidget):
         self._offset_dialog_manager.offset_changed.connect(self._on_dialog_offset_changed)
         self._offset_dialog_manager.sprite_found.connect(self._on_dialog_sprite_found)
 
-        # Output name (set via signal from OutputSettingsManager)
-        self._output_name: str = ""
+        # Output name provider (set by MainWindow to read from OutputSettingsManager)
+        self._output_name_provider: Callable[[], str] | None = None
 
         # Connect controller signals
         self._params_controller.readiness_changed.connect(self.extraction_ready.emit)
@@ -163,25 +164,36 @@ class ROMExtractionPanel(QWidget):
         self._worker_orchestrator.similarity_finished.connect(self._on_similarity_finished)
         self._worker_orchestrator.similarity_error.connect(self._on_similarity_error)
 
+    def set_output_name_provider(self, provider: Callable[[], str]) -> None:
+        """Set the output name provider (reads from OutputSettingsManager).
+
+        Args:
+            provider: Callable that returns the current output name
+        """
+        self._output_name_provider = provider
+
     def set_output_name(self, name: str) -> None:
         """Set the output name (slot for OutputSettingsManager.output_name_changed signal).
+
+        Syncs the inline output name field with the main OutputSettingsManager.
 
         Args:
             name: The current output name string
         """
-        self._output_name = name
         if hasattr(self, "output_name_edit") and self.output_name_edit:
             self.output_name_edit.blockSignals(True)
             self.output_name_edit.setText(name)
             self.output_name_edit.blockSignals(False)
 
     def _get_output_name(self) -> str:
-        """Get the current output name.
+        """Get the current output name from the provider.
 
         Returns:
-            Output name string, or empty string if not set
+            Output name string, or empty string if provider not set
         """
-        return self._output_name
+        if self._output_name_provider is not None:
+            return self._output_name_provider()
+        return ""
 
     def _setup_ui(self):
         """Initialize the user interface"""
@@ -245,46 +257,20 @@ class ROMExtractionPanel(QWidget):
         Args:
             layout: Layout to add the widget to
         """
-        from core.app_context import get_app_context_optional
+        # Create MesenCapturesSection widget
+        self.mesen_captures_section = MesenCapturesSection(self)
+        layout.addWidget(self.mesen_captures_section)
 
-        self._recent_captures_widget = RecentCapturesWidget(self)
-        layout.addWidget(self._recent_captures_widget)
+        # Connect widget signals to panel handlers
+        self.mesen_captures_section.offset_selected.connect(self._on_mesen2_offset_selected)
+        self.mesen_captures_section.offset_activated.connect(self._on_mesen2_offset_activated)
+        self.mesen_captures_section.watching_changed.connect(self.mesen2_watching_changed.emit)
 
-        # Connect capture signals
-        self._recent_captures_widget.offset_selected.connect(self._on_mesen2_offset_selected)
-        self._recent_captures_widget.offset_activated.connect(self._on_mesen2_offset_activated)
-
-        # Connect to log watcher if available
-        context = get_app_context_optional()
-        if context is not None:
-            log_watcher = context.log_watcher
-            log_watcher.offset_discovered.connect(self._on_mesen2_offset_discovered)
-            log_watcher.watch_started.connect(lambda: self._recent_captures_widget.set_watching(True))
-            log_watcher.watch_stopped.connect(lambda: self._recent_captures_widget.set_watching(False))
-            # Also emit signal for main window status bar
-            log_watcher.watch_started.connect(lambda: self.mesen2_watching_changed.emit(True))
-            log_watcher.watch_stopped.connect(lambda: self.mesen2_watching_changed.emit(False))
-
-            # Start watching if log file exists
-            log_watcher.start_watching()
-
-            # Load persistent clicks from previous Mesen2 sessions
-            persistent_clicks = log_watcher.load_persistent_clicks()
-            if persistent_clicks:
-                self._recent_captures_widget.load_persistent(persistent_clicks)
-                logger.debug("Loaded %d persistent clicks", len(persistent_clicks))
-
-    def _on_mesen2_offset_discovered(self, capture: object) -> None:
-        """Handle new offset discovered from Mesen2 log.
-
-        Args:
-            capture: CapturedOffset from log watcher
-        """
-        from core.mesen_integration.log_watcher import CapturedOffset
-
-        if isinstance(capture, CapturedOffset):
-            self._recent_captures_widget.add_capture(capture)
-            logger.debug("Added Mesen2 capture: 0x%06X", capture.offset)
+        # Wire up log watcher if module provided (dependency injection)
+        if self._mesen2_module is not None:
+            # Module handles all LogWatcher connections and lifecycle
+            self._mesen2_module.connect_to_widget(self.mesen_captures_section)
+            logger.debug("Mesen2Module connected to captures widget")
 
     def _on_mesen2_offset_selected(self, offset: int) -> None:
         """Handle offset selection (single-click) from captures widget.
@@ -330,56 +316,10 @@ class ROMExtractionPanel(QWidget):
         Args:
             layout: Layout to add controls to
         """
-        # Create collapsible advanced section
-        advanced_row = QHBoxLayout()
-        advanced_row.setContentsMargins(0, 0, 0, 0)
-
-        self.advanced_toggle = QToolButton()
-        self.advanced_toggle.setText("Manual Offset Browser")
-        self.advanced_toggle.setCheckable(True)
-        self.advanced_toggle.setChecked(False)
-        self.advanced_toggle.setArrowType(Qt.ArrowType.RightArrow)
-        self.advanced_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.advanced_toggle.setToolTip(
-            "Manually browse sprites at any ROM offset\ninstead of using the preset sprite list above"
-        )
-        self.advanced_toggle.setStyleSheet(
-            "QToolButton { border: none; padding: 4px; font-weight: bold; }"
-            "QToolButton:hover { background-color: rgba(255, 255, 255, 0.1); }"
-            "QToolButton::right-arrow { subcontrol-position: center left; }"
-            "QToolButton::down-arrow { subcontrol-position: center left; }"
-        )
-        self.advanced_toggle.toggled.connect(self._on_advanced_toggled)
-        advanced_row.addWidget(self.advanced_toggle)
-
-        # Persistent manual offset indicator
-        self.manual_offset_display = QLabel("")
-        self.manual_offset_display.setStyleSheet(f"color: {COLORS['highlight']}; font-weight: bold;")
-        self.manual_offset_display.setVisible(False)
-        advanced_row.addWidget(self.manual_offset_display)
-
-        advanced_row.addStretch()
-
-        layout.addLayout(advanced_row)
-
-        # Create and style the manual offset button (hidden by default)
-        self.manual_offset_button = self._create_manual_offset_button()
-        self.manual_offset_button.setVisible(False)  # Hidden until advanced section expanded
-        layout.addWidget(self.manual_offset_button)
-
-    def _create_manual_offset_button(self) -> QPushButton:
-        """Create and configure the manual offset control button.
-
-        Returns:
-            QPushButton: The configured button
-        """
-        button = QPushButton("Browse Sprites (Ctrl+M)")
-        button.setMinimumHeight(BUTTON_HEIGHT)  # Standard button height
-        _ = button.clicked.connect(self._open_manual_offset_dialog)
-        button.setVisible(True)  # Always visible (enabled/disabled based on mode)
-        button.setToolTip("Open advanced sprite browser to explore ROM offsets manually\nKeyboard shortcut: Ctrl+M")
-        button.setStyleSheet(get_manual_offset_button_style())
-        return button
+        # Create manual offset section widget
+        self.manual_offset_section = ManualOffsetSection()
+        self.manual_offset_section.browse_clicked.connect(self.open_manual_offset_dialog)
+        layout.addWidget(self.manual_offset_section)
 
     def _add_output_controls(self, layout: QVBoxLayout):
         """Add output and CGRAM controls to the layout.
@@ -402,8 +342,10 @@ class ROMExtractionPanel(QWidget):
         layout.addWidget(self.cgram_selector_widget)
 
     def _on_output_name_text_changed(self, text: str) -> None:
-        """Handle output name text change from inline field."""
-        self._output_name = text
+        """Handle output name text change from inline field.
+
+        Emits signal to notify MainWindow, which updates OutputSettingsManager.
+        """
         self.output_name_changed.emit(text)
         self._check_extraction_ready()
 
@@ -475,6 +417,7 @@ class ROMExtractionPanel(QWidget):
 
             # Notify that files changed
             self.files_changed.emit()
+            self.rom_loaded.emit(filename)
 
             # Auto-fill output name from ROM filename if not already set
             if not self._get_output_name():
@@ -538,11 +481,11 @@ class ROMExtractionPanel(QWidget):
         self._load_rom_sprites()
         self._init_similarity_indexing()
 
-    def _open_manual_offset_dialog(self) -> None:
+    def open_manual_offset_dialog(self) -> None:
         """Open the manual offset control dialog using manager."""
         from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
 
-        logger.debug("_open_manual_offset_dialog called")
+        logger.debug("open_manual_offset_dialog called")
 
         if not self.rom_path:
             UserErrorDialog.display_error(
@@ -782,6 +725,18 @@ class ROMExtractionPanel(QWidget):
             logger.exception("Error in _check_extraction_ready")
             self.extraction_ready.emit(False, "Internal error")
 
+    def get_last_mesen_offset(self) -> int | None:
+        """Get the last selected Mesen2 capture offset.
+
+        This is a public interface to the Mesen2 captures widget. When the user
+        clicks on a captured sprite offset from Mesen2, this method returns that
+        offset so the UI can jump to it in the sprite editor or offset dialog.
+
+        Returns:
+            The offset if one is selected, None otherwise.
+        """
+        return self.mesen_captures_section.get_selected_offset()
+
     def get_extraction_params(self) -> dict[str, object] | None:
         """Get parameters for ROM extraction using controller.
 
@@ -882,12 +837,9 @@ class ROMExtractionPanel(QWidget):
         Args:
             expanded: Whether the advanced section is expanded
         """
-        # Update arrow direction
-        arrow = Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow
-        self.advanced_toggle.setArrowType(arrow)
-
-        # Show/hide manual offset button
-        self.manual_offset_button.setVisible(expanded)
+        # Widget handles its own toggle state - this is now just a placeholder
+        # for any additional logic needed when section expands/collapses
+        pass
 
     def _on_mode_changed(self, is_manual: bool) -> None:
         """Handle extraction mode change.
@@ -900,11 +852,12 @@ class ROMExtractionPanel(QWidget):
         self.sprite_selector_widget.setEnabled(not is_manual)
 
         # Update manual offset indicator
-        if hasattr(self, "manual_offset_display"):
-            self.manual_offset_display.setVisible(is_manual)
+        if hasattr(self, "manual_offset_section"):
             if is_manual:
                 offset = self._params_controller.manual_offset
-                self.manual_offset_display.setText(f"Manual offset: 0x{offset:06X}")
+                self.manual_offset_section.set_offset_display(f"Manual offset: 0x{offset:06X}")
+            else:
+                self.manual_offset_section.set_offset_display("")
 
     def _on_state_changed(self, old_state: ExtractionState, new_state: ExtractionState):
         """Handle state changes to update UI accordingly"""
@@ -913,21 +866,17 @@ class ROMExtractionPanel(QWidget):
             # Re-enable all controls
             if self.rom_file_widget:
                 self.rom_file_widget.setEnabled(True)
-            if hasattr(self, "advanced_toggle") and self.advanced_toggle:
-                self.advanced_toggle.setEnabled(True)
+            if hasattr(self, "manual_offset_section"):
+                self.manual_offset_section.setEnabled(True)
             self.sprite_selector_widget.set_find_button_enabled(True)
-            if self.manual_offset_button:
-                self.manual_offset_button.setEnabled(True)
 
         elif new_state in {ExtractionState.LOADING_ROM, ExtractionState.EXTRACTING}:
             # Disable all controls during critical operations
             if self.rom_file_widget:
                 self.rom_file_widget.setEnabled(False)
-            if hasattr(self, "advanced_toggle") and self.advanced_toggle:
-                self.advanced_toggle.setEnabled(False)
+            if hasattr(self, "manual_offset_section"):
+                self.manual_offset_section.setEnabled(False)
             self.sprite_selector_widget.set_find_button_enabled(False)
-            if self.manual_offset_button:
-                self.manual_offset_button.setEnabled(False)
 
         elif new_state == ExtractionState.SCANNING_SPRITES:
             # Disable sprite selection during scan
@@ -935,8 +884,8 @@ class ROMExtractionPanel(QWidget):
 
         elif new_state == ExtractionState.SEARCHING_SPRITE:
             # Disable navigation during search
-            if self.manual_offset_button:
-                self.manual_offset_button.setEnabled(False)
+            if hasattr(self, "manual_offset_section"):
+                self.manual_offset_section.set_browse_enabled(False)
 
         # Log state transitions for debugging
         logger.debug(f"State transition: {old_state.name} -> {new_state.name}")

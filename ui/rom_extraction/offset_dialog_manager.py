@@ -81,6 +81,7 @@ class OffsetDialogManager(QObject):
     def _create_dialog(self) -> UnifiedManualOffsetDialog:
         """Create the dialog instance with injected dependencies."""
         from core.app_context import get_app_context
+        from ui.common.modules.preview_module import PreviewModule
         from ui.dialogs import UnifiedManualOffsetDialog
 
         # Get dependencies from AppContext
@@ -90,12 +91,16 @@ class OffsetDialogManager(QObject):
         extraction_manager = context.core_operations_manager
         rom_extractor = extraction_manager.get_rom_extractor()
 
+        # Create PreviewModule for dependency injection
+        preview_module = PreviewModule(rom_extractor=rom_extractor, parent=None)
+
         dialog = UnifiedManualOffsetDialog(
             parent=self._parent_widget,
             rom_cache=rom_cache,
             settings_manager=settings_manager,
             extraction_manager=extraction_manager,
             rom_extractor=rom_extractor,
+            preview_module=preview_module,
         )
         return dialog
 

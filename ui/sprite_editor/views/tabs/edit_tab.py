@@ -54,6 +54,7 @@ class EditTab(QWidget):
 
         # Create splitter for resizable layout
         splitter = QSplitter()
+        splitter.setChildrenCollapsible(False)
 
         # Left side: Tool panels
         left_panel = QWidget()
@@ -90,7 +91,6 @@ class EditTab(QWidget):
         actions_layout.addWidget(self.inject_btn)
 
         left_layout.addLayout(actions_layout)
-        left_layout.addStretch()
 
         splitter.addWidget(left_panel)
 
@@ -116,6 +116,8 @@ class EditTab(QWidget):
 
         # Set splitter sizes (left panel: 250px, canvas: rest)
         splitter.setSizes([250, 600])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
 
         main_layout.addWidget(splitter)
 

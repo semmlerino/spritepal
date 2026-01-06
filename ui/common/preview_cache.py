@@ -19,15 +19,15 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Type alias for preview data tuple: (tile_data, width, height, sprite_name)
-PreviewData = tuple[bytes, int, int, str | None]
+# Type alias for preview data tuple: (tile_data, width, height, sprite_name, compressed_size)
+PreviewData = tuple[bytes, int, int, str | None, int]
 
 
 def _calculate_preview_size(data: PreviewData) -> int:
     """Calculate byte size of preview data tuple."""
-    tile_data, _width, _height, sprite_name = data
+    tile_data, _width, _height, sprite_name, _compressed_size = data
     name_len = len(sprite_name) if sprite_name else 0
-    return len(tile_data) + name_len + 16  # Rough size estimate
+    return len(tile_data) + name_len + 20  # Rough size estimate
 
 
 class SpritePreviewCache(BaseLRUCache[PreviewData]):
@@ -97,11 +97,11 @@ class SpritePreviewCache(BaseLRUCache[PreviewData]):
             key: Cache key
 
         Returns:
-            Tuple of (tile_data, width, height, sprite_name) or empty tuple if not found
+            Tuple of (tile_data, width, height, sprite_name, compressed_size) or empty tuple if not found
         """
         result = super().get(key)
         if result is None:
-            return (b"", 0, 0, None)
+            return (b"", 0, 0, None, 0)
         return result
 
     @override

@@ -105,6 +105,40 @@ class ImageConverter:
         except (OSError, AttributeError) as e:
             raise RuntimeError(f"Error converting PNG: {e}") from e
 
+    def image_to_tiles(self, img: Image.Image) -> bytes:
+        """
+        Convert an in-memory indexed image to SNES 4bpp tile data.
+
+        Args:
+            img: PIL Image in indexed (P) mode.
+
+        Returns:
+            Tile data bytes.
+        """
+        if img.mode != "P":
+            raise ValueError(f"Image must be in indexed color mode (current: {img.mode})")
+
+        width, height = img.size
+        tiles_x, tiles_y, _ = calculate_tile_grid_padded(width, height)
+        pixels = list(cast(Iterable[int], img.getdata()))
+
+        output_data = bytearray()
+        padded_count = [0]
+
+        for tile_y_idx in range(tiles_y):
+            for tile_x_idx in range(tiles_x):
+                tile_pixels = self._extract_tile_from_image(pixels, tile_x_idx, tile_y_idx, width, padded_count)
+                tile_data = encode_4bpp_tile(tile_pixels)
+                output_data.extend(tile_data)
+
+        if padded_count[0] > 0:
+            logger.warning(
+                f"{padded_count[0]} pixel(s) were out of bounds and "
+                "padded with transparent (0). Image may not be tile-aligned."
+            )
+
+        return bytes(output_data)
+
     def validate_png(self, png_file: str) -> tuple[bool, list[str]]:
         """
         Validate PNG file is suitable for SNES conversion.

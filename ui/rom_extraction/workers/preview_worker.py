@@ -24,8 +24,8 @@ class SpritePreviewWorker(BaseWorker):
     """Worker thread for loading sprite previews"""
 
     # Custom signals (BaseWorker provides progress, error, warning, operation_finished)
-    preview_ready = Signal(bytes, int, int, str)
-    """Emitted when preview is ready. Args: tile_data (bytes), width (pixels), height (pixels), sprite_name."""
+    preview_ready = Signal(bytes, int, int, str, int)
+    """Emitted when preview is ready. Args: tile_data (bytes), width (pixels), height (pixels), sprite_name, compressed_size."""
 
     preview_error = Signal(str)
     """Emitted on preview error. Args: error_message."""
@@ -259,7 +259,7 @@ class SpritePreviewWorker(BaseWorker):
             width = min(tiles_per_row * 8, 128)
             height = min(tile_rows * 8, 128)
 
-            self.preview_ready.emit(tile_data, width, height, self.sprite_name)
+            self.preview_ready.emit(tile_data, width, height, self.sprite_name, compressed_size)
             self.operation_finished.emit(True, f"Preview loaded for {self.sprite_name}")
 
         except Exception as e:

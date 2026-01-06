@@ -56,6 +56,7 @@ from PySide6.QtWidgets import (
 
 from ui.common import SpriteSearchCoordinator, WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
+from ui.common.modules.preview_module import PreviewModule
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.common.spacing_constants import SPACING_SMALL, SPACING_STANDARD
 from ui.styles.theme import COLORS
@@ -112,6 +113,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         settings_manager: ApplicationStateManager,
         extraction_manager: CoreOperationsManager,
         rom_extractor: ROMExtractor | None = None,
+        preview_module: PreviewModule | None = None,
     ) -> None:
         # Debug logging for singleton tracking
         logger.debug(
@@ -160,6 +162,10 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Worker references (preview worker still managed here)
         self.preview_worker: SpritePreviewWorker | None = None
         # Note: search_worker, _sprite_scan_worker, _scan_progress_dialog now managed by SpriteSearchCoordinator
+
+        # Preview module - injected or created internally
+        self._preview_module: PreviewModule | None = preview_module
+        self._preview_module_injected = preview_module is not None
 
         # Preview coordinator handles preview generation (Smart or Simple based on env flag)
         self._smart_preview_coordinator: SmartPreviewCoordinator | None = None
@@ -365,21 +371,29 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     def _setup_smart_preview_coordinator(self):
         """Set up SmartPreviewCoordinator for efficient preview generation."""
-        coordinator = SmartPreviewCoordinator(self)
-        self._smart_preview_coordinator = coordinator
-        assert self._smart_preview_coordinator is not None  # Just assigned
+        # If preview module was injected, use its coordinator
+        if self._preview_module is not None:
+            self._smart_preview_coordinator = self._preview_module.coordinator
+            logger.debug("Using injected preview module's coordinator")
+        else:
+            # Create coordinator internally for backward compatibility
+            coordinator = SmartPreviewCoordinator(self)
+            self._smart_preview_coordinator = coordinator
+            logger.debug("Created internal SmartPreviewCoordinator")
+
+        assert self._smart_preview_coordinator is not None
 
         # Use AutoConnection (default) to let Qt choose the best connection type
-        coordinator.preview_ready.connect(self._on_smart_preview_ready)
-        coordinator.preview_cached.connect(self._on_smart_preview_cached)
-        coordinator.preview_error.connect(self._on_smart_preview_error)
+        self._smart_preview_coordinator.preview_ready.connect(self._on_smart_preview_ready)
+        self._smart_preview_coordinator.preview_cached.connect(self._on_smart_preview_cached)
+        self._smart_preview_coordinator.preview_error.connect(self._on_smart_preview_error)
 
         # Setup ROM data provider
-        coordinator.set_rom_data_provider(self._get_rom_data_for_preview)
+        self._smart_preview_coordinator.set_rom_data_provider(self._get_rom_data_for_preview)
 
         # Connect cache-related signals
-        coordinator.preview_ready.connect(self._on_cache_miss)
-        coordinator.preview_cached.connect(self._on_cache_hit)
+        self._smart_preview_coordinator.preview_ready.connect(self._on_cache_miss)
+        self._smart_preview_coordinator.preview_cached.connect(self._on_cache_hit)
 
         logger.debug("Smart preview coordinator setup complete")
 
@@ -542,13 +556,13 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                 self.preview_worker.preview_error.connect(self._on_preview_error)
                 self.preview_worker.start()
 
-    def _on_preview_ready(self, tile_data: bytes, width: int, height: int, sprite_name: str):
+    def _on_preview_ready(self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int):
         """Handle preview ready."""
         if self.preview_widget is not None:
             self.preview_widget.load_sprite_from_4bpp(tile_data, width, height, sprite_name)
 
         current_offset = self.get_current_offset()
-        self._update_status(f"Sprite found at 0x{current_offset:06X}")
+        self._update_status(f"Sprite found at 0x{current_offset:06X} (size: {compressed_size} bytes)")
 
     def _on_preview_error(self, error_msg: str):
         """Handle preview error."""
@@ -594,7 +608,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             self._preview_timer.stop()
 
         # Signal coordinator cleanup handled by SmartPreviewCoordinator
-        if self._smart_preview_coordinator is not None:
+        # Only cleanup if we created it (not injected via PreviewModule)
+        if self._smart_preview_coordinator is not None and not self._preview_module_injected:
             self._smart_preview_coordinator.cleanup()
 
         # Cleanup cache controller
@@ -756,11 +771,13 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                 return None
             return (self.rom_path, self.rom_extractor)
 
-    def _on_smart_preview_ready(self, tile_data: bytes, width: int, height: int, sprite_name: str):
+    def _on_smart_preview_ready(
+        self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int
+    ):
         """Handle preview ready from smart coordinator with guaranteed UI updates."""
         logger.info("[PREVIEW_READY] ========== START ===========")
         logger.info(
-            f"[PREVIEW_READY] data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}"
+            f"[PREVIEW_READY] data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}, compressed_size={compressed_size}"
         )
         logger.debug(f"[PREVIEW_READY] tile_data first 20 bytes: {tile_data[:20].hex() if tile_data else 'None'}")
 
@@ -820,10 +837,12 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         logger.info("[PREVIEW_READY] ========== END ===========")
 
-    def _on_smart_preview_cached(self, tile_data: bytes, width: int, height: int, sprite_name: str):
+    def _on_smart_preview_cached(
+        self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int
+    ):
         """Handle cached preview from smart coordinator."""
         logger.debug(
-            f"[SIGNAL_RECEIVED] _on_smart_preview_cached called: data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}"
+            f"[SIGNAL_RECEIVED] _on_smart_preview_cached called: data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}, compressed_size={compressed_size}"
         )
         logger.debug(
             f"[SIGNAL_RECEIVED] cached tile_data first 20 bytes: {tile_data[:20].hex() if tile_data else 'None'}"

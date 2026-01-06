@@ -36,6 +36,7 @@ Run from `spritepal/`:
 ## Configuration & Environment
 - Tooling config lives in `pyproject.toml` (ruff, basedpyright, pytest).
 - Useful vars: `PYTEST_TIMEOUT_MULTIPLIER`, `SPRITEPAL_EXHAL_PATH`, `SPRITEPAL_INHAL_PATH`, `SPRITEPAL_LEAK_MODE`. Tests set `QT_QPA_PLATFORM=offscreen`.
+- PySide6 is installed in the project venv.
 
 ## Mesen2 Integration Notes
 - For unclear Mesen2 behavior, consult the local source and trace implementation details:

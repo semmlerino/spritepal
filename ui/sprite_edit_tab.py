@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from ui.sprite_editor.controllers.main_controller import MainController
 from ui.sprite_editor.views.tabs import EditTab, ExtractTab, InjectTab, MultiPaletteTab
+from ui.sprite_editor.views.tabs.rom_workflow_tab import ROMWorkflowTab
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
@@ -78,7 +79,7 @@ class SpriteEditTab(QWidget):
         header = self._create_header()
         layout.addWidget(header)
 
-        # Internal tab widget with 4 tabs
+        # Internal tab widget
         self._tab_widget = QTabWidget()
         self._tab_widget.currentChanged.connect(self._on_internal_tab_changed)
 
@@ -87,18 +88,24 @@ class SpriteEditTab(QWidget):
         self._edit_tab = EditTab()
         self._inject_tab = InjectTab(settings_manager=self._settings_manager)
         self._multi_palette_tab = MultiPaletteTab()
+        self._rom_workflow_tab = ROMWorkflowTab(edit_tab=self._edit_tab)
 
         # Add tabs
         self._tab_widget.addTab(self._extract_tab, "Extract")
         self._tab_widget.addTab(self._edit_tab, "Edit")
         self._tab_widget.addTab(self._inject_tab, "Inject")
         self._tab_widget.addTab(self._multi_palette_tab, "Multi-Palette")
+        self._tab_widget.addTab(self._rom_workflow_tab, "ROM Workflow")
+
+        # Hide ROM Workflow tab by default (index 4)
+        self._tab_widget.setTabVisible(4, False)
 
         # Hide "Pop Out Editor" button in embedded mode (workflow clarity)
         if hasattr(self._edit_tab, "detach_btn"):
             self._edit_tab.detach_btn.hide()
 
-        layout.addWidget(self._tab_widget)
+        # Add tab widget with stretch factor to fill available space
+        layout.addWidget(self._tab_widget, 1)
 
     def _create_header(self) -> QWidget:
         """Create header with action buttons."""
@@ -140,22 +147,62 @@ class SpriteEditTab(QWidget):
         self._controller.extraction_controller.set_view(self._extract_tab)
         self._controller.editing_controller.set_view(self._edit_tab)
         self._controller.injection_controller.set_view(self._inject_tab)
-        self._controller.extraction_controller.set_multi_palette_view(
-            self._multi_palette_tab
-        )
+        self._controller.extraction_controller.set_multi_palette_view(self._multi_palette_tab)
+        self._controller.rom_workflow_controller.set_view(self._rom_workflow_tab)
 
         # Connect undo/redo state updates
-        self._controller.editing_controller.undoStateChanged.connect(
-            self._update_undo_state
-        )
+        self._controller.editing_controller.undoStateChanged.connect(self._update_undo_state)
 
         # Connect edit tab workflow signals
         self._edit_tab.ready_for_inject.connect(self._on_ready_for_inject)
 
         # Connect mode change
         self.mode_changed.connect(self._controller.set_mode)
+        self.mode_changed.connect(self._on_mode_switched)
 
         logger.debug("Controllers wired to embedded tabs")
+
+    def _on_mode_switched(self, mode: str) -> None:
+        """Handle UI switching between VRAM and ROM workflows."""
+        is_rom = mode == "rom"
+        logger.info("Mode switched to: %s", mode)
+
+        if is_rom:
+            # Move EditTab to ROM workflow container
+            self._rom_workflow_tab.edit_tab_layout.addWidget(self._edit_tab)
+
+            # Hide VRAM tabs, show ROM Workflow
+            for i in range(4):
+                self._tab_widget.setTabVisible(i, False)
+            self._tab_widget.setTabVisible(4, True)
+            self._tab_widget.setCurrentIndex(4)
+
+            # Force visibility on all ROM workflow components
+            self._rom_workflow_tab.show()
+            self._rom_workflow_tab.main_splitter.show()
+            self._rom_workflow_tab.left_panel.show()
+            self._rom_workflow_tab.edit_tab_container.show()
+            self._edit_tab.show()
+
+            # Force layout update
+            self._tab_widget.update()
+            self._rom_workflow_tab.update()
+
+            logger.info(
+                "ROM Workflow: tab visible=%s, current=%s, rom_tab size=%s",
+                self._tab_widget.isTabVisible(4),
+                self._tab_widget.currentIndex(),
+                self._rom_workflow_tab.size(),
+            )
+        else:
+            # Move EditTab back to TabWidget at index 1
+            self._tab_widget.insertTab(1, self._edit_tab, "Edit")
+
+            # Show VRAM tabs, hide ROM Workflow
+            for i in range(4):
+                self._tab_widget.setTabVisible(i, True)
+            self._tab_widget.setTabVisible(4, False)
+            self._tab_widget.setCurrentIndex(0)
 
     def _update_undo_state(self, can_undo: bool, can_redo: bool) -> None:
         """Sync undo/redo button state from editing controller."""
@@ -184,9 +231,17 @@ class SpriteEditTab(QWidget):
         """Set the editor mode ('vram' or 'rom')."""
         index = self._mode_combo.findData(mode)
         if index >= 0:
-            self._mode_combo.setCurrentIndex(index)
+            if self._mode_combo.currentIndex() == index:
+                # Already at this index, manually trigger the mode switch
+                self._on_mode_switched(mode)
+            else:
+                self._mode_combo.setCurrentIndex(index)
 
     # Public API
+
+    def load_rom(self, path: str) -> None:
+        """Load a ROM into the sprite editor."""
+        self._controller.rom_workflow_controller.load_rom(path)
 
     def jump_to_offset(self, offset: int) -> None:
         """
@@ -202,11 +257,8 @@ class SpriteEditTab(QWidget):
         # Switch to ROM mode
         self.set_mode("rom")
 
-        # Switch to extract tab
-        self._tab_widget.setCurrentIndex(0)
-
-        # Set the offset in the extract tab
-        self._extract_tab.set_offset(offset)
+        # Use ROM workflow controller
+        self._controller.rom_workflow_controller.set_offset(offset)
         self.status_message.emit(f"Offset set to 0x{offset:06X}")
 
     def switch_to_extract(self) -> None:

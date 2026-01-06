@@ -109,7 +109,9 @@ class LibraryTab(QWidget):
         self._grid_widget = QListWidget(parent=self)
         self._grid_widget.setViewMode(QListWidget.ViewMode.IconMode)
         self._grid_widget.setIconSize(self._grid_widget.iconSize().scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio))
-        self._grid_widget.setGridSize(self._grid_widget.gridSize().scaled(80, 100, Qt.AspectRatioMode.IgnoreAspectRatio))
+        self._grid_widget.setGridSize(
+            self._grid_widget.gridSize().scaled(80, 100, Qt.AspectRatioMode.IgnoreAspectRatio)
+        )
         self._grid_widget.setSpacing(8)
         self._grid_widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._grid_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -120,8 +122,8 @@ class LibraryTab(QWidget):
         # Style the grid
         self._grid_widget.setStyleSheet(f"""
             QListWidget {{
-                background-color: {COLORS['background']};
-                border: 1px solid {COLORS['border']};
+                background-color: {COLORS["background"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 4px;
             }}
             QListWidget::item {{
@@ -129,11 +131,11 @@ class LibraryTab(QWidget):
                 border-radius: 4px;
             }}
             QListWidget::item:selected {{
-                background-color: {COLORS['accent']};
-                color: {COLORS['background']};
+                background-color: {COLORS["accent"]};
+                color: {COLORS["background"]};
             }}
             QListWidget::item:hover:!selected {{
-                background-color: {COLORS['panel_background']};
+                background-color: {COLORS["panel_background"]};
             }}
         """)
 

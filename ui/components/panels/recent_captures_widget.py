@@ -100,13 +100,12 @@ class RecentCapturesWidget(QWidget):
         self._list_widget.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._list_widget.setMinimumHeight(100)
-        self._list_widget.setMaximumHeight(200)
 
         # Style the list
         self._list_widget.setStyleSheet(f"""
             QListWidget {{
-                background-color: {COLORS['background']};
-                border: 1px solid {COLORS['border']};
+                background-color: {COLORS["background"]};
+                border: 1px solid {COLORS["border"]};
                 border-radius: 4px;
                 font-family: monospace;
                 font-size: 12px;
@@ -115,11 +114,11 @@ class RecentCapturesWidget(QWidget):
                 padding: 4px 8px;
             }}
             QListWidget::item:selected {{
-                background-color: {COLORS['accent']};
-                color: {COLORS['background']};
+                background-color: {COLORS["accent"]};
+                color: {COLORS["background"]};
             }}
             QListWidget::item:hover:!selected {{
-                background-color: {COLORS['panel_background']};
+                background-color: {COLORS["panel_background"]};
             }}
         """)
 

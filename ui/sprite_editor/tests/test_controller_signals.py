@@ -19,11 +19,13 @@ from tests.fixtures.timeouts import signal_timeout
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
 
+    from tests.fixtures.core_fixtures import AppContextFixture
+
 
 class TestExtractionControllerSignalFix:
     """Tests that ExtractionController uses finished_signal correctly."""
 
-    def test_extract_sprites_connects_to_finished_signal(self, qtbot: QtBot) -> None:
+    def test_extract_sprites_connects_to_finished_signal(self, qtbot: QtBot, app_context: AppContextFixture) -> None:
         """Verify extract_sprites connects to finished_signal, not finished.
 
         This test verifies runtime behavior by checking signal connection counts.
@@ -66,7 +68,9 @@ class TestExtractionControllerSignalFix:
             # Verify QThread.finished was NOT connected
             mock_worker.finished.connect.assert_not_called()
 
-    def test_extract_multi_palette_connects_to_finished_signal(self, qtbot: QtBot) -> None:
+    def test_extract_multi_palette_connects_to_finished_signal(
+        self, qtbot: QtBot, app_context: AppContextFixture
+    ) -> None:
         """Verify extract_multi_palette connects to finished_signal."""
         from ui.sprite_editor.controllers.extraction_controller import ExtractionController
         from ui.sprite_editor.workers import MultiPaletteExtractWorker
@@ -104,7 +108,7 @@ class TestExtractionControllerSignalFix:
         assert hasattr(ExtractionController, "_cleanup_worker")
         assert callable(ExtractionController._cleanup_worker)
 
-    def test_cleanup_worker_disconnects_signals(self) -> None:
+    def test_cleanup_worker_disconnects_signals(self, app_context: AppContextFixture) -> None:
         """Verify _cleanup_worker actually disconnects signals."""
         from ui.sprite_editor.controllers.extraction_controller import ExtractionController
 
@@ -198,7 +202,7 @@ class TestInjectionControllerSignalFix:
 class TestMainControllerTempFiles:
     """Tests for MainController temp file cleanup."""
 
-    def test_temp_file_list_initialized(self) -> None:
+    def test_temp_file_list_initialized(self, app_context: AppContextFixture) -> None:
         """Test that temp files list is initialized."""
         from ui.sprite_editor.controllers.main_controller import MainController
 
@@ -213,7 +217,7 @@ class TestMainControllerTempFiles:
 
         assert hasattr(MainController, "_cleanup_temp_files")
 
-    def test_temp_file_cleanup(self, tmp_path: Path) -> None:
+    def test_temp_file_cleanup(self, tmp_path: Path, app_context: AppContextFixture) -> None:
         """Test that temp files are cleaned up."""
         from ui.sprite_editor.controllers.main_controller import MainController
 
@@ -236,7 +240,7 @@ class TestMainControllerTempFiles:
         assert not temp_file.exists()
         assert len(controller._temp_files) == 0
 
-    def test_cleanup_handles_missing_files(self, tmp_path: Path) -> None:
+    def test_cleanup_handles_missing_files(self, tmp_path: Path, app_context: AppContextFixture) -> None:
         """Test that cleanup handles already-deleted files gracefully."""
         from ui.sprite_editor.controllers.main_controller import MainController
 
@@ -250,7 +254,7 @@ class TestMainControllerTempFiles:
 
         assert len(controller._temp_files) == 0
 
-    def test_injection_completed_triggers_cleanup(self, qtbot: QtBot) -> None:
+    def test_injection_completed_triggers_cleanup(self, qtbot: QtBot, app_context: AppContextFixture) -> None:
         """Verify _on_injection_completed calls _cleanup_temp_files."""
         from ui.sprite_editor.controllers.main_controller import MainController
 

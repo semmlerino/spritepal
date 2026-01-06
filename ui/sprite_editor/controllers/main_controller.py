@@ -14,6 +14,7 @@ from PySide6.QtCore import QObject, Signal
 from .editing_controller import EditingController
 from .extraction_controller import ExtractionController
 from .injection_controller import InjectionController
+from .rom_workflow_controller import ROMWorkflowController
 
 if TYPE_CHECKING:
     from ..views.main_window import SpriteEditorMainWindow
@@ -24,7 +25,7 @@ class MainController(QObject):
 
     # Signals
     status_message = Signal(str)
-    workflow_state_changed = Signal(str)  # 'extract', 'edit', 'inject'
+    workflow_state_changed = Signal(str)  # 'extract', 'edit', 'inject', 'rom_workflow'
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -33,6 +34,7 @@ class MainController(QObject):
         self.extraction_controller = ExtractionController(self)
         self.editing_controller = EditingController(self)
         self.injection_controller = InjectionController(self)
+        self.rom_workflow_controller = ROMWorkflowController(self)
 
         # Main window reference
         self._main_window: SpriteEditorMainWindow | None = None

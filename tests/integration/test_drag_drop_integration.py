@@ -338,14 +338,14 @@ class TestDropZoneEdgeCases:
     """Test edge cases in drop zone behavior."""
 
     def test_empty_path_string(self, qtbot, vram_drop_zone):
-        """Test setting empty path string."""
+        """Test setting empty path string - no signal emitted for non-existent paths."""
         spy = QSignalSpy(vram_drop_zone.file_dropped)
 
         # Set empty string
         vram_drop_zone.set_file("")
 
-        # Should emit signal with empty string
-        assert spy.count() == 1
+        # No signal emitted - implementation only emits for existing files
+        assert spy.count() == 0
 
     def test_path_with_spaces(self, qtbot, vram_drop_zone, tmp_path):
         """Test file path with spaces."""

@@ -370,13 +370,19 @@ The main SpritePal window has 3 extraction tabs:
 - **Tab 2**: Sprite Editor (embedded)
 
 The Sprite Editor tab embeds the full 4-step workflow without menus/toolbar/statusbar:
-1. Extract tab - Load sprites from ROM offset
+1. Extract tab - Load sprites from ROM offset or VRAM dump
 2. Edit tab - Modify sprite pixels and palettes
-3. Inject tab - Repack modified sprites back to ROM
+3. Inject tab - Repack modified sprites back to ROM or VRAM
 4. Multi-Palette tab - Manage alternative palettes
+
+**Modes:**
+The editor has a **Mode Toggle** (ROM | VRAM) in the header:
+- **ROM Mode**: Operates directly on ROM files using offsets (default for Mesen2 captures).
+- **VRAM Mode**: Operates on emulator VRAM/CGRAM dumps.
 
 ```
 SpriteEditTab (ui/sprite_edit_tab.py)
+├── Header (Mode Toggle: ROM/VRAM)
 ├── MainController (from sprite_editor subsystem)
 │   ├── ExtractionController
 │   ├── EditingController
@@ -406,8 +412,9 @@ MainWindow._on_open_in_sprite_editor(offset)
          ├── Switch to Sprite Editor tab (index 2)
          │
          └── SpriteEditTab.jump_to_offset(offset)
+             ├── Switch to ROM Mode
              ├── Switch to Extract subtab
-             ├── Set offset in ExtractTab._offset_input
+             ├── Set offset in ExtractTab
              └── Emit status_message signal
 ```
 

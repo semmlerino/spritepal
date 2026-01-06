@@ -261,7 +261,9 @@ class MultiPaletteTab(QWidget):
         self.oam_file_edit.setReadOnly(True)
         self.oam_file_edit.setPlaceholderText("Optional: OAM enables palette filtering")
         self.oam_browse_btn = QPushButton("Load OAM (Optional)")
-        self.oam_browse_btn.setToolTip("OAM file enables palette filtering.\nWithout it, all 16 palettes will be shown.")
+        self.oam_browse_btn.setToolTip(
+            "OAM file enables palette filtering.\nWithout it, all 16 palettes will be shown."
+        )
         self.oam_browse_btn.clicked.connect(self.browse_oam_requested.emit)
 
         controls_layout.addWidget(QLabel("OAM:"))

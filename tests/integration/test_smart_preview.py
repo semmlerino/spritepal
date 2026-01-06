@@ -112,7 +112,7 @@ class TestSmartPreviewMemoryCache:
 
     def test_memory_cache_hit(self, coordinator):
         """Test memory cache hit returns cached data."""
-        cached_data = (b"test_tile_data\x01\x02", 16, 16, "test_sprite")
+        cached_data = (b"test_tile_data\x01\x02", 16, 16, "test_sprite", 100)
 
         # Setup memory cache to return valid data
         coordinator._cache.get.return_value = cached_data
@@ -133,7 +133,7 @@ class TestSmartPreviewMemoryCache:
     def test_invalid_cached_data_removed(self, coordinator):
         """Test that all-zero cached data is removed from cache."""
         # Setup memory cache to return all-zeros data (invalid)
-        cached_data = (b"\x00" * 100, 16, 16, "test_sprite")
+        cached_data = (b"\x00" * 100, 16, 16, "test_sprite", 100)
         coordinator._cache.get.return_value = cached_data
 
         result = coordinator._try_show_cached_preview()
@@ -151,7 +151,7 @@ class TestSmartPreviewMemoryCache:
 
     def test_request_preview_checks_cache_first(self, coordinator):
         """Test that request_preview checks cache before scheduling worker."""
-        cached_data = (b"test_data\x01\x02", 8, 8, "sprite")
+        cached_data = (b"test_data\x01\x02", 8, 8, "sprite", 50)
         coordinator._cache.get.return_value = cached_data
 
         coordinator.request_preview(0x8000)
@@ -165,21 +165,22 @@ class TestSmartPreviewMemoryCache:
         width = 16
         height = 16
         sprite_name = "new_sprite"
+        compressed_size = 75
 
         # Simulate worker callback
-        coordinator._on_worker_preview_ready(1, tile_data, width, height, sprite_name)
+        coordinator._on_worker_preview_ready(1, tile_data, width, height, sprite_name, compressed_size)
 
         # Should cache the result
         coordinator._cache.put.assert_called_once()
         call_args = coordinator._cache.put.call_args
-        assert call_args[0][1] == (tile_data, width, height, sprite_name)
+        assert call_args[0][1] == (tile_data, width, height, sprite_name, compressed_size)
 
     def test_stale_preview_not_cached(self, coordinator):
         """Test that stale preview results are not processed."""
         # Set request counter high to make request_id=1 stale
         coordinator._request_counter = 10
 
-        coordinator._on_worker_preview_ready(1, b"data", 8, 8, "sprite")
+        coordinator._on_worker_preview_ready(1, b"data", 8, 8, "sprite", 50)
 
         # Should not cache stale result
         coordinator._cache.put.assert_not_called()

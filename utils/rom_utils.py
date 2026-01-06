@@ -83,3 +83,9 @@ def load_rom_data_stripped(rom_path: str) -> bytes:
 
     logger.debug(f"ROM size: {len(rom_data)} bytes (after SMC strip)")
     return rom_data
+
+
+def snes_to_pc(bank: int, addr: int) -> int:
+    """Convert LoROM SNES bank:address to PC offset."""
+    full_addr = (bank << 16) | addr
+    return ((full_addr & 0x7F0000) >> 1) + (full_addr & 0x7FFF)

@@ -9,7 +9,6 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QFileDialog
 
 from core.app_context import get_app_context
-from core.rom_extractor import ROMExtractor
 from ui.common.signal_utils import safe_disconnect
 
 from ..services import SpriteRenderer
@@ -38,10 +37,10 @@ class ExtractionController(QObject):
         self._multi_worker: MultiPaletteExtractWorker | None = None
         self.renderer = SpriteRenderer()
 
-        # ROM Extractor
+        # ROM Extractor - use shared instance from AppContext
         context = get_app_context()
         self.rom_cache = context.rom_cache
-        self.rom_extractor = ROMExtractor(self.rom_cache)
+        self.rom_extractor = context.rom_extractor
         self._mode = "vram"
 
         # File paths
@@ -194,38 +193,39 @@ class ExtractionController(QObject):
 
         params = self._view.get_extraction_params()
         rom_file = str(params.get("rom_file", ""))
-        offset = int(params["offset"]) # type: ignore
+        offset = int(params["offset"])  # type: ignore
 
         if not rom_file:
             self._view.append_output("ERROR: ROM file required")
             return
 
         self._view.append_output(f"Loading from ROM: {rom_file} at 0x{offset:X}")
-        
+
         # Use temp dir for output
         import tempfile
-        from PIL import Image
         from pathlib import Path
-        
+
+        from PIL import Image
+
         try:
             with tempfile.TemporaryDirectory() as tmp_dir:
                 output_base = str(Path(tmp_dir) / "rom_extract")
-                
+
                 # Run extraction (synchronous for now, could be threaded)
                 png_path, info = self.rom_extractor.extract_sprite_from_rom(
                     rom_file, offset, output_base, sprite_name=f"sprite_{offset:X}"
                 )
-                
+
                 # Load the result image
                 image = Image.open(png_path)
                 # Force load to ensure file can be closed/deleted if needed (though temp dir handles it)
                 image.load()
-                
-                tile_count = int(info["tile_count"]) # type: ignore
-                
+
+                tile_count = int(info["tile_count"])  # type: ignore
+
                 self._view.append_output(f"Loaded {tile_count} tiles.")
                 self.extraction_completed.emit(image, tile_count)
-                
+
         except Exception as e:
             self._view.append_output(f"ERROR: {e}")
             self.extraction_failed.emit(str(e))
