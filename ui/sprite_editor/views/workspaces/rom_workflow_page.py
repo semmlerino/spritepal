@@ -18,6 +18,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -35,7 +36,6 @@ from ui.common.spacing_constants import (
     SPACING_STANDARD,
 )
 from ui.components.panels import RecentCapturesWidget
-from ui.styles.theme import COLORS
 
 from ..widgets.source_bar import SourceBar
 from .edit_workspace import EditWorkspace
@@ -58,7 +58,6 @@ class ROMWorkflowPage(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setStyleSheet(f"background-color: {COLORS['background']};")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         # Minimum width removed to allow flexible resizing
         self._setup_ui()
@@ -75,9 +74,6 @@ class ROMWorkflowPage(QWidget):
 
         # 2. Main Content (Splitter)
         self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        self._main_splitter.setStyleSheet(
-            f"QSplitter::handle {{ background-color: {COLORS['border']}; width: 1px; }}"
-        )
         self._main_splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._main_splitter.setChildrenCollapsible(False)
 
@@ -101,70 +97,28 @@ class ROMWorkflowPage(QWidget):
     def _create_left_panel(self) -> QWidget:
         """Create the left navigation panel."""
         left_panel = QWidget()
-        left_panel.setStyleSheet(
-            f"background-color: {COLORS['darker_gray']}; border-right: 1px solid {COLORS['border']};"
-        )
+        # Object name handles background and border via global theme
+        left_panel.setObjectName("leftNavPanel")
+        
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD)
         left_layout.setSpacing(SPACING_MEDIUM)
 
-        # Offset Browser group
-        browser_group = QFrame()
-        browser_group.setStyleSheet(
-            f"background-color: {COLORS['panel_background']}; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 10px;"
-        )
+        # Offset Browser group - uses standard QGroupBox theme
+        browser_group = QGroupBox("ROM NAVIGATION")
         browser_layout = QVBoxLayout(browser_group)
         browser_layout.setContentsMargins(SPACING_COMPACT_MEDIUM, SPACING_COMPACT_MEDIUM, SPACING_COMPACT_MEDIUM, SPACING_COMPACT_MEDIUM)
 
-        title_label = QLabel("ROM NAVIGATION")
-        title_label.setStyleSheet(
-            f"color: {COLORS['highlight']}; font-weight: bold; font-size: 10px; letter-spacing: 1px;"
-        )
-        browser_layout.addWidget(title_label)
-
-        # Offset slider
+        # Offset slider - now uses global QSlider theme
         self._offset_slider = QSlider(Qt.Orientation.Horizontal)
         self._offset_slider.setMinimum(0)
         self._offset_slider.setMaximum(100)  # Updated when ROM loads
-        self._offset_slider.setStyleSheet(f"""
-            QSlider::groove:horizontal {{
-                border: 1px solid {COLORS["border"]};
-                height: 6px;
-                background: {COLORS["input_background"]};
-                margin: 2px 0;
-                border-radius: 3px;
-            }}
-            QSlider::handle:horizontal {{
-                background: {COLORS["highlight"]};
-                border: 1px solid {COLORS["highlight_border"]};
-                width: 14px;
-                height: 14px;
-                margin: -5px 0;
-                border-radius: 7px;
-            }}
-        """)
         browser_layout.addWidget(self._offset_slider)
 
         # Navigation row
         nav_layout = QHBoxLayout()
         self._prev_btn = QPushButton("◀ Prev")
         self._next_btn = QPushButton("Next ▶")
-
-        button_style = f"""
-            QPushButton {{
-                background-color: {COLORS["edit"]};
-                color: white;
-                border-radius: 2px;
-                padding: 4px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS["edit_hover"]};
-            }}
-        """
-        self._prev_btn.setStyleSheet(button_style)
-        self._next_btn.setStyleSheet(button_style)
 
         nav_layout.addWidget(self._prev_btn)
         nav_layout.addWidget(self._next_btn)
@@ -178,9 +132,6 @@ class ROMWorkflowPage(QWidget):
         self._step_spin.setValue(0x100)
         self._step_spin.setDisplayIntegerBase(16)
         self._step_spin.setPrefix("0x")
-        self._step_spin.setStyleSheet(
-            f"background-color: {COLORS['input_background']}; border: 1px solid {COLORS['border']};"
-        )
         step_layout.addWidget(self._step_spin)
         browser_layout.addLayout(step_layout)
 
@@ -188,10 +139,6 @@ class ROMWorkflowPage(QWidget):
         preview_container = QFrame()
         preview_container.setFrameStyle(QFrame.Shape.StyledPanel)
         preview_container.setMinimumHeight(220)
-        preview_container.setStyleSheet(
-            f"background-color: {COLORS['preview_background']}; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 4px;"
-        )
 
         preview_layout = QVBoxLayout(preview_container)
         preview_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -199,7 +146,7 @@ class ROMWorkflowPage(QWidget):
 
         self._preview_label = QLabel("No Preview")
         self._preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._preview_label.setStyleSheet("border: none; background: transparent;")
+        self._preview_label.setProperty("preview", "true")
         preview_layout.addWidget(self._preview_label)
 
         browser_layout.addWidget(preview_container)

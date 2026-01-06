@@ -52,6 +52,7 @@ from ui.rom_extraction.widgets import (
     ROMFileWidget,
     SpriteSelectorWidget,
 )
+from ui.styles import get_section_label_style
 from ui.styles.theme import COLORS
 from utils.constants import (
     ROM_SIZE_4MB,
@@ -331,7 +332,7 @@ class ROMExtractionPanel(QWidget):
         output_section.setSpacing(SPACING_COMPACT_SMALL)  # 6px spacing
 
         output_label = QLabel("Output Name:")
-        output_label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
+        output_label.setStyleSheet(get_section_label_style())
         output_section.addWidget(output_label)
 
         self.output_name_edit = QLineEdit()

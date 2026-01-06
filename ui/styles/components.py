@@ -586,12 +586,13 @@ def get_section_label_style() -> str:
     Returns:
         CSS string for bold section labels
     """
-    return """
-    QLabel {
+    return f"""
+    QLabel {{
         font-weight: bold;
-        font-size: 12px;
+        font-size: {FONTS["default_size"]};
+        color: {COLORS["text_secondary"]};
         margin-bottom: 4px;
-    }
+    }}
     """
 
 

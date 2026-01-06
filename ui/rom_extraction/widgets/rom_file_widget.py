@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, override
 
-from PySide6.QtCore import Signal, Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFontMetrics, QResizeEvent
 from PySide6.QtWidgets import QLabel, QProgressBar, QSizePolicy, QWidget
 
@@ -34,45 +34,25 @@ class ElidedPathLabel(QLabel):
         self._placeholder = placeholder
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.setMinimumWidth(PATH_EDIT_MIN_WIDTH)
-        # Mimic QLineEdit look
-        self.setStyleSheet(f"""
-            QLabel {{
-                border: 1px solid {COLORS["border"]};
-                border-radius: 4px;
-                background-color: {COLORS["input_background"]};
-                padding: 4px 8px;
-                color: {COLORS["text_secondary"]};  /* Placeholder color initially */
-            }}
-        """)
+        # Use theme-defined ID and dynamic property for styling
+        self.setObjectName("pathLabel")
+        self.setProperty("placeholder", "true")
 
     @override
     def setText(self, text: str) -> None:
         self._full_text = text
         if text:
             # Normal text color
-            self.setStyleSheet(f"""
-                QLabel {{
-                    border: 1px solid {COLORS["border"]};
-                    border-radius: 4px;
-                    background-color: {COLORS["input_background"]};
-                    padding: 4px 8px;
-                    color: {COLORS["text_primary"]};
-                }}
-            """)
+            self.setProperty("placeholder", "false")
             self.setToolTip(text)
         else:
             # Placeholder styling
-            self.setStyleSheet(f"""
-                QLabel {{
-                    border: 1px solid {COLORS["border"]};
-                    border-radius: 4px;
-                    background-color: {COLORS["input_background"]};
-                    padding: 4px 8px;
-                    color: {COLORS["text_secondary"]};
-                }}
-            """)
+            self.setProperty("placeholder", "true")
             self.setToolTip("")
 
+        # Force style re-evaluation for dynamic property
+        self.style().unpolish(self)
+        self.style().polish(self)
         self._update_elided_text()
 
     @override
