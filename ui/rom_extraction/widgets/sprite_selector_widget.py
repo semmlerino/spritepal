@@ -1,13 +1,20 @@
 """Sprite selector widget for ROM extraction"""
 
-from typing import Any
+from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QHeaderView, QLabel, QPushButton, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QWidget
+from PySide6.QtWidgets import (
+    QLabel,
+    QPushButton,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QTreeWidgetItemIterator,
+    QWidget,
+)
 
 from core.types import SpritePreset
-from ui.common.spacing_constants import EXTRACTION_ACTION_BUTTON_HEIGHT, SPRITE_COMBO_MIN_WIDTH
+from ui.common.spacing_constants import EXTRACTION_ACTION_BUTTON_HEIGHT
 from ui.styles import get_prominent_action_button_style
 from ui.styles.theme import COLORS
 
@@ -102,10 +109,14 @@ class SpriteSelectorWidget(BaseExtractionWidget):
 
     def _on_selection_changed(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:
         if current:
-            data = current.data(0, Qt.UserRole)
+            data = current.data(0, Qt.ItemDataRole.UserRole)
             # Only emit if data is present (skip category headers)
             if data is not None:
                 self.sprite_changed.emit(data)
+
+    def count(self) -> int:
+        """Get number of top-level items."""
+        return self.sprite_tree.topLevelItemCount()
 
     def clear(self):
         """Clear sprite selection"""
@@ -114,7 +125,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self._set_offset_label_style()
         self.find_sprites_btn.setEnabled(False)
 
-    def add_sprite(self, name: str, data: Any) -> None:  # pyright: ignore[reportExplicitAny] - Sprite metadata
+    def add_sprite(self, name: str, data: object) -> None:
         """Add a sprite to the tree with categorization."""
         if " - " in name:
             category, item_name = name.split(" - ", 1)
@@ -125,13 +136,13 @@ class SpriteSelectorWidget(BaseExtractionWidget):
             item = QTreeWidgetItem(self.sprite_tree)
             item.setText(0, name)
 
-        item.setData(0, Qt.UserRole, data)
+        item.setData(0, Qt.ItemDataRole.UserRole, data)
 
     def _get_or_create_category(self, name: str) -> QTreeWidgetItem:
         # Check existing top-level items
         for i in range(self.sprite_tree.topLevelItemCount()):
             item = self.sprite_tree.topLevelItem(i)
-            if item.text(0) == name:
+            if item is not None and item.text(0) == name:
                 return item
 
         # Create new category
@@ -156,16 +167,16 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         """Get data for current selection"""
         current = self.sprite_tree.currentItem()
         if current:
-            return current.data(0, Qt.UserRole)
+            return current.data(0, Qt.ItemDataRole.UserRole)
         return None
 
-    def select_item_by_data(self, data: Any) -> None:
+    def select_item_by_data(self, data: object) -> None:
         """Select item matching data."""
         # Traverse tree
         iterator = QTreeWidgetItemIterator(self.sprite_tree)
         while iterator.value():
             item = iterator.value()
-            if item.data(0, Qt.UserRole) == data:
+            if item.data(0, Qt.ItemDataRole.UserRole) == data:
                 self.sprite_tree.setCurrentItem(item)
                 return
             iterator += 1
@@ -194,6 +205,6 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.clear()
         item = QTreeWidgetItem(self.sprite_tree)
         item.setText(0, message)
-        item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
         self.sprite_tree.setEnabled(False)
         self.find_sprites_btn.setEnabled(False)
