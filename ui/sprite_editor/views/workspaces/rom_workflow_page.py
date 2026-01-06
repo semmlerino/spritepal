@@ -29,6 +29,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import (
+    SPACING_COMPACT_MEDIUM,
+    SPACING_MEDIUM,
+    SPACING_STANDARD,
+)
 from ui.components.panels import RecentCapturesWidget
 from ui.styles.theme import COLORS
 
@@ -55,8 +60,7 @@ class ROMWorkflowPage(QWidget):
         super().__init__(parent)
         self.setStyleSheet(f"background-color: {COLORS['background']};")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        # Set minimum width at page root (nav 250 + workspace 450)
-        self.setMinimumWidth(700)
+        # Minimum width removed to allow flexible resizing
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -101,8 +105,8 @@ class ROMWorkflowPage(QWidget):
             f"background-color: {COLORS['darker_gray']}; border-right: 1px solid {COLORS['border']};"
         )
         left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(12, 12, 12, 12)
-        left_layout.setSpacing(15)
+        left_layout.setContentsMargins(SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD)
+        left_layout.setSpacing(SPACING_MEDIUM)
 
         # Offset Browser group
         browser_group = QFrame()
@@ -111,7 +115,7 @@ class ROMWorkflowPage(QWidget):
             f"border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 10px;"
         )
         browser_layout = QVBoxLayout(browser_group)
-        browser_layout.setContentsMargins(10, 10, 10, 10)
+        browser_layout.setContentsMargins(SPACING_COMPACT_MEDIUM, SPACING_COMPACT_MEDIUM, SPACING_COMPACT_MEDIUM, SPACING_COMPACT_MEDIUM)
 
         title_label = QLabel("ROM NAVIGATION")
         title_label.setStyleSheet(

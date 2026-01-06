@@ -44,6 +44,7 @@ from ui.common.spacing_constants import (
     MIN_PANEL_WIDTH,
     SPACING_COMPACT_SMALL,
     SPACING_SMALL,
+    SPACING_MEDIUM,
 )
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
@@ -64,8 +65,8 @@ logger = get_logger(__name__)
 # Layout constants for consistent sizing and spacing
 MAIN_WINDOW_MIN_SIZE = (1000, 700)  # Expanded for embedded editor
 DEFAULT_SPLITTER_RATIO = 0.40  # Give more space to preview panel
-LAYOUT_MARGINS = SPACING_SMALL  # 8px - standard margins
-LAYOUT_SPACING = SPACING_COMPACT_SMALL  # 6px - compact spacing
+LAYOUT_MARGINS = SPACING_MEDIUM  # 16px - standard margins
+LAYOUT_SPACING = SPACING_SMALL  # 8px - standard spacing
 
 
 class MainWindow(QMainWindow):

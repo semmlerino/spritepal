@@ -327,14 +327,21 @@ class ROMExtractionPanel(QWidget):
         Args:
             layout: Layout to add controls to
         """
-        # Output Name row (reintroduced for better discoverability)
-        output_row = QHBoxLayout()
-        output_row.addWidget(QLabel("Output Name:"))
+        # Output Name section (Vertical layout for better resizing behavior)
+        output_section = QVBoxLayout()
+        output_section.setSpacing(SPACING_COMPACT_SMALL)  # 6px spacing
+
+        output_label = QLabel("Output Name:")
+        output_label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
+        output_section.addWidget(output_label)
+
         self.output_name_edit = QLineEdit()
         self.output_name_edit.setPlaceholderText("e.g. kirby_sprites")
         self.output_name_edit.textChanged.connect(self._on_output_name_text_changed)
-        output_row.addWidget(self.output_name_edit)
-        layout.addLayout(output_row)
+        self.output_name_edit.setMinimumHeight(32)  # Standard input height
+        output_section.addWidget(self.output_name_edit)
+
+        layout.addLayout(output_section)
 
         # CGRAM selector widget
         self.cgram_selector_widget = CGRAMSelectorWidget()

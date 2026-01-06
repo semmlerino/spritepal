@@ -48,8 +48,7 @@ class VRAMEditorPage(QWidget):
         self._settings_manager = settings_manager
         self._setup_ui()
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        # Set minimum width at page root
-        self.setMinimumWidth(500)
+        # Minimum width removed to allow flexible resizing
 
     def _setup_ui(self) -> None:
         """Create the VRAM workflow tabs."""

@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QLabel, QProgressBar, QWidget
+from PySide6.QtCore import Signal, Qt
+from PySide6.QtGui import QFontMetrics, QResizeEvent
+from PySide6.QtWidgets import QLabel, QProgressBar, QWidget, QSizePolicy
 
-from ui.common.spacing_constants import CONTROL_PANEL_LABEL_WIDTH, LOADING_PROGRESS_HEIGHT, SPACING_MEDIUM
+from ui.common.spacing_constants import (
+    CONTROL_PANEL_LABEL_WIDTH,
+    LOADING_PROGRESS_HEIGHT,
+    PATH_EDIT_MIN_WIDTH,
+    SPACING_MEDIUM,
+)
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
 
@@ -17,6 +23,77 @@ if TYPE_CHECKING:
     from core.services.rom_cache import ROMCache
 
 logger = get_logger(__name__)
+
+
+class ElidedPathLabel(QLabel):
+    """Label that elides text in the middle when it doesn't fit."""
+
+    def __init__(self, placeholder: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(placeholder, parent)
+        self._full_text = ""  # Actual value is empty initially
+        self._placeholder = placeholder
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMinimumWidth(PATH_EDIT_MIN_WIDTH)
+        # Mimic QLineEdit look
+        self.setStyleSheet(f"""
+            QLabel {{
+                border: 1px solid {COLORS["border"]};
+                border-radius: 4px;
+                background-color: {COLORS["input_background"]};
+                padding: 4px 8px;
+                color: {COLORS["text_secondary"]};  /* Placeholder color initially */
+            }}
+        """)
+
+    def setText(self, text: str) -> None:
+        self._full_text = text
+        if text:
+            # Normal text color
+            self.setStyleSheet(f"""
+                QLabel {{
+                    border: 1px solid {COLORS["border"]};
+                    border-radius: 4px;
+                    background-color: {COLORS["input_background"]};
+                    padding: 4px 8px;
+                    color: {COLORS["text_primary"]};
+                }}
+            """)
+            self.setToolTip(text)
+        else:
+            # Placeholder styling
+            self.setStyleSheet(f"""
+                QLabel {{
+                    border: 1px solid {COLORS["border"]};
+                    border-radius: 4px;
+                    background-color: {COLORS["input_background"]};
+                    padding: 4px 8px;
+                    color: {COLORS["text_secondary"]};
+                }}
+            """)
+            self.setToolTip("")
+
+        self._update_elided_text()
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        self._update_elided_text()
+        super().resizeEvent(event)
+
+    def _update_elided_text(self) -> None:
+        text_to_show = self._full_text if self._full_text else self._placeholder
+        
+        metrics = QFontMetrics(self.font())
+        # Subtract typical padding (8px left + 8px right approx)
+        width = self.width() - 16
+        if width <= 0:
+            return
+            
+        if self._full_text:
+            elided = metrics.elidedText(self._full_text, Qt.TextElideMode.ElideMiddle, width)
+        else:
+             # Don't elide placeholder if possible, or elide at end
+            elided = metrics.elidedText(self._placeholder, Qt.TextElideMode.ElideRight, width)
+            
+        super().setText(elided)
 
 
 class ROMFileWidget(BaseExtractionWidget):
@@ -52,7 +129,8 @@ class ROMFileWidget(BaseExtractionWidget):
         rom_label = self._create_control_label("ROM:")
         rom_row.addWidget(rom_label)
 
-        self.rom_path_edit = self._create_readonly_path_edit("Select ROM file...")
+        # Replaced QLineEdit with ElidedPathLabel for better path readability
+        self.rom_path_edit = ElidedPathLabel("Select ROM file...")
         rom_row.addWidget(self.rom_path_edit, 1)  # Stretch factor 1
 
         self.browse_rom_btn = self._create_browse_button(signal=self.browse_clicked)
@@ -89,6 +167,7 @@ class ROMFileWidget(BaseExtractionWidget):
 
         # Use flat layout without group box for cleaner appearance
         self._setup_widget_flat(rom_layout, with_separator=False)
+        self._set_empty_state_guidance()
 
     def _set_empty_state_guidance(self) -> None:
         """Show simple guidance when no ROM is loaded, with detailed tooltip"""
@@ -146,10 +225,8 @@ class ROMFileWidget(BaseExtractionWidget):
         self._rom_path = ""
         self._cache_status = {"has_cache": False, "cache_type": None}
         if self.rom_path_edit:
-            self.rom_path_edit.clear()
-        if self.rom_info_label:
-            self.rom_info_label.setText("")
-            self.rom_info_label.setToolTip("")
+            self.rom_path_edit.setText("")
+        self._set_empty_state_guidance()
 
     def _check_cache_status(self):
         """Check cache status for the current ROM"""
