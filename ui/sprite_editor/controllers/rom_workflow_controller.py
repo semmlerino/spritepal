@@ -39,7 +39,7 @@ class ROMWorkflowController(QObject):
     def __init__(self, main_controller: "MainController") -> None:
         super().__init__(main_controller)
         self.main_controller = main_controller
-        self._view: "ROMWorkflowPage | None" = None
+        self._view: ROMWorkflowPage | None = None
 
         # Core components - use shared instances from AppContext
         context = get_app_context()
