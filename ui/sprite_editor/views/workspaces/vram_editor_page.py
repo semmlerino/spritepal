@@ -13,10 +13,12 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QSizePolicy,
-    QTabWidget,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
+
+from ui.components.navigation.workflow_nav_bar import WorkflowNavBar
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
@@ -51,7 +53,7 @@ class VRAMEditorPage(QWidget):
         # Minimum width removed to allow flexible resizing
 
     def _setup_ui(self) -> None:
-        """Create the VRAM workflow tabs."""
+        """Create the VRAM workflow UI."""
         # Lazy imports to avoid circular import with edit_tab → edit_workspace
         from ..tabs import EditTab, ExtractTab, InjectTab, MultiPaletteTab
 
@@ -59,10 +61,15 @@ class VRAMEditorPage(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Tab widget for VRAM workflow
-        self._tab_widget = QTabWidget()
-        self._tab_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._tab_widget.currentChanged.connect(self.current_tab_changed.emit)
+        # 1. Navigation Bar
+        steps = ["Extract", "Edit", "Inject", "Multi-Palette"]
+        self._nav_bar = WorkflowNavBar(steps)
+        self._nav_bar.step_selected.connect(self._on_step_selected)
+        layout.addWidget(self._nav_bar)
+
+        # 2. Content Stack
+        self._stack = QStackedWidget()
+        self._stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Create tabs
         self._extract_tab = ExtractTab(settings_manager=self._settings_manager)
@@ -71,10 +78,10 @@ class VRAMEditorPage(QWidget):
         self._multi_palette_tab = MultiPaletteTab()
 
         # Add tabs
-        self._tab_widget.addTab(self._extract_tab, "Extract")
-        self._tab_widget.addTab(self._edit_tab, "Edit")
-        self._tab_widget.addTab(self._inject_tab, "Inject")
-        self._tab_widget.addTab(self._multi_palette_tab, "Multi-Palette")
+        self._stack.addWidget(self._extract_tab)
+        self._stack.addWidget(self._edit_tab)
+        self._stack.addWidget(self._inject_tab)
+        self._stack.addWidget(self._multi_palette_tab)
 
         # Hide "Pop Out Editor" button in embedded mode
         if hasattr(self._edit_tab, "detach_btn"):
@@ -83,13 +90,17 @@ class VRAMEditorPage(QWidget):
         # Forward ready_for_inject signal
         self._edit_tab.ready_for_inject.connect(self.ready_for_inject.emit)
 
-        layout.addWidget(self._tab_widget, 1)
+        layout.addWidget(self._stack, 1)
+
+    def _on_step_selected(self, index: int) -> None:
+        """Handle step selection from nav bar."""
+        self.set_current_tab(index)
 
     # Tab accessors
     @property
-    def tab_widget(self) -> QTabWidget:
-        """Access the internal tab widget."""
-        return self._tab_widget
+    def tab_widget(self) -> QStackedWidget:
+        """Access the internal stack widget (deprecated name)."""
+        return self._stack
 
     @property
     def extract_tab(self) -> ExtractTab:
@@ -113,12 +124,14 @@ class VRAMEditorPage(QWidget):
 
     def set_current_tab(self, index: int) -> None:
         """Set the current tab by index."""
-        self._tab_widget.setCurrentIndex(index)
+        self._stack.setCurrentIndex(index)
+        self._nav_bar.set_current_step(index)
+        self.current_tab_changed.emit(index)
 
     def current_tab_index(self) -> int:
         """Get the current tab index."""
-        return self._tab_widget.currentIndex()
+        return self._stack.currentIndex()
 
     def switch_to_inject_tab(self) -> None:
         """Switch to the Inject tab (index 2)."""
-        self._tab_widget.setCurrentIndex(2)
+        self.set_current_tab(2)
