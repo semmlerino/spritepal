@@ -238,11 +238,6 @@ class UICoordinator(QObject):
             if x is not None and y is not None and x >= 0:
                 self.main_window.move(x, y)
 
-            # Restore splitter sizes if available
-            splitter_sizes = window_geometry.get("splitter_sizes", [])
-            if isinstance(splitter_sizes, list) and len(splitter_sizes) >= 2:
-                self.main_window.main_splitter.setSizes(splitter_sizes)
-
     def save_session(self) -> None:
         """Save the current session"""
         # Get session data from extraction panel
@@ -266,7 +261,6 @@ class UICoordinator(QObject):
             "height": self.main_window.height(),
             "x": self.main_window.x(),
             "y": self.main_window.y(),
-            "splitter_sizes": self.main_window.main_splitter.sizes(),
         }
         self.session_manager.update_window_state(window_geometry)
 
@@ -303,8 +297,6 @@ class UICoordinator(QObject):
 
     def _configure_rom_extraction_tab(self) -> None:
         """Configure UI for ROM extraction tab"""
-        # Restore layout if coming from sprite editor
-        self._restore_layout_if_needed()
         self._restore_toolbar_state()
 
         # Check extraction readiness
@@ -323,8 +315,6 @@ class UICoordinator(QObject):
 
     def _configure_vram_extraction_tab(self) -> None:
         """Configure UI for VRAM extraction tab"""
-        # Restore layout if coming from sprite editor
-        self._restore_layout_if_needed()
         self._restore_toolbar_state()
 
         # Check extraction readiness based on mode
@@ -353,9 +343,6 @@ class UICoordinator(QObject):
         self.toolbar_manager.set_open_editor_button_label("Open External")
         self.toolbar_manager.set_inject_button_enabled(False)
 
-        # Maximize editor space by collapsing the right preview panel
-        self._maximize_editor_layout()
-
     def _restore_toolbar_state(self) -> None:
         """Restore toolbar state when leaving editor tab"""
         self.toolbar_manager.set_open_editor_button_label("Open Editor")
@@ -363,28 +350,6 @@ class UICoordinator(QObject):
         is_enabled = self.toolbar_manager.open_editor_button.isEnabled()
         self.toolbar_manager.set_inject_button_enabled(is_enabled)
 
-    def _maximize_editor_layout(self) -> None:
-        """Collapse right panel to give editor more space"""
-        splitter = self.main_window.main_splitter
-        current_sizes = splitter.sizes()
-
-        # Only save if right panel is visible (size > 0)
-        if len(current_sizes) >= 2 and current_sizes[1] > 0:
-            self._saved_splitter_sizes = current_sizes
-            # Unlock right panel min width to allow full collapse
-            if splitter.count() > 1:
-                splitter.widget(1).setMinimumWidth(0)
-            # Collapse right panel (index 1)
-            splitter.setSizes([99999, 0])
-
-    def _restore_layout_if_needed(self) -> None:
-        """Restore layout if it was modified for editor"""
-        if self._saved_splitter_sizes:
-            # Restore min width constraint
-            if self.main_window.main_splitter.count() > 1:
-                self.main_window.main_splitter.widget(1).setMinimumWidth(MIN_PANEL_WIDTH)
-            self.main_window.main_splitter.setSizes(self._saved_splitter_sizes)
-            self._saved_splitter_sizes = []
 
     def get_current_tab_index(self) -> int:
         """Get current active tab index"""

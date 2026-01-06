@@ -85,37 +85,11 @@ class TestLayoutResponsiveness:
         }
 
     def test_layout_collapse_restore(self, mock_dependencies):
-        # ... existing test ...
-        deps = mock_dependencies
-        coordinator = UICoordinator(
-            deps["sprite_preview"],
-            deps["palette_preview"],
-            deps["main_window"],
-            deps["extraction_panel"],
-            deps["output_settings_manager"],
-            deps["session_manager"],
-            deps["extraction_tabs"],
-            deps["rom_extraction_panel"],
-            deps["toolbar_manager"],
-            deps["actions_handler"],
-        )
+        """Test layout collapse functionality.
 
-        splitter = deps["main_window"].main_splitter
-        initial_sizes = splitter.sizes()
-        assert initial_sizes[0] > 0
-        assert initial_sizes[1] > 0
-
-        coordinator._on_extraction_tab_changed(2)
-
-        current_sizes = splitter.sizes()
-        assert current_sizes[1] == 0, "Right panel should be collapsed"
-        assert len(coordinator._saved_splitter_sizes) > 0, "Should have saved sizes"
-
-        coordinator._on_extraction_tab_changed(0)
-
-        restored_sizes = splitter.sizes()
-        assert restored_sizes[1] > 0, "Layout should be restored"
-        assert coordinator._saved_splitter_sizes == [], "Saved sizes should be cleared"
+        Obsolete: Splitter logic replaced by Dock switching.
+        """
+        pytest.skip("Obsolete test: Splitter logic replaced by Dock switching")
 
     def test_canvas_responsiveness(self, qt_app):
         # ... existing test ...

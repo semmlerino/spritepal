@@ -20,6 +20,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeyEvent, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
+    QDockWidget,
     QGridLayout,
     QHBoxLayout,
     QMainWindow,
@@ -142,94 +143,39 @@ class MainWindow(QMainWindow):
         # Create main toolbar
         self._create_main_toolbar()
 
-        # Create central widget
-        central_widget = QWidget(self)
-        central_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setCentralWidget(central_widget)
+        # Center Stack (replaces Splitter)
+        self.center_stack = QStackedWidget()
+        self.setCentralWidget(self.center_stack)
 
-        # Main horizontal splitter (stored as instance for session persistence)
-        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.main_splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS, LAYOUT_MARGINS)
-        main_layout.setSpacing(0)  # Splitter handles spacing
-        main_layout.addWidget(self.main_splitter, 1)
+        # Left Dock
+        self.left_dock = QDockWidget("Controls", self)
+        self.left_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.left_dock.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.left_dock)
 
-        # Left panel - Input and controls
-        self.left_panel = self._create_left_panel()
-
-        # Right panel - Previews (will be created by UICoordinator)
+        # Pre-create preview widgets (needed for UI Coordinator)
         self.sprite_preview = PreviewPanel()
         self.palette_preview = PalettePreviewWidget()
 
-        # Add panels to main splitter (right panel created by manager)
-        self.main_splitter.addWidget(self.left_panel)
-        # Right panel will be added by UICoordinator, sizing configured there
-
-        # Set minimum sizes for panels
-        self.left_panel.setMinimumWidth(MIN_PANEL_WIDTH)
+        # Create workspaces
+        self._create_workspaces()
 
         # Status bar
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Ready to extract sprites")
 
-    def _create_main_toolbar(self) -> None:
-        """Create the main toolbar with global actions."""
-        toolbar = self.addToolBar("Main Toolbar")
-        toolbar.setMovable(False)
-        toolbar.setFloatable(False)
-
-        style = QApplication.style()
-
-        # Undo
-        self.undo_action = QAction("Undo", self)
-        self.undo_action.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_ArrowBack))
-        self.undo_action.setShortcut(QKeySequence.Undo)
-        self.undo_action.setEnabled(False)
-        self.undo_action.triggered.connect(self._on_undo)
-        toolbar.addAction(self.undo_action)
-
-        # Redo
-        self.redo_action = QAction("Redo", self)
-        self.redo_action.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_ArrowForward))
-        self.redo_action.setShortcut(QKeySequence.Redo)
-        self.redo_action.setEnabled(False)
-        self.redo_action.triggered.connect(self._on_redo)
-        toolbar.addAction(self.redo_action)
-
-    def _create_left_panel(self) -> QWidget:
-        """Create the left panel with stacked workspaces.
-
-        Structure:
-        - QStackedWidget containing:
-          - ExtractionWorkspace (index 0): ROM/VRAM extraction tabs + action zone
-          - SpriteEditorWorkspace (index 1): Full sprite editing experience
-
-        Keyboard shortcuts:
-        - Ctrl+1: ROM Extraction tab (in ExtractionWorkspace)
-        - Ctrl+2: VRAM Extraction tab (in ExtractionWorkspace)
-        - Ctrl+3: Switch to SpriteEditorWorkspace
-        """
+    def _create_workspaces(self) -> None:
+        """Create workspace widgets."""
         from core.app_context import get_app_context
         from ui.rom_extraction.modules import Mesen2Module
 
-        left_panel = QWidget(self)
-        left_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        main_layout = QVBoxLayout(left_panel)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-
-        # Create workspace stack
-        self._workspace_stack = QStackedWidget()
-        self._workspace_stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-
-        # Get dependencies from app context
+        # Get dependencies
         extraction_manager = get_app_context().core_operations_manager
         log_watcher = get_app_context().log_watcher
         mesen2_module = Mesen2Module(log_watcher=log_watcher, parent=self)
 
-        # ExtractionWorkspace (index 0)
+        # 1. Extraction Workspace (Dock Content)
         self._extraction_workspace = ExtractionWorkspace(
             parent=self,
             extraction_manager=extraction_manager,
@@ -237,38 +183,32 @@ class MainWindow(QMainWindow):
             rom_cache=self.rom_cache,
             mesen2_module=mesen2_module,
         )
-        self._workspace_stack.addWidget(self._extraction_workspace)
+        self._extraction_workspace.tab_changed.connect(self._on_extraction_tab_changed)
+        self.left_dock.setWidget(self._extraction_workspace)
 
-        # SpriteEditorWorkspace (index 1)
+        # 2. Sprite Editor Workspace (Center Content)
         self._sprite_editor_workspace = SpriteEditorWorkspace(
             parent=self,
             settings_manager=self.settings_manager,
         )
-        self._workspace_stack.addWidget(self._sprite_editor_workspace)
-
-        # Connect workspace signals
-        self._extraction_workspace.tab_changed.connect(self._on_extraction_tab_changed)
         self._sprite_editor_workspace.status_message.connect(self._on_status_message)
         self._sprite_editor_workspace.undo_state_changed.connect(self._update_undo_redo_state)
 
-        # Connect workspace stack change
-        self._workspace_stack.currentChanged.connect(self._on_workspace_changed)
+        self.center_stack.addWidget(self._sprite_editor_workspace)
 
-        main_layout.addWidget(self._workspace_stack, 1)
-
-        # Backward compatibility: expose panels that other code might reference
+        # Backward compatibility aliases
         self.extraction_tabs = self._extraction_workspace.extraction_tabs
         self.rom_extraction_panel = self._extraction_workspace.rom_extraction_panel
         self.extraction_panel = self._extraction_workspace.extraction_panel
         self.action_zone = self._extraction_workspace.action_zone
-        self.sprite_edit_tab = self._sprite_editor_workspace  # Type changed but API similar
-
-        return left_panel
+        self.sprite_edit_tab = self._sprite_editor_workspace
 
     def _on_extraction_tab_changed(self, index: int) -> None:
         """Handle extraction tab changes within ExtractionWorkspace."""
-        # Action zone is part of ExtractionWorkspace, so no visibility toggle needed
-        pass
+        if index == 2:  # Sprite Editor tab
+            self.switch_to_workspace(1)
+        else:
+            self.switch_to_workspace(0)
 
     def _on_status_message(self, message: str) -> None:
         """Handle status messages from sprite editor."""
@@ -285,22 +225,10 @@ class MainWindow(QMainWindow):
     def _update_undo_redo_state(self, can_undo: bool, can_redo: bool) -> None:
         """Update undo/redo action state."""
         self._last_undo_state = (can_undo, can_redo)
-        # Only update buttons if sprite editor is active
-        if self._workspace_stack.currentIndex() == 1:
+        # Only update buttons if sprite editor is active (Index 1)
+        if hasattr(self, "center_stack") and self.center_stack.currentIndex() == 1:
             self.undo_action.setEnabled(can_undo)
             self.redo_action.setEnabled(can_redo)
-
-    def _on_workspace_changed(self, index: int) -> None:
-        """Handle workspace switch (Extraction vs Sprite Editor)."""
-        if index == 1:  # Sprite Editor
-            # Restore last known state
-            can_undo, can_redo = self._last_undo_state
-            self.undo_action.setEnabled(can_undo)
-            self.redo_action.setEnabled(can_redo)
-        else:
-            # Disable undo/redo in other workspaces
-            self.undo_action.setEnabled(False)
-            self.redo_action.setEnabled(False)
 
     def _on_tab_changed(self, index: int) -> None:
         """Handle legacy tab changes (now unused with workspace architecture).
@@ -321,7 +249,18 @@ class MainWindow(QMainWindow):
             workspace_index: 0 for Extraction, 1 for Sprite Editor
             tab_index: Optional tab index within the workspace
         """
-        self._workspace_stack.setCurrentIndex(workspace_index)
+        if workspace_index == 0:
+            # Extraction Mode
+            self.center_stack.setCurrentIndex(0)  # Preview
+            self.left_dock.show()
+            self._update_undo_redo_state(False, False)  # Disable undo
+        elif workspace_index == 1:
+            # Sprite Editor Mode
+            self.center_stack.setCurrentIndex(1)  # Editor
+            self.left_dock.hide()
+            # Restore last undo state
+            can_undo, can_redo = self._last_undo_state
+            self._update_undo_redo_state(can_undo, can_redo)
 
         if tab_index is not None and workspace_index == 0:
             # Switch tab within ExtractionWorkspace
@@ -396,22 +335,15 @@ class MainWindow(QMainWindow):
             self.toolbar_manager.create_action_buttons(button_layout)
             action_zone_layout.addLayout(button_layout)
 
-        # Add preview panel to main splitter
+        # Add preview panel to center stack (for Extraction mode)
+        # Note: create_preview_panel returns a splitter containing preview/palette.
+        # This acts as the Central Widget content for index 0.
         right_panel = self.ui_coordinator.create_preview_panel(self)
-        self.main_splitter.addWidget(right_panel)
-        right_panel.setMinimumWidth(MIN_PANEL_WIDTH)
-        # Ensure right panel has proper size policy
-        from PySide6.QtWidgets import QSizePolicy
+        # Insert at index 0 (pushing Editor to 1)
+        self.center_stack.insertWidget(0, right_panel)
 
-        right_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-
-        # Configure splitter now that both panels exist
-        total_width = MAIN_WINDOW_MIN_SIZE[0] - (2 * LAYOUT_MARGINS)
-        left_width = int(total_width * DEFAULT_SPLITTER_RATIO)
-        right_width = total_width - left_width
-        self.main_splitter.setSizes([left_width, right_width])
-        self.main_splitter.setStretchFactor(0, 1)  # Left: lower stretch priority
-        self.main_splitter.setStretchFactor(1, 3)  # Right: higher stretch priority
+        # Initial State: Extraction Mode (Index 0)
+        self.center_stack.setCurrentIndex(0)
 
     def _update_initial_ui_state(self) -> None:
         """Update initial UI state after setup"""
@@ -854,7 +786,7 @@ class MainWindow(QMainWindow):
         if self.rom_extraction_panel.rom_path:
             self._sprite_editor_workspace.load_rom(self.rom_extraction_panel.rom_path)
         # Switch to sprite editor workspace
-        self._workspace_stack.setCurrentWidget(self._sprite_editor_workspace)
+        self.switch_to_workspace(1)
         # Jump to offset in sprite editor
         self._sprite_editor_workspace.jump_to_offset(offset)
 
