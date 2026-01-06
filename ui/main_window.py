@@ -16,24 +16,19 @@ if TYPE_CHECKING:
 from typing import override
 
 from PySide6.QtCore import Qt, Signal
-
-from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeyEvent, QKeySequence
+from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
     QGridLayout,
-    QHBoxLayout,
     QMainWindow,
     QMessageBox,
     QScrollArea,
-    QSizePolicy,
-    QSplitter,
     QStackedWidget,
     QStatusBar,
     QStyle,
     QTabWidget,
     QVBoxLayout,
-    QWidget,
 )
 
 # Session manager accessed via get_app_context().application_state_manager
@@ -41,10 +36,8 @@ from PySide6.QtWidgets import (
 from core.types import VRAMExtractionParams
 from ui.common import ErrorHandler
 from ui.common.spacing_constants import (
-    MIN_PANEL_WIDTH,
-    SPACING_COMPACT_SMALL,
-    SPACING_SMALL,
     SPACING_MEDIUM,
+    SPACING_SMALL,
 )
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
@@ -95,7 +88,10 @@ class MainWindow(QMainWindow):
         self._extracted_files: list[str]
         self._controller: ExtractionController | None
         self._error_handler: ErrorHandler
-        self.left_panel: QWidget
+        self.left_dock: QDockWidget
+        self.center_stack: QStackedWidget
+        self.undo_action: QAction
+        self.redo_action: QAction
         self.extraction_tabs: QTabWidget
         self.rom_extraction_panel: ROMExtractionPanel
         self.extraction_panel: ExtractionPanel
@@ -149,9 +145,9 @@ class MainWindow(QMainWindow):
 
         # Left Dock
         self.left_dock = QDockWidget("Controls", self)
-        self.left_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
-        self.left_dock.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable)
-        self.addDockWidget(Qt.LeftDockWidgetArea, self.left_dock)
+        self.left_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
+        self.left_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable | QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.left_dock)
 
         # Pre-create preview widgets (needed for UI Coordinator)
         self.sprite_preview = PreviewPanel()
@@ -164,6 +160,30 @@ class MainWindow(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Ready to extract sprites")
+
+    def _create_main_toolbar(self) -> None:
+        """Create the main toolbar with global actions."""
+        toolbar = self.addToolBar("Main Toolbar")
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+
+        style = QApplication.style()
+
+        # Undo
+        self.undo_action = QAction("Undo", self)
+        self.undo_action.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_ArrowBack))
+        self.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
+        self.undo_action.setEnabled(False)
+        self.undo_action.triggered.connect(self._on_undo)
+        toolbar.addAction(self.undo_action)
+
+        # Redo
+        self.redo_action = QAction("Redo", self)
+        self.redo_action.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_ArrowForward))
+        self.redo_action.setShortcut(QKeySequence.StandardKey.Redo)
+        self.redo_action.setEnabled(False)
+        self.redo_action.triggered.connect(self._on_redo)
+        toolbar.addAction(self.redo_action)
 
     def _create_workspaces(self) -> None:
         """Create workspace widgets."""
@@ -579,7 +599,6 @@ class MainWindow(QMainWindow):
 
     def _create_menus(self) -> None:
         """Create application menus"""
-        from PySide6.QtGui import QAction
 
         menubar = self.menuBar()
         if not menubar:

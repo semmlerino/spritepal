@@ -20,7 +20,6 @@ from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QSizePolicy,
     QStackedWidget,
     QVBoxLayout,

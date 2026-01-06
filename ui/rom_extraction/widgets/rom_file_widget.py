@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from PySide6.QtCore import Signal, Qt
 from PySide6.QtGui import QFontMetrics, QResizeEvent
-from PySide6.QtWidgets import QLabel, QProgressBar, QWidget, QSizePolicy
+from PySide6.QtWidgets import QLabel, QProgressBar, QSizePolicy, QWidget
 
 from ui.common.spacing_constants import (
     CONTROL_PANEL_LABEL_WIDTH,
@@ -45,6 +45,7 @@ class ElidedPathLabel(QLabel):
             }}
         """)
 
+    @override
     def setText(self, text: str) -> None:
         self._full_text = text
         if text:
@@ -74,13 +75,12 @@ class ElidedPathLabel(QLabel):
 
         self._update_elided_text()
 
+    @override
     def resizeEvent(self, event: QResizeEvent) -> None:
         self._update_elided_text()
         super().resizeEvent(event)
 
     def _update_elided_text(self) -> None:
-        text_to_show = self._full_text if self._full_text else self._placeholder
-        
         metrics = QFontMetrics(self.font())
         # Subtract typical padding (8px left + 8px right approx)
         width = self.width() - 16

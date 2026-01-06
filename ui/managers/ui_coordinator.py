@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.spacing_constants import (
-    MIN_PANEL_WIDTH,
     PALETTE_GROUP_MAX_HEIGHT,
     PALETTE_GROUP_MIN_HEIGHT,
     PREVIEW_GROUP_MIN_HEIGHT,

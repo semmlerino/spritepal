@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, cast, override
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
