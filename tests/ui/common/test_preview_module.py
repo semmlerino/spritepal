@@ -197,34 +197,38 @@ class TestPreviewModuleSignalForwarding:
         # Set up signal spy
         with qtbot.waitSignal(preview_module.preview_ready, timeout=signal_timeout()) as blocker:
             # Emit from coordinator
+            # Signal format: (tile_data, width, height, sprite_name, compressed_size, slack_size)
             tile_data = b"\x00\x01\x02"
             width = 8
             height = 8
             sprite_name = "test_sprite"
             compressed_size = 100
+            slack_size = 0
 
-            preview_module._coordinator.preview_ready.emit(tile_data, width, height, sprite_name, compressed_size)
+            preview_module._coordinator.preview_ready.emit(tile_data, width, height, sprite_name, compressed_size, slack_size)
 
         # Verify signal was received
         assert blocker.signal_triggered
-        assert blocker.args == [tile_data, width, height, sprite_name, compressed_size]
+        assert blocker.args == [tile_data, width, height, sprite_name, compressed_size, slack_size]
 
     def test_preview_cached_signal_forwarded(self, qtbot: QtBot, preview_module: PreviewModule) -> None:
         """Verify preview_cached signal is forwarded from coordinator."""
         # Set up signal spy
         with qtbot.waitSignal(preview_module.preview_cached, timeout=signal_timeout()) as blocker:
             # Emit from coordinator
+            # Signal format: (tile_data, width, height, sprite_name, compressed_size, slack_size)
             tile_data = b"\x00\x01\x02"
             width = 8
             height = 8
             sprite_name = "cached_sprite"
             compressed_size = 100
+            slack_size = 0
 
-            preview_module._coordinator.preview_cached.emit(tile_data, width, height, sprite_name, compressed_size)
+            preview_module._coordinator.preview_cached.emit(tile_data, width, height, sprite_name, compressed_size, slack_size)
 
         # Verify signal was received
         assert blocker.signal_triggered
-        assert blocker.args == [tile_data, width, height, sprite_name, compressed_size]
+        assert blocker.args == [tile_data, width, height, sprite_name, compressed_size, slack_size]
 
     def test_preview_error_signal_forwarded(self, qtbot: QtBot, preview_module: PreviewModule) -> None:
         """Verify preview_error signal is forwarded from coordinator."""

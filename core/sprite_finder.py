@@ -350,7 +350,7 @@ class SpriteFinder:
         # Step 2: Try decompression
         try:
             # Use ROMExtractor's rom_injector
-            compressed_size, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
+            compressed_size, sprite_data, _ = self.extractor.rom_injector.find_compressed_sprite(
                 rom_data, offset, expected_size=None
             )
             if len(sprite_data) == 0:
@@ -550,7 +550,7 @@ class SpriteFinder:
             sprite_data = b""
             try:
                 # Use ROMExtractor's rom_injector
-                compressed_size, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
+                compressed_size, sprite_data, _ = self.extractor.rom_injector.find_compressed_sprite(
                     rom_data, offset, expected_size=None
                 )
 
@@ -708,7 +708,7 @@ class SpriteFinder:
         try:
             # Try to decompress sprite at this offset
             # Use ROMExtractor's rom_injector
-            compressed_size, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
+            compressed_size, sprite_data, _ = self.extractor.rom_injector.find_compressed_sprite(
                 rom_data, offset, expected_size=None
             )
 

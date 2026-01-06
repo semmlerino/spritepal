@@ -127,6 +127,29 @@ class InjectionController(QObject):
                 create_backup=True,
             )
 
+            if not success and "ROM checksum mismatch" in message:
+                from PySide6.QtWidgets import QMessageBox
+
+                reply = QMessageBox.question(
+                    self._view,
+                    "ROM Checksum Mismatch",
+                    f"Validation failed: {message}\n\n"
+                    "This usually happens with modified/patched ROMs.\n"
+                    "Do you want to ignore this warning and proceed anyway?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+
+                if reply == QMessageBox.StandardButton.Yes:
+                    self._view.append_output("Retrying with lenient checksum validation...")
+                    success, message = self.rom_injector.inject_sprite_to_rom(
+                        sprite_path=png_file,
+                        rom_path=rom_file,
+                        output_path=rom_file,
+                        sprite_offset=offset,
+                        create_backup=True,
+                        ignore_checksum=True,
+                    )
+
             if success:
                 self._view.append_output("Success!")
                 self._view.append_output(message)

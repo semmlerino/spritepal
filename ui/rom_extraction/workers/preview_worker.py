@@ -24,8 +24,8 @@ class SpritePreviewWorker(BaseWorker):
     """Worker thread for loading sprite previews"""
 
     # Custom signals (BaseWorker provides progress, error, warning, operation_finished)
-    preview_ready = Signal(bytes, int, int, str, int)
-    """Emitted when preview is ready. Args: tile_data (bytes), width (pixels), height (pixels), sprite_name, compressed_size."""
+    preview_ready = Signal(bytes, int, int, str, int, int)
+    """Emitted when preview is ready. Args: tile_data (bytes), width (pixels), height (pixels), sprite_name, compressed_size, slack_size."""
 
     preview_error = Signal(str)
     """Emitted on preview error. Args: error_message."""
@@ -143,6 +143,7 @@ class SpritePreviewWorker(BaseWorker):
             # Try HAL decompression first for all sprites (including manual offset browsing)
             # This allows Lua-captured offsets to work correctly
             compressed_size = 0
+            slack_size = 0
 
             # First attempt: Try HAL decompression
             decompression_start = time.time()
@@ -168,13 +169,13 @@ class SpritePreviewWorker(BaseWorker):
                 # Try to decompress
                 rom_injector = self.extractor.rom_injector
                 if offset_variants:
-                    compressed_size, tile_data, successful_offset = rom_injector.find_compressed_sprite_with_fallback(
+                    compressed_size, tile_data, successful_offset, slack_size = rom_injector.find_compressed_sprite_with_fallback(
                         rom_data, self.offset, offset_variants, expected_size
                     )
                     if successful_offset != self.offset:
                         logger.info(f"Used alternate offset 0x{successful_offset:X} for {self.sprite_name}")
                 else:
-                    compressed_size, tile_data = rom_injector.find_compressed_sprite(
+                    compressed_size, tile_data, slack_size = rom_injector.find_compressed_sprite(
                         rom_data, self.offset, expected_size
                     )
 
@@ -183,9 +184,7 @@ class SpritePreviewWorker(BaseWorker):
                     f"[PREVIEW_WORKER] Successfully decompressed {len(tile_data)} bytes from offset 0x{self.offset:06X} in {decompression_time:.1f}ms"
                 )
                 logger.debug(
-                    f"[PREVIEW_WORKER] Compressed size: {compressed_size} bytes, Compression ratio: {len(tile_data) / compressed_size:.2f}x"
-                    if compressed_size > 0
-                    else "[PREVIEW_WORKER] No compression size info"
+                    f"[PREVIEW_WORKER] Compressed size: {compressed_size} bytes, slack: {slack_size} bytes"
                 )
 
             except Exception as decomp_error:
@@ -208,6 +207,7 @@ class SpritePreviewWorker(BaseWorker):
                         tile_data = rom_data[self.offset :]
 
                     compressed_size = 0
+                    slack_size = 0
                     logger.info(
                         f"[PREVIEW_WORKER] Extracted {len(tile_data)} bytes of raw tile data from 0x{self.offset:06X}"
                     )
@@ -259,7 +259,7 @@ class SpritePreviewWorker(BaseWorker):
             width = min(tiles_per_row * 8, 128)
             height = min(tile_rows * 8, 128)
 
-            self.preview_ready.emit(tile_data, width, height, self.sprite_name, compressed_size)
+            self.preview_ready.emit(tile_data, width, height, self.sprite_name, compressed_size, slack_size)
             self.operation_finished.emit(True, f"Preview loaded for {self.sprite_name}")
 
         except Exception as e:

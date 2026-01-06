@@ -264,7 +264,8 @@ class TestROMExtractor:
         rom_data = Path(rom_path).read_bytes()
 
         # Use the injector to find and decompress
-        compressed_size, decompressed_data = extractor.rom_injector.find_compressed_sprite(
+        # Returns: (compressed_size, decompressed_data, slack_size)
+        compressed_size, decompressed_data, _slack_size = extractor.rom_injector.find_compressed_sprite(
             rom_data, sprite_info["offset"], expected_size=None
         )
 

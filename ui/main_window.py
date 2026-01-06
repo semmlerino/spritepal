@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 else:
     from PySide6.QtGui import QCloseEvent, QKeyEvent
 from PySide6.QtWidgets import (
-    QFrame,
     QGridLayout,
     QHBoxLayout,
     QMainWindow,
@@ -30,6 +29,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSplitter,
+    QStackedWidget,
     QStatusBar,
     QTabWidget,
     QVBoxLayout,
@@ -55,8 +55,7 @@ from ui.managers import (
 )
 from ui.palette_preview import PalettePreviewWidget
 from ui.rom_extraction_panel import ROMExtractionPanel
-from ui.sprite_edit_tab import SpriteEditTab
-from ui.styles.components import get_action_zone_style
+from ui.workspaces import ExtractionWorkspace, SpriteEditorWorkspace
 from ui.zoomable_preview import PreviewPanel
 from utils.logging_config import get_logger
 
@@ -172,112 +171,118 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage("Ready to extract sprites")
 
     def _create_left_panel(self) -> QWidget:
-        """Create the left panel with tabs and action zone.
+        """Create the left panel with stacked workspaces.
 
         Structure:
-        - Tabs (top, takes available space):
-          - ROM Extraction: Wrapped in ScrollArea
-          - VRAM Extraction: Wrapped in ScrollArea
-          - Sprite Editor: Direct widget (no scroll wrapper, full height)
-        - Action Zone (bottom, fixed): Shared buttons for extraction tabs
+        - QStackedWidget containing:
+          - ExtractionWorkspace (index 0): ROM/VRAM extraction tabs + action zone
+          - SpriteEditorWorkspace (index 1): Full sprite editing experience
 
-        This ensures the Sprite Editor is not constrained by the extraction scroll area
-        or the action zone.
+        Keyboard shortcuts:
+        - Ctrl+1: ROM Extraction tab (in ExtractionWorkspace)
+        - Ctrl+2: VRAM Extraction tab (in ExtractionWorkspace)
+        - Ctrl+3: Switch to SpriteEditorWorkspace
         """
+        from core.app_context import get_app_context
+        from ui.rom_extraction.modules import Mesen2Module
+
         left_panel = QWidget(self)
         left_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         main_layout = QVBoxLayout(left_panel)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Create tab widget for extraction methods
-        self.extraction_tabs = QTabWidget(self)
-        self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.extraction_tabs.currentChanged.connect(self._on_tab_changed)
+        # Create workspace stack
+        self._workspace_stack = QStackedWidget()
+        self._workspace_stack.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        # ROM extraction tab (wrapped in scroll area)
-        from core.app_context import get_app_context
-
+        # Get dependencies from app context
         extraction_manager = get_app_context().core_operations_manager
-
-        # Create Mesen2Module for log watcher lifecycle management
-        from ui.rom_extraction.modules import Mesen2Module
-
         log_watcher = get_app_context().log_watcher
         mesen2_module = Mesen2Module(log_watcher=log_watcher, parent=self)
 
-        self.rom_extraction_panel = ROMExtractionPanel(
+        # ExtractionWorkspace (index 0)
+        self._extraction_workspace = ExtractionWorkspace(
             parent=self,
             extraction_manager=extraction_manager,
             state_manager=self.settings_manager,
             rom_cache=self.rom_cache,
             mesen2_module=mesen2_module,
         )
+        self._workspace_stack.addWidget(self._extraction_workspace)
 
-        rom_scroll = QScrollArea()
-        rom_scroll.setWidgetResizable(True)
-        rom_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        rom_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        rom_scroll.setWidget(self.rom_extraction_panel)
-
-        self.extraction_tabs.addTab(rom_scroll, "ROM Extraction")
-        self.extraction_tabs.setTabToolTip(0, "Extract sprites directly from game ROM files")
-
-        # VRAM extraction tab (wrapped in scroll area)
-        self.extraction_panel = ExtractionPanel(settings_manager=self.settings_manager)
-
-        vram_scroll = QScrollArea()
-        vram_scroll.setWidgetResizable(True)
-        vram_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        vram_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        vram_scroll.setWidget(self.extraction_panel)
-
-        self.extraction_tabs.addTab(vram_scroll, "VRAM Extraction")
-        self.extraction_tabs.setTabToolTip(1, "Extract from emulator memory dumps (VRAM/CGRAM/OAM)")
-
-        # Sprite Editor tab (direct, no scroll wrapper)
-        self.sprite_edit_tab = SpriteEditTab(
+        # SpriteEditorWorkspace (index 1)
+        self._sprite_editor_workspace = SpriteEditorWorkspace(
             parent=self,
             settings_manager=self.settings_manager,
         )
-        self.extraction_tabs.addTab(self.sprite_edit_tab, "Sprite Editor")
-        self.extraction_tabs.setTabToolTip(2, "Edit sprites: Extract, Edit, Inject workflow")
+        self._workspace_stack.addWidget(self._sprite_editor_workspace)
 
-        # Add tabs to layout
-        main_layout.addWidget(self.extraction_tabs, 1)
+        # Connect workspace signals
+        self._extraction_workspace.tab_changed.connect(self._on_extraction_tab_changed)
+        self._sprite_editor_workspace.status_message.connect(self._on_status_message)
 
-        # ACTION ZONE: Fixed height, pinned to bottom
-        self.action_zone = QWidget()
-        self.action_zone.setObjectName("actionZone")
-        self.action_zone.setStyleSheet(get_action_zone_style())
-        self.action_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        action_zone_layout = QVBoxLayout(self.action_zone)
-        # Tight top margin - CSS border-top provides visual separation
-        action_zone_layout.setContentsMargins(LAYOUT_MARGINS, SPACING_COMPACT_SMALL, LAYOUT_MARGINS, LAYOUT_MARGINS)
-        action_zone_layout.setSpacing(SPACING_COMPACT_SMALL)
+        main_layout.addWidget(self._workspace_stack, 1)
 
-        # Output settings and buttons will be added by managers in _setup_managers()
-
-        main_layout.addWidget(self.action_zone)  # No stretch = fixed size based on content
+        # Backward compatibility: expose panels that other code might reference
+        self.extraction_tabs = self._extraction_workspace.extraction_tabs
+        self.rom_extraction_panel = self._extraction_workspace.rom_extraction_panel
+        self.extraction_panel = self._extraction_workspace.extraction_panel
+        self.action_zone = self._extraction_workspace.action_zone
+        self.sprite_edit_tab = self._sprite_editor_workspace  # Type changed but API similar
 
         return left_panel
 
+    def _on_extraction_tab_changed(self, index: int) -> None:
+        """Handle extraction tab changes within ExtractionWorkspace."""
+        # Action zone is part of ExtractionWorkspace, so no visibility toggle needed
+        pass
+
+    def _on_status_message(self, message: str) -> None:
+        """Handle status messages from sprite editor."""
+        self.status_bar_manager.show_message(message)
+
     def _on_tab_changed(self, index: int) -> None:
-        """Handle tab changes to update UI visibility.
+        """Handle legacy tab changes (now unused with workspace architecture).
+
+        With the new workspace architecture, tabs are within ExtractionWorkspace
+        and don't need action zone visibility toggling.
 
         Args:
-            index: New tab index
+            index: Tab index (unused)
         """
-        # Guard against early calls before action_zone is created during init
-        if not hasattr(self, "action_zone"):
-            return
+        # Action zone is now part of ExtractionWorkspace, always visible
+        pass
 
-        # Hide action zone for Sprite Editor (index 2) as it has its own controls
-        # and needs full vertical space
-        if index == 2:
-            self.action_zone.hide()
-        else:
-            self.action_zone.show()
+    def switch_to_workspace(self, workspace_index: int, tab_index: int | None = None) -> None:
+        """Switch to a specific workspace and optionally a tab within it.
+
+        Args:
+            workspace_index: 0 for Extraction, 1 for Sprite Editor
+            tab_index: Optional tab index within the workspace
+        """
+        self._workspace_stack.setCurrentIndex(workspace_index)
+
+        if tab_index is not None and workspace_index == 0:
+            # Switch tab within ExtractionWorkspace
+            self._extraction_workspace.set_current_tab(tab_index)
+
+    def handle_tab_switch(self, index: int) -> None:
+        """Handle tab switch requests from keyboard shortcuts.
+
+        Ctrl+1: ROM Extraction (extraction workspace, tab 0)
+        Ctrl+2: VRAM Extraction (extraction workspace, tab 1)
+        Ctrl+3: Sprite Editor workspace
+
+        Args:
+            index: Requested tab index (0-2)
+        """
+        if index == 0:
+            self.switch_to_workspace(0, 0)  # Extraction workspace, ROM tab
+        elif index == 1:
+            self.switch_to_workspace(0, 1)  # Extraction workspace, VRAM tab
+        elif index == 2:
+            self.switch_to_workspace(1)  # Sprite Editor workspace
 
     def _setup_managers(self) -> None:
         """Set up all UI managers"""
@@ -707,13 +712,13 @@ class MainWindow(QMainWindow):
         self.rom_extraction_panel.output_name_changed.connect(self._on_rom_output_name_changed)
 
         # Connect sprite editor status messages to main status bar
-        self.sprite_edit_tab.status_message.connect(lambda msg: self.status_bar_manager.show_message(msg, 3000))
+        self._sprite_editor_workspace.status_message.connect(lambda msg: self.status_bar_manager.show_message(msg, 3000))
 
         # Connect ROM panel's "open in sprite editor" signal
         self.rom_extraction_panel.open_in_sprite_editor.connect(self._on_open_in_sprite_editor)
 
         # Sync ROM path to sprite editor
-        self.rom_extraction_panel.rom_loaded.connect(self.sprite_edit_tab.load_rom)
+        self.rom_extraction_panel.rom_loaded.connect(self._sprite_editor_workspace.load_rom)
 
         # Connect ROM panel's Mesen2 watching status to status bar
         self.rom_extraction_panel.mesen2_watching_changed.connect(self.status_bar_manager.set_mesen2_watching)
@@ -787,11 +792,11 @@ class MainWindow(QMainWindow):
         """
         logger.info("Opening offset 0x%06X in sprite editor", offset)
         if self.rom_extraction_panel.rom_path:
-            self.sprite_edit_tab.load_rom(self.rom_extraction_panel.rom_path)
-        # Switch to sprite editor tab
-        self.extraction_tabs.setCurrentIndex(2)
+            self._sprite_editor_workspace.load_rom(self.rom_extraction_panel.rom_path)
+        # Switch to sprite editor workspace
+        self._workspace_stack.setCurrentWidget(self._sprite_editor_workspace)
         # Jump to offset in sprite editor
-        self.sprite_edit_tab.jump_to_offset(offset)
+        self._sprite_editor_workspace.jump_to_offset(offset)
 
     # Tab change handling now managed by UICoordinator
 

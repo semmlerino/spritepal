@@ -278,8 +278,9 @@ class TestROMExtractorMainExtraction:
         mock_extractor.rom_injector.read_rom_header.return_value = mock_header
 
         # Mock compressed sprite data
+        # Returns (compressed_size, decompressed_data, slack_size)
         test_sprite_data = b"\x00" * (4 * BYTES_PER_TILE)  # 4 tiles
-        mock_extractor.rom_injector.find_compressed_sprite.return_value = (100, test_sprite_data)
+        mock_extractor.rom_injector.find_compressed_sprite.return_value = (100, test_sprite_data, 0)
 
         # Mock sprite config loader to return empty dict (no sprite config found)
         mock_extractor.sprite_config_loader.get_game_sprites.return_value = {}
@@ -325,9 +326,9 @@ class TestROMExtractorMainExtraction:
         mock_header.header_offset = 0  # No SMC header
         mock_extractor.rom_injector.read_rom_header.return_value = mock_header
 
-        # Mock sprite data
+        # Mock sprite data (compressed_size, decompressed_data, slack_size)
         test_sprite_data = b"\x00" * (8 * BYTES_PER_TILE)
-        mock_extractor.rom_injector.find_compressed_sprite.return_value = (200, test_sprite_data)
+        mock_extractor.rom_injector.find_compressed_sprite.return_value = (200, test_sprite_data, 0)
 
         # Mock sprite config loader to return config for test_sprite
         mock_sprite_config = Mock()
@@ -370,9 +371,9 @@ class TestROMExtractorMainExtraction:
         mock_header.header_offset = 0  # No SMC header
         mock_extractor.rom_injector.read_rom_header.return_value = mock_header
 
-        # Mock sprite data
+        # Mock sprite data (compressed_size, decompressed_data, slack_size)
         test_sprite_data = b"\x00" * (2 * BYTES_PER_TILE)
-        mock_extractor.rom_injector.find_compressed_sprite.return_value = (50, test_sprite_data)
+        mock_extractor.rom_injector.find_compressed_sprite.return_value = (50, test_sprite_data, 0)
 
         # Mock sprite config loader to return empty dict (no sprite config found)
         mock_extractor.sprite_config_loader.get_game_sprites.return_value = {}
@@ -412,9 +413,9 @@ class TestROMExtractorMainExtraction:
         mock_header.header_offset = 0  # No SMC header
         mock_extractor.rom_injector.read_rom_header.return_value = mock_header
 
-        # Mock sprite data
+        # Mock sprite data (compressed_size, decompressed_data, slack_size)
         test_sprite_data = b"\x00" * BYTES_PER_TILE
-        mock_extractor.rom_injector.find_compressed_sprite.return_value = (25, test_sprite_data)
+        mock_extractor.rom_injector.find_compressed_sprite.return_value = (25, test_sprite_data, 0)
 
         output_path, extraction_info = mock_extractor.extract_sprite_from_rom(
             str(rom_path),
@@ -617,11 +618,12 @@ class TestROMExtractorScanMethods:
         rom_path.write_bytes(rom_data)
 
         # Mock successful decompression at specific offsets
+        # Returns (compressed_size, decompressed_data, slack_size)
         test_sprite_data = b"\x00" * (32 * BYTES_PER_TILE)  # 32 tiles
         extractor.rom_injector.find_compressed_sprite.side_effect = [
-            (256, test_sprite_data),  # First offset - valid
+            (256, test_sprite_data, 0),  # First offset - valid
             Exception("No sprite"),  # Second offset - invalid
-            (512, test_sprite_data),  # Third offset - valid
+            (512, test_sprite_data, 0),  # Third offset - valid
         ]
 
         found_sprites = extractor.scan_for_sprites(str(rom_path), 0x1000, 0x1300, step=0x100)
@@ -662,9 +664,10 @@ class TestROMExtractorScanMethods:
         good_sprite = self._create_realistic_sprite_data(64)  # 64 tiles
         bad_sprite = b"\x00" * 100  # Not aligned, too small
 
+        # Returns (compressed_size, decompressed_data, slack_size)
         extractor.rom_injector.find_compressed_sprite.side_effect = [
-            (256, good_sprite),
-            (50, bad_sprite),  # Should be rejected
+            (256, good_sprite, 0),
+            (50, bad_sprite, 0),  # Should be rejected
         ]
 
         found_sprites = extractor.scan_for_sprites(str(rom_path), 0x0, 0x200, step=0x100)

@@ -15,7 +15,7 @@ from core.app_context import get_app_context
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 
 if TYPE_CHECKING:
-    from ..views.tabs.rom_workflow_tab import ROMWorkflowTab
+    from ..views.workspaces.rom_workflow_page import ROMWorkflowPage
     from .main_controller import MainController
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class ROMWorkflowController(QObject):
     def __init__(self, main_controller: "MainController") -> None:
         super().__init__(main_controller)
         self.main_controller = main_controller
-        self._view: ROMWorkflowTab | None = None
+        self._view: "ROMWorkflowPage | None" = None
 
         # Core components - use shared instances from AppContext
         context = get_app_context()
@@ -65,6 +65,7 @@ class ROMWorkflowController(QObject):
         self.current_height: int = 0
         self.current_sprite_name: str = ""
         self.original_compressed_size: int = 0
+        self.available_slack: int = 0
 
         # Connect LogWatcher
         self._connect_log_watcher()
@@ -83,7 +84,7 @@ class ROMWorkflowController(QObject):
             if isinstance(capture, CapturedOffset):
                 self._view.recent_captures_widget.add_capture(capture)
 
-    def set_view(self, view: "ROMWorkflowTab") -> None:
+    def set_view(self, view: "ROMWorkflowPage") -> None:
         """Set the view and connect signals."""
         self._view = view
         self._connect_view_signals()
@@ -91,7 +92,7 @@ class ROMWorkflowController(QObject):
         # Load existing persistent clicks
         persistent_clicks = self.log_watcher.load_persistent_clicks()
         if persistent_clicks:
-            self._view.recent_captures_widget.load_persistent(persistent_clicks)
+            view.recent_captures_widget.load_persistent(persistent_clicks)
 
     def _connect_view_signals(self) -> None:
         """Connect view signals."""
@@ -306,11 +307,21 @@ class ROMWorkflowController(QObject):
             msg = "Ready to inject edited sprite into ROM.\n\n"
             msg += f"Target Offset: 0x{self.current_offset:06X}\n"
             msg += f"Original Size: {self.original_compressed_size} bytes\n"
+            
+            # Use max 32 bytes slack by default for safety
+            safe_slack = min(self.available_slack, 32)
+            if self.available_slack > 0:
+                msg += f"Available Space: {self.original_compressed_size + safe_slack} bytes "
+                msg += f"({self.original_compressed_size} + {safe_slack} slack)\n"
+            
             msg += f"New Size: {new_size} bytes\n\n"
 
-            if new_size > self.original_compressed_size and self.original_compressed_size > 0:
-                msg += "⚠️ WARNING: New sprite is LARGER than original. "
-                msg += "This may overwrite adjacent data if not carefully handled!\n\n"
+            if new_size > (self.original_compressed_size + safe_slack):
+                msg += "⚠️ WARNING: New sprite is LARGER than available space. "
+                msg += "This WILL overwrite adjacent data and likely crash the game!\n\n"
+            elif new_size > self.original_compressed_size:
+                msg += "NOTE: New sprite is slightly larger than original, "
+                msg += f"but fits within detected slack space ({new_size - self.original_compressed_size} bytes used).\n\n"
 
             msg += "A backup of the ROM will be created automatically.\n"
             msg += "Proceed with injection?"
@@ -350,6 +361,8 @@ class ROMWorkflowController(QObject):
 
             # Perform injection with backup
             rom_injector = self.rom_extractor.rom_injector
+            
+            # First attempt (standard validation)
             success, message = rom_injector.inject_sprite_to_rom(
                 sprite_path=temp_png,
                 rom_path=self.rom_path,
@@ -357,6 +370,59 @@ class ROMWorkflowController(QObject):
                 sprite_offset=self.current_offset,
                 create_backup=True,
             )
+            
+            # Handle failure due to checksum mismatch
+            if not success and "ROM checksum mismatch" in message:
+                from PySide6.QtWidgets import QMessageBox
+
+                reply = QMessageBox.question(
+                    self._view,
+                    "ROM Checksum Mismatch",
+                    f"Validation failed: {message}\n\n"
+                    "This usually happens with modified/patched ROMs.\n"
+                    "Do you want to ignore this warning and proceed anyway?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+
+                if reply == QMessageBox.StandardButton.Yes:
+                    self.status_message.emit("Retrying with lenient checksum validation...")
+                    success, message = rom_injector.inject_sprite_to_rom(
+                        sprite_path=temp_png,
+                        rom_path=self.rom_path,
+                        output_path=self.rom_path,
+                        sprite_offset=self.current_offset,
+                        create_backup=True,
+                        ignore_checksum=True,
+                    )
+
+            # Handle failure due to compressed size too large
+            if not success and "Compressed sprite too large" in message:
+                from PySide6.QtWidgets import QMessageBox
+
+                reply = QMessageBox.warning(
+                    self._view,
+                    "Sprite Too Large",
+                    f"{message}\n\n"
+                    "⚠️ FORCE INJECTION WARNING ⚠️\n\n"
+                    "Force injecting will overwrite adjacent ROM data, which may:\n"
+                    "• Corrupt other sprites or game data\n"
+                    "• Cause the game to crash or glitch\n\n"
+                    "A backup of your ROM will be created first.\n\n"
+                    "Do you want to force inject anyway?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,  # Default to No
+                )
+
+                if reply == QMessageBox.StandardButton.Yes:
+                    self.status_message.emit("Force injecting (backup created)...")
+                    success, message = rom_injector.inject_sprite_to_rom(
+                        sprite_path=temp_png,
+                        rom_path=self.rom_path,
+                        output_path=self.rom_path,
+                        sprite_offset=self.current_offset,
+                        create_backup=True,
+                        force=True,
+                    )
 
             # Cleanup temp file
             try:
@@ -402,7 +468,7 @@ class ROMWorkflowController(QObject):
         return (self.rom_path, self.rom_extractor)
 
     def _on_preview_ready(
-        self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int
+        self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int, slack_size: int = 0
     ) -> None:
         """Handle preview ready from coordinator."""
         self.current_tile_data = tile_data
@@ -410,6 +476,7 @@ class ROMWorkflowController(QObject):
         self.current_height = height
         self.current_sprite_name = sprite_name
         self.original_compressed_size = compressed_size
+        self.available_slack = slack_size
 
         # Render for view
         from ..services import SpriteRenderer
@@ -422,7 +489,8 @@ class ROMWorkflowController(QObject):
 
         if self._view:
             self._view.update_preview(image)
-            self.status_message.emit(f"Sprite found! Original size: {compressed_size} bytes")
+            slack_info = f" (+{slack_size} slack)" if slack_size > 0 else ""
+            self.status_message.emit(f"Sprite found! Original size: {compressed_size} bytes{slack_info}")
 
     def _on_preview_error(self, error_msg: str) -> None:
         """Handle preview error."""

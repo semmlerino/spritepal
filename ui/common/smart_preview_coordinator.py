@@ -100,8 +100,8 @@ class SmartPreviewCoordinator(QObject):
     """
 
     # Signals for preview updates
-    preview_ready = Signal(bytes, int, int, str, int)  # tile_data, width, height, name, compressed_size
-    preview_cached = Signal(bytes, int, int, str, int)  # Cached preview displayed, with compressed_size
+    preview_ready = Signal(bytes, int, int, str, int, int)  # tile_data, width, height, name, compressed_size, slack_size
+    preview_cached = Signal(bytes, int, int, str, int, int)  # Cached preview displayed, with compressed_size, slack_size
     preview_error = Signal(str)  # Error message
 
     def __init__(self, parent: QObject | None = None):
@@ -372,12 +372,14 @@ class SmartPreviewCoordinator(QObject):
             cache_key = self._cache.make_key(rom_path, offset)
             cached_data = self._cache.get(cache_key)
 
-            if cached_data:
-                tile_data, width, height, sprite_name, compressed_size = cached_data
+            # cached_data is never None, but might be empty (b"", 0, 0, None, 0, 0)
+            if cached_data and cached_data[0]:  # Check if tile_data is not empty
+                # cached_data contains 6 elements (tile_data, width, height, sprite_name, compressed_size, slack_size)
+                tile_data, width, height, sprite_name, compressed_size, slack_size = cached_data
 
                 if _validate_tile_data(tile_data):
                     logger.debug(f"Cache hit for 0x{offset:06X}: {len(tile_data)} bytes")
-                    self.preview_cached.emit(tile_data, width, height, sprite_name or "", compressed_size)
+                    self.preview_cached.emit(tile_data, width, height, sprite_name or "", compressed_size, slack_size)
                     return True
 
                 # Remove invalid entry from cache
@@ -428,12 +430,12 @@ class SmartPreviewCoordinator(QObject):
             self.preview_error.emit(f"Preview request failed: {e}")
 
     def _on_worker_preview_ready(
-        self, request_id: int, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int
+        self, request_id: int, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int, slack_size: int = 0
     ) -> None:
         """Handle preview ready from worker."""
         logger.debug(
             f"[COORD] Received worker preview: request_id={request_id}, sprite_name={sprite_name}, "
-            f"current_counter={self._request_counter}"
+            f"current_counter={self._request_counter}, slack_size={slack_size}"
         )
         # Check if this is still the current request
         with QMutexLocker(self._mutex):
@@ -447,20 +449,20 @@ class SmartPreviewCoordinator(QObject):
                 provider_result = self._rom_data_provider()
                 if provider_result is None:
                     # Emit result even if caching fails
-                    self.preview_ready.emit(tile_data, width, height, sprite_name, compressed_size)
+                    self.preview_ready.emit(tile_data, width, height, sprite_name, compressed_size, slack_size)
                     return
                 rom_path, _ = provider_result
-                preview_data = (tile_data, width, height, sprite_name, compressed_size)
+                preview_data = (tile_data, width, height, sprite_name, compressed_size, slack_size)
 
                 # Save to memory cache
                 cache_key = self._cache.make_key(rom_path, self._current_offset)
                 self._cache.put(cache_key, preview_data)
-                logger.debug(f"Cached preview for 0x{self._current_offset:06X}: {len(tile_data)} bytes")
+                logger.debug(f"Cached preview for 0x{self._current_offset:06X}: {len(tile_data)} bytes (slack: {slack_size})")
             except Exception as e:
                 logger.warning(f"Error caching preview: {e}")
 
         logger.debug(f"[COORD] Forwarding preview_ready: sprite_name={sprite_name}")
-        self.preview_ready.emit(tile_data, width, height, sprite_name, compressed_size)
+        self.preview_ready.emit(tile_data, width, height, sprite_name, compressed_size, slack_size)
 
     def _on_worker_preview_error(self, request_id: int, error_msg: str) -> None:
         """Handle preview error from worker."""

@@ -513,7 +513,7 @@ class BatchThumbnailWorker(QObject):
                     chunk = self._read_rom_chunk(request.offset, 0x10000)  # Read up to 64KB
                     if chunk:
                         rom_injector = self.rom_extractor.rom_injector
-                        _, decompressed_data = rom_injector.find_compressed_sprite(
+                        _, decompressed_data, _ = rom_injector.find_compressed_sprite(
                             chunk,
                             0,  # Offset within chunk
                             expected_size=None,

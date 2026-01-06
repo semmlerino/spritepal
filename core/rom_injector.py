@@ -103,7 +103,7 @@ class ROMInjector(SpriteInjector):
 
     def find_compressed_sprite(
         self, rom_data: bytes | bytearray, offset: int, expected_size: int | None = None
-    ) -> tuple[int, bytes]:
+    ) -> tuple[int, bytes, int]:
         """
         Find and decompress sprite data at given offset.
 
@@ -113,7 +113,8 @@ class ROMInjector(SpriteInjector):
             expected_size: Expected decompressed size (will truncate if larger)
 
         Returns:
-            Tuple of (compressed_size, decompressed_data)
+            Tuple of (compressed_size, decompressed_data, slack_size)
+            - slack_size: Number of padding bytes (0xFF/0x00) following the compressed block
         """
         logger.debug(f"Finding and decompressing sprite at offset 0x{offset:X}")
 
@@ -217,6 +218,9 @@ class ROMInjector(SpriteInjector):
             # Falls back to conservative heuristic if parsing fails
             compressed_size = self._parse_hal_compressed_size(bytes(rom_data), offset)
 
+            # Calculate slack space (trailing 0xFF or 0x00 padding before next block)
+            slack_size = self._detect_slack_space(bytes(rom_data), offset + compressed_size)
+
             # Validate compression ratio is reasonable (HAL typically achieves 30-70%)
             # This helps detect parser errors and reject non-sprite data
             # Only apply strict ratio check when parser found a proper terminator
@@ -229,7 +233,7 @@ class ROMInjector(SpriteInjector):
                         f"Rejected: invalid compression ratio ({compression_ratio:.2%}) at 0x{offset:X}. "
                         f"compressed={compressed_size}, decompressed={original_size}"
                     )
-                    return 0, b""  # Reject this candidate
+                    return 0, b"", 0  # Reject this candidate
 
             if original_size > 0:
                 compression_ratio = compressed_size / original_size
@@ -248,12 +252,48 @@ class ROMInjector(SpriteInjector):
 
             logger.debug(
                 f"Decompressed {original_size} bytes (truncated to {len(decompressed)} bytes), "
-                f"estimated compressed size: {compressed_size} bytes"
+                f"estimated compressed size: {compressed_size} bytes, slack: {slack_size} bytes"
             )
-            return compressed_size, decompressed
+            return compressed_size, decompressed, slack_size
 
         finally:
             Path(tmp_rom).unlink(missing_ok=True)
+
+    def _detect_slack_space(self, rom_data: bytes, start_offset: int) -> int:
+        """
+        Detect number of trailing padding bytes (0xFF or 0x00) after a compressed block.
+
+        This 'slack' space can safely be used if a new compressed sprite is slightly
+        larger than the original, without overwriting adjacent sprites or data.
+
+        Args:
+            rom_data: Full ROM data
+            start_offset: Offset immediately after the original compressed block (after 0xFF terminator)
+
+        Returns:
+            Number of padding bytes found (capped at 256 for safety)
+        """
+        if start_offset >= len(rom_data):
+            return 0
+
+        max_slack = 256  # Safety limit: never overwrite more than 256 bytes of padding
+        slack = 0
+
+        # Detect padding character from the first byte
+        pad_char = rom_data[start_offset]
+        if pad_char not in (0x00, 0xFF):
+            return 0
+
+        for i in range(start_offset, min(start_offset + max_slack, len(rom_data))):
+            if rom_data[i] == pad_char:
+                slack += 1
+            else:
+                break
+
+        if slack > 0:
+            logger.debug(f"Detected {slack} bytes of slack space (0x{pad_char:02X}) at 0x{start_offset:X}")
+
+        return slack
 
     def _validate_sprite_data(self, data: bytes) -> bool:
         """
@@ -527,6 +567,8 @@ class ROMInjector(SpriteInjector):
         sprite_offset: int,
         fast_compression: bool = False,
         create_backup: bool = True,
+        ignore_checksum: bool = False,
+        force: bool = False,
     ) -> tuple[bool, str]:
         """
         Inject sprite directly into ROM file with validation and backup.
@@ -538,6 +580,8 @@ class ROMInjector(SpriteInjector):
             sprite_offset: Offset in ROM where sprite data is located
             fast_compression: Use fast compression mode
             create_backup: Create backup before modification
+            ignore_checksum: If True, warn on checksum mismatch instead of failing
+            force: If True, inject even if compressed size exceeds limit (may corrupt ROM)
 
         Returns:
             Tuple of (success, message)
@@ -547,7 +591,9 @@ class ROMInjector(SpriteInjector):
             logger.info(f"Starting ROM injection: {Path(sprite_path).name} -> offset 0x{sprite_offset:X}")
 
             # Validate ROM before modification
-            _header_info, _header_offset = ROMValidator.validate_rom_for_injection(rom_path, sprite_offset)
+            _header_info, _header_offset = ROMValidator.validate_rom_for_injection(
+                rom_path, sprite_offset, lenient_checksum=ignore_checksum
+            )
 
             # Create backup if requested - ABORT if backup fails
             backup_path = None
@@ -586,8 +632,10 @@ class ROMInjector(SpriteInjector):
 
             # Find and decompress original sprite for size comparison
             logger.info("Analyzing original sprite data in ROM")
-            original_size, original_data = self.find_compressed_sprite(self.rom_data, file_offset)
+            original_size, original_data, slack_size = self.find_compressed_sprite(self.rom_data, file_offset)
             logger.debug(f"Original sprite: {original_size} bytes compressed, {len(original_data)} bytes decompressed")
+            if slack_size > 0:
+                logger.info(f"Available slack space after sprite: {slack_size} bytes")
 
             # Compress new sprite data
             # FIX #1: Use try-finally to guarantee temp file cleanup on any error
@@ -618,15 +666,53 @@ class ROMInjector(SpriteInjector):
                 logger.info(f"  - Space saved vs original: {space_saved} bytes")
 
                 # Check if compressed data fits
-                if compressed_size > original_size:
+                # We allow using slack space up to 32 bytes by default
+                max_slack_usage = 32
+                effective_limit = original_size + min(slack_size, max_slack_usage)
+
+                overflow_bytes = compressed_size - effective_limit
+                if compressed_size > effective_limit:
                     suggestion = (
                         "standard compression" if fast_compression else "a smaller sprite or split it into parts"
                     )
-                    return False, (
-                        f"Compressed sprite too large: {compressed_size} bytes "
-                        f"(original: {original_size} bytes).\n"
-                        f"Compression ratio: {compression_ratio:.1f}%\n"
-                        f"Try using {suggestion}."
+                    slack_msg = f" (including {min(slack_size, max_slack_usage)} bytes slack)" if slack_size > 0 else ""
+
+                    # Enhanced diagnostics for 0 slack
+                    diag_msg = ""
+                    if slack_size == 0:
+                        next_byte_offset = file_offset + original_size
+                        if next_byte_offset < len(self.rom_data):
+                            next_byte = self.rom_data[next_byte_offset]
+                            diag_msg = f" No slack detected. Next byte at 0x{next_byte_offset:X} is 0x{next_byte:02X}."
+                        else:
+                            diag_msg = " No slack detected (end of ROM)."
+
+                    if not force:
+                        return False, (
+                            f"Compressed sprite too large: {compressed_size} bytes "
+                            f"(original limit: {original_size} bytes{slack_msg}).{diag_msg}\n"
+                            f"Compression ratio: {compression_ratio:.1f}%\n"
+                            f"Try using {suggestion}."
+                        )
+                    else:
+                        # Force injection - warn but proceed
+                        logger.warning(
+                            f"FORCE INJECTION: Overwriting {overflow_bytes} bytes of adjacent data! "
+                            f"Compressed: {compressed_size}, Limit: {effective_limit}"
+                        )
+                        # Show what data will be overwritten
+                        overwrite_start = file_offset + effective_limit
+                        overwrite_end = min(overwrite_start + overflow_bytes, len(self.rom_data))
+                        overwritten_data = self.rom_data[overwrite_start:overwrite_end]
+                        logger.warning(
+                            f"Data being overwritten at 0x{overwrite_start:X}: "
+                            f"{overwritten_data[:16].hex(' ').upper()}{'...' if len(overwritten_data) > 16 else ''}"
+                        )
+                
+                if compressed_size > original_size:
+                    logger.warning(
+                        f"New sprite ({compressed_size} bytes) is larger than original ({original_size} bytes). "
+                        f"Using {compressed_size - original_size} bytes of slack space."
                     )
 
                 # Read compressed data
@@ -652,6 +738,8 @@ class ROMInjector(SpriteInjector):
             modified_rom[file_offset : file_offset + compressed_size] = compressed_data
 
             # Pad remaining space if needed
+            # IMPORTANT: If we used slack space, original_size might be less than compressed_size
+            # We only pad if we are smaller than the ORIGINAL space we occupied
             if compressed_size < original_size:
                 padding = b"\xff" * (original_size - compressed_size)
                 modified_rom[file_offset + compressed_size : file_offset + original_size] = padding
@@ -676,14 +764,25 @@ class ROMInjector(SpriteInjector):
         except Exception as e:
             return False, f"ROM injection error: {e!s}"
         else:
+            slack_used = max(0, compressed_size - original_size)
+            slack_info = f" ({slack_used} bytes slack used)" if slack_used > 0 else ""
+
+            # Check if force injection was used (overflow occurred)
+            force_warning = ""
+            if force and overflow_bytes > 0:
+                force_warning = (
+                    f"\n⚠️ FORCE INJECTION: {overflow_bytes} bytes of adjacent data overwritten!\n"
+                    "Test the ROM carefully - game may crash or show glitches."
+                )
+
             return True, (
-                f"Successfully injected sprite at 0x{sprite_offset:X}\n"
+                f"Successfully injected sprite at 0x{sprite_offset:X}{slack_info}\n"
                 f"Original size: {original_size} bytes\n"
                 f"New size: {compressed_size} bytes ({compression_ratio:.1f}% compression)\n"
                 f"Space saved: {space_saved} bytes\n"
                 f"Compression mode: {compression_mode}\n"
                 f"Checksum updated: 0x{self.header.checksum:04X}\n"
-                f"Total time: {total_time:.2f} seconds"
+                f"Total time: {total_time:.2f} seconds{force_warning}"
             )
 
     def find_sprite_locations(self, rom_path: str) -> dict[str, SpritePointer]:
@@ -735,7 +834,7 @@ class ROMInjector(SpriteInjector):
         primary_offset: int,
         fallback_offsets: list[int] | None = None,
         expected_size: int | None = None,
-    ) -> tuple[int, bytes, int]:
+    ) -> tuple[int, bytes, int, int]:
         """
         Try to find and decompress sprite data with fallback offsets.
 
@@ -746,7 +845,7 @@ class ROMInjector(SpriteInjector):
             expected_size: Expected decompressed size (will truncate if larger)
 
         Returns:
-            Tuple of (compressed_size, decompressed_data, successful_offset)
+            Tuple of (compressed_size, decompressed_data, successful_offset, slack_size)
         """
         offsets_to_try = [primary_offset]
         if fallback_offsets:
@@ -758,19 +857,19 @@ class ROMInjector(SpriteInjector):
         for i, offset in enumerate(offsets_to_try):
             logger.debug(f"Trying offset {i + 1}/{len(offsets_to_try)}: 0x{offset:X}")
             try:
-                compressed_size, decompressed = self.find_compressed_sprite(rom_data, offset, expected_size)
+                compressed_size, decompressed, slack_size = self.find_compressed_sprite(rom_data, offset, expected_size)
 
                 # Check if data is valid (multiple of tile size)
                 extra_bytes = len(decompressed) % BYTES_PER_TILE
 
                 if extra_bytes == 0:
                     logger.info(f"Successfully decompressed sprite at offset 0x{offset:X} (perfectly aligned)")
-                    return compressed_size, decompressed, offset
+                    return compressed_size, decompressed, offset, slack_size
                 if extra_bytes <= BYTES_PER_TILE // 4:  # Allow up to 8 extra bytes
                     logger.info(
                         f"Successfully decompressed sprite at offset 0x{offset:X} (minor misalignment: {extra_bytes} extra bytes)"
                     )
-                    return compressed_size, decompressed, offset
+                    return compressed_size, decompressed, offset, slack_size
                 logger.warning(
                     f"Offset 0x{offset:X} produced misaligned data ({extra_bytes} extra bytes), trying next offset"
                 )

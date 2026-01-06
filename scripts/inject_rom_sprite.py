@@ -40,6 +40,11 @@ def main() -> int:
         action="store_true",
         help="Skip creating backup of original ROM",
     )
+    parser.add_argument(
+        "--ignore-checksum",
+        action="store_true",
+        help="Ignore ROM checksum errors (useful for patched ROMs)",
+    )
 
     args = parser.parse_args()
 
@@ -86,6 +91,7 @@ def main() -> int:
             sprite_offset=offset,
             fast_compression=args.fast,
             create_backup=not args.no_backup,
+            ignore_checksum=args.ignore_checksum,
         )
 
         print()

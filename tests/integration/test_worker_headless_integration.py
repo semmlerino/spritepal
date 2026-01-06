@@ -1,19 +1,13 @@
-"""Integration tests adapted for headless environments"""
+"""Integration tests for workers with mocked dependencies."""
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from PIL import Image
 
-if TYPE_CHECKING:
-    from core.app_context import AppContext
-
-# NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
 from core.workers import VRAMExtractionWorker
@@ -34,33 +28,12 @@ pytestmark = [
 
 
 class TestVRAMExtractionWorkerHeadless:
-    """Test VRAMExtractionWorker in headless environment"""
+    """Test VRAMExtractionWorker with mocked dependencies.
 
-    @pytest.fixture
-    def mock_qt_imports(self):
-        """Mock Qt imports for headless testing"""
-        # Mock PySide6 modules
-        mock_qobject = MagicMock()
-        mock_qthread = MagicMock()
-        mock_signal = MagicMock()
-        mock_qpixmap = MagicMock()
-
-        # Make signals callable
-        mock_signal.return_value = MagicMock()
-
-        with patch.dict(
-            "sys.modules",
-            {
-                "PySide6.QtCore": MagicMock(QObject=mock_qobject, QThread=mock_qthread, Signal=mock_signal),
-                "PySide6.QtGui": MagicMock(QPixmap=mock_qpixmap),
-            },
-        ):
-            yield {
-                "QObject": mock_qobject,
-                "QThread": mock_qthread,
-                "Signal": mock_signal,
-                "QPixmap": mock_qpixmap,
-            }
+    Note: These tests still require Qt because VRAMExtractionWorker inherits
+    from QThread. The 'headless' aspect refers to mocked extraction managers,
+    not absence of Qt.
+    """
 
     @pytest.fixture
     def worker_params(self, tmp_path):
@@ -93,11 +66,14 @@ class TestVRAMExtractionWorkerHeadless:
             "oam_path": None,
         }
 
-    def test_worker_logic_without_qt(self, worker_params, mock_qt_imports, app_context: AppContext):
-        """Test worker logic without Qt dependencies"""
-        # Managers already initialized by app_context fixture
+    def test_worker_logic_without_qt(self, worker_params, qapp):
+        """Test worker logic with mocked manager (Qt required for worker instantiation).
 
-        # Create mock manager and pass directly to worker (replaces deprecated get_extraction_manager patch)
+        Note: Despite the name, Qt is still required because VRAMExtractionWorker
+        inherits from QThread. This test verifies worker logic with a mocked
+        extraction manager, not true headless operation.
+        """
+        # Create mock manager and pass directly to worker
         mock_manager = Mock()
 
         # Create worker with mocked manager passed directly

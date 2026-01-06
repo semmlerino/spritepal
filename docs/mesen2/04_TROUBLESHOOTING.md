@@ -407,6 +407,24 @@ register logs and game state to interpret results correctly.
 - Likely cause: flip-variant lookups inflate candidate counts and reduce weights
 - Fix: keep flip lookup optional and use it only for targeted debugging
 
+---
+
+## ROM Injection Failures
+
+### Symptom: "ROM checksum mismatch" during injection
+- **Cause:** `SpritePal` validates the SNES header checksum before modifying the ROM. If you are using a patched ROM (e.g., translation, hack) or have already modified it, the checksum in the header will not match the calculated data.
+- **Fix:** The UI will now prompt you to proceed with "lenient validation." Click **Yes** to ignore the mismatch.
+- **CLI Fix:** Use the `--ignore-checksum` flag if using `scripts/inject_rom_sprite.py`.
+
+### Symptom: "Compressed sprite too large"
+- **Cause:** The edited sprite, when compressed using HAL, exceeds the space occupied by the original sprite.
+- **Fix:**
+  1. **Slack Space:** The tool automatically scans for trailing `0xFF` or `0x00` padding (slack space) after the original sprite. It will safely use up to 32 bytes of this slack to accommodate slightly larger sprites.
+  2. **Optimization:** If it still doesn't fit, try simplifying the sprite (fewer unique colors or patterns) to improve compression ratio.
+  3. **Manual Check:** If you are certain there is more room, check the "Available Space" info in the injection dialog to see how much total padding was detected.
+
+---
+
 ## Guardrail
 If capture tiles are invalid (half-zero or wrong length), **stop** and fix capture first.
 Any downstream matching work is wasted until capture integrity is restored.

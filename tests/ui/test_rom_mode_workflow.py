@@ -1,19 +1,33 @@
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from PySide6.QtWidgets import QComboBox, QLineEdit, QPushButton, QWidget
+from PySide6.QtWidgets import QComboBox, QWidget
 
-from ui.sprite_edit_tab import SpriteEditTab
+from ui.workspaces import SpriteEditorWorkspace
 from ui.sprite_editor.controllers.main_controller import MainController
 
 
+class MockEditTab(QWidget):
+    """Mock for EditTab which wraps EditWorkspace."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.detach_btn = Mock()
+        self.detach_btn.hide = Mock()
+        self.ready_for_inject = Mock()
+        self.ready_for_inject.connect = Mock()
+
+    def set_controller(self, ctrl):
+        pass
+
+
 class MockTab(QWidget):
+    """Mock for other tabs (Extract, Inject, etc.)."""
+
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.set_mode = Mock()
         self.set_offset = Mock()
-        self.detach_btn = Mock()  # For EditTab check
-        self.detach_btn.hide = Mock()
         # Signals
         self.ready_for_inject = Mock()
         self.ready_for_inject.connect = Mock()
@@ -36,7 +50,45 @@ class MockTab(QWidget):
         self.browse_png_requested = Mock()
         self.browse_png_requested.connect = Mock()
 
-        # ROM Workflow specific
+    def set_extraction_controller(self, ctrl):
+        pass
+
+    def set_controller(self, ctrl):
+        pass
+
+
+class MockVRAMEditorPage(QWidget):
+    """Mock for VRAMEditorPage."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.extract_tab = MockTab()
+        self.edit_tab = MockEditTab()
+        self.inject_tab = MockTab()
+        self.multi_palette_tab = MockTab()
+        self.ready_for_inject = Mock()
+        self.ready_for_inject.connect = Mock()
+
+    def switch_to_inject_tab(self):
+        pass
+
+
+class MockEditWorkspace(QWidget):
+    """Mock for EditWorkspace."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+
+    def set_controller(self, ctrl):
+        pass
+
+
+class MockROMWorkflowPage(QWidget):
+    """Mock for ROMWorkflowPage."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.workspace = MockEditWorkspace()
         self.source_bar = Mock()
         self.source_bar.offset_changed = Mock()
         self.source_bar.offset_changed.connect = Mock()
@@ -66,24 +118,8 @@ class MockTab(QWidget):
         self.step_spin = Mock()
         self.step_spin.value = Mock(return_value=1)
 
-        # ROM Workflow Tab Layout
-        self.edit_tab_layout = Mock()
-        self.edit_tab_layout.addWidget = Mock()
-
-        self.main_splitter = Mock()
-        self.main_splitter.show = Mock()
-
-        self.left_panel = Mock()
-        self.left_panel.show = Mock()
-
-        self.edit_tab_container = Mock()
-        self.edit_tab_container.show = Mock()
-
-    def set_extraction_controller(self, ctrl):
+    def set_rom_size(self, size: int) -> None:
         pass
-
-    def set_controller(self, ctrl):
-        pass  # For InjectTab
 
 
 class TestRomModeWorkflow:
@@ -107,27 +143,25 @@ class TestRomModeWorkflow:
             yield context
 
     @pytest.fixture
-    def sprite_edit_tab(self, qt_app, mock_app_context):
-        # Patch internal classes to use MockTab
+    def sprite_editor_workspace(self, qt_app, mock_app_context):
+        # Patch the VRAMEditorPage and ROMWorkflowPage at the location they're imported
+        # (workspace module imports from views.workspaces)
         with (
-            patch("ui.sprite_edit_tab.ExtractTab", MockTab),
-            patch("ui.sprite_edit_tab.EditTab", MockTab),
-            patch("ui.sprite_edit_tab.InjectTab", MockTab),
-            patch("ui.sprite_edit_tab.MultiPaletteTab", MockTab),
-            patch("ui.sprite_edit_tab.ROMWorkflowTab", MockTab),
+            patch("ui.workspaces.sprite_editor_workspace.VRAMEditorPage", MockVRAMEditorPage),
+            patch("ui.workspaces.sprite_editor_workspace.ROMWorkflowPage", MockROMWorkflowPage),
         ):
-            tab = SpriteEditTab(settings_manager=mock_app_context.application_state_manager)
-            return tab
+            workspace = SpriteEditorWorkspace(settings_manager=mock_app_context.application_state_manager)
+            return workspace
 
-    def test_mode_switch(self, sprite_edit_tab):
+    def test_mode_switch(self, sprite_editor_workspace):
         # Verify mode combo exists
-        assert hasattr(sprite_edit_tab, "_mode_combo")
-        combo = sprite_edit_tab._mode_combo
+        assert hasattr(sprite_editor_workspace, "_mode_combo")
+        combo = sprite_editor_workspace._mode_combo
         assert isinstance(combo, QComboBox)
         assert combo.count() == 2
 
         # Test switching to ROM mode
-        with patch.object(sprite_edit_tab._controller, "set_mode") as mock_set_mode:
+        with patch.object(sprite_editor_workspace._controller, "set_mode") as mock_set_mode:
             # Change index to ROM (index 1)
             combo.setCurrentIndex(1)
 
@@ -138,20 +172,20 @@ class TestRomModeWorkflow:
             combo.setCurrentIndex(0)
             mock_set_mode.assert_called_with("vram")
 
-    def test_jump_to_offset_switches_mode(self, sprite_edit_tab):
+    def test_jump_to_offset_switches_mode(self, sprite_editor_workspace):
         # Verify jump_to_offset sets mode and offset
 
         # Mock the controller methods we expect to be called
-        sprite_edit_tab._controller.rom_workflow_controller = MagicMock()
+        sprite_editor_workspace._controller.rom_workflow_controller = MagicMock()
 
         # Call jump_to_offset
-        sprite_edit_tab.jump_to_offset(0x123456)
+        sprite_editor_workspace.jump_to_offset(0x123456)
 
         # Should have switched to ROM mode
-        assert sprite_edit_tab._mode_combo.currentData() == "rom"
+        assert sprite_editor_workspace._mode_combo.currentData() == "rom"
 
         # Verify rom workflow controller offset set
-        sprite_edit_tab._controller.rom_workflow_controller.set_offset.assert_called_with(0x123456)
+        sprite_editor_workspace._controller.rom_workflow_controller.set_offset.assert_called_with(0x123456)
 
     def test_controller_propagates_mode(self, mock_app_context):
         # Test MainController propagation logic

@@ -120,10 +120,10 @@ class TestLayoutResponsiveness:
     def test_canvas_responsiveness(self, qt_app):
         # ... existing test ...
         with (
-            patch("ui.sprite_editor.views.tabs.edit_tab.ToolPanel", MockPanel),
-            patch("ui.sprite_editor.views.tabs.edit_tab.PalettePanel", MockPanel),
-            patch("ui.sprite_editor.views.tabs.edit_tab.OptionsPanel", MockPanel),
-            patch("ui.sprite_editor.views.tabs.edit_tab.PreviewPanel", MockPanel),
+            patch("ui.sprite_editor.views.workspaces.edit_workspace.ToolPanel", MockPanel),
+            patch("ui.sprite_editor.views.workspaces.edit_workspace.PalettePanel", MockPanel),
+            patch("ui.sprite_editor.views.workspaces.edit_workspace.OptionsPanel", MockPanel),
+            patch("ui.sprite_editor.views.workspaces.edit_workspace.PreviewPanel", MockPanel),
         ):
             edit_tab = EditTab()
 

@@ -206,7 +206,7 @@ class RangeScanWorker(BaseWorker):
 
                 try:
                     # Try to find compressed sprite at this offset
-                    _, sprite_data = self.extractor.rom_injector.find_compressed_sprite(
+                    _, sprite_data, _ = self.extractor.rom_injector.find_compressed_sprite(
                         rom_data, offset, expected_size=self.max_sprite_size
                     )
 

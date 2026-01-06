@@ -53,15 +53,15 @@ class PreviewModule(QObject):
 
     Signals:
         preview_ready: Emitted when preview is ready
-            (tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int)
+            (tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int, slack_size: int)
         preview_cached: Emitted when cached preview is displayed
-            (tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int)
+            (tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int, slack_size: int)
         preview_error: Emitted when preview generation fails (error_msg: str)
     """
 
     # Forwarded signals from coordinator
-    preview_ready = Signal(bytes, int, int, str, int)  # tile_data, w, h, name, compressed_size
-    preview_cached = Signal(bytes, int, int, str, int)  # Cached preview displayed, with compressed_size
+    preview_ready = Signal(bytes, int, int, str, int, int)  # tile_data, w, h, name, compressed_size, slack_size
+    preview_cached = Signal(bytes, int, int, str, int, int)  # Cached preview displayed, with compressed_size, slack_size
     preview_error = Signal(str)  # Error message
 
     def __init__(
