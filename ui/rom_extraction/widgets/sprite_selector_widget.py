@@ -2,9 +2,9 @@
 
 from typing import Any
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence
-from PySide6.QtWidgets import QComboBox, QLabel, QPushButton, QWidget
+from PySide6.QtWidgets import QHeaderView, QLabel, QPushButton, QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QWidget
 
 from core.types import SpritePreset
 from ui.common.spacing_constants import EXTRACTION_ACTION_BUTTON_HEIGHT, SPRITE_COMBO_MIN_WIDTH
@@ -18,7 +18,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
     """Widget for selecting sprites from ROM"""
 
     # Signals
-    sprite_changed = Signal(int)  # Emitted when sprite selection changes
+    sprite_changed = Signal(object)  # Emitted when sprite selection changes (data)
     find_sprites_clicked = Signal()  # Emitted when find sprites button clicked
     manage_presets_clicked = Signal()  # Emitted when manage presets button clicked
     preset_applied = Signal(SpritePreset)  # Emitted when a preset is applied
@@ -28,31 +28,34 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self._setup_ui()
 
     def _set_offset_label_style(self, color_key: str = "disabled_text") -> None:
-        """Apply consistent monospace styling to offset label.
-
-        Args:
-            color_key: Key from COLORS dict - 'disabled_text' for inactive, 'border_focus' for active
-        """
+        """Apply consistent monospace styling to offset label."""
         self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS[color_key]}; font-size: 14px;")
 
     def _setup_ui(self):
         """Initialize the user interface"""
         sprite_layout = self._create_vbox_layout()
 
-        # Sprite selection row
-        sprite_row = self._create_hbox_layout()
+        # Sprite selection tree
+        self.sprite_tree = QTreeWidget()
+        self.sprite_tree.setHeaderLabels(["Sprite Name"])
+        self.sprite_tree.header().setVisible(False)
+        self.sprite_tree.setMinimumHeight(200)
+        self.sprite_tree.setAlternatingRowColors(True)
+        self.sprite_tree.currentItemChanged.connect(self._on_selection_changed)
 
-        sprite_label = self._create_control_label("Sprite:")
-        sprite_row.addWidget(sprite_label)
+        # Style the tree
+        self.sprite_tree.setStyleSheet(f"""
+            QTreeWidget {{
+                background-color: {COLORS["input_background"]};
+                border: 1px solid {COLORS["border"]};
+                border-radius: 4px;
+            }}
+            QTreeWidget::item {{
+                padding: 4px;
+            }}
+        """)
 
-        self.sprite_combo = QComboBox()
-        self.sprite_combo.setMinimumWidth(SPRITE_COMBO_MIN_WIDTH)
-        self.sprite_combo.addItem("Select ROM file first...", None)
-        self.sprite_combo.setEnabled(False)
-        _ = self.sprite_combo.currentIndexChanged.connect(self.sprite_changed.emit)
-        sprite_row.addWidget(self.sprite_combo, 1)
-
-        sprite_layout.addLayout(sprite_row)
+        sprite_layout.addWidget(self.sprite_tree)
 
         # Offset display row (simplified - no button)
         offset_row = self._create_hbox_layout()
@@ -63,7 +66,6 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.offset_label = QLabel("--")
         self._set_offset_label_style()
         self.offset_label.setMinimumWidth(100)
-        self.offset_label.setEnabled(False)  # Visually disabled until sprite selected
         offset_row.addWidget(self.offset_label, 1)  # Stretch factor fills space
 
         sprite_layout.addLayout(offset_row)
@@ -77,7 +79,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.find_sprites_btn.setShortcut(QKeySequence("Ctrl+F"))
         self.find_sprites_btn.setToolTip("Scan ROM for valid sprite offsets\n\nKeyboard shortcut: Ctrl+F")
         self.find_sprites_btn.setStyleSheet(get_prominent_action_button_style())
-        _ = self.find_sprites_btn.clicked.connect(self.find_sprites_clicked.emit)
+        self.find_sprites_btn.clicked.connect(self.find_sprites_clicked.emit)
         self.find_sprites_btn.setEnabled(False)
         button_row.addWidget(self.find_sprites_btn, 1)  # Stretch to take more space
 
@@ -91,58 +93,82 @@ class SpriteSelectorWidget(BaseExtractionWidget):
             "Save and load known sprite offsets for quick access.\n"
             "Import/export presets to share with the community."
         )
-        _ = self.presets_btn.clicked.connect(self.manage_presets_clicked.emit)
+        self.presets_btn.clicked.connect(self.manage_presets_clicked.emit)
         button_row.addWidget(self.presets_btn)
 
         sprite_layout.addLayout(button_row)
 
         self._setup_widget_with_group("Sprite Selection", sprite_layout)
 
+    def _on_selection_changed(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:
+        if current:
+            data = current.data(0, Qt.UserRole)
+            # Only emit if data is present (skip category headers)
+            if data is not None:
+                self.sprite_changed.emit(data)
+
     def clear(self):
         """Clear sprite selection"""
-        self.sprite_combo.clear()
-        self.sprite_combo.addItem("Select ROM file first...", None)
-        self.sprite_combo.setEnabled(False)
+        self.sprite_tree.clear()
         self.offset_label.setText("--")
         self._set_offset_label_style()
-        self.offset_label.setEnabled(False)  # Visually disabled
         self.find_sprites_btn.setEnabled(False)
 
     def add_sprite(self, name: str, data: Any) -> None:  # pyright: ignore[reportExplicitAny] - Sprite metadata
-        """Add a sprite to the combo box"""
-        self.sprite_combo.addItem(name, data)
+        """Add a sprite to the tree with categorization."""
+        if " - " in name:
+            category, item_name = name.split(" - ", 1)
+            parent = self._get_or_create_category(category)
+            item = QTreeWidgetItem(parent)
+            item.setText(0, item_name)
+        else:
+            item = QTreeWidgetItem(self.sprite_tree)
+            item.setText(0, name)
+
+        item.setData(0, Qt.UserRole, data)
+
+    def _get_or_create_category(self, name: str) -> QTreeWidgetItem:
+        # Check existing top-level items
+        for i in range(self.sprite_tree.topLevelItemCount()):
+            item = self.sprite_tree.topLevelItem(i)
+            if item.text(0) == name:
+                return item
+
+        # Create new category
+        item = QTreeWidgetItem(self.sprite_tree)
+        item.setText(0, name)
+        # Style category item
+        font = item.font(0)
+        font.setBold(True)
+        item.setFont(0, font)
+        item.setExpanded(True)
+        return item
 
     def insert_separator(self, index: int):
-        """Insert a separator at the given index"""
-        self.sprite_combo.insertSeparator(index)
+        """Insert a separator (No-op for tree)."""
+        pass
 
     def set_enabled(self, enabled: bool):
-        """Enable/disable the sprite combo"""
-        self.sprite_combo.setEnabled(enabled)
-
-    def get_current_index(self) -> int:
-        """Get current selection index"""
-        return self.sprite_combo.currentIndex()
+        """Enable/disable the sprite tree"""
+        self.sprite_tree.setEnabled(enabled)
 
     def get_current_data(self):
         """Get data for current selection"""
-        return self.sprite_combo.currentData()
+        current = self.sprite_tree.currentItem()
+        if current:
+            return current.data(0, Qt.UserRole)
+        return None
 
-    def set_current_index(self, index: int):
-        """Set current selection index"""
-        self.sprite_combo.setCurrentIndex(index)
-
-    def count(self) -> int:
-        """Get number of items"""
-        return self.sprite_combo.count()
-
-    def item_data(self, index: int):
-        """Get data at specific index"""
-        return self.sprite_combo.itemData(index)
-
-    def item_text(self, index: int) -> str:
-        """Get text at specific index"""
-        return self.sprite_combo.itemText(index)
+    def select_item_by_data(self, data: Any) -> None:
+        """Select item matching data."""
+        # Traverse tree
+        iterator = QTreeWidgetItemIterator(self.sprite_tree)
+        while iterator.value():
+            item = iterator.value()
+            if item.data(0, Qt.UserRole) == data:
+                self.sprite_tree.setCurrentItem(item)
+                return
+            iterator += 1
 
     def set_offset_text(self, text: str):
         """Update the offset label"""
@@ -164,17 +190,10 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         self.find_sprites_btn.setToolTip(tooltip)
 
     def set_disabled_state(self, message: str = "Select ROM first") -> None:
-        """Show disabled state with explanation message.
-
-        Use this to clearly indicate why the sprite selector is unavailable.
-
-        Args:
-            message: Explanation shown in the combo placeholder
-        """
-        self.sprite_combo.clear()
-        self.sprite_combo.addItem(message, None)
-        self.sprite_combo.setEnabled(False)
-        self.offset_label.setText("--")
-        self._set_offset_label_style()
-        self.offset_label.setEnabled(False)  # Visually disabled
+        """Show disabled state with explanation message."""
+        self.clear()
+        item = QTreeWidgetItem(self.sprite_tree)
+        item.setText(0, message)
+        item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+        self.sprite_tree.setEnabled(False)
         self.find_sprites_btn.setEnabled(False)

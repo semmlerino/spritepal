@@ -682,12 +682,12 @@ class ROMExtractionPanel(QWidget):
         """Handle similarity indexing errors"""
         logger.error(f"Similarity indexing error: {error_message}")
 
-    def _on_sprite_changed(self, index: int) -> None:
+    def _on_sprite_changed(self, data: object) -> None:
         """Handle sprite selection change."""
         try:
-            if index > 0:
-                data = self.sprite_selector_widget.get_current_data()
-                if data:
+            if data:
+                # Assuming data is tuple (name, offset)
+                if isinstance(data, tuple) and len(data) >= 2:
                     sprite_name, offset = data
                     # Switch to preset mode via controller
                     self._params_controller.set_preset_mode(offset=offset)
@@ -699,7 +699,7 @@ class ROMExtractionPanel(QWidget):
                         self.output_name_edit.setText(suggested_name)
                         self.output_name_changed.emit(suggested_name)
                 else:
-                    logger.warning("No data found for selected sprite")
+                    logger.warning(f"Invalid data format for selected sprite: {data}")
             else:
                 self.sprite_selector_widget.set_offset_text("--")
 
@@ -714,7 +714,7 @@ class ROMExtractionPanel(QWidget):
         try:
             has_rom = bool(self.rom_path)
             has_output_name = bool(self._get_output_name())
-            has_sprite = self.sprite_selector_widget.get_current_index() > 0
+            has_sprite = self.sprite_selector_widget.get_current_data() is not None
 
             # Show/hide output name hint (appears when ROM loaded but no output name)
             if hasattr(self, "output_hint_label") and self.output_hint_label:
@@ -753,8 +753,7 @@ class ROMExtractionPanel(QWidget):
         # Get sprite data for preset mode
         sprite_data: tuple[str, int] | None = None
         if not self._params_controller.is_manual_mode:
-            if self.sprite_selector_widget.get_current_index() > 0:
-                sprite_data = self.sprite_selector_widget.get_current_data()
+            sprite_data = self.sprite_selector_widget.get_current_data()
 
         return self._params_controller.get_params_dict(
             rom_path=self.rom_path,
@@ -800,43 +799,26 @@ class ROMExtractionPanel(QWidget):
         )
 
     def _add_selected_sprite(self, offset: int) -> None:
-        """Add the selected sprite to the combo box.
+        """Add the selected sprite to the tree.
 
         Args:
             offset: The selected sprite offset
         """
         sprite_name = f"custom_0x{offset:X}"
-        display_name = f"Custom Sprite (0x{offset:06X})"
+        # Use category prefix for tree organization
+        display_name = f"Custom - Sprite (0x{offset:06X})"
+        sprite_data = (sprite_name, offset)
 
-        # Check if already exists
-        for i in range(self.sprite_selector_widget.count()):
-            data = self.sprite_selector_widget.item_data(i)
-            if data and data[0] == sprite_name:
-                self.sprite_selector_widget.set_current_index(i)
-                return
+        # Select if exists
+        self.sprite_selector_widget.select_item_by_data(sprite_data)
 
-        # Add separator if needed
-        self._add_scanner_section_separator()
-
-        # Add new sprite with cache indicator
-        self.sprite_selector_widget.add_sprite(f"{display_name} \U0001f4be", (sprite_name, offset))
-        self.sprite_selector_widget.set_current_index(self.sprite_selector_widget.count() - 1)
+        # If not selected (meaning not found), add it
+        current_data = self.sprite_selector_widget.get_current_data()
+        if current_data != sprite_data:
+            self.sprite_selector_widget.add_sprite(f"{display_name} \U0001f4be", sprite_data)
+            self.sprite_selector_widget.select_item_by_data(sprite_data)
 
         logger.info(f"User selected custom sprite offset: 0x{offset:X}")
-
-    def _add_scanner_section_separator(self) -> None:
-        """Add a separator for scanner results if needed."""
-        if not self.sprite_locations or self.sprite_selector_widget.count() <= 2:
-            return
-
-        # Check if scanner section already exists
-        for i in range(self.sprite_selector_widget.count()):
-            text = self.sprite_selector_widget.item_text(i)
-            if "Scanner Results" in text:
-                return
-
-        # Add separator
-        self.sprite_selector_widget.add_sprite("-- Scanner Results (now cached) --", None)
 
     def _on_advanced_toggled(self, expanded: bool):
         """Handle advanced section expand/collapse.
