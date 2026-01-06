@@ -52,6 +52,7 @@ class SpriteEditorWorkspace(QWidget):
     status_message = Signal(str)
     mode_changed = Signal(str)  # 'vram' or 'rom'
     undo_state_changed = Signal(bool, bool)  # can_undo, can_redo
+    offset_changed = Signal(int)
 
     def __init__(
         self,
@@ -146,6 +147,9 @@ class SpriteEditorWorkspace(QWidget):
 
         # Connect undo/redo state updates (forwarded to signal)
         editing_ctrl.undoStateChanged.connect(self.undo_state_changed.emit)
+
+        # Connect offset changed
+        self._rom_page.offset_changed.connect(self.offset_changed.emit)
 
         # Connect ready_for_inject from VRAM page
         self._vram_page.ready_for_inject.connect(self._on_ready_for_inject)

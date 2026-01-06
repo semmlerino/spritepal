@@ -21,15 +21,19 @@ from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
     QGridLayout,
+    QLabel,
     QMainWindow,
     QMessageBox,
     QScrollArea,
+    QSizePolicy,
     QStackedWidget,
     QStatusBar,
     QStyle,
     QTabWidget,
     QVBoxLayout,
+    QWidget,
 )
+from ui.sprite_editor.views.widgets.offset_line_edit import OffsetLineEdit
 
 # Session manager accessed via get_app_context().application_state_manager
 # Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
@@ -185,6 +189,34 @@ class MainWindow(QMainWindow):
         self.redo_action.triggered.connect(self._on_redo)
         toolbar.addAction(self.redo_action)
 
+        # Spacer
+        empty = QWidget()
+        empty.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        toolbar.addWidget(empty)
+
+        # Offset Input
+        toolbar.addWidget(QLabel("Go to: 0x"))
+        self.toolbar_offset_edit = OffsetLineEdit()
+        self.toolbar_offset_edit.setMaximumWidth(100)
+        self.toolbar_offset_edit.offset_changed.connect(self._on_global_offset_changed)
+        toolbar.addWidget(self.toolbar_offset_edit)
+
+    def _on_global_offset_changed(self, offset: int) -> None:
+        """Handle global offset change from toolbar."""
+        # Check active mode
+        if self.center_stack.currentIndex() == 1:
+            # Editor Mode
+            self._sprite_editor_workspace.jump_to_offset(offset)
+        else:
+            # Extraction Mode
+            # Switch to ROM tab if not active (assuming ROM offset)
+            if not self.ui_coordinator.is_rom_tab_active():
+                self.ui_coordinator.switch_to_rom_tab()
+
+            # Set offset in ROM panel
+            if hasattr(self.rom_extraction_panel, "set_manual_offset"):
+                self.rom_extraction_panel.set_manual_offset(offset)
+
     def _create_workspaces(self) -> None:
         """Create workspace widgets."""
         from core.app_context import get_app_context
@@ -204,6 +236,8 @@ class MainWindow(QMainWindow):
             mesen2_module=mesen2_module,
         )
         self._extraction_workspace.tab_changed.connect(self._on_extraction_tab_changed)
+        # Connect manual offset changed from ROM panel
+        self._extraction_workspace.rom_extraction_panel.manual_offset_changed.connect(self.toolbar_offset_edit.set_offset)
         self.left_dock.setWidget(self._extraction_workspace)
 
         # 2. Sprite Editor Workspace (Center Content)
@@ -213,6 +247,7 @@ class MainWindow(QMainWindow):
         )
         self._sprite_editor_workspace.status_message.connect(self._on_status_message)
         self._sprite_editor_workspace.undo_state_changed.connect(self._update_undo_redo_state)
+        self._sprite_editor_workspace.offset_changed.connect(self.toolbar_offset_edit.set_offset)
 
         self.center_stack.addWidget(self._sprite_editor_workspace)
 

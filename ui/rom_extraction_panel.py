@@ -88,6 +88,7 @@ class ROMExtractionPanel(QWidget):
     output_name_changed = Signal(str)  # Emit when output name changes in ROM panel
     open_in_sprite_editor = Signal(int)  # Emitted when user wants to open offset in sprite editor
     mesen2_watching_changed = Signal(bool)  # Emitted when log watcher status changes
+    manual_offset_changed = Signal(int)  # Emitted when manual offset changes
 
     def __init__(
         self,
@@ -488,6 +489,17 @@ class ROMExtractionPanel(QWidget):
         self._load_rom_sprites()
         self._init_similarity_indexing()
 
+    def set_manual_offset(self, offset: int) -> None:
+        """Set the manual offset and enable manual mode."""
+        self._params_controller.set_manual_mode(enabled=True, offset=offset)
+        self.manual_offset_changed.emit(offset)
+
+        # Update dialog if open
+        if self._offset_dialog_manager._dialog is not None:
+            self._offset_dialog_manager._dialog.set_offset(offset)
+
+        self._check_extraction_ready()
+
     def open_manual_offset_dialog(self) -> None:
         """Open the manual offset control dialog using manager."""
         from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
@@ -515,6 +527,7 @@ class ROMExtractionPanel(QWidget):
     def _on_dialog_offset_changed(self, offset: int) -> None:
         """Handle offset changes from the dialog."""
         self._params_controller.set_manual_mode(enabled=True, offset=offset)
+        self.manual_offset_changed.emit(offset)
         self._check_extraction_ready()
         # Preview now handled in manual offset dialog
 
@@ -522,6 +535,7 @@ class ROMExtractionPanel(QWidget):
         """Handle sprite found signal from dialog."""
         offset = cast(int, sprite_data.get("offset", 0))
         self._params_controller.set_manual_mode(enabled=True, offset=offset)
+        self.manual_offset_changed.emit(offset)
         self._check_extraction_ready()
 
     def _open_presets_dialog(self) -> None:
@@ -555,6 +569,7 @@ class ROMExtractionPanel(QWidget):
 
         # Set the manual offset from the preset via controller
         self._params_controller.set_manual_mode(enabled=True, offset=preset.offset)
+        self.manual_offset_changed.emit(preset.offset)
 
         # Update the offset display
         if self.sprite_selector_widget:

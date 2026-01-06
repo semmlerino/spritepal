@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QFrame,
@@ -56,6 +56,8 @@ class ROMWorkflowPage(QWidget):
     mode switching without reparenting widgets.
     """
 
+    offset_changed = Signal(int)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -70,6 +72,7 @@ class ROMWorkflowPage(QWidget):
 
         # 1. Source Bar (Top)
         self._source_bar = SourceBar()
+        self._source_bar.offset_changed.connect(self.offset_changed.emit)
         layout.addWidget(self._source_bar)
 
         # 2. Main Content (Splitter)

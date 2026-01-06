@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from PySide6.QtWidgets import QComboBox, QWidget
 
-from ui.workspaces import SpriteEditorWorkspace
 from ui.sprite_editor.controllers.main_controller import MainController
+from ui.workspaces import SpriteEditorWorkspace
 
 
 class MockEditTab(QWidget):
@@ -88,6 +88,8 @@ class MockROMWorkflowPage(QWidget):
 
     def __init__(self, *args, **kwargs):
         super().__init__()
+        self.offset_changed = Mock()
+        self.offset_changed.connect = Mock()
         self.workspace = MockEditWorkspace()
         self.source_bar = Mock()
         self.source_bar.offset_changed = Mock()
