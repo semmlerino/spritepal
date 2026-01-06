@@ -52,6 +52,7 @@ class SpriteEditorWorkspace(QWidget):
     # Signals
     status_message = Signal(str)
     mode_changed = Signal(str)  # 'vram' or 'rom'
+    undo_state_changed = Signal(bool, bool)  # can_undo, can_redo
 
     def __init__(
         self,
@@ -81,7 +82,7 @@ class SpriteEditorWorkspace(QWidget):
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
-        # Header with mode switch and undo/redo
+        # Header with mode switch (undo/redo moved to main toolbar)
         header = self._create_header()
         layout.addWidget(header)
 
@@ -104,7 +105,7 @@ class SpriteEditorWorkspace(QWidget):
         layout.addWidget(self._mode_stack, 1)
 
     def _create_header(self) -> QWidget:
-        """Create header with mode switch and action buttons."""
+        """Create header with mode switch."""
         header = QWidget()
         layout = QHBoxLayout(header)
         layout.setContentsMargins(0, 0, 0, 4)
@@ -123,17 +124,6 @@ class SpriteEditorWorkspace(QWidget):
         layout.addWidget(self._mode_combo)
 
         layout.addStretch()
-
-        # Undo/Redo buttons
-        self._undo_btn = QPushButton("Undo")
-        self._undo_btn.setEnabled(False)
-        self._undo_btn.clicked.connect(self._controller.editing_controller.undo)
-        layout.addWidget(self._undo_btn)
-
-        self._redo_btn = QPushButton("Redo")
-        self._redo_btn.setEnabled(False)
-        self._redo_btn.clicked.connect(self._controller.editing_controller.redo)
-        layout.addWidget(self._redo_btn)
 
         return header
 
@@ -155,8 +145,8 @@ class SpriteEditorWorkspace(QWidget):
         # Wire ROM workflow controller to ROM page
         self._controller.rom_workflow_controller.set_view(self._rom_page)
 
-        # Connect undo/redo state updates
-        editing_ctrl.undoStateChanged.connect(self._update_undo_state)
+        # Connect undo/redo state updates (forwarded to signal)
+        editing_ctrl.undoStateChanged.connect(self.undo_state_changed.emit)
 
         # Connect ready_for_inject from VRAM page
         self._vram_page.ready_for_inject.connect(self._on_ready_for_inject)
@@ -166,6 +156,14 @@ class SpriteEditorWorkspace(QWidget):
         self.mode_changed.connect(self._on_mode_switched)
 
         logger.debug("Controllers wired to workspace pages")
+
+    def undo(self) -> None:
+        """Trigger undo action."""
+        self._controller.editing_controller.undo()
+
+    def redo(self) -> None:
+        """Trigger redo action."""
+        self._controller.editing_controller.redo()
 
     def _on_mode_changed(self, index: int) -> None:
         """Handle mode combo box change."""
@@ -185,11 +183,6 @@ class SpriteEditorWorkspace(QWidget):
         else:
             self._mode_stack.setCurrentWidget(self._vram_page)
             logger.info("Switched to VRAM workflow page")
-
-    def _update_undo_state(self, can_undo: bool, can_redo: bool) -> None:
-        """Sync undo/redo button state from editing controller."""
-        self._undo_btn.setEnabled(can_undo)
-        self._redo_btn.setEnabled(can_redo)
 
     def _on_ready_for_inject(self) -> None:
         """Handle 'ready for inject' from edit tab."""

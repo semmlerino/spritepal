@@ -17,11 +17,9 @@ from typing import override
 
 from PySide6.QtCore import Qt, Signal
 
-if TYPE_CHECKING:
-    from PySide6.QtGui import QCloseEvent, QKeyEvent
-else:
-    from PySide6.QtGui import QCloseEvent, QKeyEvent
+from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeyEvent, QKeySequence
 from PySide6.QtWidgets import (
+    QApplication,
     QGridLayout,
     QHBoxLayout,
     QMainWindow,
@@ -31,6 +29,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QStatusBar,
+    QStyle,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -120,6 +119,7 @@ class MainWindow(QMainWindow):
         self._output_path = ""
         self._extracted_files = []
         self._controller = None  # Lazy initialization to break circular dependency
+        self._last_undo_state = (False, False)
 
         self._setup_ui()
         self._setup_managers()  # This creates all UI widgets via managers
@@ -138,6 +138,9 @@ class MainWindow(QMainWindow):
         """Initialize the user interface"""
         self.setWindowTitle("SpritePal - Sprite Extraction Tool")
         self.setMinimumSize(*MAIN_WINDOW_MIN_SIZE)
+
+        # Create main toolbar
+        self._create_main_toolbar()
 
         # Create central widget
         central_widget = QWidget(self)
@@ -170,6 +173,30 @@ class MainWindow(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Ready to extract sprites")
+
+    def _create_main_toolbar(self) -> None:
+        """Create the main toolbar with global actions."""
+        toolbar = self.addToolBar("Main Toolbar")
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
+
+        style = QApplication.style()
+
+        # Undo
+        self.undo_action = QAction("Undo", self)
+        self.undo_action.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_ArrowBack))
+        self.undo_action.setShortcut(QKeySequence.Undo)
+        self.undo_action.setEnabled(False)
+        self.undo_action.triggered.connect(self._on_undo)
+        toolbar.addAction(self.undo_action)
+
+        # Redo
+        self.redo_action = QAction("Redo", self)
+        self.redo_action.setIcon(style.standardIcon(QStyle.StandardPixmap.SP_ArrowForward))
+        self.redo_action.setShortcut(QKeySequence.Redo)
+        self.redo_action.setEnabled(False)
+        self.redo_action.triggered.connect(self._on_redo)
+        toolbar.addAction(self.redo_action)
 
     def _create_left_panel(self) -> QWidget:
         """Create the left panel with stacked workspaces.
@@ -222,6 +249,10 @@ class MainWindow(QMainWindow):
         # Connect workspace signals
         self._extraction_workspace.tab_changed.connect(self._on_extraction_tab_changed)
         self._sprite_editor_workspace.status_message.connect(self._on_status_message)
+        self._sprite_editor_workspace.undo_state_changed.connect(self._update_undo_redo_state)
+
+        # Connect workspace stack change
+        self._workspace_stack.currentChanged.connect(self._on_workspace_changed)
 
         main_layout.addWidget(self._workspace_stack, 1)
 
@@ -242,6 +273,34 @@ class MainWindow(QMainWindow):
     def _on_status_message(self, message: str) -> None:
         """Handle status messages from sprite editor."""
         self.status_bar_manager.show_message(message)
+
+    def _on_undo(self) -> None:
+        """Handle undo action."""
+        self._sprite_editor_workspace.undo()
+
+    def _on_redo(self) -> None:
+        """Handle redo action."""
+        self._sprite_editor_workspace.redo()
+
+    def _update_undo_redo_state(self, can_undo: bool, can_redo: bool) -> None:
+        """Update undo/redo action state."""
+        self._last_undo_state = (can_undo, can_redo)
+        # Only update buttons if sprite editor is active
+        if self._workspace_stack.currentIndex() == 1:
+            self.undo_action.setEnabled(can_undo)
+            self.redo_action.setEnabled(can_redo)
+
+    def _on_workspace_changed(self, index: int) -> None:
+        """Handle workspace switch (Extraction vs Sprite Editor)."""
+        if index == 1:  # Sprite Editor
+            # Restore last known state
+            can_undo, can_redo = self._last_undo_state
+            self.undo_action.setEnabled(can_undo)
+            self.redo_action.setEnabled(can_redo)
+        else:
+            # Disable undo/redo in other workspaces
+            self.undo_action.setEnabled(False)
+            self.redo_action.setEnabled(False)
 
     def _on_tab_changed(self, index: int) -> None:
         """Handle legacy tab changes (now unused with workspace architecture).
