@@ -133,8 +133,8 @@ class TestLayoutResponsiveness:
             assert isinstance(container, QWidget)
             layout = container.layout()
             assert isinstance(layout, QVBoxLayout)
-            # No alignment set allows scroll area's widgetResizable to handle expansion
-            assert layout.alignment() == Qt.AlignmentFlag(0)
+            # Alignment set to Center for better UX when canvas is smaller than viewport
+            assert layout.alignment() == Qt.AlignmentFlag.AlignCenter
 
             assert layout.count() == 1
 

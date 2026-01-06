@@ -108,7 +108,7 @@ class EditTab(QWidget):
         left_scroll.setFrameShape(QFrame.Shape.NoFrame)
         left_scroll.setWidget(left_panel)
         # Constrain left panel width so canvas gets most space
-        left_scroll.setMinimumWidth(200)
+        left_scroll.setMinimumWidth(150)
         left_scroll.setMaximumWidth(300)
         left_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
 

@@ -40,7 +40,7 @@ class ROMWorkflowTab(QWidget):
         super().__init__(parent)
         self.edit_tab = edit_tab
         self.setStyleSheet(f"background-color: {COLORS['background']};")
-        self.setMinimumSize(600, 400)  # Ensure tab has minimum size
+        self.setMinimumSize(200, 200)  # Flexible minimum size
         # Ensure widget expands to fill available space
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._setup_ui()
@@ -174,7 +174,7 @@ class ROMWorkflowTab(QWidget):
 
         # Right Panel: Editor (existing EditTab)
         self.edit_tab_container = QWidget()
-        self.edit_tab_container.setMinimumWidth(400)  # Ensure container has minimum size
+        self.edit_tab_container.setMinimumWidth(250)  # Min width for tool palette
         self.edit_tab_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.edit_tab_layout = QVBoxLayout(self.edit_tab_container)
         self.edit_tab_layout.setContentsMargins(0, 0, 0, 0)

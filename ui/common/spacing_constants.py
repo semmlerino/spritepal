@@ -143,5 +143,8 @@ DEFAULT_RESULTS_DIALOG_SIZE = (600, 400)  # Default size for results dialogs
 # Window sizing
 DEFAULT_GALLERY_WINDOW_SIZE = (1024, 768)  # Default size for gallery windows
 
+# Main window constraints
+MIN_PANEL_WIDTH = 440  # Minimum width for side panels to prevent truncation
+
 # Qt maximum (use instead of magic number 16777215)
 QWIDGETSIZE_MAX = 16777215  # Qt's maximum widget size constant

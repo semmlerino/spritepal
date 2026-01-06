@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.spacing_constants import (
+    MIN_PANEL_WIDTH,
     PALETTE_GROUP_MAX_HEIGHT,
     PALETTE_GROUP_MIN_HEIGHT,
     PREVIEW_GROUP_MIN_HEIGHT,
@@ -370,12 +371,18 @@ class UICoordinator(QObject):
         # Only save if right panel is visible (size > 0)
         if len(current_sizes) >= 2 and current_sizes[1] > 0:
             self._saved_splitter_sizes = current_sizes
+            # Unlock right panel min width to allow full collapse
+            if splitter.count() > 1:
+                splitter.widget(1).setMinimumWidth(0)
             # Collapse right panel (index 1)
             splitter.setSizes([99999, 0])
 
     def _restore_layout_if_needed(self) -> None:
         """Restore layout if it was modified for editor"""
         if self._saved_splitter_sizes:
+            # Restore min width constraint
+            if self.main_window.main_splitter.count() > 1:
+                self.main_window.main_splitter.widget(1).setMinimumWidth(MIN_PANEL_WIDTH)
             self.main_window.main_splitter.setSizes(self._saved_splitter_sizes)
             self._saved_splitter_sizes = []
 

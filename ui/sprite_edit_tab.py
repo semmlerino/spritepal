@@ -171,14 +171,25 @@ class SpriteEditTab(QWidget):
         logger.info("Mode switched to: %s", mode)
 
         if is_rom:
+            # Cleanly remove EditTab from TabWidget so it can be reparented
+            # Note: We must check if it's currently in the tab widget
+            index = self._tab_widget.indexOf(self._edit_tab)
+            if index != -1:
+                self._tab_widget.removeTab(index)
+
             # Move EditTab to ROM workflow container
             self._rom_workflow_tab.edit_tab_layout.addWidget(self._edit_tab, 1)  # Stretch to fill
 
-            # Hide VRAM tabs, show ROM Workflow
-            for i in range(4):
+            # Hide all tabs first
+            count = self._tab_widget.count()
+            for i in range(count):
                 self._tab_widget.setTabVisible(i, False)
-            self._tab_widget.setTabVisible(4, True)
-            self._tab_widget.setCurrentIndex(4)
+
+            # Show only ROM Workflow tab
+            rom_index = self._tab_widget.indexOf(self._rom_workflow_tab)
+            if rom_index != -1:
+                self._tab_widget.setTabVisible(rom_index, True)
+                self._tab_widget.setCurrentIndex(rom_index)
 
             # Force visibility on all ROM workflow components
             self._rom_workflow_tab.show()
@@ -193,18 +204,23 @@ class SpriteEditTab(QWidget):
 
             logger.info(
                 "ROM Workflow: tab visible=%s, current=%s, rom_tab size=%s",
-                self._tab_widget.isTabVisible(4),
+                self._tab_widget.isTabVisible(rom_index),
                 self._tab_widget.currentIndex(),
                 self._rom_workflow_tab.size(),
             )
         else:
-            # Move EditTab back to TabWidget at index 1
-            self._tab_widget.insertTab(1, self._edit_tab, "Edit")
+            # Reparent back to TabWidget if not already there
+            if self._tab_widget.indexOf(self._edit_tab) == -1:
+                self._tab_widget.insertTab(1, self._edit_tab, "Edit")
 
-            # Show VRAM tabs, hide ROM Workflow
-            for i in range(4):
-                self._tab_widget.setTabVisible(i, True)
-            self._tab_widget.setTabVisible(4, False)
+            # Show VRAM tabs (Extract, Edit, Inject, Multi)
+            # We iterate and show everything EXCEPT ROM workflow
+            count = self._tab_widget.count()
+            rom_index = self._tab_widget.indexOf(self._rom_workflow_tab)
+            
+            for i in range(count):
+                self._tab_widget.setTabVisible(i, i != rom_index)
+            
             self._tab_widget.setCurrentIndex(0)
 
     def _update_undo_state(self, can_undo: bool, can_redo: bool) -> None:
