@@ -2,6 +2,17 @@
 
 Inherits all rules from `spritepal/CLAUDE.md`. This file covers only subsystem-specific concerns.
 
+## Entry Points
+
+| Use Case | Code |
+|----------|------|
+| **Standalone app** | `python launch_editor.py` from `spritepal/` |
+| **Programmatic** | `from ui.sprite_editor import SpriteEditorApplication; app = SpriteEditorApplication(); app.run()` |
+| **Window only** | `from ui.sprite_editor import SpriteEditorMainWindow` |
+| **Embed as tab** | `from ui.sprite_edit_tab import SpriteEditTab` |
+
+See `ui/sprite_editor/README.md` for full documentation.
+
 ## Layer Rules
 
 ```
