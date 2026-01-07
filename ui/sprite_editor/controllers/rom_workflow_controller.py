@@ -125,13 +125,13 @@ class ROMWorkflowController(QObject):
     def _on_sprite_activated(self, offset: int, source_type: str) -> None:
         """Handle sprite activation (double-click) - enter edit mode."""
         logger.debug(f"[DOUBLE-CLICK] _on_sprite_activated called: offset=0x{offset:06X}, source={source_type}")
-        
+
         # If we already have tile data for this offset, open directly without re-requesting preview
         if self.current_offset == offset and self.current_tile_data:
             logger.debug("[DOUBLE-CLICK] Already have data for this offset, opening directly")
             self.open_in_editor()
             return
-        
+
         # Set flag to auto-open in editor when preview completes
         self._pending_open_in_editor = True
         logger.debug("[DOUBLE-CLICK] Flag set, calling set_offset")
@@ -244,30 +244,19 @@ class ROMWorkflowController(QObject):
             return
 
         # Use SpriteRenderer to create PIL image from 4bpp
+        from ..core.palette_utils import get_default_snes_palette
         from ..services import SpriteRenderer
 
         renderer = SpriteRenderer()
-
-        # For ROM mode, we might need a default palette if none selected
-        # Use palette from extraction controller if available
-        if (
-            hasattr(self.main_controller.extraction_controller, "_view")
-            and self.main_controller.extraction_controller._view
-        ):
-            params = self.main_controller.extraction_controller._view.get_extraction_params()
-            int(params.get("palette_num", 0))  # type: ignore
 
         image = renderer.render_4bpp(self.current_tile_data, self.current_width, self.current_height)
 
         # Convert to numpy and load into editor
         image_array = np.array(image, dtype=np.uint8)
-        palette_data = image.getpalette()
-        palette: list[tuple[int, int, int]] = []
-        if palette_data:
-            for i in range(0, min(48, len(palette_data)), 3):
-                palette.append((palette_data[i], palette_data[i + 1], palette_data[i + 2]))
-        while len(palette) < 16:
-            palette.append((0, 0, 0))
+
+        # Use default SNES-style palette for initial display (not grayscale)
+        # User can load actual palette via "Load Palette..." button in palette panel
+        palette = get_default_snes_palette()
 
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self.main_controller.editing_controller.load_image(image_array, palette)
@@ -525,7 +514,9 @@ class ROMWorkflowController(QObject):
         self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int, slack_size: int = 0
     ) -> None:
         """Handle preview ready from coordinator."""
-        logger.debug(f"[PREVIEW] _on_preview_ready called: {len(tile_data)} bytes, {width}x{height}, pending_open={self._pending_open_in_editor}")
+        logger.debug(
+            f"[PREVIEW] _on_preview_ready called: {len(tile_data)} bytes, {width}x{height}, pending_open={self._pending_open_in_editor}"
+        )
         self.current_tile_data = tile_data
         self.current_width = width
         self.current_height = height

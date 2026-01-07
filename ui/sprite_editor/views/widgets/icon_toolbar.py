@@ -4,7 +4,7 @@ Icon toolbar widget for the sprite editor.
 Provides horizontal toolbar with tool selection, zoom controls, and grid toggles.
 """
 
-from PySide6.QtCore import QSignalBlocker, QSize, Signal
+from PySide6.QtCore import QSignalBlocker, QSize, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -38,18 +38,20 @@ class IconToolbar(QWidget):
     tileGridToggled = Signal(bool)  # tile grid visibility
     palettePreviewToggled = Signal(bool)  # palette preview visibility
 
-    # Icon configuration: (theme_name, fallback_text)
+    # Icon configuration: (theme_name, fallback_icon_text, display_label)
     # Theme names follow freedesktop.org icon naming spec
-    ICON_CONFIG = {
-        "pencil": ("draw-freehand", "✏️"),
-        "fill": ("color-fill", "🪣"),
-        "picker": ("color-picker", "💧"),
-        "eraser": ("edit-clear", "🧹"),
-        "zoom_in": ("zoom-in", "+"),
-        "zoom_out": ("zoom-out", "−"),  # noqa: RUF001
-        "grid": ("view-grid", "⊞"),
-        "tile_grid": ("view-split-left-right", "▦"),
-        "palette": ("preferences-desktop-color", "🎨"),
+    # fallback_icon_text is shown when theme icon unavailable
+    # display_label is always shown below the icon (matching Goal.jpg mockup)
+    ICON_CONFIG: dict[str, tuple[str, str, str]] = {
+        "pencil": ("draw-freehand", "P", "Pencil"),
+        "fill": ("color-fill", "F", "Fill Bucket"),
+        "picker": ("color-picker", "K", "Color Picker"),
+        "eraser": ("edit-clear", "E", "Eraser"),
+        "zoom_in": ("zoom-in", "+", "Zoom In"),
+        "zoom_out": ("zoom-out", "-", "Zoom Out"),
+        "grid": ("view-grid", "#", "Show Pixel Grid"),
+        "tile_grid": ("view-split-left-right", "T", "Show Tile Grid"),
+        "palette": ("preferences-desktop-color", "C", "Toggle Palette Preview"),
     }
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -160,7 +162,11 @@ class IconToolbar(QWidget):
         layout.addStretch()
 
     def _apply_icon(self, button: QToolButton, icon_key: str) -> None:
-        """Apply a theme icon to a button, falling back to text if unavailable.
+        """Apply icon and text label to a button (matching Goal.jpg mockup).
+
+        The mockup shows icons with text labels below them. This method:
+        1. Always shows text label below the icon
+        2. Tries theme icon first, then Qt standard icons, then uses fallback letter
 
         Args:
             button: The QToolButton to configure.
@@ -169,31 +175,35 @@ class IconToolbar(QWidget):
         if icon_key not in self.ICON_CONFIG:
             return
 
-        theme_name, fallback_text = self.ICON_CONFIG[icon_key]
+        theme_name, fallback_icon_text, display_label = self.ICON_CONFIG[icon_key]
+
+        # Configure button to show text below icon (matches Goal.jpg mockup)
+        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        button.setText(display_label)
 
         # Try theme icon first
         icon = QIcon.fromTheme(theme_name)
         if not icon.isNull():
             button.setIcon(icon)
-            button.setText("")  # Clear text when icon is available
-        else:
-            # Try standard Qt style icons for zoom
-            style = QApplication.style()
+            return
+
+        # Try standard Qt style icons
+        style = QApplication.style()
+        if style is not None:
+            std_pixmap: QStyle.StandardPixmap | None = None
             if icon_key == "zoom_in":
-                std_icon = style.standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
-                if not std_icon.isNull():
-                    button.setIcon(std_icon)
-                    button.setText("")
-                    return
+                std_pixmap = QStyle.StandardPixmap.SP_ArrowUp
             elif icon_key == "zoom_out":
-                std_icon = style.standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
+                std_pixmap = QStyle.StandardPixmap.SP_ArrowDown
+
+            if std_pixmap is not None:
+                std_icon = style.standardIcon(std_pixmap)
                 if not std_icon.isNull():
                     button.setIcon(std_icon)
-                    button.setText("")
                     return
 
-            # Fall back to text
-            button.setText(fallback_text)
+        # No icon available - text label is already set, which serves as visual indicator
+        # The button will show just the label text without an icon
 
     @staticmethod
     def _get_icon_size() -> QSize:

@@ -133,3 +133,35 @@ def get_grayscale_palette() -> list[int]:
         gray = (i * RGB888_MAX_VALUE) // 15 if i < COLORS_PER_PALETTE else 0
         palette.extend([gray, gray, gray])
     return palette
+
+
+def get_default_snes_palette() -> list[tuple[int, int, int]]:
+    """
+    Get a default SNES-style color palette for initial sprite display.
+
+    Returns a visually distinct 16-color palette similar to what SNES games
+    commonly use. Color 0 is typically transparent (black in display).
+
+    Returns:
+        List of 16 (R, G, B) tuples in 0-255 range.
+    """
+    # A typical SNES-style palette with distinct colors
+    # Index 0 is transparent (shown as black/magenta), rest are common sprite colors
+    return [
+        (0, 0, 0),  # 0: Transparent (black)
+        (255, 255, 255),  # 1: White
+        (248, 216, 176),  # 2: Skin tone light
+        (232, 168, 120),  # 3: Skin tone medium
+        (200, 120, 88),  # 4: Skin tone dark
+        (255, 200, 120),  # 5: Yellow/blonde
+        (248, 88, 88),  # 6: Red
+        (88, 144, 248),  # 7: Blue
+        (120, 216, 88),  # 8: Green
+        (248, 168, 200),  # 9: Pink
+        (168, 88, 200),  # 10: Purple
+        (88, 88, 88),  # 11: Dark gray
+        (168, 168, 168),  # 12: Light gray
+        (200, 160, 88),  # 13: Brown/orange
+        (48, 48, 48),  # 14: Near black
+        (255, 216, 88),  # 15: Gold/highlight
+    ]

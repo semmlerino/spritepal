@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QLabel,
     QSizePolicy,
     QSplitter,
     QVBoxLayout,
@@ -90,7 +91,13 @@ class ROMWorkflowPage(QWidget):
 
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD)
-        left_layout.setSpacing(0)
+        left_layout.setSpacing(SPACING_STANDARD)
+
+        # Title banner
+        title_label = QLabel("SPRITE & ASSET BROWSER")
+        title_label.setObjectName("panelTitle")
+        title_label.setStyleSheet("font-weight: bold; font-size: 12px; padding: 4px 0px;")
+        left_layout.addWidget(title_label)
 
         # Asset Browser (fills entire left panel)
         self._asset_browser = SpriteAssetBrowser()

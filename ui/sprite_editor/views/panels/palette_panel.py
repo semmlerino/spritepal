@@ -36,7 +36,7 @@ class PalettePanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # Palette group box
-        palette_group = QGroupBox("Palette")
+        palette_group = QGroupBox("PALETTE")
         palette_layout = QVBoxLayout()
 
         # Create and add palette source selector

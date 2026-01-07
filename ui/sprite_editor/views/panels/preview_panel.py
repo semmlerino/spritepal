@@ -40,7 +40,7 @@ class PreviewPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         # Preview group box
-        preview_group = QGroupBox("Preview")
+        preview_group = QGroupBox("REAL-TIME PREVIEW")
         preview_layout = QVBoxLayout()
 
         # Create ContextualPreview widget

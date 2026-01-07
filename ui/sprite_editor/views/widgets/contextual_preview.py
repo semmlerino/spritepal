@@ -38,12 +38,13 @@ class ContextualPreview(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        # Background selector dropdown
+        # Background selector dropdown (hidden - checkerboard is the default)
+        # Keeping the widget for programmatic access but not showing it
         self._background_combo = QComboBox()
         self._background_combo.addItems(["Checkerboard", "Black", "White", "Custom..."])
         self._background_combo.setCurrentIndex(0)
         self._background_combo.currentTextChanged.connect(self._on_background_changed)
-        layout.addWidget(self._background_combo)
+        self._background_combo.hide()  # Hidden per mockup - checkerboard is standard
 
         # Preview area
         self._preview_label = QLabel()
