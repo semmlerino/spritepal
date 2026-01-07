@@ -17,6 +17,9 @@ from PySide6.QtWidgets import (
 )
 
 
+from ui.common.spacing_constants import GROUP_PADDING, SPACING_MEDIUM, SPACING_SMALL
+
+
 class ToolPanel(QWidget):
     """Panel for tool selection (pencil, fill, picker)."""
 
@@ -32,11 +35,13 @@ class ToolPanel(QWidget):
         """Initialize the tool panel UI."""
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(GROUP_PADDING, GROUP_PADDING, GROUP_PADDING, GROUP_PADDING)
+        layout.setSpacing(SPACING_MEDIUM)
 
         # Tool group box
         tool_group = QGroupBox("Tools")
         tool_layout = QVBoxLayout()
+        tool_layout.setSpacing(SPACING_SMALL)
 
         # Create button group for radio buttons
         self.tool_group = QButtonGroup()
@@ -67,6 +72,7 @@ class ToolPanel(QWidget):
         # Brush size group box
         brush_group = QGroupBox("Brush Size")
         brush_layout = QHBoxLayout()
+        brush_layout.setSpacing(SPACING_SMALL)
 
         self.brush_size_label = QLabel("Size:")
         self.brush_size_spinbox = QSpinBox()

@@ -1,0 +1,3 @@
+FILE OFFSET: 0x2847C8
+frame=1377
+timestamp=1767653112

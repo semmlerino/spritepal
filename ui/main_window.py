@@ -33,7 +33,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from ui.sprite_editor.views.widgets.offset_line_edit import OffsetLineEdit
 
 # Session manager accessed via get_app_context().application_state_manager
 # Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
@@ -53,6 +52,7 @@ from ui.managers import (
 )
 from ui.palette_preview import PalettePreviewWidget
 from ui.rom_extraction_panel import ROMExtractionPanel
+from ui.sprite_editor.views.widgets.offset_line_edit import OffsetLineEdit
 from ui.workspaces import ExtractionWorkspace, SpriteEditorWorkspace
 from ui.zoomable_preview import PreviewPanel
 from utils.logging_config import get_logger

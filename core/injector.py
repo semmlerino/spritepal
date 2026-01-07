@@ -174,16 +174,23 @@ class SpriteInjector:
 
                 # Validate palette indices for 4-bit compatibility (Issue 7 fix)
                 if max_index > 15:
-                    raise ValueError(
-                        f"PNG palette has indices up to {max_index}, but SNES sprites "
-                        f"only support 16 colors (indices 0-15). Please reduce the "
-                        f"image palette to 16 colors or use grayscale mode."
+                    logger.warning(
+                        f"PNG palette has indices up to {max_index}, which exceeds SNES 4bpp limit (15). "
+                        "Attempting to recover by treating as grayscale intensity map."
                     )
+                    # Convert to grayscale to recover indices from intensity
+                    # This handles cases where the image was saved with a linear 0-255 palette
+                    gray = img.convert("L")
+                    pixels = np.array(gray, dtype=np.uint8)
+                    pixels = np.minimum(15, pixels // 17).astype(np.uint8)
             else:
                 # Convert to indexed mode
-                logger.warning(f"Converting {img.mode} to indexed mode - may lose color information")
-                converted = img.convert("P", palette=Image.Palette.ADAPTIVE, colors=16)
-                pixels = np.array(converted, dtype=np.uint8)
+                logger.warning(f"Converting {img.mode} to grayscale to recover indices")
+                # Use grayscale conversion to preserve intensity mapping
+                # This is safer than adaptive palette which can scramble index order
+                gray = img.convert("L")
+                pixels = np.array(gray, dtype=np.uint8)
+                pixels = np.minimum(15, pixels // 17).astype(np.uint8)
 
         tiles_x = width // TILE_WIDTH
         tiles_y = height // TILE_HEIGHT

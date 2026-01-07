@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.spacing_constants import SPACING_MEDIUM
 from ui.widgets.drop_zone import DropZone
 
 from ..widgets import HexLineEdit
@@ -56,6 +57,8 @@ class ExtractTab(QWidget):
     def _setup_ui(self) -> None:
         """Create the extraction tab UI."""
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)
+        layout.setSpacing(SPACING_MEDIUM)
 
         # File selection (Drop Zones for consistency)
         self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)  # type: ignore[arg-type]
@@ -77,6 +80,7 @@ class ExtractTab(QWidget):
         # Extraction settings group
         settings_group = QGroupBox("Extraction Settings")
         settings_layout = QGridLayout()
+        settings_layout.setSpacing(SPACING_MEDIUM)
 
         # Offset
         self.extract_offset_edit = HexLineEdit("0xC000")
@@ -112,6 +116,7 @@ class ExtractTab(QWidget):
         # Palette settings group
         palette_group = QGroupBox("Palette (Optional)")
         palette_layout = QGridLayout()
+        palette_layout.setSpacing(SPACING_MEDIUM)
 
         self.use_palette_check = QCheckBox("Apply CGRAM Palette")
         self.use_palette_check.toggled.connect(self._on_palette_toggle)
@@ -149,6 +154,7 @@ class ExtractTab(QWidget):
         # Output group
         output_group = QGroupBox("Output")
         output_layout = QVBoxLayout()
+        output_layout.setSpacing(SPACING_MEDIUM)
 
         self.extract_output_text = QTextEdit()
         self.extract_output_text.setReadOnly(True)

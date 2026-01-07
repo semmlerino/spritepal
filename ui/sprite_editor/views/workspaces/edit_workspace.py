@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.signal_utils import safe_disconnect
+from ui.common.spacing_constants import PANEL_PADDING, SPACING_MEDIUM, SPACING_SMALL
 
 from ..panels import OptionsPanel, PalettePanel, PreviewPanel, ToolPanel
 from ..widgets import PixelCanvas
@@ -55,13 +56,13 @@ class EditWorkspace(QWidget):
         # Ensure workspace expands to fill parent container
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         # Set minimum width at workspace root (tool panel + canvas)
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(600)
 
     def _setup_ui(self) -> None:
         """Create the workspace UI with tool panels and canvas."""
         main_layout = QHBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(PANEL_PADDING, PANEL_PADDING, PANEL_PADDING, PANEL_PADDING)
+        main_layout.setSpacing(SPACING_MEDIUM)
 
         # Create splitter for resizable layout
         self._splitter = QSplitter()
@@ -73,6 +74,7 @@ class EditWorkspace(QWidget):
         left_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(SPACING_SMALL)
 
         # Tool panel
         self._tool_panel = ToolPanel()
@@ -112,9 +114,8 @@ class EditWorkspace(QWidget):
         self._left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._left_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self._left_scroll.setWidget(left_panel)
-        # Constrain left panel width so canvas gets most space
-        self._left_scroll.setMinimumWidth(150)
-        self._left_scroll.setMaximumWidth(300)
+        # Allow user to resize, set reasonable min width
+        self._left_scroll.setMinimumWidth(200)
         self._left_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
 
         self._splitter.addWidget(self._left_scroll)
@@ -141,8 +142,8 @@ class EditWorkspace(QWidget):
 
         self._splitter.addWidget(self._scroll_area)
 
-        # Set splitter sizes (left panel: 250px, canvas: rest)
-        self._splitter.setSizes([250, 600])
+        # Set splitter sizes (left panel: 300px, canvas: rest)
+        self._splitter.setSizes([300, 600])
         self._splitter.setStretchFactor(0, 0)
         self._splitter.setStretchFactor(1, 1)
 

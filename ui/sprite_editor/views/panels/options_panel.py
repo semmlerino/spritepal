@@ -17,6 +17,9 @@ from PySide6.QtWidgets import (
 )
 
 
+from ui.common.spacing_constants import GROUP_PADDING, SPACING_MEDIUM, SPACING_SMALL
+
+
 class OptionsPanel(QWidget):
     """Panel for editor options and zoom controls."""
 
@@ -34,11 +37,13 @@ class OptionsPanel(QWidget):
         """Initialize the options panel UI."""
         # Main layout
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(GROUP_PADDING, GROUP_PADDING, GROUP_PADDING, GROUP_PADDING)
+        layout.setSpacing(SPACING_MEDIUM)
 
         # Options group box
         options_group = QGroupBox("Options")
         options_layout = QVBoxLayout()
+        options_layout.setSpacing(SPACING_SMALL)
 
         # Grid checkbox
         self.grid_checkbox = QCheckBox("Show Grid")
@@ -57,9 +62,11 @@ class OptionsPanel(QWidget):
         # Zoom controls group
         zoom_group = QGroupBox("Zoom Controls")
         zoom_group_layout = QVBoxLayout()
+        zoom_group_layout.setSpacing(SPACING_SMALL)
 
         # Zoom slider with label
         zoom_slider_layout = QHBoxLayout()
+        zoom_slider_layout.setSpacing(SPACING_SMALL)
         zoom_slider_layout.addWidget(QLabel("Zoom:"))
 
         self.zoom_slider = QSlider(Qt.Orientation.Horizontal)
@@ -73,13 +80,14 @@ class OptionsPanel(QWidget):
 
         # Quick zoom buttons
         zoom_buttons_layout = QHBoxLayout()
+        zoom_buttons_layout.setSpacing(2)  # Tight spacing for button row
         self.zoom_buttons: list[tuple[QPushButton, int]] = []
 
         zoom_presets = [("1x", 1), ("2x", 2), ("4x", 4), ("8x", 8), ("16x", 16)]
         for label, value in zoom_presets:
             btn = QPushButton(label)
             btn.clicked.connect(lambda checked, v=value: self.set_zoom(v))
-            btn.setMaximumWidth(35)
+            # Removed fixed width to prevent clipping
             zoom_buttons_layout.addWidget(btn)
             self.zoom_buttons.append((btn, value))
 

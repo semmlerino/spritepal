@@ -226,7 +226,12 @@ class ROMInjector(SpriteInjector):
             # Only apply strict ratio check when parser found a proper terminator
             # If compressed >> decompressed (10x+), parser clearly didn't find terminator
             hal_parsing_confident = original_size > 0 and compressed_size < original_size * 10
-            if hal_parsing_confident:
+            
+            # Skip strict ratio check for very small sprites (< 256 bytes)
+            # Small sprites often have outlier ratios that trigger false negatives
+            is_very_small = original_size < 256
+            
+            if hal_parsing_confident and not is_very_small:
                 if not self._validate_compression_ratio(compressed_size, original_size):
                     compression_ratio = compressed_size / original_size
                     logger.debug(

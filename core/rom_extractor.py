@@ -460,8 +460,19 @@ class ROMExtractor:
         logger.debug(f"Tiles per row: {tiles_per_row}")
         logger.debug(f"Image dimensions: {img_width}x{img_height} pixels")
 
-        # Create grayscale image
-        img = Image.new("L", (img_width, img_height), 0)
+        # Create indexed image directly
+        img = Image.new("P", (img_width, img_height), 0)
+
+        # Create grayscale palette (16 colors)
+        # Map indices 0-15 to grayscale values 0-255 (multiples of 17)
+        palette = []
+        for i in range(256):
+            if i < 16:
+                val = i * PIXEL_SCALE_FACTOR
+                palette.extend((val, val, val))
+            else:
+                palette.extend((0, 0, 0))
+        img.putpalette(palette)
 
         # Process each tile
         log_interval = PROGRESS_LOG_INTERVAL  # Log progress every 100 tiles
@@ -481,14 +492,12 @@ class ROMExtractor:
             # Convert 4bpp planar to pixels
             for y in range(TILE_HEIGHT):
                 for x in range(TILE_WIDTH):
-                    # Get pixel value from 4bpp planar format
+                    # Get pixel value from 4bpp planar format (0-15)
                     pixel = self._get_4bpp_pixel(tile_bytes, x, y)
-                    # Convert 4-bit value to 8-bit grayscale (0-15 -> 0-255)
-                    gray_value = pixel * PIXEL_SCALE_FACTOR
-                    img.putpixel((tile_x + x, tile_y + y), gray_value)
+                    # Set pixel index directly
+                    img.putpixel((tile_x + x, tile_y + y), pixel)
 
         # Save as indexed PNG
-        img = img.convert("P")
         img.save(output_path, "PNG")
 
         logger.info(f"Saved PNG: {output_path} ({img.width}x{img.height} pixels, {num_tiles} tiles)")

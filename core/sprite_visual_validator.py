@@ -4,7 +4,7 @@ Visual sprite validation to distinguish real character sprites from garbage data
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from types import ModuleType
 
 import numpy as np
 from PIL import Image
@@ -17,13 +17,12 @@ from utils.constants import (
 )
 from utils.logging_config import get_logger
 
-if TYPE_CHECKING:
-    import cv2  # type: ignore[import-not-found]
-else:
-    try:
-        import cv2
-    except ImportError:
-        cv2 = None
+# Handle optional cv2 dependency with proper typing
+cv2: ModuleType | None
+try:
+    import cv2  # type: ignore[reportMissingImports]
+except ImportError:
+    cv2 = None
 
 logger = get_logger(__name__)
 
