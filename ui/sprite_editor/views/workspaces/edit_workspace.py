@@ -224,6 +224,7 @@ class EditWorkspace(QWidget):
             safe_disconnect(self._canvas.pixelMoved)
             safe_disconnect(self._canvas.pixelReleased)
             safe_disconnect(self._canvas.zoomRequested)
+            safe_disconnect(self._canvas.hoverPositionChanged)
 
         # Disconnect icon toolbar signals
         safe_disconnect(self._icon_toolbar.toolChanged)
@@ -297,9 +298,8 @@ class EditWorkspace(QWidget):
         # Bidirectional zoom sync: canvas → toolbar (if needed for display)
         self._canvas.zoomRequested.connect(self._on_zoom_changed_from_canvas)
 
-        # Connect canvas hover events to status bar (if canvas provides these signals)
-        # Note: These connections require canvas to emit cursor position signals
-        # which may need to be added to PixelCanvas
+        # Connect canvas hover events to status bar
+        self._canvas.hoverPositionChanged.connect(self._on_hover_position_changed)
 
     def update_from_controller(self) -> None:
         """Update UI state from controller."""
@@ -358,3 +358,29 @@ class EditWorkspace(QWidget):
         """Handle zoom change from canvas (e.g., mouse wheel)."""
         # Update status bar or other UI elements if needed
         pass
+
+    def _on_hover_position_changed(self, x: int, y: int) -> None:
+        """Update status bar from canvas hover position."""
+        if x == -1 and y == -1:
+            # Mouse left canvas
+            self._status_bar.clear_cursor()
+            return
+
+        # Update cursor position
+        self._status_bar.update_cursor(x, y)
+
+        if not self._controller:
+            return
+
+        # Calculate tile ID (8x8 tiles for SNES sprites)
+        width, _height = self._controller.get_image_size()
+        if width > 0:
+            tiles_per_row = max(1, width // 8)
+            tile_id = (y // 8) * tiles_per_row + (x // 8)
+            self._status_bar.update_tile(tile_id)
+
+        # Get pixel color and update color preview
+        color_index = self._controller.image_model.get_pixel(x, y)
+        colors = self._controller.get_current_colors()
+        if 0 <= color_index < len(colors):
+            self._status_bar.update_color(colors[color_index])

@@ -10,9 +10,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtGui import QImage, QPixmap
 
 from core.app_context import get_app_context
+from core.mesen_integration.log_watcher import CapturedOffset
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
+from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 
 if TYPE_CHECKING:
     from ..views.workspaces.rom_workflow_page import ROMWorkflowPage
@@ -70,6 +73,9 @@ class ROMWorkflowController(QObject):
         # Flag for auto-opening in editor after preview completes (double-click)
         self._pending_open_in_editor: bool = False
 
+        # Thumbnail worker controller
+        self._thumbnail_controller: ThumbnailWorkerController | None = None
+
         # Connect LogWatcher
         self._connect_log_watcher()
 
@@ -79,15 +85,55 @@ class ROMWorkflowController(QObject):
         # Start watching if not already
         self.log_watcher.start_watching()
 
+    def _setup_thumbnail_worker(self) -> None:
+        """Create thumbnail worker after ROM is loaded."""
+        if self._thumbnail_controller:
+            self._thumbnail_controller.cleanup()
+
+        self._thumbnail_controller = ThumbnailWorkerController(self)
+        self._thumbnail_controller.start_worker(self.rom_path, self.rom_extractor)
+
+        # Connect ready signal to browser update
+        if self._thumbnail_controller.worker:
+            self._thumbnail_controller.worker.thumbnail_ready.connect(self._on_thumbnail_ready)
+            logger.debug("Thumbnail worker connected for asset browser")
+
+    def _on_thumbnail_ready(self, offset: int, thumbnail: QImage) -> None:
+        """Handle thumbnail ready from worker."""
+        if self._view:
+            pixmap = QPixmap.fromImage(thumbnail)
+            self._view.asset_browser.set_thumbnail(offset, pixmap)
+            logger.debug(f"Thumbnail set for offset 0x{offset:06X}")
+
+    def _get_capture_name(self, capture: CapturedOffset) -> str:
+        """Generate display name for captured sprite with gameplay context."""
+        if capture.frame is not None:
+            # Add frame context - helps identify when sprite appeared
+            if capture.frame >= 1500:
+                context = "Gameplay"
+            elif capture.frame >= 1200:
+                context = "Cutscene"
+            elif capture.frame >= 500:
+                context = "Menu"
+            else:
+                context = "Boot"
+            return f"{context} 0x{capture.offset:06X} (F{capture.frame})"
+        else:
+            # Fallback to timestamp if no frame
+            timestamp_str = capture.timestamp.strftime("%H:%M:%S")
+            return f"Capture 0x{capture.offset:06X} ({timestamp_str})"
+
     def _on_offset_discovered(self, capture: object) -> None:
         """Handle new offset discovered from Mesen2 log."""
         if self._view:
-            from core.mesen_integration.log_watcher import CapturedOffset
-
             if isinstance(capture, CapturedOffset):
-                # Add to asset browser with formatted name
-                name = f"Capture 0x{capture.offset:06X}"
+                # Add to asset browser with context-aware name
+                name = self._get_capture_name(capture)
                 self._view.asset_browser.add_mesen_capture(name, capture.offset)
+
+                # Request thumbnail if worker is ready
+                if self._thumbnail_controller:
+                    self._thumbnail_controller.queue_thumbnail(capture.offset)
 
     def set_view(self, view: "ROMWorkflowPage") -> None:
         """Set the view and connect signals."""
@@ -98,8 +144,13 @@ class ROMWorkflowController(QObject):
         persistent_clicks = self.log_watcher.load_persistent_clicks()
         if persistent_clicks:
             for capture in persistent_clicks:
-                name = f"Capture 0x{capture.offset:06X}"
+                name = self._get_capture_name(capture)
                 view.asset_browser.add_mesen_capture(name, capture.offset)
+
+            # Request thumbnails for all loaded captures if worker is ready
+            if self._thumbnail_controller:
+                for capture in persistent_clicks:
+                    self._thumbnail_controller.queue_thumbnail(capture.offset)
 
     def _connect_view_signals(self) -> None:
         """Connect view signals."""
@@ -179,6 +230,15 @@ class ROMWorkflowController(QObject):
             self.rom_info_updated.emit("Unknown ROM")
 
         self.status_message.emit(f"Loaded ROM: {rom_path.name}")
+
+        # Setup thumbnail worker for asset browser
+        self._setup_thumbnail_worker()
+
+        # Request thumbnails for any existing assets
+        if self._view and self._thumbnail_controller:
+            persistent_clicks = self.log_watcher.load_persistent_clicks()
+            for capture in persistent_clicks:
+                self._thumbnail_controller.queue_thumbnail(capture.offset)
 
         # Trigger initial preview
         self.set_offset(self.current_offset)
@@ -552,3 +612,6 @@ class ROMWorkflowController(QObject):
     def cleanup(self) -> None:
         """Clean up resources."""
         self.preview_coordinator.cleanup()
+        if self._thumbnail_controller:
+            self._thumbnail_controller.cleanup()
+            self._thumbnail_controller = None
