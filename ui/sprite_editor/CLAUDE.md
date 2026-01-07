@@ -13,6 +13,63 @@ Inherits all rules from `spritepal/CLAUDE.md`. This file covers only subsystem-s
 
 See `ui/sprite_editor/README.md` for full documentation.
 
+## UI Structure (for Screenshots/Debugging)
+
+The embedded sprite editor uses nested containers:
+
+```
+MainWindow
+└── center_stack (QStackedWidget)
+    ├── [0] ExtractionWorkspace (ROM/VRAM extraction tabs)
+    └── [1] SpriteEditorWorkspace
+            └── _mode_stack (QStackedWidget)
+                ├── [0] VRAMEditorPage (Extract→Edit→Inject→Multi-Palette)
+                └── [1] ROMWorkflowPage (Asset browser + editor)
+```
+
+**Switching views programmatically:**
+
+```python
+# Switch to Sprite Editor workspace
+window.switch_to_workspace(1)
+
+# Switch modes within sprite editor
+editor = window._sprite_editor_workspace
+editor._mode_combo.setCurrentIndex(0)  # VRAM Mode
+editor._mode_combo.setCurrentIndex(1)  # ROM Mode
+
+# Switch tabs within VRAM mode
+vram_page = editor._vram_page
+vram_page.set_current_tab(0)  # Extract
+vram_page.set_current_tab(1)  # Edit
+vram_page.set_current_tab(2)  # Inject
+vram_page.set_current_tab(3)  # Multi-Palette
+```
+
+**Taking screenshots** (requires `QT_QPA_PLATFORM=xcb` for WSL):
+
+```python
+import os
+os.environ['QT_QPA_PLATFORM'] = 'xcb'
+
+from core.configuration_service import ConfigurationService
+from core.app_context import create_app_context
+from launch_spritepal import SpritePalApp
+
+config = ConfigurationService()
+config.ensure_directories_exist()
+context = create_app_context('SpritePal', settings_path=config.settings_file, configuration_service=config)
+app = SpritePalApp(sys.argv, context=context)
+
+window = app.main_window
+window.show()
+window.resize(1200, 900)
+
+# Navigate to desired view, then:
+pixmap = window.grab()
+pixmap.save('/tmp/screenshot.png')
+```
+
 ## Layer Rules
 
 ```
