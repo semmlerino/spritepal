@@ -82,17 +82,21 @@ class ROMWorkflowController(QObject):
             from core.mesen_integration.log_watcher import CapturedOffset
 
             if isinstance(capture, CapturedOffset):
-                self._view.recent_captures_widget.add_capture(capture)
+                # Add to asset browser with formatted name
+                name = f"Capture 0x{capture.offset:06X}"
+                self._view.asset_browser.add_mesen_capture(name, capture.offset)
 
     def set_view(self, view: "ROMWorkflowPage") -> None:
         """Set the view and connect signals."""
         self._view = view
         self._connect_view_signals()
 
-        # Load existing persistent clicks
+        # Load existing persistent clicks into asset browser
         persistent_clicks = self.log_watcher.load_persistent_clicks()
         if persistent_clicks:
-            view.recent_captures_widget.load_persistent(persistent_clicks)
+            for capture in persistent_clicks:
+                name = f"Capture 0x{capture.offset:06X}"
+                view.asset_browser.add_mesen_capture(name, capture.offset)
 
     def _connect_view_signals(self) -> None:
         """Connect view signals."""
@@ -103,31 +107,24 @@ class ROMWorkflowController(QObject):
         self._view.source_bar.action_clicked.connect(self.handle_primary_action)
         self._view.source_bar.browse_rom_requested.connect(self.browse_rom)
 
-        # Recent captures signals
-        self._view.recent_captures_widget.offset_selected.connect(self.set_offset)
-        self._view.recent_captures_widget.offset_activated.connect(self.set_offset)
+        # Asset browser signals
+        self._view.sprite_selected.connect(self._on_sprite_selected)
+        self._view.sprite_activated.connect(self._on_sprite_activated)
 
-        # Navigation buttons
-        self._view.prev_btn.clicked.connect(self.navigate_prev)
-        self._view.next_btn.clicked.connect(self.navigate_next)
+        # EditWorkspace signals (save/export)
+        self._view.workspace.saveToRomRequested.connect(self.prepare_injection)
+        self._view.workspace.exportPngRequested.connect(self.export_png)
 
-        # Connect preview coordinator to view's slider if it exists
-        if hasattr(self._view, "offset_slider"):
-            self.preview_coordinator.connect_slider(self._view.offset_slider)
-            # Also connect slider value changed to update offset
-            self._view.offset_slider.valueChanged.connect(self.set_offset)
+    def _on_sprite_selected(self, offset: int, source_type: str) -> None:
+        """Handle sprite selection from asset browser."""
+        self.set_offset(offset)
 
-    def navigate_prev(self) -> None:
-        """Move backward by step size."""
-        if self._view:
-            step = self._view.step_spin.value()
-            self.set_offset(max(0, self.current_offset - step))
-
-    def navigate_next(self) -> None:
-        """Move forward by step size."""
-        if self._view:
-            step = self._view.step_spin.value()
-            self.set_offset(min(self.rom_size - 1, self.current_offset + step))
+    def _on_sprite_activated(self, offset: int, source_type: str) -> None:
+        """Handle sprite activation (double-click) - enter edit mode."""
+        self.set_offset(offset)
+        # Auto-load into editor on double-click
+        if self.current_tile_data:
+            self.open_in_editor()
 
     def browse_rom(self) -> None:
         """Open file dialog to select ROM file."""
@@ -157,7 +154,6 @@ class ROMWorkflowController(QObject):
         # Update view
         if self._view:
             self._view.source_bar.set_rom_path(path)
-            self._view.set_rom_size(self.rom_size)
 
         # Get ROM info (checksum/title)
         try:
@@ -192,10 +188,9 @@ class ROMWorkflowController(QObject):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if reply == QMessageBox.StandardButton.No:
-                # Reset slider/text to current offset
+                # Reset to current offset
                 if self._view:
                     self._view.source_bar.set_offset(self.current_offset)
-                    self._view.offset_slider.setValue(self.current_offset)
                 return
 
             # User chose to continue, reset state to preview
@@ -207,11 +202,6 @@ class ROMWorkflowController(QObject):
         self.current_offset = offset
         if self._view:
             self._view.source_bar.set_offset(offset)
-            # Update slider if not already matched
-            if self._view.offset_slider.value() != offset:
-                self._view.offset_slider.blockSignals(True)
-                self._view.offset_slider.setValue(offset)
-                self._view.offset_slider.blockSignals(False)
 
         if self.rom_path:
             self.preview_coordinator.request_manual_preview(offset)
@@ -307,13 +297,13 @@ class ROMWorkflowController(QObject):
             msg = "Ready to inject edited sprite into ROM.\n\n"
             msg += f"Target Offset: 0x{self.current_offset:06X}\n"
             msg += f"Original Size: {self.original_compressed_size} bytes\n"
-            
+
             # Use max 32 bytes slack by default for safety
             safe_slack = min(self.available_slack, 32)
             if self.available_slack > 0:
                 msg += f"Available Space: {self.original_compressed_size + safe_slack} bytes "
                 msg += f"({self.original_compressed_size} + {safe_slack} slack)\n"
-            
+
             msg += f"New Size: {new_size} bytes\n\n"
 
             if new_size > (self.original_compressed_size + safe_slack):
@@ -321,7 +311,9 @@ class ROMWorkflowController(QObject):
                 msg += "This WILL overwrite adjacent data and likely crash the game!\n\n"
             elif new_size > self.original_compressed_size:
                 msg += "NOTE: New sprite is slightly larger than original, "
-                msg += f"but fits within detected slack space ({new_size - self.original_compressed_size} bytes used).\n\n"
+                msg += (
+                    f"but fits within detected slack space ({new_size - self.original_compressed_size} bytes used).\n\n"
+                )
 
             msg += "A backup of the ROM will be created automatically.\n"
             msg += "Proceed with injection?"
@@ -361,7 +353,7 @@ class ROMWorkflowController(QObject):
 
             # Perform injection with backup
             rom_injector = self.rom_extractor.rom_injector
-            
+
             # First attempt (standard validation)
             success, message = rom_injector.inject_sprite_to_rom(
                 sprite_path=temp_png,
@@ -370,7 +362,7 @@ class ROMWorkflowController(QObject):
                 sprite_offset=self.current_offset,
                 create_backup=True,
             )
-            
+
             # Handle failure due to checksum mismatch
             if not success and "ROM checksum mismatch" in message:
                 from PySide6.QtWidgets import QMessageBox
@@ -461,6 +453,44 @@ class ROMWorkflowController(QObject):
 
             QMessageBox.critical(self._view, "Error", f"An error occurred during injection: {e}")
 
+    def export_png(self) -> None:
+        """Export current sprite as PNG file."""
+        data = self.main_controller.editing_controller.get_image_data()
+        if data is None:
+            self.status_message.emit("No image to export")
+            return
+
+        from PySide6.QtWidgets import QFileDialog
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self._view,
+            "Export PNG",
+            f"sprite_0x{self.current_offset:06X}.png",
+            "PNG Files (*.png);;All Files (*)",
+        )
+
+        if not file_path:
+            return
+
+        try:
+            # Create PIL image for export
+            img = Image.fromarray(data, mode="P")
+            img.putpalette(self.main_controller.editing_controller.get_flat_palette())
+            img.save(file_path, "PNG")
+            self.status_message.emit(f"Exported to: {file_path}")
+
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.information(self._view, "Export Successful", f"Sprite exported to:\n{file_path}")
+
+        except Exception as e:
+            logger.exception("Error during PNG export")
+            self.status_message.emit(f"Error exporting PNG: {e}")
+
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.critical(self._view, "Export Failed", f"Failed to export PNG: {e}")
+
     def _get_rom_data_for_preview(self) -> tuple[str, object] | None:
         """Provide ROM data for smart preview coordinator."""
         if not self.rom_path:
@@ -484,11 +514,10 @@ class ROMWorkflowController(QObject):
         renderer = SpriteRenderer()
         image = renderer.render_4bpp(tile_data, width, height)
 
-        # Convert PIL to QPixmap or emit as is
+        # Emit preview ready signal
         self.preview_ready.emit(image, compressed_size)
 
         if self._view:
-            self._view.update_preview(image)
             slack_info = f" (+{slack_size} slack)" if slack_size > 0 else ""
             self.status_message.emit(f"Sprite found! Original size: {compressed_size} bytes{slack_info}")
 

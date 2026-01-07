@@ -20,12 +20,12 @@ if TYPE_CHECKING:
 class TestPanelSynchronization:
     """Tests for controller ↔ panel bidirectional sync."""
 
-    def test_tool_panel_syncs_from_controller(self, qtbot: QtBot) -> None:
-        """Verify tool_panel updates when controller.set_tool() is called.
+    def test_icon_toolbar_syncs_from_controller(self, qtbot: QtBot) -> None:
+        """Verify icon_toolbar updates when controller.set_tool() is called.
 
-        Bug: Controller state changes not reflected in tool panel UI.
+        Bug: Controller state changes not reflected in toolbar UI.
 
-        Fix: EditTab connects controller.toolChanged → tool_panel.set_tool
+        Fix: EditWorkspace connects controller.toolChanged → icon_toolbar.set_tool
         """
         from ui.sprite_editor.controllers.editing_controller import EditingController
         from ui.sprite_editor.views.tabs.edit_tab import EditTab
@@ -39,20 +39,20 @@ class TestPanelSynchronization:
 
         # Verify initial state (pencil is default)
         assert controller.get_current_tool_name() == "pencil"
-        assert tab.tool_panel.get_current_tool() == "pencil"
+        assert tab.icon_toolbar.get_current_tool() == "pencil"
 
         # Change tool via controller
         controller.set_tool("fill")
         QCoreApplication.processEvents()
 
-        # Verify tool panel synced
-        assert tab.tool_panel.get_current_tool() == "fill", "Tool panel should sync when controller.set_tool() called"
+        # Verify icon toolbar synced
+        assert tab.icon_toolbar.get_current_tool() == "fill", "Icon toolbar should sync when controller.set_tool() called"
 
         # Change to picker
         controller.set_tool("picker")
         QCoreApplication.processEvents()
 
-        assert tab.tool_panel.get_current_tool() == "picker"
+        assert tab.icon_toolbar.get_current_tool() == "picker"
 
     def test_palette_panel_syncs_color(self, qtbot: QtBot) -> None:
         """Verify palette_panel updates when controller.set_selected_color() is called.
@@ -127,15 +127,11 @@ class TestPanelSynchronization:
         assert displayed_colors[1] == (0, 255, 0), "Second color should be green"
         assert displayed_colors[2] == (0, 0, 255), "Third color should be blue"
 
-    def test_brush_size_syncs_from_controller(self, qtbot: QtBot) -> None:
-        """Verify tool_panel brush size updates when controller.set_brush_size() is called.
+    def test_brush_size_in_controller(self, qtbot: QtBot) -> None:
+        """Verify brush size can be set via controller.
 
-        Note: Currently, brush size does NOT have automatic bidirectional sync
-        (no controller.brushSizeChanged signal). Brush size syncs only via
-        update_from_controller() which is called manually when needed.
-
-        This test verifies the current behavior where programmatic controller changes
-        do NOT automatically sync to panel, but update_from_controller() does work.
+        Note: IconToolbar does not expose brush size control (simplified UI).
+        Brush size is managed internally by the controller's tool_manager.
         """
         from ui.sprite_editor.controllers.editing_controller import EditingController
         from ui.sprite_editor.views.tabs.edit_tab import EditTab
@@ -147,24 +143,16 @@ class TestPanelSynchronization:
         # Set controller on tab
         tab.set_controller(controller)
 
-        # Verify initial brush size
+        # Verify initial brush size in controller
         assert controller.tool_manager.get_brush_size() == 1
-        assert tab.tool_panel.get_brush_size() == 1
 
         # Change brush size via controller
         controller.set_brush_size(3)
         QCoreApplication.processEvents()
 
-        # Currently brush size does NOT auto-sync (no signal connection)
-        # This is expected behavior - brush size is not signaled
-        assert tab.tool_panel.get_brush_size() == 1, "Tool panel brush size does NOT auto-sync (no signal connection)"
-
-        # However, update_from_controller() SHOULD sync it
-        tab.update_from_controller()
-        QCoreApplication.processEvents()
-
-        assert tab.tool_panel.get_brush_size() == 3, (
-            "Tool panel brush size should sync when update_from_controller() is called"
+        # Verify brush size changed in controller
+        assert controller.tool_manager.get_brush_size() == 3, (
+            "Brush size should update in controller"
         )
 
     def test_update_from_controller_syncs_all_panels(self, qtbot: QtBot) -> None:
@@ -184,19 +172,16 @@ class TestPanelSynchronization:
 
         # Change controller state
         controller.set_tool("fill")
-        controller.set_brush_size(4)
         controller.set_selected_color(7)
         QCoreApplication.processEvents()
 
         # Reset panel state manually (simulate desync)
-        tab.tool_panel.set_tool("pencil")
-        tab.tool_panel.set_brush_size(1)
+        tab.icon_toolbar.set_tool("pencil")
         tab.palette_panel.set_selected_color(0)
         QCoreApplication.processEvents()
 
         # Verify panels are desynced
-        assert tab.tool_panel.get_current_tool() == "pencil"
-        assert tab.tool_panel.get_brush_size() == 1
+        assert tab.icon_toolbar.get_current_tool() == "pencil"
         assert tab.palette_panel.get_selected_color() == 0
 
         # Call update_from_controller to re-sync
@@ -204,15 +189,14 @@ class TestPanelSynchronization:
         QCoreApplication.processEvents()
 
         # Verify all panels synced back to controller state
-        assert tab.tool_panel.get_current_tool() == "fill", "Tool should sync from controller"
-        assert tab.tool_panel.get_brush_size() == 4, "Brush size should sync from controller"
+        assert tab.icon_toolbar.get_current_tool() == "fill", "Tool should sync from controller"
         assert tab.palette_panel.get_selected_color() == 7, "Selected color should sync from controller"
 
     def test_tool_change_signal_not_blocked_on_user_click(self, qtbot: QtBot) -> None:
         """Verify user-initiated tool changes DO emit signals (not blocked).
 
         QSignalBlocker should only block programmatic updates from controller,
-        not user interactions with the tool panel.
+        not user interactions with the icon toolbar.
         """
         from unittest.mock import Mock
 
@@ -230,8 +214,8 @@ class TestPanelSynchronization:
         signal_spy = Mock()
         controller.toolChanged.connect(signal_spy)
 
-        # Simulate user clicking fill button
-        tab.tool_panel.fill_btn.click()
+        # Simulate user clicking fill button on icon toolbar
+        tab.icon_toolbar.tool_buttons["fill"].click()
         QCoreApplication.processEvents()
 
         # Signal should have been emitted (user action)

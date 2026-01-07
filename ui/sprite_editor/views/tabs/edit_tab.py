@@ -20,8 +20,8 @@ from ..workspaces import EditWorkspace
 
 if TYPE_CHECKING:
     from ...controllers.editing_controller import EditingController
-    from ..panels import OptionsPanel, PalettePanel, PreviewPanel, ToolPanel
-    from ..widgets import PixelCanvas
+    from ..panels import PalettePanel, PreviewPanel
+    from ..widgets import IconToolbar, PixelCanvas
 
 
 class EditTab(QWidget):
@@ -70,19 +70,14 @@ class EditTab(QWidget):
 
     # Delegate panel access to workspace
     @property
-    def tool_panel(self) -> "ToolPanel":
-        """Access the tool panel."""
-        return self._workspace.tool_panel
+    def icon_toolbar(self) -> "IconToolbar":
+        """Access the icon toolbar (replaced tool panel)."""
+        return self._workspace.icon_toolbar
 
     @property
     def palette_panel(self) -> "PalettePanel":
         """Access the palette panel."""
         return self._workspace.palette_panel
-
-    @property
-    def options_panel(self) -> "OptionsPanel":
-        """Access the options panel."""
-        return self._workspace.options_panel
 
     @property
     def preview_panel(self) -> "PreviewPanel":

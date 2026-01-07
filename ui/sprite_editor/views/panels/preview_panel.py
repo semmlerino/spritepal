@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
 """
 Preview panel for the pixel editor.
-Shows current view and color preview of the image.
+Shows current sprite preview with configurable background options.
 """
 
 from typing import TYPE_CHECKING, override
 
 import numpy as np
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QImage, QPixmap, QResizeEvent
-from PySide6.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import Signal
+from PySide6.QtGui import QImage, QResizeEvent
+from PySide6.QtWidgets import QGroupBox, QVBoxLayout, QWidget
+
+from ..widgets.contextual_preview import ContextualPreview
 
 if TYPE_CHECKING:
     from ...controllers.editing_controller import EditingController
 
 
 class PreviewPanel(QWidget):
-    """Panel showing preview of the current image."""
+    """Panel showing preview of the current image with background options."""
+
+    # Signals
+    backgroundChanged = Signal(str)  # "checkerboard", "black", "white", "custom"
 
     def __init__(
         self,
@@ -25,6 +30,7 @@ class PreviewPanel(QWidget):
     ) -> None:
         super().__init__(parent)
         self.controller = controller
+        self._preview_widget: ContextualPreview | None = None
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -37,27 +43,13 @@ class PreviewPanel(QWidget):
         preview_group = QGroupBox("Preview")
         preview_layout = QVBoxLayout()
 
-        # Main preview (current image)
-        main_preview_label = QLabel("Image Preview:")
-        main_preview_label.setStyleSheet("QLabel { font-weight: bold; }")
-        preview_layout.addWidget(main_preview_label)
+        # Create ContextualPreview widget
+        self._preview_widget = ContextualPreview()
+        self._preview_widget.setMinimumHeight(220)
+        preview_layout.addWidget(self._preview_widget)
 
-        self.main_preview = QLabel("No image loaded")
-        self.main_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.main_preview.setStyleSheet("QLabel { border: 1px solid #999; background: #222; }")
-        self.main_preview.setMinimumHeight(100)
-        preview_layout.addWidget(self.main_preview)
-
-        # Color preview (current selected color)
-        color_preview_label = QLabel("Selected Color:")
-        color_preview_label.setStyleSheet("QLabel { font-weight: bold; }")
-        preview_layout.addWidget(color_preview_label)
-
-        self.color_preview = QLabel()
-        self.color_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.color_preview.setStyleSheet("QLabel { border: 1px solid #999; background: #222; }")
-        self.color_preview.setMinimumHeight(60)
-        preview_layout.addWidget(self.color_preview)
+        # Forward the backgroundChanged signal
+        self._preview_widget.backgroundChanged.connect(self.backgroundChanged.emit)
 
         preview_group.setLayout(preview_layout)
 
@@ -66,45 +58,26 @@ class PreviewPanel(QWidget):
 
     def update_preview(self) -> None:
         """Update the main preview from controller image data."""
+        if not self._preview_widget:
+            return
+
         if not self.controller or not self.controller.has_image():
-            self.main_preview.clear()
-            self.main_preview.setText("No image loaded")
+            self._preview_widget.clear_preview()
             return
 
-        # Convert indexed image data to QPixmap
-        pixmap = self._create_pixmap_from_controller()
-        if pixmap and not pixmap.isNull():
-            # Scale to fit while maintaining aspect ratio
-            scaled = pixmap.scaled(
-                self.main_preview.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            )
-            self.main_preview.setPixmap(scaled)
+        # Convert indexed image data to QImage
+        qimage = self._create_qimage_from_controller()
+        if qimage and not qimage.isNull():
+            self._preview_widget.update_preview(qimage)
         else:
-            self.main_preview.clear()
-            self.main_preview.setText("No image loaded")
+            self._preview_widget.clear_preview()
 
-    def update_color_preview(self, color_index: int) -> None:
-        """Update the color preview to show the selected color."""
-        if not self.controller:
-            return
+    def _create_qimage_from_controller(self) -> QImage | None:
+        """Convert controller's image and palette data to a QImage.
 
-        # Get RGB color from palette
-        colors = self.controller.palette_model.colors
-        if 0 <= color_index < len(colors):
-            r, g, b = colors[color_index]
-            color = QColor(r, g, b)
-
-            # Create solid color pixmap
-            pixmap = QPixmap(self.color_preview.size())
-            pixmap.fill(color)
-            self.color_preview.setPixmap(pixmap)
-        else:
-            self.color_preview.clear()
-
-    def _create_pixmap_from_controller(self) -> QPixmap | None:
-        """Convert controller's image and palette data to a QPixmap."""
+        Returns:
+            QImage with ARGB format, or None if no valid image data
+        """
         if not self.controller:
             return None
 
@@ -151,7 +124,7 @@ class PreviewPanel(QWidget):
         argb_bytes = argb_data.tobytes()
         buffer_ptr[: len(argb_bytes)] = argb_bytes  # type: ignore[reportIndexIssue]
 
-        return QPixmap.fromImage(qimage)
+        return qimage
 
     @override
     def resizeEvent(self, event: QResizeEvent) -> None:

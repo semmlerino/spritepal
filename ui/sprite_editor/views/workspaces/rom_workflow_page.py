@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-ROM workflow page combining offset navigation and pixel editing.
+ROM workflow page combining asset browser and pixel editing.
 
 This page provides the ROM-based sprite editing workflow:
-- Left panel: ROM offset navigation, preview, recent captures
+- Left panel: SpriteAssetBrowser with searchable thumbnails
 - Right panel: Pixel editing workspace
 
 Unlike the old ROMWorkflowTab, this page owns its own EditWorkspace
@@ -12,43 +12,26 @@ instance, eliminating the need for widget reparenting when switching modes.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QFrame,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
     QSizePolicy,
-    QSlider,
-    QSpinBox,
     QSplitter,
     QVBoxLayout,
     QWidget,
 )
 
-from ui.common.spacing_constants import (
-    SPACING_COMPACT_MEDIUM,
-    SPACING_MEDIUM,
-    SPACING_STANDARD,
-)
-from ui.components.panels import RecentCapturesWidget
+from ui.common.spacing_constants import SPACING_STANDARD
 
 from ..widgets.source_bar import SourceBar
+from ..widgets.sprite_asset_browser import SpriteAssetBrowser
 from .edit_workspace import EditWorkspace
-
-if TYPE_CHECKING:
-    from PIL import Image
 
 
 class ROMWorkflowPage(QWidget):
-    """ROM workflow page with navigation panel and editing workspace.
+    """ROM workflow page with asset browser and editing workspace.
 
     This page provides the ROM-based sprite editing workflow:
-    - Left panel: ROM offset navigation, mini preview, recent captures
+    - Left panel: SpriteAssetBrowser for navigating available sprites
     - Right panel: EditWorkspace for pixel editing
 
     The page owns its own EditWorkspace instance, which shares the
@@ -56,12 +39,14 @@ class ROMWorkflowPage(QWidget):
     mode switching without reparenting widgets.
     """
 
+    # Forward signals from asset browser
     offset_changed = Signal(int)
+    sprite_selected = Signal(int, str)  # offset, source_type
+    sprite_activated = Signal(int, str)  # offset, source_type
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        # Minimum width removed to allow flexible resizing
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -80,7 +65,7 @@ class ROMWorkflowPage(QWidget):
         self._main_splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._main_splitter.setChildrenCollapsible(False)
 
-        # Left Panel: Offset Browser + Preview
+        # Left Panel: Asset Browser
         self._left_panel = self._create_left_panel()
         self._main_splitter.addWidget(self._left_panel)
 
@@ -98,67 +83,23 @@ class ROMWorkflowPage(QWidget):
         layout.addWidget(self._main_splitter, 1)
 
     def _create_left_panel(self) -> QWidget:
-        """Create the left navigation panel."""
+        """Create the left panel with asset browser."""
         left_panel = QWidget()
         # Object name handles background and border via global theme
         left_panel.setObjectName("leftNavPanel")
-        
+
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD)
-        left_layout.setSpacing(SPACING_MEDIUM)
+        left_layout.setSpacing(0)
 
-        # Offset Browser group - uses standard QGroupBox theme
-        browser_group = QGroupBox("ROM NAVIGATION")
-        browser_layout = QVBoxLayout(browser_group)
-        browser_layout.setContentsMargins(SPACING_COMPACT_MEDIUM, SPACING_COMPACT_MEDIUM, SPACING_COMPACT_MEDIUM, SPACING_COMPACT_MEDIUM)
+        # Asset Browser (fills entire left panel)
+        self._asset_browser = SpriteAssetBrowser()
 
-        # Offset slider - now uses global QSlider theme
-        self._offset_slider = QSlider(Qt.Orientation.Horizontal)
-        self._offset_slider.setMinimum(0)
-        self._offset_slider.setMaximum(100)  # Updated when ROM loads
-        browser_layout.addWidget(self._offset_slider)
+        # Forward signals from asset browser
+        self._asset_browser.sprite_selected.connect(self.sprite_selected.emit)
+        self._asset_browser.sprite_activated.connect(self.sprite_activated.emit)
 
-        # Navigation row
-        nav_layout = QHBoxLayout()
-        self._prev_btn = QPushButton("◀ Prev")
-        self._next_btn = QPushButton("Next ▶")
-
-        nav_layout.addWidget(self._prev_btn)
-        nav_layout.addWidget(self._next_btn)
-        browser_layout.addLayout(nav_layout)
-
-        # Step controls
-        step_layout = QHBoxLayout()
-        step_layout.addWidget(QLabel("Step:"))
-        self._step_spin = QSpinBox()
-        self._step_spin.setRange(1, 0x10000)
-        self._step_spin.setValue(0x100)
-        self._step_spin.setDisplayIntegerBase(16)
-        self._step_spin.setPrefix("0x")
-        step_layout.addWidget(self._step_spin)
-        browser_layout.addLayout(step_layout)
-
-        # Mini Preview
-        preview_container = QFrame()
-        preview_container.setFrameStyle(QFrame.Shape.StyledPanel)
-        preview_container.setMinimumHeight(220)
-
-        preview_layout = QVBoxLayout(preview_container)
-        preview_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        preview_layout.setContentsMargins(5, 5, 5, 5)
-
-        self._preview_label = QLabel("No Preview")
-        self._preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._preview_label.setProperty("preview", "true")
-        preview_layout.addWidget(self._preview_label)
-
-        browser_layout.addWidget(preview_container)
-
-        left_layout.addWidget(browser_group)
-
-        # Recent Captures
-        self._recent_captures_widget = RecentCapturesWidget()
-        left_layout.addWidget(self._recent_captures_widget, 1)
+        left_layout.addWidget(self._asset_browser, 1)
 
         return left_panel
 
@@ -174,34 +115,9 @@ class ROMWorkflowPage(QWidget):
         return self._source_bar
 
     @property
-    def offset_slider(self) -> QSlider:
-        """Access the offset slider."""
-        return self._offset_slider
-
-    @property
-    def prev_btn(self) -> QPushButton:
-        """Access the previous button."""
-        return self._prev_btn
-
-    @property
-    def next_btn(self) -> QPushButton:
-        """Access the next button."""
-        return self._next_btn
-
-    @property
-    def step_spin(self) -> QSpinBox:
-        """Access the step spinbox."""
-        return self._step_spin
-
-    @property
-    def preview_label(self) -> QLabel:
-        """Access the preview label."""
-        return self._preview_label
-
-    @property
-    def recent_captures_widget(self) -> RecentCapturesWidget:
-        """Access the recent captures widget."""
-        return self._recent_captures_widget
+    def asset_browser(self) -> SpriteAssetBrowser:
+        """Access the sprite asset browser."""
+        return self._asset_browser
 
     @property
     def main_splitter(self) -> QSplitter:
@@ -213,39 +129,13 @@ class ROMWorkflowPage(QWidget):
         """Access the left panel."""
         return self._left_panel
 
-    def set_rom_size(self, size: int) -> None:
-        """Update slider range based on ROM size."""
-        self._offset_slider.setMaximum(size - 1)
-
-    def update_preview(self, pil_image: Image.Image) -> None:
-        """Update the mini-preview label."""
-        # Convert PIL to QPixmap
-        if pil_image.mode != "RGBA":
-            pil_image = pil_image.convert("RGBA")
-
-        data = pil_image.tobytes("raw", "RGBA")
-        qimg = QImage(data, pil_image.width, pil_image.height, QImage.Format.Format_RGBA8888)
-        pixmap = QPixmap.fromImage(qimg)
-
-        # Scale for preview if too small
-        if pixmap.width() < 128:
-            pixmap = pixmap.scaled(
-                pixmap.width() * 2,
-                pixmap.height() * 2,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            )
-
-        self._preview_label.setPixmap(pixmap)
-        self._preview_label.setText("")
-
     def set_workflow_state(self, state: str) -> None:
         """Update UI based on workflow state."""
         if state == "preview":
             self._left_panel.setEnabled(True)
             self._workspace.setEnabled(False)
         elif state == "edit":
-            self._left_panel.setEnabled(False)  # Lock offset while editing
+            self._left_panel.setEnabled(False)  # Lock browser while editing
             self._workspace.setEnabled(True)
         elif state == "save":
             self._left_panel.setEnabled(False)

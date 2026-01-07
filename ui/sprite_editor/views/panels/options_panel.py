@@ -16,7 +16,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-
 from ui.common.spacing_constants import GROUP_PADDING, SPACING_MEDIUM, SPACING_SMALL
 
 

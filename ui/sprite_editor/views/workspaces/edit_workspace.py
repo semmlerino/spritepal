@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
-    QHBoxLayout,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -24,8 +23,8 @@ from PySide6.QtWidgets import (
 from ui.common.signal_utils import safe_disconnect
 from ui.common.spacing_constants import PANEL_PADDING, SPACING_MEDIUM, SPACING_SMALL
 
-from ..panels import OptionsPanel, PalettePanel, PreviewPanel, ToolPanel
-from ..widgets import PixelCanvas
+from ..panels import PalettePanel, PreviewPanel
+from ..widgets import EditorStatusBar, IconToolbar, PixelCanvas, SaveExportPanel
 
 if TYPE_CHECKING:
     from ...controllers.editing_controller import EditingController
@@ -35,8 +34,10 @@ class EditWorkspace(QWidget):
     """Reusable workspace with tool panels and pixel canvas.
 
     This workspace provides the core editing UI:
-    - Left panel: Tool, Palette, Options, Preview panels in a scroll area
-    - Right panel: Pixel canvas in a scroll area
+    - Top: IconToolbar (horizontal, spans full width)
+    - Center-Left: Pixel canvas in scroll area (majority of space)
+    - Center-Right: Palette, Preview, and Save/Export panels (vertical stack)
+    - Bottom: EditorStatusBar (spans full width)
 
     The workspace connects to an EditingController for signal wiring.
     Multiple EditWorkspace instances can share the same controller,
@@ -47,6 +48,8 @@ class EditWorkspace(QWidget):
     detach_requested = Signal()
     image_modified = Signal()
     ready_for_inject = Signal()
+    saveToRomRequested = Signal()
+    exportPngRequested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -60,67 +63,20 @@ class EditWorkspace(QWidget):
 
     def _setup_ui(self) -> None:
         """Create the workspace UI with tool panels and canvas."""
-        main_layout = QHBoxLayout(self)
+        main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(PANEL_PADDING, PANEL_PADDING, PANEL_PADDING, PANEL_PADDING)
         main_layout.setSpacing(SPACING_MEDIUM)
 
-        # Create splitter for resizable layout
-        self._splitter = QSplitter()
+        # Top: Icon toolbar (horizontal, spans full width)
+        self._icon_toolbar = IconToolbar()
+        main_layout.addWidget(self._icon_toolbar)
+
+        # Center: Splitter for canvas (left) and panels (right)
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
         self._splitter.setChildrenCollapsible(False)
         self._splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        # Left side: Tool panels in scroll area
-        left_panel = QWidget()
-        left_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(SPACING_SMALL)
-
-        # Tool panel
-        self._tool_panel = ToolPanel()
-        left_layout.addWidget(self._tool_panel)
-
-        # Palette panel
-        self._palette_panel = PalettePanel()
-        left_layout.addWidget(self._palette_panel)
-
-        # Options panel
-        self._options_panel = OptionsPanel()
-        left_layout.addWidget(self._options_panel)
-
-        # Preview panel
-        self._preview_panel = PreviewPanel()
-        left_layout.addWidget(self._preview_panel)
-
-        # Action buttons
-        actions_layout = QHBoxLayout()
-
-        self._detach_btn = QPushButton("Pop Out Editor")
-        self._detach_btn.setToolTip("Open editor in a separate window")
-        self._detach_btn.clicked.connect(self.detach_requested.emit)
-        actions_layout.addWidget(self._detach_btn)
-
-        self._inject_btn = QPushButton("Ready for Inject")
-        self._inject_btn.setToolTip("Save changes and switch to Inject tab")
-        self._inject_btn.clicked.connect(self.ready_for_inject.emit)
-        actions_layout.addWidget(self._inject_btn)
-
-        left_layout.addLayout(actions_layout)
-        left_layout.addStretch()
-
-        # Wrap in scroll area for small screens
-        self._left_scroll = QScrollArea()
-        self._left_scroll.setWidgetResizable(True)
-        self._left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._left_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self._left_scroll.setWidget(left_panel)
-        # Allow user to resize, set reasonable min width
-        self._left_scroll.setMinimumWidth(200)
-        self._left_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-
-        self._splitter.addWidget(self._left_scroll)
-
-        # Right side: Canvas in scroll area
+        # Left side of splitter: Canvas in scroll area
         self._scroll_area = QScrollArea()
         self._scroll_area.setWidgetResizable(True)
         self._scroll_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -139,21 +95,72 @@ class EditWorkspace(QWidget):
         self._canvas_layout.addWidget(self._canvas_placeholder)
 
         self._scroll_area.setWidget(self._canvas_container)
-
         self._splitter.addWidget(self._scroll_area)
 
-        # Set splitter sizes (left panel: 300px, canvas: rest)
-        self._splitter.setSizes([300, 600])
-        self._splitter.setStretchFactor(0, 0)
-        self._splitter.setStretchFactor(1, 1)
+        # Right side of splitter: Panel stack
+        right_panel = QWidget()
+        right_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(SPACING_SMALL)
+
+        # Palette panel
+        self._palette_panel = PalettePanel()
+        right_layout.addWidget(self._palette_panel)
+
+        # Preview panel
+        self._preview_panel = PreviewPanel()
+        right_layout.addWidget(self._preview_panel)
+
+        # Save/Export panel
+        self._save_export_panel = SaveExportPanel()
+        right_layout.addWidget(self._save_export_panel)
+
+        # Action buttons (detach and ready for inject)
+        self._detach_btn = QPushButton("Pop Out Editor")
+        self._detach_btn.setToolTip("Open editor in a separate window")
+        self._detach_btn.clicked.connect(self.detach_requested.emit)
+        right_layout.addWidget(self._detach_btn)
+
+        self._inject_btn = QPushButton("Ready for Inject")
+        self._inject_btn.setToolTip("Save changes and switch to Inject tab")
+        self._inject_btn.clicked.connect(self.ready_for_inject.emit)
+        right_layout.addWidget(self._inject_btn)
+
+        right_layout.addStretch()
+
+        # Wrap right panel in scroll area for small screens
+        self._right_scroll = QScrollArea()
+        self._right_scroll.setWidgetResizable(True)
+        self._right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._right_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._right_scroll.setWidget(right_panel)
+        # Allow user to resize, set reasonable min width
+        self._right_scroll.setMinimumWidth(200)
+        self._right_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+
+        self._splitter.addWidget(self._right_scroll)
+
+        # Set splitter sizes (canvas: majority, right panel: 250px)
+        self._splitter.setSizes([700, 250])
+        self._splitter.setStretchFactor(0, 1)  # Canvas stretches
+        self._splitter.setStretchFactor(1, 0)  # Right panel fixed
 
         main_layout.addWidget(self._splitter, 1)
 
+        # Bottom: Status bar (spans full width)
+        self._status_bar = EditorStatusBar()
+        main_layout.addWidget(self._status_bar)
+
+        # Connect SaveExportPanel signals
+        self._save_export_panel.saveToRomClicked.connect(self.saveToRomRequested.emit)
+        self._save_export_panel.exportPngClicked.connect(self.exportPngRequested.emit)
+
     # Public panel accessors (for external signal connections)
     @property
-    def tool_panel(self) -> ToolPanel:
-        """Access the tool panel."""
-        return self._tool_panel
+    def icon_toolbar(self) -> IconToolbar:
+        """Access the icon toolbar."""
+        return self._icon_toolbar
 
     @property
     def palette_panel(self) -> PalettePanel:
@@ -161,14 +168,19 @@ class EditWorkspace(QWidget):
         return self._palette_panel
 
     @property
-    def options_panel(self) -> OptionsPanel:
-        """Access the options panel."""
-        return self._options_panel
-
-    @property
     def preview_panel(self) -> PreviewPanel:
         """Access the preview panel."""
         return self._preview_panel
+
+    @property
+    def save_export_panel(self) -> SaveExportPanel:
+        """Access the save/export panel."""
+        return self._save_export_panel
+
+    @property
+    def status_bar(self) -> EditorStatusBar:
+        """Access the status bar."""
+        return self._status_bar
 
     @property
     def scroll_area(self) -> QScrollArea:
@@ -213,18 +225,16 @@ class EditWorkspace(QWidget):
             safe_disconnect(self._canvas.pixelReleased)
             safe_disconnect(self._canvas.zoomRequested)
 
-        # Disconnect tool panel signals
-        safe_disconnect(self._tool_panel.toolChanged)
-        safe_disconnect(self._tool_panel.brushSizeChanged)
+        # Disconnect icon toolbar signals
+        safe_disconnect(self._icon_toolbar.toolChanged)
+        safe_disconnect(self._icon_toolbar.zoomInClicked)
+        safe_disconnect(self._icon_toolbar.zoomOutClicked)
+        safe_disconnect(self._icon_toolbar.gridToggled)
+        safe_disconnect(self._icon_toolbar.tileGridToggled)
+        safe_disconnect(self._icon_toolbar.palettePreviewToggled)
 
         # Disconnect palette panel signals
         safe_disconnect(self._palette_panel.colorSelected)
-
-        # Disconnect options panel signals
-        safe_disconnect(self._options_panel.gridToggled)
-        safe_disconnect(self._options_panel.paletteToggled)
-        safe_disconnect(self._options_panel.zoomChanged)
-        safe_disconnect(self._options_panel.zoomToFit)
 
         # Disconnect controller signals (bidirectional sync)
         if self._controller is not None:
@@ -256,15 +266,26 @@ class EditWorkspace(QWidget):
         self._canvas.pixelMoved.connect(controller.handle_pixel_move)
         self._canvas.pixelReleased.connect(controller.handle_pixel_release)
 
-        # Connect tool panel signals
-        self._tool_panel.toolChanged.connect(controller.set_tool)
-        self._tool_panel.brushSizeChanged.connect(controller.set_brush_size)
+        # Connect icon toolbar signals
+        self._icon_toolbar.toolChanged.connect(controller.set_tool)
+        self._icon_toolbar.zoomInClicked.connect(self._on_zoom_in)
+        self._icon_toolbar.zoomOutClicked.connect(self._on_zoom_out)
+        self._icon_toolbar.gridToggled.connect(self._canvas.set_grid_visible)
+        # Note: tileGridToggled connection depends on canvas support (may add later)
+
+        # Connect palette preview toggle (canvas is guaranteed to exist here)
+        canvas = self._canvas
+        assert canvas is not None, "Canvas must exist in set_controller"
+        self._icon_toolbar.palettePreviewToggled.connect(lambda visible: canvas.set_greyscale_mode(not visible))
+
+        # Initialize canvas greyscale mode based on toolbar's default state
+        canvas.set_greyscale_mode(not self._icon_toolbar.is_palette_preview_enabled())
 
         # Connect palette panel signals
         self._palette_panel.colorSelected.connect(controller.set_selected_color)
 
         # Connect controller→panel signals (bidirectional sync)
-        controller.toolChanged.connect(self._tool_panel.set_tool)
+        controller.toolChanged.connect(self._icon_toolbar.set_tool)
         controller.colorChanged.connect(self._palette_panel.set_selected_color)
         controller.paletteChanged.connect(self._update_palette)
 
@@ -272,22 +293,13 @@ class EditWorkspace(QWidget):
         self._preview_panel.controller = controller
         controller.imageChanged.connect(self._preview_panel.update_preview)
         controller.paletteChanged.connect(self._preview_panel.update_preview)
-        controller.colorChanged.connect(self._preview_panel.update_color_preview)
 
-        # Connect palette selection to color preview
-        self._palette_panel.colorSelected.connect(self._preview_panel.update_color_preview)
+        # Bidirectional zoom sync: canvas → toolbar (if needed for display)
+        self._canvas.zoomRequested.connect(self._on_zoom_changed_from_canvas)
 
-        # Connect options panel signals to canvas
-        canvas = self._canvas
-        self._options_panel.gridToggled.connect(canvas.set_grid_visible)
-        self._options_panel.paletteToggled.connect(lambda visible: canvas.set_greyscale_mode(not visible))
-        self._options_panel.zoomChanged.connect(canvas.set_zoom)
-
-        # Bidirectional zoom sync: canvas → slider
-        canvas.zoomRequested.connect(self._options_panel.set_zoom)
-
-        # Fit button handler
-        self._options_panel.zoomToFit.connect(self._on_zoom_to_fit)
+        # Connect canvas hover events to status bar (if canvas provides these signals)
+        # Note: These connections require canvas to emit cursor position signals
+        # which may need to be added to PixelCanvas
 
     def update_from_controller(self) -> None:
         """Update UI state from controller."""
@@ -296,11 +308,7 @@ class EditWorkspace(QWidget):
 
         # Update tool selection
         current_tool = self._controller.get_current_tool_name()
-        self._tool_panel.set_tool(current_tool)
-
-        # Update brush size
-        brush_size = self._controller.tool_manager.get_brush_size()
-        self._tool_panel.set_brush_size(brush_size)
+        self._icon_toolbar.set_tool(current_tool)
 
         # Update selected color
         selected_color = self._controller.get_selected_color()
@@ -316,9 +324,10 @@ class EditWorkspace(QWidget):
 
     def set_image_loaded(self, loaded: bool) -> None:
         """Enable/disable editing controls based on image state."""
-        self._tool_panel.setEnabled(loaded)
-        self._options_panel.setEnabled(loaded)
+        self._icon_toolbar.setEnabled(loaded)
         self._inject_btn.setEnabled(loaded)
+        self._save_export_panel.set_save_enabled(loaded)
+        self._save_export_panel.set_export_enabled(loaded)
 
     def _update_palette(self) -> None:
         """Update palette panel when controller palette changes."""
@@ -329,24 +338,23 @@ class EditWorkspace(QWidget):
         palette_name = self._controller.palette_model.name
         self._palette_panel.set_palette(colors, palette_name)
 
-    def _on_zoom_to_fit(self) -> None:
-        """Calculate and apply zoom to fit image in viewport."""
-        if not self._canvas or not self._controller:
+    def _on_zoom_in(self) -> None:
+        """Handle zoom in button click."""
+        if not self._canvas:
             return
+        current_zoom = self._canvas.zoom
+        new_zoom = min(current_zoom + 1, 64)  # Max zoom 64x
+        self._canvas.set_zoom(new_zoom)
 
-        # Get viewport visible area
-        viewport_size = self._scroll_area.viewport().size()
-
-        # Get image dimensions
-        img_width, img_height = self._controller.get_image_size()
-        if img_width == 0 or img_height == 0:
+    def _on_zoom_out(self) -> None:
+        """Handle zoom out button click."""
+        if not self._canvas:
             return
+        current_zoom = self._canvas.zoom
+        new_zoom = max(current_zoom - 1, 1)  # Min zoom 1x
+        self._canvas.set_zoom(new_zoom)
 
-        # Calculate zoom that fits entire image
-        zoom_x = max(1, viewport_size.width() // img_width)
-        zoom_y = max(1, viewport_size.height() // img_height)
-        fit_zoom = min(zoom_x, zoom_y, 64)  # Clamp to valid range
-
-        # Apply zoom to both canvas and slider
-        self._canvas.set_zoom(fit_zoom)
-        self._options_panel.set_zoom(fit_zoom)
+    def _on_zoom_changed_from_canvas(self, zoom: int) -> None:
+        """Handle zoom change from canvas (e.g., mouse wheel)."""
+        # Update status bar or other UI elements if needed
+        pass

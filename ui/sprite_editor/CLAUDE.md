@@ -56,7 +56,9 @@ Don't rewrite these:
 
 ## Current State
 
-- **Tests:** 48 tests across 5 test files covering controller signals, widget validation, and panel synchronization.
+- **Tests:** 106 tests across 7 test files covering controller signals, widget validation, panel synchronization, and UI redesign components.
   - Located in `ui/sprite_editor/tests/` (collected automatically by pytest via `pyproject.toml`)
   - Run with: `uv run pytest ui/sprite_editor/tests/`
+  - `test_redesign_widgets.py` - Unit tests for new UI widgets (IconToolbar, SpriteAssetBrowser, etc.)
+  - `test_redesign_integration.py` - Integration tests for widget-controller signal chains
 - **Coverage:** Services are more complete than controllers; tests focus on behavioral verification of signals and widget state.
