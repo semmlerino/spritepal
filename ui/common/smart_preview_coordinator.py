@@ -379,7 +379,9 @@ class SmartPreviewCoordinator(QObject):
 
                 if _validate_tile_data(tile_data):
                     logger.debug(f"Cache hit for 0x{offset:06X}: {len(tile_data)} bytes")
+                    # Emit both signals: preview_cached for statistics, preview_ready for data consumers
                     self.preview_cached.emit(tile_data, width, height, sprite_name or "", compressed_size, slack_size)
+                    self.preview_ready.emit(tile_data, width, height, sprite_name or "", compressed_size, slack_size)
                     return True
 
                 # Remove invalid entry from cache

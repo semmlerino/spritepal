@@ -67,6 +67,9 @@ class ROMWorkflowController(QObject):
         self.original_compressed_size: int = 0
         self.available_slack: int = 0
 
+        # Flag for auto-opening in editor after preview completes (double-click)
+        self._pending_open_in_editor: bool = False
+
         # Connect LogWatcher
         self._connect_log_watcher()
 
@@ -121,10 +124,18 @@ class ROMWorkflowController(QObject):
 
     def _on_sprite_activated(self, offset: int, source_type: str) -> None:
         """Handle sprite activation (double-click) - enter edit mode."""
-        self.set_offset(offset)
-        # Auto-load into editor on double-click
-        if self.current_tile_data:
+        logger.debug(f"[DOUBLE-CLICK] _on_sprite_activated called: offset=0x{offset:06X}, source={source_type}")
+        
+        # If we already have tile data for this offset, open directly without re-requesting preview
+        if self.current_offset == offset and self.current_tile_data:
+            logger.debug("[DOUBLE-CLICK] Already have data for this offset, opening directly")
             self.open_in_editor()
+            return
+        
+        # Set flag to auto-open in editor when preview completes
+        self._pending_open_in_editor = True
+        logger.debug("[DOUBLE-CLICK] Flag set, calling set_offset")
+        self.set_offset(offset)
 
     def browse_rom(self) -> None:
         """Open file dialog to select ROM file."""
@@ -172,10 +183,19 @@ class ROMWorkflowController(QObject):
         # Trigger initial preview
         self.set_offset(self.current_offset)
 
-    def set_offset(self, offset: int) -> None:
-        """Set current ROM offset and request preview."""
+    def set_offset(self, offset: int, *, auto_open: bool = False) -> None:
+        """Set current ROM offset and request preview.
+
+        Args:
+            offset: ROM offset to navigate to.
+            auto_open: If True, automatically open in editor when preview completes.
+        """
         if offset < 0 or (self.rom_size > 0 and offset >= self.rom_size):
             return
+
+        # Set flag to auto-open in editor when preview completes
+        if auto_open:
+            self._pending_open_in_editor = True
 
         # Check for unsaved changes if in edit mode
         if self.state == "edit" and self.main_controller.editing_controller.undo_manager.can_undo():
@@ -217,7 +237,9 @@ class ROMWorkflowController(QObject):
 
     def open_in_editor(self) -> None:
         """Load the current preview into the pixel editor."""
+        logger.debug(f"[OPEN] open_in_editor called, tile_data={self.current_tile_data is not None}")
         if not self.current_tile_data:
+            logger.debug("[OPEN] No tile data, returning early")
             self.status_message.emit("No sprite data to edit")
             return
 
@@ -247,6 +269,7 @@ class ROMWorkflowController(QObject):
         while len(palette) < 16:
             palette.append((0, 0, 0))
 
+        logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self.main_controller.editing_controller.load_image(image_array, palette)
 
         # Change state
@@ -255,6 +278,7 @@ class ROMWorkflowController(QObject):
             self._view.source_bar.set_action_text("Save to ROM")
             self._view.set_workflow_state("edit")
         self.workflow_state_changed.emit("edit")
+        logger.debug("[OPEN] Sprite loaded in editor, state changed to 'edit'")
         self.status_message.emit("Sprite loaded in editor")
 
     def prepare_injection(self) -> None:
@@ -501,6 +525,7 @@ class ROMWorkflowController(QObject):
         self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int, slack_size: int = 0
     ) -> None:
         """Handle preview ready from coordinator."""
+        logger.debug(f"[PREVIEW] _on_preview_ready called: {len(tile_data)} bytes, {width}x{height}, pending_open={self._pending_open_in_editor}")
         self.current_tile_data = tile_data
         self.current_width = width
         self.current_height = height
@@ -520,6 +545,13 @@ class ROMWorkflowController(QObject):
         if self._view:
             slack_info = f" (+{slack_size} slack)" if slack_size > 0 else ""
             self.status_message.emit(f"Sprite found! Original size: {compressed_size} bytes{slack_info}")
+
+        # Auto-open in editor if triggered by double-click
+        logger.debug(f"[PREVIEW] Checking flag: _pending_open_in_editor={self._pending_open_in_editor}")
+        if self._pending_open_in_editor:
+            logger.debug("[PREVIEW] Flag is True, calling open_in_editor()")
+            self._pending_open_in_editor = False
+            self.open_in_editor()
 
     def _on_preview_error(self, error_msg: str) -> None:
         """Handle preview error."""
