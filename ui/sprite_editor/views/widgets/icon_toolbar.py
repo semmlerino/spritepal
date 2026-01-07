@@ -5,9 +5,12 @@ Provides horizontal toolbar with tool selection, zoom controls, and grid toggles
 """
 
 from PySide6.QtCore import QSignalBlocker, QSize, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QHBoxLayout,
+    QStyle,
     QToolButton,
     QWidget,
 )
@@ -19,6 +22,8 @@ class IconToolbar(QWidget):
     """
     Horizontal toolbar with tool selection, zoom, and display toggle buttons.
     Replaces ToolPanel for a more compact UI in the sprite editor.
+
+    Uses Qt theme icons with emoji fallbacks for cross-platform compatibility.
     """
 
     # Signals - Tool selection
@@ -33,18 +38,26 @@ class IconToolbar(QWidget):
     tileGridToggled = Signal(bool)  # tile grid visibility
     palettePreviewToggled = Signal(bool)  # palette preview visibility
 
+    # Icon configuration: (theme_name, fallback_text)
+    # Theme names follow freedesktop.org icon naming spec
+    ICON_CONFIG = {
+        "pencil": ("draw-freehand", "✏️"),
+        "fill": ("color-fill", "🪣"),
+        "picker": ("color-picker", "💧"),
+        "eraser": ("edit-clear", "🧹"),
+        "zoom_in": ("zoom-in", "+"),
+        "zoom_out": ("zoom-out", "−"),  # noqa: RUF001
+        "grid": ("view-grid", "⊞"),
+        "tile_grid": ("view-split-left-right", "▦"),
+        "palette": ("preferences-desktop-color", "🎨"),
+    }
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("iconToolbar")
 
         # Tool names and their display info
         self._tool_names = ["pencil", "fill", "picker", "eraser"]
-        self._tool_icons = {
-            "pencil": "✏️",
-            "fill": "🪣",
-            "picker": "💧",
-            "eraser": "🧹",
-        }
         self._tool_tooltips = {
             "pencil": "Pencil (Draw pixels)",
             "fill": "Fill Bucket (Fill regions)",
@@ -81,7 +94,7 @@ class IconToolbar(QWidget):
         for i, tool_name in enumerate(self._tool_names):
             btn = QToolButton()
             btn.setCheckable(True)
-            btn.setText(self._tool_icons[tool_name])
+            self._apply_icon(btn, tool_name)
             btn.setToolTip(self._tool_tooltips[tool_name])
             btn.setIconSize(self._get_icon_size())
 
@@ -101,14 +114,14 @@ class IconToolbar(QWidget):
 
         # Zoom controls
         self.zoom_in_btn = QToolButton()
-        self.zoom_in_btn.setText("➕")  # noqa: RUF001
+        self._apply_icon(self.zoom_in_btn, "zoom_in")
         self.zoom_in_btn.setToolTip("Zoom In (Ctrl + Mouse Wheel Up)")
         self.zoom_in_btn.setIconSize(self._get_icon_size())
         self.zoom_in_btn.clicked.connect(self.zoomInClicked.emit)
         layout.addWidget(self.zoom_in_btn)
 
         self.zoom_out_btn = QToolButton()
-        self.zoom_out_btn.setText("➖")  # noqa: RUF001
+        self._apply_icon(self.zoom_out_btn, "zoom_out")
         self.zoom_out_btn.setToolTip("Zoom Out (Ctrl + Mouse Wheel Down)")
         self.zoom_out_btn.setIconSize(self._get_icon_size())
         self.zoom_out_btn.clicked.connect(self.zoomOutClicked.emit)
@@ -120,7 +133,7 @@ class IconToolbar(QWidget):
         # Display toggle buttons
         self.grid_btn = QToolButton()
         self.grid_btn.setCheckable(True)
-        self.grid_btn.setText("⊞")
+        self._apply_icon(self.grid_btn, "grid")
         self.grid_btn.setToolTip("Toggle Pixel Grid (G)")
         self.grid_btn.setIconSize(self._get_icon_size())
         self.grid_btn.clicked.connect(self._on_grid_toggled)
@@ -128,7 +141,7 @@ class IconToolbar(QWidget):
 
         self.tile_grid_btn = QToolButton()
         self.tile_grid_btn.setCheckable(True)
-        self.tile_grid_btn.setText("▦")
+        self._apply_icon(self.tile_grid_btn, "tile_grid")
         self.tile_grid_btn.setToolTip("Toggle Tile Grid (T)")
         self.tile_grid_btn.setIconSize(self._get_icon_size())
         self.tile_grid_btn.clicked.connect(self._on_tile_grid_toggled)
@@ -137,7 +150,7 @@ class IconToolbar(QWidget):
         self.palette_preview_btn = QToolButton()
         self.palette_preview_btn.setCheckable(True)
         self.palette_preview_btn.setChecked(True)  # Start with palette preview enabled
-        self.palette_preview_btn.setText("🎨")
+        self._apply_icon(self.palette_preview_btn, "palette")
         self.palette_preview_btn.setToolTip("Toggle Palette Preview (P)")
         self.palette_preview_btn.setIconSize(self._get_icon_size())
         self.palette_preview_btn.clicked.connect(self._on_palette_preview_toggled)
@@ -145,6 +158,42 @@ class IconToolbar(QWidget):
 
         # Add stretch to push everything to the left
         layout.addStretch()
+
+    def _apply_icon(self, button: QToolButton, icon_key: str) -> None:
+        """Apply a theme icon to a button, falling back to text if unavailable.
+
+        Args:
+            button: The QToolButton to configure.
+            icon_key: Key into ICON_CONFIG for the icon to apply.
+        """
+        if icon_key not in self.ICON_CONFIG:
+            return
+
+        theme_name, fallback_text = self.ICON_CONFIG[icon_key]
+
+        # Try theme icon first
+        icon = QIcon.fromTheme(theme_name)
+        if not icon.isNull():
+            button.setIcon(icon)
+            button.setText("")  # Clear text when icon is available
+        else:
+            # Try standard Qt style icons for zoom
+            style = QApplication.style()
+            if icon_key == "zoom_in":
+                std_icon = style.standardIcon(QStyle.StandardPixmap.SP_ArrowUp)
+                if not std_icon.isNull():
+                    button.setIcon(std_icon)
+                    button.setText("")
+                    return
+            elif icon_key == "zoom_out":
+                std_icon = style.standardIcon(QStyle.StandardPixmap.SP_ArrowDown)
+                if not std_icon.isNull():
+                    button.setIcon(std_icon)
+                    button.setText("")
+                    return
+
+            # Fall back to text
+            button.setText(fallback_text)
 
     @staticmethod
     def _get_icon_size() -> QSize:
