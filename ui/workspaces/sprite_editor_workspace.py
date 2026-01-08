@@ -339,6 +339,9 @@ class SpriteEditorWorkspace(QWidget):
 
         Delegates to the ROM workflow controller.
         """
+        # Switch to ROM mode first so the user sees the loaded ROM
+        self.set_mode("rom")
+        
         self._rom_workflow_controller.load_rom(path)
 
     def cleanup(self) -> None:
