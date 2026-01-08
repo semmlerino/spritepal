@@ -28,7 +28,7 @@ def test_shortcuts_exist(workspace):
     keys = [s.key().toString() for s in shortcuts]
     
     assert "P" in keys
-    assert "F" in keys
+    assert "B" in keys
     assert "K" in keys
     assert "E" in keys
     assert "G" in keys
@@ -36,7 +36,7 @@ def test_shortcuts_exist(workspace):
     assert "C" in keys
     assert "+" in keys or "=" in keys
     assert "Ctrl+0" in keys
-    assert "Ctrl+9" in keys
+    assert "F" in keys
 
 def test_eraser_shortcut_triggers_eraser_tool(workspace, qtbot):
     """Test that pressing E selects the eraser tool."""

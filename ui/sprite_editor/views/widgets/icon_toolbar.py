@@ -61,10 +61,10 @@ class IconToolbar(QWidget):
         # Tool names and their display info
         self._tool_names = ["pencil", "fill", "picker", "eraser"]
         self._tool_tooltips = {
-            "pencil": "Pencil (Draw pixels)",
-            "fill": "Fill Bucket (Fill regions)",
-            "picker": "Color Picker (Sample colors)",
-            "eraser": "Eraser (Paint transparent)",
+            "pencil": "Pencil (P)",
+            "fill": "Fill Bucket (B)",
+            "picker": "Color Picker (K)",
+            "eraser": "Eraser (E)",
         }
 
         # Store button references
@@ -124,7 +124,7 @@ class IconToolbar(QWidget):
 
         self.zoom_out_btn = QToolButton()
         self._apply_icon(self.zoom_out_btn, "zoom_out")
-        self.zoom_out_btn.setToolTip("Zoom Out (Ctrl + Mouse Wheel Down)")
+        self.zoom_out_btn.setToolTip("Zoom Out (Ctrl + Mouse Wheel Down) • Fit to Window (F)")
         self.zoom_out_btn.setIconSize(self._get_icon_size())
         self.zoom_out_btn.clicked.connect(self.zoomOutClicked.emit)
         layout.addWidget(self.zoom_out_btn)

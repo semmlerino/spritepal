@@ -162,7 +162,7 @@ class EditWorkspace(QWidget):
         """Setup keyboard shortcuts for tools and actions."""
         # Tool shortcuts
         QShortcut(QKeySequence("P"), self, lambda: self._icon_toolbar.tool_buttons["pencil"].click())
-        QShortcut(QKeySequence("F"), self, lambda: self._icon_toolbar.tool_buttons["fill"].click())
+        QShortcut(QKeySequence("B"), self, lambda: self._icon_toolbar.tool_buttons["fill"].click())
         QShortcut(QKeySequence("K"), self, lambda: self._icon_toolbar.tool_buttons["picker"].click())
         QShortcut(QKeySequence("E"), self, lambda: self._icon_toolbar.tool_buttons["eraser"].click())
 
@@ -185,7 +185,7 @@ class EditWorkspace(QWidget):
         QShortcut(QKeySequence("Ctrl+0"), self, self._on_zoom_reset)
         
         # Fit to window
-        QShortcut(QKeySequence("Ctrl+9"), self, self._on_zoom_fit)
+        QShortcut(QKeySequence("F"), self, self._on_zoom_fit)
 
     # Public panel accessors (for external signal connections)
     @property
