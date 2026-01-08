@@ -97,10 +97,12 @@ class ExtractionController(QObject):
         self.error_handler = ConsoleErrorHandler()
 
         # Connect UI signals
-        _ = self.main_window.extract_requested.connect(self.start_extraction)
-        _ = self.main_window.open_in_editor_requested.connect(self.open_in_editor)
-        _ = self.main_window.arrange_rows_requested.connect(self.open_row_arrangement)
-        _ = self.main_window.arrange_grid_requested.connect(self.open_grid_arrangement)
+        # extract_requested connection moved to MainWindow (Phase 4d: direct orchestration)
+        # _ = self.main_window.extract_requested.connect(self.start_extraction)
+        # Dialog signals moved to DialogCoordinator (Phase 4b)
+        # _ = self.main_window.open_in_editor_requested.connect(self.open_in_editor)
+        # _ = self.main_window.arrange_rows_requested.connect(self.open_row_arrangement)
+        # _ = self.main_window.arrange_grid_requested.connect(self.open_grid_arrangement)
         _ = self.main_window.inject_requested.connect(self.start_injection)
         # offset_changed connection moved to MainWindow (Phase 4c)
         # _ = self.main_window.extraction_panel.offset_changed.connect(self.update_preview_with_offset)

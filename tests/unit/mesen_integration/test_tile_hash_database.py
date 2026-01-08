@@ -20,7 +20,6 @@ from core.mesen_integration.tile_hash_database import (
     build_and_save_database,
 )
 
-
 # =============================================================================
 # TileMatch Tests
 # =============================================================================
@@ -166,32 +165,32 @@ class TestTileHashDatabaseStaticMethods:
     def test_flip_tile_h_produces_different(self) -> None:
         """Horizontal flip produces different data (for non-symmetric tiles)."""
         # Create non-symmetric tile data
-        tile_data = bytes([i for i in range(BYTES_PER_TILE)])
+        tile_data = bytes(list(range(BYTES_PER_TILE)))
         result = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=False)
         assert result != tile_data
 
     def test_flip_tile_v_produces_different(self) -> None:
         """Vertical flip produces different data (for non-symmetric tiles)."""
-        tile_data = bytes([i for i in range(BYTES_PER_TILE)])
+        tile_data = bytes(list(range(BYTES_PER_TILE)))
         result = TileHashDatabase._flip_tile(tile_data, flip_h=False, flip_v=True)
         assert result != tile_data
 
     def test_flip_tile_hv_produces_different(self) -> None:
         """HV flip produces different data (for non-symmetric tiles)."""
-        tile_data = bytes([i for i in range(BYTES_PER_TILE)])
+        tile_data = bytes(list(range(BYTES_PER_TILE)))
         result = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=True)
         assert result != tile_data
 
     def test_flip_tile_double_h_flip(self) -> None:
         """Double horizontal flip returns original."""
-        tile_data = bytes([i for i in range(BYTES_PER_TILE)])
+        tile_data = bytes(list(range(BYTES_PER_TILE)))
         flipped_once = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=False)
         flipped_twice = TileHashDatabase._flip_tile(flipped_once, flip_h=True, flip_v=False)
         assert flipped_twice == tile_data
 
     def test_flip_tile_double_v_flip(self) -> None:
         """Double vertical flip returns original."""
-        tile_data = bytes([i for i in range(BYTES_PER_TILE)])
+        tile_data = bytes(list(range(BYTES_PER_TILE)))
         flipped_once = TileHashDatabase._flip_tile(tile_data, flip_h=False, flip_v=True)
         flipped_twice = TileHashDatabase._flip_tile(flipped_once, flip_h=False, flip_v=True)
         assert flipped_twice == tile_data
@@ -480,17 +479,13 @@ class TestTileHashDatabasePersistence:
         }
         return db
 
-    def test_save_database_creates_file(
-        self, db_for_save: TileHashDatabase, tmp_path: Path
-    ) -> None:
+    def test_save_database_creates_file(self, db_for_save: TileHashDatabase, tmp_path: Path) -> None:
         """save_database creates a JSON file."""
         output_path = tmp_path / "db.json"
         db_for_save.save_database(output_path)
         assert output_path.exists()
 
-    def test_save_database_valid_json(
-        self, db_for_save: TileHashDatabase, tmp_path: Path
-    ) -> None:
+    def test_save_database_valid_json(self, db_for_save: TileHashDatabase, tmp_path: Path) -> None:
         """save_database creates valid JSON."""
         output_path = tmp_path / "db.json"
         db_for_save.save_database(output_path)
@@ -498,9 +493,7 @@ class TestTileHashDatabasePersistence:
         assert "blocks" in data
         assert "metadata" in data
 
-    def test_save_database_metadata(
-        self, db_for_save: TileHashDatabase, tmp_path: Path
-    ) -> None:
+    def test_save_database_metadata(self, db_for_save: TileHashDatabase, tmp_path: Path) -> None:
         """save_database includes ROM metadata."""
         output_path = tmp_path / "db.json"
         db_for_save.save_database(output_path)
@@ -510,9 +503,7 @@ class TestTileHashDatabasePersistence:
         assert metadata["rom_checksum"] == 0x1234
         assert metadata["rom_header_offset"] == 512
 
-    def test_save_database_blocks(
-        self, db_for_save: TileHashDatabase, tmp_path: Path
-    ) -> None:
+    def test_save_database_blocks(self, db_for_save: TileHashDatabase, tmp_path: Path) -> None:
         """save_database includes block data."""
         output_path = tmp_path / "db.json"
         db_for_save.save_database(output_path)
@@ -522,9 +513,7 @@ class TestTileHashDatabasePersistence:
         assert blocks[0]["rom_offset"] == 0x1B0000
         assert blocks[0]["hashes"] == ["abc123", "def456"]
 
-    def test_load_database_restores_hashes(
-        self, db_for_save: TileHashDatabase, tmp_path: Path
-    ) -> None:
+    def test_load_database_restores_hashes(self, db_for_save: TileHashDatabase, tmp_path: Path) -> None:
         """load_database restores hash->match mappings."""
         output_path = tmp_path / "db.json"
         db_for_save.save_database(output_path)
@@ -544,9 +533,7 @@ class TestTileHashDatabasePersistence:
         assert len(new_db._hash_to_match["abc123"]) == 1
         assert new_db._hash_to_match["abc123"][0].rom_offset == 0x1B0000
 
-    def test_load_database_restores_blocks(
-        self, db_for_save: TileHashDatabase, tmp_path: Path
-    ) -> None:
+    def test_load_database_restores_blocks(self, db_for_save: TileHashDatabase, tmp_path: Path) -> None:
         """load_database restores block list."""
         output_path = tmp_path / "db.json"
         db_for_save.save_database(output_path)
@@ -564,9 +551,7 @@ class TestTileHashDatabasePersistence:
         assert new_db._blocks[0].rom_offset == 0x1B0000
         assert new_db._blocks[0].tile_count == 2
 
-    def test_load_database_clears_existing(
-        self, db_for_save: TileHashDatabase, tmp_path: Path
-    ) -> None:
+    def test_load_database_clears_existing(self, db_for_save: TileHashDatabase, tmp_path: Path) -> None:
         """load_database clears existing data before loading."""
         output_path = tmp_path / "db.json"
         db_for_save.save_database(output_path)

@@ -8,9 +8,12 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from PIL import Image
+
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.services.rom_cache import ROMCache
+    from core.workers import ROMExtractionWorker, VRAMExtractionWorker
     from ui.extraction_controller import ExtractionController
     from ui.services.dialog_coordinator import DialogCoordinator
 
@@ -37,6 +40,7 @@ from PySide6.QtWidgets import (
 
 # Session manager accessed via get_app_context().application_state_manager
 # Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
+from core.services.image_utils import pil_to_qpixmap
 from core.types import VRAMExtractionParams
 from ui.common import ErrorHandler
 from ui.common.spacing_constants import (
@@ -56,6 +60,8 @@ from ui.rom_extraction_panel import ROMExtractionPanel
 from ui.sprite_editor.views.widgets.offset_line_edit import OffsetLineEdit
 from ui.workspaces import ExtractionWorkspace, SpriteEditorWorkspace
 from ui.zoomable_preview import PreviewPanel
+from utils.constants import VRAM_SPRITE_OFFSET
+from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -124,6 +130,14 @@ class MainWindow(QMainWindow):
         self._controller = None  # Lazy initialization to break circular dependency
         self._dialog_coordinator = None  # Lazy initialization for dialog service
         self._last_undo_state = (False, False)
+
+        # Worker management (Phase 4d: direct extraction orchestration)
+        self._vram_worker: VRAMExtractionWorker | None = None
+        self._rom_worker: ROMExtractionWorker | None = None
+        self._manager_connections: list[object] = []
+        # Extraction result storage
+        self._extracted_palettes: dict[int, list[list[int]]] = {}
+        self._active_palettes: list[int] = []
 
         self._setup_ui()
         self._setup_managers()  # This creates all UI widgets via managers
@@ -767,8 +781,173 @@ class MainWindow(QMainWindow):
         self.status_bar_manager.show_message("Extracting sprites from VRAM...")
         self.toolbar_manager.set_extract_enabled(False)
 
-        # Emit signal for controller to handle extraction
-        self.extract_requested.emit()
+        # Start extraction directly (Phase 4d: controller removal)
+        self._start_vram_extraction()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # VRAM EXTRACTION ORCHESTRATION (Phase 4d: moved from ExtractionController)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def _start_vram_extraction(self) -> None:
+        """Start the VRAM extraction process.
+
+        Validates parameters, creates worker, and connects signals.
+        Handles PIL→QPixmap conversion in main thread (Bug #26 fix).
+        """
+        from core.app_context import get_app_context
+        from core.workers import VRAMExtractionWorker
+
+        # Get parameters from UI
+        params = self.get_extraction_params()
+
+        # Get extraction manager from app context
+        context = get_app_context()
+        extraction_manager = context.core_operations_manager
+
+        # PARAMETER VALIDATION: Check requirements first for better UX
+        try:
+            extraction_manager.validate_extraction_params(params)
+        except (ValueError, TypeError) as e:
+            self.extraction_failed(str(e))
+            return
+        except Exception as e:
+            logger.exception("Unexpected error during extraction parameter validation")
+            self.extraction_failed(f"Validation error: {e}")
+            return
+
+        # DEFENSIVE VALIDATION: Validate files that exist
+        vram_path = params.get("vram_path", "")
+        if vram_path:
+            vram_result = FileValidator.validate_vram_file(vram_path)
+            if not vram_result.is_valid:
+                self.extraction_failed(vram_result.error_message or "VRAM file validation failed")
+                return
+            for warning in vram_result.warnings:
+                logger.warning(f"VRAM file warning: {warning}")
+
+        cgram_path = params.get("cgram_path", "")
+        grayscale_mode = params.get("grayscale_mode", False)
+        if cgram_path and not grayscale_mode:
+            cgram_result = FileValidator.validate_cgram_file(cgram_path)
+            if not cgram_result.is_valid:
+                self.extraction_failed(cgram_result.error_message or "CGRAM file validation failed")
+                return
+            for warning in cgram_result.warnings:
+                logger.warning(f"CGRAM file warning: {warning}")
+
+        oam_path = params.get("oam_path", "")
+        if oam_path:
+            oam_result = FileValidator.validate_oam_file(oam_path)
+            if not oam_result.is_valid:
+                self.extraction_failed(oam_result.error_message or "OAM file validation failed")
+                return
+            for warning in oam_result.warnings:
+                logger.warning(f"OAM file warning: {warning}")
+
+        # Create extraction parameters TypedDict
+        extraction_params: VRAMExtractionParams = {
+            "vram_path": params["vram_path"],
+            "cgram_path": params.get("cgram_path") or None,
+            "oam_path": params.get("oam_path") or None,
+            "vram_offset": params.get("vram_offset", VRAM_SPRITE_OFFSET),
+            "output_base": params["output_base"],
+            "create_grayscale": params.get("create_grayscale", True),
+            "create_metadata": params.get("create_metadata", True),
+            "grayscale_mode": params.get("grayscale_mode", False),
+        }
+
+        # Create and start worker
+        worker = VRAMExtractionWorker(extraction_params, extraction_manager=extraction_manager)
+        self._vram_worker = worker
+
+        # Worker-owned signals
+        _ = worker.progress.connect(self._on_vram_progress)
+        _ = worker.extraction_finished.connect(self._on_vram_extraction_finished)
+        _ = worker.error.connect(self._on_vram_extraction_error)
+
+        # Connect directly to manager signals for data (1 hop instead of 3)
+        self._manager_connections = [
+            extraction_manager.preview_generated.connect(self._on_vram_preview_ready),
+            extraction_manager.palettes_extracted.connect(self._on_vram_palettes_ready),
+            extraction_manager.active_palettes_found.connect(self._on_vram_active_palettes_ready),
+        ]
+
+        worker.start()
+
+    def _on_vram_progress(self, percent: int, message: str) -> None:
+        """Handle progress updates from worker."""
+        self.status_bar_manager.show_message(message)
+
+    def _on_vram_preview_ready(self, pil_image: Image.Image, tile_count: int) -> None:
+        """Handle preview ready - convert PIL Image to QPixmap in main thread.
+
+        CRITICAL FIX FOR BUG #26: This MUST run in the main thread.
+        Manager emits PIL Image to avoid Qt threading violations.
+        """
+        pixmap = pil_to_qpixmap(pil_image)
+        if pixmap is not None:
+            self.sprite_preview.set_preview(pixmap, tile_count)
+            self.status_bar_manager.show_message(f"Preview updated: {tile_count} tiles")
+        else:
+            logger.error("Failed to convert PIL image to QPixmap for preview")
+
+    def _on_vram_palettes_ready(self, palettes: dict[int, list[list[int]]]) -> None:
+        """Handle palettes ready from extraction."""
+        # Store for dialog use
+        self._extracted_palettes = palettes
+        # Update palette preview widget with normalized data
+        if hasattr(self, "palette_preview") and self.palette_preview:
+            normalized = self._normalize_palettes(palettes)
+            if normalized is not None:
+                self.palette_preview.set_all_palettes(normalized)
+
+    def _on_vram_active_palettes_ready(self, active_palettes: list[int]) -> None:
+        """Handle active palettes ready."""
+        # Store for dialog use
+        self._active_palettes = active_palettes
+
+    def _on_vram_extraction_finished(self, extracted_files: list[str]) -> None:
+        """Handle extraction finished."""
+        self._cleanup_vram_worker()
+        self._extracted_files = extracted_files
+        self.toolbar_manager.set_extract_enabled(True)
+
+        if extracted_files:
+            self.status_bar_manager.show_message(f"Extraction complete: {len(extracted_files)} file(s)")
+            # Emit for external listeners
+            self.extraction_completed.emit(extracted_files)
+        else:
+            self.status_bar_manager.show_message("Extraction complete (no files)")
+
+    def _on_vram_extraction_error(self, error_message: str, exception: Exception | None = None) -> None:
+        """Handle extraction error."""
+        self._cleanup_vram_worker()
+        self.extraction_failed(error_message)
+
+    def _cleanup_vram_worker(self) -> None:
+        """Safely cleanup VRAM worker thread and manager signal connections."""
+        from core.services.worker_lifecycle import WorkerManager
+
+        # Disconnect manager signals (connected per-operation)
+        self._disconnect_manager_signals()
+
+        if self._vram_worker is not None:
+            WorkerManager.cleanup_worker(self._vram_worker, timeout=3000)
+            self._vram_worker = None
+
+    def _disconnect_manager_signals(self) -> None:
+        """Disconnect manager signal connections."""
+        from PySide6.QtCore import QObject
+
+        for connection in self._manager_connections:
+            try:
+                QObject.disconnect(connection)  # type: ignore[arg-type]
+            except (RuntimeError, TypeError):
+                # Signal may already be disconnected
+                pass
+        self._manager_connections.clear()
+
+    # ═══════════════════════════════════════════════════════════════════════════
 
     def show_cache_operation_badge(self, operation: str) -> None:
         """Show cache operation badge in status bar

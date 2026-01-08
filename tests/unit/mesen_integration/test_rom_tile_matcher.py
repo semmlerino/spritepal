@@ -20,7 +20,6 @@ from core.mesen_integration.rom_tile_matcher import (
     TileLocation,
 )
 
-
 # =============================================================================
 # TileLocation Tests
 # =============================================================================
@@ -451,17 +450,13 @@ class TestROMTileMatcherPersistence:
         matcher._two_plane_matches_by_combo = {}
         return matcher
 
-    def test_save_database_creates_file(
-        self, matcher_for_save: ROMTileMatcher, tmp_path: Path
-    ) -> None:
+    def test_save_database_creates_file(self, matcher_for_save: ROMTileMatcher, tmp_path: Path) -> None:
         """save_database creates JSON file."""
         output_path = tmp_path / "db.json"
         matcher_for_save.save_database(output_path)
         assert output_path.exists()
 
-    def test_save_database_valid_json(
-        self, matcher_for_save: ROMTileMatcher, tmp_path: Path
-    ) -> None:
+    def test_save_database_valid_json(self, matcher_for_save: ROMTileMatcher, tmp_path: Path) -> None:
         """save_database creates valid JSON."""
         output_path = tmp_path / "db.json"
         matcher_for_save.save_database(output_path)
@@ -470,9 +465,7 @@ class TestROMTileMatcherPersistence:
         assert "blocks" in data
         assert "hash_to_locations" in data
 
-    def test_save_database_blocks(
-        self, matcher_for_save: ROMTileMatcher, tmp_path: Path
-    ) -> None:
+    def test_save_database_blocks(self, matcher_for_save: ROMTileMatcher, tmp_path: Path) -> None:
         """save_database includes block data."""
         output_path = tmp_path / "db.json"
         matcher_for_save.save_database(output_path)
@@ -482,9 +475,7 @@ class TestROMTileMatcherPersistence:
         assert blocks[0]["rom_offset"] == 0x1B0000
         assert blocks[0]["tile_count"] == 10
 
-    def test_save_database_locations(
-        self, matcher_for_save: ROMTileMatcher, tmp_path: Path
-    ) -> None:
+    def test_save_database_locations(self, matcher_for_save: ROMTileMatcher, tmp_path: Path) -> None:
         """save_database includes hash->location mappings."""
         output_path = tmp_path / "db.json"
         matcher_for_save.save_database(output_path)
@@ -495,9 +486,7 @@ class TestROMTileMatcherPersistence:
         assert locs["abcd1234abcd1234"][0]["flip_variant"] == ""
         assert locs["abcd1234abcd1234"][1]["flip_variant"] == "H"
 
-    def test_load_database_restores_structure(
-        self, matcher_for_save: ROMTileMatcher, tmp_path: Path
-    ) -> None:
+    def test_load_database_restores_structure(self, matcher_for_save: ROMTileMatcher, tmp_path: Path) -> None:
         """load_database restores matcher structure."""
         output_path = tmp_path / "db.json"
         matcher_for_save.save_database(output_path)
@@ -510,9 +499,7 @@ class TestROMTileMatcherPersistence:
         assert loaded._total_tiles == 10
         assert loaded._unique_hashes == 2
 
-    def test_load_database_flip_variants(
-        self, matcher_for_save: ROMTileMatcher, tmp_path: Path
-    ) -> None:
+    def test_load_database_flip_variants(self, matcher_for_save: ROMTileMatcher, tmp_path: Path) -> None:
         """load_database restores flip variant information."""
         output_path = tmp_path / "db.json"
         matcher_for_save.save_database(output_path)

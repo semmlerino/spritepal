@@ -24,7 +24,6 @@ from core.mesen_integration.capture_to_rom_mapper import (
 )
 from core.mesen_integration.tile_hash_database import TileMatch
 
-
 # =============================================================================
 # Mock Classes for Testing
 # =============================================================================

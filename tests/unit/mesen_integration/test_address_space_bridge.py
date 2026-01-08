@@ -21,7 +21,6 @@ from core.mesen_integration.address_space_bridge import (
     scpu_to_canonical,
 )
 
-
 # =============================================================================
 # BankRegisters Tests
 # =============================================================================
@@ -42,10 +41,7 @@ class TestBankRegisters:
 
     def test_parse_from_log_valid(self) -> None:
         """Parse valid SA1_BANKS log line."""
-        log_line = (
-            "SA1_BANKS (init): frame=0 run=idle "
-            "cxb=0x04 dxb=0x05 exb=0x06 fxb=0x07 bmaps=0x1F bmap=0x0A"
-        )
+        log_line = "SA1_BANKS (init): frame=0 run=idle cxb=0x04 dxb=0x05 exb=0x06 fxb=0x07 bmaps=0x1F bmap=0x0A"
         regs = BankRegisters.parse_from_log(log_line)
         assert regs is not None
         assert regs.cxb == 0x04
@@ -73,9 +69,7 @@ class TestBankRegisters:
 
     def test_parse_from_log_extra_whitespace(self) -> None:
         """Handle extra whitespace in log line."""
-        log_line = (
-            "cxb=0x00   dxb=0x01   exb=0x02   fxb=0x03   bmaps=0x00   bmap=0x00"
-        )
+        log_line = "cxb=0x00   dxb=0x01   exb=0x02   fxb=0x03   bmaps=0x00   bmap=0x00"
         regs = BankRegisters.parse_from_log(log_line)
         assert regs is not None
         assert regs.cxb == 0x00
