@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.services.rom_cache import ROMCache
     from core.workers import ROMExtractionWorker, VRAMExtractionWorker
-    from ui.extraction_controller import ExtractionController
     from ui.injection_dialog import InjectionDialog
     from ui.services.dialog_coordinator import DialogCoordinator
 
@@ -98,7 +97,6 @@ class MainWindow(QMainWindow):
         # Declare instance variables with type hints
         self._output_path: str
         self._extracted_files: list[str]
-        self._controller: ExtractionController | None
         self._dialog_coordinator: DialogCoordinator | None
         self._error_handler: ErrorHandler
         self.left_dock: QDockWidget
@@ -128,7 +126,6 @@ class MainWindow(QMainWindow):
 
         self._output_path = ""
         self._extracted_files = []
-        self._controller = None  # Lazy initialization to break circular dependency
         self._dialog_coordinator = None  # Lazy initialization for dialog service
         self._last_undo_state = (False, False)
 
@@ -1655,84 +1652,6 @@ class MainWindow(QMainWindow):
             return getattr(self.output_settings_manager, "metadata_check", None)
         return None
 
-    @property
-    def controller(self) -> ExtractionController:
-        """Lazy initialization of controller to break circular dependency.
-
-        This allows tests to create MainWindow without hanging, as the controller
-        is only created when actually needed (not during __init__).
-        """
-        if self._controller is None:
-            # Import here to avoid circular dependency at module level
-            from core.app_context import get_app_context
-            from ui.extraction_controller import ExtractionController
-
-            context = get_app_context()
-            self._controller = ExtractionController(
-                self,
-                extraction_manager=context.core_operations_manager,
-                session_manager=context.application_state_manager,
-                injection_manager=context.core_operations_manager,
-                settings_manager=self.settings_manager,
-                preview_generator=context.preview_generator,
-            )
-            # Connect controller output signals for decoupled UI updates
-            self._connect_controller_signals(self._controller)
-        return self._controller
-
-    def _connect_controller_signals(self, ctrl: ExtractionController) -> None:
-        """Connect controller output signals to MainWindow slots.
-
-        This enables fully decoupled communication where the controller
-        emits signals instead of calling MainWindow methods directly.
-        """
-        # Status messages
-        ctrl.status_message_changed.connect(self.status_bar.showMessage)
-
-        # Preview updates
-        ctrl.preview_ready.connect(self._on_controller_preview_ready)
-        ctrl.grayscale_image_ready.connect(self._on_controller_grayscale_ready)
-
-        # Palette updates
-        ctrl.palettes_ready.connect(self._on_controller_palettes_ready)
-        ctrl.active_palettes_ready.connect(self._on_controller_active_palettes_ready)
-
-        # Extraction completion
-        ctrl.extraction_completed.connect(self.extraction_complete)
-        ctrl.extraction_error.connect(self.extraction_failed)
-
-        # Cache badge connections removed in Phase 2 simplification
-
-    def _on_controller_preview_ready(self, result: object, tile_count: int) -> None:
-        """Handle preview ready signal from controller."""
-        from typing import cast
-
-        from PySide6.QtGui import QPixmap
-
-        self.sprite_preview.set_preview(cast(QPixmap, result), tile_count)
-
-    def _on_controller_grayscale_ready(self, image: object) -> None:
-        """Handle grayscale image ready signal from controller."""
-        from typing import cast
-
-        from PIL.Image import Image as PILImage
-
-        self.sprite_preview.set_grayscale_image(cast(PILImage, image))
-
-    def _on_controller_palettes_ready(self, palettes: object) -> None:
-        """Handle palettes ready signal from controller."""
-        if hasattr(self, "palette_preview") and self.palette_preview:
-            normalized = self._normalize_palettes(palettes)
-            if normalized is not None:
-                self.palette_preview.set_all_palettes(normalized)
-
-    def _on_controller_active_palettes_ready(self, palettes: object) -> None:
-        """Handle active palettes highlight signal from controller."""
-        if hasattr(self, "palette_preview") and self.palette_preview:
-            active_indices = self._normalize_active_palettes(palettes)
-            if active_indices is not None:
-                self.palette_preview.highlight_active_palettes(active_indices)
-
     @staticmethod
     def _normalize_palettes(palettes: object) -> dict[int, list[tuple[int, int, int]]] | None:
         """Normalize palette data into palette_index -> list[(r, g, b)]."""
@@ -1785,11 +1704,6 @@ class MainWindow(QMainWindow):
                 continue
 
         return normalized
-
-    @controller.setter
-    def controller(self, value: ExtractionController) -> None:
-        """Allow setting controller for testing purposes."""
-        self._controller = value
 
     @property
     def dialog_coordinator(self) -> DialogCoordinator:
