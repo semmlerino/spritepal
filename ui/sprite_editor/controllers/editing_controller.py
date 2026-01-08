@@ -80,6 +80,7 @@ class EditingController(QObject):
             ToolType.PENCIL: "pencil",
             ToolType.FILL: "fill",
             ToolType.PICKER: "picker",
+            ToolType.ERASER: "eraser",
         }.get(tool_type, "pencil")
 
     def get_selected_color(self) -> int:
@@ -92,6 +93,7 @@ class EditingController(QObject):
             "pencil": ToolType.PENCIL,
             "fill": ToolType.FILL,
             "picker": ToolType.PICKER,
+            "eraser": ToolType.ERASER,
         }
         tool_type = tool_map.get(tool_name, ToolType.PENCIL)
         self.tool_manager.set_tool(tool_type)
@@ -136,6 +138,7 @@ class EditingController(QObject):
             ToolType.PENCIL: "pencil",
             ToolType.FILL: "fill",
             ToolType.PICKER: "picker",
+            ToolType.ERASER: "eraser",
         }.get(tool_type, "pencil")
         self.toolChanged.emit(tool_name)
 
@@ -193,8 +196,8 @@ class EditingController(QObject):
 
         tool_type = self.tool_manager.current_tool_type
 
-        # Only pencil tool uses move for continuous drawing
-        if tool_type != ToolType.PENCIL:
+        # Only pencil and eraser tools use move for continuous drawing
+        if tool_type not in (ToolType.PENCIL, ToolType.ERASER):
             return
 
         # Get line points from tool (for interpolation)
@@ -292,7 +295,7 @@ class EditingController(QObject):
             colors = []
             if file_path.endswith(".json"):
                 import json
-                with open(file_path, "r") as f:
+                with open(file_path) as f:
                     data = json.load(f)
                     # Expecting {"colors": [[r,g,b], ...]}
                     if "colors" in data:
@@ -301,7 +304,7 @@ class EditingController(QObject):
                 # Assume JASC PAL or raw RGB
                 # For now, simplistic implementation or rely on a service if available
                 # Let's support JASC-PAL for now as it's common
-                with open(file_path, "r") as f:
+                with open(file_path) as f:
                     lines = f.readlines()
                     if "JASC-PAL" in lines[0]:
                         for line in lines[3:]: # Skip header, version, count
@@ -348,8 +351,7 @@ class EditingController(QObject):
             elif file_path.endswith(".pal"):
                 with open(file_path, "w") as f:
                     f.write("JASC-PAL\n0100\n16\n")
-                    for r, g, b in colors:
-                        f.write(f"{r} {g} {b}\n")
+                    f.writelines(f"{r} {g} {b}\n" for r, g, b in colors)
                         
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox

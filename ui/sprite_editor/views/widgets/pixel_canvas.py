@@ -34,6 +34,7 @@ class PixelCanvas(QWidget):
         # View state (not business logic)
         self.zoom = 4
         self.grid_visible = False
+        self.tile_grid_visible = False
         self.greyscale_mode = False
 
         # Interaction state
@@ -99,7 +100,7 @@ class PixelCanvas(QWidget):
 
     def _update_cursor_for_tool(self, tool_name: str) -> None:
         """Update cursor based on the current tool."""
-        if tool_name == "pencil":
+        if tool_name in ("pencil", "eraser"):
             self.setCursor(Qt.CursorShape.CrossCursor)
         elif tool_name == "fill":
             self.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -149,6 +150,11 @@ class PixelCanvas(QWidget):
     def set_grid_visible(self, visible: bool) -> None:
         """Toggle grid visibility."""
         self.grid_visible = visible
+        self.update()
+
+    def set_tile_grid_visible(self, visible: bool) -> None:
+        """Toggle tile grid visibility."""
+        self.tile_grid_visible = visible
         self.update()
 
     def set_greyscale_mode(self, greyscale: bool) -> None:
@@ -453,6 +459,10 @@ class PixelCanvas(QWidget):
         if self.grid_visible and self.zoom >= 4:
             self._draw_grid_viewport(painter, image_rect)
 
+        # Draw tile grid if visible (8x8 tiles)
+        if self.tile_grid_visible and self.zoom >= 1:
+            self._draw_tile_grid_viewport(painter, image_rect)
+
         # Draw hover highlight without clipping restrictions
         if self.hover_pos and not self.drawing:
             painter.save()  # Save current painter state
@@ -529,6 +539,42 @@ class PixelCanvas(QWidget):
 
         # Horizontal lines
         for y in range(start_y, end_y, self.zoom):
+            if rect.y() <= y <= rect.bottom():
+                lines.append(QPointF(rect.x(), y))
+                lines.append(QPointF(rect.right(), y))
+
+        # Draw all lines at once using QPainter.drawLines() for maximum efficiency
+        if lines:
+            painter.drawLines(lines)
+
+    def _draw_tile_grid_viewport(self, painter: QPainter, rect: QRect) -> None:
+        """Draw 8x8 tile grid lines only in visible region using optimized batch drawing."""
+        # Cyan color for tile grid to distinguish from pixel grid
+        pen = QPen(QColor(0, 255, 255, 128), 1)
+        # pen.setStyle(Qt.PenStyle.DashLine) # Optional: make it dashed
+        painter.setPen(pen)
+
+        # Tile size in pixels
+        tile_size_px = 8
+        scaled_tile_size = tile_size_px * self.zoom
+
+        # Calculate grid bounds within visible rect
+        start_x = (rect.x() // scaled_tile_size) * scaled_tile_size
+        start_y = (rect.y() // scaled_tile_size) * scaled_tile_size
+        end_x = rect.right() + scaled_tile_size
+        end_y = rect.bottom() + scaled_tile_size
+
+        # Collect all grid lines for batch drawing using QPointF objects
+        lines: list[QPointF] = []
+
+        # Vertical lines
+        for x in range(start_x, end_x, scaled_tile_size):
+            if rect.x() <= x <= rect.right():
+                lines.append(QPointF(x, rect.y()))
+                lines.append(QPointF(x, rect.bottom()))
+
+        # Horizontal lines
+        for y in range(start_y, end_y, scaled_tile_size):
             if rect.y() <= y <= rect.bottom():
                 lines.append(QPointF(rect.x(), y))
                 lines.append(QPointF(rect.right(), y))

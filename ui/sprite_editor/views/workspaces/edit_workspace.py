@@ -10,6 +10,7 @@ widget reparenting when switching modes.
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QFrame,
     QPushButton,
@@ -56,6 +57,7 @@ class EditWorkspace(QWidget):
         self._controller: EditingController | None = None
         self._canvas: PixelCanvas | None = None
         self._setup_ui()
+        self._setup_shortcuts()
         # Ensure workspace expands to fill parent container
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         # Set minimum width at workspace root (tool panel + canvas)
@@ -155,6 +157,29 @@ class EditWorkspace(QWidget):
         # Connect SaveExportPanel signals
         self._save_export_panel.saveToRomClicked.connect(self.saveToRomRequested.emit)
         self._save_export_panel.exportPngClicked.connect(self.exportPngRequested.emit)
+
+    def _setup_shortcuts(self) -> None:
+        """Setup keyboard shortcuts for tools and actions."""
+        # Tool shortcuts
+        QShortcut(QKeySequence("P"), self, lambda: self._icon_toolbar.tool_buttons["pencil"].click())
+        QShortcut(QKeySequence("F"), self, lambda: self._icon_toolbar.tool_buttons["fill"].click())
+        QShortcut(QKeySequence("K"), self, lambda: self._icon_toolbar.tool_buttons["picker"].click())
+        QShortcut(QKeySequence("E"), self, lambda: self._icon_toolbar.tool_buttons["eraser"].click())
+
+        # Toggle shortcuts
+        if self._icon_toolbar.grid_btn:
+            QShortcut(QKeySequence("G"), self, self._icon_toolbar.grid_btn.click)
+        if self._icon_toolbar.tile_grid_btn:
+            QShortcut(QKeySequence("T"), self, self._icon_toolbar.tile_grid_btn.click)
+        if self._icon_toolbar.palette_preview_btn:
+            QShortcut(QKeySequence("C"), self, self._icon_toolbar.palette_preview_btn.click)
+
+        # Zoom shortcuts
+        if self._icon_toolbar.zoom_in_btn:
+            QShortcut(QKeySequence("+"), self, self._icon_toolbar.zoom_in_btn.click)
+            QShortcut(QKeySequence("="), self, self._icon_toolbar.zoom_in_btn.click)  # Handle unshifted +
+        if self._icon_toolbar.zoom_out_btn:
+            QShortcut(QKeySequence("-"), self, self._icon_toolbar.zoom_out_btn.click)
 
     # Public panel accessors (for external signal connections)
     @property
@@ -277,7 +302,7 @@ class EditWorkspace(QWidget):
         self._icon_toolbar.zoomInClicked.connect(self._on_zoom_in)
         self._icon_toolbar.zoomOutClicked.connect(self._on_zoom_out)
         self._icon_toolbar.gridToggled.connect(self._canvas.set_grid_visible)
-        # Note: tileGridToggled connection depends on canvas support (may add later)
+        self._icon_toolbar.tileGridToggled.connect(self._canvas.set_tile_grid_visible)
 
         # Connect palette preview toggle (canvas is guaranteed to exist here)
         canvas = self._canvas

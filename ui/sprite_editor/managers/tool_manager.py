@@ -20,6 +20,7 @@ class ToolType(Enum):
     PENCIL = auto()
     FILL = auto()
     PICKER = auto()
+    ERASER = auto()
 
 
 class Tool(ABC):
@@ -120,6 +121,22 @@ class FillTool(Tool):
         """Nothing to do on release."""
 
 
+class EraserTool(PencilTool):
+    """Eraser tool (draws with transparent color index 0)."""
+
+    @override
+    def on_press(self, x: int, y: int, color: int, image_model: ImageModel) -> bool:
+        """Draw a single transparent pixel and start tracking position."""
+        # Always use color 0 (transparent)
+        return super().on_press(x, y, 0, image_model)
+
+    @override
+    def on_move(self, x: int, y: int, color: int, image_model: ImageModel) -> list[tuple[int, int]]:
+        """Continue erasing with line interpolation."""
+        # Always use color 0 (transparent)
+        return super().on_move(x, y, 0, image_model)
+
+
 class ColorPickerTool(Tool):
     """Color picker tool."""
 
@@ -157,6 +174,7 @@ class ToolManager(QObject):
             ToolType.PENCIL: PencilTool(),
             ToolType.FILL: FillTool(),
             ToolType.PICKER: ColorPickerTool(),
+            ToolType.ERASER: EraserTool(),
         }
         self._current_tool = ToolType.PENCIL
         self.current_color = 0
@@ -187,6 +205,7 @@ class ToolManager(QObject):
                 "pencil": ToolType.PENCIL,
                 "fill": ToolType.FILL,
                 "picker": ToolType.PICKER,
+                "eraser": ToolType.ERASER,
             }
             mapped_type = tool_map.get(tool_type.lower())
             if not mapped_type:
@@ -211,6 +230,7 @@ class ToolManager(QObject):
                 "pencil": ToolType.PENCIL,
                 "fill": ToolType.FILL,
                 "picker": ToolType.PICKER,
+                "eraser": ToolType.ERASER,
             }
             orig_tool_type = tool_type
             tool_type = tool_map.get(orig_tool_type.lower())

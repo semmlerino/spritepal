@@ -27,6 +27,11 @@ class MockPanel(QWidget):
     zoomOutClicked = Signal()
     tileGridToggled = Signal(bool)
     palettePreviewToggled = Signal(bool)
+    # PalettePanel signals
+    sourceChanged = Signal(str)
+    loadPaletteClicked = Signal()
+    savePaletteClicked = Signal()
+    editColorClicked = Signal()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -40,6 +45,19 @@ class MockPanel(QWidget):
         self._controller = None
         # IconToolbar methods
         self.is_palette_preview_enabled = Mock(return_value=False)
+        self.grid_btn = Mock()
+        self.tile_grid_btn = Mock()
+        self.palette_preview_btn = Mock()
+        self.zoom_in_btn = Mock()
+        self.zoom_out_btn = Mock()
+        self.tool_buttons = {"pencil": Mock(), "fill": Mock(), "picker": Mock(), "eraser": Mock()}
+        # SaveExportPanel methods
+        self.set_save_enabled = Mock()
+        self.set_export_enabled = Mock()
+        self.set_save_visible = Mock()
+        self.set_export_visible = Mock()
+        # PalettePanel methods
+        self.add_palette_source = Mock()
 
     @property
     def controller(self):

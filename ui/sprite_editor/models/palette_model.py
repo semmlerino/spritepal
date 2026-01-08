@@ -108,3 +108,14 @@ class PaletteModel:
             self.index = palette_num
             return True
         return False
+
+    def get_color(self, index: int) -> tuple[int, int, int]:
+        """Get RGB color at index."""
+        if 0 <= index < len(self.colors):
+            return self.colors[index]
+        return (0, 0, 0)
+
+    def set_color(self, index: int, rgb: tuple[int, int, int]) -> None:
+        """Set RGB color at index."""
+        if 0 <= index < len(self.colors):
+            self.colors[index] = rgb

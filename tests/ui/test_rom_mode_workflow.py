@@ -15,6 +15,7 @@ class MockEditTab(QWidget):
         self.detach_btn.hide = Mock()
         self.ready_for_inject = Mock()
         self.ready_for_inject.connect = Mock()
+        self.workspace = MockEditWorkspace()
 
     def set_controller(self, ctrl):
         pass
