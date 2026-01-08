@@ -24,6 +24,7 @@ from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
+    QFrame,
     QGridLayout,
     QLabel,
     QMainWindow,
@@ -44,9 +45,11 @@ from core.services.image_utils import pil_to_qpixmap
 from core.types import VRAMExtractionParams
 from ui.common import ErrorHandler
 from ui.common.spacing_constants import (
+    SPACING_COMPACT_SMALL,
     SPACING_MEDIUM,
     SPACING_SMALL,
 )
+from ui.styles.components import get_action_zone_style
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
     KeyboardShortcutManager,
@@ -58,7 +61,7 @@ from ui.managers import (
 from ui.palette_preview import PalettePreviewWidget
 from ui.rom_extraction_panel import ROMExtractionPanel
 from ui.sprite_editor.views.widgets.offset_line_edit import OffsetLineEdit
-from ui.workspaces import ExtractionWorkspace, SpriteEditorWorkspace
+from ui.workspaces import SpriteEditorWorkspace
 from ui.zoomable_preview import PreviewPanel
 from utils.constants import VRAM_SPRITE_OFFSET
 from utils.file_validator import FileValidator
@@ -246,20 +249,58 @@ class MainWindow(QMainWindow):
         log_watcher = get_app_context().log_watcher
         mesen2_module = Mesen2Module(log_watcher=log_watcher, parent=self)
 
-        # 1. Extraction Workspace (Dock Content)
-        self._extraction_workspace = ExtractionWorkspace(
+        # 1. Extraction UI (Dock Content) - inline, no wrapper class
+        # Create tab widget for extraction methods
+        self.extraction_tabs = QTabWidget()
+        self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.extraction_tabs.currentChanged.connect(self._on_extraction_tab_changed)
+
+        # ROM extraction tab (wrapped in scroll area)
+        self.rom_extraction_panel = ROMExtractionPanel(
             parent=self,
             extraction_manager=extraction_manager,
             state_manager=self.settings_manager,
             rom_cache=self.rom_cache,
             mesen2_module=mesen2_module,
         )
-        self._extraction_workspace.tab_changed.connect(self._on_extraction_tab_changed)
+        rom_scroll = QScrollArea()
+        rom_scroll.setWidgetResizable(True)
+        rom_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        rom_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        rom_scroll.setWidget(self.rom_extraction_panel)
+        self.extraction_tabs.addTab(rom_scroll, "ROM Extraction")
+        self.extraction_tabs.setTabToolTip(0, "Extract sprites directly from game ROM files")
+
+        # VRAM extraction tab (wrapped in scroll area)
+        self.extraction_panel = ExtractionPanel(settings_manager=self.settings_manager)
+        vram_scroll = QScrollArea()
+        vram_scroll.setWidgetResizable(True)
+        vram_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        vram_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        vram_scroll.setWidget(self.extraction_panel)
+        self.extraction_tabs.addTab(vram_scroll, "VRAM Extraction")
+        self.extraction_tabs.setTabToolTip(1, "Extract from emulator memory dumps (VRAM/CGRAM/OAM)")
+
+        # Action zone (fixed height, pinned to bottom)
+        self.action_zone = QWidget()
+        self.action_zone.setObjectName("actionZone")
+        self.action_zone.setStyleSheet(get_action_zone_style())
+        self.action_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        action_zone_layout = QVBoxLayout(self.action_zone)
+        action_zone_layout.setContentsMargins(SPACING_SMALL, SPACING_COMPACT_SMALL, SPACING_SMALL, SPACING_SMALL)
+        action_zone_layout.setSpacing(SPACING_COMPACT_SMALL)
+
+        # Container for dock widget
+        extraction_container = QWidget()
+        container_layout = QVBoxLayout(extraction_container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(0)
+        container_layout.addWidget(self.extraction_tabs, 1)
+        container_layout.addWidget(self.action_zone)
+        self.left_dock.setWidget(extraction_container)
+
         # Connect manual offset changed from ROM panel
-        self._extraction_workspace.rom_extraction_panel.manual_offset_changed.connect(
-            self.toolbar_offset_edit.set_offset
-        )
-        self.left_dock.setWidget(self._extraction_workspace)
+        self.rom_extraction_panel.manual_offset_changed.connect(self.toolbar_offset_edit.set_offset)
 
         # 2. Sprite Editor Workspace (Center Content)
         # Note: message_service is None here because status_bar_manager hasn't been created yet.
@@ -273,16 +314,10 @@ class MainWindow(QMainWindow):
         self._sprite_editor_workspace.offset_changed.connect(self.toolbar_offset_edit.set_offset)
 
         self.center_stack.addWidget(self._sprite_editor_workspace)
-
-        # Backward compatibility aliases
-        self.extraction_tabs = self._extraction_workspace.extraction_tabs
-        self.rom_extraction_panel = self._extraction_workspace.rom_extraction_panel
-        self.extraction_panel = self._extraction_workspace.extraction_panel
-        self.action_zone = self._extraction_workspace.action_zone
         self.sprite_edit_tab = self._sprite_editor_workspace
 
     def _on_extraction_tab_changed(self, index: int) -> None:
-        """Handle extraction tab changes within ExtractionWorkspace."""
+        """Handle extraction tab changes."""
         if index == 2:  # Sprite Editor tab
             self.switch_to_workspace(1)
         else:
@@ -307,13 +342,13 @@ class MainWindow(QMainWindow):
     def _on_tab_changed(self, index: int) -> None:
         """Handle legacy tab changes (now unused with workspace architecture).
 
-        With the new workspace architecture, tabs are within ExtractionWorkspace
+        With the workspace architecture, tabs are in the extraction dock
         and don't need action zone visibility toggling.
 
         Args:
             index: Tab index (unused)
         """
-        # Action zone is now part of ExtractionWorkspace, always visible
+        # Action zone is always visible with dock content
         pass
 
     def switch_to_workspace(self, workspace_index: int, tab_index: int | None = None) -> None:
@@ -337,8 +372,8 @@ class MainWindow(QMainWindow):
             self._update_undo_redo_state(can_undo, can_redo)
 
         if tab_index is not None and workspace_index == 0:
-            # Switch tab within ExtractionWorkspace
-            self._extraction_workspace.set_current_tab(tab_index)
+            # Switch tab within extraction panel
+            self.extraction_tabs.setCurrentIndex(tab_index)
 
     def handle_tab_switch(self, index: int) -> None:
         """Handle tab switch requests from keyboard shortcuts.

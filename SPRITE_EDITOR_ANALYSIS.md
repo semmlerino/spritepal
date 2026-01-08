@@ -7,16 +7,17 @@
 | Phase | Status | Completed |
 |-------|--------|-----------|
 | **Phase 1: Quick Wins** | ✅ Complete | ✅ Item 1, ✅ Item 2, ✅ Item 3 |
-| **Phase 2: Medium (Collapse Layers)** | Pending | — |
+| **Phase 2: Medium (Collapse Layers)** | In Progress | ✅ Item 4 |
 | **Phase 3: Deeper (Architecture)** | Pending | — |
 
 **Completed Work:**
 - ✅ Problem #1 (Dual-Path Signal Wiring) - Removed `MainController._update_undo_state` and duplicate status connection. Single signal path now active.
 - ✅ Phase 1 Item 2 (Flatten Status Messages) - Replaced 3-layer signal relay with direct dependency injection. Fixed bug where `ROMWorkflowController.status_message` (~25 emit calls) was never connected. Controllers now call `message_service.show_message()` directly.
 - ✅ Phase 1 Item 3 (Delete `MainController`) - Moved sub-controller ownership to `SpriteEditorWorkspace`. Broke circular dependency in `ROMWorkflowController`. Deleted `MainController` class entirely.
-- Test Coverage: 1978 passed, 23 skipped, 0 failures (no regression)
+- ✅ Phase 2 Item 4 (Merge `ExtractionWorkspace` into `MainWindow`) - Inlined setup code into `MainWindow._create_workspaces()`. Deleted `ExtractionWorkspace` class entirely.
+- Test Coverage: 1977 passed, 23 skipped, 0 failures (no regression)
 
-**Next Priority:** Phase 2 Item 4 (Merge `ExtractionWorkspace` into `MainWindow`)
+**Next Priority:** Phase 2 Item 5 (Dissolve `UICoordinator`)
 
 ---
 
@@ -27,7 +28,7 @@
 3.  **God-Class `UICoordinator`:** This class orchestrates unrelated UI concerns (session, tabs, previews, toolbars), creating high coupling between the extraction and editor views.
 4.  **Passthrough Signal Chains:** `SpriteEditorWorkspace` acts largely as a "signal relay," receiving signals from controllers and re-emitting them to `MainWindow` (e.g., `status_message`, `mode_changed`), adding noise without value.
 5.  **Circular Dependency Workarounds:** `MainWindow` uses lazy properties for `ExtractionController` and `controller` setters to break circular imports, indicating a flaw in the dependency graph (View depends on Controller, which depends on View).
-6.  **Redundant Abstraction Layers:** The hierarchy `MainController` -> `ExtractionController` -> `ExtractionPanel` -> `ExtractionWorkspace` adds 4 layers to perform a simple task (extracting sprites), making the "Find Usages" feature of IDEs useless.
+6.  **Redundant Abstraction Layers:** ✅ **PARTIALLY RESOLVED** - `MainController` deleted (Phase 1 Item 3), `ExtractionWorkspace` merged into `MainWindow` (Phase 2 Item 4). Remaining: `ExtractionController` layer (extraction logic split between controller and `MainWindow`).
 7.  **Implicit State Sharing:** `ApplicationStateManager` is passed around everywhere, but specific state (like current palette or selected tool) is also synchronized via manual signal connections, leading to "split source of truth."
 8.  **Direct Widget Manipulation from Controllers:** `MainController` holds a reference to `MainWindow` and directly manipulates its actions (`action_undo.setEnabled`), violating the Law of Demeter and tight-coupling the Controller to the specific View implementation.
 9.  **Over-Architected Editor MVC:** The `ui/sprite_editor` package uses a heavy MVC/Command pattern (`MainController`, `EditingController`, `ExtractionController`, `InjectionController`, `ROMWorkflowController`) for what is essentially a single-page pixel editor with a side panel.
@@ -145,9 +146,11 @@
 
 ### Phase 2: Medium (Collapse Layers)
 
-4.  **Merge `ExtractionWorkspace` into `MainWindow`:**
-    *   It's just layout configuration. Move the setup code to `MainWindow._setup_ui`.
-    *   Delete `ui/workspaces/extraction_workspace.py`.
+4.  ✅ **Merge `ExtractionWorkspace` into `MainWindow`:** (COMPLETED 2026-01-08)
+    *   ✅ Inlined layout configuration into `MainWindow._create_workspaces()`.
+    *   ✅ Deleted `ui/workspaces/extraction_workspace.py`.
+    *   ✅ Updated `ui/workspaces/__init__.py` to remove export.
+    *   ✅ All tests pass (1977 passed, 23 skipped, 0 failures).
 
 5.  **Dissolve `UICoordinator`:**
     *   Move tab handling logic to `MainWindow`.
