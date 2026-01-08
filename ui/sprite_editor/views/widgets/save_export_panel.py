@@ -115,6 +115,24 @@ class SaveExportPanel(QWidget):
         """
         self.export_png_btn.setEnabled(enabled)
 
+    def set_save_visible(self, visible: bool) -> None:
+        """
+        Show or hide the "Save to ROM" button.
+
+        Args:
+            visible: Whether the button should be visible
+        """
+        self.save_to_rom_btn.setVisible(visible)
+
+    def set_export_visible(self, visible: bool) -> None:
+        """
+        Show or hide the "Export PNG" button.
+
+        Args:
+            visible: Whether the button should be visible
+        """
+        self.export_png_btn.setVisible(visible)
+
     def set_size_info(self, original_bytes: int, modified_bytes: int) -> None:
         """
         Set and display size information for the sprite data.

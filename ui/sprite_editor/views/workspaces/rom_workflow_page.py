@@ -72,6 +72,7 @@ class ROMWorkflowPage(QWidget):
 
         # Right Panel: EditWorkspace (owned by this page)
         self._workspace = EditWorkspace()
+        self._workspace.set_workflow_mode("rom")
         # Hide detach button in ROM mode (not applicable)
         self._workspace._detach_btn.hide()
         self._main_splitter.addWidget(self._workspace)

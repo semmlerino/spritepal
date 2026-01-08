@@ -168,6 +168,8 @@ class SpriteEditorWorkspace(QWidget):
         # Wire VRAM page
         self._extraction_controller.set_view(self._vram_page.extract_tab)
         self._editing_controller.set_view(self._vram_page.edit_tab)
+        # Wire Export PNG for VRAM mode
+        self._vram_page.edit_tab.workspace.exportPngRequested.connect(self._editing_controller.save_image_as)
         self._injection_controller.set_view(self._vram_page.inject_tab)
         self._extraction_controller.set_multi_palette_view(self._vram_page.multi_palette_tab)
 

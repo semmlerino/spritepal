@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
 from PySide6.QtCore import Signal
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
@@ -272,6 +273,44 @@ class SpriteEditorMainWindow(QMainWindow):
         """Clear the coordinates display."""
         self.coords_label.setText("")
 
+    def _on_sprite_extracted(self, image: object, tile_count: int) -> None:
+        """Handle sprite extraction success.
+
+        Args:
+            image: PIL Image object
+            tile_count: Number of tiles extracted
+        """
+        if self._editing_controller is None:
+            return
+
+        try:
+            # Convert PIL image to numpy array (indices)
+            # Ensure we're working with a paletted image
+            if not (hasattr(image, "mode") and image.mode == "P"):  # type: ignore
+                self.set_status("Error: Extracted image is not a valid indexed image.")
+                return
+
+            data = np.array(image)
+
+            # Extract palette
+            palette_data = image.getpalette()  # type: ignore
+            palette: list[tuple[int, int, int]] = []
+            if palette_data:
+                # Convert flat list [r,g,b, r,g,b...] to list of tuples
+                for i in range(0, min(len(palette_data), 48), 3):
+                    if i + 2 < len(palette_data):
+                        palette.append((palette_data[i], palette_data[i + 1], palette_data[i + 2]))
+
+            # Load into editor
+            self._editing_controller.load_image(data, palette)
+
+            # Switch to edit tab
+            self.show_edit_tab()
+
+            self.set_status(f"Loaded extracted sprite ({tile_count} tiles)")
+        except Exception as e:
+            self.set_status(f"Error loading extracted sprite: {e}")
+
     def wire_controllers(
         self,
         extraction_controller: ExtractionController,
@@ -294,6 +333,9 @@ class SpriteEditorMainWindow(QMainWindow):
         self._editing_controller = editing_controller
         self._injection_controller = injection_controller
         self._rom_workflow_controller = rom_workflow_controller
+
+        # Extraction events
+        extraction_controller.sprite_extracted.connect(self._on_sprite_extracted)
 
         # File menu
         self.action_open_vram.triggered.connect(extraction_controller.browse_vram_file)

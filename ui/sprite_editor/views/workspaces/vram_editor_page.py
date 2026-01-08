@@ -74,6 +74,7 @@ class VRAMEditorPage(QWidget):
         # Create tabs
         self._extract_tab = ExtractTab(settings_manager=self._settings_manager)
         self._edit_tab = EditTab()
+        self._edit_tab.workspace.set_workflow_mode("vram")
         self._inject_tab = InjectTab(settings_manager=self._settings_manager)
         self._multi_palette_tab = MultiPaletteTab()
 

@@ -6,6 +6,7 @@ This allows for proper testing and separation of concerns.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+import threading
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QMessageBox
@@ -82,3 +83,29 @@ class ErrorHandler(QObject):
         """Default handler for info messages - shows QMessageBox"""
         if self._show_dialogs and self._parent_widget is not None:
             QMessageBox.information(self._parent_widget, title, message)
+
+
+# Global singleton instance
+_error_handler: ErrorHandler | None = None
+_error_handler_lock = threading.Lock()
+
+
+def get_error_handler(parent: QWidget | None = None) -> ErrorHandler:
+    """Get or create the global error handler instance (thread-safe)"""
+    global _error_handler
+
+    # Fast path - check without lock
+    if _error_handler is not None:
+        if parent is not None and _error_handler._parent_widget is None:
+            with _error_handler_lock:
+                if _error_handler._parent_widget is None:
+                    _error_handler._parent_widget = parent
+                    _error_handler.setParent(parent)
+        return _error_handler
+
+    # Slow path - create with lock
+    with _error_handler_lock:
+        # Double-check pattern
+        if _error_handler is None:
+            _error_handler = ErrorHandler(parent)
+        return _error_handler

@@ -329,6 +329,29 @@ class EditWorkspace(QWidget):
         self._save_export_panel.set_save_enabled(loaded)
         self._save_export_panel.set_export_enabled(loaded)
 
+    def set_workflow_mode(self, mode: str) -> None:
+        """Configure workspace for specific workflow mode.
+
+        Args:
+            mode: 'vram' or 'rom'
+        """
+        if mode == "vram":
+            # VRAM Mode:
+            # - Ready for Inject: Visible (switch to inject tab)
+            # - Save to ROM: Hidden (not applicable)
+            # - Export PNG: Visible
+            self._inject_btn.setVisible(True)
+            self._save_export_panel.set_save_visible(False)
+            self._save_export_panel.set_export_visible(True)
+        elif mode == "rom":
+            # ROM Mode:
+            # - Ready for Inject: Hidden (stay in same view)
+            # - Save to ROM: Visible (direct injection)
+            # - Export PNG: Visible
+            self._inject_btn.setVisible(False)
+            self._save_export_panel.set_save_visible(True)
+            self._save_export_panel.set_export_visible(True)
+
     def _update_palette(self) -> None:
         """Update palette panel when controller palette changes."""
         if not self._controller:
