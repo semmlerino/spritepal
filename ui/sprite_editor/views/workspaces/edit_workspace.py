@@ -183,6 +183,9 @@ class EditWorkspace(QWidget):
         
         # Reset zoom
         QShortcut(QKeySequence("Ctrl+0"), self, self._on_zoom_reset)
+        
+        # Fit to window
+        QShortcut(QKeySequence("Ctrl+9"), self, self._on_zoom_fit)
 
     # Public panel accessors (for external signal connections)
     @property
@@ -420,6 +423,36 @@ class EditWorkspace(QWidget):
         if not self._canvas:
             return
         self._canvas.set_zoom(4)  # Reset to default 4x
+
+    def _on_zoom_fit(self) -> None:
+        """Handle zoom fit shortcut."""
+        if not self._canvas or not self._controller:
+            return
+
+        image_size = self._controller.get_image_size()
+        if not image_size or image_size[0] == 0 or image_size[1] == 0:
+            return
+            
+        width, height = image_size
+        
+        # Get viewport size minus padding
+        viewport = self._scroll_area.viewport()
+        vp_width = viewport.width() - 40  # 20px padding on each side
+        vp_height = viewport.height() - 40
+        
+        if vp_width <= 0 or vp_height <= 0:
+            return
+
+        # Calculate max zoom that fits
+        zoom_x = vp_width // width
+        zoom_y = vp_height // height
+        
+        fit_zoom = min(zoom_x, zoom_y)
+        
+        # Clamp between 1 and 64
+        fit_zoom = max(1, min(64, fit_zoom))
+        
+        self._canvas.set_zoom(fit_zoom)
 
     def _on_zoom_changed_from_canvas(self, zoom: int) -> None:
         """Handle zoom change from canvas (e.g., mouse wheel)."""

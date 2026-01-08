@@ -1,7 +1,9 @@
 
-import pytest
 import numpy as np
+import pytest
+
 from ui.sprite_editor.controllers.editing_controller import EditingController
+
 
 def test_eraser_tool_uses_transparent_color():
     """Test that eraser tool always uses color 0 regardless of selected color."""
