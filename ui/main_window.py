@@ -761,7 +761,8 @@ class MainWindow(QMainWindow):
             self._output_path = params["output_base"]
             self.status_bar_manager.show_message("Extracting sprites from ROM...")
             self.toolbar_manager.set_extract_enabled(False)
-            self.controller.start_rom_extraction(params)
+            # Start ROM extraction directly (Phase 4e: controller removal)
+            self._start_rom_extraction(params)
 
     def _handle_vram_extraction(
         self,
@@ -950,6 +951,67 @@ class MainWindow(QMainWindow):
                 # Signal may already be disconnected
                 pass
         self._manager_connections.clear()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ROM EXTRACTION ORCHESTRATION (Phase 4e: moved from ExtractionController)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def _start_rom_extraction(self, params: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - params are dynamic extraction config
+        """Start ROM sprite extraction process."""
+        from core.app_context import get_app_context
+        from core.types import ROMExtractionParams
+        from core.workers import ROMExtractionWorker
+
+        context = get_app_context()
+        extraction_manager = context.core_operations_manager
+
+        # Convert validated params dict to ROMExtractionParams TypedDict
+        rom_extraction_params: ROMExtractionParams = {
+            "rom_path": params["rom_path"],
+            "sprite_offset": params["sprite_offset"],
+            "sprite_name": params["sprite_name"],
+            "output_base": params["output_base"],
+            "cgram_path": params.get("cgram_path"),
+        }
+
+        # Create and start ROM extraction worker
+        worker = ROMExtractionWorker(rom_extraction_params, extraction_manager=extraction_manager)
+        self._rom_worker = worker
+
+        _ = worker.progress.connect(self._on_rom_progress)
+        _ = worker.extraction_finished.connect(self._on_rom_extraction_finished)
+        _ = worker.error.connect(self._on_rom_extraction_error)
+
+        worker.start()
+
+    def _on_rom_progress(self, percent: int, message: str) -> None:
+        """Handle ROM extraction progress."""
+        self.status_bar_manager.show_message(message)
+
+    def _on_rom_extraction_finished(self, extracted_files: list[str]) -> None:
+        """Handle ROM extraction completion."""
+        self._cleanup_rom_worker()
+        self._extracted_files = extracted_files
+        self.toolbar_manager.set_extract_enabled(True)
+
+        if extracted_files:
+            self.status_bar_manager.show_message(f"ROM extraction complete: {len(extracted_files)} file(s)")
+            self.extraction_completed.emit(extracted_files)
+        else:
+            self.status_bar_manager.show_message("ROM extraction complete (no files)")
+
+    def _on_rom_extraction_error(self, error_message: str) -> None:
+        """Handle ROM extraction error."""
+        self._cleanup_rom_worker()
+        self.extraction_failed(error_message)
+
+    def _cleanup_rom_worker(self) -> None:
+        """Safely cleanup ROM worker thread."""
+        from core.services.worker_lifecycle import WorkerManager
+
+        if self._rom_worker is not None:
+            WorkerManager.cleanup_worker(self._rom_worker, timeout=3000)
+            self._rom_worker = None
 
     # ═══════════════════════════════════════════════════════════════════════════
     # INJECTION ORCHESTRATION (Phase 4e: moved from ExtractionController)
