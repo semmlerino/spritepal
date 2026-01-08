@@ -26,6 +26,7 @@ class EditingController(QObject):
     toolChanged = Signal(str)
     colorChanged = Signal(int)
     undoStateChanged = Signal(bool, bool)  # can_undo, can_redo
+    paletteSourceAdded = Signal(str, str, int)  # name, type, index
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -38,6 +39,9 @@ class EditingController(QObject):
 
         # Selected color index
         self._selected_color = 1
+
+        # Palette sources registry: (source_type, index) -> [colors]
+        self._palette_sources: dict[tuple[str, int], list[tuple[int, int, int]]] = {}
 
         # View reference
         self._view: EditTab | None = None
@@ -247,6 +251,124 @@ class EditingController(QObject):
             self.set_selected_color(color)
             return color
         return None
+
+    # Palette Management
+
+    def register_palette_source(
+        self, source_type: str, index: int, colors: list[tuple[int, int, int]], name: str
+    ) -> None:
+        """Register a new palette source."""
+        key = (source_type, index)
+        self._palette_sources[key] = colors
+        self.paletteSourceAdded.emit(name, source_type, index)
+
+    def handle_palette_source_changed(self, source_type: str, index: int) -> None:
+        """Handle palette source selection change."""
+        if source_type == "default":
+            from ..core.palette_utils import get_default_snes_palette
+
+            colors = get_default_snes_palette()
+            self.set_palette(colors, "Default SNES")
+        elif source_type == "mesen":
+            key = (source_type, index)
+            if key in self._palette_sources:
+                self.set_palette(self._palette_sources[key], f"Mesen #{index}")
+
+    def handle_load_palette(self) -> None:
+        """Handle load palette button click."""
+        from PySide6.QtWidgets import QFileDialog
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self._view,
+            "Load Palette",
+            "",
+            "Palette Files (*.pal *.json);;All Files (*)",
+        )
+
+        if not file_path:
+            return
+
+        try:
+            colors = []
+            if file_path.endswith(".json"):
+                import json
+                with open(file_path, "r") as f:
+                    data = json.load(f)
+                    # Expecting {"colors": [[r,g,b], ...]}
+                    if "colors" in data:
+                        colors = [tuple(c) for c in data["colors"]]
+            else:
+                # Assume JASC PAL or raw RGB
+                # For now, simplistic implementation or rely on a service if available
+                # Let's support JASC-PAL for now as it's common
+                with open(file_path, "r") as f:
+                    lines = f.readlines()
+                    if "JASC-PAL" in lines[0]:
+                        for line in lines[3:]: # Skip header, version, count
+                            parts = line.strip().split()
+                            if len(parts) >= 3:
+                                colors.append((int(parts[0]), int(parts[1]), int(parts[2])))
+
+            if colors:
+                # Ensure we have at least 16 colors, pad if necessary
+                while len(colors) < 16:
+                    colors.append((0, 0, 0))
+                self.set_palette(colors[:16], "Loaded Palette")
+                
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            if self._view:
+                QMessageBox.critical(self._view, "Error", f"Failed to load palette: {e}")
+
+    def handle_save_palette(self) -> None:
+        """Handle save palette button click."""
+        from PySide6.QtWidgets import QFileDialog
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self._view,
+            "Save Palette",
+            "palette.json",
+            "JSON Palette (*.json);;JASC Palette (*.pal);;All Files (*)",
+        )
+
+        if not file_path:
+            return
+
+        try:
+            colors = self.get_current_colors()
+            
+            if file_path.endswith(".json"):
+                import json
+                data = {
+                    "name": self.palette_model.name,
+                    "colors": colors
+                }
+                with open(file_path, "w") as f:
+                    json.dump(data, f, indent=2)
+            elif file_path.endswith(".pal"):
+                with open(file_path, "w") as f:
+                    f.write("JASC-PAL\n0100\n16\n")
+                    for r, g, b in colors:
+                        f.write(f"{r} {g} {b}\n")
+                        
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            if self._view:
+                QMessageBox.critical(self._view, "Error", f"Failed to save palette: {e}")
+
+    def handle_edit_color(self) -> None:
+        """Handle edit color button click."""
+        from PySide6.QtGui import QColor
+        from PySide6.QtWidgets import QColorDialog
+
+        current_color = self.palette_model.get_color(self._selected_color)
+        qcolor = QColor(*current_color)
+
+        color = QColorDialog.getColor(qcolor, self._view, "Edit Color")
+        if color.isValid():
+            new_rgb = (color.red(), color.green(), color.blue())
+            self.palette_model.set_color(self._selected_color, new_rgb)
+            self.paletteChanged.emit()
 
     # Undo/Redo
 

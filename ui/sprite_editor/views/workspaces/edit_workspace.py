@@ -236,12 +236,17 @@ class EditWorkspace(QWidget):
 
         # Disconnect palette panel signals
         safe_disconnect(self._palette_panel.colorSelected)
+        safe_disconnect(self._palette_panel.sourceChanged)
+        safe_disconnect(self._palette_panel.loadPaletteClicked)
+        safe_disconnect(self._palette_panel.savePaletteClicked)
+        safe_disconnect(self._palette_panel.editColorClicked)
 
         # Disconnect controller signals (bidirectional sync)
         if self._controller is not None:
             safe_disconnect(self._controller.toolChanged)
             safe_disconnect(self._controller.colorChanged)
             safe_disconnect(self._controller.paletteChanged)
+            safe_disconnect(self._controller.paletteSourceAdded)
             safe_disconnect(self._controller.imageChanged)
 
     def set_controller(self, controller: "EditingController") -> None:
@@ -284,11 +289,16 @@ class EditWorkspace(QWidget):
 
         # Connect palette panel signals
         self._palette_panel.colorSelected.connect(controller.set_selected_color)
+        self._palette_panel.sourceChanged.connect(controller.handle_palette_source_changed)
+        self._palette_panel.loadPaletteClicked.connect(controller.handle_load_palette)
+        self._palette_panel.savePaletteClicked.connect(controller.handle_save_palette)
+        self._palette_panel.editColorClicked.connect(controller.handle_edit_color)
 
         # Connect controller→panel signals (bidirectional sync)
         controller.toolChanged.connect(self._icon_toolbar.set_tool)
         controller.colorChanged.connect(self._palette_panel.set_selected_color)
         controller.paletteChanged.connect(self._update_palette)
+        controller.paletteSourceAdded.connect(self._palette_panel.add_palette_source)
 
         # Connect preview panel to controller
         self._preview_panel.controller = controller
