@@ -4,7 +4,6 @@ import pytest
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import QLabel, QScrollArea, QSplitter, QTabWidget, QVBoxLayout, QWidget
 
-from ui.managers.ui_coordinator import UICoordinator
 from ui.sprite_editor.views.tabs.edit_tab import EditTab
 from ui.sprite_editor.views.tabs.extract_tab import ExtractTab
 from ui.sprite_editor.views.tabs.inject_tab import InjectTab

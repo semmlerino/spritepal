@@ -26,11 +26,13 @@ from PySide6.QtWidgets import (
     QDockWidget,
     QFrame,
     QGridLayout,
+    QGroupBox,
     QLabel,
     QMainWindow,
     QMessageBox,
     QScrollArea,
     QSizePolicy,
+    QSplitter,
     QStackedWidget,
     QStatusBar,
     QStyle,
@@ -45,10 +47,14 @@ from core.services.image_utils import pil_to_qpixmap
 from core.types import VRAMExtractionParams
 from ui.common import ErrorHandler
 from ui.common.spacing_constants import (
+    PALETTE_GROUP_MAX_HEIGHT,
+    PALETTE_GROUP_MIN_HEIGHT,
+    PREVIEW_GROUP_MIN_HEIGHT,
     SPACING_COMPACT_SMALL,
     SPACING_MEDIUM,
     SPACING_SMALL,
 )
+from ui.styles import get_muted_text_style
 from ui.styles.components import get_action_zone_style
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
@@ -56,7 +62,6 @@ from ui.managers import (
     OutputSettingsManager,
     StatusBarManager,
     ToolbarManager,
-    UICoordinator,
 )
 from ui.palette_preview import PalettePreviewWidget
 from ui.rom_extraction_panel import ROMExtractionPanel
@@ -124,7 +129,6 @@ class MainWindow(QMainWindow):
         self.toolbar_manager: ToolbarManager
         self.status_bar_manager: StatusBarManager
         self.output_settings_manager: OutputSettingsManager
-        self.ui_coordinator: UICoordinator
         self.keyboard_shortcut_manager: KeyboardShortcutManager
 
         self._output_path = ""
@@ -150,7 +154,7 @@ class MainWindow(QMainWindow):
         # This breaks the circular dependency: tests can create MainWindow without hanging
 
         # Restore session after UI is set up
-        self.ui_coordinator.restore_session()
+        self._restore_session()
 
         # Update initial UI state (after managers are fully set up)
         self._update_initial_ui_state()
@@ -175,9 +179,11 @@ class MainWindow(QMainWindow):
         )
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.left_dock)
 
-        # Pre-create preview widgets (needed for UI Coordinator)
+        # Pre-create preview widgets (needed for preview panel creation)
         self.sprite_preview = PreviewPanel()
         self.palette_preview = PalettePreviewWidget()
+        self.preview_info = QLabel("No sprites loaded")
+        self.preview_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Create workspaces
         self._create_workspaces()
@@ -232,8 +238,8 @@ class MainWindow(QMainWindow):
         else:
             # Extraction Mode
             # Switch to ROM tab if not active (assuming ROM offset)
-            if not self.ui_coordinator.is_rom_tab_active():
-                self.ui_coordinator.switch_to_rom_tab()
+            if not self.is_rom_tab_active():
+                self.switch_to_rom_tab()
 
             # Set offset in ROM panel
             if hasattr(self.rom_extraction_panel, "set_manual_offset"):
@@ -318,10 +324,266 @@ class MainWindow(QMainWindow):
 
     def _on_extraction_tab_changed(self, index: int) -> None:
         """Handle extraction tab changes."""
+        # Workspace switching
         if index == 2:  # Sprite Editor tab
             self.switch_to_workspace(1)
         else:
             self.switch_to_workspace(0)
+
+        # Tab configuration (inlined from UICoordinator)
+        # Guard: Skip configuration during initial setup (before managers are created)
+        if not hasattr(self, "toolbar_manager"):
+            return
+
+        if index == 0:
+            self._configure_rom_extraction_tab()
+        elif index == 1:
+            self._configure_vram_extraction_tab()
+        elif index == 2:
+            self._configure_sprite_editor_tab()
+
+    # =========================================================================
+    # Tab Query Methods (inlined from UICoordinator)
+    # =========================================================================
+
+    def is_rom_tab_active(self) -> bool:
+        """Check if ROM extraction tab is active."""
+        return self.extraction_tabs.currentIndex() == 0
+
+    def is_vram_tab_active(self) -> bool:
+        """Check if VRAM extraction tab is active."""
+        return self.extraction_tabs.currentIndex() == 1
+
+    def is_sprite_editor_tab_active(self) -> bool:
+        """Check if Sprite Editor tab is active."""
+        return self.extraction_tabs.currentIndex() == 2
+
+    def switch_to_rom_tab(self) -> None:
+        """Switch to ROM extraction tab."""
+        self.extraction_tabs.setCurrentIndex(0)
+
+    def switch_to_vram_tab(self) -> None:
+        """Switch to VRAM extraction tab."""
+        self.extraction_tabs.setCurrentIndex(1)
+
+    def get_current_extraction_tab_index(self) -> int:
+        """Get current active extraction tab index."""
+        return self.extraction_tabs.currentIndex()
+
+    # =========================================================================
+    # Tab Configuration Methods (inlined from UICoordinator)
+    # =========================================================================
+
+    def _configure_rom_extraction_tab(self) -> None:
+        """Configure UI for ROM extraction tab."""
+        self._restore_toolbar_state()
+
+        # Check extraction readiness
+        params = self.get_rom_extraction_params()
+        if params is not None:
+            self.toolbar_manager.set_extract_enabled(True)
+        else:
+            self.toolbar_manager.set_extract_enabled(False, "Load a ROM file")
+
+        # Sync output name from ROM panel to main output field
+        if params and params.get("output_base"):
+            self.output_settings_manager.set_output_name(params["output_base"])
+
+        # Configure output settings for ROM mode
+        self.output_settings_manager.set_rom_extraction_mode()
+
+    def _configure_vram_extraction_tab(self) -> None:
+        """Configure UI for VRAM extraction tab."""
+        self._restore_toolbar_state()
+
+        # Check extraction readiness based on mode
+        ready = self.is_vram_extraction_ready()
+        if ready:
+            self.toolbar_manager.set_extract_enabled(True)
+        else:
+            self.toolbar_manager.set_extract_enabled(False, "Load VRAM file")
+
+        # Update output info label
+        is_grayscale_mode = self.is_grayscale_mode()
+        self.output_settings_manager.update_output_info_label(is_vram_tab=True, is_grayscale_mode=is_grayscale_mode)
+
+        # Update checkbox states based on mode
+        self.output_settings_manager.set_extraction_mode_options(is_grayscale_mode)
+
+        # Configure output settings for VRAM mode
+        self.output_settings_manager.set_vram_extraction_mode()
+
+    def _configure_sprite_editor_tab(self) -> None:
+        """Configure UI for Sprite Editor tab."""
+        # Disable main Extract button - the editor has its own extract controls
+        self.toolbar_manager.set_extract_enabled(False, "Use editor's Extract")
+
+        # Clarify workflow: Rename Open Editor -> Open External, Disable Inject
+        self.toolbar_manager.set_open_editor_button_label("Open External")
+        self.toolbar_manager.set_inject_button_enabled(False)
+
+    def _restore_toolbar_state(self) -> None:
+        """Restore toolbar state when leaving editor tab."""
+        self.toolbar_manager.set_open_editor_button_label("Open Editor")
+        # Restore inject button state to match open editor button (both enabled after extraction)
+        is_enabled = self.toolbar_manager.open_editor_button.isEnabled()
+        self.toolbar_manager.set_inject_button_enabled(is_enabled)
+
+    # =========================================================================
+    # Session Methods (inlined from UICoordinator)
+    # =========================================================================
+
+    def _restore_session(self) -> bool:
+        """Restore the previous session."""
+        # Validate file paths
+        session_data: dict[str, Any] = dict(self.session_manager.get_session_data())  # pyright: ignore[reportExplicitAny] - session state
+        validated_paths = {}
+
+        for key in ["vram_path", "cgram_path", "oam_path"]:
+            path = session_data.get(key, "")
+            if path and Path(path).exists():
+                validated_paths[key] = path
+            else:
+                validated_paths[key] = ""
+
+        # Check if there's a valid session to restore
+        has_valid_session = bool(validated_paths.get("vram_path") or validated_paths.get("cgram_path"))
+
+        if has_valid_session:
+            # Restore file paths
+            self.extraction_panel.restore_session_files(validated_paths)
+
+            # Restore output settings
+            if session_data.get("output_name"):
+                self.output_settings_manager.set_output_name(session_data["output_name"])
+
+            self.output_settings_manager.set_grayscale_enabled(session_data.get("create_grayscale", True))
+            self.output_settings_manager.set_metadata_enabled(session_data.get("create_metadata", True))
+
+        # Always restore window size/position if enabled (regardless of session validity)
+        self._restore_window_geometry()
+
+        return has_valid_session
+
+    def _restore_window_geometry(self) -> None:
+        """Restore window geometry if enabled in settings."""
+        if self.session_manager.get("ui", "restore_position", False):
+            window_geometry: dict[str, Any] = dict(self.session_manager.get_window_geometry())  # pyright: ignore[reportExplicitAny] - window state
+
+            # Extract scalar values with type narrowing
+            width_val = window_geometry.get("width")
+            height_val = window_geometry.get("height")
+            x_val = window_geometry.get("x")
+            y_val = window_geometry.get("y")
+
+            # Safely get values ensuring int type
+            width = width_val if isinstance(width_val, int) else 0
+            height = height_val if isinstance(height_val, int) else 0
+            x = x_val if isinstance(x_val, int) else None
+            y = y_val if isinstance(y_val, int) else None
+
+            if width > 0 and height > 0:
+                self.resize(width, height)
+
+            if x is not None and y is not None and x >= 0:
+                self.move(x, y)
+
+    def _save_session(self) -> None:
+        """Save the current session."""
+        # Get session data from extraction panel
+        session_data = self.extraction_panel.get_session_data()
+
+        # Add output settings
+        session_data.update(
+            {
+                "output_name": self.output_settings_manager.get_output_name(),
+                "create_grayscale": self.output_settings_manager.get_grayscale_enabled(),
+                "create_metadata": self.output_settings_manager.get_metadata_enabled(),
+            }
+        )
+
+        # Save session data
+        self.session_manager.update_session_data(session_data)
+
+        # Save UI settings including splitter positions
+        window_geometry: dict[str, int | float | list[int]] = {
+            "width": self.width(),
+            "height": self.height(),
+            "x": self.x(),
+            "y": self.y(),
+        }
+        self.session_manager.update_window_state(window_geometry)
+
+        # Save the session to disk
+        self.session_manager.save_session()
+
+    def _clear_session(self) -> None:
+        """Clear session data."""
+        self.session_manager.clear_session()
+
+    # =========================================================================
+    # Preview Methods (inlined from UICoordinator)
+    # =========================================================================
+
+    def _create_preview_panel(self) -> QWidget:
+        """Create and configure the preview panel.
+
+        Returns:
+            Configured preview panel widget
+        """
+        # Create vertical splitter for right panel
+        right_splitter = QSplitter(Qt.Orientation.Vertical)
+
+        # Extraction preview group
+        preview_group = QGroupBox("Extraction Preview")
+        preview_layout = QVBoxLayout()
+
+        preview_layout.addWidget(self.sprite_preview, 1)  # Give stretch factor to expand
+
+        # Configure preview info label
+        self.preview_info.setStyleSheet(get_muted_text_style())
+        self.preview_info.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        preview_layout.addWidget(self.preview_info, 0)  # No stretch factor
+
+        preview_group.setLayout(preview_layout)
+        right_splitter.addWidget(preview_group)
+
+        # Palette preview group
+        palette_group = QGroupBox("Palette Preview")
+        palette_layout = QVBoxLayout()
+        palette_layout.addWidget(self.palette_preview)
+        palette_group.setLayout(palette_layout)
+        right_splitter.addWidget(palette_group)
+
+        # Configure splitter with better proportions
+        right_splitter.setSizes([500, 100])  # Much smaller palette area
+        right_splitter.setStretchFactor(0, 4)  # Preview panel gets most space
+        right_splitter.setStretchFactor(1, 0)  # Palette panel fixed size
+
+        # Set minimum sizes - more compact
+        preview_group.setMinimumHeight(PREVIEW_GROUP_MIN_HEIGHT)
+        palette_group.setMinimumHeight(PALETTE_GROUP_MIN_HEIGHT)
+        palette_group.setMaximumHeight(PALETTE_GROUP_MAX_HEIGHT)
+
+        return right_splitter
+
+    def _clear_previews(self) -> None:
+        """Clear both sprite and palette previews."""
+        if self.sprite_preview:
+            self.sprite_preview.clear()
+        if self.palette_preview:
+            self.palette_preview.clear()
+        if self.preview_info:
+            self.preview_info.setText("No sprites loaded")
+
+    def _update_preview_info(self, message: str) -> None:
+        """Update preview info message.
+
+        Args:
+            message: Message to display
+        """
+        if self.preview_info:
+            self.preview_info.setText(message)
 
     def _on_undo(self) -> None:
         """Handle undo action."""
@@ -416,23 +678,6 @@ class MainWindow(QMainWindow):
         # Keyboard shortcut manager
         self.keyboard_shortcut_manager = KeyboardShortcutManager(self)
 
-        # Consolidated UI coordinator handles preview, session, and tab operations
-        self.ui_coordinator = UICoordinator(
-            sprite_preview=self.sprite_preview,
-            palette_preview=self.palette_preview,
-            main_window=self,
-            extraction_panel=self.extraction_panel,
-            output_settings_manager=self.output_settings_manager,
-            session_manager=self.session_manager,
-            extraction_tabs=self.extraction_tabs,
-            rom_extraction_panel=self.rom_extraction_panel,
-            toolbar_manager=self.toolbar_manager,
-            actions_handler=self,
-        )
-
-        # Backward compatibility: expose preview_info for existing code/tests
-        self.preview_info = self.ui_coordinator.preview_info
-
         # Initialize manager UIs
         self._create_menus()
         self.status_bar_manager.setup_status_bar_indicators()
@@ -449,9 +694,9 @@ class MainWindow(QMainWindow):
             action_zone_layout.addLayout(button_layout)
 
         # Add preview panel to center stack (for Extraction mode)
-        # Note: create_preview_panel returns a splitter containing preview/palette.
+        # Note: _create_preview_panel returns a splitter containing preview/palette.
         # This acts as the Central Widget content for index 0.
-        right_panel = self.ui_coordinator.create_preview_panel(self)
+        right_panel = self._create_preview_panel()
         # Insert at index 0 (pushing Editor to 1)
         self.center_stack.insertWidget(0, right_panel)
 
@@ -479,14 +724,14 @@ class MainWindow(QMainWindow):
         # Reset UI
         self.extraction_panel.clear_files()
         self.output_settings_manager.clear_output_name()
-        self.ui_coordinator.clear_previews()
+        self._clear_previews()
         self.toolbar_manager.reset_buttons()
         self._output_path = ""
         self._extracted_files = []
         self.status_bar_manager.show_message("Ready to extract sprites")
 
         # Clear session data
-        self.ui_coordinator.clear_session()
+        self._clear_session()
 
     def show_settings(self) -> None:
         """Show the settings dialog"""
@@ -534,7 +779,7 @@ class MainWindow(QMainWindow):
         from ui.dialogs import OutputSettingsDialog
 
         # Determine if we're in ROM mode (affects dialog options)
-        is_rom_mode = self.ui_coordinator.is_rom_tab_active()
+        is_rom_mode = self.is_rom_tab_active()
 
         # Get suggested output name from the current state
         suggested_name = self.output_settings_manager.get_output_name()
@@ -761,7 +1006,7 @@ class MainWindow(QMainWindow):
     # KeyboardActionsProtocol
     def can_open_manual_offset_dialog(self) -> bool:
         """Check if manual offset dialog can be opened"""
-        return self.ui_coordinator.is_rom_tab_active() and bool(self.rom_extraction_panel.rom_path)
+        return self.is_rom_tab_active() and bool(self.rom_extraction_panel.rom_path)
 
     def open_manual_offset_dialog(self) -> None:
         """Open manual offset dialog"""
@@ -1352,12 +1597,12 @@ class MainWindow(QMainWindow):
             self.output_settings_manager.set_output_name(output_name)
 
         # Save session data when files change
-        self.ui_coordinator.save_session()
+        self._save_session()
 
     def _on_vram_extraction_ready(self, ready: bool, reason: str = "") -> None:
         """Handle VRAM extraction ready state change"""
         # Only enable if VRAM tab is active
-        if self.ui_coordinator.is_vram_tab_active():
+        if self.is_vram_tab_active():
             self.toolbar_manager.set_extract_enabled(ready, reason)
 
     def _on_extraction_mode_changed(self, mode_index: int) -> None:
@@ -1369,7 +1614,7 @@ class MainWindow(QMainWindow):
     def _on_rom_extraction_ready(self, ready: bool, reason: str = "") -> None:
         """Handle ROM extraction ready state change"""
         # Only enable if ROM tab is active
-        if self.ui_coordinator.is_rom_tab_active():
+        if self.is_rom_tab_active():
             self.toolbar_manager.set_extract_enabled(ready, reason)
 
     def _on_rom_files_changed(self) -> None:
@@ -1492,7 +1737,7 @@ class MainWindow(QMainWindow):
             self.toolbar_manager.set_post_extraction_buttons_enabled(True)
 
             # Update preview info with successful extraction
-            self.ui_coordinator.update_preview_info(f"Extracted {len(extracted_files)} files")
+            self._update_preview_info(f"Extracted {len(extracted_files)} files")
             self.status_bar_manager.show_message("Extraction complete!")
         else:
             # No PNG file found - this shouldn't happen with successful extraction
@@ -1524,7 +1769,7 @@ class MainWindow(QMainWindow):
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:
         """Handle window close event."""
-        self.ui_coordinator.save_session()
+        self._save_session()
         self._cleanup_managers()
         if a0:
             super().closeEvent(a0)
@@ -1541,7 +1786,6 @@ class MainWindow(QMainWindow):
             self.status_bar_manager,
             self.output_settings_manager,
             self.toolbar_manager,
-            self.ui_coordinator,
         ]
         for manager in managers:
             cleanup_fn = getattr(manager, "cleanup", None)
@@ -1622,14 +1866,14 @@ class MainWindow(QMainWindow):
 
     def _navigate_to_next_tab(self) -> None:
         """Navigate to next tab"""
-        current = self.ui_coordinator.get_current_tab_index()
+        current = self.get_current_extraction_tab_index()
         tab_count = self.extraction_tabs.count()
         next_tab = (current + 1) % tab_count
         self.extraction_tabs.setCurrentIndex(next_tab)
 
     def _navigate_to_previous_tab(self) -> None:
         """Navigate to previous tab"""
-        current = self.ui_coordinator.get_current_tab_index()
+        current = self.get_current_extraction_tab_index()
         tab_count = self.extraction_tabs.count()
         prev_tab = (current - 1) % tab_count
         self.extraction_tabs.setCurrentIndex(prev_tab)

@@ -7,7 +7,7 @@
 | Phase | Status | Completed |
 |-------|--------|-----------|
 | **Phase 1: Quick Wins** | ✅ Complete | ✅ Item 1, ✅ Item 2, ✅ Item 3 |
-| **Phase 2: Medium (Collapse Layers)** | In Progress | ✅ Item 4 |
+| **Phase 2: Medium (Collapse Layers)** | ✅ Complete | ✅ Item 4, ✅ Item 5 |
 | **Phase 3: Deeper (Architecture)** | Pending | — |
 
 **Completed Work:**
@@ -15,9 +15,10 @@
 - ✅ Phase 1 Item 2 (Flatten Status Messages) - Replaced 3-layer signal relay with direct dependency injection. Fixed bug where `ROMWorkflowController.status_message` (~25 emit calls) was never connected. Controllers now call `message_service.show_message()` directly.
 - ✅ Phase 1 Item 3 (Delete `MainController`) - Moved sub-controller ownership to `SpriteEditorWorkspace`. Broke circular dependency in `ROMWorkflowController`. Deleted `MainController` class entirely.
 - ✅ Phase 2 Item 4 (Merge `ExtractionWorkspace` into `MainWindow`) - Inlined setup code into `MainWindow._create_workspaces()`. Deleted `ExtractionWorkspace` class entirely.
-- Test Coverage: 1977 passed, 23 skipped, 0 failures (no regression)
+- ✅ Phase 2 Item 5 (Dissolve `UICoordinator`) - Inlined tab helpers, session methods, preview methods, and tab configuration into `MainWindow`. Deleted `UICoordinator` class entirely (~380 lines removed).
+- Test Coverage: 1978 passed, 23 skipped, 0 failures (no regression)
 
-**Next Priority:** Phase 2 Item 5 (Dissolve `UICoordinator`)
+**Next Priority:** Phase 3 Item 6 (Remove `AppContext` Service Locator)
 
 ---
 
@@ -25,7 +26,7 @@
 
 1.  **Dual-Path Signal Wiring (Undo/Redo):** ✅ **RESOLVED** (2025-01-08) - Removed `MainController._update_undo_state()` direct path. Single signal flow now: `EditingController.undoStateChanged` → `SpriteEditorWorkspace.undo_state_changed` → `MainWindow._update_undo_redo_state()`. Also removed duplicate status message connection at MainWindow level.
 2.  **Service Locator Anti-Pattern (`AppContext`):** `AppContext` is a global bag of services. While it makes dependencies "explicit" in `launch_spritepal.py`, it effectively hides dependencies deeper in the stack where `get_app_context()` is called (e.g., inside `MainWindow` properties).
-3.  **God-Class `UICoordinator`:** This class orchestrates unrelated UI concerns (session, tabs, previews, toolbars), creating high coupling between the extraction and editor views.
+3.  **God-Class `UICoordinator`:** ✅ **RESOLVED** (2026-01-08) - Dissolved UICoordinator by inlining tab helpers, session methods, preview methods, and tab configuration into `MainWindow`. Deleted `ui/managers/ui_coordinator.py` (~380 lines).
 4.  **Passthrough Signal Chains:** `SpriteEditorWorkspace` acts largely as a "signal relay," receiving signals from controllers and re-emitting them to `MainWindow` (e.g., `status_message`, `mode_changed`), adding noise without value.
 5.  **Circular Dependency Workarounds:** `MainWindow` uses lazy properties for `ExtractionController` and `controller` setters to break circular imports, indicating a flaw in the dependency graph (View depends on Controller, which depends on View).
 6.  **Redundant Abstraction Layers:** ✅ **PARTIALLY RESOLVED** - `MainController` deleted (Phase 1 Item 3), `ExtractionWorkspace` merged into `MainWindow` (Phase 2 Item 4). Remaining: `ExtractionController` layer (extraction logic split between controller and `MainWindow`).
@@ -152,11 +153,15 @@
     *   ✅ Updated `ui/workspaces/__init__.py` to remove export.
     *   ✅ All tests pass (1977 passed, 23 skipped, 0 failures).
 
-5.  **Dissolve `UICoordinator`:**
-    *   Move tab handling logic to `MainWindow`.
-    *   Move session logic to `SessionManager`.
-    *   Move preview logic to `PreviewController`.
-    *   Delete `ui/managers/ui_coordinator.py`.
+5.  ✅ **Dissolve `UICoordinator`:** (COMPLETED 2026-01-08)
+    *   ✅ Added tab helper methods to `MainWindow` (`is_rom_tab_active()`, `is_vram_tab_active()`, etc.).
+    *   ✅ Moved tab configuration logic to `MainWindow` (`_configure_rom_extraction_tab()`, etc.).
+    *   ✅ Inlined session methods into `MainWindow` (`_restore_session()`, `_save_session()`, etc.).
+    *   ✅ Inlined preview methods into `MainWindow` (`_create_preview_panel()`, `_clear_previews()`, etc.).
+    *   ✅ Deleted `ui/managers/ui_coordinator.py` (~380 lines removed).
+    *   ✅ Updated `ui/managers/__init__.py` to remove export.
+    *   ✅ Removed dead import from `tests/ui/test_layout_responsiveness.py`.
+    *   ✅ All tests pass (1978 passed, 23 skipped, 0 failures).
 
 ### Phase 3: Deeper (Architecture Fixes)
 
