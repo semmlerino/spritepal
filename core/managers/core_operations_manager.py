@@ -67,28 +67,33 @@ class CoreOperationsManager(BaseManager):
     without using adapter classes or intermediate protocols.
     """
 
-    # ========== Signal Architecture ==========
-    # Extraction: extraction_progress, extraction_warning, preview_generated,
-    #             palettes_extracted, active_palettes_found, files_created
-    # Injection: injection_progress, injection_finished, compression_info, progress_percent
-    # Cache: cache_operation_started, cache_hit, cache_miss, cache_saved
-    # =========================================
+    # ========== Signal Architecture (Consolidated) ==========
+    # Phase 2 simplification: 13 signals → 6 signals
+    # - extraction_completed replaces: preview_generated, palettes_extracted,
+    #   active_palettes_found, files_created
+    # - Removed cache signals (cache_operation_started, cache_hit, cache_miss, cache_saved)
+    # ==========================================================
 
-    # Extraction signals
-    extraction_progress = Signal(str)  # message only (simpler for UI consumers)
+    # Extraction signals (consolidated)
+    extraction_progress = Signal(str)  # Progress messages
     extraction_warning = Signal(str)  # Warning message (partial success)
+    extraction_completed = Signal(object)  # ExtractionResult with all data
+
+    # Legacy extraction signals (kept for backward compatibility during migration)
+    # TODO: Remove after Phase 3 (ExtractionController removal)
     preview_generated = Signal(object, int)  # pixmap, offset
-    palettes_extracted = Signal(object)  # palette data - use object to avoid PySide6 copy warning
+    palettes_extracted = Signal(object)  # palette data
     active_palettes_found = Signal(list)  # list of active palette indices
     files_created = Signal(list)  # list of created file paths
 
     # Injection signals
     injection_progress = Signal(str)  # message only
     injection_finished = Signal(bool, str)  # success, message
-    compression_info = Signal(object)  # compression statistics - use object to avoid PySide6 copy warning
+    compression_info = Signal(object)  # compression statistics
     progress_percent = Signal(int)  # percent only (for progress bars)
 
-    # Cache signals (monitoring)
+    # Cache signals (deprecated - UI no longer connects to these)
+    # Kept for internal logging, will be removed in Phase 3
     cache_operation_started = Signal(str, str)  # operation, key
     cache_hit = Signal(str, float)  # key, load_time
     cache_miss = Signal(str)  # key
@@ -338,6 +343,10 @@ class CoreOperationsManager(BaseManager):
                 warning=warning,
             )
 
+            # Emit consolidated signal (new)
+            self.extraction_completed.emit(result)
+
+            # Emit legacy signals for backward compatibility (TODO: remove in Phase 3)
             if result.preview_image:
                 self.preview_generated.emit(result.preview_image, result.tile_count)
             if result.palettes:
@@ -468,6 +477,10 @@ class CoreOperationsManager(BaseManager):
                 warning=warning,
             )
 
+            # Emit consolidated signal (new)
+            self.extraction_completed.emit(result)
+
+            # Emit legacy signals for backward compatibility (TODO: remove in Phase 3)
             if result.preview_image:
                 self.preview_generated.emit(result.preview_image, result.tile_count)
             if result.palettes:

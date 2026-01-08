@@ -110,13 +110,9 @@ class ExtractionController(QObject):
         # Connect injection manager signals
         _ = self.injection_manager.injection_progress.connect(self._on_injection_progress)
         _ = self.injection_manager.injection_finished.connect(self._on_injection_finished)
-        _ = self.injection_manager.cache_saved.connect(self._on_cache_saved)
 
-        # Connect extraction manager cache signals
-        _ = self.extraction_manager.cache_operation_started.connect(self._on_cache_operation_started)
-        _ = self.extraction_manager.cache_hit.connect(self._on_cache_hit)
-        _ = self.extraction_manager.cache_miss.connect(self._on_cache_miss)
-        _ = self.extraction_manager.cache_saved.connect(self._on_cache_saved)
+        # Cache signal connections removed in Phase 2 simplification
+        # (cache_operation_started, cache_hit, cache_miss, cache_saved)
 
     def start_extraction(self) -> None:
         """Start the extraction process"""
@@ -615,42 +611,8 @@ class ExtractionController(QObject):
         self._current_injection_dialog = None
         self.session_manager.set("workflow", "current_injection_params", None)
 
-    def _on_cache_operation_started(self, operation: str, cache_type: str) -> None:
-        """Handle cache operation started notification"""
-        settings_manager = self.settings_manager
-
-        # Only show if indicators are enabled
-        if settings_manager.get("cache", "show_indicators", True):
-            badge_text = f"{operation} {cache_type.replace('_', ' ')}"
-            self.cache_badge_show.emit(badge_text)
-
-    def _on_cache_hit(self, cache_type: str, time_saved: float) -> None:
-        """Handle cache hit notification"""
-        settings_manager = self.settings_manager
-
-        self.cache_badge_hide.emit()
-
-        # Only show if indicators are enabled
-        if settings_manager.get("cache", "show_indicators", True):
-            message = f"Loaded {cache_type.replace('_', ' ')} from cache (saved {time_saved:.1f}s)"
-            self.status_message_timed.emit(message, 5000)
-            self.cache_status_updated.emit(cache_type, time_saved)
-
-    def _on_cache_miss(self, cache_type: str) -> None:
-        """Handle cache miss notification"""
-        # Cache misses are normal - only log them, don't show in UI
-        logger.debug(f"Cache miss for {cache_type}")
-
-    def _on_cache_saved(self, cache_type: str, count: int) -> None:
-        """Handle cache saved notification"""
-        settings_manager = self.settings_manager
-
-        self.cache_badge_hide.emit()
-
-        # Only show if indicators are enabled
-        if settings_manager.get("cache", "show_indicators", True):
-            message = f"Saved {count} {cache_type.replace('_', ' ')} to cache"
-            self.status_message_timed.emit(message, 5000)
+    # Cache handler methods removed in Phase 2 simplification
+    # (_on_cache_operation_started, _on_cache_hit, _on_cache_miss, _on_cache_saved)
 
     def start_rom_extraction(self, params: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - params are dynamic extraction config
         """Start ROM sprite extraction process"""
