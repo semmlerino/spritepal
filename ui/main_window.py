@@ -14,8 +14,10 @@ if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.mesen_integration.log_watcher import LogWatcher
+    from core.rom_extractor import ROMExtractor
     from core.services.preview_generator import PreviewGenerator
     from core.services.rom_cache import ROMCache
+    from core.sprite_library import SpriteLibrary
     from core.workers import ROMExtractionWorker, VRAMExtractionWorker
     from ui.injection_dialog import InjectionDialog
     from ui.services.dialog_coordinator import DialogCoordinator
@@ -105,6 +107,8 @@ class MainWindow(QMainWindow):
         core_operations_manager: CoreOperationsManager,
         log_watcher: LogWatcher,
         preview_generator: PreviewGenerator,
+        rom_extractor: ROMExtractor,
+        sprite_library: SpriteLibrary,
     ) -> None:
         super().__init__()
         # Declare instance variables with type hints
@@ -132,6 +136,8 @@ class MainWindow(QMainWindow):
         self.core_operations_manager = core_operations_manager
         self.log_watcher = log_watcher
         self.preview_generator = preview_generator
+        self.rom_extractor = rom_extractor
+        self.sprite_library = sprite_library
 
         # Manager instances
         self.toolbar_manager: ToolbarManager
@@ -320,6 +326,10 @@ class MainWindow(QMainWindow):
             parent=self,
             settings_manager=self.settings_manager,
             message_service=None,
+            rom_cache=self.rom_cache,
+            rom_extractor=self.rom_extractor,
+            log_watcher=self.log_watcher,
+            sprite_library=self.sprite_library,
         )
         self._sprite_editor_workspace.undo_state_changed.connect(self._update_undo_redo_state)
         self._sprite_editor_workspace.offset_changed.connect(self.toolbar_offset_edit.set_offset)

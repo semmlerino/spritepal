@@ -39,6 +39,10 @@ from ui.sprite_editor.views.workspaces import ROMWorkflowPage, VRAMEditorPage
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
+    from core.rom_extractor import ROMExtractor
+    from core.services.log_watcher import LogWatcher
+    from core.services.rom_cache import ROMCache
+    from core.sprite_library import SpriteLibrary
     from ui.managers.status_bar_manager import StatusBarManager
 
 logger = logging.getLogger(__name__)
@@ -67,16 +71,30 @@ class SpriteEditorWorkspace(QWidget):
         *,
         settings_manager: ApplicationStateManager | None = None,
         message_service: StatusBarManager | None = None,
+        rom_cache: ROMCache | None = None,
+        rom_extractor: ROMExtractor | None = None,
+        log_watcher: LogWatcher | None = None,
+        sprite_library: SpriteLibrary | None = None,
     ) -> None:
         super().__init__(parent)
         self._settings_manager = settings_manager
 
         # Create sub-controllers directly (no MainController wrapper)
-        self._extraction_controller = ExtractionController(self)
+        self._extraction_controller = ExtractionController(
+            self,
+            rom_cache=rom_cache,
+            rom_extractor=rom_extractor,
+        )
         self._editing_controller = EditingController(self)
         self._injection_controller = InjectionController(self)
         self._rom_workflow_controller = ROMWorkflowController(
-            self, self._editing_controller, message_service=message_service
+            self,
+            self._editing_controller,
+            message_service=message_service,
+            rom_cache=rom_cache,
+            rom_extractor=rom_extractor,
+            log_watcher=log_watcher,
+            sprite_library=sprite_library,
         )
 
         # Track temporary files for cleanup during injection workflow

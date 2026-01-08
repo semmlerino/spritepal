@@ -79,6 +79,8 @@ class TestPureAppContextComponentInitialization:
         core_ops_mgr = app_context.core_operations_manager
         log_watcher = app_context.log_watcher
         preview_gen = app_context.preview_generator
+        rom_extractor = app_context.rom_extractor
+        sprite_library = app_context.sprite_library
 
         # Create window with explicit deps
         window = MainWindow(
@@ -88,6 +90,8 @@ class TestPureAppContextComponentInitialization:
             core_operations_manager=core_ops_mgr,
             log_watcher=log_watcher,
             preview_generator=preview_gen,
+            rom_extractor=rom_extractor,
+            sprite_library=sprite_library,
         )
 
         try:
@@ -97,6 +101,8 @@ class TestPureAppContextComponentInitialization:
             assert window.core_operations_manager is core_ops_mgr
             assert window.log_watcher is log_watcher
             assert window.preview_generator is preview_gen
+            assert window.rom_extractor is rom_extractor
+            assert window.sprite_library is sprite_library
         finally:
             window.close()
             window.deleteLater()

@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QFileDialog
 
-from core.app_context import get_app_context
 from ui.common.signal_utils import safe_disconnect
 
 from ..services import SpriteRenderer
@@ -16,6 +15,9 @@ from ..workers import ExtractWorker, MultiPaletteExtractWorker
 
 if TYPE_CHECKING:
     from PIL import Image
+
+    from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
 
     from ..views.tabs import ExtractTab
 
@@ -28,7 +30,13 @@ class ExtractionController(QObject):
     progress_updated = Signal(int, str)  # percent, message
     multi_palette_completed = Signal(dict, int)  # palette_images, tile_count
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        *,
+        rom_cache: "ROMCache | None" = None,
+        rom_extractor: "ROMExtractor | None" = None,
+    ) -> None:
         super().__init__(parent)
         self._view: ExtractTab | None = None
         self._multi_palette_view: object = None
@@ -36,10 +44,9 @@ class ExtractionController(QObject):
         self._multi_worker: MultiPaletteExtractWorker | None = None
         self.renderer = SpriteRenderer()
 
-        # ROM Extractor - use shared instance from AppContext
-        context = get_app_context()
-        self.rom_cache = context.rom_cache
-        self.rom_extractor = context.rom_extractor
+        # ROM services - injected dependencies
+        self.rom_cache = rom_cache
+        self.rom_extractor = rom_extractor
         self._mode = "vram"
 
         # File paths

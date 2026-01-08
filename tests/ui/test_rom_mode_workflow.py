@@ -145,33 +145,31 @@ class MockROMWorkflowPage(QWidget):
 
 class TestRomModeWorkflow:
     @pytest.fixture
-    def mock_app_context(self):
-        # Patch get_app_context in all controllers that use it
-        with (
-            patch("ui.sprite_editor.controllers.extraction_controller.get_app_context") as mock_extract,
-            patch("ui.sprite_editor.controllers.rom_workflow_controller.get_app_context") as mock_rom,
-            patch("core.app_context.get_app_context") as mock_core,
-        ):
-            context = MagicMock()
-            context.rom_cache = MagicMock()
-            context.application_state_manager = MagicMock()
-            context.log_watcher = MagicMock()  # Needed for ROMWorkflowController
-
-            mock_extract.return_value = context
-            mock_rom.return_value = context
-            mock_core.return_value = context
-
-            yield context
+    def mock_deps(self):
+        """Create mock dependencies for controllers."""
+        deps = MagicMock()
+        deps.rom_cache = MagicMock()
+        deps.rom_extractor = MagicMock()
+        deps.application_state_manager = MagicMock()
+        deps.log_watcher = MagicMock()
+        deps.sprite_library = MagicMock()
+        return deps
 
     @pytest.fixture
-    def sprite_editor_workspace(self, qt_app, mock_app_context):
+    def sprite_editor_workspace(self, qt_app, mock_deps):
         # Patch the VRAMEditorPage and ROMWorkflowPage at the location they're imported
         # (workspace module imports from views.workspaces)
         with (
             patch("ui.workspaces.sprite_editor_workspace.VRAMEditorPage", MockVRAMEditorPage),
             patch("ui.workspaces.sprite_editor_workspace.ROMWorkflowPage", MockROMWorkflowPage),
         ):
-            workspace = SpriteEditorWorkspace(settings_manager=mock_app_context.application_state_manager)
+            workspace = SpriteEditorWorkspace(
+                settings_manager=mock_deps.application_state_manager,
+                rom_cache=mock_deps.rom_cache,
+                rom_extractor=mock_deps.rom_extractor,
+                log_watcher=mock_deps.log_watcher,
+                sprite_library=mock_deps.sprite_library,
+            )
             return workspace
 
     def test_mode_switch(self, sprite_editor_workspace):

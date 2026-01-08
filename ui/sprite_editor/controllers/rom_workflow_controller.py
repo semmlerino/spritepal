@@ -12,12 +12,15 @@ from PIL import Image
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage, QPixmap
 
-from core.app_context import get_app_context
 from core.mesen_integration.log_watcher import CapturedOffset
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 
 if TYPE_CHECKING:
+    from core.mesen_integration.log_watcher import LogWatcher
+    from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
+    from core.sprite_library import SpriteLibrary
     from ui.managers.status_bar_manager import StatusBarManager
 
     from ..views.workspaces.rom_workflow_page import ROMWorkflowPage
@@ -39,17 +42,27 @@ class ROMWorkflowController(QObject):
     rom_info_updated = Signal(str)
     workflow_state_changed = Signal(str)  # 'preview', 'edit', 'save'
 
-    def __init__(self, parent: QObject | None, editing_controller: "EditingController", *, message_service: "StatusBarManager | None" = None) -> None:
+    def __init__(
+        self,
+        parent: QObject | None,
+        editing_controller: "EditingController",
+        *,
+        message_service: "StatusBarManager | None" = None,
+        rom_cache: "ROMCache | None" = None,
+        rom_extractor: "ROMExtractor | None" = None,
+        log_watcher: "LogWatcher | None" = None,
+        sprite_library: "SpriteLibrary | None" = None,
+    ) -> None:
         super().__init__(parent)
         self._editing_controller = editing_controller
         self._message_service: StatusBarManager | None = message_service
         self._view: ROMWorkflowPage | None = None
 
-        # Core components - use shared instances from AppContext
-        context = get_app_context()
-        self.rom_cache = context.rom_cache
-        self.rom_extractor = context.rom_extractor
-        self.log_watcher = context.log_watcher
+        # Core services - injected dependencies
+        self.rom_cache = rom_cache
+        self.rom_extractor = rom_extractor
+        self.log_watcher = log_watcher
+        self._sprite_library = sprite_library
 
         # Preview coordinator
         self.preview_coordinator = SmartPreviewCoordinator(self)
@@ -221,7 +234,13 @@ class ROMWorkflowController(QObject):
                 self._message_service.show_message("Cannot save to library: no ROM loaded")
             return
 
-        library = get_app_context().sprite_library
+        if not self._sprite_library:
+            logger.warning("Cannot save to library: sprite library not available")
+            if self._message_service:
+                self._message_service.show_message("Cannot save to library: sprite library not available")
+            return
+
+        library = self._sprite_library
 
         # Check if already in library
         rom_hash = library.compute_rom_hash(self.rom_path)
@@ -325,8 +344,8 @@ class ROMWorkflowController(QObject):
         logger.info("Asset renamed: 0x%06X → %s", offset, new_name)
         # Names are stored in widget's UserRole data, which updates on edit
         # Also update library if this sprite is in the library
-        if self.rom_path:
-            library = get_app_context().sprite_library
+        if self.rom_path and self._sprite_library:
+            library = self._sprite_library
             rom_hash = library.compute_rom_hash(self.rom_path)
             existing = library.get_by_offset(offset, rom_hash)
             if existing:
@@ -354,10 +373,10 @@ class ROMWorkflowController(QObject):
 
     def _load_library_sprites(self) -> None:
         """Load sprites from library that match current ROM."""
-        if not self._view or not self.rom_path:
+        if not self._view or not self.rom_path or not self._sprite_library:
             return
 
-        library = get_app_context().sprite_library
+        library = self._sprite_library
         rom_hash = library.compute_rom_hash(self.rom_path)
 
         count = 0
@@ -382,10 +401,10 @@ class ROMWorkflowController(QObject):
         """Load thumbnail from library."""
         from core.sprite_library import LibrarySprite
 
-        if not isinstance(sprite, LibrarySprite):
+        if not isinstance(sprite, LibrarySprite) or not self._sprite_library:
             return None
 
-        library = get_app_context().sprite_library
+        library = self._sprite_library
         path = library.get_thumbnail_path(sprite)
         if path and path.exists():
             return QPixmap(str(path))

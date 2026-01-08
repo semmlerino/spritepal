@@ -38,6 +38,8 @@ class TestMainWindowInitialization:
             "core_operations_manager": context.core_operations_manager,
             "log_watcher": context.log_watcher,
             "preview_generator": context.preview_generator,
+            "rom_extractor": context.rom_extractor,
+            "sprite_library": context.sprite_library,
         }
 
     @pytest.mark.timeout(5)  # Should complete quickly, not hang

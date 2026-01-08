@@ -67,14 +67,22 @@ class SpriteEditorApplication:
         # Create message adapter
         message_adapter = MainWindowMessageAdapter(self.main_window)
 
-        # Create sub-controllers directly
-        self.extraction_controller = ExtractionController(None)
+        # Create sub-controllers directly with explicit dependencies
+        self.extraction_controller = ExtractionController(
+            None,
+            rom_cache=context.rom_cache,
+            rom_extractor=context.rom_extractor,
+        )
         self.editing_controller = EditingController(None)
         self.injection_controller = InjectionController(None)
         self.rom_workflow_controller = ROMWorkflowController(
             None,
             self.editing_controller,
             message_service=cast("StatusBarManager", message_adapter),
+            rom_cache=context.rom_cache,
+            rom_extractor=context.rom_extractor,
+            log_watcher=context.log_watcher,
+            sprite_library=context.sprite_library,
         )
 
         # Wire controllers to window
