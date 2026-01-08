@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock, Mock, patch
+
 import pytest
 from PySide6.QtWidgets import QComboBox, QWidget
+
 from ui.workspaces.sprite_editor_workspace import SpriteEditorWorkspace
 
 # --- Mock Classes (simplified from test_rom_mode_workflow.py) ---

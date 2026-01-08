@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock
-from ui.sprite_editor.views.workspaces.edit_workspace import EditWorkspace
+
+import pytest
+
 from ui.sprite_editor.controllers.editing_controller import EditingController
+from ui.sprite_editor.views.workspaces.edit_workspace import EditWorkspace
+
 
 def test_palette_wiring(qtbot):
     """Verify palette panel signals are wired to controller."""

@@ -184,15 +184,16 @@ class ExtractTab(QWidget):
 
     def get_extraction_params(self) -> dict[str, object]:
         """Get the current extraction parameters."""
+        use_palette = self.use_palette_check.isChecked()
         return {
             "vram_file": self.vram_drop.get_file_path(),
             "rom_file": self.rom_path_edit.text(),
             "offset": self.extract_offset_edit.value(),
             "size": self.extract_size_edit.value(),
             "tiles_per_row": self.tiles_per_row_spin.value(),
-            "use_palette": self.use_palette_check.isChecked(),
-            "cgram_file": self.cgram_drop.get_file_path(),
-            "palette_num": self.palette_combo.currentIndex(),
+            "use_palette": use_palette,
+            "cgram_file": self.cgram_drop.get_file_path() if use_palette else None,
+            "palette_num": self.palette_combo.currentIndex() if use_palette else None,
         }
 
     def validate_params(self) -> tuple[bool, str]:

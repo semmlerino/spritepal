@@ -220,6 +220,53 @@ class SpriteAssetBrowser(QWidget):
         self._library_category = self._create_category(self.CATEGORY_LIBRARY)
         self._local_category = self._create_category(self.CATEGORY_LOCAL)
 
+    def _update_placeholder(self, category_item: QTreeWidgetItem) -> None:
+        """Update placeholder state for a category."""
+        # Check if we have any real items
+        has_items = False
+        placeholder_item = None
+        
+        for i in range(category_item.childCount()):
+            child = category_item.child(i)
+            data = child.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("is_placeholder"):
+                placeholder_item = child
+            else:
+                has_items = True
+
+        if has_items and placeholder_item:
+            # We have items but still have placeholder -> remove it
+            category_item.removeChild(placeholder_item)
+        elif not has_items and not placeholder_item:
+            # No items and no placeholder -> add it
+            item = QTreeWidgetItem(category_item)
+            item.setText(0, "(No sprites)")
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            item.setData(0, Qt.ItemDataRole.UserRole, {"is_placeholder": True})
+
+    def remove_sprite_by_offset(self, offset: int) -> bool:
+        """
+        Remove sprite by ROM offset.
+
+        Args:
+            offset: ROM offset to remove
+
+        Returns:
+            True if sprite was found and removed
+        """
+        iterator = QTreeWidgetItemIterator(self.tree)
+        while iterator.value():
+            item = iterator.value()
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("offset") == offset:
+                parent = item.parent()
+                if parent:
+                    parent.removeChild(item)
+                    self._update_placeholder(parent)
+                return True
+            iterator += 1
+        return False
+
     def _create_category(self, name: str) -> QTreeWidgetItem:
         """
         Create a top-level category item.
@@ -242,6 +289,9 @@ class SpriteAssetBrowser(QWidget):
 
         # Store empty dict to identify as category
         item.setData(0, Qt.ItemDataRole.UserRole, {})
+
+        # Add initial placeholder
+        self._update_placeholder(item)
 
         return item
 
@@ -459,6 +509,7 @@ class SpriteAssetBrowser(QWidget):
             "thumbnail": thumbnail,
         }
         item.setData(0, Qt.ItemDataRole.UserRole, data)
+        self._update_placeholder(self._rom_category)
 
     def add_mesen_capture(self, name: str, offset: int, thumbnail: QPixmap | None = None) -> None:
         """
@@ -480,6 +531,7 @@ class SpriteAssetBrowser(QWidget):
             "thumbnail": thumbnail,
         }
         item.setData(0, Qt.ItemDataRole.UserRole, data)
+        self._update_placeholder(self._mesen_category)
 
     def add_local_file(self, name: str, path: str, thumbnail: QPixmap | None = None) -> None:
         """
@@ -501,6 +553,7 @@ class SpriteAssetBrowser(QWidget):
             "thumbnail": thumbnail,
         }
         item.setData(0, Qt.ItemDataRole.UserRole, data)
+        self._update_placeholder(self._local_category)
 
     def add_library_sprite(self, name: str, offset: int, thumbnail: QPixmap | None = None) -> None:
         """
@@ -523,6 +576,7 @@ class SpriteAssetBrowser(QWidget):
             "thumbnail": thumbnail,
         }
         item.setData(0, Qt.ItemDataRole.UserRole, data)
+        self._update_placeholder(self._library_category)
 
     def clear_category(self, category: str) -> None:
         """
@@ -533,13 +587,21 @@ class SpriteAssetBrowser(QWidget):
         """
         category_item = self._get_or_create_category(category)
         category_item.takeChildren()
+        self._update_placeholder(category_item)
 
     def clear_all(self) -> None:
         """Clear all items from all categories."""
         self._rom_category.takeChildren()
+        self._update_placeholder(self._rom_category)
+        
         self._mesen_category.takeChildren()
+        self._update_placeholder(self._mesen_category)
+        
         self._library_category.takeChildren()
+        self._update_placeholder(self._library_category)
+        
         self._local_category.takeChildren()
+        self._update_placeholder(self._local_category)
 
     def set_thumbnail(self, offset: int, thumbnail: QPixmap) -> None:
         """
@@ -612,12 +674,22 @@ class SpriteAssetBrowser(QWidget):
         Returns:
             Dict mapping category name to item count
         """
-        return {
-            self.CATEGORY_ROM: self._rom_category.childCount(),
-            self.CATEGORY_MESEN: self._mesen_category.childCount(),
-            self.CATEGORY_LIBRARY: self._library_category.childCount(),
-            self.CATEGORY_LOCAL: self._local_category.childCount(),
-        }
+        counts = {}
+        for category, item in [
+            (self.CATEGORY_ROM, self._rom_category),
+            (self.CATEGORY_MESEN, self._mesen_category),
+            (self.CATEGORY_LIBRARY, self._library_category),
+            (self.CATEGORY_LOCAL, self._local_category),
+        ]:
+            count = item.childCount()
+            # If 1 item and it's a placeholder, count is 0
+            if count == 1:
+                child = item.child(0)
+                data = child.data(0, Qt.ItemDataRole.UserRole)
+                if isinstance(data, dict) and data.get("is_placeholder"):
+                    count = 0
+            counts[category] = count
+        return counts
 
     def select_sprite_by_offset(self, offset: int) -> bool:
         """

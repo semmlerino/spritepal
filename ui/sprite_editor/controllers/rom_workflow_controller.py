@@ -227,6 +227,12 @@ class ROMWorkflowController(QObject):
             self.open_in_editor()
             return
 
+        # If we are already waiting for this offset (preview pending), just set the flag
+        if self.current_offset == offset:
+            logger.debug("[DOUBLE-CLICK] Preview pending for this offset, setting flag only")
+            self._pending_open_in_editor = True
+            return
+
         # Set flag to auto-open in editor when preview completes
         self._pending_open_in_editor = True
         logger.debug("[DOUBLE-CLICK] Flag set, calling set_offset")
@@ -361,6 +367,16 @@ class ROMWorkflowController(QObject):
     def _on_asset_deleted(self, offset: int, source_type: str) -> None:
         """Handle asset deletion from context menu."""
         logger.info("Asset deleted: 0x%06X (%s)", offset, source_type)
+
+        # Handle persistent deletion
+        if source_type == "library" and self._sprite_library and self.rom_path:
+            library = self._sprite_library
+            rom_hash = library.compute_rom_hash(self.rom_path)
+            matches = library.get_by_offset(offset, rom_hash)
+            for sprite in matches:
+                library.remove_sprite(sprite.unique_id)
+                logger.info("Removed persistent sprite: %s", sprite.unique_id)
+
         # Remove item from browser tree
         if self._view:
             from PySide6.QtCore import Qt

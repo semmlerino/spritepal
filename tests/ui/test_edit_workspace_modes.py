@@ -1,5 +1,7 @@
 import pytest
+
 from ui.sprite_editor.views.workspaces.edit_workspace import EditWorkspace
+
 
 def test_edit_workspace_modes(qtbot):
     """Verify that setting workflow mode updates button visibility correctly."""
