@@ -361,7 +361,7 @@ uv run basedpyright core ui utils  # Type check
 The codebase passes basedpyright with zero errors. Key rules:
 
 - Use `| None` not `Optional`; Qt signals need annotations: `finished = Signal(str, int)`
-- Protocols live in `core/protocols/` - check before creating new ones
+- **Protocols removed:** All protocol definitions were eliminated as over-engineering (commits 0c37f478, ace57d16). Use concrete types instead.
 - **Dict invariance:** Use `Mapping[str, object]` for read-only params; never replace `dict[str, Any]` with `dict[str, object]`
 
 ### Taking UI Screenshots
@@ -377,12 +377,12 @@ os.environ['QT_QPA_PLATFORM'] = 'xcb'
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer
 
-from core.managers import initialize_managers
+from core.app_context import create_app_context
 from core.configuration_service import ConfigurationService
 
 config_service = ConfigurationService()
 config_service.ensure_directories_exist()
-initialize_managers('SpritePal', settings_path=config_service.settings_file, configuration_service=config_service)
+context = create_app_context('SpritePal', settings_path=config_service.settings_file)
 
 from launch_spritepal import SpritePalApp
 app = SpritePalApp(sys.argv)
@@ -433,7 +433,6 @@ spritepal/
 ├── core/                  # Business logic
 │   ├── managers/          # Manager classes
 │   ├── mesen_integration/ # Mesen 2 capture → ROM offset discovery
-│   ├── protocols/         # Protocol definitions
 │   └── *.py               # Core logic
 ├── ui/                    # Qt UI components
 │   ├── sprite_editor/     # Unified sprite editor (Extract → Edit → Inject)
@@ -453,7 +452,7 @@ spritepal/
 | Looking for... | Location |
 |----------------|----------|
 | **Unified Sprite Editor** | `ui/sprite_editor/` (Extract/Edit/Inject workflow with full documentation) |
-| **Embedded Editor Tab** | `ui/sprite_edit_tab.py` (Sprite Editor as 3rd tab in main window) |
+| **Sprite Editor Workspace** | `ui/sprite_editor/views/workspaces/` (Embedded as workspace tabs in MainWindow) |
 | Sprite Editor Quick Start | Run: `python launch_editor.py` from spritepal directory |
 | Sprite Editor Docs | `ui/sprite_editor/README.md` (architecture, formats, components) |
 | Keyboard Shortcuts | Ctrl+1/2/3 for tabs, F6 for last Mesen2 capture |
@@ -515,4 +514,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: January 6, 2026 (Added embedded Sprite Editor tab, keyboard shortcuts, and Mesen2 integration)*
+*Last updated: January 8, 2026 (Fixed initialize_managers→create_app_context, removed obsolete protocols guidance, corrected sprite_editor workspace reference)*
