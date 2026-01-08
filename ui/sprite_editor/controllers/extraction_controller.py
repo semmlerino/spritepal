@@ -197,6 +197,10 @@ class ExtractionController(QObject):
         if not self._view:
             return
 
+        if not self.rom_extractor:
+            self._view.append_output("ERROR: ROM extractor not initialized")
+            return
+
         params = self._view.get_extraction_params()
         rom_file = str(params.get("rom_file", ""))
         offset = int(params["offset"])  # type: ignore

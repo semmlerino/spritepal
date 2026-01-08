@@ -39,8 +39,8 @@ from ui.sprite_editor.views.workspaces import ROMWorkflowPage, VRAMEditorPage
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
+    from core.mesen_integration.log_watcher import LogWatcher
     from core.rom_extractor import ROMExtractor
-    from core.services.log_watcher import LogWatcher
     from core.services.rom_cache import ROMCache
     from core.sprite_library import SpriteLibrary
     from ui.managers.status_bar_manager import StatusBarManager

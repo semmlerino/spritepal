@@ -274,10 +274,10 @@ class SpriteEditorMainWindow(QMainWindow):
 
     def wire_controllers(
         self,
-        extraction_controller: "ExtractionController",
-        editing_controller: "EditingController",
-        injection_controller: "InjectionController",
-        rom_workflow_controller: "ROMWorkflowController | None" = None,
+        extraction_controller: ExtractionController,
+        editing_controller: EditingController,
+        injection_controller: InjectionController,
+        rom_workflow_controller: ROMWorkflowController | None = None,
     ) -> None:
         """Wire menu actions to controller methods.
 

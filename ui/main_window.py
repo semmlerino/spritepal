@@ -58,8 +58,6 @@ from ui.common.spacing_constants import (
     SPACING_MEDIUM,
     SPACING_SMALL,
 )
-from ui.styles import get_muted_text_style
-from ui.styles.components import get_action_zone_style
 from ui.extraction_panel import ExtractionPanel
 from ui.managers import (
     KeyboardShortcutManager,
@@ -70,6 +68,8 @@ from ui.managers import (
 from ui.palette_preview import PalettePreviewWidget
 from ui.rom_extraction_panel import ROMExtractionPanel
 from ui.sprite_editor.views.widgets.offset_line_edit import OffsetLineEdit
+from ui.styles import get_muted_text_style
+from ui.styles.components import get_action_zone_style
 from ui.workspaces import SpriteEditorWorkspace
 from ui.zoomable_preview import PreviewPanel
 from utils.constants import VRAM_SPRITE_OFFSET

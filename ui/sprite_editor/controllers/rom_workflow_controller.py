@@ -98,6 +98,8 @@ class ROMWorkflowController(QObject):
 
     def _connect_log_watcher(self) -> None:
         """Connect LogWatcher signals to handle discovered offsets."""
+        if not self.log_watcher:
+            return
         self.log_watcher.offset_discovered.connect(self._on_offset_discovered)
         # Start watching if not already
         self.log_watcher.start_watching()
@@ -106,6 +108,9 @@ class ROMWorkflowController(QObject):
         """Create thumbnail worker after ROM is loaded."""
         if self._thumbnail_controller:
             self._thumbnail_controller.cleanup()
+
+        if not self.rom_extractor:
+            return
 
         self._thumbnail_controller = ThumbnailWorkerController(self)
         self._thumbnail_controller.start_worker(self.rom_path, self.rom_extractor)
@@ -176,9 +181,10 @@ class ROMWorkflowController(QObject):
         self._connect_view_signals()
 
         # Load existing persistent clicks into asset browser
-        persistent_clicks = self.log_watcher.load_persistent_clicks()
-        for capture in persistent_clicks:
-            self._add_capture_to_browser(capture)
+        if self.log_watcher:
+            persistent_clicks = self.log_watcher.load_persistent_clicks()
+            for capture in persistent_clicks:
+                self._add_capture_to_browser(capture)
 
         # Flush any pending real-time captures (discovered before view was ready)
         if self._pending_captures:
@@ -462,7 +468,7 @@ class ROMWorkflowController(QObject):
         self._load_library_sprites()
 
         # Request thumbnails for any existing assets
-        if self._view and self._thumbnail_controller:
+        if self._view and self._thumbnail_controller and self.log_watcher:
             persistent_clicks = self.log_watcher.load_persistent_clicks()
             for capture in persistent_clicks:
                 self._thumbnail_controller.queue_thumbnail(capture.offset)
@@ -635,6 +641,11 @@ class ROMWorkflowController(QObject):
 
     def save_to_rom(self) -> None:
         """Inject edited sprite back to ROM."""
+        if not self.rom_extractor:
+            if self._message_service:
+                self._message_service.show_message("ROM extractor not initialized")
+            return
+
         data = self._editing_controller.get_image_data()
         if data is None:
             if self._message_service:
