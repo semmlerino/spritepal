@@ -8,7 +8,7 @@
 |-------|--------|-----------|
 | **Phase 1: Quick Wins** | ✅ Complete | ✅ Item 1, ✅ Item 2, ✅ Item 3 |
 | **Phase 2: Medium (Collapse Layers)** | ✅ Complete | ✅ Item 4, ✅ Item 5 |
-| **Phase 3: Deeper (Architecture)** | In Progress | ✅ Item 6, ✅ Item 7, ✅ Item 8 |
+| **Phase 3: Deeper (Architecture)** | ✅ Complete | ✅ Item 6, ✅ Item 7, ✅ Item 8, ✅ Item 9 |
 
 **Completed Work:**
 - ✅ Problem #1 (Dual-Path Signal Wiring) - Removed `MainController._update_undo_state` and duplicate status connection. Single signal path now active.
@@ -19,18 +19,19 @@
 - ✅ Phase 3 Item 6 (Remove `AppContext` from MainWindow) - Added 3 explicit constructor parameters (`core_operations_manager`, `log_watcher`, `preview_generator`). Eliminated all 8 `get_app_context()` calls from MainWindow. Updated 2 test files for new signature.
 - ✅ Phase 3 Item 7 (Clean Up Dead Signals) - Removed 3 dead signals that emitted UI types: `ROMWorkflowController.preview_ready` (+ rendering code), `AssetBrowserController.thumbnailReady`, `ExtractionController.extraction_completed`. ~15 lines of dead code removed.
 - ✅ Phase 3 Item 8 (Remove AppContext from Controllers) - Eliminated all 8 `get_app_context()` calls from `ExtractionController` and `ROMWorkflowController`. Added explicit constructor parameters for `rom_cache`, `rom_extractor`, `log_watcher`, `sprite_library`. Updated `SpriteEditorWorkspace` and `MainWindow` to pass deps. Zero service locator calls remain in sprite editor controllers.
+- ✅ Phase 3 Item 9 (Flatten Signal Relay Chains) - Removed 2 pure passthrough signals from `SpriteEditorWorkspace`: `undo_state_changed` and `offset_changed`. MainWindow now connects directly to `EditingController.undoStateChanged` and `ROMWorkflowPage.offset_changed`. Signal chain depth reduced (undo: 2→1 hop, offset: 4→2 hops).
 - Test Coverage: 1978 passed, 23 skipped, 0 failures (no regression)
 
-**Next Priority:** Phase 3 Item 9 (further architectural cleanup) or Phase 4 planning
+**Next Priority:** Phase 4 planning (remaining architecture issues #6-#10)
 
 ---
 
 ## 1. 10 Highest Impact Problems
 
-1.  **Dual-Path Signal Wiring (Undo/Redo):** ✅ **RESOLVED** (2025-01-08) - Removed `MainController._update_undo_state()` direct path. Single signal flow now: `EditingController.undoStateChanged` → `SpriteEditorWorkspace.undo_state_changed` → `MainWindow._update_undo_redo_state()`. Also removed duplicate status message connection at MainWindow level.
+1.  **Dual-Path Signal Wiring (Undo/Redo):** ✅ **RESOLVED** (2025-01-08, updated 2026-01-08) - Removed `MainController._update_undo_state()` direct path. Signal flow now direct: `EditingController.undoStateChanged` → `MainWindow._update_undo_redo_state()` (no workspace relay). Also removed duplicate status message connection at MainWindow level.
 2.  **Service Locator Anti-Pattern (`AppContext`):** ✅ **RESOLVED** (2026-01-08) - MainWindow and all sprite editor controllers now receive dependencies via constructor. Zero `get_app_context()` calls in MainWindow or sprite editor controllers. Full explicit DI chain: `launch_spritepal.py` → `MainWindow` → `SpriteEditorWorkspace` → Controllers.
 3.  **God-Class `UICoordinator`:** ✅ **RESOLVED** (2026-01-08) - Dissolved UICoordinator by inlining tab helpers, session methods, preview methods, and tab configuration into `MainWindow`. Deleted `ui/managers/ui_coordinator.py` (~380 lines).
-4.  **Passthrough Signal Chains:** `SpriteEditorWorkspace` acts largely as a "signal relay," receiving signals from controllers and re-emitting them to `MainWindow` (e.g., `status_message`, `mode_changed`), adding noise without value.
+4.  **Passthrough Signal Chains:** ✅ **RESOLVED** (2026-01-08) - Removed 2 relay signals (`undo_state_changed`, `offset_changed`) from `SpriteEditorWorkspace`. MainWindow connects directly to `EditingController.undoStateChanged` (1 hop) and `ROMWorkflowPage.offset_changed` (2 hops). Only `mode_changed` remains (not a relay - originates from workspace).
 5.  **Circular Dependency Workarounds:** `MainWindow` uses lazy properties for `ExtractionController` and `controller` setters to break circular imports, indicating a flaw in the dependency graph (View depends on Controller, which depends on View).
 6.  **Redundant Abstraction Layers:** ✅ **PARTIALLY RESOLVED** - `MainController` deleted (Phase 1 Item 3), `ExtractionWorkspace` merged into `MainWindow` (Phase 2 Item 4). Remaining: `ExtractionController` layer (extraction logic split between controller and `MainWindow`).
 7.  **Implicit State Sharing:** `ApplicationStateManager` is passed around everywhere, but specific state (like current palette or selected tool) is also synchronized via manual signal connections, leading to "split source of truth."

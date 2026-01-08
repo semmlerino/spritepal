@@ -62,8 +62,6 @@ class SpriteEditorWorkspace(QWidget):
 
     # Signals
     mode_changed = Signal(str)  # 'vram' or 'rom'
-    undo_state_changed = Signal(bool, bool)  # can_undo, can_redo
-    offset_changed = Signal(int)
 
     def __init__(
         self,
@@ -179,12 +177,6 @@ class SpriteEditorWorkspace(QWidget):
 
         # Wire ROM workflow controller to ROM page
         self._rom_workflow_controller.set_view(self._rom_page)
-
-        # Connect undo/redo state updates (forwarded to signal)
-        self._editing_controller.undoStateChanged.connect(self.undo_state_changed.emit)
-
-        # Connect offset changed
-        self._rom_page.offset_changed.connect(self.offset_changed.emit)
 
         # Connect ready_for_inject from VRAM page
         self._vram_page.ready_for_inject.connect(self._on_ready_for_inject)
