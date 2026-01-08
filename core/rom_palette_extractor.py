@@ -204,3 +204,37 @@ class ROMPaletteExtractor:
             logger.warning(f"Failed to extract palette range: {e}")
 
         return palettes
+
+    def extract_palette_colors_from_rom(
+        self, rom_path: str, palette_offset: int, palette_index: int
+    ) -> list[tuple[int, int, int]] | None:
+        """
+        Extract a specific palette from ROM as a list of RGB tuples.
+
+        Args:
+            rom_path: Path to ROM file
+            palette_offset: Offset in ROM where palette data starts
+            palette_index: Index of the palette to extract (0-15)
+
+        Returns:
+            List of 16 RGB tuples, or None if extraction fails
+        """
+        try:
+            with Path(rom_path).open("rb") as f:
+                # Detect SMC header and adjust offset
+                file_size = f.seek(0, 2)
+                smc_offset = detect_smc_offset_from_size(file_size)
+                file_offset = palette_offset + smc_offset
+
+                f.seek(file_offset)
+                palette_data = f.read(512)
+
+            if 0 <= palette_index <= 15:
+                colors_list = self._extract_palette_colors(palette_data, palette_index)
+                # Convert list of lists to list of tuples for consistency
+                return [tuple(c) for c in colors_list] # type: ignore
+
+        except OSError as e:
+            logger.warning(f"Failed to extract palette colors: {e}")
+
+        return None

@@ -253,6 +253,26 @@ class SpriteEditorWorkspace(QWidget):
         # Pass to injection controller
         self._injection_controller.set_source_image(temp_path)
 
+        # Check if we have a loaded ROM context to pre-fill
+        if self._rom_workflow_controller.rom_path:
+            logger.info("Auto-configuring Inject Tab with loaded ROM: %s", self._rom_workflow_controller.rom_path)
+            # Switch Inject Tab to ROM mode
+            self._injection_controller.set_mode("rom")
+            # Set the ROM file (we need to bypass controller and set on view directly or add method to controller)
+            # The injection controller has rom_file attribute but doesn't expose a setter that updates view
+            # So we rely on the view update that usually happens or add a method.
+            # Let's check InjectionController again. It has self.rom_file but browse_rom_file sets it.
+            # We should probably add set_rom_file to InjectionController.
+            # For now, we can access the view via controller if needed, or add the method.
+            # Ideally, we should add set_rom_file to InjectionController. I'll assume it exists or I'll add it.
+            if hasattr(self._injection_controller, "set_rom_file"):
+                self._injection_controller.set_rom_file(self._rom_workflow_controller.rom_path)
+            else:
+                # Fallback: direct access if possible, or just set attribute
+                self._injection_controller.rom_file = self._rom_workflow_controller.rom_path
+                if self._injection_controller._view:
+                    self._injection_controller._view.set_rom_file(self._rom_workflow_controller.rom_path)
+
         # Switch to inject tab in VRAM page
         self._vram_page.switch_to_inject_tab()
         logger.debug("Prepared image for injection and switched to inject tab")

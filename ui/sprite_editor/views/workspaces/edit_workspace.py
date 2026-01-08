@@ -332,6 +332,7 @@ class EditWorkspace(QWidget):
         # Connect preview panel to controller
         self._preview_panel.controller = controller
         controller.imageChanged.connect(self._preview_panel.update_preview)
+        controller.imageChanged.connect(self._on_image_changed)
         controller.paletteChanged.connect(self._preview_panel.update_preview)
 
         # Bidirectional zoom sync: canvas → toolbar (if needed for display)
@@ -339,6 +340,14 @@ class EditWorkspace(QWidget):
 
         # Connect canvas hover events to status bar
         self._canvas.hoverPositionChanged.connect(self._on_hover_position_changed)
+
+        # Initialize image loaded state
+        if controller.has_image():
+            self.set_image_loaded(True)
+
+    def _on_image_changed(self) -> None:
+        """Handle image change from controller."""
+        self.set_image_loaded(True)
 
     def update_from_controller(self) -> None:
         """Update UI state from controller."""

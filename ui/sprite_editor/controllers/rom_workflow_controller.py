@@ -564,9 +564,41 @@ class ROMWorkflowController(QObject):
         # Convert to numpy and load into editor
         image_array = np.array(image, dtype=np.uint8)
 
-        # Use default SNES-style palette for initial display (not grayscale)
-        # User can load actual palette via "Load Palette..." button in palette panel
-        palette = get_default_snes_palette()
+        # Try to extract palette from ROM if possible
+        palette = None
+        if self.rom_extractor and self.rom_path:
+            try:
+                # 1. Get header to identify game
+                header = self.rom_extractor.rom_injector.read_rom_header(self.rom_path)
+                
+                # 2. Get game config
+                game_config = self.rom_extractor._find_game_configuration(header)
+                
+                if game_config and self.current_sprite_name:
+                    from typing import cast
+                    # 3. Get palette config for this sprite
+                    palette_offset, palette_indices = self.rom_extractor.rom_palette_extractor.get_palette_config_from_sprite_config(
+                        cast(dict[str, object], game_config),
+                        self.current_sprite_name,
+                    )
+                    
+                    # 4. Extract first palette if available
+                    if palette_offset is not None and palette_indices:
+                        # Use first available palette index
+                        target_index = palette_indices[0]
+                        extracted_palette = self.rom_extractor.rom_palette_extractor.extract_palette_colors_from_rom(
+                            self.rom_path, palette_offset, target_index
+                        )
+                        if extracted_palette:
+                            palette = extracted_palette
+                            logger.info(f"Loaded ROM palette for {self.current_sprite_name} (index {target_index})")
+            except Exception as e:
+                logger.warning(f"Failed to extract ROM palette: {e}")
+
+        # Fallback to default SNES-style palette
+        if palette is None:
+            palette = get_default_snes_palette()
+            logger.debug("Using default SNES palette")
 
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self._editing_controller.load_image(image_array, palette)

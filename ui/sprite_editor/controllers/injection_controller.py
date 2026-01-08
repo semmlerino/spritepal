@@ -86,6 +86,12 @@ class InjectionController(QObject):
         if self._view:
             self._view.set_mode(mode)
 
+    def set_rom_file(self, file_path: str) -> None:
+        """Set the ROM file path."""
+        self.rom_file = file_path
+        if self._view and hasattr(self._view, "set_rom_file"):
+            self._view.set_rom_file(file_path)
+
     def browse_rom_file(self) -> None:
         """Open file dialog to select ROM file."""
         file_path, _ = QFileDialog.getOpenFileName(
