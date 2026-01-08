@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from core.services.rom_cache import ROMCache
     from core.workers import ROMExtractionWorker, VRAMExtractionWorker
     from ui.extraction_controller import ExtractionController
+    from ui.injection_dialog import InjectionDialog
     from ui.services.dialog_coordinator import DialogCoordinator
 
 from typing import override
@@ -138,6 +139,8 @@ class MainWindow(QMainWindow):
         # Extraction result storage
         self._extracted_palettes: dict[int, list[list[int]]] = {}
         self._active_palettes: list[int] = []
+        # Injection state (Phase 4e)
+        self._current_injection_dialog: InjectionDialog | None = None
 
         self._setup_ui()
         self._setup_managers()  # This creates all UI widgets via managers
@@ -694,7 +697,8 @@ class MainWindow(QMainWindow):
     def on_inject_clicked(self) -> None:
         """Handle inject to VRAM button click"""
         if self._output_path:
-            self.inject_requested.emit()
+            # Start injection directly (Phase 4e: controller removal)
+            self._start_injection()
 
     def get_current_vram_path(self) -> str:
         """Get current VRAM path for browse dialog default directory"""
@@ -946,6 +950,129 @@ class MainWindow(QMainWindow):
                 # Signal may already be disconnected
                 pass
         self._manager_connections.clear()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # INJECTION ORCHESTRATION (Phase 4e: moved from ExtractionController)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def _start_injection(self) -> None:
+        """Start the injection process using InjectionManager."""
+
+        from core.app_context import get_app_context
+
+        # Get sprite path and metadata path
+        output_base = self.get_output_path()
+        if not output_base:
+            self.status_bar.showMessage("No extraction to inject")
+            return
+
+        sprite_path = f"{output_base}.png"
+        metadata_path = f"{output_base}.metadata.json"
+
+        # Validate sprite file exists before creating dialog
+        sprite_result = FileValidator.validate_file_existence(sprite_path, "Sprite file")
+        if not sprite_result.is_valid:
+            self.status_bar.showMessage(sprite_result.error_message or f"Sprite file not found: {sprite_path}")
+            return
+
+        # Get managers from app context
+        context = get_app_context()
+        injection_manager = context.core_operations_manager
+        settings_mgr = context.application_state_manager
+
+        # Get smart input VRAM suggestion using injection manager
+        suggested_input_vram = injection_manager.get_smart_vram_suggestion(
+            sprite_path, metadata_path if Path(metadata_path).exists() else ""
+        )
+
+        # Show injection dialog directly
+        from ui.injection_dialog import InjectionDialog
+
+        dialog = InjectionDialog(
+            parent=self,
+            sprite_path=sprite_path,
+            metadata_path=metadata_path if Path(metadata_path).exists() else "",
+            input_vram=suggested_input_vram,
+            injection_manager=injection_manager,
+            settings_manager=settings_mgr,
+        )
+
+        if dialog.exec():
+            params = dialog.get_parameters()
+            if params:
+                # Store dialog reference for saving on success
+                self._current_injection_dialog = dialog
+                settings_mgr.set("workflow", "current_injection_params", params)
+
+                # Connect injection manager signals before starting
+                self._injection_progress_connection = injection_manager.injection_progress.connect(
+                    self._on_injection_progress
+                )
+                self._injection_finished_connection = injection_manager.injection_finished.connect(
+                    self._on_injection_finished
+                )
+
+                # Start injection using manager
+                success = injection_manager.start_injection(params)
+                if not success:
+                    self.status_bar.showMessage("Failed to start injection")
+                    self._cleanup_injection_connections()
+
+    def _on_injection_progress(self, message: str) -> None:
+        """Handle injection progress updates."""
+        self.status_bar.showMessage(message)
+
+    def _on_injection_finished(self, success: bool, message: str) -> None:
+        """Handle injection completion."""
+
+        from core.app_context import get_app_context
+
+        context = get_app_context()
+        settings_mgr = context.application_state_manager
+
+        if success:
+            success_msg = f"Injection successful: {message}"
+            self.status_bar.showMessage(success_msg)
+
+            # Save injection parameters for future use if it was a ROM injection
+            current_injection_params = settings_mgr.get("workflow", "current_injection_params")
+
+            if (
+                current_injection_params
+                and isinstance(current_injection_params, Mapping)
+                and current_injection_params.get("mode") == "rom"
+                and self._current_injection_dialog
+            ):
+                try:
+                    self._current_injection_dialog.save_rom_injection_parameters()
+                except Exception as e:
+                    logger.warning(f"Could not save ROM injection parameters: {e}")
+        else:
+            fail_msg = f"Injection failed: {message}"
+            self.status_bar.showMessage(fail_msg)
+
+        # Clean up
+        self._current_injection_dialog = None
+        settings_mgr.set("workflow", "current_injection_params", None)
+        self._cleanup_injection_connections()
+
+    def _cleanup_injection_connections(self) -> None:
+        """Cleanup injection signal connections."""
+        from PySide6.QtCore import QObject
+
+        if hasattr(self, "_injection_progress_connection"):
+            try:
+                QObject.disconnect(self._injection_progress_connection)
+            except (RuntimeError, TypeError):
+                pass
+            delattr(self, "_injection_progress_connection")
+
+        if hasattr(self, "_injection_finished_connection"):
+            try:
+                QObject.disconnect(self._injection_finished_connection)
+            except (RuntimeError, TypeError):
+                pass
+            delattr(self, "_injection_finished_connection")
 
     # ═══════════════════════════════════════════════════════════════════════════
 

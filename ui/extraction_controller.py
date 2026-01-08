@@ -103,13 +103,14 @@ class ExtractionController(QObject):
         # _ = self.main_window.open_in_editor_requested.connect(self.open_in_editor)
         # _ = self.main_window.arrange_rows_requested.connect(self.open_row_arrangement)
         # _ = self.main_window.arrange_grid_requested.connect(self.open_grid_arrangement)
-        _ = self.main_window.inject_requested.connect(self.start_injection)
+        # inject_requested connection moved to MainWindow (Phase 4e)
+        # _ = self.main_window.inject_requested.connect(self.start_injection)
         # offset_changed connection moved to MainWindow (Phase 4c)
         # _ = self.main_window.extraction_panel.offset_changed.connect(self.update_preview_with_offset)
 
-        # Connect injection manager signals
-        _ = self.injection_manager.injection_progress.connect(self._on_injection_progress)
-        _ = self.injection_manager.injection_finished.connect(self._on_injection_finished)
+        # Injection manager signals moved to MainWindow (Phase 4e)
+        # _ = self.injection_manager.injection_progress.connect(self._on_injection_progress)
+        # _ = self.injection_manager.injection_finished.connect(self._on_injection_finished)
 
         # Cache signal connections removed in Phase 2 simplification
         # (cache_operation_started, cache_hit, cache_miss, cache_saved)
