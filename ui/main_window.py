@@ -1183,9 +1183,7 @@ class MainWindow(QMainWindow):
         ctrl.extraction_completed.connect(self.extraction_complete)
         ctrl.extraction_error.connect(self.extraction_failed)
 
-        # Cache badge operations
-        ctrl.cache_badge_show.connect(self.show_cache_operation_badge)
-        ctrl.cache_badge_hide.connect(self.hide_cache_operation_badge)
+        # Cache badge connections removed in Phase 2 simplification
 
     def _on_controller_preview_ready(self, result: object, tile_count: int) -> None:
         """Handle preview ready signal from controller."""

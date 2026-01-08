@@ -63,10 +63,7 @@ class ExtractionController(QObject):
     extraction_completed = Signal(object)  # list[str] of extracted files
     extraction_error = Signal(str)  # Error message
 
-    # Cache operation signals
-    cache_badge_show = Signal(str)  # Badge text
-    cache_badge_hide = Signal()
-    cache_status_updated = Signal(str, float)  # cache_type, time_saved
+    # Cache signals removed in Phase 2 simplification
 
     def __init__(
         self,
