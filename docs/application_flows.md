@@ -301,7 +301,7 @@ Sprite data loaded
          │
          ▼
 ┌────────────────────────────┐
-│ PreviewCoordinator         │  ui/managers/preview_coordinator.py
+│ SmartPreviewCoordinator     │  ui/common/smart_preview_coordinator.py
 │ generate_preview()         │
 └────────────────────────────┘
          │
@@ -466,4 +466,4 @@ StatusBarManager.set_mesen2_watching(bool)
 
 ---
 
-*Last updated: January 6, 2026 (Added Sprite Editor Tab and Mesen2 integration flows)*
+*Last updated: January 8, 2026 (Fixed PreviewCoordinator file path reference)*

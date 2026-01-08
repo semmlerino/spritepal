@@ -168,7 +168,7 @@ def test_worker_image_processing():
     """Test real worker thread with ThreadSafeTestImage."""
     
     class ImageWorker(QThread):
-        result_ready = pyqtSignal(object)
+        result_ready = Signal(object)
         
         def run(self):
             # Safe to create images in QThread

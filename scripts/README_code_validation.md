@@ -146,7 +146,7 @@ def test_{test_name}():
 def generate_qt_widget(class_name: str, base_class: str) -> str:
     """Generate validated Qt widget code."""
     code = f'''
-from PyQt6.QtWidgets import {base_class}
+from PySide6.QtWidgets import {base_class}
 
 class {class_name}({base_class}):
     """Generated Qt widget."""
@@ -313,7 +313,7 @@ validate:
 
 ### Development/Testing
 - **pytest** - Test framework
-- **PyQt6/PySide6** - Qt validation testing
+- **PySide6** - Qt validation testing
 
 ## Common Use Cases
 

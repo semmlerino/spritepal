@@ -1,6 +1,6 @@
 # Unified Sprite Editor
 
-A consolidated PyQt6/PySide6 application for SNES sprite extraction, pixel-level editing, and injection. Combines the capabilities of the legacy `sprite_editor/` and `pixel_editor/` into a single Extract → Edit → Inject workflow.
+A consolidated PySide6 application for SNES sprite extraction, pixel-level editing, and injection. Combines the capabilities of the legacy `sprite_editor/` and `pixel_editor/` into a single Extract → Edit → Inject workflow.
 
 ## Quick Start
 
