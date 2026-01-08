@@ -93,9 +93,12 @@ class VRAMInjectionWorker(ManagedWorker):
     @override
     @handle_worker_errors("VRAM injection")
     def perform_operation(self) -> None:
-        """Perform VRAM injection via manager."""
-        # Type cast for better type safety
-        injection_manager = cast(CoreOperationsManager, self.manager)
+        """Perform VRAM injection using SpriteInjector directly.
+
+        This method calls the actual injection business logic instead of delegating
+        back to the manager (which would cause infinite recursion by creating another worker).
+        """
+        from core.injector import SpriteInjector
 
         # Check for cancellation before starting
         self.check_cancellation()
@@ -103,17 +106,43 @@ class VRAMInjectionWorker(ManagedWorker):
         logger.info(f"{self._operation_name}: Starting VRAM injection")
         self.emit_progress(10, "Starting VRAM injection...")
 
-        # Perform injection using manager
-        success = injection_manager.start_injection(dict(self.params))
+        # Create injector instance
+        injector = SpriteInjector()
+
+        # Load metadata if provided
+        metadata_path = self.params.get("metadata_path")
+        if metadata_path:
+            self.emit_progress(20, "Loading metadata...")
+            injector.load_metadata(metadata_path)
+
+        self.check_cancellation()
+        self.emit_progress(40, "Injecting sprite into VRAM...")
+
+        # Extract parameters
+        sprite_path = self.params.get("sprite_path", "")
+        input_vram = self.params.get("input_vram", "")
+        output_vram = self.params.get("output_vram", "")
+        offset = self.params.get("offset")
+
+        # Perform the actual injection
+        success, message = injector.inject_sprite(
+            sprite_path=sprite_path,
+            vram_path=input_vram,
+            output_path=output_vram,
+            offset=offset,
+        )
+
+        self.emit_progress(100, "VRAM injection complete")
 
         if success:
-            logger.info(f"{self._operation_name}: Injection started successfully")
-            # The manager will emit completion signals when done via connected signals
+            logger.info(f"{self._operation_name}: {message}")
+            self.injection_finished.emit(True, message)
+            self.operation_finished.emit(True, message)
         else:
-            error_msg = "Failed to start injection"
-            logger.error(f"{self._operation_name}: {error_msg}")
-            self.emit_error(error_msg)
-            self.operation_finished.emit(False, error_msg)
+            logger.error(f"{self._operation_name}: {message}")
+            self.emit_error(message)
+            self.injection_finished.emit(False, message)
+            self.operation_finished.emit(False, message)
 
 
 class ROMInjectionWorker(ManagedWorker):
@@ -161,7 +190,11 @@ class ROMInjectionWorker(ManagedWorker):
     @override
     @handle_worker_errors("ROM injection")
     def perform_operation(self) -> None:
-        """Perform ROM injection via manager."""
+        """Perform ROM injection using ROMInjector directly.
+
+        This method calls the actual injection business logic instead of delegating
+        back to the manager (which would cause infinite recursion by creating another worker).
+        """
         # Type cast for better type safety
         injection_manager = cast(CoreOperationsManager, self.manager)
 
@@ -171,14 +204,46 @@ class ROMInjectionWorker(ManagedWorker):
         logger.info(f"{self._operation_name}: Starting ROM injection")
         self.emit_progress(10, "Starting ROM injection...")
 
-        # Perform injection using manager
-        success = injection_manager.start_injection(dict(self.params))
-
-        if success:
-            logger.info(f"{self._operation_name}: ROM injection started successfully")
-            # The manager will emit completion signals when done
-        else:
-            error_msg = "Failed to start ROM injection"
+        # Access the ROMInjector through the manager's rom_extractor
+        # The rom_extractor is a required dependency of CoreOperationsManager
+        rom_extractor = injection_manager._rom_extractor
+        if rom_extractor is None:
+            error_msg = "ROM extractor not initialized"
             logger.error(f"{self._operation_name}: {error_msg}")
             self.emit_error(error_msg)
+            self.injection_finished.emit(False, error_msg)
             self.operation_finished.emit(False, error_msg)
+            return
+
+        rom_injector = rom_extractor.rom_injector
+
+        self.check_cancellation()
+        self.emit_progress(30, "Compressing and injecting sprite into ROM...")
+
+        # Extract parameters
+        sprite_path = self.params.get("sprite_path", "")
+        input_rom = self.params.get("input_rom", "")
+        output_rom = self.params.get("output_rom", "")
+        offset = self.params.get("offset", 0)
+        fast_compression = self.params.get("fast_compression", False)
+
+        # Perform the actual injection
+        success, message = rom_injector.inject_sprite_to_rom(
+            sprite_path=sprite_path,
+            rom_path=input_rom,
+            output_path=output_rom,
+            sprite_offset=offset,
+            fast_compression=fast_compression,
+        )
+
+        self.emit_progress(100, "ROM injection complete")
+
+        if success:
+            logger.info(f"{self._operation_name}: {message}")
+            self.injection_finished.emit(True, message)
+            self.operation_finished.emit(True, message)
+        else:
+            logger.error(f"{self._operation_name}: {message}")
+            self.emit_error(message)
+            self.injection_finished.emit(False, message)
+            self.operation_finished.emit(False, message)
