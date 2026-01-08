@@ -31,6 +31,7 @@ class PreviewPanel(QWidget):
         super().__init__(parent)
         self.controller = controller
         self._preview_widget: ContextualPreview | None = None
+        self._greyscale_mode = False
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -55,6 +56,16 @@ class PreviewPanel(QWidget):
 
         # Add to main layout
         layout.addWidget(preview_group)
+
+    def set_greyscale_mode(self, enabled: bool) -> None:
+        """Enable or disable greyscale (index) preview mode.
+
+        Args:
+            enabled: True for greyscale/index mode, False for color mode.
+        """
+        if self._greyscale_mode != enabled:
+            self._greyscale_mode = enabled
+            self.update_preview()
 
     def update_preview(self) -> None:
         """Update the main preview from controller image data."""
@@ -99,11 +110,20 @@ class PreviewPanel(QWidget):
         image_data = np.clip(image_model.data, 0, 15).astype(np.uint8)
         rgb_data = np.zeros((height, width, 3), dtype=np.uint8)
 
-        for i in range(16):
-            mask = image_data == i
-            if i < len(colors):
-                r, g, b = colors[i]
-                rgb_data[mask] = [r, g, b]
+        if self._greyscale_mode:
+            # Greyscale mode: Map indices 0-15 to greyscale values 0-255
+            # We'll use a linear mapping: index * 16 (approx)
+            for i in range(16):
+                mask = image_data == i
+                val = i * 17  # 0->0, 15->255
+                rgb_data[mask] = [val, val, val]
+        else:
+            # Color mode: Use palette colors
+            for i in range(16):
+                mask = image_data == i
+                if i < len(colors):
+                    r, g, b = colors[i]
+                    rgb_data[mask] = [r, g, b]
 
         # Create QImage with ARGB format for transparency support
         qimage = QImage(width, height, QImage.Format.Format_ARGB32)

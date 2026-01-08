@@ -272,31 +272,40 @@ class EditingController(QObject):
 
     def handle_palette_source_changed(self, source_type: str, index: int) -> None:
         """Handle palette source selection change."""
-        if source_type == "default":
-            from ..core.palette_utils import get_default_snes_palette
+        try:
+            if source_type == "default":
+                from ..core.palette_utils import get_default_snes_palette
 
-            colors = get_default_snes_palette()
-            self.set_palette(colors, "Default SNES")
-        elif source_type == "mesen":
-            key = (source_type, index)
-            if key in self._palette_sources:
-                self.set_palette(self._palette_sources[key], f"Mesen #{index}")
+                colors = get_default_snes_palette()
+                self.set_palette(colors, "Default SNES")
+            elif source_type == "mesen":
+                key = (source_type, index)
+                if key in self._palette_sources:
+                    self.set_palette(self._palette_sources[key], f"Mesen #{index}")
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            # Use view if available, otherwise None (desktop)
+            parent = self._view if self._view else None
+            QMessageBox.critical(parent, "Error", f"Failed to change palette source: {e}")
 
     def handle_load_palette(self) -> None:
         """Handle load palette button click."""
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-        file_path, _ = QFileDialog.getOpenFileName(
-            self._view,
-            "Load Palette",
-            "",
-            "Palette Files (*.pal *.json);;All Files (*)",
-        )
-
-        if not file_path:
-            return
+        # Use view if available, otherwise None
+        parent = self._view if self._view else None
 
         try:
+            file_path, _ = QFileDialog.getOpenFileName(
+                parent,
+                "Load Palette",
+                "",
+                "Palette Files (*.pal *.json);;All Files (*)",
+            )
+
+            if not file_path:
+                return
+
             colors = []
             if file_path.endswith(".json"):
                 import json
@@ -324,25 +333,26 @@ class EditingController(QObject):
                 self.set_palette(colors[:16], "Loaded Palette")
                 
         except Exception as e:
-            from PySide6.QtWidgets import QMessageBox
-            if self._view:
-                QMessageBox.critical(self._view, "Error", f"Failed to load palette: {e}")
+            QMessageBox.critical(parent, "Error", f"Failed to load palette: {e}")
 
     def handle_save_palette(self) -> None:
         """Handle save palette button click."""
-        from PySide6.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-        file_path, _ = QFileDialog.getSaveFileName(
-            self._view,
-            "Save Palette",
-            "palette.json",
-            "JSON Palette (*.json);;JASC Palette (*.pal);;All Files (*)",
-        )
-
-        if not file_path:
-            return
+        # Use view if available, otherwise None
+        parent = self._view if self._view else None
 
         try:
+            file_path, _ = QFileDialog.getSaveFileName(
+                parent,
+                "Save Palette",
+                "palette.json",
+                "JSON Palette (*.json);;JASC Palette (*.pal);;All Files (*)",
+            )
+
+            if not file_path:
+                return
+
             colors = self.get_current_colors()
             
             if file_path.endswith(".json"):
@@ -359,23 +369,27 @@ class EditingController(QObject):
                     f.writelines(f"{r} {g} {b}\n" for r, g, b in colors)
                         
         except Exception as e:
-            from PySide6.QtWidgets import QMessageBox
-            if self._view:
-                QMessageBox.critical(self._view, "Error", f"Failed to save palette: {e}")
+            QMessageBox.critical(parent, "Error", f"Failed to save palette: {e}")
 
     def handle_edit_color(self) -> None:
         """Handle edit color button click."""
         from PySide6.QtGui import QColor
-        from PySide6.QtWidgets import QColorDialog
+        from PySide6.QtWidgets import QColorDialog, QMessageBox
 
-        current_color = self.palette_model.get_color(self._selected_color)
-        qcolor = QColor(*current_color)
+        # Use view if available, otherwise None
+        parent = self._view if self._view else None
 
-        color = QColorDialog.getColor(qcolor, self._view, "Edit Color")
-        if color.isValid():
-            new_rgb = (color.red(), color.green(), color.blue())
-            self.palette_model.set_color(self._selected_color, new_rgb)
-            self.paletteChanged.emit()
+        try:
+            current_color = self.palette_model.get_color(self._selected_color)
+            qcolor = QColor(*current_color)
+
+            color = QColorDialog.getColor(qcolor, parent, "Edit Color")
+            if color.isValid():
+                new_rgb = (color.red(), color.green(), color.blue())
+                self.palette_model.set_color(self._selected_color, new_rgb)
+                self.paletteChanged.emit()
+        except Exception as e:
+            QMessageBox.critical(parent, "Error", f"Failed to edit color: {e}")
 
     # Undo/Redo
 

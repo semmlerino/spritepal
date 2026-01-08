@@ -310,13 +310,11 @@ class EditWorkspace(QWidget):
         self._icon_toolbar.gridToggled.connect(self._canvas.set_grid_visible)
         self._icon_toolbar.tileGridToggled.connect(self._canvas.set_tile_grid_visible)
 
-        # Connect palette preview toggle (canvas is guaranteed to exist here)
-        canvas = self._canvas
-        assert canvas is not None, "Canvas must exist in set_controller"
-        self._icon_toolbar.palettePreviewToggled.connect(lambda visible: canvas.set_greyscale_mode(not visible))
+        # Connect palette preview toggle
+        self._icon_toolbar.palettePreviewToggled.connect(self._on_palette_preview_toggled)
 
-        # Initialize canvas greyscale mode based on toolbar's default state
-        canvas.set_greyscale_mode(not self._icon_toolbar.is_palette_preview_enabled())
+        # Initialize greyscale mode based on toolbar's default state
+        self._on_palette_preview_toggled(self._icon_toolbar.is_palette_preview_enabled())
 
         # Connect palette panel signals
         self._palette_panel.colorSelected.connect(controller.set_selected_color)
@@ -401,6 +399,19 @@ class EditWorkspace(QWidget):
         colors = self._controller.get_current_colors()
         palette_name = self._controller.palette_model.name
         self._palette_panel.set_palette(colors, palette_name)
+
+    def _on_palette_preview_toggled(self, visible: bool) -> None:
+        """Handle palette preview toggle.
+
+        visible=True means "Show Palette Colors" -> Greyscale OFF
+        visible=False means "Show Indices/Greyscale" -> Greyscale ON
+        """
+        greyscale_mode = not visible
+        
+        if self._canvas:
+            self._canvas.set_greyscale_mode(greyscale_mode)
+            
+        self._preview_panel.set_greyscale_mode(greyscale_mode)
 
     def _on_zoom_in(self) -> None:
         """Handle zoom in button click."""

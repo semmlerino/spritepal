@@ -44,7 +44,7 @@ class ContextualPreview(QWidget):
         self._background_combo.addItems(["Checkerboard", "Black", "White", "Custom..."])
         self._background_combo.setCurrentIndex(0)
         self._background_combo.currentTextChanged.connect(self._on_background_changed)
-        self._background_combo.hide()  # Hidden per mockup - checkerboard is standard
+        layout.addWidget(self._background_combo)
 
         # Preview area
         self._preview_label = QLabel()

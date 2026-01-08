@@ -40,6 +40,7 @@ class MockPanel(QWidget):
         self.set_selected_color = Mock()
         self.set_palette = Mock()
         self.set_zoom = Mock()
+        self.set_greyscale_mode = Mock()
         self.update_preview = Mock()
         self.update_color_preview = Mock()
         self._controller = None
