@@ -25,7 +25,6 @@ from core.managers.core_operations_manager import CoreOperationsManager
 
 # ExtractionManagerProtocol and InjectionManagerProtocol removed - use CoreOperationsManager directly
 from tests.infrastructure.real_component_factory import RealComponentFactory
-from ui.extraction_controller import ExtractionController
 
 pytestmark = [
     pytest.mark.usefixtures("session_app_context"),
@@ -109,38 +108,18 @@ class TestQtSignalArchitecture:
         """Get mock factory instance"""
         return RealComponentFactory()
 
-    def test_signal_connection_with_casting(self, app, mock_factory, signal_capture):
-        """Test that signal connections work correctly with protocol casting"""
-        # Managers initialized by session_managers fixture
-
+    def test_signal_connection_with_managers(self, app, signal_capture):
+        """Test that signal connections work correctly with CoreOperationsManager."""
         # Create real managers
         injection_mgr = CoreOperationsManager()
         extraction_mgr = CoreOperationsManager()
-
-        # Create mock main window
-        main_window = mock_factory.create_main_window()
-
-        # Create controller with managers as protocols
-        context = get_app_context()
-        controller = ExtractionController(
-            main_window=main_window,
-            extraction_manager=extraction_mgr,
-            session_manager=context.application_state_manager,
-            injection_manager=injection_mgr,
-            settings_manager=context.application_state_manager,
-            preview_generator=context.preview_generator,
-        )
 
         # Connect signal capture to manager signals
         injection_mgr.injection_progress.connect(signal_capture.capture)
         injection_mgr.injection_finished.connect(signal_capture.capture)
         extraction_mgr.cache_saved.connect(signal_capture.capture)
 
-        # Test 1: Verify signals are properly connected
-        assert controller.injection_manager is injection_mgr
-        assert controller.extraction_manager is extraction_mgr
-
-        # Test 2: Emit signals and verify they're received
+        # Emit signals and verify they're received
         injection_mgr.injection_progress.emit("Test progress")
         assert signal_capture.wait_for_signal()
         assert signal_capture.captured_signals[0] == ("Test progress",)
@@ -348,54 +327,6 @@ class TestQtSignalArchitecture:
 
         QTest.qWait(100)  # wait-ok: verifying signal NOT delivered after disconnect
         assert len(signal_capture.captured_signals) == 0
-
-    def test_controller_signal_forwarding(self, app, mock_factory, signal_capture):
-        """Test that controller properly forwards signals from managers"""
-        # Create managers and controller
-        injection_mgr = CoreOperationsManager()
-        extraction_mgr = CoreOperationsManager()
-        main_window = mock_factory.create_main_window()
-
-        context = get_app_context()
-        controller = ExtractionController(
-            main_window=main_window,
-            extraction_manager=extraction_mgr,
-            session_manager=context.application_state_manager,
-            injection_manager=injection_mgr,
-            settings_manager=context.application_state_manager,
-            preview_generator=context.preview_generator,
-        )
-
-        # Capture controller's handling of manager signals
-        called_methods = []
-
-        def capture_method_call(method_name):
-            def wrapper(*args, **kwargs):
-                called_methods.append((method_name, args, kwargs))
-
-            return wrapper
-
-        # Mock controller handler methods
-        controller._on_injection_progress = capture_method_call("_on_injection_progress")
-        controller._on_injection_finished = capture_method_call("_on_injection_finished")
-        controller._on_cache_saved = capture_method_call("_on_cache_saved")
-
-        # Emit signals from managers
-        injection_mgr.injection_progress.emit("Test progress")
-        injection_mgr.injection_finished.emit(True, "Success")
-        extraction_mgr.cache_saved.emit("sprite_cache", 5)
-
-        # Process events to ensure signal delivery
-        app.processEvents()
-        from PySide6.QtTest import QTest
-
-        QTest.qWait(100)  # wait-ok: ensuring queued signal delivery completes
-
-        # Verify controller methods were called
-        assert len(called_methods) == 3
-        assert called_methods[0] == ("_on_injection_progress", ("Test progress",), {})
-        assert called_methods[1] == ("_on_injection_finished", (True, "Success"), {})
-        assert called_methods[2] == ("_on_cache_saved", ("sprite_cache", 5), {})
 
     def test_worker_thread_signal_pattern(self, app, signal_capture):
         """Test the worker thread pattern with proper signal handling"""

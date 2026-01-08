@@ -79,8 +79,7 @@ class CoreOperationsManager(BaseManager):
     extraction_warning = Signal(str)  # Warning message (partial success)
     extraction_completed = Signal(object)  # ExtractionResult with all data
 
-    # Legacy extraction signals (kept for backward compatibility during migration)
-    # TODO: Remove after Phase 3 (ExtractionController removal)
+    # Legacy extraction signals (kept for direct MainWindow connections)
     preview_generated = Signal(object, int)  # pixmap, offset
     palettes_extracted = Signal(object)  # palette data
     active_palettes_found = Signal(list)  # list of active palette indices

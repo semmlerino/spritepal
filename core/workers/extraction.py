@@ -55,9 +55,9 @@ class VRAMExtractionWorker(ManagedWorker):
     def connect_manager_signals(self) -> None:
         """Connect extraction manager signals to worker signals.
 
-        Note: Preview and palette signals are connected directly by ExtractionController
-        to the manager (reduced signal chain from 3 hops to 1). Only progress signals
-        are forwarded through the worker for status updates.
+        Note: Preview and palette signals are connected directly by MainWindow
+        to the manager. Only progress signals are forwarded through the worker
+        for status updates.
         """
         helper = SignalConnectionHelper(self)
 

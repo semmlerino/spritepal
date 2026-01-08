@@ -7,7 +7,6 @@ These tests validate that components can access managers via AppContext.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import Mock
 
 import pytest
 
@@ -65,50 +64,6 @@ class TestAppContextAccess:
 
 class TestPureAppContextComponentInitialization:
     """Test components can initialize with explicit AppContext deps."""
-
-    def test_extraction_controller_pure_di(self, app_context: AppContext):
-        """Test ExtractionController works with all deps from AppContext."""
-        from ui.extraction_controller import ExtractionController
-
-        # Get all dependencies via AppContext
-        extraction_mgr = app_context.core_operations_manager
-        session_mgr = app_context.application_state_manager
-        injection_mgr = app_context.core_operations_manager
-        settings_mgr = app_context.application_state_manager
-        preview_gen = app_context.preview_generator
-
-        # Create mock main window
-        mock_window = Mock()
-        mock_window.extract_requested = Mock()
-        mock_window.open_in_editor_requested = Mock()
-        mock_window.arrange_rows_requested = Mock()
-        mock_window.arrange_grid_requested = Mock()
-        mock_window.inject_requested = Mock()
-        mock_window.extraction_panel = Mock()
-        mock_window.extraction_panel.offset_changed = Mock()
-
-        # Suppress deprecation warnings - we're passing all required params
-        import warnings
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-            # Create with explicit deps
-            controller = ExtractionController(
-                mock_window,
-                extraction_manager=extraction_mgr,
-                session_manager=session_mgr,
-                injection_manager=injection_mgr,
-                settings_manager=settings_mgr,
-                preview_generator=preview_gen,
-            )
-
-        # Verify managers are the injected ones
-        assert controller.extraction_manager is extraction_mgr
-        assert controller.session_manager is session_mgr
-        assert controller.injection_manager is injection_mgr
-        assert controller.settings_manager is settings_mgr
-        assert controller.preview_generator is preview_gen
 
     def test_main_window_pure_di(self, app_context: AppContext, qtbot):
         """Test MainWindow works with all deps from AppContext.

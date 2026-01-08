@@ -22,16 +22,18 @@ pytestmark = [
 
 
 class TestInfrastructureVerification:
-    def test_circular_import_fixed(self):
-        """Verify circular import is resolved"""
+    def test_main_window_import_doesnt_hang(self):
+        """Verify MainWindow imports without circular dependency issues.
+
+        Note: ExtractionController was removed in Phase 4e. MainWindow now handles
+        extraction directly, eliminating the circular dependency.
+        """
         try:
-            # These imports should work without hanging
-            from ui.extraction_controller import ExtractionController
+            # This import should work without hanging
             from ui.main_window import MainWindow
 
-            # Should be able to reference each other through protocols
+            # Should be importable
             assert MainWindow is not None
-            assert ExtractionController is not None
         except ImportError as e:
             pytest.fail(f"Import failed: {e}")
 

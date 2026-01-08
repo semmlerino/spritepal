@@ -358,15 +358,17 @@ class TestRealMainWindowStateIntegration:
 
         EXPOSED BUGS MOCKS WOULD MISS:
         - Real ExtractionPanel integration with MainWindow
-        - Real Controller integration with UI components
         - Cross-component state synchronization
         - Real Qt layout and widget hierarchy issues
+
+        Note: ExtractionController was removed in Phase 4e. MainWindow now handles
+        extraction directly via dialog_coordinator.
         """
         with self.main_window_test() as main_window:
             # Validate real component integration (vs mock component creation)
             assert hasattr(main_window, "extraction_panel"), "Should have real ExtractionPanel"
             assert hasattr(main_window, "rom_extraction_panel"), "Should have real ROMExtractionPanel"
-            assert hasattr(main_window, "controller"), "Should have real ExtractionController"
+            assert hasattr(main_window, "dialog_coordinator"), "Should have DialogCoordinator"
 
             # Validate real Qt parent relationships in component hierarchy
             assert main_window.extraction_panel.parent() is not None, "ExtractionPanel should have Qt parent"
@@ -377,8 +379,8 @@ class TestRealMainWindowStateIntegration:
             params = main_window.get_extraction_params()
             assert isinstance(params, dict), "Real parameter gathering should work"
 
-            # Validate real controller integration (vs mock controller)
-            assert main_window.controller is not None, "Should have real controller instance"
+            # Validate dialog coordinator integration
+            assert main_window.dialog_coordinator is not None, "Should have dialog coordinator"
 
 
 class TestRealMainWindowWorkflowIntegration:

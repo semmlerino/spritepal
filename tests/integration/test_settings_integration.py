@@ -9,12 +9,11 @@ import json
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from core.managers.application_state_manager import ApplicationStateManager
-from ui.extraction_controller import ExtractionController
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -38,21 +37,6 @@ class TestSettingsIntegration:
             patch("pathlib.Path.cwd", return_value=Path(tmpdir)),
         ):
             yield tmpdir
-
-    @pytest.fixture
-    def mock_main_window(self):
-        """Create mock main window for controller"""
-        mock = MagicMock()
-        mock.vram_input.text.return_value = ""
-        mock.cgram_input.text.return_value = ""
-        mock.oam_input.text.return_value = ""
-        mock.output_name_input.text.return_value = "output"
-        mock.grayscale_checkbox.isChecked.return_value = True
-        mock.metadata_checkbox.isChecked.return_value = True
-        mock.sprite_preview = MagicMock()
-        mock.extraction_panel = MagicMock()
-        mock.palette_list = MagicMock()
-        return mock
 
     def test_settings_persistence_across_sessions(self, temp_settings_dir, app_context: AppContext):
         """Test that settings persist across application restarts"""
@@ -81,8 +65,8 @@ class TestSettingsIntegration:
         assert settings2.get("ui", "window_height") == 768
         assert settings2.get("custom", "last_export_dir") == "/exports"
 
-    def test_controller_settings_integration(self, temp_settings_dir, mock_main_window, app_context: AppContext):
-        """Test controller interaction with settings manager"""
+    def test_settings_manager_session_data(self, temp_settings_dir, app_context: AppContext):
+        """Test settings manager session data persistence (formerly controller integration test)."""
         settings = app_context.application_state_manager
 
         # Pre-populate settings
@@ -90,20 +74,12 @@ class TestSettingsIntegration:
         settings.set("session", "last_tile_count", 64)
         settings.save_settings()
 
-        # Create controller with all required dependencies
-        ExtractionController(
-            main_window=mock_main_window,
-            extraction_manager=app_context.core_operations_manager,
-            session_manager=app_context.application_state_manager,
-            injection_manager=app_context.core_operations_manager,
-            settings_manager=settings,
-            preview_generator=app_context.preview_generator,
-        )
-
-        # Controller should be able to access settings
-        # (In real implementation, controller would use settings)
+        # Verify settings persisted
         last_offset = settings.get("session", "last_extraction_offset", 0)
         assert last_offset == 0xC000
+
+        tile_count = settings.get("session", "last_tile_count", 0)
+        assert tile_count == 64
 
     def test_window_geometry_persistence(self, temp_settings_dir, app_context: AppContext):
         """Test UI geometry settings persistence"""

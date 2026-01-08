@@ -15,7 +15,6 @@ import pytest
 # Import business logic components - no more manual path setup needed
 from core.extractor import SpriteExtractor
 from core.palette_manager import PaletteManager
-from ui.extraction_controller import ExtractionController
 
 # Test categorization
 pytestmark = [
