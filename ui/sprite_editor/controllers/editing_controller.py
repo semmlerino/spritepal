@@ -200,8 +200,13 @@ class EditingController(QObject):
         if tool_type not in (ToolType.PENCIL, ToolType.ERASER):
             return
 
+        # Determine draw color based on tool
+        draw_color = self._selected_color
+        if tool_type == ToolType.ERASER:
+            draw_color = 0
+
         # Get line points from tool (for interpolation)
-        line_points = tool.on_move(x, y, self._selected_color, self.image_model)
+        line_points = tool.on_move(x, y, draw_color, self.image_model)
 
         if not line_points:
             return
@@ -218,10 +223,10 @@ class EditingController(QObject):
                     continue
 
                 old_color = self.image_model.get_pixel(px, py)
-                if self.image_model.set_pixel(px, py, self._selected_color):
+                if self.image_model.set_pixel(px, py, draw_color):
                     any_changed = True
                     if self._current_stroke is not None:
-                        cmd = DrawPixelCommand(x=px, y=py, old_color=old_color, new_color=self._selected_color)
+                        cmd = DrawPixelCommand(x=px, y=py, old_color=old_color, new_color=draw_color)
                         self._current_stroke.add_command(cmd)
 
         if any_changed:

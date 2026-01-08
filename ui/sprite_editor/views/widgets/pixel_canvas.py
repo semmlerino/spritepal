@@ -455,6 +455,9 @@ class PixelCanvas(QWidget):
         # Draw only the visible portion of the image
         painter.drawImage(image_rect, scaled_qimage, image_rect)
 
+        # Reset clipping to allow drawing grid lines on the exact edge of the image
+        painter.setClipping(False)
+
         # Draw grid if visible and zoomed in enough (only in visible region)
         if self.grid_visible and self.zoom >= 4:
             self._draw_grid_viewport(painter, image_rect)
@@ -559,25 +562,28 @@ class PixelCanvas(QWidget):
         scaled_tile_size = tile_size_px * self.zoom
 
         # Calculate grid bounds within visible rect
+        # We add scaled_tile_size to end calculation to ensure we catch the bottom/right edge
         start_x = (rect.x() // scaled_tile_size) * scaled_tile_size
         start_y = (rect.y() // scaled_tile_size) * scaled_tile_size
-        end_x = rect.right() + scaled_tile_size
-        end_y = rect.bottom() + scaled_tile_size
+        end_x = rect.right() + scaled_tile_size + 1
+        end_y = rect.bottom() + scaled_tile_size + 1
 
         # Collect all grid lines for batch drawing using QPointF objects
         lines: list[QPointF] = []
 
         # Vertical lines
         for x in range(start_x, end_x, scaled_tile_size):
-            if rect.x() <= x <= rect.right():
+            # Allow drawing on the very edge (right + 1)
+            if rect.x() <= x <= rect.right() + 1:
                 lines.append(QPointF(x, rect.y()))
-                lines.append(QPointF(x, rect.bottom()))
+                lines.append(QPointF(x, rect.bottom() + 1))
 
         # Horizontal lines
         for y in range(start_y, end_y, scaled_tile_size):
-            if rect.y() <= y <= rect.bottom():
+            # Allow drawing on the very edge (bottom + 1)
+            if rect.y() <= y <= rect.bottom() + 1:
                 lines.append(QPointF(rect.x(), y))
-                lines.append(QPointF(rect.right(), y))
+                lines.append(QPointF(rect.right() + 1, y))
 
         # Draw all lines at once using QPainter.drawLines() for maximum efficiency
         if lines:

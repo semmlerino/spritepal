@@ -180,6 +180,9 @@ class EditWorkspace(QWidget):
             QShortcut(QKeySequence("="), self, self._icon_toolbar.zoom_in_btn.click)  # Handle unshifted +
         if self._icon_toolbar.zoom_out_btn:
             QShortcut(QKeySequence("-"), self, self._icon_toolbar.zoom_out_btn.click)
+        
+        # Reset zoom
+        QShortcut(QKeySequence("Ctrl+0"), self, self._on_zoom_reset)
 
     # Public panel accessors (for external signal connections)
     @property
@@ -411,6 +414,12 @@ class EditWorkspace(QWidget):
         current_zoom = self._canvas.zoom
         new_zoom = max(current_zoom - 1, 1)  # Min zoom 1x
         self._canvas.set_zoom(new_zoom)
+
+    def _on_zoom_reset(self) -> None:
+        """Handle zoom reset shortcut."""
+        if not self._canvas:
+            return
+        self._canvas.set_zoom(4)  # Reset to default 4x
 
     def _on_zoom_changed_from_canvas(self, zoom: int) -> None:
         """Handle zoom change from canvas (e.g., mouse wheel)."""
