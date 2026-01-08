@@ -122,6 +122,45 @@ Don't rewrite these:
 | Signal cleanup | `ui/common/signal_utils.safe_disconnect()` |
 | Worker cancellation | `BaseWorker.is_cancelled()` (check every 32 tiles) |
 
+## Asset Browser & Library
+
+### Context Menu Actions
+
+The `SpriteAssetBrowser` widget provides right-click context menu with:
+- **Rename** - Inline edit item name (also updates library if sprite is saved there)
+- **Delete** - Remove item from browser tree
+- **Save to Library** - Persist sprite to `~/.spritepal/library/` for cross-session access
+- **Copy Offset** - Copy hex offset to clipboard (e.g., "0x3C6EF1")
+
+### Sprite Library Integration
+
+`SpriteLibrary` (`core/sprite_library.py`) provides persistent storage:
+
+```python
+from core.app_context import get_app_context
+
+library = get_app_context().sprite_library
+library.add_sprite(rom_offset=0x3C6EF1, rom_path="rom.sfc", name="Kirby")
+library.get_by_offset(0x3C6EF1, rom_hash)  # Find by offset
+library.update_sprite(unique_id, name="New Name")
+library.remove_sprite(unique_id)
+```
+
+**Storage:** `~/.spritepal/library/sprites.json` + thumbnails in `thumbnails/` subdirectory.
+
+**ROM matching:** Library sprites are keyed by SHA256 ROM hash, so sprites from different ROMs don't collide.
+
+### Signal Wiring (ROMWorkflowController)
+
+```python
+# Asset browser signals → controller handlers
+asset_browser.save_to_library_requested → _on_save_to_library()
+asset_browser.rename_requested → _on_asset_renamed()
+asset_browser.delete_requested → _on_asset_deleted()
+asset_browser.sprite_selected → _on_sprite_selected()
+asset_browser.sprite_activated → _on_sprite_activated()  # Double-click
+```
+
 ## Current State
 
 - **Tests:** 106 tests across 7 test files covering controller signals, widget validation, panel synchronization, and UI redesign components.

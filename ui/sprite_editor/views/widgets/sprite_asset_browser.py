@@ -148,10 +148,12 @@ class SpriteAssetBrowser(QWidget):
     sprite_activated = Signal(int, str)  # double-click -> offset, source_type
     rename_requested = Signal(int, str)  # offset, new_name
     delete_requested = Signal(int, str)  # offset, source_type
+    save_to_library_requested = Signal(int, str)  # offset, source_type
 
     # Category names
     CATEGORY_ROM = "ROM Sprites"
     CATEGORY_MESEN = "Mesen2 Captures"
+    CATEGORY_LIBRARY = "Saved Library"
     CATEGORY_LOCAL = "Local Files"
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -213,6 +215,7 @@ class SpriteAssetBrowser(QWidget):
         # Create categories
         self._rom_category = self._create_category(self.CATEGORY_ROM)
         self._mesen_category = self._create_category(self.CATEGORY_MESEN)
+        self._library_category = self._create_category(self.CATEGORY_LIBRARY)
         self._local_category = self._create_category(self.CATEGORY_LOCAL)
 
     def _create_category(self, name: str) -> QTreeWidgetItem:
@@ -254,6 +257,8 @@ class SpriteAssetBrowser(QWidget):
             return self._rom_category
         elif name == self.CATEGORY_MESEN:
             return self._mesen_category
+        elif name == self.CATEGORY_LIBRARY:
+            return self._library_category
         elif name == self.CATEGORY_LOCAL:
             return self._local_category
         else:
@@ -343,6 +348,13 @@ class SpriteAssetBrowser(QWidget):
         delete_action.triggered.connect(lambda: self._delete_item(item))
         menu.addAction(delete_action)
 
+        # Save to Library action (only for ROM/Mesen sprites)
+        if "offset" in data:
+            menu.addSeparator()
+            save_action = QAction("Save to Library", self)
+            save_action.triggered.connect(lambda: self._save_to_library(item))
+            menu.addAction(save_action)
+
         # Copy offset action (only for ROM/Mesen sprites)
         if "offset" in data:
             menu.addSeparator()
@@ -396,6 +408,19 @@ class SpriteAssetBrowser(QWidget):
                 # For local files, use path as identifier
                 path = data["path"]
                 self.delete_requested.emit(-1, path)
+
+    def _save_to_library(self, item: QTreeWidgetItem) -> None:
+        """
+        Request saving item to library.
+
+        Args:
+            item: Item to save
+        """
+        data = item.data(0, Qt.ItemDataRole.UserRole)
+        if isinstance(data, dict) and "offset" in data:
+            offset = data["offset"]
+            source_type = data["source_type"]
+            self.save_to_library_requested.emit(offset, source_type)
 
     def _copy_offset(self, item: QTreeWidgetItem) -> None:
         """
@@ -475,6 +500,28 @@ class SpriteAssetBrowser(QWidget):
         }
         item.setData(0, Qt.ItemDataRole.UserRole, data)
 
+    def add_library_sprite(self, name: str, offset: int, thumbnail: QPixmap | None = None) -> None:
+        """
+        Add a sprite from the persistent library.
+
+        Args:
+            name: Sprite name
+            offset: ROM offset
+            thumbnail: Optional thumbnail pixmap
+        """
+        item = QTreeWidgetItem(self._library_category)
+        item.setText(0, name)
+        item.setToolTip(0, f"Library: 0x{offset:06X}")
+
+        # Store data
+        data = {
+            "name": name,
+            "offset": offset,
+            "source_type": "library",
+            "thumbnail": thumbnail,
+        }
+        item.setData(0, Qt.ItemDataRole.UserRole, data)
+
     def clear_category(self, category: str) -> None:
         """
         Clear all items from a category.
@@ -489,6 +536,7 @@ class SpriteAssetBrowser(QWidget):
         """Clear all items from all categories."""
         self._rom_category.takeChildren()
         self._mesen_category.takeChildren()
+        self._library_category.takeChildren()
         self._local_category.takeChildren()
 
     def set_thumbnail(self, offset: int, thumbnail: QPixmap) -> None:
@@ -565,6 +613,7 @@ class SpriteAssetBrowser(QWidget):
         return {
             self.CATEGORY_ROM: self._rom_category.childCount(),
             self.CATEGORY_MESEN: self._mesen_category.childCount(),
+            self.CATEGORY_LIBRARY: self._library_category.childCount(),
             self.CATEGORY_LOCAL: self._local_category.childCount(),
         }
 

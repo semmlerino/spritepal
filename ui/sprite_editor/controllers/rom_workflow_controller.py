@@ -76,6 +76,9 @@ class ROMWorkflowController(QObject):
         # Thumbnail worker controller
         self._thumbnail_controller: ThumbnailWorkerController | None = None
 
+        # Queue for captures discovered before view is ready
+        self._pending_captures: list[CapturedOffset] = []
+
         # Connect LogWatcher
         self._connect_log_watcher()
 
@@ -125,15 +128,29 @@ class ROMWorkflowController(QObject):
 
     def _on_offset_discovered(self, capture: object) -> None:
         """Handle new offset discovered from Mesen2 log."""
-        if self._view:
-            if isinstance(capture, CapturedOffset):
-                # Add to asset browser with context-aware name
-                name = self._get_capture_name(capture)
-                self._view.asset_browser.add_mesen_capture(name, capture.offset)
+        if not isinstance(capture, CapturedOffset):
+            return
 
-                # Request thumbnail if worker is ready
-                if self._thumbnail_controller:
-                    self._thumbnail_controller.queue_thumbnail(capture.offset)
+        # Queue if view not ready yet
+        if self._view is None:
+            self._pending_captures.append(capture)
+            logger.debug("Queued capture 0x%06X (view not ready)", capture.offset)
+            return
+
+        # Process immediately
+        self._add_capture_to_browser(capture)
+
+    def _add_capture_to_browser(self, capture: CapturedOffset) -> None:
+        """Add a capture to the browser with thumbnail."""
+        if not self._view:
+            return
+
+        name = self._get_capture_name(capture)
+        self._view.asset_browser.add_mesen_capture(name, capture.offset)
+
+        # Request thumbnail if worker is ready
+        if self._thumbnail_controller:
+            self._thumbnail_controller.queue_thumbnail(capture.offset)
 
     def set_view(self, view: "ROMWorkflowPage") -> None:
         """Set the view and connect signals."""
@@ -142,15 +159,15 @@ class ROMWorkflowController(QObject):
 
         # Load existing persistent clicks into asset browser
         persistent_clicks = self.log_watcher.load_persistent_clicks()
-        if persistent_clicks:
-            for capture in persistent_clicks:
-                name = self._get_capture_name(capture)
-                view.asset_browser.add_mesen_capture(name, capture.offset)
+        for capture in persistent_clicks:
+            self._add_capture_to_browser(capture)
 
-            # Request thumbnails for all loaded captures if worker is ready
-            if self._thumbnail_controller:
-                for capture in persistent_clicks:
-                    self._thumbnail_controller.queue_thumbnail(capture.offset)
+        # Flush any pending real-time captures (discovered before view was ready)
+        if self._pending_captures:
+            logger.info("Flushing %d pending captures", len(self._pending_captures))
+            for capture in self._pending_captures:
+                self._add_capture_to_browser(capture)
+            self._pending_captures.clear()
 
     def _connect_view_signals(self) -> None:
         """Connect view signals."""
@@ -164,6 +181,9 @@ class ROMWorkflowController(QObject):
         # Asset browser signals
         self._view.sprite_selected.connect(self._on_sprite_selected)
         self._view.sprite_activated.connect(self._on_sprite_activated)
+        self._view.asset_browser.save_to_library_requested.connect(self._on_save_to_library)
+        self._view.asset_browser.rename_requested.connect(self._on_asset_renamed)
+        self._view.asset_browser.delete_requested.connect(self._on_asset_deleted)
 
         # EditWorkspace signals (save/export)
         self._view.workspace.saveToRomRequested.connect(self.prepare_injection)
@@ -187,6 +207,181 @@ class ROMWorkflowController(QObject):
         self._pending_open_in_editor = True
         logger.debug("[DOUBLE-CLICK] Flag set, calling set_offset")
         self.set_offset(offset)
+
+    def _on_save_to_library(self, offset: int, source_type: str) -> None:
+        """Save sprite to library."""
+        if not self.rom_path:
+            logger.warning("Cannot save to library: no ROM loaded")
+            self.status_message.emit("Cannot save to library: no ROM loaded")
+            return
+
+        library = get_app_context().sprite_library
+
+        # Check if already in library
+        rom_hash = library.compute_rom_hash(self.rom_path)
+        existing = library.get_by_offset(offset, rom_hash)
+        if existing:
+            logger.info("Sprite at 0x%06X already in library", offset)
+            self.status_message.emit(f"Sprite at 0x{offset:06X} is already in library")
+            return
+
+        # Get display name from browser
+        name = self._get_display_name_for_offset(offset) or f"Sprite 0x{offset:06X}"
+
+        # Generate thumbnail (PIL Image for library storage)
+        pil_thumbnail = self._generate_library_thumbnail(offset)
+
+        # Add to library (persistent storage)
+        library.add_sprite(
+            rom_offset=offset,
+            rom_path=self.rom_path,
+            name=name,
+            thumbnail=pil_thumbnail,
+        )
+
+        # Also add to browser's Library category for immediate visibility
+        if self._view:
+            qpixmap = self._pil_to_qpixmap(pil_thumbnail) if pil_thumbnail else None
+            self._view.asset_browser.add_library_sprite(name, offset, qpixmap)
+
+        logger.info("Saved to library: %s at 0x%06X", name, offset)
+        self.status_message.emit(f"Saved '{name}' to library")
+
+    def _get_display_name_for_offset(self, offset: int) -> str | None:
+        """Get current display name for offset from browser."""
+        if not self._view:
+            return None
+
+        # Search browser items for matching offset
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QTreeWidgetItemIterator
+
+        iterator = QTreeWidgetItemIterator(self._view.asset_browser.tree)
+        while iterator.value():
+            item = iterator.value()
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("offset") == offset:
+                return item.text(0)
+            iterator += 1
+        return None
+
+    def _generate_library_thumbnail(self, offset: int) -> Image.Image | None:
+        """Generate PIL Image thumbnail for library storage."""
+        if not self.rom_path:
+            return None
+        try:
+            from core.tile_renderer import TileRenderer
+
+            # Read sprite data from ROM
+            with open(self.rom_path, "rb") as f:
+                f.seek(offset)
+                data = f.read(32 * 64)  # Read up to 64 tiles worth
+
+            if not data:
+                return None
+
+            tile_count = len(data) // 32
+            if tile_count == 0:
+                return None
+
+            # Calculate grid dimensions
+            width_tiles = min(8, tile_count)
+            height_tiles = (tile_count + width_tiles - 1) // width_tiles
+
+            # Render using TileRenderer (grayscale)
+            renderer = TileRenderer()
+            image = renderer.render_tiles(data, width_tiles, height_tiles, palette_index=None)
+            return image
+        except Exception as e:
+            logger.error("Failed to generate thumbnail: %s", e)
+            return None
+
+    def _pil_to_qpixmap(self, pil_image: Image.Image) -> QPixmap:
+        """Convert PIL Image to QPixmap."""
+        # Convert to RGBA if needed
+        if pil_image.mode != "RGBA":
+            pil_image = pil_image.convert("RGBA")
+
+        data = pil_image.tobytes("raw", "RGBA")
+        qimage = QImage(
+            data,
+            pil_image.width,
+            pil_image.height,
+            pil_image.width * 4,
+            QImage.Format.Format_RGBA8888,
+        )
+        return QPixmap.fromImage(qimage)
+
+    def _on_asset_renamed(self, offset: int, new_name: str) -> None:
+        """Handle asset rename from context menu."""
+        logger.info("Asset renamed: 0x%06X → %s", offset, new_name)
+        # Names are stored in widget's UserRole data, which updates on edit
+        # Also update library if this sprite is in the library
+        if self.rom_path:
+            library = get_app_context().sprite_library
+            rom_hash = library.compute_rom_hash(self.rom_path)
+            existing = library.get_by_offset(offset, rom_hash)
+            if existing:
+                library.update_sprite(existing[0].unique_id, name=new_name)
+                logger.info("Updated library sprite name: %s", new_name)
+
+    def _on_asset_deleted(self, offset: int, source_type: str) -> None:
+        """Handle asset deletion from context menu."""
+        logger.info("Asset deleted: 0x%06X (%s)", offset, source_type)
+        # Remove item from browser tree
+        if self._view:
+            from PySide6.QtCore import Qt
+            from PySide6.QtWidgets import QTreeWidgetItemIterator
+
+            iterator = QTreeWidgetItemIterator(self._view.asset_browser.tree)
+            while iterator.value():
+                item = iterator.value()
+                data = item.data(0, Qt.ItemDataRole.UserRole)
+                if isinstance(data, dict) and data.get("offset") == offset:
+                    parent = item.parent()
+                    if parent:
+                        parent.removeChild(item)
+                    break
+                iterator += 1
+
+    def _load_library_sprites(self) -> None:
+        """Load sprites from library that match current ROM."""
+        if not self._view or not self.rom_path:
+            return
+
+        library = get_app_context().sprite_library
+        rom_hash = library.compute_rom_hash(self.rom_path)
+
+        count = 0
+        for sprite in library.sprites:
+            if sprite.rom_hash == rom_hash:
+                # Add to Library category (not ROM Sprites)
+                thumbnail = self._load_library_thumbnail(sprite)
+                self._view.asset_browser.add_library_sprite(
+                    sprite.name,
+                    sprite.rom_offset,
+                    thumbnail=thumbnail,
+                )
+                # Request fresh thumbnail
+                if self._thumbnail_controller:
+                    self._thumbnail_controller.queue_thumbnail(sprite.rom_offset)
+                count += 1
+
+        if count > 0:
+            logger.info("Loaded %d library sprites for this ROM", count)
+
+    def _load_library_thumbnail(self, sprite: object) -> QPixmap | None:
+        """Load thumbnail from library."""
+        from core.sprite_library import LibrarySprite
+
+        if not isinstance(sprite, LibrarySprite):
+            return None
+
+        library = get_app_context().sprite_library
+        path = library.get_thumbnail_path(sprite)
+        if path and path.exists():
+            return QPixmap(str(path))
+        return None
 
     def browse_rom(self) -> None:
         """Open file dialog to select ROM file."""
@@ -233,6 +428,9 @@ class ROMWorkflowController(QObject):
 
         # Setup thumbnail worker for asset browser
         self._setup_thumbnail_worker()
+
+        # Load library sprites for this ROM
+        self._load_library_sprites()
 
         # Request thumbnails for any existing assets
         if self._view and self._thumbnail_controller:

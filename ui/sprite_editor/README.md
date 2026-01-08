@@ -39,6 +39,12 @@ uv run python launch_editor.py
   - OAM-correct palette assignments
   - Palette validation
 
+- **ROM Mode** (Asset Browser): Mesen 2 integrated sprite discovery
+  - Live capture of sprite offsets from running game
+  - Context menu: Rename, Delete, Save to Library, Copy Offset
+  - Persistent sprite library across sessions
+  - Thumbnail previews with context-aware naming (Boot/Menu/Cutscene/Gameplay)
+
 ## Architecture
 
 ### Directory Structure
@@ -68,6 +74,8 @@ ui/sprite_editor/
 │   ├── extraction_controller.py   # Extract tab logic
 │   ├── editing_controller.py      # Edit tab logic
 │   ├── injection_controller.py    # Inject tab logic
+│   ├── rom_workflow_controller.py # ROM mode + asset browser
+│   ├── asset_browser_controller.py # Asset management (optional)
 │   └── base_controller.py         # Common base class
 ├── workers/                       # Background threads
 │   ├── extraction_worker.py       # Async extraction
@@ -86,7 +94,13 @@ ui/sprite_editor/
 │   │   ├── palette_panel.py
 │   │   └── preview_panel.py
 │   ├── widgets/                   # Custom widgets
-│   │   └── pixel_canvas.py        # Sprite editing canvas
+│   │   ├── pixel_canvas.py        # Sprite editing canvas
+│   │   ├── sprite_asset_browser.py # Asset tree with thumbnails
+│   │   ├── icon_toolbar.py        # Tool selection toolbar
+│   │   ├── editor_status_bar.py   # Cursor/tile/color status
+│   │   ├── save_export_panel.py   # Save/Export buttons
+│   │   ├── contextual_preview.py  # Real-time sprite preview
+│   │   └── palette_source_selector.py # Palette source dropdown
 │   └── dialogs/                   # Dialog windows
 │       └── palette_switcher_dialog.py
 └── tests/                         # Unit tests
@@ -149,6 +163,41 @@ undo.record_action(action_name, undo_func, redo_func)
 undo.undo()
 undo.redo()
 ```
+
+### Sprite Library
+
+**SpriteLibrary** - Persistent sprite storage across sessions
+```python
+from core.app_context import get_app_context
+
+library = get_app_context().sprite_library
+
+# Add sprite to library
+sprite = library.add_sprite(
+    rom_offset=0x3C6EF1,
+    rom_path="path/to/rom.sfc",
+    name="Kirby Running",
+    thumbnail=pil_image,  # Optional PIL Image
+    tags=["kirby", "gameplay"],
+)
+
+# Find sprites by offset
+matches = library.get_by_offset(0x3C6EF1, rom_hash="abc123...")
+
+# Update sprite metadata
+library.update_sprite(sprite.unique_id, name="New Name", tags=["updated"])
+
+# Search by name/notes/tags
+results = library.search("kirby")
+
+# Library is auto-saved on changes
+```
+
+**Storage location:** `~/.spritepal/library/`
+- `sprites.json` - Sprite metadata (offset, ROM hash, name, tags, timestamps)
+- `thumbnails/` - PNG thumbnail images
+
+**ROM isolation:** Sprites are keyed by SHA256 ROM hash, ensuring sprites from different ROMs don't conflict.
 
 ### Settings Management
 
@@ -343,7 +392,6 @@ class MyApp(QMainWindow):
 - Maximum sprite size: 64KB (limited by VRAM)
 - Palette editing not yet supported (view-only)
 - No batch operations
-- Detached editor window not yet implemented
 
 ## Future Enhancements
 
@@ -362,4 +410,4 @@ class MyApp(QMainWindow):
 
 ---
 
-*Last updated: January 6, 2026 (Added SpriteEditTab embedding documentation)*
+*Last updated: January 8, 2026 (Added Asset Browser context menu, Sprite Library integration, ROM Mode documentation)*
