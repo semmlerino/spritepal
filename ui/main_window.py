@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.services.rom_cache import ROMCache
     from ui.extraction_controller import ExtractionController
+    from ui.services.dialog_coordinator import DialogCoordinator
 
 from typing import override
 
@@ -91,6 +92,7 @@ class MainWindow(QMainWindow):
         self._output_path: str
         self._extracted_files: list[str]
         self._controller: ExtractionController | None
+        self._dialog_coordinator: DialogCoordinator | None
         self._error_handler: ErrorHandler
         self.left_dock: QDockWidget
         self.center_stack: QStackedWidget
@@ -120,6 +122,7 @@ class MainWindow(QMainWindow):
         self._output_path = ""
         self._extracted_files = []
         self._controller = None  # Lazy initialization to break circular dependency
+        self._dialog_coordinator = None  # Lazy initialization for dialog service
         self._last_undo_state = (False, False)
 
         self._setup_ui()
@@ -512,22 +515,167 @@ class MainWindow(QMainWindow):
             self._handle_vram_extraction(settings.output_name, settings.export_palette_files, settings.include_metadata)
 
     def on_open_editor_clicked(self) -> None:
-        """Handle open in editor button click"""
+        """Handle open in editor button click."""
         if self._output_path:
             sprite_file = f"{self._output_path}.png"
+            # Use DialogCoordinator directly (Phase 4b: controller removal)
+            self.dialog_coordinator.open_in_editor(
+                sprite_file,
+                status_callback=self.status_bar.showMessage,
+            )
+            # Keep signal for backwards compatibility during transition
             self.open_in_editor_requested.emit(sprite_file)
 
     def on_arrange_rows_clicked(self) -> None:
-        """Handle arrange rows button click"""
+        """Handle arrange rows button click."""
         if self._output_path:
             sprite_file = f"{self._output_path}.png"
+            # Get palettes from sprite preview if available
+            palettes = self._get_palettes_for_dialog()
+            # Get tiles per row from sprite preview if available
+            tiles_per_row = self._get_tiles_per_row_for_dialog()
+
+            # Use DialogCoordinator directly (Phase 4b: controller removal)
+            def _open_arranged_rows(path: str) -> None:
+                self.dialog_coordinator.open_in_editor(path, status_callback=self.status_bar.showMessage)
+
+            self.dialog_coordinator.open_row_arrangement(
+                sprite_file,
+                palettes=palettes,
+                tiles_per_row=tiles_per_row,
+                status_callback=self.status_bar.showMessage,
+                on_success=_open_arranged_rows,
+            )
+            # Keep signal for backwards compatibility during transition
             self.arrange_rows_requested.emit(sprite_file)
 
     def on_arrange_grid_clicked(self) -> None:
-        """Handle arrange grid button click"""
+        """Handle arrange grid button click."""
         if self._output_path:
             sprite_file = f"{self._output_path}.png"
+            # Get palettes from sprite preview if available
+            palettes = self._get_palettes_for_dialog()
+            # Get tiles per row from sprite preview if available
+            tiles_per_row = self._get_tiles_per_row_for_dialog()
+
+            # Use DialogCoordinator directly (Phase 4b: controller removal)
+            def _open_arranged_grid(path: str) -> None:
+                self.dialog_coordinator.open_in_editor(path, status_callback=self.status_bar.showMessage)
+
+            self.dialog_coordinator.open_grid_arrangement(
+                sprite_file,
+                palettes=palettes,
+                tiles_per_row=tiles_per_row,
+                status_callback=self.status_bar.showMessage,
+                on_success=_open_arranged_grid,
+            )
+            # Keep signal for backwards compatibility during transition
             self.arrange_grid_requested.emit(sprite_file)
+
+    def _get_palettes_for_dialog(self) -> dict[int, list[tuple[int, int, int]]] | None:
+        """Get palette data from sprite preview for dialogs.
+
+        Returns:
+            Palette dict if available, None otherwise.
+        """
+        if hasattr(self, "sprite_preview") and self.sprite_preview:
+            if hasattr(self.sprite_preview, "get_palettes"):
+                try:
+                    palettes = self.sprite_preview.get_palettes()
+                    if palettes:
+                        return palettes
+                except Exception as e:
+                    logger.warning(f"Failed to get palettes for dialog: {e}")
+        return None
+
+    def _get_tiles_per_row_for_dialog(self) -> int | None:
+        """Get tiles per row from sprite preview for dialogs.
+
+        Returns:
+            Tiles per row if available, None to let DialogCoordinator calculate.
+        """
+        if hasattr(self, "sprite_preview") and self.sprite_preview:
+            try:
+                _, tiles_per_row = self.sprite_preview.get_tile_info()
+                if tiles_per_row > 0:
+                    return tiles_per_row
+            except (AttributeError, TypeError):
+                pass
+        return None
+
+    def _update_preview_with_offset(self, offset: int) -> None:
+        """Update preview with new VRAM offset without full extraction.
+
+        Handles real-time preview updates when user moves the offset slider.
+        Uses PreviewGenerator service for preview generation.
+
+        Note: This method is connected to extraction_panel.offset_changed.
+        CRITICAL: PIL→QPixmap conversion happens in main thread (Bug #26 fix).
+        """
+        logger.debug(f"Updating preview with offset: 0x{offset:04X} ({offset})")
+
+        try:
+            # Check if we have VRAM loaded
+            has_vram = self.extraction_panel.has_vram()
+            if not has_vram:
+                logger.debug("No VRAM loaded, skipping preview update")
+                return
+
+            # Get VRAM path
+            vram_path = self.extraction_panel.get_vram_path()
+            if not vram_path:
+                logger.warning("VRAM path is empty or None")
+                self.status_bar.showMessage("VRAM path not available")
+                return
+
+            # Get PreviewGenerator from app context
+            from core.app_context import get_app_context
+            from core.services.preview_generator import create_vram_preview_request
+
+            preview_generator = get_app_context().preview_generator
+
+            # Create preview request
+            preview_request = create_vram_preview_request(
+                vram_path=vram_path,
+                offset=offset,
+                sprite_name=f"vram_0x{offset:06X}",
+                size=(self.sprite_preview.width(), self.sprite_preview.height()),
+            )
+
+            # Generate preview with progress tracking
+            def progress_callback(percent: int, message: str) -> None:
+                progress_msg = f"{message} ({percent}%)"
+                self.status_bar.showMessage(progress_msg)
+
+            result = preview_generator.generate_preview(preview_request, progress_callback)
+
+            if result is None:
+                logger.error("Preview generation failed")
+                self.status_bar.showMessage("Preview generation failed")
+                return
+
+            logger.debug(f"Generated preview with {result.tile_count} tiles, cached: {result.cached}")
+
+            # Update preview without resetting view (for real-time slider updates)
+            # CRITICAL: result.pixmap is already QPixmap from PreviewGenerator (main thread safe)
+            self.sprite_preview.update_preview(result.pixmap, result.tile_count)
+
+            # Update status bar with preview info
+            info_text = f"Tiles: {result.tile_count} (Offset: 0x{offset:04X})"
+            self.status_bar.showMessage(info_text)
+
+            # Update grayscale image for palette application
+            self.sprite_preview.set_grayscale_image(result.pil_image)
+
+            logger.debug("Preview update completed successfully")
+
+        except Exception as e:
+            error_msg = f"Preview update failed: {e!s}"
+            logger.exception("Error in preview update with offset 0x%04X", offset)
+
+            # Show error in status bar
+            self.status_bar.showMessage(error_msg)
+            self.sprite_preview.clear()
 
     def on_inject_clicked(self) -> None:
         """Handle inject to VRAM button click"""
@@ -755,6 +903,8 @@ class MainWindow(QMainWindow):
         self.extraction_panel.files_changed.connect(self._on_files_changed)
         self.extraction_panel.extraction_ready.connect(self._on_vram_extraction_ready)
         self.extraction_panel.mode_changed.connect(self._on_extraction_mode_changed)
+        # Direct preview update handling (Phase 4c: controller removal)
+        self.extraction_panel.offset_changed.connect(self._update_preview_with_offset)
 
         # Connect ROM extraction panel signals
         self.rom_extraction_panel.files_changed.connect(self._on_rom_files_changed)
@@ -1272,6 +1422,19 @@ class MainWindow(QMainWindow):
     def controller(self, value: ExtractionController) -> None:
         """Allow setting controller for testing purposes."""
         self._controller = value
+
+    @property
+    def dialog_coordinator(self) -> DialogCoordinator:
+        """Lazy initialization of dialog coordinator.
+
+        DialogCoordinator handles dialog-related operations (open in editor,
+        row/grid arrangement) that were previously in ExtractionController.
+        """
+        if self._dialog_coordinator is None:
+            from ui.services.dialog_coordinator import DialogCoordinator
+
+            self._dialog_coordinator = DialogCoordinator(parent=self)
+        return self._dialog_coordinator
 
     @property
     def error_handler(self) -> ErrorHandler:

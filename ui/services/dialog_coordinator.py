@@ -10,6 +10,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
+
 from PIL import Image
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QWidget
@@ -111,7 +112,7 @@ class DialogCoordinator(QObject):
     def open_row_arrangement(
         self,
         sprite_file: str,
-        palettes: dict[int, list[list[int]]] | None,
+        palettes: dict[int, list[tuple[int, int, int]]] | None,
         tiles_per_row: int | None,
         status_callback: Callable[[str], None] | None = None,
         on_success: Callable[[str], None] | None = None,
@@ -174,7 +175,7 @@ class DialogCoordinator(QObject):
     def open_grid_arrangement(
         self,
         sprite_file: str,
-        palettes: dict[int, list[list[int]]] | None,
+        palettes: dict[int, list[tuple[int, int, int]]] | None,
         tiles_per_row: int | None,
         status_callback: Callable[[str], None] | None = None,
         on_success: Callable[[str], None] | None = None,

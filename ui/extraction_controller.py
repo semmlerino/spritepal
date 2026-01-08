@@ -102,7 +102,8 @@ class ExtractionController(QObject):
         _ = self.main_window.arrange_rows_requested.connect(self.open_row_arrangement)
         _ = self.main_window.arrange_grid_requested.connect(self.open_grid_arrangement)
         _ = self.main_window.inject_requested.connect(self.start_injection)
-        _ = self.main_window.extraction_panel.offset_changed.connect(self.update_preview_with_offset)
+        # offset_changed connection moved to MainWindow (Phase 4c)
+        # _ = self.main_window.extraction_panel.offset_changed.connect(self.update_preview_with_offset)
 
         # Connect injection manager signals
         _ = self.injection_manager.injection_progress.connect(self._on_injection_progress)
