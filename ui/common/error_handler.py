@@ -5,8 +5,8 @@ This allows for proper testing and separation of concerns.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
 import threading
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QMessageBox
