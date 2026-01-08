@@ -1276,11 +1276,6 @@ class MainWindow(QMainWindow):
         self.rom_extraction_panel.extraction_ready.connect(self._on_rom_extraction_ready)
         self.rom_extraction_panel.output_name_changed.connect(self._on_rom_output_name_changed)
 
-        # Connect sprite editor status messages to main status bar
-        self._sprite_editor_workspace.status_message.connect(
-            lambda msg: self.status_bar_manager.show_message(msg, 3000)
-        )
-
         # Connect ROM panel's "open in sprite editor" signal
         self.rom_extraction_panel.open_in_sprite_editor.connect(self._on_open_in_sprite_editor)
 

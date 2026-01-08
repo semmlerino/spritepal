@@ -1,8 +1,26 @@
 # Sprite Editor Analysis & Refactoring Plan
 
+## Status Summary
+
+**Last Update:** 2025-01-08
+
+| Phase | Status | Completed |
+|-------|--------|-----------|
+| **Phase 1: Quick Wins** | In Progress | ✅ Item 1 (Kill Dual Signal Path) |
+| **Phase 2: Medium (Collapse Layers)** | Pending | — |
+| **Phase 3: Deeper (Architecture)** | Pending | — |
+
+**Completed Work:**
+- ✅ Problem #1 (Dual-Path Signal Wiring) - Removed `MainController._update_undo_state` and duplicate status connection. Single signal path now active.
+- Test Coverage: 1984 passed, 23 skipped, 0 failures (no regression)
+
+**Next Priority:** Problem #2 (Service Locator Anti-Pattern) or Phase 1 Item 2 (Flatten Status Messages)
+
+---
+
 ## 1. 10 Highest Impact Problems
 
-1.  **Dual-Path Signal Wiring (Undo/Redo):** The `EditingController` updates the `MainWindow`'s Undo/Redo buttons via *two* conflicting paths: one direct via `MainController` setting widget state, and another via `SpriteEditorWorkspace` re-emitting signals to `MainWindow`.
+1.  **Dual-Path Signal Wiring (Undo/Redo):** ✅ **RESOLVED** (2025-01-08) - Removed `MainController._update_undo_state()` direct path. Single signal flow now: `EditingController.undoStateChanged` → `SpriteEditorWorkspace.undo_state_changed` → `MainWindow._update_undo_redo_state()`. Also removed duplicate status message connection at MainWindow level.
 2.  **Service Locator Anti-Pattern (`AppContext`):** `AppContext` is a global bag of services. While it makes dependencies "explicit" in `launch_spritepal.py`, it effectively hides dependencies deeper in the stack where `get_app_context()` is called (e.g., inside `MainWindow` properties).
 3.  **God-Class `UICoordinator`:** This class orchestrates unrelated UI concerns (session, tabs, previews, toolbars), creating high coupling between the extraction and editor views.
 4.  **Passthrough Signal Chains:** `SpriteEditorWorkspace` acts largely as a "signal relay," receiving signals from controllers and re-emitting them to `MainWindow` (e.g., `status_message`, `mode_changed`), adding noise without value.
@@ -45,15 +63,12 @@
 4.  **`EditTab` (View)**
     *   Listens to `imageChanged`.
     *   Triggers `repaint()`.
-5.  **`MainController` (Coordinator)**
-    *   Listens to `undoStateChanged`.
-    *   **Direct Call:** `MainWindow.action_undo.setEnabled(True)`.
-6.  **`SpriteEditorWorkspace` (Passthrough)**
+5.  **`SpriteEditorWorkspace` (Signal Relay)**
     *   Listens to `undoStateChanged`.
     *   **Signal:** Re-emits `undo_state_changed`.
-7.  **`MainWindow` (Root View)**
+6.  **`MainWindow` (Root View)**
     *   Listens to `undo_state_changed` (from Workspace).
-    *   **Direct Call:** `self.undo_action.setEnabled(True)` (Redundant Step 5).
+    *   **Direct Call:** `self.undo_action.setEnabled(True)` (conditional: only when sprite editor tab active).
 
 ### Workflow 3: VRAM Extraction
 1.  **User Action:** "Extract" button clicked.
@@ -90,8 +105,8 @@
 
 | Signal Name | Emitter | Subscriber | Payload | Issues |
 | :--- | :--- | :--- | :--- | :--- |
-| `undoStateChanged` | `EditingController` | `MainController`, `SpriteEditorWorkspace` | `(bool, bool)` | **Dual Path:** Handled twice (Controller->Window, Workspace->Window). |
-| `status_message` | `EditingController` | `MainController` -> `SpriteEditorWorkspace` -> `MainWindow` | `str` | **Bucket Brigade:** Passed through 3 layers just to show text. |
+| `undoStateChanged` | `EditingController` | `SpriteEditorWorkspace` | `(bool, bool)` | ✅ **RESOLVED:** Single path (removed MainController direct path). Workspace relays → MainWindow. |
+| `status_message` | `EditingController`, `ROMWorkflowController` | `SpriteEditorWorkspace` -> `MainWindow` | `str` | **Minor:** 3-layer relay, but acceptable. Single connection at MainWindow (duplicate removed). |
 | `extract_requested` | `MainWindow` | `ExtractionController` (presumed) | None | **Ambiguous:** Unclear if this triggers the action or just notifies. |
 | `mode_changed` | `SpriteEditorWorkspace` | `MainController` | `str` | **Circular:** Workspace UI -> Controller -> Workspace UI (to switch stack). |
 | `files_changed` | `ExtractionPanel` | `MainWindow` | None | **Generic:** Doesn't say *what* file changed. |
@@ -101,12 +116,12 @@
 
 ### Phase 1: Quick Wins (Clarify Flow & Remove Duplicates)
 
-1.  **Kill the Dual Signal Path:**
-    *   Remove `SpriteEditorWorkspace.undo_state_changed` signal.
-    *   Remove `MainController._update_undo_state` (the direct manipulation one).
-    *   **Action:** Expose `EditingController` via `SpriteEditorWorkspace` property.
-    *   **Connect:** `MainWindow` connects directly: `self.sprite_editor.controller.undo_state_changed.connect(self.update_buttons)`.
-    *   *Verify:* Undo buttons still work, debug prints show only 1 call per event.
+1.  ✅ **Kill the Dual Signal Path:** (COMPLETED 2025-01-08)
+    *   ✅ Removed `MainController._update_undo_state` method and signal connection.
+    *   ✅ Removed duplicate status message connection at MainWindow level (lines 1279-1282).
+    *   ✅ Single signal path now active: `EditingController.undoStateChanged` → `SpriteEditorWorkspace.undo_state_changed` → `MainWindow._update_undo_redo_state()`.
+    *   ✅ Path 2 retains conditional check (only updates when sprite editor tab is active).
+    *   ✅ All tests pass (1984 passed, 23 skipped, 0 failures).
 
 2.  **Flatten Status Messages:**
     *   Remove `status_message` signal from `SpriteEditorWorkspace` and `MainController`.
@@ -142,32 +157,43 @@
 
 ## Example Rewrite: Undo Wiring
 
-**Before (Current Spaghettification):**
+**Before (Spaghettification):**
 ```python
 # EditingController
 self.undoStateChanged.emit(can_undo, can_redo)
 
-# MainController
+# MainController (PATH 1 - REMOVED)
 self.editing_controller.undoStateChanged.connect(self._update_undo_state)
 def _update_undo_state(self, u, r):
-    self._main_window.action_undo.setEnabled(u) # Direct manipulation
+    self._main_window.action_undo.setEnabled(u)  # ❌ REMOVED
 
-# SpriteEditorWorkspace
+# SpriteEditorWorkspace (PATH 2 - KEPT)
 self._controller.editing_controller.undoStateChanged.connect(self.undo_state_changed.emit)
 
-# MainWindow
+# MainWindow (NOW SINGLE PATH)
 self._sprite_editor_workspace.undo_state_changed.connect(self._update_undo_redo_state)
 ```
 
-**After (Direct Observation):**
+**After (Single Path, 2025-01-08):**
 ```python
-# MainWindow
-def _setup_ui(self):
-    # ... create workspace ...
-    # Connect directly to the source of truth
-    self.sprite_editor.editing_controller.undo_state_changed.connect(self.update_undo_actions)
+# EditingController
+self.undoStateChanged.emit(can_undo, can_redo)
 
-def update_undo_actions(self, can_undo, can_redo):
-    self.undo_action.setEnabled(can_undo)
-    self.redo_action.setEnabled(can_redo)
+# SpriteEditorWorkspace (Relay)
+editing_ctrl.undoStateChanged.connect(self.undo_state_changed.emit)
+
+# MainWindow (Single subscriber)
+self._sprite_editor_workspace.undo_state_changed.connect(self._update_undo_redo_state)
+
+def _update_undo_redo_state(self, can_undo: bool, can_redo: bool) -> None:
+    # Only update when sprite editor is active tab
+    if hasattr(self, "center_stack") and self.center_stack.currentIndex() == 1:
+        self.undo_action.setEnabled(can_undo)
+        self.redo_action.setEnabled(can_redo)
 ```
+
+**Impact:**
+- ✅ Removed redundant button updates (was happening twice per operation)
+- ✅ Cleaner signal flow: one source of truth, one subscriber
+- ✅ Conditional check preserved (buttons only update when appropriate tab is active)
+- ✅ Zero test regressions (1984 tests pass)

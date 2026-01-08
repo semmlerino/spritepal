@@ -92,7 +92,6 @@ class MainController(QObject):
         self._main_window.action_picker.triggered.connect(lambda: self.editing_controller.set_tool("picker"))
 
         # Controller state → UI sync
-        self.editing_controller.undoStateChanged.connect(self._update_undo_state)
         self.editing_controller.toolChanged.connect(self._update_tool_state)
 
         # Tab changed
@@ -101,12 +100,6 @@ class MainController(QObject):
 
         # Edit tab workflow signals
         self._main_window.edit_tab.ready_for_inject.connect(self._on_ready_for_inject)
-
-    def _update_undo_state(self, can_undo: bool, can_redo: bool) -> None:
-        """Sync undo/redo button state from editing controller."""
-        if self._main_window:
-            self._main_window.action_undo.setEnabled(can_undo)
-            self._main_window.action_redo.setEnabled(can_redo)
 
     def _update_tool_state(self, tool_name: str) -> None:
         """Sync tool menu checkmarks from editing controller."""
