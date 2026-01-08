@@ -364,6 +364,25 @@ The codebase passes basedpyright with zero errors. Key rules:
 - **Protocols removed:** All protocol definitions were eliminated as over-engineering (commits 0c37f478, ace57d16). Use concrete types instead.
 - **Dict invariance:** Use `Mapping[str, object]` for read-only params; never replace `dict[str, Any]` with `dict[str, object]`
 
+### Dependency Injection & Initialization Order
+
+`MainWindow.__init__()` runs `_setup_ui()` (creates workspaces) BEFORE `_setup_managers()` (creates services). Pass `None` initially, inject via setter later:
+
+```python
+# In _create_workspaces(): service doesn't exist yet
+workspace = SpriteEditorWorkspace(message_service=None)
+
+# In _setup_managers(): now inject
+workspace.set_message_service(status_bar_manager)
+
+# Setter cascades through hierarchy
+def set_message_service(self, service):
+    self._message_service = service
+    self.child_controller.set_message_service(service)
+```
+
+**Before any DI refactoring:** Trace `__init__` → `_setup_ui()` → `_setup_managers()` order. If service needed before created → deferred injection required.
+
 ### Taking UI Screenshots
 
 For visual debugging and UI iteration, use this script to capture the app window:
