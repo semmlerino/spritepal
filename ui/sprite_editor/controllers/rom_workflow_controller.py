@@ -37,7 +37,6 @@ class ROMWorkflowController(QObject):
 
     # Signals
     rom_info_updated = Signal(str)
-    preview_ready = Signal(object, int)  # QPixmap or Image, compressed_size
     workflow_state_changed = Signal(str)  # 'preview', 'edit', 'save'
 
     def __init__(self, parent: QObject | None, editing_controller: "EditingController", *, message_service: "StatusBarManager | None" = None) -> None:
@@ -806,15 +805,6 @@ class ROMWorkflowController(QObject):
         self.current_sprite_name = sprite_name
         self.original_compressed_size = compressed_size
         self.available_slack = slack_size
-
-        # Render for view
-        from ..services import SpriteRenderer
-
-        renderer = SpriteRenderer()
-        image = renderer.render_4bpp(tile_data, width, height)
-
-        # Emit preview ready signal
-        self.preview_ready.emit(image, compressed_size)
 
         if self._view:
             slack_info = f" (+{slack_size} slack)" if slack_size > 0 else ""

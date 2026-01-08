@@ -33,7 +33,6 @@ class AssetBrowserController(QObject):
 
     # Signals
     thumbnailRequested = Signal(int, str)  # offset, source_type - request thumbnail loading
-    thumbnailReady = Signal(int, QImage)  # offset, thumbnail - for external providers
     assetsChanged = Signal()  # assets list modified
     captureAdded = Signal(int, str)  # offset, name - when Mesen2 capture added
     spriteSelected = Signal(int, str)  # forward from widget for external listeners

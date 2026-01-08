@@ -24,7 +24,6 @@ class ExtractionController(QObject):
     """Controller for sprite extraction operations."""
 
     # Signals
-    extraction_completed = Signal(object, int)  # image, tile_count
     extraction_failed = Signal(str)  # error message
     progress_updated = Signal(int, str)  # percent, message
     multi_palette_completed = Signal(dict, int)  # palette_images, tile_count
@@ -224,7 +223,6 @@ class ExtractionController(QObject):
                 tile_count = int(info["tile_count"])  # type: ignore
 
                 self._view.append_output(f"Loaded {tile_count} tiles.")
-                self.extraction_completed.emit(image, tile_count)
 
         except Exception as e:
             self._view.append_output(f"ERROR: {e}")
@@ -339,7 +337,6 @@ class ExtractionController(QObject):
         """Handle successful extraction."""
         if self._view:
             self._view.append_output(f"Extracted {tile_count} tiles successfully!")
-        self.extraction_completed.emit(image, tile_count)
 
     def _on_multi_palette_complete(self, palette_images: dict[str, "Image.Image"], tile_count: int) -> None:
         """Handle successful multi-palette extraction."""

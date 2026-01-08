@@ -8,7 +8,7 @@
 |-------|--------|-----------|
 | **Phase 1: Quick Wins** | ✅ Complete | ✅ Item 1, ✅ Item 2, ✅ Item 3 |
 | **Phase 2: Medium (Collapse Layers)** | ✅ Complete | ✅ Item 4, ✅ Item 5 |
-| **Phase 3: Deeper (Architecture)** | In Progress | ✅ Item 6 |
+| **Phase 3: Deeper (Architecture)** | In Progress | ✅ Item 6, ✅ Item 7 |
 
 **Completed Work:**
 - ✅ Problem #1 (Dual-Path Signal Wiring) - Removed `MainController._update_undo_state` and duplicate status connection. Single signal path now active.
@@ -17,9 +17,10 @@
 - ✅ Phase 2 Item 4 (Merge `ExtractionWorkspace` into `MainWindow`) - Inlined setup code into `MainWindow._create_workspaces()`. Deleted `ExtractionWorkspace` class entirely.
 - ✅ Phase 2 Item 5 (Dissolve `UICoordinator`) - Inlined tab helpers, session methods, preview methods, and tab configuration into `MainWindow`. Deleted `UICoordinator` class entirely (~380 lines removed).
 - ✅ Phase 3 Item 6 (Remove `AppContext` from MainWindow) - Added 3 explicit constructor parameters (`core_operations_manager`, `log_watcher`, `preview_generator`). Eliminated all 8 `get_app_context()` calls from MainWindow. Updated 2 test files for new signature.
+- ✅ Phase 3 Item 7 (Clean Up Dead Signals) - Removed 3 dead signals that emitted UI types: `ROMWorkflowController.preview_ready` (+ rendering code), `AssetBrowserController.thumbnailReady`, `ExtractionController.extraction_completed`. ~15 lines of dead code removed.
 - Test Coverage: 1978 passed, 23 skipped, 0 failures (no regression)
 
-**Next Priority:** Phase 3 Item 7 (Standardize Signal Direction)
+**Next Priority:** Phase 3 Item 8 (Remove AppContext from remaining Controllers)
 
 ---
 
@@ -115,7 +116,7 @@
 | `extract_requested` | `MainWindow` | `ExtractionController` (presumed) | None | **Ambiguous:** Unclear if this triggers the action or just notifies. |
 | `mode_changed` | `SpriteEditorWorkspace` | `MainController` | `str` | **Circular:** Workspace UI -> Controller -> Workspace UI (to switch stack). |
 | `files_changed` | `ExtractionPanel` | `MainWindow` | None | **Generic:** Doesn't say *what* file changed. |
-| `controller.preview_ready` | `ExtractionController` | `MainWindow` | `QPixmap` | **Wrong Direction:** Controller passing UI assets (Pixmap) to View. |
+| `controller.preview_ready` | `ExtractionController` | `MainWindow` | `QPixmap` | ✅ **RESOLVED:** (2026-01-08) Dead signal removed. Also removed `ROMWorkflowController.preview_ready`, `AssetBrowserController.thumbnailReady`, `ExtractionController.extraction_completed`. |
 
 ## 5. Refactor Plan
 
@@ -166,14 +167,19 @@
 
 ### Phase 3: Deeper (Architecture Fixes)
 
-6.  **Remove `AppContext` (Service Locator):**
-    *   Refactor `launch_spritepal.py` to create managers and pass them *explicitly* to `MainWindow`.
-    *   Refactor `MainWindow` to pass specific managers to child widgets/controllers.
-    *   *Goal:* `MainWindow` should have `__init__(self, rom_service, state_manager, ...)` and NO `get_app_context()` calls.
+6.  ✅ **Remove `AppContext` from MainWindow:** (COMPLETED 2026-01-08)
+    *   ✅ Added 3 explicit constructor parameters: `core_operations_manager`, `log_watcher`, `preview_generator`.
+    *   ✅ Eliminated all 8 `get_app_context()` calls from MainWindow.
+    *   ✅ Updated `launch_spritepal.py` to pass dependencies explicitly.
+    *   ✅ Updated 2 test files for new signature.
+    *   *Remaining:* Controllers still use service locator (~8 call sites in ExtractionController, ROMWorkflowController).
 
-7.  **Standardize Signal Direction (MVI-lite):**
-    *   Enforce: **View** emits `UserAction` -> **Controller** updates **Model** -> **Model** emits `StateChanged` -> **View** updates.
-    *   Remove signals where Controller emits UI types (like `QPixmap`). Controller should emit data, View converts to Pixmap.
+7.  ✅ **Clean Up Dead Signals:** (COMPLETED 2026-01-08)
+    *   ✅ Removed `ROMWorkflowController.preview_ready` signal + unused rendering code (~10 lines).
+    *   ✅ Removed `AssetBrowserController.thumbnailReady` signal (defined but never used).
+    *   ✅ Removed `ExtractionController.extraction_completed` signal + emit calls (no subscribers).
+    *   ✅ All tests pass (1978 passed, 23 skipped, 0 failures).
+    *   *Note:* Full MVI-lite refactoring (converting direct view manipulation to signal-based) deferred as lower priority.
 
 ## Example Rewrite: Undo Wiring
 
