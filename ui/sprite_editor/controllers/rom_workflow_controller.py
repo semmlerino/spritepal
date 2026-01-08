@@ -18,6 +18,8 @@ from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 
 if TYPE_CHECKING:
+    from ui.managers.status_bar_manager import StatusBarManager
+
     from ..views.workspaces.rom_workflow_page import ROMWorkflowPage
     from .main_controller import MainController
 
@@ -34,14 +36,14 @@ class ROMWorkflowController(QObject):
     """
 
     # Signals
-    status_message = Signal(str)
     rom_info_updated = Signal(str)
     preview_ready = Signal(object, int)  # QPixmap or Image, compressed_size
     workflow_state_changed = Signal(str)  # 'preview', 'edit', 'save'
 
-    def __init__(self, main_controller: "MainController") -> None:
+    def __init__(self, main_controller: "MainController", *, message_service: "StatusBarManager | None" = None) -> None:
         super().__init__(main_controller)
         self.main_controller = main_controller
+        self._message_service: StatusBarManager | None = message_service
         self._view: ROMWorkflowPage | None = None
 
         # Core components - use shared instances from AppContext
@@ -107,6 +109,10 @@ class ROMWorkflowController(QObject):
             pixmap = QPixmap.fromImage(thumbnail)
             self._view.asset_browser.set_thumbnail(offset, pixmap)
             logger.debug(f"Thumbnail set for offset 0x{offset:06X}")
+
+    def set_message_service(self, service: "StatusBarManager | None") -> None:
+        """Inject message service after construction (for deferred initialization)."""
+        self._message_service = service
 
     def _get_capture_name(self, capture: CapturedOffset) -> str:
         """Generate display name for captured sprite with gameplay context."""
@@ -212,7 +218,8 @@ class ROMWorkflowController(QObject):
         """Save sprite to library."""
         if not self.rom_path:
             logger.warning("Cannot save to library: no ROM loaded")
-            self.status_message.emit("Cannot save to library: no ROM loaded")
+            if self._message_service:
+                self._message_service.show_message("Cannot save to library: no ROM loaded")
             return
 
         library = get_app_context().sprite_library
@@ -222,7 +229,8 @@ class ROMWorkflowController(QObject):
         existing = library.get_by_offset(offset, rom_hash)
         if existing:
             logger.info("Sprite at 0x%06X already in library", offset)
-            self.status_message.emit(f"Sprite at 0x{offset:06X} is already in library")
+            if self._message_service:
+                self._message_service.show_message(f"Sprite at 0x{offset:06X} is already in library")
             return
 
         # Get display name from browser
@@ -245,7 +253,8 @@ class ROMWorkflowController(QObject):
             self._view.asset_browser.add_library_sprite(name, offset, qpixmap)
 
         logger.info("Saved to library: %s at 0x%06X", name, offset)
-        self.status_message.emit(f"Saved '{name}' to library")
+        if self._message_service:
+            self._message_service.show_message(f"Saved '{name}' to library")
 
     def _get_display_name_for_offset(self, offset: int) -> str | None:
         """Get current display name for offset from browser."""
@@ -402,7 +411,8 @@ class ROMWorkflowController(QObject):
 
         rom_path = Path(path)
         if not rom_path.exists():
-            self.status_message.emit(f"Error: ROM file not found: {path}")
+            if self._message_service:
+                self._message_service.show_message(f"Error: ROM file not found: {path}")
             return
 
         self.rom_path = path
@@ -424,7 +434,8 @@ class ROMWorkflowController(QObject):
         except Exception:
             self.rom_info_updated.emit("Unknown ROM")
 
-        self.status_message.emit(f"Loaded ROM: {rom_path.name}")
+        if self._message_service:
+            self._message_service.show_message(f"Loaded ROM: {rom_path.name}")
 
         # Setup thumbnail worker for asset browser
         self._setup_thumbnail_worker()
@@ -498,7 +509,8 @@ class ROMWorkflowController(QObject):
         logger.debug(f"[OPEN] open_in_editor called, tile_data={self.current_tile_data is not None}")
         if not self.current_tile_data:
             logger.debug("[OPEN] No tile data, returning early")
-            self.status_message.emit("No sprite data to edit")
+            if self._message_service:
+                self._message_service.show_message("No sprite data to edit")
             return
 
         # Use SpriteRenderer to create PIL image from 4bpp
@@ -526,13 +538,15 @@ class ROMWorkflowController(QObject):
             self._view.set_workflow_state("edit")
         self.workflow_state_changed.emit("edit")
         logger.debug("[OPEN] Sprite loaded in editor, state changed to 'edit'")
-        self.status_message.emit("Sprite loaded in editor")
+        if self._message_service:
+            self._message_service.show_message("Sprite loaded in editor")
 
     def prepare_injection(self) -> None:
         """Transition from editing to save confirmation with size comparison."""
         data = self.main_controller.editing_controller.get_image_data()
         if data is None:
-            self.status_message.emit("No image to inject")
+            if self._message_service:
+                self._message_service.show_message("No image to inject")
             return
 
         # Calculate new compressed size
@@ -598,17 +612,20 @@ class ROMWorkflowController(QObject):
 
         except Exception as e:
             logger.exception("Error during injection preparation")
-            self.status_message.emit(f"Error: {e}")
+            if self._message_service:
+                self._message_service.show_message(f"Error: {e}")
 
     def save_to_rom(self) -> None:
         """Inject edited sprite back to ROM."""
         data = self.main_controller.editing_controller.get_image_data()
         if data is None:
-            self.status_message.emit("No image to save")
+            if self._message_service:
+                self._message_service.show_message("No image to save")
             return
 
         try:
-            self.status_message.emit(f"Saving to ROM at 0x{self.current_offset:06X}...")
+            if self._message_service:
+                self._message_service.show_message(f"Saving to ROM at 0x{self.current_offset:06X}...")
 
             # Create PIL image for conversion
             img = Image.fromarray(data, mode="P")
@@ -648,7 +665,8 @@ class ROMWorkflowController(QObject):
                 )
 
                 if reply == QMessageBox.StandardButton.Yes:
-                    self.status_message.emit("Retrying with lenient checksum validation...")
+                    if self._message_service:
+                        self._message_service.show_message("Retrying with lenient checksum validation...")
                     success, message = rom_injector.inject_sprite_to_rom(
                         sprite_path=temp_png,
                         rom_path=self.rom_path,
@@ -677,7 +695,8 @@ class ROMWorkflowController(QObject):
                 )
 
                 if reply == QMessageBox.StandardButton.Yes:
-                    self.status_message.emit("Force injecting (backup created)...")
+                    if self._message_service:
+                        self._message_service.show_message("Force injecting (backup created)...")
                     success, message = rom_injector.inject_sprite_to_rom(
                         sprite_path=temp_png,
                         rom_path=self.rom_path,
@@ -694,7 +713,8 @@ class ROMWorkflowController(QObject):
                 pass
 
             if success:
-                self.status_message.emit(f"Successfully saved: {message}")
+                if self._message_service:
+                    self._message_service.show_message(f"Successfully saved: {message}")
                 # Show success in view
                 from PySide6.QtWidgets import QMessageBox
 
@@ -712,14 +732,16 @@ class ROMWorkflowController(QObject):
                     # Trigger a re-preview to verify
                     self.set_offset(self.current_offset)
             else:
-                self.status_message.emit(f"Injection failed: {message}")
+                if self._message_service:
+                    self._message_service.show_message(f"Injection failed: {message}")
                 from PySide6.QtWidgets import QMessageBox
 
                 QMessageBox.critical(self._view, "Injection Failed", f"Failed to inject sprite: {message}")
 
         except Exception as e:
             logger.exception("Error during ROM injection")
-            self.status_message.emit(f"Error saving to ROM: {e}")
+            if self._message_service:
+                self._message_service.show_message(f"Error saving to ROM: {e}")
             from PySide6.QtWidgets import QMessageBox
 
             QMessageBox.critical(self._view, "Error", f"An error occurred during injection: {e}")
@@ -728,7 +750,8 @@ class ROMWorkflowController(QObject):
         """Export current sprite as PNG file."""
         data = self.main_controller.editing_controller.get_image_data()
         if data is None:
-            self.status_message.emit("No image to export")
+            if self._message_service:
+                self._message_service.show_message("No image to export")
             return
 
         from PySide6.QtWidgets import QFileDialog
@@ -748,7 +771,8 @@ class ROMWorkflowController(QObject):
             img = Image.fromarray(data, mode="P")
             img.putpalette(self.main_controller.editing_controller.get_flat_palette())
             img.save(file_path, "PNG")
-            self.status_message.emit(f"Exported to: {file_path}")
+            if self._message_service:
+                self._message_service.show_message(f"Exported to: {file_path}")
 
             from PySide6.QtWidgets import QMessageBox
 
@@ -756,7 +780,8 @@ class ROMWorkflowController(QObject):
 
         except Exception as e:
             logger.exception("Error during PNG export")
-            self.status_message.emit(f"Error exporting PNG: {e}")
+            if self._message_service:
+                self._message_service.show_message(f"Error exporting PNG: {e}")
 
             from PySide6.QtWidgets import QMessageBox
 
@@ -793,7 +818,8 @@ class ROMWorkflowController(QObject):
 
         if self._view:
             slack_info = f" (+{slack_size} slack)" if slack_size > 0 else ""
-            self.status_message.emit(f"Sprite found! Original size: {compressed_size} bytes{slack_info}")
+            if self._message_service:
+                self._message_service.show_message(f"Sprite found! Original size: {compressed_size} bytes{slack_info}")
 
         # Auto-open in editor if triggered by double-click
         logger.debug(f"[PREVIEW] Checking flag: _pending_open_in_editor={self._pending_open_in_editor}")
@@ -805,7 +831,8 @@ class ROMWorkflowController(QObject):
     def _on_preview_error(self, error_msg: str) -> None:
         """Handle preview error."""
         self.current_tile_data = None
-        self.status_message.emit(f"Preview error: {error_msg}")
+        if self._message_service:
+            self._message_service.show_message(f"Preview error: {error_msg}")
 
     def cleanup(self) -> None:
         """Clean up resources."""

@@ -4,11 +4,30 @@ Application entry point for the unified sprite editor.
 """
 
 import sys
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtWidgets import QApplication
 
 from .controllers import MainController
 from .views import SpriteEditorMainWindow
+
+if TYPE_CHECKING:
+    from ui.managers.status_bar_manager import StatusBarManager
+
+
+class MainWindowMessageAdapter:
+    """Adapts SpriteEditorMainWindow.set_status to message service interface."""
+
+    def __init__(self, window: "SpriteEditorMainWindow") -> None:
+        self._window = window
+
+    def show_message(self, message: str, timeout: int = 0) -> None:
+        """Display a message in the window's status bar."""
+        self._window.set_status(message)
+
+    def clear_message(self) -> None:
+        """Clear the status bar message."""
+        self._window.set_status("")
 
 
 class SpriteEditorApplication:
@@ -40,12 +59,10 @@ class SpriteEditorApplication:
         # Create main window with settings manager
         self.main_window = SpriteEditorMainWindow(settings_manager=context.application_state_manager)
 
-        # Create main controller
-        self.controller = MainController()
+        # Create message adapter and main controller
+        message_adapter = MainWindowMessageAdapter(self.main_window)
+        self.controller = MainController(message_service=cast("StatusBarManager", message_adapter))
         self.controller.set_main_window(self.main_window)
-
-        # Connect status messages
-        self.controller.status_message.connect(self.main_window.set_status)
 
     def run(self) -> int:
         """Run the application.

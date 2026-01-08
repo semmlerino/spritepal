@@ -31,6 +31,7 @@ from ui.sprite_editor.views.workspaces import ROMWorkflowPage, VRAMEditorPage
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
+    from ui.managers.status_bar_manager import StatusBarManager
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +45,10 @@ class SpriteEditorWorkspace(QWidget):
     - Coordinates controllers across both mode pages
 
     Signals:
-        status_message: Emitted for status updates (routed to main status bar)
         mode_changed: Emitted when mode switches ('vram' or 'rom')
     """
 
     # Signals
-    status_message = Signal(str)
     mode_changed = Signal(str)  # 'vram' or 'rom'
     undo_state_changed = Signal(bool, bool)  # can_undo, can_redo
     offset_changed = Signal(int)
@@ -59,13 +58,13 @@ class SpriteEditorWorkspace(QWidget):
         parent: QWidget | None = None,
         *,
         settings_manager: ApplicationStateManager | None = None,
+        message_service: StatusBarManager | None = None,
     ) -> None:
         super().__init__(parent)
         self._settings_manager = settings_manager
 
         # Create controller first (it creates sub-controllers)
-        self._controller = MainController(self)
-        self._controller.status_message.connect(self.status_message.emit)
+        self._controller = MainController(self, message_service=message_service)
 
         # Setup UI
         self._setup_ui()
@@ -74,6 +73,10 @@ class SpriteEditorWorkspace(QWidget):
         self._wire_controllers()
 
         logger.debug("SpriteEditorWorkspace initialized")
+
+    def set_message_service(self, service: StatusBarManager | None) -> None:
+        """Inject message service after construction (for deferred initialization)."""
+        self._controller.set_message_service(service)
 
     def _setup_ui(self) -> None:
         """Create the workspace UI."""

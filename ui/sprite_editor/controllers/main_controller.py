@@ -17,6 +17,8 @@ from .injection_controller import InjectionController
 from .rom_workflow_controller import ROMWorkflowController
 
 if TYPE_CHECKING:
+    from ui.managers.status_bar_manager import StatusBarManager
+
     from ..views.main_window import SpriteEditorMainWindow
 
 
@@ -24,17 +26,19 @@ class MainController(QObject):
     """Main controller coordinating all application controllers."""
 
     # Signals
-    status_message = Signal(str)
     workflow_state_changed = Signal(str)  # 'extract', 'edit', 'inject', 'rom_workflow'
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(self, parent: QObject | None = None, *, message_service: "StatusBarManager | None" = None) -> None:
         super().__init__(parent)
+
+        # Store message service for status messages
+        self._message_service: StatusBarManager | None = message_service
 
         # Create sub-controllers
         self.extraction_controller = ExtractionController(self)
         self.editing_controller = EditingController(self)
         self.injection_controller = InjectionController(self)
-        self.rom_workflow_controller = ROMWorkflowController(self)
+        self.rom_workflow_controller = ROMWorkflowController(self, message_service=message_service)
 
         # Main window reference
         self._main_window: SpriteEditorMainWindow | None = None
@@ -47,6 +51,12 @@ class MainController(QObject):
 
         # Connect cross-controller signals
         self._connect_cross_controller_signals()
+
+    def set_message_service(self, service: "StatusBarManager | None") -> None:
+        """Inject message service after construction (for deferred initialization)."""
+        self._message_service = service
+        # Also propagate to sub-controllers
+        self.rom_workflow_controller.set_message_service(service)
 
     def set_main_window(self, window: "SpriteEditorMainWindow") -> None:
         """Set the main window and connect views to controllers."""
@@ -154,7 +164,8 @@ class MainController(QObject):
         if self._main_window:
             self._main_window.switch_to_tab(1)  # Edit tab
 
-        self.status_message.emit(f"Extracted {tile_count} tiles - ready for editing")
+        if self._message_service:
+            self._message_service.show_message(f"Extracted {tile_count} tiles - ready for editing")
 
     def _on_ready_for_inject(self) -> None:
         """Handle 'ready for inject' from edit tab."""
@@ -163,7 +174,8 @@ class MainController(QObject):
 
         data = self.editing_controller.get_image_data()
         if data is None:
-            self.status_message.emit("No image to inject")
+            if self._message_service:
+                self._message_service.show_message("No image to inject")
             return
 
         # Create unique temp PNG file to avoid collision with other instances
@@ -189,12 +201,14 @@ class MainController(QObject):
         if self._main_window:
             self._main_window.switch_to_tab(2)  # Inject tab
 
-        self.status_message.emit("Image exported - ready for injection")
+        if self._message_service:
+            self._message_service.show_message("Image exported - ready for injection")
 
     def _on_injection_completed(self, output_path: str) -> None:
         """Handle injection completion."""
         self._cleanup_temp_files()
-        self.status_message.emit(f"Injection complete: {output_path}")
+        if self._message_service:
+            self._message_service.show_message(f"Injection complete: {output_path}")
 
     def _cleanup_temp_files(self) -> None:
         """Remove temp files created during workflow."""

@@ -262,11 +262,13 @@ class MainWindow(QMainWindow):
         self.left_dock.setWidget(self._extraction_workspace)
 
         # 2. Sprite Editor Workspace (Center Content)
+        # Note: message_service is None here because status_bar_manager hasn't been created yet.
+        # It will be injected later in _setup_managers() after status_bar_manager exists.
         self._sprite_editor_workspace = SpriteEditorWorkspace(
             parent=self,
             settings_manager=self.settings_manager,
+            message_service=None,
         )
-        self._sprite_editor_workspace.status_message.connect(self._on_status_message)
         self._sprite_editor_workspace.undo_state_changed.connect(self._update_undo_redo_state)
         self._sprite_editor_workspace.offset_changed.connect(self.toolbar_offset_edit.set_offset)
 
@@ -285,10 +287,6 @@ class MainWindow(QMainWindow):
             self.switch_to_workspace(1)
         else:
             self.switch_to_workspace(0)
-
-    def _on_status_message(self, message: str) -> None:
-        """Handle status messages from sprite editor."""
-        self.status_bar_manager.show_message(message)
 
     def _on_undo(self) -> None:
         """Handle undo action."""
@@ -365,6 +363,10 @@ class MainWindow(QMainWindow):
         self.status_bar_manager = StatusBarManager(
             self.status_bar, settings_manager=self.settings_manager, rom_cache=self.rom_cache
         )
+        # Now that status_bar_manager exists, inject it into the sprite editor workspace
+        # (which was created earlier in _create_workspaces with message_service=None)
+        self._sprite_editor_workspace.set_message_service(self.status_bar_manager)
+
         self.output_settings_manager = OutputSettingsManager(self, self)
 
         # Connect ROM panel to shared output name via signals (decoupled communication)

@@ -2,19 +2,20 @@
 
 ## Status Summary
 
-**Last Update:** 2025-01-08
+**Last Update:** 2026-01-08
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| **Phase 1: Quick Wins** | In Progress | ✅ Item 1 (Kill Dual Signal Path) |
+| **Phase 1: Quick Wins** | In Progress | ✅ Item 1, ✅ Item 2 |
 | **Phase 2: Medium (Collapse Layers)** | Pending | — |
 | **Phase 3: Deeper (Architecture)** | Pending | — |
 
 **Completed Work:**
 - ✅ Problem #1 (Dual-Path Signal Wiring) - Removed `MainController._update_undo_state` and duplicate status connection. Single signal path now active.
+- ✅ Phase 1 Item 2 (Flatten Status Messages) - Replaced 3-layer signal relay with direct dependency injection. Fixed bug where `ROMWorkflowController.status_message` (~25 emit calls) was never connected. Controllers now call `message_service.show_message()` directly.
 - Test Coverage: 1984 passed, 23 skipped, 0 failures (no regression)
 
-**Next Priority:** Problem #2 (Service Locator Anti-Pattern) or Phase 1 Item 2 (Flatten Status Messages)
+**Next Priority:** Phase 1 Item 3 (Delete `MainController`) or Phase 2 Item 4 (Merge `ExtractionWorkspace`)
 
 ---
 
@@ -106,7 +107,7 @@
 | Signal Name | Emitter | Subscriber | Payload | Issues |
 | :--- | :--- | :--- | :--- | :--- |
 | `undoStateChanged` | `EditingController` | `SpriteEditorWorkspace` | `(bool, bool)` | ✅ **RESOLVED:** Single path (removed MainController direct path). Workspace relays → MainWindow. |
-| `status_message` | `EditingController`, `ROMWorkflowController` | `SpriteEditorWorkspace` -> `MainWindow` | `str` | **Minor:** 3-layer relay, but acceptable. Single connection at MainWindow (duplicate removed). |
+| `status_message` | `EditingController`, `ROMWorkflowController` | N/A | `str` | ✅ **RESOLVED:** (2026-01-08) Replaced with direct DI. Controllers call `message_service.show_message()`. Signals removed from `MainController`, `ROMWorkflowController`, `SpriteEditorWorkspace`. |
 | `extract_requested` | `MainWindow` | `ExtractionController` (presumed) | None | **Ambiguous:** Unclear if this triggers the action or just notifies. |
 | `mode_changed` | `SpriteEditorWorkspace` | `MainController` | `str` | **Circular:** Workspace UI -> Controller -> Workspace UI (to switch stack). |
 | `files_changed` | `ExtractionPanel` | `MainWindow` | None | **Generic:** Doesn't say *what* file changed. |
@@ -123,10 +124,14 @@
     *   ✅ Path 2 retains conditional check (only updates when sprite editor tab is active).
     *   ✅ All tests pass (1984 passed, 23 skipped, 0 failures).
 
-2.  **Flatten Status Messages:**
-    *   Remove `status_message` signal from `SpriteEditorWorkspace` and `MainController`.
-    *   **Action:** Pass `StatusBarManager` (or a `MessageService` interface) to `EditingController` in `__init__`.
-    *   *Verify:* Controller calls `self.message_service.show("Saved")` directly.
+2.  ✅ **Flatten Status Messages:** (COMPLETED 2026-01-08)
+    *   ✅ Removed `status_message` signal from `SpriteEditorWorkspace`, `MainController`, and `ROMWorkflowController`.
+    *   ✅ Passed `StatusBarManager` to controllers via `message_service` parameter.
+    *   ✅ Controllers call `self._message_service.show_message()` directly (with null guard).
+    *   ✅ Fixed pre-existing bug: `ROMWorkflowController.status_message` had ~25 emit calls but was **never connected** to anything.
+    *   ✅ Created `MainWindowMessageAdapter` for standalone mode (`application.py`).
+    *   ✅ Deferred injection via `set_message_service()` to handle initialization order.
+    *   ✅ All tests pass (1984 passed, 23 skipped, 0 failures).
 
 3.  **Delete `MainController`:**
     *   It's largely a container. Move `EditingController`, `ExtractionController`, `InjectionController` ownership to `SpriteEditorWorkspace`.
