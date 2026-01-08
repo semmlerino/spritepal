@@ -226,11 +226,11 @@ class ROMInjector(SpriteInjector):
             # Only apply strict ratio check when parser found a proper terminator
             # If compressed >> decompressed (10x+), parser clearly didn't find terminator
             hal_parsing_confident = original_size > 0 and compressed_size < original_size * 10
-            
+
             # Skip strict ratio check for very small sprites (< 256 bytes)
             # Small sprites often have outlier ratios that trigger false negatives
             is_very_small = original_size < 256
-            
+
             if hal_parsing_confident and not is_very_small:
                 if not self._validate_compression_ratio(compressed_size, original_size):
                     compression_ratio = compressed_size / original_size
@@ -713,7 +713,7 @@ class ROMInjector(SpriteInjector):
                             f"Data being overwritten at 0x{overwrite_start:X}: "
                             f"{overwritten_data[:16].hex(' ').upper()}{'...' if len(overwritten_data) > 16 else ''}"
                         )
-                
+
                 if compressed_size > original_size:
                     logger.warning(
                         f"New sprite ({compressed_size} bytes) is larger than original ({original_size} bytes). "

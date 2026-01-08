@@ -117,21 +117,26 @@ class Mesen2Module(QObject):
         logger.debug("Loaded %d persistent clicks", len(captures))
         return captures
 
-    def connect_to_widget(self, widget: MesenCapturesSection) -> None:
+    def connect_signals(self, widget: MesenCapturesSection) -> bool:
         """
-        Wire up all signals between log_watcher and widget.
+        Wire up signals between log_watcher and widget (pure wiring, no side effects).
 
-        This method establishes the complete signal chain:
+        This method establishes the signal chain:
         - LogWatcher.offset_discovered -> widget.add_capture()
         - LogWatcher.watch_started -> widget.set_watching(True)
         - LogWatcher.watch_stopped -> widget.set_watching(False)
 
+        Call start_and_load() separately to begin watching and load persistent data.
+
         Args:
             widget: MesenCapturesSection widget to connect.
+
+        Returns:
+            True if signals were connected, False if widget was already connected.
         """
         if widget in self._connected_widgets:
             logger.warning("Widget already connected, skipping")
-            return
+            return False
 
         # Connect log_watcher signals to widget methods
         self._log_watcher.offset_discovered.connect(widget.add_capture)
@@ -140,11 +145,19 @@ class Mesen2Module(QObject):
 
         # Track connected widget for cleanup
         self._connected_widgets.append(widget)
-
         logger.debug("Connected widget to Mesen2Module signals")
+        return True
 
-        # Load persistent clicks if not already watching
-        # (if watching already started, widget will receive live updates)
+    def start_and_load(self, widget: MesenCapturesSection) -> None:
+        """
+        Start watching and load persistent clicks into widget (explicit lifecycle).
+
+        This should be called after connect_signals() to start the watcher
+        and populate the widget with any persistent data.
+
+        Args:
+            widget: MesenCapturesSection widget to populate.
+        """
         if self.is_watching:
             widget.set_watching(True)
         else:
@@ -154,6 +167,20 @@ class Mesen2Module(QObject):
             if persistent_clicks:
                 widget.load_persistent(persistent_clicks)
                 logger.debug("Loaded %d persistent clicks into widget", len(persistent_clicks))
+
+    def connect_to_widget(self, widget: MesenCapturesSection) -> None:
+        """
+        Wire up signals AND start watching/load data (convenience method).
+
+        Equivalent to calling connect_signals() followed by start_and_load().
+        Kept for backward compatibility. Skips start_and_load if widget was
+        already connected.
+
+        Args:
+            widget: MesenCapturesSection widget to connect.
+        """
+        if self.connect_signals(widget):
+            self.start_and_load(widget)
 
     def disconnect_widget(self, widget: MesenCapturesSection) -> None:
         """

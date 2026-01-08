@@ -149,15 +149,12 @@ class PaletteSourceSelector(QWidget):
         for i in range(self._combo_box.count()):
             if (
                 self._combo_box.itemData(i, self._SOURCE_TYPE_ROLE) == source_type
-                and self._combo_box.itemData(i, self._PALETTE_INDEX_ROLE)
-                == palette_index
+                and self._combo_box.itemData(i, self._PALETTE_INDEX_ROLE) == palette_index
             ):
                 self._combo_box.setCurrentIndex(i)
                 return
 
-    def add_palette_source(
-        self, display_name: str, source_type: str, palette_index: int
-    ) -> None:
+    def add_palette_source(self, display_name: str, source_type: str, palette_index: int) -> None:
         """Add a palette source to the dropdown.
 
         Args:

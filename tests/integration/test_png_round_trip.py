@@ -68,11 +68,12 @@ class TestPNGRoundTrip:
                         pixel = img.getpixel((x, y))
                         first_tile_pixels.append(pixel)
 
-                # Verify grayscale conversion (index * 17)
+                # Verify indexed mode stores palette indices directly
                 for i, pixel in enumerate(first_tile_pixels):
-                    expected = ((i // 8) * 2 + ((i % 8) // 4)) % 16
-                    # In indexed mode after save, should be the actual value
-                    assert pixel == expected * 17
+                    expected_index = ((i // 8) * 2 + ((i % 8) // 4)) % 16
+                    # In indexed mode ("P"), getpixel() returns the palette index (0-15)
+                    # The palette maps index i to RGB (i*17, i*17, i*17)
+                    assert pixel == expected_index
 
                 # Step 2: Convert back to 4bpp (simulating injection)
                 # First convert to grayscale to simulate what happens after editing

@@ -92,6 +92,9 @@ class ExtractionController(QObject):
         # Store current injection dialog reference (not in session - not serializable)
         self._current_injection_dialog: InjectionDialog | None = None
 
+        # Track manager signal connections for cleanup (connected per-operation)
+        self._manager_connections: list[object] = []
+
         # Initialize error handler - always use console error handler for core layer
         # This removes the UI dependency while still properly logging errors
         self.error_handler = ConsoleErrorHandler()
@@ -190,13 +193,20 @@ class ExtractionController(QObject):
         }
         # Pass extraction manager explicitly (B.2: constructor injection)
         self.worker = VRAMExtractionWorker(extraction_params, extraction_manager=self.extraction_manager)
+
+        # Worker-owned signals (progress, completion, errors)
         _ = self.worker.progress.connect(self._on_progress)
-        _ = self.worker.preview_ready.connect(self._on_preview_ready)
-        _ = self.worker.preview_image_ready.connect(self._on_preview_image_ready)
-        _ = self.worker.palettes_ready.connect(self._on_palettes_ready)
-        _ = self.worker.active_palettes_ready.connect(self._on_active_palettes_ready)
         _ = self.worker.extraction_finished.connect(self._on_extraction_finished)
         _ = self.worker.error.connect(self._on_extraction_error)
+
+        # Connect directly to manager signals for data (1 hop instead of 3)
+        # These are emitted during extract_from_vram() in the worker thread
+        self._manager_connections = [
+            self.extraction_manager.preview_generated.connect(self._on_preview_ready),
+            self.extraction_manager.palettes_extracted.connect(self._on_palettes_ready),
+            self.extraction_manager.active_palettes_found.connect(self._on_active_palettes_ready),
+        ]
+
         self.worker.start()
 
     def _on_progress(self, percent: int, message: str) -> None:
@@ -204,20 +214,21 @@ class ExtractionController(QObject):
         self.status_message_changed.emit(message)
 
     def _on_preview_ready(self, pil_image: Image.Image, tile_count: int) -> None:
-        """Handle preview ready - convert PIL Image to QPixmap in main thread"""
+        """Handle preview ready - convert PIL Image to QPixmap in main thread.
+
+        Connected directly to extraction_manager.preview_generated (no worker forwarding).
+        """
         # CRITICAL FIX FOR BUG #26: Convert PIL Image to QPixmap in main thread (safe!)
-        # Worker now emits PIL Image to avoid Qt threading violations
+        # Manager emits PIL Image to avoid Qt threading violations
         pixmap = pil_to_qpixmap(pil_image)
         if pixmap is not None:
             self.preview_ready.emit(pixmap, tile_count)
             self.preview_info_changed.emit(f"Tiles: {tile_count}")
+            # Also emit grayscale image for palette application
+            self.grayscale_image_ready.emit(pil_image)
         else:
             logger.error("Failed to convert PIL image to QPixmap for preview")
             self.error_handler.handle_warning("Preview Error", "Failed to convert preview image for display")
-
-    def _on_preview_image_ready(self, pil_image: Image.Image) -> None:
-        """Handle preview PIL image ready"""
-        self.grayscale_image_ready.emit(pil_image)
 
     def _on_palettes_ready(self, palettes: dict[int, list[list[int]]]) -> None:
         """Handle palettes ready"""
@@ -238,11 +249,26 @@ class ExtractionController(QObject):
         self._cleanup_worker()
 
     def _cleanup_worker(self) -> None:
-        """Safely cleanup worker thread"""
+        """Safely cleanup worker thread and manager signal connections."""
         from core.services.worker_lifecycle import WorkerManager
+
+        # Disconnect manager signals (connected per-operation)
+        self._disconnect_manager_signals()
 
         WorkerManager.cleanup_worker(self.worker, timeout=3000)
         self.worker = None
+
+    def _disconnect_manager_signals(self) -> None:
+        """Disconnect manager signal connections."""
+        from PySide6.QtCore import QObject
+
+        for connection in self._manager_connections:
+            try:
+                QObject.disconnect(connection)  # type: ignore[arg-type]
+            except (RuntimeError, TypeError):
+                # Signal may already be disconnected
+                pass
+        self._manager_connections.clear()
 
     def update_preview_with_offset(self, offset: int) -> None:
         """Update preview with new VRAM offset without full extraction"""

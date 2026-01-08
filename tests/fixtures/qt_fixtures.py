@@ -491,7 +491,7 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
 
 @pytest.fixture
 def cleanup_singleton(qt_app: Any) -> Generator[None, None, None]:
-    """Dialog cleanup fixture for tests using OffsetDialogManager.
+    """Dialog cleanup fixture for tests using Qt dialogs.
 
     With per-instance dialog management, cleanup is handled automatically
     by Qt's parent-child hierarchy. This fixture processes pending events
@@ -500,8 +500,7 @@ def cleanup_singleton(qt_app: Any) -> Generator[None, None, None]:
     Usage:
         def test_something(cleanup_singleton):
             # Events processed before test
-            manager = OffsetDialogManager(parent_widget=widget)
-            dialog = manager.get_dialog()
+            dialog = UnifiedManualOffsetDialog(parent=widget, ...)
             # ... test code ...
             # Events processed after test
     """

@@ -4,7 +4,7 @@ ROM extraction panel for SpritePal.
 This panel coordinates ROM-based sprite extraction using:
 - ROMWorkerOrchestrator: Background worker management
 - ScanController: Sprite scanning workflow and cache
-- OffsetDialogManager: Manual offset dialog lifecycle
+- UnifiedManualOffsetDialog: Manual offset browsing (owned directly)
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from core.rom_validator import ROMHeader
     from core.services.rom_cache import ROMCache
     from core.types import SpritePreset
+    from ui.dialogs import UnifiedManualOffsetDialog
     from ui.rom_extraction.modules import Mesen2Module
 
 from core.managers.workflow_state_manager import ExtractionState
@@ -44,7 +45,7 @@ from ui.controllers import (
     ROMSessionController,
     format_sprite_list,
 )
-from ui.rom_extraction import OffsetDialogManager, ROMWorkerOrchestrator, ScanController
+from ui.rom_extraction import ROMWorkerOrchestrator, ScanController
 from ui.rom_extraction.widgets import (
     CGRAMSelectorWidget,
     ManualOffsetSection,
@@ -125,17 +126,14 @@ class ROMExtractionPanel(QWidget):
             rom_cache=self.rom_cache,
             settings_manager=self.state_manager,
         )
-        self._offset_dialog_manager = OffsetDialogManager(parent_widget=self, parent=self)
+        # Manual offset dialog (created lazily when needed)
+        self._manual_offset_dialog: UnifiedManualOffsetDialog | None = None
         self._scan_controller = ScanController(parent=self, cache=self.rom_cache, state_manager=self.state_manager)
         self._scan_controller.sprite_selected.connect(self._add_selected_sprite)
         self.scan_worker = None
 
         # Connect orchestrator signals
         self._connect_orchestrator_signals()
-
-        # Connect dialog manager signals
-        self._offset_dialog_manager.offset_changed.connect(self._on_dialog_offset_changed)
-        self._offset_dialog_manager.sprite_found.connect(self._on_dialog_sprite_found)
 
         # Output name provider (set by MainWindow to read from OutputSettingsManager)
         self._output_name_provider: Callable[[], str] | None = None
@@ -269,8 +267,9 @@ class ROMExtractionPanel(QWidget):
 
         # Wire up log watcher if module provided (dependency injection)
         if self._mesen2_module is not None:
-            # Module handles all LogWatcher connections and lifecycle
-            self._mesen2_module.connect_to_widget(self.mesen_captures_section)
+            # Explicit two-step setup: connect signals, then start watching
+            if self._mesen2_module.connect_signals(self.mesen_captures_section):
+                self._mesen2_module.start_and_load(self.mesen_captures_section)
             logger.debug("Mesen2Module connected to captures widget")
 
     def _on_mesen2_offset_selected(self, offset: int) -> None:
@@ -283,8 +282,8 @@ class ROMExtractionPanel(QWidget):
         """
         logger.debug("Mesen2 offset selected: 0x%06X", offset)
         # Update the offset dialog if it's open
-        if self._offset_dialog_manager._dialog is not None:
-            self._offset_dialog_manager._dialog.set_offset(offset)
+        if self._manual_offset_dialog is not None:
+            self._manual_offset_dialog.set_offset(offset)
 
     def _on_mesen2_offset_activated(self, offset: int) -> None:
         """Handle offset activation (double-click) from captures widget.
@@ -406,9 +405,8 @@ class ROMExtractionPanel(QWidget):
                     f.seek(0, 2)  # Seek to end
                     self.rom_size = f.tell()
                     # Update dialog if it exists
-                    current_dialog = self._offset_dialog_manager.get_current_dialog()
-                    if current_dialog is not None:
-                        current_dialog.set_rom_data(self.rom_path, self.rom_size, self.extraction_manager)
+                    if self._manual_offset_dialog is not None:
+                        self._manual_offset_dialog.set_rom_data(self.rom_path, self.rom_size, self.extraction_manager)
                     logger.debug(f"ROM size: {self.rom_size} bytes (0x{self.rom_size:X})")
             except Exception as e:
                 logger.warning(f"Could not determine ROM size: {e}")
@@ -495,14 +493,14 @@ class ROMExtractionPanel(QWidget):
         self.manual_offset_changed.emit(offset)
 
         # Update dialog if open
-        if self._offset_dialog_manager._dialog is not None:
-            self._offset_dialog_manager._dialog.set_offset(offset)
+        if self._manual_offset_dialog is not None:
+            self._manual_offset_dialog.set_offset(offset)
 
         self._check_extraction_ready()
 
     def open_manual_offset_dialog(self) -> None:
-        """Open the manual offset control dialog using manager."""
-        from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
+        """Open the manual offset control dialog (owned directly by panel)."""
+        from ui.dialogs import UnifiedManualOffsetDialog, UserErrorDialog
 
         logger.debug("open_manual_offset_dialog called")
 
@@ -512,17 +510,34 @@ class ROMExtractionPanel(QWidget):
             )
             return
 
-        # Use dialog manager to open the dialog
-        dialog = self._offset_dialog_manager.open_dialog(
-            rom_path=self.rom_path,
-            extractor=self.rom_extractor,
-            rom_size=self.rom_size,
-            extraction_manager=self.extraction_manager,
-            initial_offset=self._params_controller.manual_offset,
-        )
+        # Create dialog if not exists or was destroyed
+        if self._manual_offset_dialog is None:
+            self._manual_offset_dialog = UnifiedManualOffsetDialog(
+                parent=self,
+                rom_cache=self.rom_cache,
+                settings_manager=self.state_manager,
+                extraction_manager=self.extraction_manager,
+                rom_extractor=self.rom_extractor,
+            )
+            # Connect signals directly (no forwarding layer)
+            self._manual_offset_dialog.offset_changed.connect(self._on_dialog_offset_changed)
+            self._manual_offset_dialog.sprite_found.connect(self._on_dialog_sprite_found)
+            self._manual_offset_dialog.destroyed.connect(self._on_dialog_destroyed)
+            logger.debug("Created UnifiedManualOffsetDialog instance")
 
-        if dialog:
-            logger.debug("Opened ManualOffsetDialog via manager")
+        # Configure the dialog with ROM data
+        self._manual_offset_dialog.set_rom_data(self.rom_path, self.rom_size, self.extraction_manager)
+
+        # Set initial offset from controller
+        initial_offset = self._params_controller.manual_offset
+        logger.info("open_manual_offset_dialog: setting initial_offset to 0x%06X", initial_offset)
+        self._manual_offset_dialog.set_offset(initial_offset)
+
+        # Show the dialog
+        self._manual_offset_dialog.show()
+        self._manual_offset_dialog.raise_()
+        self._manual_offset_dialog.activateWindow()
+        logger.debug("Opened ManualOffsetDialog")
 
     def _on_dialog_offset_changed(self, offset: int) -> None:
         """Handle offset changes from the dialog."""
@@ -531,12 +546,22 @@ class ROMExtractionPanel(QWidget):
         self._check_extraction_ready()
         # Preview now handled in manual offset dialog
 
-    def _on_dialog_sprite_found(self, sprite_data: Mapping[str, object]) -> None:
-        """Handle sprite found signal from dialog."""
-        offset = cast(int, sprite_data.get("offset", 0))
+    def _on_dialog_sprite_found(self, offset: int, name: str) -> None:
+        """Handle sprite found signal from dialog.
+
+        Args:
+            offset: ROM offset where sprite was found
+            name: Sprite name/identifier
+        """
+        logger.debug("Sprite found at 0x%06X: %s", offset, name)
         self._params_controller.set_manual_mode(enabled=True, offset=offset)
         self.manual_offset_changed.emit(offset)
         self._check_extraction_ready()
+
+    def _on_dialog_destroyed(self) -> None:
+        """Handle dialog destroyed signal."""
+        self._manual_offset_dialog = None
+        logger.debug("Manual offset dialog destroyed")
 
     def _open_presets_dialog(self) -> None:
         """Open the sprite presets management dialog."""
@@ -937,9 +962,19 @@ class ROMExtractionPanel(QWidget):
         # State manager signals
         safe_disconnect(self.state_manager.workflow_state_changed)
 
-        # Dialog manager signals
-        safe_disconnect(self._offset_dialog_manager.offset_changed)
-        safe_disconnect(self._offset_dialog_manager.sprite_found)
+        # Dialog signals (disconnect if dialog exists)
+        if self._manual_offset_dialog is not None:
+            safe_disconnect(self._manual_offset_dialog.offset_changed)
+            safe_disconnect(self._manual_offset_dialog.sprite_found)
+
+    def _close_dialog(self) -> None:
+        """Close the manual offset dialog if open."""
+        if self._manual_offset_dialog is not None:
+            try:
+                self._manual_offset_dialog.close()
+            except RuntimeError:
+                pass  # Already deleted by Qt
+            self._manual_offset_dialog = None
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:
@@ -950,8 +985,8 @@ class ROMExtractionPanel(QWidget):
         # Clean up workers before closing
         self._cleanup_workers()
 
-        # Close manual offset dialog via manager
-        self._offset_dialog_manager.close()
+        # Close manual offset dialog directly
+        self._close_dialog()
 
         # Call parent implementation
         if a0 is not None:
@@ -965,4 +1000,4 @@ class ROMExtractionPanel(QWidget):
         """
         self._disconnect_signals()
         self._cleanup_workers()
-        self._offset_dialog_manager.close()
+        self._close_dialog()

@@ -100,7 +100,7 @@ class SpriteEditorWorkspace(QWidget):
 
         # Add pages to stack
         self._mode_stack.addWidget(self._vram_page)  # Index 0: VRAM mode
-        self._mode_stack.addWidget(self._rom_page)   # Index 1: ROM mode
+        self._mode_stack.addWidget(self._rom_page)  # Index 1: ROM mode
 
         layout.addWidget(self._mode_stack, 1)
 

@@ -71,7 +71,7 @@ def reset_all_singletons() -> None:
 
     Note: PreviewGenerator and ConfigurationService are now handled by AppContext
     cleanup (via reset_app_context in app_context_fixtures.py).
-    OffsetDialogManager cleanup is per-instance, handled by Qt parent-child hierarchy.
+    Dialog cleanup is per-instance, handled by Qt parent-child hierarchy.
 
     Failures are logged but don't stop the reset process.
     Some resets are expected to fail in certain contexts (e.g., MockHALProcessPool

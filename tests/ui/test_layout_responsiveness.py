@@ -20,6 +20,14 @@ class MockPanel(QWidget):
     paletteToggled = Signal(bool)
     zoomChanged = Signal(int)
     zoomToFit = Signal()
+    # SaveExportPanel signals
+    saveToRomClicked = Signal()
+    exportPngClicked = Signal()
+    # IconToolbar signals
+    zoomInClicked = Signal()
+    zoomOutClicked = Signal()
+    tileGridToggled = Signal(bool)
+    palettePreviewToggled = Signal(bool)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -31,6 +39,8 @@ class MockPanel(QWidget):
         self.update_preview = Mock()
         self.update_color_preview = Mock()
         self._controller = None
+        # IconToolbar methods
+        self.is_palette_preview_enabled = Mock(return_value=False)
 
     @property
     def controller(self):
@@ -92,12 +102,12 @@ class TestLayoutResponsiveness:
         pytest.skip("Obsolete test: Splitter logic replaced by Dock switching")
 
     def test_canvas_responsiveness(self, qt_app):
-        # ... existing test ...
+        # Patch the panels/widgets that EditWorkspace creates
         with (
-            patch("ui.sprite_editor.views.workspaces.edit_workspace.ToolPanel", MockPanel),
+            patch("ui.sprite_editor.views.workspaces.edit_workspace.IconToolbar", MockPanel),
             patch("ui.sprite_editor.views.workspaces.edit_workspace.PalettePanel", MockPanel),
-            patch("ui.sprite_editor.views.workspaces.edit_workspace.OptionsPanel", MockPanel),
             patch("ui.sprite_editor.views.workspaces.edit_workspace.PreviewPanel", MockPanel),
+            patch("ui.sprite_editor.views.workspaces.edit_workspace.SaveExportPanel", MockPanel),
         ):
             edit_tab = EditTab()
 

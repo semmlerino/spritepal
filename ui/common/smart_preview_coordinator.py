@@ -100,8 +100,12 @@ class SmartPreviewCoordinator(QObject):
     """
 
     # Signals for preview updates
-    preview_ready = Signal(bytes, int, int, str, int, int)  # tile_data, width, height, name, compressed_size, slack_size
-    preview_cached = Signal(bytes, int, int, str, int, int)  # Cached preview displayed, with compressed_size, slack_size
+    preview_ready = Signal(
+        bytes, int, int, str, int, int
+    )  # tile_data, width, height, name, compressed_size, slack_size
+    preview_cached = Signal(
+        bytes, int, int, str, int, int
+    )  # Cached preview displayed, with compressed_size, slack_size
     preview_error = Signal(str)  # Error message
 
     def __init__(self, parent: QObject | None = None):
@@ -432,7 +436,14 @@ class SmartPreviewCoordinator(QObject):
             self.preview_error.emit(f"Preview request failed: {e}")
 
     def _on_worker_preview_ready(
-        self, request_id: int, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int, slack_size: int = 0
+        self,
+        request_id: int,
+        tile_data: bytes,
+        width: int,
+        height: int,
+        sprite_name: str,
+        compressed_size: int,
+        slack_size: int = 0,
     ) -> None:
         """Handle preview ready from worker."""
         logger.debug(
@@ -459,7 +470,9 @@ class SmartPreviewCoordinator(QObject):
                 # Save to memory cache
                 cache_key = self._cache.make_key(rom_path, self._current_offset)
                 self._cache.put(cache_key, preview_data)
-                logger.debug(f"Cached preview for 0x{self._current_offset:06X}: {len(tile_data)} bytes (slack: {slack_size})")
+                logger.debug(
+                    f"Cached preview for 0x{self._current_offset:06X}: {len(tile_data)} bytes (slack: {slack_size})"
+                )
             except Exception as e:
                 logger.warning(f"Error caching preview: {e}")
 

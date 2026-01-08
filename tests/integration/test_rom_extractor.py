@@ -170,10 +170,12 @@ class TestROMExtractor4bppConversion:
 
         # Verify pixel value
         with Image.open(output_path) as img:
-            pixel_value = img.getpixel((0, 0))
+            # Image is indexed ("P" mode) - getpixel returns the palette index
+            pixel_index = img.getpixel((0, 0))
 
-            # 4-bit value 15 should become 8-bit value 255 (15 * 17 = 255)
-            assert pixel_value == 255
+            # 4-bit value 15 is stored as palette index 15
+            # (The palette maps index 15 to RGB (255, 255, 255))
+            assert pixel_index == 15
 
     def test_convert_4bpp_to_png_empty_data(self, extractor, tmp_path):
         """Test PNG conversion with empty data"""

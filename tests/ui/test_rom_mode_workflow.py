@@ -78,6 +78,11 @@ class MockEditWorkspace(QWidget):
 
     def __init__(self, *args, **kwargs):
         super().__init__()
+        # Signals required by ROMWorkflowController
+        self.saveToRomRequested = Mock()
+        self.saveToRomRequested.connect = Mock()
+        self.exportPngRequested = Mock()
+        self.exportPngRequested.connect = Mock()
 
     def set_controller(self, ctrl):
         pass
@@ -98,6 +103,21 @@ class MockROMWorkflowPage(QWidget):
         self.source_bar.action_clicked.connect = Mock()
         self.source_bar.browse_rom_requested = Mock()
         self.source_bar.browse_rom_requested.connect = Mock()
+
+        # Asset browser signals (required by ROMWorkflowController)
+        self.sprite_selected = Mock()
+        self.sprite_selected.connect = Mock()
+        self.sprite_activated = Mock()
+        self.sprite_activated.connect = Mock()
+
+        # Asset browser with context menu signals
+        self.asset_browser = Mock()
+        self.asset_browser.save_to_library_requested = Mock()
+        self.asset_browser.save_to_library_requested.connect = Mock()
+        self.asset_browser.rename_requested = Mock()
+        self.asset_browser.rename_requested.connect = Mock()
+        self.asset_browser.delete_requested = Mock()
+        self.asset_browser.delete_requested.connect = Mock()
 
         self.recent_captures_widget = Mock()
         self.recent_captures_widget.offset_selected = Mock()
@@ -186,8 +206,10 @@ class TestRomModeWorkflow:
         # Should have switched to ROM mode
         assert sprite_editor_workspace._mode_combo.currentData() == "rom"
 
-        # Verify rom workflow controller offset set
-        sprite_editor_workspace._controller.rom_workflow_controller.set_offset.assert_called_with(0x123456)
+        # Verify rom workflow controller offset set (auto_open=True is default behavior)
+        sprite_editor_workspace._controller.rom_workflow_controller.set_offset.assert_called_with(
+            0x123456, auto_open=True
+        )
 
     def test_controller_propagates_mode(self, mock_app_context):
         # Test MainController propagation logic

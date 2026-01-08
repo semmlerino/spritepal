@@ -495,18 +495,23 @@ class TestExtractionControllerIntegration:
         assert len(info_signals) == 1
         assert f"{tile_count}" in info_signals[0]
 
-    def test_preview_image_ready_handler(
+    def test_preview_ready_emits_grayscale_image(
         self, controller: ExtractionController, mock_main_window: MockMainWindow
     ) -> None:
-        """Test preview image ready handler emits signal."""
+        """Test preview ready handler also emits grayscale_image_ready signal.
+
+        Since controller connects directly to manager.preview_generated, the handler
+        must emit both preview_ready (with QPixmap) and grayscale_image_ready (with PIL Image).
+        """
         test_image = Image.new("L", (8, 8), color=128)
-        signals_received: list[Image.Image] = []
-        controller.grayscale_image_ready.connect(lambda img: signals_received.append(img))
+        tile_count = 1
+        grayscale_signals: list[Image.Image] = []
+        controller.grayscale_image_ready.connect(lambda img: grayscale_signals.append(img))
 
-        controller._on_preview_image_ready(test_image)
+        controller._on_preview_ready(test_image, tile_count)
 
-        assert len(signals_received) == 1
-        assert signals_received[0] is test_image
+        assert len(grayscale_signals) == 1
+        assert grayscale_signals[0] is test_image
 
     def test_palettes_ready_handler(self, controller: ExtractionController, mock_main_window: MockMainWindow) -> None:
         """Test palettes ready handler emits signal."""

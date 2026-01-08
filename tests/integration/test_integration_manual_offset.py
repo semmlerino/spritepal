@@ -295,10 +295,10 @@ class TestDialogIntegrationWithPanel:
 
         # Open manual offset dialog
         panel.open_manual_offset_dialog()
-        qtbot.waitUntil(lambda: panel._offset_dialog_manager.is_open(), timeout=500)
+        qtbot.waitUntil(lambda: panel._manual_offset_dialog is not None, timeout=500)
 
         # Verify dialog was created
-        dialog = panel._offset_dialog_manager.get_current_dialog()
+        dialog = panel._manual_offset_dialog
         assert dialog is not None
 
         # Verify dialog has ROM data
@@ -311,8 +311,8 @@ class TestDialogIntegrationWithPanel:
 
         # Open dialog
         panel.open_manual_offset_dialog()
-        qtbot.waitUntil(lambda: panel._offset_dialog_manager.is_open(), timeout=500)
-        dialog = panel._offset_dialog_manager.get_current_dialog()
+        qtbot.waitUntil(lambda: panel._manual_offset_dialog is not None, timeout=500)
+        dialog = panel._manual_offset_dialog
         assert dialog is not None
 
         with qtbot.waitExposed(dialog):
@@ -328,23 +328,22 @@ class TestDialogIntegrationWithPanel:
         assert panel._params_controller.manual_offset == new_offset
         assert panel._params_controller.is_manual_mode is True
 
-    def test_multiple_dialog_opens_reuse_singleton(self, loaded_rom_panel, qtbot, wait_for_signal_processed):
-        """Test that opening dialog multiple times creates consistent dialogs.
+    def test_multiple_dialog_opens_reuse_instance(self, loaded_rom_panel, qtbot, wait_for_signal_processed):
+        """Test that opening dialog multiple times reuses instance or creates valid new one.
 
-        Note: The singleton pattern used here recreates the instance when closed/destroyed,
-        so we verify consistent behavior rather than identical instance IDs.
+        With direct dialog ownership, the panel keeps the same instance until closed/destroyed.
         """
         panel, rom_info = loaded_rom_panel
 
         # Open dialog first time
         panel.open_manual_offset_dialog()
-        qtbot.waitUntil(lambda: panel._offset_dialog_manager.is_open(), timeout=500)
-        dialog1 = panel._offset_dialog_manager.get_current_dialog()
+        qtbot.waitUntil(lambda: panel._manual_offset_dialog is not None, timeout=500)
+        dialog1 = panel._manual_offset_dialog
         assert dialog1 is not None
 
         # Opening again without closing should return same instance
         panel.open_manual_offset_dialog()
-        dialog2 = panel._offset_dialog_manager.get_current_dialog()
+        dialog2 = panel._manual_offset_dialog
         # Same instance when not closed
         assert dialog1 is dialog2
 
@@ -352,10 +351,10 @@ class TestDialogIntegrationWithPanel:
         dialog1.close()
         wait_for_signal_processed()
 
-        # Open again after close - may get new instance due to singleton reset
+        # Open again after close - gets new instance (old one was destroyed)
         panel.open_manual_offset_dialog()
-        qtbot.waitUntil(lambda: panel._offset_dialog_manager.is_open(), timeout=500)
-        dialog3 = panel._offset_dialog_manager.get_current_dialog()
+        qtbot.waitUntil(lambda: panel._manual_offset_dialog is not None, timeout=500)
+        dialog3 = panel._manual_offset_dialog
         # New instance should still be valid and functional
         assert dialog3 is not None
         assert dialog3.rom_path == str(rom_info["path"])

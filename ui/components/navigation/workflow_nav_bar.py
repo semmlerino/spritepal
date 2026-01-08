@@ -28,7 +28,9 @@ class WorkflowNavBar(QWidget):
 
     def _setup_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(DIMENSIONS["spacing_md"], DIMENSIONS["spacing_sm"], DIMENSIONS["spacing_md"], DIMENSIONS["spacing_sm"])
+        layout.setContentsMargins(
+            DIMENSIONS["spacing_md"], DIMENSIONS["spacing_sm"], DIMENSIONS["spacing_md"], DIMENSIONS["spacing_sm"]
+        )
         layout.setSpacing(DIMENSIONS["spacing_md"])
 
         for i, step_name in enumerate(self._steps):
@@ -37,16 +39,18 @@ class WorkflowNavBar(QWidget):
             btn.setCheckable(True)
             # Use lambda with default arg to capture loop variable
             btn.clicked.connect(lambda checked=False, idx=i: self.step_selected.emit(idx))
-            
+
             layout.addWidget(btn)
             self._buttons.append(btn)
-            
+
             # Add separator if not last
             if i < len(self._steps) - 1:
                 sep = QLabel("→")
-                sep.setStyleSheet(f"color: {COLORS['text_muted']}; font-weight: bold; font-size: {FONTS['large_size']};")
+                sep.setStyleSheet(
+                    f"color: {COLORS['text_muted']}; font-weight: bold; font-size: {FONTS['large_size']};"
+                )
                 layout.addWidget(sep)
-        
+
         layout.addStretch()
         self.set_current_step(0)
 

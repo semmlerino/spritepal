@@ -53,20 +53,21 @@ class VRAMExtractionWorker(ManagedWorker):
 
     @override
     def connect_manager_signals(self) -> None:
-        """Connect extraction manager signals to worker signals."""
+        """Connect extraction manager signals to worker signals.
+
+        Note: Preview and palette signals are connected directly by ExtractionController
+        to the manager (reduced signal chain from 3 hops to 1). Only progress signals
+        are forwarded through the worker for status updates.
+        """
         helper = SignalConnectionHelper(self)
 
         # Validate manager type
         if not helper.validate_manager_type(CoreOperationsManager, "VRAM extraction"):
             return
 
-        # Type cast for better type checking - we know this is CoreOperationsManager from __init__
-        extraction_manager = cast(CoreOperationsManager, self.manager)
-
-        # Connect all standard signals using helper
+        # Connect only progress signal - palette/preview signals are connected
+        # directly by controller to manager (no forwarding through worker)
         helper.connect_progress_signals("extraction_progress", 50)
-        helper.connect_extraction_signals(extraction_manager)
-        helper.connect_preview_signals(extraction_manager)
 
         logger.debug(f"{self._operation_name}: Connected {len(self._connections)} manager signals")
 

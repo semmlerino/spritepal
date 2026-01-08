@@ -46,7 +46,9 @@ class ThumbnailDelegate(QStyledItemDelegate):
         self._placeholder_text = QColor(COLORS["text_muted"])
 
     @override
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> None:
+    def paint(
+        self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex
+    ) -> None:
         """
         Paint the tree item with thumbnail.
 

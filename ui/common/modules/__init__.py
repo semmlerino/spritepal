@@ -1,10 +1,9 @@
 """
 UI module wrappers for dependency injection.
 
-This package provides lightweight wrappers around coordinator classes
-to enable dependency injection and resource sharing across components.
+This package previously contained PreviewModule, which was removed in favor of
+direct SmartPreviewCoordinator injection. The package is kept for future
+module additions.
 """
 
-from ui.common.modules.preview_module import PreviewModule
-
-__all__ = ["PreviewModule"]
+__all__: list[str] = []

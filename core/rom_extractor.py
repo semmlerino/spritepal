@@ -144,7 +144,9 @@ class ROMExtractor:
             expected_size = self._load_sprite_configuration(sprite_name, header)
 
             # Stage 3: Decompress sprite data
-            compressed_size, sprite_data, _slack_size = self._decompress_sprite_data(rom_data, sprite_offset, expected_size)
+            compressed_size, sprite_data, _slack_size = self._decompress_sprite_data(
+                rom_data, sprite_offset, expected_size
+            )
 
             # Stage 4: Convert to PNG
             output_path = f"{output_base}.png"
@@ -262,7 +264,9 @@ class ROMExtractor:
             Tuple of (compressed_size, decompressed_data, slack_size)
         """
         logger.info(f"Decompressing sprite data at offset 0x{sprite_offset:X}")
-        compressed_size, sprite_data, slack_size = self.rom_injector.find_compressed_sprite(rom_data, sprite_offset, expected_size)
+        compressed_size, sprite_data, slack_size = self.rom_injector.find_compressed_sprite(
+            rom_data, sprite_offset, expected_size
+        )
 
         logger.info(
             f"Decompressed sprite from 0x{sprite_offset:X}: "

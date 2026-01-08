@@ -175,7 +175,7 @@ class IconToolbar(QWidget):
         if icon_key not in self.ICON_CONFIG:
             return
 
-        theme_name, fallback_icon_text, display_label = self.ICON_CONFIG[icon_key]
+        theme_name, _fallback_icon_text, display_label = self.ICON_CONFIG[icon_key]
 
         # Configure button to show text below icon (matches Goal.jpg mockup)
         button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
@@ -189,18 +189,17 @@ class IconToolbar(QWidget):
 
         # Try standard Qt style icons
         style = QApplication.style()
-        if style is not None:
-            std_pixmap: QStyle.StandardPixmap | None = None
-            if icon_key == "zoom_in":
-                std_pixmap = QStyle.StandardPixmap.SP_ArrowUp
-            elif icon_key == "zoom_out":
-                std_pixmap = QStyle.StandardPixmap.SP_ArrowDown
+        std_pixmap: QStyle.StandardPixmap | None = None
+        if icon_key == "zoom_in":
+            std_pixmap = QStyle.StandardPixmap.SP_ArrowUp
+        elif icon_key == "zoom_out":
+            std_pixmap = QStyle.StandardPixmap.SP_ArrowDown
 
-            if std_pixmap is not None:
-                std_icon = style.standardIcon(std_pixmap)
-                if not std_icon.isNull():
-                    button.setIcon(std_icon)
-                    return
+        if std_pixmap is not None:
+            std_icon = style.standardIcon(std_pixmap)
+            if not std_icon.isNull():
+                button.setIcon(std_icon)
+                return
 
         # No icon available - text label is already set, which serves as visual indicator
         # The button will show just the label text without an icon

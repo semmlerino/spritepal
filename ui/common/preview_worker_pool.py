@@ -220,10 +220,14 @@ class PooledPreviewWorker(SpritePreviewWorker):
                 rom_injector = self.extractor.rom_injector
                 if try_offset == self.offset:
                     # Capture slack for primary offset
-                    compressed_size, tile_data, slack_size = rom_injector.find_compressed_sprite(rom_data, try_offset, expected_size)
+                    compressed_size, tile_data, slack_size = rom_injector.find_compressed_sprite(
+                        rom_data, try_offset, expected_size
+                    )
                 else:
                     # Capture slack for variant offsets
-                    compressed_size, tile_data, slack_size = rom_injector.find_compressed_sprite(rom_data, try_offset, expected_size)
+                    compressed_size, tile_data, slack_size = rom_injector.find_compressed_sprite(
+                        rom_data, try_offset, expected_size
+                    )
 
                 if tile_data and len(tile_data) > 0:
                     # Validate that it's reasonable sprite data
@@ -240,9 +244,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
                         logger.debug(
                             f"[TRACE] Successfully decompressed {len(tile_data)} bytes from offset 0x{try_offset:X}"
                         )
-                        logger.debug(
-                            f"[TRACE] Compressed size: {compressed_size} bytes, slack: {slack_size} bytes"
-                        )
+                        logger.debug(f"[TRACE] Compressed size: {compressed_size} bytes, slack: {slack_size} bytes")
                         logger.debug(
                             f"[TRACE] First 20 bytes of decompressed data: {tile_data[:20].hex() if tile_data else 'None'}"
                         )
@@ -512,7 +514,14 @@ class PreviewWorkerPool(QObject):
             logger.warning(f"Error processing queued request: {e}")
 
     def _on_worker_ready(
-        self, request_id: int, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int, slack_size: int
+        self,
+        request_id: int,
+        tile_data: bytes,
+        width: int,
+        height: int,
+        sprite_name: str,
+        compressed_size: int,
+        slack_size: int,
     ) -> None:
         """Handle worker preview ready."""
         logger.debug(

@@ -169,8 +169,10 @@ class SpritePreviewWorker(BaseWorker):
                 # Try to decompress
                 rom_injector = self.extractor.rom_injector
                 if offset_variants:
-                    compressed_size, tile_data, successful_offset, slack_size = rom_injector.find_compressed_sprite_with_fallback(
-                        rom_data, self.offset, offset_variants, expected_size
+                    compressed_size, tile_data, successful_offset, slack_size = (
+                        rom_injector.find_compressed_sprite_with_fallback(
+                            rom_data, self.offset, offset_variants, expected_size
+                        )
                     )
                     if successful_offset != self.offset:
                         logger.info(f"Used alternate offset 0x{successful_offset:X} for {self.sprite_name}")
@@ -183,9 +185,7 @@ class SpritePreviewWorker(BaseWorker):
                 logger.info(
                     f"[PREVIEW_WORKER] Successfully decompressed {len(tile_data)} bytes from offset 0x{self.offset:06X} in {decompression_time:.1f}ms"
                 )
-                logger.debug(
-                    f"[PREVIEW_WORKER] Compressed size: {compressed_size} bytes, slack: {slack_size} bytes"
-                )
+                logger.debug(f"[PREVIEW_WORKER] Compressed size: {compressed_size} bytes, slack: {slack_size} bytes")
 
             except Exception as decomp_error:
                 # Decompression failed - fall back to raw tile extraction for manual browsing

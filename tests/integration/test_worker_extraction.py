@@ -102,14 +102,13 @@ class TestVRAMExtractionWorker:
 
         # Set up signal spies to verify real signal connections
         progress_spy = QSignalSpy(worker.progress)
-        QSignalSpy(worker.preview_ready)
-        QSignalSpy(worker.palettes_ready)
 
         # Connect real manager signals
         worker.connect_manager_signals()
 
-        # Verify connections were stored (real Qt connections)
-        assert len(worker._connections) == 4
+        # Verify only progress connection is made (1 connection)
+        # Note: Preview/palette signals are connected directly by controller (not forwarded through worker)
+        assert len(worker._connections) == 1
 
         # Test that manager signals are properly connected by emitting test signal
         # The real manager's extraction_progress signal should trigger worker's progress
@@ -122,43 +121,29 @@ class TestVRAMExtractionWorker:
         # Clean up connections
         worker.disconnect_manager_signals()
 
-    def test_vram_preview_signal_conversion_real(self, extraction_manager, test_files):
-        """Test that preview signals emit PIL images directly with real manager."""
-        params = {
-            "vram_path": test_files["vram_path"],
-            "cgram_path": test_files["cgram_path"],  # Include CGRAM for preview generation
-            "output_base": test_files["output_base"],
-        }
+    def test_manager_preview_signal_emission(self, extraction_manager, test_files):
+        """Test that manager emits preview_generated signal with PIL images.
 
-        # Create worker with real manager
-        worker = VRAMExtractionWorker(params, extraction_manager)
-
-        # Set up signal spies
-        preview_spy = QSignalSpy(worker.preview_ready)
-        preview_image_spy = QSignalSpy(worker.preview_image_ready)
-
-        # Connect real manager signals
-        worker.connect_manager_signals()
+        Note: Workers no longer forward preview signals. The controller connects
+        directly to manager.preview_generated. This test verifies the manager
+        emits the signal correctly.
+        """
+        # Set up signal spy on manager (not worker)
+        preview_spy = QSignalSpy(extraction_manager.preview_generated)
 
         # Create a real PIL image to test with
         test_image = Image.new("RGBA", (64, 64), color=(255, 0, 0, 255))
         tile_count = 10
 
-        # Emit preview from real manager
-        worker.manager.preview_generated.emit(test_image, tile_count)
+        # Emit preview from manager
+        extraction_manager.preview_generated.emit(test_image, tile_count)
 
-        # Verify signals were emitted with PIL image objects directly
+        # Verify signal was emitted with PIL image objects directly
         # (No QPixmap conversion should happen in worker thread)
         assert preview_spy.count() == 1
         emitted_image, emitted_count = preview_spy.at(0)
         assert isinstance(emitted_image, Image.Image)
         assert emitted_count == tile_count
-
-        assert preview_image_spy.count() == 1
-        assert isinstance(preview_image_spy.at(0)[0], Image.Image)
-
-        # Clean up
-        worker.disconnect_manager_signals()
 
     def test_vram_successful_operation_real(self, extraction_manager, test_files):
         """Test successful VRAM extraction operation with real manager."""

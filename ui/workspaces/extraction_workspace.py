@@ -126,9 +126,7 @@ class ExtractionWorkspace(QWidget):
         self._action_zone.setStyleSheet(get_action_zone_style())
         self._action_zone.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         action_zone_layout = QVBoxLayout(self._action_zone)
-        action_zone_layout.setContentsMargins(
-            LAYOUT_MARGINS, SPACING_COMPACT_SMALL, LAYOUT_MARGINS, LAYOUT_MARGINS
-        )
+        action_zone_layout.setContentsMargins(LAYOUT_MARGINS, SPACING_COMPACT_SMALL, LAYOUT_MARGINS, LAYOUT_MARGINS)
         action_zone_layout.setSpacing(SPACING_COMPACT_SMALL)
 
         # Output settings and buttons will be added by managers

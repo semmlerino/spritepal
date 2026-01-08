@@ -46,7 +46,9 @@ class TestPanelSynchronization:
         QCoreApplication.processEvents()
 
         # Verify icon toolbar synced
-        assert tab.icon_toolbar.get_current_tool() == "fill", "Icon toolbar should sync when controller.set_tool() called"
+        assert tab.icon_toolbar.get_current_tool() == "fill", (
+            "Icon toolbar should sync when controller.set_tool() called"
+        )
 
         # Change to picker
         controller.set_tool("picker")
@@ -151,9 +153,7 @@ class TestPanelSynchronization:
         QCoreApplication.processEvents()
 
         # Verify brush size changed in controller
-        assert controller.tool_manager.get_brush_size() == 3, (
-            "Brush size should update in controller"
-        )
+        assert controller.tool_manager.get_brush_size() == 3, "Brush size should update in controller"
 
     def test_update_from_controller_syncs_all_panels(self, qtbot: QtBot) -> None:
         """Verify update_from_controller() syncs all panel states.

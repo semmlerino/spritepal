@@ -282,7 +282,8 @@ class TestThemeStylingFunctions:
         assert len(css) > 0
         assert "QWidget {" in css
         assert "QGroupBox {" in css
-        assert "QLabel {" in css
+        # QLabel inherits from QWidget; only preview labels have specific styling
+        assert "QLabel[preview=" in css
         assert "QStatusBar {" in css
         assert COLORS["text_primary"] in css
         assert COLORS["background"] in css

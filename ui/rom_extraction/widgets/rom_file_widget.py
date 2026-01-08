@@ -66,13 +66,13 @@ class ElidedPathLabel(QLabel):
         width = self.width() - 16
         if width <= 0:
             return
-            
+
         if self._full_text:
             elided = metrics.elidedText(self._full_text, Qt.TextElideMode.ElideMiddle, width)
         else:
-             # Don't elide placeholder if possible, or elide at end
+            # Don't elide placeholder if possible, or elide at end
             elided = metrics.elidedText(self._placeholder, Qt.TextElideMode.ElideRight, width)
-            
+
         super().setText(elided)
 
 

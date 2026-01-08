@@ -56,7 +56,6 @@ from PySide6.QtWidgets import (
 
 from ui.common import SpriteSearchCoordinator, WorkerManager
 from ui.common.collapsible_group_box import CollapsibleGroupBox
-from ui.common.modules.preview_module import PreviewModule
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.common.spacing_constants import SPACING_SMALL, SPACING_STANDARD
 from ui.styles.theme import COLORS
@@ -113,7 +112,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         settings_manager: ApplicationStateManager,
         extraction_manager: CoreOperationsManager,
         rom_extractor: ROMExtractor | None = None,
-        preview_module: PreviewModule | None = None,
     ) -> None:
         # Debug logging for singleton tracking
         logger.debug(
@@ -163,11 +161,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self.preview_worker: SpritePreviewWorker | None = None
         # Note: search_worker, _sprite_scan_worker, _scan_progress_dialog now managed by SpriteSearchCoordinator
 
-        # Preview module - injected or created internally
-        self._preview_module: PreviewModule | None = preview_module
-        self._preview_module_injected = preview_module is not None
-
-        # Preview coordinator handles preview generation (Smart or Simple based on env flag)
+        # Preview coordinator handles preview generation (created in _setup_smart_preview_coordinator)
         self._smart_preview_coordinator: SmartPreviewCoordinator | None = None
 
         # Preview update timer (legacy - kept for compatibility)
@@ -371,24 +365,16 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     def _setup_smart_preview_coordinator(self):
         """Set up SmartPreviewCoordinator for efficient preview generation."""
-        # If preview module was injected, use its coordinator
-        if self._preview_module is not None:
-            self._smart_preview_coordinator = self._preview_module.coordinator
-            logger.debug("Using injected preview module's coordinator")
-        else:
-            # Create coordinator internally for backward compatibility
-            coordinator = SmartPreviewCoordinator(self)
-            self._smart_preview_coordinator = coordinator
-            logger.debug("Created internal SmartPreviewCoordinator")
+        # Create coordinator owned by this dialog
+        self._smart_preview_coordinator = SmartPreviewCoordinator(self)
+        logger.debug("Created SmartPreviewCoordinator")
 
-        assert self._smart_preview_coordinator is not None
-
-        # Use AutoConnection (default) to let Qt choose the best connection type
+        # Connect preview signals
         self._smart_preview_coordinator.preview_ready.connect(self._on_smart_preview_ready)
         self._smart_preview_coordinator.preview_cached.connect(self._on_smart_preview_cached)
         self._smart_preview_coordinator.preview_error.connect(self._on_smart_preview_error)
 
-        # Setup ROM data provider
+        # Setup ROM data provider (dialog provides rom_path and extractor)
         self._smart_preview_coordinator.set_rom_data_provider(self._get_rom_data_for_preview)
 
         # Connect cache-related signals
@@ -607,9 +593,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         if self._preview_timer is not None:
             self._preview_timer.stop()
 
-        # Signal coordinator cleanup handled by SmartPreviewCoordinator
-        # Only cleanup if we created it (not injected via PreviewModule)
-        if self._smart_preview_coordinator is not None and not self._preview_module_injected:
+        # Clean up preview coordinator (we always own it)
+        if self._smart_preview_coordinator is not None:
             self._smart_preview_coordinator.cleanup()
 
         # Cleanup cache controller

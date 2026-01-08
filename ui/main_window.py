@@ -150,7 +150,9 @@ class MainWindow(QMainWindow):
         # Left Dock
         self.left_dock = QDockWidget("Controls", self)
         self.left_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
-        self.left_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable | QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+        self.left_dock.setFeatures(
+            QDockWidget.DockWidgetFeature.DockWidgetMovable | QDockWidget.DockWidgetFeature.DockWidgetFloatable
+        )
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.left_dock)
 
         # Pre-create preview widgets (needed for UI Coordinator)
@@ -237,7 +239,9 @@ class MainWindow(QMainWindow):
         )
         self._extraction_workspace.tab_changed.connect(self._on_extraction_tab_changed)
         # Connect manual offset changed from ROM panel
-        self._extraction_workspace.rom_extraction_panel.manual_offset_changed.connect(self.toolbar_offset_edit.set_offset)
+        self._extraction_workspace.rom_extraction_panel.manual_offset_changed.connect(
+            self.toolbar_offset_edit.set_offset
+        )
         self.left_dock.setWidget(self._extraction_workspace)
 
         # 2. Sprite Editor Workspace (Center Content)
@@ -758,7 +762,9 @@ class MainWindow(QMainWindow):
         self.rom_extraction_panel.output_name_changed.connect(self._on_rom_output_name_changed)
 
         # Connect sprite editor status messages to main status bar
-        self._sprite_editor_workspace.status_message.connect(lambda msg: self.status_bar_manager.show_message(msg, 3000))
+        self._sprite_editor_workspace.status_message.connect(
+            lambda msg: self.status_bar_manager.show_message(msg, 3000)
+        )
 
         # Connect ROM panel's "open in sprite editor" signal
         self.rom_extraction_panel.open_in_sprite_editor.connect(self._on_open_in_sprite_editor)

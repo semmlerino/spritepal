@@ -1,7 +1,5 @@
 """Sprite selector widget for ROM extraction"""
 
-from typing import TYPE_CHECKING, override
-
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (

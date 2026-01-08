@@ -349,7 +349,6 @@ class UICoordinator(QObject):
         is_enabled = self.toolbar_manager.open_editor_button.isEnabled()
         self.toolbar_manager.set_inject_button_enabled(is_enabled)
 
-
     def get_current_tab_index(self) -> int:
         """Get current active tab index"""
         return self.extraction_tabs.currentIndex()
