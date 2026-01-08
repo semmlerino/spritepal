@@ -12,6 +12,9 @@ from PIL import Image
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
+    from core.managers.core_operations_manager import CoreOperationsManager
+    from core.mesen_integration.log_watcher import LogWatcher
+    from core.services.preview_generator import PreviewGenerator
     from core.services.rom_cache import ROMCache
     from core.workers import ROMExtractionWorker, VRAMExtractionWorker
     from ui.injection_dialog import InjectionDialog
@@ -41,7 +44,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# Session manager accessed via get_app_context().application_state_manager
 # Dialog imports moved to lazy imports in methods that use them (see show_settings, extraction_failed)
 from core.services.image_utils import pil_to_qpixmap
 from core.types import VRAMExtractionParams
@@ -100,6 +102,9 @@ class MainWindow(QMainWindow):
         settings_manager: ApplicationStateManager,
         rom_cache: ROMCache,
         session_manager: ApplicationStateManager,
+        core_operations_manager: CoreOperationsManager,
+        log_watcher: LogWatcher,
+        preview_generator: PreviewGenerator,
     ) -> None:
         super().__init__()
         # Declare instance variables with type hints
@@ -124,6 +129,9 @@ class MainWindow(QMainWindow):
         self.settings_manager = settings_manager
         self.rom_cache = rom_cache
         self.session_manager = session_manager
+        self.core_operations_manager = core_operations_manager
+        self.log_watcher = log_watcher
+        self.preview_generator = preview_generator
 
         # Manager instances
         self.toolbar_manager: ToolbarManager
@@ -247,13 +255,10 @@ class MainWindow(QMainWindow):
 
     def _create_workspaces(self) -> None:
         """Create workspace widgets."""
-        from core.app_context import get_app_context
         from ui.rom_extraction.modules import Mesen2Module
 
-        # Get dependencies
-        extraction_manager = get_app_context().core_operations_manager
-        log_watcher = get_app_context().log_watcher
-        mesen2_module = Mesen2Module(log_watcher=log_watcher, parent=self)
+        # Get dependencies from instance attributes
+        mesen2_module = Mesen2Module(log_watcher=self.log_watcher, parent=self)
 
         # 1. Extraction UI (Dock Content) - inline, no wrapper class
         # Create tab widget for extraction methods
@@ -264,7 +269,7 @@ class MainWindow(QMainWindow):
         # ROM extraction tab (wrapped in scroll area)
         self.rom_extraction_panel = ROMExtractionPanel(
             parent=self,
-            extraction_manager=extraction_manager,
+            extraction_manager=self.core_operations_manager,
             state_manager=self.settings_manager,
             rom_cache=self.rom_cache,
             mesen2_module=mesen2_module,
@@ -924,11 +929,10 @@ class MainWindow(QMainWindow):
                 self.status_bar.showMessage("VRAM path not available")
                 return
 
-            # Get PreviewGenerator from app context
-            from core.app_context import get_app_context
+            # Get PreviewGenerator from instance attribute
             from core.services.preview_generator import create_vram_preview_request
 
-            preview_generator = get_app_context().preview_generator
+            preview_generator = self.preview_generator
 
             # Create preview request
             preview_request = create_vram_preview_request(
@@ -1024,12 +1028,8 @@ class MainWindow(QMainWindow):
             params["output_base"] = output_name
 
             # Validate parameters using extraction manager
-            # Delayed import to avoid initialization order issues
-            from core.app_context import get_app_context
-
             try:
-                extraction_manager = get_app_context().core_operations_manager
-                extraction_manager.validate_extraction_params(params)
+                self.core_operations_manager.validate_extraction_params(params)
             except (ValueError, TypeError) as e:
                 QMessageBox.warning(self, "Validation Error", f"Invalid extraction parameters: {e}")
                 return
@@ -1078,15 +1078,13 @@ class MainWindow(QMainWindow):
         Validates parameters, creates worker, and connects signals.
         Handles PIL→QPixmap conversion in main thread (Bug #26 fix).
         """
-        from core.app_context import get_app_context
         from core.workers import VRAMExtractionWorker
 
         # Get parameters from UI
         params = self.get_extraction_params()
 
-        # Get extraction manager from app context
-        context = get_app_context()
-        extraction_manager = context.core_operations_manager
+        # Get extraction manager from instance attribute
+        extraction_manager = self.core_operations_manager
 
         # PARAMETER VALIDATION: Check requirements first for better UX
         try:
@@ -1237,12 +1235,10 @@ class MainWindow(QMainWindow):
 
     def _start_rom_extraction(self, params: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - params are dynamic extraction config
         """Start ROM sprite extraction process."""
-        from core.app_context import get_app_context
         from core.types import ROMExtractionParams
         from core.workers import ROMExtractionWorker
 
-        context = get_app_context()
-        extraction_manager = context.core_operations_manager
+        extraction_manager = self.core_operations_manager
 
         # Convert validated params dict to ROMExtractionParams TypedDict
         rom_extraction_params: ROMExtractionParams = {
@@ -1299,8 +1295,6 @@ class MainWindow(QMainWindow):
     def _start_injection(self) -> None:
         """Start the injection process using InjectionManager."""
 
-        from core.app_context import get_app_context
-
         # Get sprite path and metadata path
         output_base = self.get_output_path()
         if not output_base:
@@ -1316,10 +1310,9 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage(sprite_result.error_message or f"Sprite file not found: {sprite_path}")
             return
 
-        # Get managers from app context
-        context = get_app_context()
-        injection_manager = context.core_operations_manager
-        settings_mgr = context.application_state_manager
+        # Get managers from instance attributes
+        injection_manager = self.core_operations_manager
+        settings_mgr = self.settings_manager
 
         # Get smart input VRAM suggestion using injection manager
         suggested_input_vram = injection_manager.get_smart_vram_suggestion(
@@ -1366,10 +1359,7 @@ class MainWindow(QMainWindow):
     def _on_injection_finished(self, success: bool, message: str) -> None:
         """Handle injection completion."""
 
-        from core.app_context import get_app_context
-
-        context = get_app_context()
-        settings_mgr = context.application_state_manager
+        settings_mgr = self.settings_manager
 
         if success:
             success_msg = f"Injection successful: {message}"

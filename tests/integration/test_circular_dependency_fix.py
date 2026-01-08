@@ -35,6 +35,9 @@ class TestMainWindowInitialization:
             "settings_manager": context.application_state_manager,
             "rom_cache": context.rom_cache,
             "session_manager": context.application_state_manager,
+            "core_operations_manager": context.core_operations_manager,
+            "log_watcher": context.log_watcher,
+            "preview_generator": context.preview_generator,
         }
 
     @pytest.mark.timeout(5)  # Should complete quickly, not hang

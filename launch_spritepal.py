@@ -77,6 +77,9 @@ class SpritePalApp(QApplication):
             settings_manager=context.application_state_manager,
             rom_cache=context.rom_cache,
             session_manager=context.application_state_manager,
+            core_operations_manager=context.core_operations_manager,
+            log_watcher=context.log_watcher,
+            preview_generator=context.preview_generator,
         )
 
     def _apply_dark_theme(self):

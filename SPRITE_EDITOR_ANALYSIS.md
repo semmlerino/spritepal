@@ -8,7 +8,7 @@
 |-------|--------|-----------|
 | **Phase 1: Quick Wins** | ✅ Complete | ✅ Item 1, ✅ Item 2, ✅ Item 3 |
 | **Phase 2: Medium (Collapse Layers)** | ✅ Complete | ✅ Item 4, ✅ Item 5 |
-| **Phase 3: Deeper (Architecture)** | Pending | — |
+| **Phase 3: Deeper (Architecture)** | In Progress | ✅ Item 6 |
 
 **Completed Work:**
 - ✅ Problem #1 (Dual-Path Signal Wiring) - Removed `MainController._update_undo_state` and duplicate status connection. Single signal path now active.
@@ -16,16 +16,17 @@
 - ✅ Phase 1 Item 3 (Delete `MainController`) - Moved sub-controller ownership to `SpriteEditorWorkspace`. Broke circular dependency in `ROMWorkflowController`. Deleted `MainController` class entirely.
 - ✅ Phase 2 Item 4 (Merge `ExtractionWorkspace` into `MainWindow`) - Inlined setup code into `MainWindow._create_workspaces()`. Deleted `ExtractionWorkspace` class entirely.
 - ✅ Phase 2 Item 5 (Dissolve `UICoordinator`) - Inlined tab helpers, session methods, preview methods, and tab configuration into `MainWindow`. Deleted `UICoordinator` class entirely (~380 lines removed).
+- ✅ Phase 3 Item 6 (Remove `AppContext` from MainWindow) - Added 3 explicit constructor parameters (`core_operations_manager`, `log_watcher`, `preview_generator`). Eliminated all 8 `get_app_context()` calls from MainWindow. Updated 2 test files for new signature.
 - Test Coverage: 1978 passed, 23 skipped, 0 failures (no regression)
 
-**Next Priority:** Phase 3 Item 6 (Remove `AppContext` Service Locator)
+**Next Priority:** Phase 3 Item 7 (Standardize Signal Direction)
 
 ---
 
 ## 1. 10 Highest Impact Problems
 
 1.  **Dual-Path Signal Wiring (Undo/Redo):** ✅ **RESOLVED** (2025-01-08) - Removed `MainController._update_undo_state()` direct path. Single signal flow now: `EditingController.undoStateChanged` → `SpriteEditorWorkspace.undo_state_changed` → `MainWindow._update_undo_redo_state()`. Also removed duplicate status message connection at MainWindow level.
-2.  **Service Locator Anti-Pattern (`AppContext`):** `AppContext` is a global bag of services. While it makes dependencies "explicit" in `launch_spritepal.py`, it effectively hides dependencies deeper in the stack where `get_app_context()` is called (e.g., inside `MainWindow` properties).
+2.  **Service Locator Anti-Pattern (`AppContext`):** ✅ **PARTIALLY RESOLVED** (2026-01-08) - MainWindow now receives all dependencies via constructor (6 explicit params). Zero `get_app_context()` calls in MainWindow. Controllers (`ExtractionController`, `ROMWorkflowController`) still use service locator (8 call sites in 2 files).
 3.  **God-Class `UICoordinator`:** ✅ **RESOLVED** (2026-01-08) - Dissolved UICoordinator by inlining tab helpers, session methods, preview methods, and tab configuration into `MainWindow`. Deleted `ui/managers/ui_coordinator.py` (~380 lines).
 4.  **Passthrough Signal Chains:** `SpriteEditorWorkspace` acts largely as a "signal relay," receiving signals from controllers and re-emitting them to `MainWindow` (e.g., `status_message`, `mode_changed`), adding noise without value.
 5.  **Circular Dependency Workarounds:** `MainWindow` uses lazy properties for `ExtractionController` and `controller` setters to break circular imports, indicating a flaw in the dependency graph (View depends on Controller, which depends on View).

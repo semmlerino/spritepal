@@ -76,18 +76,27 @@ class TestPureAppContextComponentInitialization:
         settings_mgr = app_context.application_state_manager
         rom_cache = app_context.rom_cache
         session_mgr = app_context.application_state_manager
+        core_ops_mgr = app_context.core_operations_manager
+        log_watcher = app_context.log_watcher
+        preview_gen = app_context.preview_generator
 
         # Create window with explicit deps
         window = MainWindow(
             settings_manager=settings_mgr,
             rom_cache=rom_cache,
             session_manager=session_mgr,
+            core_operations_manager=core_ops_mgr,
+            log_watcher=log_watcher,
+            preview_generator=preview_gen,
         )
 
         try:
             assert window.settings_manager is settings_mgr
             assert window.rom_cache is rom_cache
             assert window.session_manager is session_mgr
+            assert window.core_operations_manager is core_ops_mgr
+            assert window.log_watcher is log_watcher
+            assert window.preview_generator is preview_gen
         finally:
             window.close()
             window.deleteLater()
