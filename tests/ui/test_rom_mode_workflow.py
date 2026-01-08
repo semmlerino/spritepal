@@ -3,7 +3,6 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from PySide6.QtWidgets import QComboBox, QWidget
 
-from ui.sprite_editor.controllers.main_controller import MainController
 from ui.workspaces import SpriteEditorWorkspace
 
 
@@ -183,22 +182,31 @@ class TestRomModeWorkflow:
         assert combo.count() == 2
 
         # Test switching to ROM mode
-        with patch.object(sprite_editor_workspace._controller, "set_mode") as mock_set_mode:
-            # Change index to ROM (index 1)
-            combo.setCurrentIndex(1)
+        # The mode_changed signal triggers _on_mode_changed_internal which
+        # propagates to extraction/injection controllers
+        with patch.object(
+            sprite_editor_workspace._extraction_controller, "set_mode"
+        ) as mock_extract_mode:
+            with patch.object(
+                sprite_editor_workspace._injection_controller, "set_mode"
+            ) as mock_inject_mode:
+                # Change index to ROM (index 1)
+                combo.setCurrentIndex(1)
 
-            # Verify controller was called
-            mock_set_mode.assert_called_with("rom")
+                # Verify controllers received mode change
+                mock_extract_mode.assert_called_with("rom")
+                mock_inject_mode.assert_called_with("rom")
 
-            # Change back to VRAM (index 0)
-            combo.setCurrentIndex(0)
-            mock_set_mode.assert_called_with("vram")
+                # Change back to VRAM (index 0)
+                combo.setCurrentIndex(0)
+                mock_extract_mode.assert_called_with("vram")
+                mock_inject_mode.assert_called_with("vram")
 
     def test_jump_to_offset_switches_mode(self, sprite_editor_workspace):
         # Verify jump_to_offset sets mode and offset
 
-        # Mock the controller methods we expect to be called
-        sprite_editor_workspace._controller.rom_workflow_controller = MagicMock()
+        # Mock the rom_workflow_controller.set_offset method
+        sprite_editor_workspace._rom_workflow_controller = MagicMock()
 
         # Call jump_to_offset
         sprite_editor_workspace.jump_to_offset(0x123456)
@@ -207,18 +215,6 @@ class TestRomModeWorkflow:
         assert sprite_editor_workspace._mode_combo.currentData() == "rom"
 
         # Verify rom workflow controller offset set (auto_open=True is default behavior)
-        sprite_editor_workspace._controller.rom_workflow_controller.set_offset.assert_called_with(
+        sprite_editor_workspace._rom_workflow_controller.set_offset.assert_called_with(
             0x123456, auto_open=True
         )
-
-    def test_controller_propagates_mode(self, mock_app_context):
-        # Test MainController propagation logic
-        with patch("ui.sprite_editor.controllers.main_controller.ROMWorkflowController", MagicMock()):
-            controller = MainController()
-            controller.extraction_controller = MagicMock()
-            controller.injection_controller = MagicMock()
-
-            controller.set_mode("rom")
-
-            controller.extraction_controller.set_mode.assert_called_with("rom")
-            controller.injection_controller.set_mode.assert_called_with("rom")

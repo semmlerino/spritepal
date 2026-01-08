@@ -6,16 +6,17 @@
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| **Phase 1: Quick Wins** | In Progress | ✅ Item 1, ✅ Item 2 |
+| **Phase 1: Quick Wins** | ✅ Complete | ✅ Item 1, ✅ Item 2, ✅ Item 3 |
 | **Phase 2: Medium (Collapse Layers)** | Pending | — |
 | **Phase 3: Deeper (Architecture)** | Pending | — |
 
 **Completed Work:**
 - ✅ Problem #1 (Dual-Path Signal Wiring) - Removed `MainController._update_undo_state` and duplicate status connection. Single signal path now active.
 - ✅ Phase 1 Item 2 (Flatten Status Messages) - Replaced 3-layer signal relay with direct dependency injection. Fixed bug where `ROMWorkflowController.status_message` (~25 emit calls) was never connected. Controllers now call `message_service.show_message()` directly.
-- Test Coverage: 1984 passed, 23 skipped, 0 failures (no regression)
+- ✅ Phase 1 Item 3 (Delete `MainController`) - Moved sub-controller ownership to `SpriteEditorWorkspace`. Broke circular dependency in `ROMWorkflowController`. Deleted `MainController` class entirely.
+- Test Coverage: 1978 passed, 23 skipped, 0 failures (no regression)
 
-**Next Priority:** Phase 1 Item 3 (Delete `MainController`) or Phase 2 Item 4 (Merge `ExtractionWorkspace`)
+**Next Priority:** Phase 2 Item 4 (Merge `ExtractionWorkspace` into `MainWindow`)
 
 ---
 
@@ -133,9 +134,14 @@
     *   ✅ Deferred injection via `set_message_service()` to handle initialization order.
     *   ✅ All tests pass (1984 passed, 23 skipped, 0 failures).
 
-3.  **Delete `MainController`:**
-    *   It's largely a container. Move `EditingController`, `ExtractionController`, `InjectionController` ownership to `SpriteEditorWorkspace`.
-    *   *Verify:* Code compiles, one less file to jump through.
+3.  ✅ **Delete `MainController`:** (COMPLETED 2026-01-08)
+    *   ✅ Broke `ROMWorkflowController` circular dependency: now accepts `editing_controller` directly instead of `main_controller`.
+    *   ✅ Moved sub-controller creation to `SpriteEditorWorkspace.__init__()`.
+    *   ✅ Moved temp file management and cleanup to `SpriteEditorWorkspace`.
+    *   ✅ Added `wire_controllers()` method to `SpriteEditorMainWindow` for standalone mode.
+    *   ✅ Deleted `ui/sprite_editor/controllers/main_controller.py` entirely.
+    *   ✅ Updated all tests (removed 6 obsolete tests, fixed 2 tests accessing old API).
+    *   ✅ All tests pass (1978 passed, 23 skipped, 0 failures).
 
 ### Phase 2: Medium (Collapse Layers)
 

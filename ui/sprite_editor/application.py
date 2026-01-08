@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING, cast
 
 from PySide6.QtWidgets import QApplication
 
-from .controllers import MainController
+from .controllers import (
+    EditingController,
+    ExtractionController,
+    InjectionController,
+)
+from .controllers.rom_workflow_controller import ROMWorkflowController
 from .views import SpriteEditorMainWindow
 
 if TYPE_CHECKING:
@@ -59,10 +64,26 @@ class SpriteEditorApplication:
         # Create main window with settings manager
         self.main_window = SpriteEditorMainWindow(settings_manager=context.application_state_manager)
 
-        # Create message adapter and main controller
+        # Create message adapter
         message_adapter = MainWindowMessageAdapter(self.main_window)
-        self.controller = MainController(message_service=cast("StatusBarManager", message_adapter))
-        self.controller.set_main_window(self.main_window)
+
+        # Create sub-controllers directly
+        self.extraction_controller = ExtractionController(None)
+        self.editing_controller = EditingController(None)
+        self.injection_controller = InjectionController(None)
+        self.rom_workflow_controller = ROMWorkflowController(
+            None,
+            self.editing_controller,
+            message_service=cast("StatusBarManager", message_adapter),
+        )
+
+        # Wire controllers to window
+        self.main_window.wire_controllers(
+            self.extraction_controller,
+            self.editing_controller,
+            self.injection_controller,
+            self.rom_workflow_controller,
+        )
 
     def run(self) -> int:
         """Run the application.

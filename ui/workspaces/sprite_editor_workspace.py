@@ -13,8 +13,11 @@ this workspace uses a QStackedWidget for clean mode switching.
 from __future__ import annotations
 
 import logging
+import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from PIL import Image
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QComboBox,
@@ -26,7 +29,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.sprite_editor.controllers.main_controller import MainController
+from ui.sprite_editor.controllers import (
+    EditingController,
+    ExtractionController,
+    InjectionController,
+)
+from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
 from ui.sprite_editor.views.workspaces import ROMWorkflowPage, VRAMEditorPage
 
 if TYPE_CHECKING:
@@ -63,8 +71,16 @@ class SpriteEditorWorkspace(QWidget):
         super().__init__(parent)
         self._settings_manager = settings_manager
 
-        # Create controller first (it creates sub-controllers)
-        self._controller = MainController(self, message_service=message_service)
+        # Create sub-controllers directly (no MainController wrapper)
+        self._extraction_controller = ExtractionController(self)
+        self._editing_controller = EditingController(self)
+        self._injection_controller = InjectionController(self)
+        self._rom_workflow_controller = ROMWorkflowController(
+            self, self._editing_controller, message_service=message_service
+        )
+
+        # Track temporary files for cleanup during injection workflow
+        self._temp_files: list[str] = []
 
         # Setup UI
         self._setup_ui()
@@ -76,7 +92,8 @@ class SpriteEditorWorkspace(QWidget):
 
     def set_message_service(self, service: StatusBarManager | None) -> None:
         """Inject message service after construction (for deferred initialization)."""
-        self._controller.set_message_service(service)
+        # Only ROM workflow controller needs message service currently
+        self._rom_workflow_controller.set_message_service(service)
 
     def _setup_ui(self) -> None:
         """Create the workspace UI."""
@@ -132,24 +149,21 @@ class SpriteEditorWorkspace(QWidget):
 
     def _wire_controllers(self) -> None:
         """Wire controllers to mode pages."""
-        # Get editing controller (shared between both pages)
-        editing_ctrl = self._controller.editing_controller
-
         # Wire VRAM page
-        self._controller.extraction_controller.set_view(self._vram_page.extract_tab)
-        editing_ctrl.set_view(self._vram_page.edit_tab)
-        self._controller.injection_controller.set_view(self._vram_page.inject_tab)
-        self._controller.extraction_controller.set_multi_palette_view(self._vram_page.multi_palette_tab)
+        self._extraction_controller.set_view(self._vram_page.extract_tab)
+        self._editing_controller.set_view(self._vram_page.edit_tab)
+        self._injection_controller.set_view(self._vram_page.inject_tab)
+        self._extraction_controller.set_multi_palette_view(self._vram_page.multi_palette_tab)
 
         # Wire ROM page's workspace to the same editing controller
         # This is the key: both pages share the same EditingController
-        self._rom_page.workspace.set_controller(editing_ctrl)
+        self._rom_page.workspace.set_controller(self._editing_controller)
 
         # Wire ROM workflow controller to ROM page
-        self._controller.rom_workflow_controller.set_view(self._rom_page)
+        self._rom_workflow_controller.set_view(self._rom_page)
 
         # Connect undo/redo state updates (forwarded to signal)
-        editing_ctrl.undoStateChanged.connect(self.undo_state_changed.emit)
+        self._editing_controller.undoStateChanged.connect(self.undo_state_changed.emit)
 
         # Connect offset changed
         self._rom_page.offset_changed.connect(self.offset_changed.emit)
@@ -157,19 +171,27 @@ class SpriteEditorWorkspace(QWidget):
         # Connect ready_for_inject from VRAM page
         self._vram_page.ready_for_inject.connect(self._on_ready_for_inject)
 
-        # Connect mode change
-        self.mode_changed.connect(self._controller.set_mode)
+        # Connect injection completion for temp file cleanup
+        self._injection_controller.injection_completed.connect(self._on_injection_completed)
+
+        # Connect mode changes to propagate to extraction and injection controllers
+        self.mode_changed.connect(self._on_mode_changed_internal)
         self.mode_changed.connect(self._on_mode_switched)
 
         logger.debug("Controllers wired to workspace pages")
 
+    def _on_mode_changed_internal(self, mode: str) -> None:
+        """Propagate mode changes to extraction and injection controllers."""
+        self._extraction_controller.set_mode(mode)
+        self._injection_controller.set_mode(mode)
+
     def undo(self) -> None:
         """Trigger undo action."""
-        self._controller.editing_controller.undo()
+        self._editing_controller.undo()
 
     def redo(self) -> None:
         """Trigger redo action."""
-        self._controller.editing_controller.redo()
+        self._editing_controller.redo()
 
     def _on_mode_changed(self, index: int) -> None:
         """Handle mode combo box change."""
@@ -191,16 +213,78 @@ class SpriteEditorWorkspace(QWidget):
             logger.info("Switched to VRAM workflow page")
 
     def _on_ready_for_inject(self) -> None:
-        """Handle 'ready for inject' from edit tab."""
+        """Handle 'ready for inject' from edit tab.
+
+        Prepares the edited image as a temporary PNG file for injection.
+        """
+        # Get the edited image data
+        image_data = self._editing_controller.get_image_data()
+        if image_data is None:
+            logger.warning("No image data to prepare for injection")
+            return
+
+        # Get palette
+        palette = self._editing_controller.get_flat_palette()
+
+        # Create indexed image with palette
+        img = Image.fromarray(image_data, mode="P")
+        img.putpalette(palette)
+
+        # Save to temp file
+        temp_dir = Path(tempfile.gettempdir())
+        temp_path = str(temp_dir / f"spritepal_inject_{id(self)}.png")
+        img.save(temp_path)
+
+        # Track for cleanup
+        self._temp_files.append(temp_path)
+
+        # Pass to injection controller
+        self._injection_controller.set_source_image(temp_path)
+
         # Switch to inject tab in VRAM page
         self._vram_page.switch_to_inject_tab()
-        logger.debug("Switched to inject tab")
+        logger.debug("Prepared image for injection and switched to inject tab")
+
+    def _on_injection_completed(self, output_path: str) -> None:
+        """Handle injection completion - cleanup temp files.
+
+        Args:
+            output_path: Path to the generated VRAM/ROM file
+        """
+        self._cleanup_temp_files()
+        logger.debug(f"Injection completed, temp files cleaned up: {output_path}")
+
+    def _cleanup_temp_files(self) -> None:
+        """Clean up temporary files created during injection workflow."""
+        for path in self._temp_files:
+            try:
+                temp_path = Path(path)
+                if temp_path.exists():
+                    temp_path.unlink()
+            except OSError:
+                pass  # Best effort cleanup
+        self._temp_files.clear()
 
     # Public API for external access
     @property
-    def controller(self) -> MainController:
-        """Access the main controller."""
-        return self._controller
+    def extraction_controller(self) -> ExtractionController:
+        """Access the extraction controller."""
+        return self._extraction_controller
+
+    @property
+    def editing_controller(self) -> EditingController:
+        """Access the editing controller."""
+        return self._editing_controller
+
+    @property
+    def injection_controller(self) -> InjectionController:
+        """Access the injection controller."""
+        return self._injection_controller
+
+    @property
+    def rom_workflow_controller(self) -> ROMWorkflowController:
+        """Access the ROM workflow controller."""
+        return self._rom_workflow_controller
 
     @property
     def vram_page(self) -> VRAMEditorPage:
@@ -236,14 +320,23 @@ class SpriteEditorWorkspace(QWidget):
         self._mode_combo.setCurrentIndex(1)
 
         # Set offset in ROM workflow controller (auto_open triggers editor after preview)
-        self._controller.rom_workflow_controller.set_offset(offset, auto_open=auto_open)
+        self._rom_workflow_controller.set_offset(offset, auto_open=auto_open)
 
     def load_rom(self, path: str) -> None:
         """Load a ROM into the sprite editor.
 
         Delegates to the ROM workflow controller.
         """
-        self._controller.rom_workflow_controller.load_rom(path)
+        self._rom_workflow_controller.load_rom(path)
+
+    def cleanup(self) -> None:
+        """Clean up resources on shutdown."""
+        # Clean up temp files
+        self._cleanup_temp_files()
+
+        # Clean up sub-controllers
+        self._extraction_controller.cleanup()
+        self._injection_controller.cleanup()
 
     # Backward compatibility: expose tabs that old code might access
     @property

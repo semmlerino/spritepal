@@ -47,7 +47,6 @@ try:
         EditingController,
         ExtractionController,
         InjectionController,
-        MainController,
     )
 
     # Views
@@ -94,7 +93,6 @@ __all__ = [
     "InjectTab",
     "InjectWorker",
     "InjectionController",
-    "MainController",
     "MultiPaletteExtractWorker",
     "MultiPaletteTab",
     "OAMPaletteMapper",

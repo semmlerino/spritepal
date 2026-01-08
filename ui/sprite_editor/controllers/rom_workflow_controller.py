@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from ui.managers.status_bar_manager import StatusBarManager
 
     from ..views.workspaces.rom_workflow_page import ROMWorkflowPage
-    from .main_controller import MainController
+    from .editing_controller import EditingController
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +40,9 @@ class ROMWorkflowController(QObject):
     preview_ready = Signal(object, int)  # QPixmap or Image, compressed_size
     workflow_state_changed = Signal(str)  # 'preview', 'edit', 'save'
 
-    def __init__(self, main_controller: "MainController", *, message_service: "StatusBarManager | None" = None) -> None:
-        super().__init__(main_controller)
-        self.main_controller = main_controller
+    def __init__(self, parent: QObject | None, editing_controller: "EditingController", *, message_service: "StatusBarManager | None" = None) -> None:
+        super().__init__(parent)
+        self._editing_controller = editing_controller
         self._message_service: StatusBarManager | None = message_service
         self._view: ROMWorkflowPage | None = None
 
@@ -467,7 +467,7 @@ class ROMWorkflowController(QObject):
             self._pending_open_in_editor = True
 
         # Check for unsaved changes if in edit mode
-        if self.state == "edit" and self.main_controller.editing_controller.undo_manager.can_undo():
+        if self.state == "edit" and self._editing_controller.undo_manager.can_undo():
             from PySide6.QtWidgets import QMessageBox
 
             reply = QMessageBox.question(
@@ -529,7 +529,7 @@ class ROMWorkflowController(QObject):
         palette = get_default_snes_palette()
 
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
-        self.main_controller.editing_controller.load_image(image_array, palette)
+        self._editing_controller.load_image(image_array, palette)
 
         # Change state
         self.state = "edit"
@@ -543,7 +543,7 @@ class ROMWorkflowController(QObject):
 
     def prepare_injection(self) -> None:
         """Transition from editing to save confirmation with size comparison."""
-        data = self.main_controller.editing_controller.get_image_data()
+        data = self._editing_controller.get_image_data()
         if data is None:
             if self._message_service:
                 self._message_service.show_message("No image to inject")
@@ -559,7 +559,7 @@ class ROMWorkflowController(QObject):
 
             # Convert to 4bpp tiles
             img = Image.fromarray(data, mode="P")
-            img.putpalette(self.main_controller.editing_controller.get_flat_palette())
+            img.putpalette(self._editing_controller.get_flat_palette())
 
             # Simple conversion for size estimation
             tiles = converter.image_to_tiles(img)
@@ -617,7 +617,7 @@ class ROMWorkflowController(QObject):
 
     def save_to_rom(self) -> None:
         """Inject edited sprite back to ROM."""
-        data = self.main_controller.editing_controller.get_image_data()
+        data = self._editing_controller.get_image_data()
         if data is None:
             if self._message_service:
                 self._message_service.show_message("No image to save")
@@ -629,7 +629,7 @@ class ROMWorkflowController(QObject):
 
             # Create PIL image for conversion
             img = Image.fromarray(data, mode="P")
-            img.putpalette(self.main_controller.editing_controller.get_flat_palette())
+            img.putpalette(self._editing_controller.get_flat_palette())
 
             # Save to temp PNG for injector
             import tempfile
@@ -748,7 +748,7 @@ class ROMWorkflowController(QObject):
 
     def export_png(self) -> None:
         """Export current sprite as PNG file."""
-        data = self.main_controller.editing_controller.get_image_data()
+        data = self._editing_controller.get_image_data()
         if data is None:
             if self._message_service:
                 self._message_service.show_message("No image to export")
@@ -769,7 +769,7 @@ class ROMWorkflowController(QObject):
         try:
             # Create PIL image for export
             img = Image.fromarray(data, mode="P")
-            img.putpalette(self.main_controller.editing_controller.get_flat_palette())
+            img.putpalette(self._editing_controller.get_flat_palette())
             img.save(file_path, "PNG")
             if self._message_service:
                 self._message_service.show_message(f"Exported to: {file_path}")

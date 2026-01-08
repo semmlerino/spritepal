@@ -24,6 +24,14 @@ from .tabs import EditTab, ExtractTab, InjectTab, MultiPaletteTab
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
+    from ui.sprite_editor.controllers import (
+        EditingController,
+        ExtractionController,
+        InjectionController,
+    )
+    from ui.sprite_editor.controllers.rom_workflow_controller import (
+        ROMWorkflowController,
+    )
 
 
 class SpriteEditorMainWindow(QMainWindow):
@@ -40,6 +48,12 @@ class SpriteEditorMainWindow(QMainWindow):
         *,
         settings_manager: ApplicationStateManager | None = None,
     ) -> None:
+        # Initialize controller references before super().__init__()
+        self._extraction_controller: ExtractionController | None = None
+        self._editing_controller: EditingController | None = None
+        self._injection_controller: InjectionController | None = None
+        self._rom_workflow_controller: ROMWorkflowController | None = None
+
         super().__init__(parent)
         self.settings_manager = settings_manager
         self.setWindowTitle("SpritePal Unified Editor")
@@ -257,3 +271,55 @@ class SpriteEditorMainWindow(QMainWindow):
     def clear_coords(self) -> None:
         """Clear the coordinates display."""
         self.coords_label.setText("")
+
+    def wire_controllers(
+        self,
+        extraction_controller: "ExtractionController",
+        editing_controller: "EditingController",
+        injection_controller: "InjectionController",
+        rom_workflow_controller: "ROMWorkflowController | None" = None,
+    ) -> None:
+        """Wire menu actions to controller methods.
+
+        Called by SpriteEditorApplication after creating controllers.
+
+        Args:
+            extraction_controller: Controller for sprite extraction
+            editing_controller: Controller for sprite editing
+            injection_controller: Controller for sprite injection
+            rom_workflow_controller: Controller for ROM workflow (optional)
+        """
+        # Store references for later use
+        self._extraction_controller = extraction_controller
+        self._editing_controller = editing_controller
+        self._injection_controller = injection_controller
+        self._rom_workflow_controller = rom_workflow_controller
+
+        # File menu
+        self.action_open_vram.triggered.connect(extraction_controller.browse_vram_file)
+        self.action_open_cgram.triggered.connect(extraction_controller.browse_cgram_file)
+        self.action_open_png.triggered.connect(injection_controller.browse_png_file)
+        self.action_save.triggered.connect(editing_controller.save_image)
+        self.action_save_as.triggered.connect(editing_controller.save_image_as)
+
+        # Edit menu
+        self.action_undo.triggered.connect(editing_controller.undo)
+        self.action_redo.triggered.connect(editing_controller.redo)
+
+        # Tools menu
+        self.action_pencil.triggered.connect(lambda: editing_controller.set_tool("pencil"))
+        self.action_fill.triggered.connect(lambda: editing_controller.set_tool("fill"))
+        self.action_picker.triggered.connect(lambda: editing_controller.set_tool("picker"))
+
+        # Tool state sync
+        editing_controller.toolChanged.connect(self._update_tool_menu)
+
+    def _update_tool_menu(self, tool: str) -> None:
+        """Update tool menu checkmarks based on current tool.
+
+        Args:
+            tool: The current tool name ("pencil", "fill", or "picker")
+        """
+        self.action_pencil.setChecked(tool == "pencil")
+        self.action_fill.setChecked(tool == "fill")
+        self.action_picker.setChecked(tool == "picker")
