@@ -303,6 +303,48 @@ class SpritePreset:
         )
 
 
+class PaletteEntry(TypedDict):
+    """A single palette entry in default_palettes.json."""
+
+    index: int
+    name: str
+    colors: list[RGBColor]
+
+
+class PaletteCategory(TypedDict):
+    """A category of palettes (e.g., 'kirby_normal') in default_palettes.json."""
+
+    description: str
+    palettes: list[PaletteEntry]
+
+
+class DefaultPalettesJson(TypedDict):
+    """Structure of the default_palettes.json file."""
+
+    format_version: str
+    description: str
+    palettes: dict[str, PaletteCategory]
+
+
+class ExtractionMetadata(TypedDict):
+    """Metadata about a sprite extraction, saved in .metadata.json."""
+
+    source_type: SourceType
+    rom_source: NotRequired[str]
+    vram_source: NotRequired[str]
+    rom_offset: NotRequired[str]
+    vram_offset: NotRequired[str]
+    sprite_name: NotRequired[str]
+    compressed_size: NotRequired[int]
+    tile_count: int
+    extraction_size: int
+    rom_title: NotRequired[str]
+    rom_checksum: NotRequired[str]
+    rom_palettes_used: NotRequired[bool]
+    default_palettes_used: NotRequired[bool]
+    palette_count: int
+
+
 # Re-export for backward compatibility
 __all__ = [
     "CacheData",
@@ -311,8 +353,10 @@ __all__ = [
     "CachePath",
     "CacheStats",
     "ConfigDict",
+    "DefaultPalettesJson",
     "DialogResult",
     "ErrorCallback",
+    "ExtractionMetadata",
     "FilePath",
     "InjectionMode",
     "NavigationHint",
@@ -322,7 +366,9 @@ __all__ = [
     "OperationStatus",
     "OutputPath",
     "PILImage",
+    "PaletteCategory",
     "PaletteData",
+    "PaletteEntry",
     "ParsedMetadataInfo",
     "PresetSource",
     "PreviewPixmap",

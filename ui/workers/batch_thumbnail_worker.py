@@ -506,7 +506,7 @@ class BatchThumbnailWorker(QObject):
             # Try to decompress sprite at offset
             decompressed_data = None
 
-            if self.rom_extractor and hasattr(self.rom_extractor, "rom_injector"):
+            if self.rom_extractor:
                 # Try HAL decompression
                 try:
                     # Read chunk for decompression
@@ -632,10 +632,9 @@ class BatchThumbnailWorker(QObject):
 
     def _clear_cache_memory(self) -> None:
         """Clear cache memory with logging."""
-        if hasattr(self, "_cache") and self._cache:
+        if self._cache:
             cache_size = len(self._cache)
-            if self._cache:
-                self._cache.clear()
+            self._cache.clear()
             if cache_size > 0:
                 logger.debug(f"Cleared thumbnail cache: freed {cache_size} cached images")
                 # Log cache statistics before clearing
@@ -646,12 +645,9 @@ class BatchThumbnailWorker(QObject):
 
     def _clear_rom_data(self) -> None:
         """Clear ROM data from memory with logging."""
-        if hasattr(self, "_rom_mmap") and self._rom_mmap is not None:
+        if self._rom_mmap is not None:
             try:
-                if hasattr(self._rom_mmap, "__len__"):
-                    rom_size = len(self._rom_mmap)
-                else:
-                    rom_size = 0
+                rom_size = len(self._rom_mmap)
 
                 # Close memory map
                 if hasattr(self._rom_mmap, "close") and callable(getattr(self._rom_mmap, "close", None)):
@@ -659,7 +655,7 @@ class BatchThumbnailWorker(QObject):
                 self._rom_mmap = None
 
                 # Close file handle
-                if hasattr(self, "_rom_file") and self._rom_file:
+                if self._rom_file:
                     self._rom_file.close()
                     self._rom_file = None
 

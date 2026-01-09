@@ -288,7 +288,7 @@ class SpriteEditorMainWindow(QMainWindow):
         try:
             # Convert PIL image to numpy array (indices)
             # Ensure we're working with a paletted image
-            if not (hasattr(image, "mode") and image.mode == "P"):
+            if image.mode != "P":
                 self.set_status("Error: Extracted image is not a valid indexed image.")
                 return
 

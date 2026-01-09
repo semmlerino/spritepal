@@ -815,7 +815,7 @@ class ROMInjector(SpriteInjector):
                     compressed_size=config.estimated_size,
                 )
                 # Store offset variants if available
-                if hasattr(config, "offset_variants") and config.offset_variants:
+                if config.offset_variants:
                     pointer.offset_variants = config.offset_variants
                 pointers[name] = pointer
 

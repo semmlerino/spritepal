@@ -421,7 +421,7 @@ class PreviewWorkerPool(QObject):
             worker.setup_request(request, extractor)
 
             # Connect signals only if not already connected
-            if not hasattr(worker, "_signals_connected") or not worker._signals_connected:
+            if not worker._signals_connected:
                 worker.preview_ready.connect(self._on_worker_ready, Qt.ConnectionType.QueuedConnection)
                 worker.preview_error.connect(self._on_worker_error, Qt.ConnectionType.QueuedConnection)
                 worker._signals_connected = True
@@ -506,10 +506,12 @@ class PreviewWorkerPool(QObject):
                         worker.setup_request(request, extractor)
 
                         # Connect signals only if not already connected
-                        if not hasattr(worker, "_signals_connected") or not worker._signals_connected:
+                        if not worker._signals_connected:
                             worker.preview_ready.connect(self._on_worker_ready, Qt.ConnectionType.QueuedConnection)
                             worker.preview_error.connect(self._on_worker_error, Qt.ConnectionType.QueuedConnection)
                             worker._signals_connected = True
+
+                        # Move to active set
                         self._active_workers.add(worker)
                         self._last_activity = time.time()
                         worker.start()
@@ -596,7 +598,7 @@ class PreviewWorkerPool(QObject):
             worker.blockSignals(True)
 
             # Disconnect signals safely now that they're blocked
-            if hasattr(worker, "_signals_connected") and worker._signals_connected:
+            if worker._signals_connected:
                 try:
                     worker.preview_ready.disconnect(self._on_worker_ready)
                 except (TypeError, RuntimeError):
@@ -662,7 +664,7 @@ class PreviewWorkerPool(QObject):
                     worker.blockSignals(True)
 
                     # Disconnect signals safely now that they're blocked
-                    if hasattr(worker, "_signals_connected") and worker._signals_connected:
+                    if worker._signals_connected:
                         with contextlib.suppress(TypeError):
                             worker.preview_ready.disconnect()
                         with contextlib.suppress(TypeError):

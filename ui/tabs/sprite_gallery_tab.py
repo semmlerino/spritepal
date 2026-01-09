@@ -58,6 +58,7 @@ class SpriteGalleryTab(QWidget):
         self.rom_size: int = 0
         self.rom_extractor = None
         self.sprites_data: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - Sprite metadata
+        self.scan_mode = "quick"
 
         # Workers
         self.thumbnail_controller: ThumbnailWorkerController | None = None
@@ -289,7 +290,7 @@ class SpriteGalleryTab(QWidget):
 
                 scan_ranges = [(start_offset, end_offset, step_size)]
             # Choose scan ranges based on scan mode
-            elif hasattr(self, "scan_mode") and self.scan_mode == "thorough":
+            elif self.scan_mode == "thorough":
                 # Thorough scan - smaller step sizes, more areas
                 scan_ranges = [
                     (0x200000, 0x280000, 0x100),  # Main sprite area - scan every 256 bytes

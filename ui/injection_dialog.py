@@ -244,7 +244,7 @@ class InjectionDialog(TabbedDialog):
         prev_tab_shortcut.activated.connect(self._prev_tab)
 
         # Update button box if it exists
-        if hasattr(self, "button_box") and self.button_box:
+        if self.button_box:
             ok_button = self.button_box.button(QDialogButtonBox.StandardButton.Ok)
             if ok_button:
                 ok_button.setText("&Apply")
@@ -288,7 +288,7 @@ class InjectionDialog(TabbedDialog):
         AccessibilityHelper.add_focus_indicators(self)
 
         # Make tab widget accessible if it exists
-        if hasattr(self, "_main_tab_widget") and self._main_tab_widget:
+        if self._main_tab_widget:
             self._main_tab_widget.setAccessibleName("Injection Mode Tabs")
             self._main_tab_widget.setAccessibleDescription("Choose between VRAM or ROM injection mode")
 
@@ -897,8 +897,13 @@ class InjectionDialog(TabbedDialog):
         else:
             # Try to find and auto-fill input VRAM
             suggested_input = self.injection_manager.find_suggested_input_vram(
-                self.sprite_path, self.metadata if hasattr(self, "metadata") else None, self.suggested_input_vram
+                self.sprite_path, self.metadata, self.suggested_input_vram
             )
+            return
+
+        # VRAM offset from metadata
+        if self.metadata:
+            self.extraction_vram_offset = str(self.metadata.get("vram_offset", ""))
             if suggested_input and self.input_vram_selector:
                 self.input_vram_selector.set_path(suggested_input)
 

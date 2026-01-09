@@ -1359,7 +1359,7 @@ class HALCompressor:
             )
         except OSError as e:
             logger.exception("OS error testing tools")
-            if platform.system() == "Windows" and hasattr(e, "winerror") and getattr(e, "winerror", None) == 193:
+            if platform.system() == "Windows" and getattr(e, "winerror", None) == 193:
                 error_msg = "Wrong platform binaries. Please run 'python compile_hal_tools.py' to build for Windows"
             else:
                 error_msg = f"Error testing tools: {e!s}"

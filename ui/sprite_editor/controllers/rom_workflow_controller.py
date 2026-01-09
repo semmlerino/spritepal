@@ -340,7 +340,7 @@ class ROMWorkflowController(QObject):
                     f.seek(offset)
                     chunk = f.read(0x10000)  # Read up to 64KB for decompression
 
-                if chunk and hasattr(self.rom_extractor, "rom_injector"):
+                if chunk:
                     rom_injector = self.rom_extractor.rom_injector
                     _, decompressed_data, _ = rom_injector.find_compressed_sprite(
                         chunk, 0, expected_size=None
@@ -691,9 +691,9 @@ class ROMWorkflowController(QObject):
         # Clear previous ROM palette sources before loading new sprite
         if self._view:
             workspace = self._view.workspace
-            if workspace and hasattr(workspace, "palette_panel"):
+            if workspace:
                 palette_panel = workspace.palette_panel
-                if palette_panel and hasattr(palette_panel, "clear_rom_sources"):
+                if palette_panel:
                     palette_panel.clear_rom_sources()
 
         # Use SpriteRenderer to create PIL image from 4bpp

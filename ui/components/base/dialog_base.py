@@ -252,7 +252,7 @@ class DialogBase(QDialog):
         Args:
             message: Status message to display
         """
-        if hasattr(self, "status_bar") and self.status_bar:
+        if self.status_bar:
             self.status_bar.showMessage(message)
 
     def set_current_tab(self, index: int) -> None:

@@ -186,12 +186,11 @@ class AppContext:
             self.sprite_preset_manager,
             self.application_state_manager,
         ]:
-            if hasattr(mgr, "cleanup"):
-                try:
-                    mgr.cleanup()
-                    logger.debug("Cleaned up %s", type(mgr).__name__)
-                except Exception:
-                    logger.warning("Error cleaning up %s", type(mgr).__name__, exc_info=True)
+            try:
+                mgr.cleanup()
+                logger.debug("Cleaned up %s", type(mgr).__name__)
+            except Exception:
+                logger.warning("Error cleaning up %s", type(mgr).__name__, exc_info=True)
 
         logger.info("AppContext cleanup complete")
 

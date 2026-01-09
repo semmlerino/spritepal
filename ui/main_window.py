@@ -256,8 +256,7 @@ class MainWindow(QMainWindow):
                 self.switch_to_rom_tab()
 
             # Set offset in ROM panel
-            if hasattr(self.rom_extraction_panel, "set_manual_offset"):
-                self.rom_extraction_panel.set_manual_offset(offset)
+            self.rom_extraction_panel.set_manual_offset(offset)
 
     def _create_workspaces(self) -> None:
         """Create workspace widgets."""
@@ -890,14 +889,13 @@ class MainWindow(QMainWindow):
         Returns:
             Palette dict if available, None otherwise.
         """
-        if hasattr(self, "sprite_preview") and self.sprite_preview:
-            if hasattr(self.sprite_preview, "get_palettes"):
-                try:
-                    palettes = self.sprite_preview.get_palettes()
-                    if palettes:
-                        return palettes
-                except Exception as e:
-                    logger.warning(f"Failed to get palettes for dialog: {e}")
+        if self.sprite_preview:
+            try:
+                palettes = self.sprite_preview.get_palettes()
+                if palettes:
+                    return palettes
+            except Exception as e:
+                logger.warning(f"Failed to get palettes for dialog: {e}")
         return None
 
     def _get_tiles_per_row_for_dialog(self) -> int | None:
@@ -906,7 +904,7 @@ class MainWindow(QMainWindow):
         Returns:
             Tiles per row if available, None to let DialogCoordinator calculate.
         """
-        if hasattr(self, "sprite_preview") and self.sprite_preview:
+        if self.sprite_preview:
             try:
                 _, tiles_per_row = self.sprite_preview.get_tile_info()
                 if tiles_per_row > 0:
@@ -1189,10 +1187,9 @@ class MainWindow(QMainWindow):
         # Store for dialog use
         self._extracted_palettes = palettes
         # Update palette preview widget with normalized data
-        if hasattr(self, "palette_preview") and self.palette_preview:
-            normalized = self._normalize_palettes(palettes)
-            if normalized is not None:
-                self.palette_preview.set_all_palettes(normalized)
+        normalized = self._normalize_palettes(palettes)
+        if normalized is not None:
+            self.palette_preview.set_all_palettes(normalized)
 
     def _on_vram_active_palettes_ready(self, active_palettes: list[int]) -> None:
         """Handle active palettes ready."""

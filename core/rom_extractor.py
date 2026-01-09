@@ -22,7 +22,7 @@ from core.rom_injector import ROMInjector, SpritePointer
 from core.rom_palette_extractor import ROMPaletteExtractor
 from core.rom_validator import ROMHeader
 from core.sprite_config_loader import SpriteConfigLoader
-from core.types import SpriteInfo
+from core.types import ExtractionMetadata, SpriteInfo
 from utils.constants import (
     BUFFER_SIZE_1KB,
     BUFFER_SIZE_2KB,
@@ -118,7 +118,7 @@ class ROMExtractor:
 
     def extract_sprite_from_rom(
         self, rom_path: str, sprite_offset: int, output_base: str, sprite_name: str = ""
-    ) -> tuple[str, dict[str, object]]:
+    ) -> tuple[str, ExtractionMetadata]:
         """
         Extract sprite from ROM at specified offset.
 
@@ -397,7 +397,7 @@ class ROMExtractor:
         header: ROMHeader,
         rom_palettes_used: bool,
         palette_files: list[str],
-    ) -> dict[str, object]:
+    ) -> ExtractionMetadata:
         """
         Create extraction metadata dictionary.
 

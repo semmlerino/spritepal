@@ -190,15 +190,13 @@ class ROMFileWidget(BaseExtractionWidget):
         Args:
             message: Loading message to display
         """
-        if hasattr(self, "loading_progress"):
-            self.loading_progress.show()
+        self.loading_progress.show()
         if self.rom_info_label:
             self.rom_info_label.setText(f'<span style="color: {COLORS["info"]};">{message}</span>')
 
     def hide_loading(self):
         """Hide loading indicator."""
-        if hasattr(self, "loading_progress"):
-            self.loading_progress.hide()
+        self.loading_progress.hide()
 
     def clear(self):
         """Clear the ROM selection"""

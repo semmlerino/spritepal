@@ -708,23 +708,21 @@ class RowArrangementDialog(SplitterDialog):
     def _disconnect_signals(self) -> None:
         """Disconnect all signals to prevent memory leaks."""
         # Disconnect arrangement manager signals
-        if hasattr(self, "arrangement_manager") and self.arrangement_manager:
+        if self.arrangement_manager:
             safe_disconnect(self.arrangement_manager.arrangement_changed)
 
         # Note: palette signals are not connected (logic in toggle_palette_application/_cycle_palette)
 
         # Disconnect list widget signals
         for list_name in ("available_list", "arranged_list"):
-            if hasattr(self, list_name):
-                widget = getattr(self, list_name)
-                safe_disconnect(widget.itemDoubleClicked)
-                safe_disconnect(widget.itemSelectionChanged)
-                # Disconnect custom signals on arranged_list
-                if list_name == "arranged_list":
-                    safe_disconnect(widget.external_drop)
-                    safe_disconnect(widget.item_dropped)
+            widget = getattr(self, list_name)
+            safe_disconnect(widget.itemDoubleClicked)
+            safe_disconnect(widget.itemSelectionChanged)
+            # Disconnect custom signals on arranged_list
+            if list_name == "arranged_list":
+                safe_disconnect(widget.external_drop)
+                safe_disconnect(widget.item_dropped)
 
         # Disconnect button signals
         for btn_name in ("add_all_btn", "add_selected_btn", "clear_btn", "remove_selected_btn"):
-            if hasattr(self, btn_name):
-                safe_disconnect(getattr(self, btn_name).clicked)
+            safe_disconnect(getattr(self, btn_name).clicked)

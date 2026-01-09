@@ -85,8 +85,7 @@ class VRAMEditorPage(QWidget):
         self._stack.addWidget(self._multi_palette_tab)
 
         # Hide "Pop Out Editor" button in embedded mode
-        if hasattr(self._edit_tab, "detach_btn"):
-            self._edit_tab.detach_btn.hide()
+        self._edit_tab.detach_btn.hide()
 
         # Forward ready_for_inject signal
         self._edit_tab.ready_for_inject.connect(self.ready_for_inject.emit)

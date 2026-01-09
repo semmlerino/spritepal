@@ -499,10 +499,7 @@ class SpritePreviewWidget(QWidget):
             non_zero_pixels = 0
 
             # Choose decoding method based on extractor availability
-            if extractor is not None and hasattr(extractor, "_get_4bpp_pixel"):
-                decode_method = "rom_extractor"
-            else:
-                decode_method = "fallback"
+            decode_method = "rom_extractor" if extractor is not None else "fallback"
 
             for tile_idx in range(num_tiles):
                 tile_x = (tile_idx % tiles_per_row) * 8
@@ -517,8 +514,8 @@ class SpritePreviewWidget(QWidget):
                 # Decode 4bpp tile using available method
                 for y in range(8):
                     for x in range(8):
-                        if decode_method == "rom_extractor":
-                            pixel = extractor._get_4bpp_pixel(tile_bytes, x, y) if extractor else 0
+                        if decode_method == "rom_extractor" and extractor:
+                            pixel = extractor._get_4bpp_pixel(tile_bytes, x, y)
                         else:
                             # Fallback 4bpp decoding method
                             pixel = self._decode_4bpp_pixel_fallback(tile_bytes, x, y)

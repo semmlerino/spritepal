@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import ClassVar
 
+from core.types import DefaultPalettesJson, PaletteEntry, RGBColor
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -38,8 +39,12 @@ class DefaultPaletteLoader:
             palette_path: Path to default palettes file (uses default if None)
         """
         self.palette_path: str = palette_path or self.DEFAULT_PALETTE_PATH
-        # JSON data is inherently untyped; structure validated at runtime
-        self.palette_data: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny] - JSON data
+        # JSON data structure defined in core.types.DefaultPalettesJson
+        self.palette_data: DefaultPalettesJson = {
+            "format_version": "1.0",
+            "description": "",
+            "palettes": {},
+        }
         self.load_palettes()
 
     def load_palettes(self) -> None:
@@ -56,7 +61,7 @@ class DefaultPaletteLoader:
         except (OSError, json.JSONDecodeError) as e:
             logger.warning(f"Failed to load default palettes: {e}")
 
-    def get_sprite_palettes(self, sprite_name: str) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - palette data from JSON
+    def get_sprite_palettes(self, sprite_name: str) -> list[PaletteEntry]:
         """
         Get default palettes for a specific sprite.
 
@@ -115,14 +120,14 @@ class DefaultPaletteLoader:
 
         return created_files
 
-    def get_all_kirby_palettes(self) -> dict[int, list[tuple[int, int, int]]]:
+    def get_all_kirby_palettes(self) -> dict[int, list[RGBColor]]:
         """
         Get all Kirby palettes as a dictionary for quick access.
 
         Returns:
             Dictionary mapping palette index to color list
         """
-        all_palettes = {}
+        all_palettes: dict[int, list[RGBColor]] = {}
 
         # Collect all Kirby-related palettes
         for sprite_name, sprite_data in self.palette_data.get("palettes", {}).items():
@@ -147,7 +152,7 @@ class DefaultPaletteLoader:
         """
         return len(self.get_sprite_palettes(sprite_name)) > 0
 
-    def get_palettes_by_rom_title(self, rom_title: str) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - palette data from JSON
+    def get_palettes_by_rom_title(self, rom_title: str) -> list[PaletteEntry]:
         """
         Get default palettes based on ROM title.
 

@@ -131,7 +131,8 @@ class StatusPanel(QWidget):
 
     def _update_cache_status(self) -> None:
         """Update cache status indicator"""
-        if not hasattr(self, "cache_status_widget"):
+        # Ensure widget exists (standard check)
+        if not self.cache_status_widget:
             return
 
         cache_enabled = True

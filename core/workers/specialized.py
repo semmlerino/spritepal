@@ -89,9 +89,6 @@ class SignalConnectionHelper:
         Args:
             extraction_manager: The extraction manager instance
         """
-        if not hasattr(self.worker, "palettes_ready"):
-            return
-
         # Connect palette signals - cast to Any for signal access (protocols can't express Signal descriptors)
         mgr: Any = extraction_manager  # pyright: ignore[reportExplicitAny] - Signal access requires runtime type
         connection1 = mgr.palettes_extracted.connect(self.worker.palettes_ready.emit)
@@ -106,17 +103,13 @@ class SignalConnectionHelper:
         Args:
             extraction_manager: The extraction manager instance
         """
-        if not hasattr(self.worker, "preview_ready"):
-            return
-
         def on_preview_generated(img: Image.Image, tile_count: int) -> None:
             """Handle preview generation with Qt threading safety."""
             try:
                 # CRITICAL FIX FOR BUG #26: Don't create Qt GUI objects (QPixmap) in worker thread
                 # Let the main thread handle pil_to_qpixmap conversion to avoid Qt threading violations
                 self.worker.preview_ready.emit(img, tile_count)  # Changed: emit PIL Image, not QPixmap
-                if hasattr(self.worker, "preview_image_ready"):
-                    self.worker.preview_image_ready.emit(img)
+                self.worker.preview_image_ready.emit(img)
             except (RuntimeError, TypeError) as e:
                 logger.exception(f"Qt signal error emitting preview image: {e}")
                 self.worker.emit_warning(f"Preview generation failed: {e}")
@@ -138,9 +131,6 @@ class SignalConnectionHelper:
             injection_manager: The injection manager instance (typed as object because
                 Qt signals cannot be expressed in Protocol types)
         """
-        if not hasattr(self.worker, "injection_finished"):
-            return
-
         # Connect injection-specific signals - cast to Any for signal access
         mgr: Any = injection_manager  # pyright: ignore[reportExplicitAny] - Signal access requires runtime type
         connection1 = mgr.injection_finished.connect(self.worker.injection_finished.emit)

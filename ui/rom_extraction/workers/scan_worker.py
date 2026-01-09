@@ -316,11 +316,10 @@ class SpriteScanWorker(BaseWorker):
         self.operation_finished.emit(True, f"Scan complete. Found {len(final_sprites)} sprites.")
 
         # Cleanup parallel finder resources
-        if hasattr(self, "_parallel_finder"):
-            try:
-                self._parallel_finder.shutdown()
-            except Exception as cleanup_error:
-                logger.warning(f"Error during parallel finder cleanup: {cleanup_error}")
+        try:
+            self._parallel_finder.shutdown()
+        except Exception as cleanup_error:
+            logger.warning(f"Error during parallel finder cleanup: {cleanup_error}")
 
     @override
     def cancel(self):
@@ -328,6 +327,5 @@ class SpriteScanWorker(BaseWorker):
         # Call parent cancel method first
         super().cancel()
         # Also set our cancellation token for the parallel finder
-        if hasattr(self, "_cancellation_token"):
-            self._cancellation_token.set()
-            logger.debug("Sprite scan cancellation requested")
+        self._cancellation_token.set()
+        logger.debug("Sprite scan cancellation requested")

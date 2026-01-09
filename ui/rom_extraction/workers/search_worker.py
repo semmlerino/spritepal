@@ -155,15 +155,13 @@ class SpriteSearchWorker(BaseWorker):
             self.search_complete.emit(False)
         finally:
             # Cleanup parallel finder resources
-            if hasattr(self, "_parallel_finder"):
-                try:
-                    self._parallel_finder.shutdown()
-                except Exception as cleanup_error:
-                    logger.warning(f"Error during parallel finder cleanup: {cleanup_error}")
+            try:
+                self._parallel_finder.shutdown()
+            except Exception as cleanup_error:
+                logger.warning(f"Error during parallel finder cleanup: {cleanup_error}")
 
     @override
     def cancel(self) -> None:
         """Cancel the search."""
         super().cancel()  # Sets _cancellation_requested and calls requestInterruption()
-        if hasattr(self, "_cancellation_token"):
-            self._cancellation_token.set()
+        self._cancellation_token.set()

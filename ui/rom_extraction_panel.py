@@ -130,7 +130,6 @@ class ROMExtractionPanel(QWidget):
         self._manual_offset_dialog: UnifiedManualOffsetDialog | None = None
         self._scan_controller = ScanController(parent=self, cache=self.rom_cache, state_manager=self.state_manager)
         self._scan_controller.sprite_selected.connect(self._add_selected_sprite)
-        self.scan_worker = None
 
         # Connect orchestrator signals
         self._connect_orchestrator_signals()
@@ -171,15 +170,13 @@ class ROMExtractionPanel(QWidget):
         """
         self._output_name_provider = provider
 
-    def set_output_name(self, name: str) -> None:
-        """Set the output name (slot for OutputSettingsManager.output_name_changed signal).
-
-        Syncs the inline output name field with the main OutputSettingsManager.
+    def sync_output_name(self, name: str) -> None:
+        """Syncs the inline output name field with the main OutputSettingsManager.
 
         Args:
             name: The current output name string
         """
-        if hasattr(self, "output_name_edit") and self.output_name_edit:
+        if self.output_name_edit:
             self.output_name_edit.blockSignals(True)
             self.output_name_edit.setText(name)
             self.output_name_edit.blockSignals(False)
@@ -757,9 +754,8 @@ class ROMExtractionPanel(QWidget):
             has_sprite = self.sprite_selector_widget.get_current_data() is not None
 
             # Show/hide output name hint (appears when ROM loaded but no output name)
-            if hasattr(self, "output_hint_label") and self.output_hint_label:
-                show_hint = has_rom and not has_output_name
-                self.output_hint_label.setVisible(show_hint)
+            show_hint = has_rom and not has_output_name
+            self.output_hint_label.setVisible(show_hint)
 
             # Delegate to controller (emits readiness_changed -> extraction_ready)
             self._params_controller.check_readiness(
@@ -881,12 +877,11 @@ class ROMExtractionPanel(QWidget):
         self.sprite_selector_widget.setEnabled(not is_manual)
 
         # Update manual offset indicator
-        if hasattr(self, "manual_offset_section"):
-            if is_manual:
-                offset = self._params_controller.manual_offset
-                self.manual_offset_section.set_offset_display(f"Manual offset: 0x{offset:06X}")
-            else:
-                self.manual_offset_section.set_offset_display("")
+        if is_manual:
+            offset = self._params_controller.manual_offset
+            self.manual_offset_section.set_offset_display(f"Manual offset: 0x{offset:06X}")
+        else:
+            self.manual_offset_section.set_offset_display("")
 
     def _on_state_changed(self, old_state: ExtractionState, new_state: ExtractionState):
         """Handle state changes to update UI accordingly"""
@@ -895,16 +890,14 @@ class ROMExtractionPanel(QWidget):
             # Re-enable all controls
             if self.rom_file_widget:
                 self.rom_file_widget.setEnabled(True)
-            if hasattr(self, "manual_offset_section"):
-                self.manual_offset_section.setEnabled(True)
+            self.manual_offset_section.setEnabled(True)
             self.sprite_selector_widget.set_find_button_enabled(True)
 
         elif new_state in {ExtractionState.LOADING_ROM, ExtractionState.EXTRACTING}:
             # Disable all controls during critical operations
             if self.rom_file_widget:
                 self.rom_file_widget.setEnabled(False)
-            if hasattr(self, "manual_offset_section"):
-                self.manual_offset_section.setEnabled(False)
+            self.manual_offset_section.setEnabled(False)
             self.sprite_selector_widget.set_find_button_enabled(False)
 
         elif new_state == ExtractionState.SCANNING_SPRITES:
@@ -913,8 +906,7 @@ class ROMExtractionPanel(QWidget):
 
         elif new_state == ExtractionState.SEARCHING_SPRITE:
             # Disable navigation during search
-            if hasattr(self, "manual_offset_section"):
-                self.manual_offset_section.set_browse_enabled(False)
+            self.manual_offset_section.set_browse_enabled(False)
 
         # Log state transitions for debugging
         logger.debug(f"State transition: {old_state.name} -> {new_state.name}")
@@ -925,20 +917,6 @@ class ROMExtractionPanel(QWidget):
 
         # Use orchestrator cleanup
         self._worker_orchestrator.cleanup()
-
-        # Clean up scan worker (still managed locally)
-        from ui.common import WorkerManager
-
-        if self.scan_worker is not None:
-            try:
-                if hasattr(self.scan_worker, "cancel"):
-                    self.scan_worker.cancel()
-            except Exception as e:
-                logger.warning(f"Error cancelling scan_worker: {e}")
-        try:
-            WorkerManager.cleanup_worker_attr(self, "scan_worker")
-        except Exception as e:
-            logger.warning(f"Error cleaning up scan_worker: {e}")
 
     def _disconnect_signals(self) -> None:
         """Disconnect all signals to prevent stale handler calls after close."""

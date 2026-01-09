@@ -8,11 +8,12 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import numpy as np
 from PIL import Image
 
+from core.types import ExtractionMetadata
 from utils.constants import (
     IMAGE_DIMENSION_MULTIPLE,
     PIXEL_MASK_4BIT,
@@ -79,21 +80,31 @@ class SpriteInjector:
     """Handles sprite injection back to VRAM"""
 
     def __init__(self) -> None:
-        self.metadata: dict[str, Any] | None = None  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
+        self.metadata: ExtractionMetadata | None = None
         self.sprite_path: str | None = None
         self.vram_data: bytearray | None = None
         logger.debug("SpriteInjector initialized")
 
-    def load_metadata(self, metadata_path: str) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny] - JSON metadata can contain various types
+    def load_metadata(self, metadata_path: str) -> ExtractionMetadata:
         """Load extraction metadata from JSON file"""
         logger.debug(f"Loading metadata from {metadata_path}")
         with Path(metadata_path).open() as f:
-            self.metadata = json.load(f)
+            data = json.load(f)
+            self.metadata = cast(ExtractionMetadata, data)
+
         if self.metadata:
             logger.info(f"Loaded metadata with {len(self.metadata)} entries")
         else:
             logger.warning("Loaded empty metadata")
-            self.metadata = {}
+            self.metadata = cast(
+                ExtractionMetadata,
+                {
+                    "source_type": "vram",
+                    "tile_count": 0,
+                    "extraction_size": 0,
+                    "palette_count": 0,
+                },
+            )
         return self.metadata
 
     def validate_sprite(self, sprite_path: str) -> tuple[bool, str]:

@@ -583,9 +583,6 @@ class DetachedGalleryWindow(QMainWindow):
 
     def _update_recent_roms_menu(self):
         """Update the recent ROMs menu."""
-        if not hasattr(self, "recent_roms_menu"):
-            return
-
         if self.recent_roms_menu:
             self.recent_roms_menu.clear()
 

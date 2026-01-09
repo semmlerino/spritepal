@@ -1414,22 +1414,19 @@ class GridArrangementDialog(SplitterDialog):
     def _disconnect_signals(self) -> None:
         """Disconnect all signals to prevent memory leaks."""
         # Disconnect arrangement manager signals
-        if hasattr(self, "arrangement_manager") and self.arrangement_manager:
+        if self.arrangement_manager:
             safe_disconnect(self.arrangement_manager.arrangement_changed)
 
         # Disconnect colorizer signals
-        if hasattr(self, "colorizer"):
-            safe_disconnect(self.colorizer.palette_mode_changed)
+        safe_disconnect(self.colorizer.palette_mode_changed)
 
         # Disconnect mode button signals
-        if hasattr(self, "mode_buttons"):
-            safe_disconnect(self.mode_buttons.buttonClicked)
+        safe_disconnect(self.mode_buttons.buttonClicked)
 
         # Disconnect grid view signals
-        if hasattr(self, "grid_view"):
-            safe_disconnect(self.grid_view.tile_clicked)
-            safe_disconnect(self.grid_view.tiles_selected)
-            safe_disconnect(self.grid_view.zoom_changed)
+        safe_disconnect(self.grid_view.tile_clicked)
+        safe_disconnect(self.grid_view.tiles_selected)
+        safe_disconnect(self.grid_view.zoom_changed)
 
         # Disconnect button signals
         for btn_name in (
@@ -1442,8 +1439,7 @@ class GridArrangementDialog(SplitterDialog):
             "zoom_fit_btn",
             "zoom_reset_btn",
         ):
-            if hasattr(self, btn_name):
-                safe_disconnect(getattr(self, btn_name).clicked)
+            safe_disconnect(getattr(self, btn_name).clicked)
 
     def _cleanup_resources(self) -> None:
         """Clean up resources to prevent memory leaks"""
@@ -1451,24 +1447,20 @@ class GridArrangementDialog(SplitterDialog):
         self._disconnect_signals()
 
         # Clear colorizer cache
-        if hasattr(self, "colorizer"):
-            self.colorizer.clear_cache()
+        self.colorizer.clear_cache()
 
         # Clear graphics scene items
-        if hasattr(self, "scene") and self.scene:
+        if self.scene:
             self.scene.clear()
 
         # Clear grid view selections
-        if hasattr(self, "grid_view"):
-            self.grid_view.clear_selection()
-            if hasattr(self.grid_view, "selection_rects"):
-                self.grid_view.selection_rects.clear()
+        self.grid_view.clear_selection()
+        self.grid_view.selection_rects.clear()
 
         # Clear processor data
-        if hasattr(self, "processor"):
-            self.processor.tiles.clear()
-            self.processor.original_image = None
+        self.processor.tiles.clear()
+        self.processor.original_image = None
 
         # Clear arrangement manager
-        if hasattr(self, "arrangement_manager") and self.arrangement_manager:
+        if self.arrangement_manager:
             self.arrangement_manager.clear()

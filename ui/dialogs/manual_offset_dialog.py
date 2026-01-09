@@ -44,6 +44,7 @@ else:
     from PySide6.QtGui import QCloseEvent, QHideEvent, QKeyEvent, QMoveEvent, QResizeEvent, QShowEvent
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
     QFrame,
     QInputDialog,
     QLabel,
@@ -132,6 +133,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._bookmark_manager: BookmarkManager | None = None
         self._cache_controller: CacheStatusController | None = None
         self._search_coordinator: SpriteSearchCoordinator | None = None
+        self._advanced_search_dialog: QDialog | None = None
 
         # Business logic state
         self.rom_path: str = ""
@@ -690,7 +692,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             self.preview_widget.clear()
 
         # Clear advanced search dialog reference
-        if hasattr(self, "_advanced_search_dialog") and self._advanced_search_dialog is not None:
+        if self._advanced_search_dialog is not None:
             self._advanced_search_dialog.close()
             self._advanced_search_dialog = None
 
@@ -973,9 +975,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             return
 
         # Check if we have ROM data available
-        if not hasattr(self, "_get_rom_data_for_preview"):
-            return
-
         rom_data = self._get_rom_data_for_preview()
         if not rom_data or not rom_data[0]:  # No ROM path available
             return

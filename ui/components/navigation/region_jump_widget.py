@@ -269,7 +269,7 @@ class RegionJumpWidget(QWidget):
         name_parts.append(f"Region {index + 1}")
 
         # Add type if classified
-        if hasattr(region, "region_type") and region.region_type != "unknown":
+        if region.region_type != "unknown":
             name_parts.append(f"({region.region_type})")
 
         # Add sprite count

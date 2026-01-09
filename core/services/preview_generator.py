@@ -492,7 +492,7 @@ class PreviewGenerator(QObject):
         palette: list[int] = []
 
         # Apply palette if available
-        if request.palette and hasattr(request.palette, "data"):
+        if request.palette:
             palette_data = request.palette.data
 
             # Convert SNES BGR555 palette to RGB888

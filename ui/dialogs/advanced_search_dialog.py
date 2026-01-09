@@ -1156,7 +1156,7 @@ class AdvancedSearchDialog(QDialog):
             for result in results:
                 # Runtime type is SearchResult, but typed as Any to avoid object issues
                 result_typed: Any = result  # pyright: ignore[reportExplicitAny] - worker result list contains SearchResult objects
-                metadata = result_typed.metadata if hasattr(result_typed, "metadata") else {}
+                metadata = result_typed.metadata
                 match = SimilarityMatch(
                     offset=result_typed.offset,
                     similarity_score=result_typed.confidence,

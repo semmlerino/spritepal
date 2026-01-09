@@ -77,8 +77,7 @@ class InjectionController(QObject):
         self._view.save_rom_requested.connect(self.inject_sprite_to_rom)
         self._view.browse_png_requested.connect(self.browse_png_file)
         self._view.browse_vram_requested.connect(self.browse_vram_file)
-        if hasattr(self._view, "browse_rom_requested"):
-            self._view.browse_rom_requested.connect(self.browse_rom_file)
+        self._view.browse_rom_requested.connect(self.browse_rom_file)
 
     def set_mode(self, mode: str) -> None:
         """Set the injection mode ('vram' or 'rom')."""
@@ -89,7 +88,7 @@ class InjectionController(QObject):
     def set_rom_file(self, file_path: str) -> None:
         """Set the ROM file path."""
         self.rom_file = file_path
-        if self._view and hasattr(self._view, "set_rom_file"):
+        if self._view:
             self._view.set_rom_file(file_path)
 
     def browse_rom_file(self) -> None:
@@ -102,7 +101,7 @@ class InjectionController(QObject):
         )
         if file_path:
             self.rom_file = file_path
-            if self._view and hasattr(self._view, "set_rom_file"):
+            if self._view:
                 self._view.set_rom_file(file_path)
 
     def inject_sprite_to_rom(self) -> None:
