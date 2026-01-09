@@ -36,11 +36,20 @@ class ROMWorkflowController(QObject):
     - PREVIEW: Browsing ROM offsets.
     - EDIT: Sprite loaded in editor.
     - SAVE: Confirming injection back to ROM.
+
+    Signal Flow:
+        LogWatcher.offset_discovered → this._on_offset_discovered → asset browser
+        SmartPreviewCoordinator.preview_ready → this._on_preview_ready → view updates
+        ROMWorkflowPage.sprite_selected/activated → this handlers → set_offset/open_in_editor
+
+    Consumers:
+        - ROMWorkflowPage: Receives rom_info_updated, workflow_state_changed
+        - MainWindow/StatusBar: May connect for progress/status updates
     """
 
-    # Signals
-    rom_info_updated = Signal(str)
-    workflow_state_changed = Signal(str)  # 'preview', 'edit', 'save'
+    # Signals (originate here, consumed by views)
+    rom_info_updated = Signal(str)  # ROM title → ROMWorkflowPage.source_bar.set_info
+    workflow_state_changed = Signal(str)  # 'preview'/'edit'/'save' → view state updates
 
     def __init__(
         self,
@@ -535,13 +544,34 @@ class ROMWorkflowController(QObject):
             self.load_rom(file_path)
 
     def load_rom(self, path: str) -> None:
-        """Load and validate ROM file."""
+        """Load and validate ROM file.
+
+        Validates the ROM header before proceeding. Shows error message
+        if the file is not a valid SNES ROM.
+        """
         from pathlib import Path
+
+        from core.rom_validator import ROMHeaderError, ROMValidator
 
         rom_path = Path(path)
         if not rom_path.exists():
             if self._message_service:
                 self._message_service.show_message(f"Error: ROM file not found: {path}")
+            return
+
+        # Validate ROM file format first
+        is_valid, error_msg = ROMValidator.validate_rom_file(path)
+        if not is_valid:
+            if self._message_service:
+                self._message_service.show_message(f"Error: {error_msg}")
+            return
+
+        # Validate ROM header - this ensures it's actually a valid SNES ROM
+        try:
+            header, _ = ROMValidator.validate_rom_header(path)
+        except ROMHeaderError as e:
+            if self._message_service:
+                self._message_service.show_message(f"Error: Invalid ROM - {e}")
             return
 
         # Clear ROM-specific state (asset browser) but preserve global Mesen capture history
@@ -557,17 +587,11 @@ class ROMWorkflowController(QObject):
             self._view.source_bar.set_rom_path(path)
             self._view.source_bar.set_rom_available(True, self.rom_size)
 
-        # Get ROM info (checksum/title)
-        try:
-            # Simple title extraction for now
-            with open(path, "rb") as f:
-                f.seek(0x7FC0 if self.rom_size % 0x8000 == 0 else 0x81C0)
-                title = f.read(21).decode("ascii", errors="ignore").strip()
-                self.rom_info_updated.emit(f"{title}")
-                if self._view:
-                    self._view.source_bar.set_info(title)
-        except Exception:
-            self.rom_info_updated.emit("Unknown ROM")
+        # Use validated header info
+        title = header.title or "Unknown ROM"
+        self.rom_info_updated.emit(title)
+        if self._view:
+            self._view.source_bar.set_info(title)
 
         if self._message_service:
             self._message_service.show_message(f"Loaded ROM: {rom_path.name}")
