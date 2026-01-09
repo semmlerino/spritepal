@@ -617,6 +617,14 @@ class BatchThumbnailWorker(QObject):
         if self._cache:
             self._cache.clear()
 
+    def is_rom_loaded(self) -> bool:
+        """Check if ROM data is currently loaded.
+
+        Returns:
+            True if ROM is memory-mapped.
+        """
+        return self._rom_mmap is not None
+
     def _shutdown_thread_pool(self) -> None:
         """Shutdown thread pool safely with proper wait and error handling."""
         if self._thread_pool:

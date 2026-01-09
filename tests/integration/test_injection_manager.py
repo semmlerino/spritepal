@@ -128,10 +128,9 @@ class TestInjectionManagerInitialization:
         """
         manager = injection_manager_real
 
-        # Verify manager is properly initialized
-        assert manager._is_initialized is True
-        assert manager._current_worker is None
-        assert manager._name == "CoreOperationsManager"
+        # Verify manager is properly initialized via public API
+        assert manager.is_initialized() is True
+        assert not manager.has_active_worker()
 
         # Verify real methods work (not just hasattr checks)
         assert callable(manager.cleanup)
@@ -145,8 +144,8 @@ class TestInjectionManagerInitialization:
 
         # RED: Manager should be properly initialized
         assert isinstance(manager, CoreOperationsManager)
-        assert manager._is_initialized is True
-        assert manager._current_worker is None
+        assert manager.is_initialized() is True
+        assert not manager.has_active_worker()
 
         # GREEN: Test lifecycle management
         manager.cleanup()  # Should handle cleanup gracefully
@@ -165,14 +164,14 @@ class TestInjectionManagerInitialization:
             manager._current_worker = real_worker
 
             # Verify worker exists before cleanup
-            assert manager._current_worker is not None
+            assert manager.has_active_worker()
             assert not real_worker.isRunning()  # Worker not started
 
             # RED: Cleanup should handle real worker gracefully
             manager.cleanup()
 
             # GREEN: Should clear the worker reference
-            assert manager._current_worker is None
+            assert not manager.has_active_worker()
 
         finally:
             worker_helper.cleanup()

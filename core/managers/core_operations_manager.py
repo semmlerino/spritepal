@@ -979,6 +979,22 @@ class CoreOperationsManager(BaseManager):
         # Check local worker (kept in facade for backward compatibility)
         return bool(self._current_worker and self._current_worker.isRunning())
 
+    def is_initialized(self) -> bool:
+        """Check if manager is initialized.
+
+        Returns:
+            True if initialization completed successfully.
+        """
+        return self._is_initialized
+
+    def has_active_worker(self) -> bool:
+        """Check if there's an active worker.
+
+        Returns:
+            True if a worker exists (running or not).
+        """
+        return self._current_worker is not None
+
     def _connect_worker_signals(self) -> None:
         """Connect worker signals to manager signals."""
         if not self._current_worker:

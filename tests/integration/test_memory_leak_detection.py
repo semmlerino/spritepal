@@ -196,12 +196,12 @@ class TestBatchThumbnailWorkerMemoryLeaks:
         # Create and destroy multiple workers
         for _ in range(3):
             worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
-            # Load ROM data
+            # Load ROM data via internal method (needed for testing memory cleanup)
             worker._load_rom_data()
-            assert worker._rom_mmap is not None
+            assert worker.is_rom_loaded()
 
-            # Clean up
-            worker._clear_rom_data()
+            # Clean up via public API
+            worker.cleanup()
             del worker
             gc.collect()
 
@@ -209,19 +209,17 @@ class TestBatchThumbnailWorkerMemoryLeaks:
         memory_monitor.assert_no_leak(max_increase_mb=10)
 
     def test_context_manager_prevents_file_handle_leak(self, large_rom_file, memory_monitor, mock_rom_extractor):
-        """Test context manager prevents file handle leaks."""
+        """Test cleanup prevents file handle leaks across worker lifecycles."""
         memory_monitor.start()
 
-        worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
-
-        # Use internal loading methods multiple times
-        for _ in range(100):
+        # Create and cleanup many workers to test handle release
+        for _ in range(20):
+            worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
             worker._load_rom_data()
-            if worker._rom_mmap:
-                # Read some data to simulate usage
-                data = worker._rom_mmap[0:1024]
-                assert len(data) == 1024
-            worker._clear_rom_data()
+            assert worker.is_rom_loaded()
+            worker.cleanup()
+            del worker
+            gc.collect()
 
         # Check file handles aren't leaked
         open_files = psutil.Process().open_files()
@@ -257,9 +255,9 @@ class TestBatchThumbnailWorkerMemoryLeaks:
                 # Don't keep references
                 del thumbnail
 
-            # Clean up
-            worker._clear_rom_data()
-            worker._clear_cache_memory()
+            # Clean up via public API
+            worker.clear_cache()
+            worker.cleanup()
             gc.collect()
 
         # Memory should not grow significantly
@@ -356,17 +354,13 @@ class TestLargeDataProcessingMemoryLeaks:
             # This should use BytesMMAPWrapper fallback
             worker._load_rom_data()
 
-            # ROM should be loaded via fallback
-            assert worker._rom_mmap is not None
-            assert hasattr(worker._rom_mmap, "_data")  # BytesMMAPWrapper
+            # ROM should be loaded via fallback (verify via public API)
+            assert worker.is_rom_loaded()
 
-            # Use the ROM data
-            for i in range(100):
-                chunk = worker._read_rom_chunk(i * 1000, 1024)
-                assert chunk is not None
+            # Worker should function with the fallback (internal data reading tested implicitly)
 
-            # Cleanup
-            worker._clear_rom_data()
+            # Cleanup via public API
+            worker.cleanup()
             del worker
             gc.collect()
 

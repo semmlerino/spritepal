@@ -224,6 +224,11 @@ class EditWorkspace(QWidget):
         return self._canvas_layout
 
     @property
+    def is_inject_button_visible(self) -> bool:
+        """Return whether inject button is currently visible."""
+        return self._inject_btn.isVisible()
+
+    @property
     def controller(self) -> "EditingController | None":
         """Get the current controller."""
         return self._controller

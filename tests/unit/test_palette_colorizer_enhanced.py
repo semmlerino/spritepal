@@ -416,7 +416,7 @@ class TestPaletteColorizerEnhanced:
 
         # Test cache clearing
         colorizer.clear_cache()
-        assert len(colorizer._colorized_cache) == 0
+        assert colorizer.get_cache_stats()["size"] == 0
 
         # Create test setup
         test_image = Image.new("L", (4, 4))
@@ -427,18 +427,18 @@ class TestPaletteColorizerEnhanced:
         # Cache some images
         colorizer.get_display_image(0, test_image)
         colorizer.get_display_image(1, test_image)
-        assert len(colorizer._colorized_cache) == 2
+        assert colorizer.get_cache_stats()["size"] == 2
 
         # Clear cache
         colorizer.clear_cache()
-        assert len(colorizer._colorized_cache) == 0
+        assert colorizer.get_cache_stats()["size"] == 0
 
     def test_cache_limit_enforcement(self):
         """Test cache limit enforcement"""
         colorizer = PaletteColorizer()
 
         # Set a small cache limit for testing
-        colorizer._max_cache_size = 3
+        colorizer.set_max_cache_size(3)
 
         # Create test setup
         test_image = Image.new("L", (4, 4))
@@ -451,7 +451,7 @@ class TestPaletteColorizerEnhanced:
             colorizer.get_display_image(i, test_image)
 
         # Cache should be limited
-        assert len(colorizer._colorized_cache) <= 3
+        assert colorizer.get_cache_stats()["size"] <= 3
 
     def test_cache_invalidation_on_palette_change(self):
         """Test cache invalidation when palettes change"""
@@ -466,14 +466,14 @@ class TestPaletteColorizerEnhanced:
         # Cache some images
         colorizer.get_display_image(0, test_image)
         colorizer.get_display_image(1, test_image)
-        assert len(colorizer._colorized_cache) == 2
+        assert colorizer.get_cache_stats()["size"] == 2
 
         # Change palettes
         new_palettes = {9: [(0, 0, 0), (0, 255, 0)]}
         colorizer.set_palettes(new_palettes)
 
         # Cache should be cleared
-        assert len(colorizer._colorized_cache) == 0
+        assert colorizer.get_cache_stats()["size"] == 0
 
     def test_cache_invalidation_on_mode_toggle(self):
         """Test cache invalidation when mode toggles"""
@@ -487,13 +487,13 @@ class TestPaletteColorizerEnhanced:
 
         # Cache some images
         colorizer.get_display_image(0, test_image)
-        assert len(colorizer._colorized_cache) == 1
+        assert colorizer.get_cache_stats()["size"] == 1
 
         # Toggle mode
         colorizer.toggle_palette_mode()
 
         # Cache should be cleared
-        assert len(colorizer._colorized_cache) == 0
+        assert colorizer.get_cache_stats()["size"] == 0
 
     def test_signal_emissions(self, qtbot):
         """Test that signals are emitted correctly"""

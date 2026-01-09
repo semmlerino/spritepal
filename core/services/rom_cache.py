@@ -467,6 +467,15 @@ class ROMCache:
 
         return removed_count
 
+    def get_hash_cache_size(self) -> int:
+        """Get the current size of the in-memory hash cache.
+
+        Returns:
+            Number of entries in the hash cache.
+        """
+        with self._hash_cache_lock:
+            return len(self._hash_cache)
+
     def get_sprite_locations(self, rom_path: str) -> dict[str, object] | None:
         """Get cached sprite locations for ROM.
 

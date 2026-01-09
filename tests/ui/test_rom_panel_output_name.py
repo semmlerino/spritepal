@@ -17,22 +17,23 @@ def test_output_name_provider_pattern(app_context):
     )
 
     # Initially, no provider set
-    assert panel._get_output_name() == ""
+    params = panel.get_extraction_params()
+    assert params["output_base"] == ""
 
     # Set a mock provider
     test_name = "my_sprites"
     provider = MagicMock(return_value=test_name)
     panel.set_output_name_provider(provider)
 
-    # Now _get_output_name should call the provider
-    result = panel._get_output_name()
-    assert result == test_name
+    # Now get_extraction_params should call the provider
+    params = panel.get_extraction_params()
+    assert params["output_base"] == test_name
     provider.assert_called_once()
 
     # Test with different value
     provider.return_value = "different_name"
-    result2 = panel._get_output_name()
-    assert result2 == "different_name"
+    params = panel.get_extraction_params()
+    assert params["output_base"] == "different_name"
     assert provider.call_count == 2
 
 
