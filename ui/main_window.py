@@ -332,12 +332,8 @@ class MainWindow(QMainWindow):
             sprite_library=self.sprite_library,
         )
         # Connect directly to sources (no workspace relay)
-        self._sprite_editor_workspace.editing_controller.undoStateChanged.connect(
-            self._update_undo_redo_state
-        )
-        self._sprite_editor_workspace.rom_page.offset_changed.connect(
-            self.toolbar_offset_edit.set_offset
-        )
+        self._sprite_editor_workspace.editing_controller.undoStateChanged.connect(self._update_undo_redo_state)
+        self._sprite_editor_workspace.rom_page.offset_changed.connect(self.toolbar_offset_edit.set_offset)
 
         self.center_stack.addWidget(self._sprite_editor_workspace)
         self.sprite_edit_tab = self._sprite_editor_workspace
@@ -1640,12 +1636,21 @@ class MainWindow(QMainWindow):
             offset: ROM offset to open in sprite editor
         """
         logger.info("Opening offset 0x%06X in sprite editor", offset)
+
+        # Get capture info from log watcher for display name
+        capture = self.log_watcher.get_capture_by_offset(offset)
+        capture_name: str | None = None
+        if capture and capture.frame:
+            capture_name = f"0x{offset:06X} (f{capture.frame})"
+
         if self.rom_extraction_panel.rom_path:
             self._sprite_editor_workspace.load_rom(self.rom_extraction_panel.rom_path)
+
         # Switch to sprite editor workspace
         self.switch_to_workspace(1)
-        # Jump to offset in sprite editor
-        self._sprite_editor_workspace.jump_to_offset(offset)
+
+        # Jump to offset in sprite editor (ensures capture is in browser and selected)
+        self._sprite_editor_workspace.jump_to_offset(offset, capture_name=capture_name)
 
     # Tab change handling now managed by UICoordinator
 

@@ -225,7 +225,7 @@ class SpriteAssetBrowser(QWidget):
         # Check if we have any real items
         has_items = False
         placeholder_item = None
-        
+
         for i in range(category_item.childCount()):
             child = category_item.child(i)
             data = child.data(0, Qt.ItemDataRole.UserRole)
@@ -593,13 +593,13 @@ class SpriteAssetBrowser(QWidget):
         """Clear all items from all categories."""
         self._rom_category.takeChildren()
         self._update_placeholder(self._rom_category)
-        
+
         self._mesen_category.takeChildren()
         self._update_placeholder(self._mesen_category)
-        
+
         self._library_category.takeChildren()
         self._update_placeholder(self._library_category)
-        
+
         self._local_category.takeChildren()
         self._update_placeholder(self._local_category)
 
@@ -710,3 +710,33 @@ class SpriteAssetBrowser(QWidget):
                 return True
             iterator += 1
         return False
+
+    def has_mesen_capture(self, offset: int) -> bool:
+        """Check if a Mesen capture with this offset exists in the browser.
+
+        Args:
+            offset: ROM offset to check
+
+        Returns:
+            True if a Mesen capture with this offset exists
+        """
+        for i in range(self._mesen_category.childCount()):
+            item = self._mesen_category.child(i)
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("offset") == offset:
+                return True
+        return False
+
+    def ensure_mesen_capture(self, offset: int, name: str | None = None) -> None:
+        """Ensure a Mesen capture exists, adding if not present.
+
+        This is idempotent - if the capture already exists, no change is made.
+
+        Args:
+            offset: ROM offset of the capture
+            name: Display name for the capture (defaults to hex offset)
+        """
+        if self.has_mesen_capture(offset):
+            return
+        display_name = name or f"0x{offset:06X}"
+        self.add_mesen_capture(display_name, offset)

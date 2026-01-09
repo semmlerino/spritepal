@@ -338,7 +338,7 @@ class SpriteEditorWorkspace(QWidget):
         index = 0 if mode == "vram" else 1
         self._mode_combo.setCurrentIndex(index)
 
-    def jump_to_offset(self, offset: int, *, auto_open: bool = True) -> None:
+    def jump_to_offset(self, offset: int, *, auto_open: bool = True, capture_name: str | None = None) -> None:
         """Jump to a specific ROM offset.
 
         Switches to ROM mode and navigates to the offset.
@@ -347,9 +347,14 @@ class SpriteEditorWorkspace(QWidget):
             offset: ROM offset to navigate to.
             auto_open: If True, automatically open in editor when preview completes.
                        Defaults to True for better UX (user expects double-click to edit).
+            capture_name: Optional display name for the capture (e.g., "0x3C6EF1 (f1500)").
+                          If provided, ensures the capture appears in asset browser.
         """
         # Switch to ROM mode
         self._mode_combo.setCurrentIndex(1)
+
+        # Ensure capture is in asset browser and selected (for cross-component sync)
+        self._rom_workflow_controller.ensure_and_select_capture(offset, capture_name)
 
         # Set offset in ROM workflow controller (auto_open triggers editor after preview)
         self._rom_workflow_controller.set_offset(offset, auto_open=auto_open)
@@ -361,7 +366,7 @@ class SpriteEditorWorkspace(QWidget):
         """
         # Switch to ROM mode first so the user sees the loaded ROM
         self.set_mode("rom")
-        
+
         self._rom_workflow_controller.load_rom(path)
 
     def cleanup(self) -> None:

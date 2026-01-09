@@ -506,6 +506,22 @@ class ROMWorkflowController(QObject):
         # Trigger initial preview
         self.set_offset(self.current_offset)
 
+    def ensure_and_select_capture(self, offset: int, name: str | None = None) -> None:
+        """Ensure a Mesen capture exists in the asset browser and select it.
+
+        Called when opening a capture from RecentCapturesWidget to sync with
+        the sprite editor's asset browser.
+
+        Args:
+            offset: ROM offset of the capture
+            name: Display name for the capture (defaults to hex offset)
+        """
+        if not self._view:
+            return
+        browser = self._view.asset_browser
+        browser.ensure_mesen_capture(offset, name)
+        browser.select_sprite_by_offset(offset)
+
     def set_offset(self, offset: int, *, auto_open: bool = False) -> None:
         """Set current ROM offset and request preview.
 
@@ -592,18 +608,21 @@ class ROMWorkflowController(QObject):
             try:
                 # 1. Get header to identify game
                 header = self.rom_extractor.rom_injector.read_rom_header(self.rom_path)
-                
+
                 # 2. Get game config
                 game_config = self.rom_extractor._find_game_configuration(header)
-                
+
                 if game_config and self.current_sprite_name:
                     from typing import cast
+
                     # 3. Get palette config for this sprite
-                    palette_offset, palette_indices = self.rom_extractor.rom_palette_extractor.get_palette_config_from_sprite_config(
-                        cast(dict[str, object], game_config),
-                        self.current_sprite_name,
+                    palette_offset, palette_indices = (
+                        self.rom_extractor.rom_palette_extractor.get_palette_config_from_sprite_config(
+                            cast(dict[str, object], game_config),
+                            self.current_sprite_name,
+                        )
                     )
-                    
+
                     # 4. Extract first palette if available
                     if palette_offset is not None and palette_indices:
                         # Use first available palette index
@@ -623,9 +642,7 @@ class ROMWorkflowController(QObject):
             logger.debug("Using default SNES palette")
             # Inform user about default palette for manual offsets
             if self._message_service and self.current_sprite_name.startswith("manual_0x"):
-                self._message_service.show_message(
-                    "Using default palette (ROM palette not available for this offset)"
-                )
+                self._message_service.show_message("Using default palette (ROM palette not available for this offset)")
 
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self._editing_controller.load_image(image_array, palette)

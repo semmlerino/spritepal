@@ -99,6 +99,20 @@ class LogWatcher(QObject):
         """List of recently captured offsets (most recent first)."""
         return list(self._recent_captures)
 
+    def get_capture_by_offset(self, offset: int) -> CapturedOffset | None:
+        """Get a capture by offset from recent captures.
+
+        Args:
+            offset: ROM offset to look up
+
+        Returns:
+            The CapturedOffset if found, None otherwise
+        """
+        for capture in self._recent_captures:
+            if capture.offset == offset:
+                return capture
+        return None
+
     def start_watching(self, log_path: Path | str | None = None) -> bool:
         """
         Start watching the Mesen2 log file.
