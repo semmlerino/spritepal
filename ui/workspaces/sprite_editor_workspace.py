@@ -58,9 +58,18 @@ class SpriteEditorWorkspace(QWidget):
 
     Signals:
         mode_changed: Emitted when mode switches ('vram' or 'rom')
+
+    Signal Flow:
+        _mode_combo.currentIndexChanged → _on_mode_changed → mode_changed.emit
+        mode_changed → _on_mode_changed_internal (propagates to sub-controllers)
+        mode_changed → _on_mode_switched (switches _mode_stack page)
     """
 
-    # Signals
+    # Signal: mode_changed
+    # Emitted by: _on_mode_changed when combo selection changes
+    # Consumed by:
+    #   - self._on_mode_changed_internal: propagates to extraction/injection controllers
+    #   - self._on_mode_switched: switches _mode_stack between VRAM and ROM pages
     mode_changed = Signal(str)  # 'vram' or 'rom'
 
     def __init__(
@@ -190,9 +199,11 @@ class SpriteEditorWorkspace(QWidget):
         self.mode_changed.connect(self._on_mode_changed_internal)
         self.mode_changed.connect(self._on_mode_switched)
 
-        # Sync stack to match initial combo state (combo was set before signals were wired)
+        # Sync stack AND controllers to match initial combo state
+        # (combo was set to ROM mode before signals were wired)
         initial_mode = self._mode_combo.currentData()
         self._on_mode_switched(initial_mode)
+        self._on_mode_changed_internal(initial_mode)  # Also sync controllers
 
         logger.debug("Controllers wired to workspace pages")
 

@@ -519,6 +519,4 @@ class TestMemoryStabilityPatterns:
         # Clear references and force garbage collection
         objects.clear()
         gc.collect()
-
-        # If we get here without memory issues, test passed
-        assert True, "Stress test should complete without memory issues"
+        # Reaching this point without MemoryError IS the success condition

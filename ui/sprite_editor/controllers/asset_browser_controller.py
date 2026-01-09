@@ -35,8 +35,12 @@ class AssetBrowserController(QObject):
     thumbnailRequested = Signal(int, str)  # offset, source_type - request thumbnail loading
     assetsChanged = Signal()  # assets list modified
     captureAdded = Signal(int, str)  # offset, name - when Mesen2 capture added
-    spriteSelected = Signal(int, str)  # forward from widget for external listeners
-    spriteActivated = Signal(int, str)  # forward from widget for external listeners
+    # Signal relay: SpriteAssetBrowser.sprite_selected → this.spriteSelected
+    # Consumed by: ROMWorkflowController._on_sprite_selected()
+    spriteSelected = Signal(int, str)
+    # Signal relay: SpriteAssetBrowser.sprite_activated → this.spriteActivated
+    # Consumed by: ROMWorkflowController._on_sprite_activated() (triggers editor open)
+    spriteActivated = Signal(int, str)
 
     def __init__(self, parent: QObject | None = None) -> None:
         """Initialize the asset browser controller."""
@@ -466,11 +470,18 @@ class AssetBrowserController(QObject):
     # Signal handlers
 
     def _on_sprite_selected(self, offset: int, source_type: str) -> None:
-        """Forward sprite selection to external listeners."""
+        """Relay sprite selection from browser widget to external listeners.
+
+        Signal chain: SpriteAssetBrowser.sprite_selected → this → ROMWorkflowController
+        """
         self.spriteSelected.emit(offset, source_type)
 
     def _on_sprite_activated(self, offset: int, source_type: str) -> None:
-        """Forward sprite activation to external listeners."""
+        """Relay sprite activation (double-click) from browser widget.
+
+        Signal chain: SpriteAssetBrowser.sprite_activated → this → ROMWorkflowController
+        This triggers opening the sprite in the editor.
+        """
         self.spriteActivated.emit(offset, source_type)
 
     def _on_rename_requested(self, offset: int, new_name: str) -> None:

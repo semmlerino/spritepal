@@ -187,11 +187,19 @@ class TestMesenCapturesSection:
 
     def test_no_app_context_access(self, captures_section):
         """Test that widget does not access AppContext directly."""
-        # Read the widget source code to verify no get_app_context calls
+        import ast
         import inspect
 
         source = inspect.getsource(MesenCapturesSection)
-        assert "get_app_context" not in source, "Widget should not access AppContext directly"
+        tree = ast.parse(source)
+
+        # Check for direct calls to get_app_context() using AST
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Name) and node.func.id == "get_app_context":
+                    pytest.fail("Widget should not call get_app_context() directly")
+                if isinstance(node.func, ast.Attribute) and node.func.attr == "get_app_context":
+                    pytest.fail("Widget should not call get_app_context() directly")
 
     def test_parent_wiring_pattern(self, app_context, qtbot, sample_capture):
         """Test the expected parent wiring pattern for log_watcher integration.

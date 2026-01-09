@@ -20,13 +20,21 @@ if TYPE_CHECKING:
 
 
 class InjectionController(QObject):
-    """Controller for sprite injection operations."""
+    """Controller for sprite injection operations.
 
-    # Signals
-    injection_completed = Signal(str)  # output file path
-    injection_failed = Signal(str)  # error message
-    progress_updated = Signal(int, str)  # percent, message
-    validation_completed = Signal(bool, str)  # is_valid, message
+    Signal Flow:
+        InjectWorker signals → this controller → view updates
+
+    Consumers:
+        - InjectTab: Receives progress_updated, injection_failed, validation_completed
+        - SpriteEditorWorkspace: Connects injection_completed for temp file cleanup
+    """
+
+    # Signals (originate here, consumed by views)
+    injection_completed = Signal(str)  # output path → InjectTab, SpriteEditorWorkspace cleanup
+    injection_failed = Signal(str)  # error message → InjectTab.append_output
+    progress_updated = Signal(int, str)  # percent, message → InjectTab.append_output
+    validation_completed = Signal(bool, str)  # is_valid, message → InjectTab.set_validation_text
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)

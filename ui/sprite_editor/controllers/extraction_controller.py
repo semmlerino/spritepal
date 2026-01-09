@@ -23,13 +23,23 @@ if TYPE_CHECKING:
 
 
 class ExtractionController(QObject):
-    """Controller for sprite extraction operations."""
+    """Controller for sprite extraction operations.
 
-    # Signals
-    extraction_failed = Signal(str)  # error message
-    progress_updated = Signal(int, str)  # percent, message
-    multi_palette_completed = Signal(dict, int)  # palette_images, tile_count
-    sprite_extracted = Signal(object, int)  # image, tile_count
+    Signal Flow:
+        ExtractWorker signals → this controller → view updates
+        This controller owns extraction state and coordinates worker lifecycle.
+
+    Consumers:
+        - ExtractTab: Receives progress_updated, extraction_failed, sprite_extracted
+        - MultiPaletteTab: Receives multi_palette_completed
+        - SpriteEditorWorkspace: May connect extraction_failed for status bar updates
+    """
+
+    # Signals (originate here, consumed by views)
+    extraction_failed = Signal(str)  # error message → ExtractTab.append_output
+    progress_updated = Signal(int, str)  # percent, message → ExtractTab.append_output
+    multi_palette_completed = Signal(dict, int)  # palette_images, tile_count → MultiPaletteTab
+    sprite_extracted = Signal(object, int)  # image, tile_count → external consumers
 
     def __init__(
         self,

@@ -476,8 +476,10 @@ class TestCacheIntegration:
         stats = manager.get_cache_stats()
 
         assert isinstance(stats, dict)
-        # Should have expected keys
-        assert "total_entries" in stats or "cache_size" in stats or len(stats) >= 0
+        # Empty dict is valid when _rom_cache is None
+        # Non-empty dict must have cache_enabled key
+        if stats:
+            assert "cache_enabled" in stats
 
     def test_clear_rom_cache(self, manager):
         """clear_rom_cache should return count."""

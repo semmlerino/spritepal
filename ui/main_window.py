@@ -669,6 +669,19 @@ class MainWindow(QMainWindow):
         elif index == 2:
             self.switch_to_workspace(1)  # Sprite Editor workspace
 
+    def set_workspace(self, workspace: str) -> None:
+        """Switch to specified workspace by name.
+
+        Provides a readable alternative to index-based switch_to_workspace().
+
+        Args:
+            workspace: 'extraction' for ROM/VRAM extraction, 'editor' for Sprite Editor
+        """
+        if workspace == "extraction":
+            self.switch_to_workspace(0)
+        elif workspace == "editor":
+            self.switch_to_workspace(1)
+
     def _setup_managers(self) -> None:
         """Set up all UI managers"""
         # Create managers in dependency order

@@ -124,9 +124,8 @@ class TestWorkerManagerReal:
 
     def test_cleanup_none_worker_real(self):
         """Test cleanup handles None worker gracefully."""
-        # Should not raise any exception
+        # Should not raise any exception - test passes if no exception raised
         WorkerManager.cleanup_worker(None)
-        assert True  # If we get here, no exception was raised
 
     def test_cleanup_stopped_worker_real(self):
         """Test cleanup of already stopped real worker."""

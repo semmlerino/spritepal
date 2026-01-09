@@ -165,10 +165,8 @@ class TestSpriteFinderWithRealComponents:
                 save_previews=False,  # Skip preview generation for unit test
             )
 
-            # Verify behavior: Sprite was found and validated
-            assert len(candidates) >= 0  # May find sprites depending on validation
-
-            # Verify the decompression was attempted
+            # Verify behavior: candidates list returned and decompression was attempted
+            assert isinstance(candidates, list)
             assert mock_decompress.called
 
     def test_confidence_filtering_behavior(self, test_rom_with_sprites, output_dir):

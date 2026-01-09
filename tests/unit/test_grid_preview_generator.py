@@ -424,10 +424,9 @@ class TestGridPreviewGenerator:
 
         generator._draw_grid(draw, 8, 8, 2, 2)
 
-        # The draw operations should complete without error
-        # Testing visual output would require pixel-level verification
-        # which is complex for this test
-        assert True  # Test passes if no exceptions
+        # Smoke test: drawing operations complete without error
+        # Image remains valid after draw operations
+        assert test_image.size == (16, 16)
 
     def test_highlight_tile(self):
         """Test highlighting a tile"""
@@ -439,8 +438,9 @@ class TestGridPreviewGenerator:
 
         generator._highlight_tile(draw, TilePosition(0, 1), 8, 8, (255, 0, 0, 128))
 
-        # The draw operations should complete without error
-        assert True  # Test passes if no exceptions
+        # Smoke test: drawing operations complete without error
+        # Image remains valid after draw operations
+        assert test_image.size == (16, 16)
 
     def test_export_grid_arrangement(self, tmp_path):
         """Test exporting grid arrangement"""

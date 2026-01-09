@@ -265,9 +265,8 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
             # Stop the worker
             controller.stop_worker()
 
-            # Should have processed at least some thumbnails (may depend on ROM content)
-            # This test validates the real controller works, even if no actual sprites found
-            assert len(thumbnails_received) >= 0  # At least no crashes occurred
+            # Test passes if we reach here without exception
+            # The worker processed the queue successfully (actual sprite count depends on ROM content)
 
         finally:
             controller.cleanup()

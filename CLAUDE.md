@@ -239,8 +239,8 @@ uv run pytest -x -vv
 # Filter by name pattern
 uv run pytest -k "extraction and not slow" -vv
 
-# Filter by marker
-uv run pytest -m "not real_hal" -vv
+# Exclude slow/perf tests for faster runs
+uv run pytest -m "not slow and not perf" -vv
 
 # Find slow tests
 uv run pytest --durations=20
