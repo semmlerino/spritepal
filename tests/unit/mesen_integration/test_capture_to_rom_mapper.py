@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -23,6 +22,7 @@ from core.mesen_integration.capture_to_rom_mapper import (
     MappedOAMEntry,
 )
 from core.mesen_integration.tile_hash_database import TileMatch
+from tests.infrastructure.fake_tile_hash_database import FakeTileHashDatabase
 
 # =============================================================================
 # Mock Classes for Testing
@@ -344,37 +344,42 @@ class TestCaptureToROMMapperInstanceMethods:
     """Tests for CaptureToROMMapper instance methods."""
 
     @pytest.fixture
-    def mock_mapper(self, tmp_path: Path) -> CaptureToROMMapper:
-        """Create mapper with mocked database."""
+    def fake_db(self, tmp_path: Path) -> FakeTileHashDatabase:
+        """Create a fake database for testing."""
+        return FakeTileHashDatabase(rom_path=tmp_path / "dummy.sfc")
+
+    @pytest.fixture
+    def mapper_with_db(self, tmp_path: Path, fake_db: FakeTileHashDatabase) -> CaptureToROMMapper:
+        """Create mapper with fake database."""
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
         mapper = CaptureToROMMapper(dummy_rom)
-        mapper._db = MagicMock()
+        mapper._db = fake_db
         return mapper
 
-    def test_tile_weight_no_candidates(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_tile_weight_no_candidates(self, mapper_with_db: CaptureToROMMapper) -> None:
         """_tile_weight returns 0 for zero candidates."""
         tile_bytes = bytes(range(32))
-        weight = mock_mapper._tile_weight(tile_bytes, 0)
+        weight = mapper_with_db._tile_weight(tile_bytes, 0)
         assert weight == 0.0
 
-    def test_tile_weight_low_info(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_tile_weight_low_info(self, mapper_with_db: CaptureToROMMapper) -> None:
         """_tile_weight returns 0 for low-information tiles."""
         tile_bytes = bytes([0] * 32)  # Low info
-        weight = mock_mapper._tile_weight(tile_bytes, 1)
+        weight = mapper_with_db._tile_weight(tile_bytes, 1)
         assert weight == 0.0
 
-    def test_tile_weight_single_candidate(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_tile_weight_single_candidate(self, mapper_with_db: CaptureToROMMapper) -> None:
         """_tile_weight returns 1.0 for single candidate."""
         tile_bytes = bytes(range(32))
-        weight = mock_mapper._tile_weight(tile_bytes, 1)
+        weight = mapper_with_db._tile_weight(tile_bytes, 1)
         assert weight == 1.0
 
-    def test_tile_weight_multiple_candidates(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_tile_weight_multiple_candidates(self, mapper_with_db: CaptureToROMMapper) -> None:
         """_tile_weight returns 1/N for N candidates."""
         tile_bytes = bytes(range(32))
-        weight = mock_mapper._tile_weight(tile_bytes, 5)
+        weight = mapper_with_db._tile_weight(tile_bytes, 5)
         assert weight == pytest.approx(0.2)
 
     def test_map_single_tile_no_db(self, tmp_path: Path) -> None:
@@ -386,19 +391,23 @@ class TestCaptureToROMMapperInstanceMethods:
         with pytest.raises(RuntimeError, match="Database not built"):
             mapper.map_single_tile(bytes(32))
 
-    def test_map_single_tile_found(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_map_single_tile_found(
+        self, mapper_with_db: CaptureToROMMapper, fake_db: FakeTileHashDatabase
+    ) -> None:
         """map_single_tile returns match when found."""
+        tile_bytes = bytes(32)
         expected_match = TileMatch(rom_offset=0x1B0000, tile_index=5)
-        mock_mapper._db.lookup_tile.return_value = expected_match  # type: ignore[union-attr]
+        fake_db.seed_lookup(tile_bytes, expected_match)
 
-        result = mock_mapper.map_single_tile(bytes(32))
+        result = mapper_with_db.map_single_tile(tile_bytes)
         assert result == expected_match
 
-    def test_map_single_tile_not_found(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_map_single_tile_not_found(
+        self, mapper_with_db: CaptureToROMMapper, fake_db: FakeTileHashDatabase
+    ) -> None:
         """map_single_tile returns None when not found."""
-        mock_mapper._db.lookup_tile.return_value = None  # type: ignore[union-attr]
-
-        result = mock_mapper.map_single_tile(bytes(32))
+        # No seeding = not found
+        result = mapper_with_db.map_single_tile(bytes(32))
         assert result is None
 
     def test_get_database_stats_no_db(self, tmp_path: Path) -> None:
@@ -410,13 +419,12 @@ class TestCaptureToROMMapperInstanceMethods:
         stats = mapper.get_database_stats()
         assert "error" in stats
 
-    def test_get_database_stats_with_db(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_get_database_stats_with_db(self, mapper_with_db: CaptureToROMMapper) -> None:
         """get_database_stats delegates to database."""
-        expected_stats = {"total_tiles": 100, "unique_hashes": 50}
-        mock_mapper._db.get_statistics.return_value = expected_stats  # type: ignore[union-attr]
-
-        stats = mock_mapper.get_database_stats()
-        assert stats == expected_stats
+        stats = mapper_with_db.get_database_stats()
+        # FakeTileHashDatabase returns its own statistics structure
+        assert "total_blocks" in stats
+        assert "total_unique_hashes" in stats
 
 
 # =============================================================================
@@ -428,56 +436,66 @@ class TestCaptureToROMMapperMapEntry:
     """Tests for _map_entry method."""
 
     @pytest.fixture
-    def mock_mapper(self, tmp_path: Path) -> CaptureToROMMapper:
-        """Create mapper with mocked database."""
+    def fake_db(self, tmp_path: Path) -> FakeTileHashDatabase:
+        """Create a fake database for testing."""
+        return FakeTileHashDatabase(rom_path=tmp_path / "dummy.sfc")
+
+    @pytest.fixture
+    def mapper_with_db(self, tmp_path: Path, fake_db: FakeTileHashDatabase) -> CaptureToROMMapper:
+        """Create mapper with fake database."""
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
         mapper = CaptureToROMMapper(dummy_rom)
-        mapper._db = MagicMock()
+        mapper._db = fake_db
         return mapper
 
-    def test_map_entry_empty_tiles(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_map_entry_empty_tiles(self, mapper_with_db: CaptureToROMMapper) -> None:
         """_map_entry handles entry with no tiles."""
         entry = MockOAMEntry(tiles=[])
-        mapped = mock_mapper._map_entry(entry)  # type: ignore[arg-type]
+        mapped = mapper_with_db._map_entry(entry)  # type: ignore[arg-type]
         assert mapped.rom_offset is None
         assert mapped.total_tiles == 0
 
-    def test_map_entry_no_matches(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_map_entry_no_matches(self, mapper_with_db: CaptureToROMMapper) -> None:
         """_map_entry handles entry with no database matches."""
-        mock_mapper._db.lookup_tile_matches.return_value = []  # type: ignore[union-attr]
-
+        # No seeding = no matches
         entry = MockOAMEntry(tiles=[MockTile(bytes(range(32)))])
-        mapped = mock_mapper._map_entry(entry)  # type: ignore[arg-type]
+        mapped = mapper_with_db._map_entry(entry)  # type: ignore[arg-type]
         assert mapped.rom_offset is None
         assert mapped.match_count == 0
 
-    def test_map_entry_all_matched(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_map_entry_all_matched(
+        self, mapper_with_db: CaptureToROMMapper, fake_db: FakeTileHashDatabase
+    ) -> None:
         """_map_entry handles entry where all tiles match."""
-        mock_mapper._db.lookup_tile_matches.return_value = [  # type: ignore[union-attr]
-            TileMatch(rom_offset=0x1B0000, tile_index=0),
-        ]
-
         tiles = [MockTile(bytes(range(i, i + 32))) for i in range(5)]
+        # Seed each tile to return a match
+        for tile in tiles:
+            fake_db.seed_lookup_matches(
+                tile.data_bytes, [TileMatch(rom_offset=0x1B0000, tile_index=0)]
+            )
+
         entry = MockOAMEntry(tiles=tiles)
-        mapped = mock_mapper._map_entry(entry)  # type: ignore[arg-type]
+        mapped = mapper_with_db._map_entry(entry)  # type: ignore[arg-type]
 
         assert mapped.rom_offset == 0x1B0000
         assert mapped.match_count == 5
         assert mapped.total_tiles == 5
 
-    def test_map_entry_low_info_ignored(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_map_entry_low_info_ignored(
+        self, mapper_with_db: CaptureToROMMapper, fake_db: FakeTileHashDatabase
+    ) -> None:
         """_map_entry ignores low-information tiles."""
-        # Return matches but with low-info tiles
-        mock_mapper._db.lookup_tile_matches.return_value = [  # type: ignore[union-attr]
-            TileMatch(rom_offset=0x1B0000, tile_index=0),
-        ]
-
         # All-zero tile is low-information
-        tiles = [MockTile(bytes(32))]
+        low_info_tile = bytes(32)
+        fake_db.seed_lookup_matches(
+            low_info_tile, [TileMatch(rom_offset=0x1B0000, tile_index=0)]
+        )
+
+        tiles = [MockTile(low_info_tile)]
         entry = MockOAMEntry(tiles=tiles)
-        mapped = mock_mapper._map_entry(entry)  # type: ignore[arg-type]
+        mapped = mapper_with_db._map_entry(entry)  # type: ignore[arg-type]
 
         assert mapped.match_count == 1  # Still counted as matched
         assert mapped.scored_tiles == 0  # But not scored
@@ -493,13 +511,18 @@ class TestCaptureToROMMapperMapCapture:
     """Tests for map_capture method."""
 
     @pytest.fixture
-    def mock_mapper(self, tmp_path: Path) -> CaptureToROMMapper:
-        """Create mapper with mocked database."""
+    def fake_db(self, tmp_path: Path) -> FakeTileHashDatabase:
+        """Create a fake database for testing."""
+        return FakeTileHashDatabase(rom_path=tmp_path / "dummy.sfc")
+
+    @pytest.fixture
+    def mapper_with_db(self, tmp_path: Path, fake_db: FakeTileHashDatabase) -> CaptureToROMMapper:
+        """Create mapper with fake database."""
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
         mapper = CaptureToROMMapper(dummy_rom)
-        mapper._db = MagicMock()
+        mapper._db = fake_db
         return mapper
 
     def test_map_capture_no_db(self, tmp_path: Path) -> None:
@@ -512,48 +535,48 @@ class TestCaptureToROMMapperMapCapture:
         with pytest.raises(RuntimeError, match="Database not built"):
             mapper.map_capture(capture)  # type: ignore[arg-type]
 
-    def test_map_capture_empty(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_map_capture_empty(self, mapper_with_db: CaptureToROMMapper) -> None:
         """map_capture handles empty capture."""
         capture = MockCaptureResult(entries=[])
-        result = mock_mapper.map_capture(capture)  # type: ignore[arg-type]
+        result = mapper_with_db.map_capture(capture)  # type: ignore[arg-type]
         assert len(result.mapped_entries) == 0
         assert result.total_tiles == 0
 
-    def test_map_capture_aggregates_scores(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_map_capture_aggregates_scores(
+        self, mapper_with_db: CaptureToROMMapper, fake_db: FakeTileHashDatabase
+    ) -> None:
         """map_capture aggregates scores across entries."""
-        # First entry matches 0x1B0000
-        # Second entry matches 0x1B0000 and 0x1A0000
+        # First entry matches 0x1B0000 only
+        tile1 = bytes([0] + list(range(1, 32)))
+        fake_db.seed_lookup_matches(tile1, [TileMatch(rom_offset=0x1B0000, tile_index=0)])
 
-        def lookup_side_effect(tile_bytes: bytes, include_flips: bool = False) -> list[TileMatch]:
-            # Different matches based on tile data
-            if tile_bytes[0] == 0:
-                return [TileMatch(rom_offset=0x1B0000, tile_index=0)]
-            else:
-                return [
-                    TileMatch(rom_offset=0x1B0000, tile_index=0),
-                    TileMatch(rom_offset=0x1A0000, tile_index=0),
-                ]
+        # Second entry matches both 0x1B0000 and 0x1A0000
+        tile2 = bytes(range(1, 33))
+        fake_db.seed_lookup_matches(
+            tile2,
+            [
+                TileMatch(rom_offset=0x1B0000, tile_index=0),
+                TileMatch(rom_offset=0x1A0000, tile_index=0),
+            ],
+        )
 
-        mock_mapper._db.lookup_tile_matches.side_effect = lookup_side_effect  # type: ignore[union-attr]
-
-        entry1 = MockOAMEntry(tiles=[MockTile(bytes([0] + list(range(1, 32))))])
-        entry2 = MockOAMEntry(tiles=[MockTile(bytes(range(1, 33)))])
+        entry1 = MockOAMEntry(tiles=[MockTile(tile1)])
+        entry2 = MockOAMEntry(tiles=[MockTile(tile2)])
         capture = MockCaptureResult(entries=[entry1, entry2])
 
-        result = mock_mapper.map_capture(capture)  # type: ignore[arg-type]
+        result = mapper_with_db.map_capture(capture)  # type: ignore[arg-type]
 
         assert len(result.mapped_entries) == 2
         # 0x1B0000 should have higher total score (appears in both)
         assert 0x1B0000 in result.rom_offset_scores
 
-    def test_map_capture_counts_unmapped(self, mock_mapper: CaptureToROMMapper) -> None:
+    def test_map_capture_counts_unmapped(self, mapper_with_db: CaptureToROMMapper) -> None:
         """map_capture counts unmapped entries."""
-        mock_mapper._db.lookup_tile_matches.return_value = []  # type: ignore[union-attr]
-
+        # No seeding = no matches
         entry = MockOAMEntry(tiles=[MockTile(bytes(range(32)))])
         capture = MockCaptureResult(entries=[entry])
 
-        result = mock_mapper.map_capture(capture)  # type: ignore[arg-type]
+        result = mapper_with_db.map_capture(capture)  # type: ignore[arg-type]
         assert result.unmapped_count == 1
 
 

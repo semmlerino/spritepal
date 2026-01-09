@@ -4,9 +4,7 @@ Tests for ZoomablePreviewWidget and PreviewPanel
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from PIL import Image
@@ -291,45 +289,49 @@ class TestPreviewPanel:
         assert panel.palette_toggle.isChecked() is False
         assert panel.palette_selector.isEnabled() is False
 
-    @patch("ui.zoomable_preview.PreviewPanel._pil_to_pixmap")
-    def test_show_grayscale_preserves_view(self, mock_pil_to_pixmap, panel, test_grayscale_image):
-        """Test that showing grayscale preserves view state"""
-        # Mock the conversion
-        mock_pixmap = Mock()
-        mock_pil_to_pixmap.return_value = mock_pixmap
-
-        # Set up panel
+    def test_show_grayscale_preserves_view(self, panel, test_grayscale_image):
+        """Test that showing grayscale preserves view state and creates valid pixmap."""
+        # Set up panel with grayscale image
         panel.set_grayscale_image(test_grayscale_image)
 
-        # Mock the preview widget's update_pixmap method
-        panel.preview.update_pixmap = Mock()
+        # Set a known zoom/pan state before operation
+        panel.preview._zoom = 2.0
 
-        # Call _show_grayscale
+        # Call _show_grayscale (uses real _pil_to_pixmap conversion)
         panel._show_grayscale()
 
-        # Should call update_pixmap (not set_preview)
-        panel.preview.update_pixmap.assert_called_once_with(mock_pixmap)
+        # Verify the preview has a valid pixmap with matching dimensions
+        current_pixmap = panel.preview._pixmap
+        assert current_pixmap is not None
+        assert not current_pixmap.isNull()
+        # Pixmap dimensions should match the grayscale image
+        assert current_pixmap.width() == test_grayscale_image.width
+        assert current_pixmap.height() == test_grayscale_image.height
+        # Zoom state should be preserved (update_pixmap doesn't reset zoom)
+        assert panel.preview._zoom == 2.0
 
-    @patch("ui.zoomable_preview.PreviewPanel._pil_to_pixmap")
-    def test_apply_palette_preserves_view(self, mock_pil_to_pixmap, panel, test_grayscale_image, test_palettes):
-        """Test that applying palette preserves view state"""
-        # Mock the conversion
-        mock_pixmap = Mock()
-        mock_pil_to_pixmap.return_value = mock_pixmap
-
+    def test_apply_palette_preserves_view(self, panel, test_grayscale_image, test_palettes):
+        """Test that applying palette preserves view state and creates valid pixmap."""
         # Set up panel
         panel.set_grayscale_image(test_grayscale_image)
         panel.set_palettes(test_palettes)
         panel.palette_toggle.setChecked(True)
 
-        # Mock the preview widget's update_pixmap method
-        panel.preview.update_pixmap = Mock()
+        # Set a known zoom state before operation
+        panel.preview._zoom = 1.5
 
-        # Call _apply_current_palette
+        # Call _apply_current_palette (uses real _pil_to_pixmap conversion)
         panel._apply_current_palette()
 
-        # Should call update_pixmap (not set_preview)
-        panel.preview.update_pixmap.assert_called_once_with(mock_pixmap)
+        # Verify the preview has a valid pixmap with matching dimensions
+        current_pixmap = panel.preview._pixmap
+        assert current_pixmap is not None
+        assert not current_pixmap.isNull()
+        # Pixmap dimensions should match the source image
+        assert current_pixmap.width() == test_grayscale_image.width
+        assert current_pixmap.height() == test_grayscale_image.height
+        # Zoom state should be preserved (update_pixmap doesn't reset zoom)
+        assert panel.preview._zoom == 1.5
 
     def test_error_handling_in_palette_application(self, panel):
         """Test error handling when palette application fails"""

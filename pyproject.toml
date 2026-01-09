@@ -464,6 +464,7 @@ markers = [
     "allows_registry_state: Allow registry state without manager fixtures",
     "skip_thread_cleanup: Skip thread cleanup verification (requires reason argument)",
     "real_hal: Use real HAL components (requires exhal binary)",
+    "real_rom: Tests requiring real ROM files (skipped if ROM not available)",
     "golden_hal: Verify HAL output against recorded golden checksums",
     "no_qt: Skip Qt app/thread cleanup for tests that do not use Qt",
 

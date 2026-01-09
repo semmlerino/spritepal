@@ -218,7 +218,7 @@ class ROMPaletteExtractor:
                 if 0 <= idx <= 15:
                     colors_list = self._extract_palette_colors(palette_data, idx)
                     # Convert list of lists to list of tuples for consistency
-                    palettes[idx] = [tuple(c) for c in colors_list]  # type: ignore[misc]
+                    palettes[idx] = [tuple(c) for c in colors_list]
 
         except OSError as e:
             logger.warning(f"Failed to extract palette range: {e}")
@@ -252,7 +252,7 @@ class ROMPaletteExtractor:
             if 0 <= palette_index <= 15:
                 colors_list = self._extract_palette_colors(palette_data, palette_index)
                 # Convert list of lists to list of tuples for consistency
-                return [tuple(c) for c in colors_list]  # type: ignore
+                return [tuple(c) for c in colors_list]
 
         except OSError as e:
             logger.warning(f"Failed to extract palette colors: {e}")

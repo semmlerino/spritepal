@@ -204,7 +204,7 @@ class ExtractionController(QObject):
 
         params = self._view.get_extraction_params()
         rom_file = str(params.get("rom_file", ""))
-        offset = int(params["offset"])  # type: ignore
+        offset = int(params["offset"])
 
         if not rom_file:
             self._view.append_output("ERROR: ROM file required")

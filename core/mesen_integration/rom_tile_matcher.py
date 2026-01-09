@@ -112,10 +112,15 @@ class ROMTileMatcher:
         (0x270000, "Revenge of MK sprites"),
     ]
 
+    # Type annotations for instance variables (actual values set in __init__)
+    _hal: HALCompressor | None
+
     def __init__(
         self,
         rom_path: str | Path,
         apply_sa1_conversion: bool = True,
+        *,
+        _skip_expensive_init: bool = False,
     ):
         """
         Initialize ROM tile matcher.
@@ -123,15 +128,12 @@ class ROMTileMatcher:
         Args:
             rom_path: Path to ROM file
             apply_sa1_conversion: If True, convert bitmap→SNES 4bpp when indexing
+            _skip_expensive_init: Internal testing parameter - skips HAL and file operations
         """
         self.rom_path = Path(rom_path)
         self.apply_sa1_conversion = apply_sa1_conversion
-        self._hal = HALCompressor()
 
-        # Detect SMC header
-        file_size = self.rom_path.stat().st_size
-        self._header_offset = detect_smc_offset_from_size(file_size)
-
+        # Initialize ALL attributes unconditionally to ensure complete state
         # Database: hash → list of locations
         self._hash_to_locations: dict[str, list[TileLocation]] = {}
         self._blocks: list[ROMBlock] = []
@@ -155,7 +157,22 @@ class ROMTileMatcher:
         self._unique_hashes = 0
         self._two_plane_tiles = 0
         self._hal_two_plane_matches = 0
-        self._two_plane_matches_by_combo: dict[tuple[int, int], int] = dict.fromkeys(TWO_PLANE_COMBOS, 0)
+        self._two_plane_matches_by_combo: dict[tuple[int, int], int] = dict.fromkeys(
+            TWO_PLANE_COMBOS, 0
+        )
+
+        if _skip_expensive_init:
+            # For testing: skip expensive HAL and file operations
+            self._hal = None
+            self._header_offset = 0
+            return
+
+        # Normal expensive initialization
+        self._hal = HALCompressor()
+
+        # Detect SMC header
+        file_size = self.rom_path.stat().st_size
+        self._header_offset = detect_smc_offset_from_size(file_size)
 
     def scan_rom_for_blocks(
         self,
@@ -173,7 +190,12 @@ class ROMTileMatcher:
 
         Returns:
             List of (rom_offset, description) tuples
+
+        Raises:
+            RuntimeError: If HAL compressor is not initialized
         """
+        if self._hal is None:
+            raise RuntimeError("HAL compressor not initialized (test mode?)")
         rom_size = self.rom_path.stat().st_size - self._header_offset
         found: list[tuple[int, str]] = []
         total_steps = rom_size // step
@@ -350,6 +372,8 @@ class ROMTileMatcher:
 
         Decompresses data, optionally applies SA-1 conversion, then hashes.
         """
+        if self._hal is None:
+            raise RuntimeError("HAL compressor not initialized (test mode?)")
         file_offset = rom_offset + self._header_offset
 
         try:

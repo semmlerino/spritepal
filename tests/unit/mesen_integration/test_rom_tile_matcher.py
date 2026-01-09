@@ -9,7 +9,6 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -19,6 +18,7 @@ from core.mesen_integration.rom_tile_matcher import (
     ROMTileMatcher,
     TileLocation,
 )
+from tests.infrastructure.fake_rom_tile_matcher import create_test_rom_tile_matcher
 
 # =============================================================================
 # TileLocation Tests
@@ -183,24 +183,23 @@ class TestROMTileMatcherStaticMethods:
         restored = ROMTileMatcher._flip_v(flipped)
         assert restored == tile_data
 
-    def test_iter_flips_yields_three(self) -> None:
+    def test_iter_flips_yields_three(self, tmp_path: Path) -> None:
         """_iter_flips yields 3 variants."""
         tile_data = bytes(range(BYTES_PER_TILE))
+        dummy_rom = tmp_path / "dummy.sfc"
+        dummy_rom.write_bytes(bytes(0x200))
 
-        # Access via an instance
-        with patch.object(ROMTileMatcher, "__init__", lambda self, *args, **kwargs: None):
-            matcher = object.__new__(ROMTileMatcher)
-
+        matcher = create_test_rom_tile_matcher(rom_path=dummy_rom)
         variants = list(matcher._iter_flips(tile_data))
         assert len(variants) == 3
 
-    def test_iter_flips_labels(self) -> None:
+    def test_iter_flips_labels(self, tmp_path: Path) -> None:
         """_iter_flips yields correct flip type labels."""
         tile_data = bytes(range(BYTES_PER_TILE))
+        dummy_rom = tmp_path / "dummy.sfc"
+        dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(ROMTileMatcher, "__init__", lambda self, *args, **kwargs: None):
-            matcher = object.__new__(ROMTileMatcher)
-
+        matcher = create_test_rom_tile_matcher(rom_path=dummy_rom)
         variants = list(matcher._iter_flips(tile_data))
         labels = [v[0] for v in variants]
         assert labels == ["H", "V", "HV"]
@@ -216,28 +215,15 @@ class TestROMTileMatcherLookup:
 
     @pytest.fixture
     def mock_matcher(self, tmp_path: Path) -> ROMTileMatcher:
-        """Create matcher with mocked internals."""
+        """Create matcher with test infrastructure."""
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(ROMTileMatcher, "__init__", lambda self, *args, **kwargs: None):
-            matcher = object.__new__(ROMTileMatcher)
-
-        matcher.rom_path = dummy_rom
-        matcher._hal = MagicMock()
-        matcher._hash_to_locations = {}
-        matcher._blocks = []
-        matcher._header_offset = 0
-        matcher.apply_sa1_conversion = True
-        matcher._two_plane_indexed = False
-        matcher._two_plane_db = {}
-        matcher._total_tiles = 0
-        matcher._unique_hashes = 0
-        matcher._two_plane_tiles = 0
-        matcher._hal_two_plane_db = {}
-        matcher._hal_two_plane_indexed = False
-        matcher._two_plane_matches_by_combo = {}
-        return matcher
+        return create_test_rom_tile_matcher(
+            rom_path=dummy_rom,
+            hash_to_locations={},
+            blocks=[],
+        )
 
     @pytest.fixture
     def populated_matcher(self, mock_matcher: ROMTileMatcher) -> ROMTileMatcher:
@@ -340,23 +326,17 @@ class TestROMTileMatcherStatistics:
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(ROMTileMatcher, "__init__", lambda self, *args, **kwargs: None):
-            matcher = object.__new__(ROMTileMatcher)
-
-        matcher.rom_path = dummy_rom
-        matcher._header_offset = 512
-        matcher.apply_sa1_conversion = True
-        matcher._blocks = [
-            ROMBlock(0x1B0000, "Kirby", decompressed_size=320, tile_count=10),
-            ROMBlock(0x1A0000, "Enemy", decompressed_size=160, tile_count=5),
-        ]
-        matcher._hash_to_locations = {"hash1": [], "hash2": [], "hash3": []}
-        matcher._total_tiles = 15
-        matcher._unique_hashes = 3
-        matcher._two_plane_indexed = False
-        matcher._two_plane_tiles = 0
-        matcher._two_plane_matches_by_combo = {}
-        return matcher
+        return create_test_rom_tile_matcher(
+            rom_path=dummy_rom,
+            blocks=[
+                ROMBlock(0x1B0000, "Kirby", decompressed_size=320, tile_count=10),
+                ROMBlock(0x1A0000, "Enemy", decompressed_size=160, tile_count=5),
+            ],
+            hash_to_locations={"hash1": [], "hash2": [], "hash3": []},
+            total_tiles=15,
+            unique_hashes=3,
+            header_offset=512,
+        )
 
     def test_get_statistics_keys(self, stats_matcher: ROMTileMatcher) -> None:
         """get_statistics returns expected keys."""
@@ -395,19 +375,13 @@ class TestROMTileMatcherStatistics:
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(ROMTileMatcher, "__init__", lambda self, *args, **kwargs: None):
-            matcher = object.__new__(ROMTileMatcher)
-
-        matcher.rom_path = dummy_rom
-        matcher._header_offset = 0
-        matcher.apply_sa1_conversion = True
-        matcher._blocks = []
-        matcher._hash_to_locations = {}
-        matcher._total_tiles = 0
-        matcher._unique_hashes = 0
-        matcher._two_plane_indexed = False
-        matcher._two_plane_tiles = 0
-        matcher._two_plane_matches_by_combo = {}
+        matcher = create_test_rom_tile_matcher(
+            rom_path=dummy_rom,
+            blocks=[],
+            hash_to_locations={},
+            total_tiles=0,
+            unique_hashes=0,
+        )
 
         stats = matcher.get_statistics()
         assert stats["collision_rate"] == 0
@@ -427,28 +401,21 @@ class TestROMTileMatcherPersistence:
         dummy_rom = tmp_path / "test.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(ROMTileMatcher, "__init__", lambda self, *args, **kwargs: None):
-            matcher = object.__new__(ROMTileMatcher)
-
-        matcher.rom_path = dummy_rom
-        matcher._header_offset = 0
-        matcher.apply_sa1_conversion = True
-        matcher._blocks = [
-            ROMBlock(0x1B0000, "Test sprites", 320, 10),
-        ]
-        matcher._hash_to_locations = {
-            "abcd1234abcd1234": [
-                TileLocation(0x1B0000, 0, "Test sprites", ""),
-                TileLocation(0x1B0000, 0, "Test sprites", "H"),
+        return create_test_rom_tile_matcher(
+            rom_path=dummy_rom,
+            blocks=[
+                ROMBlock(0x1B0000, "Test sprites", 320, 10),
             ],
-            "efgh5678efgh5678": [TileLocation(0x1B0000, 1, "Test sprites", "")],
-        }
-        matcher._total_tiles = 10
-        matcher._unique_hashes = 2
-        matcher._two_plane_indexed = False
-        matcher._two_plane_tiles = 0
-        matcher._two_plane_matches_by_combo = {}
-        return matcher
+            hash_to_locations={
+                "abcd1234abcd1234": [
+                    TileLocation(0x1B0000, 0, "Test sprites", ""),
+                    TileLocation(0x1B0000, 0, "Test sprites", "H"),
+                ],
+                "efgh5678efgh5678": [TileLocation(0x1B0000, 1, "Test sprites", "")],
+            },
+            total_tiles=10,
+            unique_hashes=2,
+        )
 
     def test_save_database_creates_file(self, matcher_for_save: ROMTileMatcher, tmp_path: Path) -> None:
         """save_database creates JSON file."""
@@ -548,13 +515,10 @@ class TestEdgeCases:
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(ROMTileMatcher, "__init__", lambda self, *args, **kwargs: None):
-            matcher = object.__new__(ROMTileMatcher)
-
-        matcher.rom_path = dummy_rom
-        matcher._hash_to_locations = {}
-        matcher._two_plane_indexed = False
-        matcher._two_plane_db = {}
+        matcher = create_test_rom_tile_matcher(
+            rom_path=dummy_rom,
+            hash_to_locations={},
+        )
 
         tile_data = bytes(BYTES_PER_TILE)
         assert matcher.lookup_vram_tile(tile_data) == []
@@ -581,24 +545,20 @@ class TestEdgeCases:
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(ROMTileMatcher, "__init__", lambda self, *args, **kwargs: None):
-            matcher = object.__new__(ROMTileMatcher)
-
-        matcher.rom_path = dummy_rom
-        matcher._two_plane_indexed = False
-        matcher._two_plane_db = {}
-
         tile_data = bytes([0] * BYTES_PER_TILE)
         hash_ = ROMTileMatcher._hash_tile(tile_data)
 
         # Same hash maps to multiple locations
-        matcher._hash_to_locations = {
-            hash_: [
-                TileLocation(0x1B0000, 0, "Block A"),
-                TileLocation(0x1C0000, 5, "Block B"),
-                TileLocation(0x1D0000, 10, "Block C"),
-            ],
-        }
+        matcher = create_test_rom_tile_matcher(
+            rom_path=dummy_rom,
+            hash_to_locations={
+                hash_: [
+                    TileLocation(0x1B0000, 0, "Block A"),
+                    TileLocation(0x1C0000, 5, "Block B"),
+                    TileLocation(0x1D0000, 10, "Block C"),
+                ],
+            },
+        )
 
         matches = matcher.lookup_vram_tile(tile_data)
         assert len(matches) == 3
