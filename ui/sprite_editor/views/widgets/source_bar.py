@@ -107,3 +107,20 @@ class SourceBar(QWidget):
         # Refresh style
         self.action_btn.style().unpolish(self.action_btn)
         self.action_btn.style().polish(self.action_btn)
+
+    def set_action_enabled(self, enabled: bool) -> None:
+        """Enable or disable the action button."""
+        self.action_btn.setEnabled(enabled)
+
+    def set_action_loading(self, loading: bool) -> None:
+        """Show loading state on action button.
+
+        Args:
+            loading: If True, show "Loading..." and disable. If False, re-enable only.
+        """
+        if loading:
+            self.action_btn.setText("Loading...")
+            self.action_btn.setEnabled(False)
+        else:
+            # Caller should call set_action_text() after this to restore proper text
+            self.action_btn.setEnabled(True)

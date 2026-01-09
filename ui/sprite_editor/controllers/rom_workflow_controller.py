@@ -83,9 +83,14 @@ class ROMWorkflowController(QObject):
         self.current_sprite_name: str = ""
         self.original_compressed_size: int = 0
         self.available_slack: int = 0
+        self.hal_decompression_succeeded: bool = False
 
         # Flag for auto-opening in editor after preview completes (double-click)
         self._pending_open_in_editor: bool = False
+        self._pending_open_offset: int = -1  # Track which offset triggered pending
+
+        # Flag for preview loading state (used to disable action button)
+        self._preview_pending: bool = False
 
         # Thumbnail worker controller
         self._thumbnail_controller: ThumbnailWorkerController | None = None
@@ -231,10 +236,12 @@ class ROMWorkflowController(QObject):
         if self.current_offset == offset:
             logger.debug("[DOUBLE-CLICK] Preview pending for this offset, setting flag only")
             self._pending_open_in_editor = True
+            self._pending_open_offset = offset
             return
 
         # Set flag to auto-open in editor when preview completes
         self._pending_open_in_editor = True
+        self._pending_open_offset = offset
         logger.debug("[DOUBLE-CLICK] Flag set, calling set_offset")
         self.set_offset(offset)
 
@@ -512,6 +519,7 @@ class ROMWorkflowController(QObject):
         # Set flag to auto-open in editor when preview completes
         if auto_open:
             self._pending_open_in_editor = True
+            self._pending_open_offset = offset
 
         # Check for unsaved changes if in edit mode
         if self.state == "edit" and self._editing_controller.undo_manager.can_undo():
@@ -540,10 +548,17 @@ class ROMWorkflowController(QObject):
             self._view.source_bar.set_offset(offset)
 
         if self.rom_path:
+            # Set loading state before requesting preview
+            self._preview_pending = True
+            if self._view:
+                self._view.source_bar.set_action_loading(True)
             self.preview_coordinator.request_manual_preview(offset)
 
     def handle_primary_action(self) -> None:
         """Handle the state-dependent primary action button."""
+        # Ignore clicks while preview is loading
+        if self._preview_pending:
+            return
         if self.state == "preview":
             self.open_in_editor()
         elif self.state == "edit":
@@ -606,6 +621,11 @@ class ROMWorkflowController(QObject):
         if palette is None:
             palette = get_default_snes_palette()
             logger.debug("Using default SNES palette")
+            # Inform user about default palette for manual offsets
+            if self._message_service and self.current_sprite_name.startswith("manual_0x"):
+                self._message_service.show_message(
+                    "Using default palette (ROM palette not available for this offset)"
+                )
 
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self._editing_controller.load_image(image_array, palette)
@@ -622,6 +642,20 @@ class ROMWorkflowController(QObject):
 
     def prepare_injection(self) -> None:
         """Transition from editing to save confirmation with size comparison."""
+        # Block injection if HAL decompression failed (raw fallback was used)
+        if not self.hal_decompression_succeeded:
+            from PySide6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(
+                self._view,
+                "Cannot Inject",
+                "This offset doesn't contain a valid HAL-compressed sprite.\n\n"
+                "The preview was generated from raw ROM bytes because HAL decompression failed.\n"
+                "Injecting at this offset would corrupt the ROM.\n\n"
+                "Please select a valid sprite offset.",
+            )
+            return
+
         data = self._editing_controller.get_image_data()
         if data is None:
             if self._message_service:
@@ -886,6 +920,7 @@ class ROMWorkflowController(QObject):
         compressed_size: int,
         slack_size: int = 0,
         actual_offset: int = -1,
+        hal_succeeded: bool = True,
     ) -> None:
         """Handle preview ready from coordinator."""
         # Use current offset if actual_offset not provided
@@ -912,7 +947,7 @@ class ROMWorkflowController(QObject):
 
         logger.debug(
             f"[PREVIEW] _on_preview_ready called: {len(tile_data)} bytes, {width}x{height}, "
-            f"pending_open={self._pending_open_in_editor}, offset=0x{actual_offset:06X}"
+            f"pending_open={self._pending_open_in_editor}, offset=0x{actual_offset:06X}, hal={hal_succeeded}"
         )
         self.current_tile_data = tile_data
         self.current_width = width
@@ -920,12 +955,22 @@ class ROMWorkflowController(QObject):
         self.current_sprite_name = sprite_name
         self.original_compressed_size = compressed_size
         self.available_slack = slack_size
+        self.hal_decompression_succeeded = hal_succeeded
+
+        # Clear loading state
+        self._preview_pending = False
+        if self._view:
+            self._view.source_bar.set_action_loading(False)
+            self._view.source_bar.set_action_text("Open in Editor")
 
         if self._view:
-            slack_info = f" (+{slack_size} slack)" if slack_size > 0 else ""
-            msg = f"Sprite found! Original size: {compressed_size} bytes{slack_info}"
-            if offset_adjusted:
-                msg += f" (Aligned to 0x{actual_offset:06X})"
+            if hal_succeeded:
+                slack_info = f" (+{slack_size} slack)" if slack_size > 0 else ""
+                msg = f"Sprite found! Original size: {compressed_size} bytes{slack_info}"
+                if offset_adjusted:
+                    msg += f" (Aligned to 0x{actual_offset:06X})"
+            else:
+                msg = "Raw data preview (HAL decompression failed). Cannot inject at this offset."
 
             if self._message_service:
                 self._message_service.show_message(msg)
@@ -933,13 +978,31 @@ class ROMWorkflowController(QObject):
         # Auto-open in editor if triggered by double-click
         logger.debug(f"[PREVIEW] Checking flag: _pending_open_in_editor={self._pending_open_in_editor}")
         if self._pending_open_in_editor:
-            logger.debug("[PREVIEW] Flag is True, calling open_in_editor()")
-            self._pending_open_in_editor = False
-            self.open_in_editor()
+            # Only auto-open if offset matches (prevents stale opens after errors/navigation)
+            if self._pending_open_offset == -1 or self._pending_open_offset == actual_offset:
+                logger.debug("[PREVIEW] Flag is True and offset matches, calling open_in_editor()")
+                self._pending_open_in_editor = False
+                self._pending_open_offset = -1
+                self.open_in_editor()
+            else:
+                logger.debug(
+                    f"[PREVIEW] Offset mismatch: pending=0x{self._pending_open_offset:X} "
+                    f"vs actual=0x{actual_offset:X}, clearing flag"
+                )
+                self._pending_open_in_editor = False
+                self._pending_open_offset = -1
 
     def _on_preview_error(self, error_msg: str) -> None:
         """Handle preview error."""
         self.current_tile_data = None
+        # Clear pending flags to prevent stale auto-opens after errors
+        self._pending_open_in_editor = False
+        self._pending_open_offset = -1
+        # Clear loading state
+        self._preview_pending = False
+        if self._view:
+            self._view.source_bar.set_action_loading(False)
+            self._view.source_bar.set_action_text("Open in Editor")
         if self._message_service:
             self._message_service.show_message(f"Preview error: {error_msg}")
 

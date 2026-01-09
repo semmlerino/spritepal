@@ -112,8 +112,8 @@ class TestSmartPreviewMemoryCache:
 
     def test_memory_cache_hit(self, coordinator):
         """Test memory cache hit returns cached data."""
-        # Cache format: (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset)
-        cached_data = (b"test_tile_data\x01\x02", 16, 16, "test_sprite", 100, 0, 0x8000)
+        # Cache format: (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded)
+        cached_data = (b"test_tile_data\x01\x02", 16, 16, "test_sprite", 100, 0, 0x8000, True)
 
         # Setup memory cache to return valid data
         coordinator._cache.get.return_value = cached_data
@@ -134,8 +134,8 @@ class TestSmartPreviewMemoryCache:
     def test_invalid_cached_data_removed(self, coordinator):
         """Test that all-zero cached data is removed from cache."""
         # Setup memory cache to return all-zeros data (invalid)
-        # Cache format: (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset)
-        cached_data = (b"\x00" * 100, 16, 16, "test_sprite", 100, 0, 0x8000)
+        # Cache format: (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded)
+        cached_data = (b"\x00" * 100, 16, 16, "test_sprite", 100, 0, 0x8000, True)
         coordinator._cache.get.return_value = cached_data
 
         result = coordinator._try_show_cached_preview()
@@ -171,14 +171,18 @@ class TestSmartPreviewMemoryCache:
         compressed_size = 75
         slack_size = 0
 
-        # Simulate worker callback (includes slack_size as 7th arg)
-        coordinator._on_worker_preview_ready(1, tile_data, width, height, sprite_name, compressed_size, slack_size)
+        # Simulate worker callback (includes slack_size and hal_succeeded)
+        coordinator._on_worker_preview_ready(
+            1, tile_data, width, height, sprite_name, compressed_size, slack_size, -1, True
+        )
 
         # Should cache the result
         coordinator._cache.put.assert_called_once()
         call_args = coordinator._cache.put.call_args
-        # Cache format: (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset)
-        assert call_args[0][1] == (tile_data, width, height, sprite_name, compressed_size, slack_size, 0x8000)
+        # Cache format: (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded)
+        assert call_args[0][1] == (
+            tile_data, width, height, sprite_name, compressed_size, slack_size, 0x8000, True
+        )
 
     def test_stale_preview_not_cached(self, coordinator):
         """Test that stale preview results are not processed."""

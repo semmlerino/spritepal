@@ -101,11 +101,11 @@ class SmartPreviewCoordinator(QObject):
 
     # Signals for preview updates
     preview_ready = Signal(
-        bytes, int, int, str, int, int, int
-    )  # tile_data, width, height, name, compressed_size, slack_size, actual_offset
+        bytes, int, int, str, int, int, int, bool
+    )  # tile_data, width, height, name, compressed_size, slack_size, actual_offset, hal_succeeded
     preview_cached = Signal(
-        bytes, int, int, str, int, int, int
-    )  # Cached preview displayed, with compressed_size, slack_size, actual_offset
+        bytes, int, int, str, int, int, int, bool
+    )  # Cached preview displayed, with compressed_size, slack_size, actual_offset, hal_succeeded
     preview_error = Signal(str)  # Error message
 
     def __init__(self, parent: QObject | None = None):
@@ -376,19 +376,26 @@ class SmartPreviewCoordinator(QObject):
             cache_key = self._cache.make_key(rom_path, offset)
             cached_data = self._cache.get(cache_key)
 
-            # cached_data is never None, but might be empty (b"", 0, 0, None, 0, 0, -1)
+            # cached_data is never None, but might be empty (b"", 0, 0, None, 0, 0, -1, True)
             if cached_data and cached_data[0]:  # Check if tile_data is not empty
-                # Unpack all 7 elements (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset)
-                tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset = cached_data
+                # Unpack all 8 elements (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded)
+                # Old cache entries with 7 elements will fail to unpack and be invalidated
+                if len(cached_data) != 8:
+                    # Invalidate old-format cache entry
+                    self._cache.remove(cache_key)
+                    return False
+                tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded = cached_data
 
                 if _validate_tile_data(tile_data):
-                    logger.debug(f"Cache hit for 0x{offset:06X}: {len(tile_data)} bytes")
+                    logger.debug(f"Cache hit for 0x{offset:06X}: {len(tile_data)} bytes (hal: {hal_succeeded})")
                     # Emit both signals: preview_cached for statistics, preview_ready for data consumers
                     self.preview_cached.emit(
-                        tile_data, width, height, sprite_name or "", compressed_size, slack_size, actual_offset
+                        tile_data, width, height, sprite_name or "", compressed_size, slack_size,
+                        actual_offset, hal_succeeded
                     )
                     self.preview_ready.emit(
-                        tile_data, width, height, sprite_name or "", compressed_size, slack_size, actual_offset
+                        tile_data, width, height, sprite_name or "", compressed_size, slack_size,
+                        actual_offset, hal_succeeded
                     )
                     return True
 
@@ -449,6 +456,7 @@ class SmartPreviewCoordinator(QObject):
         compressed_size: int,
         slack_size: int = 0,
         actual_offset: int = -1,
+        hal_succeeded: bool = True,
     ) -> None:
         """Handle preview ready from worker."""
         # Use current offset if actual_offset not provided (backward compat)
@@ -458,7 +466,8 @@ class SmartPreviewCoordinator(QObject):
 
         logger.debug(
             f"[COORD] Received worker preview: request_id={request_id}, sprite_name={sprite_name}, "
-            f"current_counter={self._request_counter}, slack_size={slack_size}, actual_offset=0x{actual_offset:X}"
+            f"current_counter={self._request_counter}, slack_size={slack_size}, "
+            f"actual_offset=0x{actual_offset:X}, hal_succeeded={hal_succeeded}"
         )
         # Check if this is still the current request
         with QMutexLocker(self._mutex):
@@ -473,23 +482,30 @@ class SmartPreviewCoordinator(QObject):
                 if provider_result is None:
                     # Emit result even if caching fails
                     self.preview_ready.emit(
-                        tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset
+                        tile_data, width, height, sprite_name, compressed_size, slack_size,
+                        actual_offset, hal_succeeded
                     )
                     return
                 rom_path, _ = provider_result
-                preview_data = (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset)
+                preview_data = (
+                    tile_data, width, height, sprite_name, compressed_size, slack_size,
+                    actual_offset, hal_succeeded
+                )
 
                 # Save to memory cache
                 cache_key = self._cache.make_key(rom_path, self._current_offset)
                 self._cache.put(cache_key, preview_data)
                 logger.debug(
-                    f"Cached preview for 0x{self._current_offset:06X}: {len(tile_data)} bytes (slack: {slack_size})"
+                    f"Cached preview for 0x{self._current_offset:06X}: {len(tile_data)} bytes "
+                    f"(slack: {slack_size}, hal: {hal_succeeded})"
                 )
             except Exception as e:
                 logger.warning(f"Error caching preview: {e}")
 
-        logger.debug(f"[COORD] Forwarding preview_ready: sprite_name={sprite_name}")
-        self.preview_ready.emit(tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset)
+        logger.debug(f"[COORD] Forwarding preview_ready: sprite_name={sprite_name}, hal_succeeded={hal_succeeded}")
+        self.preview_ready.emit(
+            tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded
+        )
 
     def _on_worker_preview_error(self, request_id: int, error_msg: str) -> None:
         """Handle preview error from worker."""
