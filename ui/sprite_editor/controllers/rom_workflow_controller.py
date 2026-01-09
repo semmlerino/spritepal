@@ -455,6 +455,13 @@ class ROMWorkflowController(QObject):
                 self._message_service.show_message(f"Error: ROM file not found: {path}")
             return
 
+        # Clear previous state to prevent stale captures/sprites from appearing in new ROM
+        if self.log_watcher:
+            self.log_watcher.clear_history()
+
+        if self._view:
+            self._view.asset_browser.clear_all()
+
         self.rom_path = path
         self.rom_size = rom_path.stat().st_size
 
@@ -871,11 +878,41 @@ class ROMWorkflowController(QObject):
         return (self.rom_path, self.rom_extractor)
 
     def _on_preview_ready(
-        self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int, slack_size: int = 0
+        self,
+        tile_data: bytes,
+        width: int,
+        height: int,
+        sprite_name: str,
+        compressed_size: int,
+        slack_size: int = 0,
+        actual_offset: int = -1,
     ) -> None:
         """Handle preview ready from coordinator."""
+        # Use current offset if actual_offset not provided
+        if actual_offset == -1:
+            actual_offset = self.current_offset
+
+        # Check if offset was adjusted during preview (e.g. alignment correction)
+        offset_adjusted = actual_offset != self.current_offset
+        if offset_adjusted:
+            logger.info(
+                f"[PREVIEW] Offset adjusted from 0x{self.current_offset:06X} to 0x{actual_offset:06X} "
+                f"(delta: {actual_offset - self.current_offset:+d})"
+            )
+            # Update current offset to match reality
+            self.current_offset = actual_offset
+            # Update UI
+            if self._view:
+                self._view.source_bar.set_offset(actual_offset)
+                if self._message_service:
+                    self._message_service.show_message(
+                        f"Aligned to valid sprite at 0x{actual_offset:06X} "
+                        f"(adjusted by {actual_offset - self.current_offset:+d} bytes)"
+                    )
+
         logger.debug(
-            f"[PREVIEW] _on_preview_ready called: {len(tile_data)} bytes, {width}x{height}, pending_open={self._pending_open_in_editor}"
+            f"[PREVIEW] _on_preview_ready called: {len(tile_data)} bytes, {width}x{height}, "
+            f"pending_open={self._pending_open_in_editor}, offset=0x{actual_offset:06X}"
         )
         self.current_tile_data = tile_data
         self.current_width = width
@@ -886,8 +923,12 @@ class ROMWorkflowController(QObject):
 
         if self._view:
             slack_info = f" (+{slack_size} slack)" if slack_size > 0 else ""
+            msg = f"Sprite found! Original size: {compressed_size} bytes{slack_info}"
+            if offset_adjusted:
+                msg += f" (Aligned to 0x{actual_offset:06X})"
+
             if self._message_service:
-                self._message_service.show_message(f"Sprite found! Original size: {compressed_size} bytes{slack_info}")
+                self._message_service.show_message(msg)
 
         # Auto-open in editor if triggered by double-click
         logger.debug(f"[PREVIEW] Checking flag: _pending_open_in_editor={self._pending_open_in_editor}")

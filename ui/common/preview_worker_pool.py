@@ -330,9 +330,12 @@ class PooledPreviewWorker(SpritePreviewWorker):
         # Emit success
         logger.debug(
             f"[WORKER] Emitting preview_ready: request_id={request_id}, "
-            f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}, sprite_name={self.sprite_name}, compressed_size={compressed_size}, slack_size={slack_size}"
+            f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}, sprite_name={self.sprite_name}, "
+            f"compressed_size={compressed_size}, slack_size={slack_size}, actual_offset=0x{self.offset:X}"
         )
-        self.preview_ready.emit(request_id, tile_data, width, height, self.sprite_name, compressed_size, slack_size)
+        self.preview_ready.emit(
+            request_id, tile_data, width, height, self.sprite_name, compressed_size, slack_size, self.offset
+        )
         logger.debug("[TRACE] PoolWorker emitted preview_ready signal")
 
 
@@ -349,8 +352,8 @@ class PreviewWorkerPool(QObject):
 
     # Signals for completed previews
     preview_ready = Signal(
-        int, bytes, int, int, str, int, int
-    )  # request_id, tile_data, width, height, name, compressed_size, slack_size
+        int, bytes, int, int, str, int, int, int
+    )  # request_id, tile_data, width, height, name, compressed_size, slack_size, actual_offset
     preview_error = Signal(int, str)  # request_id, error_msg
 
     def __init__(self, max_workers: int = 2, idle_timeout: int = 30000):
@@ -522,13 +525,17 @@ class PreviewWorkerPool(QObject):
         sprite_name: str,
         compressed_size: int,
         slack_size: int,
+        actual_offset: int,
     ) -> None:
         """Handle worker preview ready."""
         logger.debug(
             f"[TRACE] Worker pool received preview: request_id={request_id}, "
-            f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}, compressed_size={compressed_size}, slack_size={slack_size}"
+            f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}, "
+            f"compressed_size={compressed_size}, slack_size={slack_size}, actual_offset=0x{actual_offset:X}"
         )
-        self.preview_ready.emit(request_id, tile_data, width, height, sprite_name, compressed_size, slack_size)
+        self.preview_ready.emit(
+            request_id, tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset
+        )
         logger.debug("[TRACE] Worker pool emitted preview_ready signal")
 
     def _on_worker_error(self, request_id: int, error_msg: str) -> None:

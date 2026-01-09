@@ -1,7 +1,10 @@
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
+
 
 def test_open_in_editor_uses_extracted_palette(qtbot):
     """Verify that open_in_editor attempts to extract palette from ROM."""

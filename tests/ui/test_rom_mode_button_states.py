@@ -1,7 +1,9 @@
 
 import pytest
 from PySide6.QtWidgets import QWidget
+
 from ui.sprite_editor.views.workspaces.rom_workflow_page import ROMWorkflowPage
+
 
 def test_ready_for_inject_hidden_in_rom_mode(qtbot):
     """Verify that 'Ready for Inject' button is hidden in ROM workflow page."""
@@ -24,7 +26,8 @@ def test_ready_for_inject_hidden_in_rom_mode(qtbot):
 
     # Mock controller to trigger enablement
     from unittest.mock import MagicMock
-    from PySide6.QtCore import Signal, QObject
+
+    from PySide6.QtCore import QObject, Signal
 
     class MockController(QObject):
         imageChanged = Signal()

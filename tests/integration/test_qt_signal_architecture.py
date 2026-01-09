@@ -111,8 +111,8 @@ class TestQtSignalArchitecture:
     def test_signal_connection_with_managers(self, app, signal_capture):
         """Test that signal connections work correctly with CoreOperationsManager."""
         # Create real managers
-        injection_mgr = CoreOperationsManager()
-        extraction_mgr = CoreOperationsManager()
+        injection_mgr = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
+        extraction_mgr = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
 
         # Connect signal capture to manager signals
         injection_mgr.injection_progress.connect(signal_capture.capture)
@@ -138,7 +138,7 @@ class TestQtSignalArchitecture:
         """Test that concrete managers comply with protocols via duck typing"""
         # Test InjectionManager compliance via duck typing
         # (Protocols aren't @runtime_checkable, so use hasattr checks)
-        injection_mgr = CoreOperationsManager()
+        injection_mgr = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
 
         # Verify injection signals exist on CoreOperationsManager
         injection_signals = ["injection_progress", "injection_finished", "compression_info"]
@@ -148,7 +148,7 @@ class TestQtSignalArchitecture:
             assert isinstance(signal, Signal), f"{signal_name} is not a Signal"
 
         # Test ExtractionManager compliance via duck typing
-        extraction_mgr = CoreOperationsManager()
+        extraction_mgr = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
 
         # Verify extraction signals exist on CoreOperationsManager
         extraction_signals = ["extraction_progress", "cache_saved", "preview_generated"]
@@ -159,7 +159,7 @@ class TestQtSignalArchitecture:
 
     def test_thread_safety_signal_emission(self, app, signal_capture):
         """Test that signals work correctly across thread boundaries"""
-        manager = CoreOperationsManager()
+        manager = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
         manager.injection_progress.connect(signal_capture.capture)
 
         # Define worker thread function
@@ -182,7 +182,7 @@ class TestQtSignalArchitecture:
 
     def test_signal_parameter_types(self, app, signal_capture):
         """Test that signal parameters are passed correctly with proper types"""
-        manager = CoreOperationsManager()
+        manager = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
 
         # Test different signal parameter types
         # Note: Qt signal/slot mechanism converts tuples to lists in dict values
@@ -206,7 +206,7 @@ class TestQtSignalArchitecture:
 
     def test_signal_cleanup_on_deletion(self, app):
         """Test that signals are properly cleaned up when objects are deleted"""
-        manager = CoreOperationsManager()
+        manager = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
 
         # Create a receiver object
         receiver = SignalCapture()
@@ -226,7 +226,7 @@ class TestQtSignalArchitecture:
     def test_casting_preserves_functionality(self, app, mock_factory):
         """Test that casting to protocol and back preserves all functionality"""
         # Create concrete manager
-        concrete_mgr = CoreOperationsManager()
+        concrete_mgr = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
 
         # Reference as same type (protocols removed - CoreOperationsManager used directly)
         protocol_mgr: CoreOperationsManager = concrete_mgr
@@ -248,7 +248,7 @@ class TestQtSignalArchitecture:
 
     def test_error_handling_with_signals(self, app, signal_capture):
         """Test signal behavior during error conditions"""
-        manager = CoreOperationsManager()
+        manager = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
         manager.error_occurred.connect(signal_capture.capture)
 
         # Emit error signal directly (there's no _emit_error helper method)
@@ -260,7 +260,7 @@ class TestQtSignalArchitecture:
 
     def test_concurrent_signal_emissions(self, app, signal_capture):
         """Test concurrent signal emissions from multiple threads"""
-        manager = CoreOperationsManager()
+        manager = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
         manager.extraction_progress.connect(signal_capture.capture)
 
         num_threads = 5
@@ -306,7 +306,7 @@ class TestQtSignalArchitecture:
 
     def test_signal_disconnection(self, app, signal_capture):
         """Test proper signal disconnection"""
-        manager = CoreOperationsManager()
+        manager = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
 
         # Connect signal
         manager.injection_progress.connect(signal_capture.capture)
@@ -510,7 +510,7 @@ class TestPerformanceImpact:
         """Test signal delivery performance across threads"""
         import statistics
 
-        manager = CoreOperationsManager()
+        manager = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
 
         # Measure signal delivery times
         delivery_times = []

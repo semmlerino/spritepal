@@ -638,7 +638,7 @@ class TestHALToolDetection:
     @pytest.fixture(autouse=True)
     def setup_detection(self, save_restore_cwd):
         """Set up test environment for detection tests."""
-        self.spritepal_dir = Path(__file__).parent.parent
+        self.spritepal_dir = Path(__file__).parent.parent.parent
         self.tools_dir = self.spritepal_dir / "tools"
         self.exe_suffix = ".exe" if platform.system() == "Windows" else ""
         self.exhal_name = f"exhal{self.exe_suffix}"
