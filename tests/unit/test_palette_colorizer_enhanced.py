@@ -4,10 +4,9 @@ Enhanced tests for PaletteColorizer
 
 from __future__ import annotations
 
-from unittest.mock import Mock
-
 import pytest
 from PIL import Image
+from PySide6.QtTest import QSignalSpy
 
 from ui.row_arrangement.palette_colorizer import PaletteColorizer
 
@@ -65,12 +64,12 @@ class TestPaletteColorizerEnhanced:
             (255, 255, 255),
         ]
 
-    def test_palette_mode_toggle(self):
+    def test_palette_mode_toggle(self, qtbot):
         """Test palette mode toggling"""
         colorizer = PaletteColorizer()
 
-        # Mock signal emission
-        colorizer.palette_mode_changed = Mock()
+        # Listen to actual signal emissions
+        spy = QSignalSpy(colorizer.palette_mode_changed)
 
         # Initially disabled
         assert colorizer.is_palette_mode() is False
@@ -79,42 +78,45 @@ class TestPaletteColorizerEnhanced:
         result = colorizer.toggle_palette_mode()
         assert result is True
         assert colorizer.is_palette_mode() is True
-        colorizer.palette_mode_changed.emit.assert_called_once_with(True)
+        assert spy.count() == 1
+        assert spy.at(0)[0] is True
 
         # Toggle off
         result = colorizer.toggle_palette_mode()
         assert result is False
         assert colorizer.is_palette_mode() is False
-        colorizer.palette_mode_changed.emit.assert_called_with(False)
+        assert spy.count() == 2
+        assert spy.at(1)[0] is False
 
-    def test_palette_selection(self):
+    def test_palette_selection(self, qtbot):
         """Test palette selection"""
         colorizer = PaletteColorizer()
 
-        # Mock signal emission
-        colorizer.palette_index_changed = Mock()
+        # Listen to actual signal emissions
+        spy = QSignalSpy(colorizer.palette_index_changed)
 
         # Test setting palette index
         colorizer.set_selected_palette(10)
         assert colorizer.get_selected_palette_index() == 10
-        colorizer.palette_index_changed.emit.assert_called_once_with(10)
+        assert spy.count() == 1
+        assert spy.at(0)[0] == 10
 
         # Test setting same palette index (should not emit signal)
-        colorizer.palette_index_changed.reset_mock()
         colorizer.set_selected_palette(10)
-        colorizer.palette_index_changed.emit.assert_not_called()
+        assert spy.count() == 1  # Still 1, no new emission
 
         # Test setting different palette index
         colorizer.set_selected_palette(12)
         assert colorizer.get_selected_palette_index() == 12
-        colorizer.palette_index_changed.emit.assert_called_once_with(12)
+        assert spy.count() == 2
+        assert spy.at(1)[0] == 12
 
-    def test_palette_cycling(self):
+    def test_palette_cycling(self, qtbot):
         """Test palette cycling functionality"""
         colorizer = PaletteColorizer()
 
-        # Mock signal emission
-        colorizer.palette_index_changed = Mock()
+        # Listen to actual signal emissions
+        spy = QSignalSpy(colorizer.palette_index_changed)
 
         # Test cycling with no palettes
         initial_index = colorizer.get_selected_palette_index()
@@ -131,13 +133,14 @@ class TestPaletteColorizerEnhanced:
 
         # Start at palette 8
         colorizer.set_selected_palette(8)
-        colorizer.palette_index_changed.reset_mock()
+        signal_count_before = spy.count()
 
         # Cycle to next palette
         result = colorizer.cycle_palette()
         assert result == 10
         assert colorizer.get_selected_palette_index() == 10
-        colorizer.palette_index_changed.emit.assert_called_once_with(10)
+        assert spy.count() == signal_count_before + 1
+        assert spy.at(spy.count() - 1)[0] == 10
 
         # Cycle to next palette
         result = colorizer.cycle_palette()
@@ -492,30 +495,33 @@ class TestPaletteColorizerEnhanced:
         # Cache should be cleared
         assert len(colorizer._colorized_cache) == 0
 
-    def test_signal_emissions(self):
+    def test_signal_emissions(self, qtbot):
         """Test that signals are emitted correctly"""
         colorizer = PaletteColorizer()
 
-        # Mock signals
-        colorizer.palette_mode_changed = Mock()
-        colorizer.palette_index_changed = Mock()
+        # Listen to actual signal emissions
+        mode_spy = QSignalSpy(colorizer.palette_mode_changed)
+        index_spy = QSignalSpy(colorizer.palette_index_changed)
 
         # Test palette mode change signal
         colorizer.toggle_palette_mode()
-        colorizer.palette_mode_changed.emit.assert_called_once_with(True)
+        assert mode_spy.count() == 1
+        assert mode_spy.at(0)[0] is True
 
         # Test palette index change signal
         colorizer.set_selected_palette(10)
-        colorizer.palette_index_changed.emit.assert_called_once_with(10)
+        assert index_spy.count() == 1
+        assert index_spy.at(0)[0] == 10
 
         # Test cycling signal
         test_palettes = {8: [(0, 0, 0), (255, 0, 0)], 9: [(0, 0, 0), (0, 255, 0)]}
         colorizer.set_palettes(test_palettes)
         colorizer.set_selected_palette(8)
-        colorizer.palette_index_changed.reset_mock()
+        index_count_before = index_spy.count()
 
         colorizer.cycle_palette()
-        colorizer.palette_index_changed.emit.assert_called_once_with(9)
+        assert index_spy.count() == index_count_before + 1
+        assert index_spy.at(index_spy.count() - 1)[0] == 9
 
     def test_comprehensive_workflow(self):
         """Test comprehensive colorizer workflow"""

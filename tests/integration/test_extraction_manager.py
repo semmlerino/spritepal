@@ -140,12 +140,10 @@ class TestExtractionManager:
         # Context should handle lifecycle automatically
         assert manager._sprite_extractor is not None
 
-    def test_validate_extraction_params_vram_real_files_tdd(self, app_context, test_data_repo):
-        """TDD: VRAM parameter validation should work with real file structures.
+    def test_validate_extraction_params_vram_real_files_succeeds(self, app_context, test_data_repo):
+        """VRAM parameter validation should succeed with valid test data.
 
-        RED: Test parameter validation with actual VRAM/CGRAM/OAM files
-        GREEN: Verify validation logic handles real file formats correctly
-        REFACTOR: Use consistent test data instead of temporary fake files
+        Tests the success path: valid files should pass validation.
         """
         manager = app_context.core_operations_manager
 
@@ -160,37 +158,42 @@ class TestExtractionManager:
             "oam_path": vram_data["oam_path"],
         }
 
-        try:
-            # Test real parameter validation
-            manager.validate_extraction_params(params)
+        # Validation should succeed with valid files
+        result = manager.validate_extraction_params(params)
+        assert result is True
 
-            # Verify all required files exist
-            assert Path(params["vram_path"]).exists()
-            assert Path(params["cgram_path"]).exists()
-            assert Path(params["oam_path"]).exists()
+        # Verify all required files exist
+        assert Path(params["vram_path"]).exists()
+        assert Path(params["cgram_path"]).exists()
+        assert Path(params["oam_path"]).exists()
 
-            # Verify file sizes are reasonable
-            vram_size = Path(params["vram_path"]).stat().st_size
-            cgram_size = Path(params["cgram_path"]).stat().st_size
-            oam_size = Path(params["oam_path"]).stat().st_size
+        # Verify file sizes are reasonable
+        vram_size = Path(params["vram_path"]).stat().st_size
+        cgram_size = Path(params["cgram_path"]).stat().st_size
+        oam_size = Path(params["oam_path"]).stat().st_size
 
-            assert vram_size >= 0x8000  # At least 32KB VRAM
-            assert cgram_size >= 512  # At least 512 bytes CGRAM
-            assert oam_size >= 544  # At least 544 bytes OAM
+        assert vram_size >= 0x8000  # At least 32KB VRAM
+        assert cgram_size >= 512  # At least 512 bytes CGRAM
+        assert oam_size >= 544  # At least 544 bytes OAM
 
-        except ValidationError as e:
-            # Real validation may be stricter - this is valuable test feedback
-            # Log the error for debugging but don't skip
-            print(f"Note: Real validation error encountered: {e}")
-            # The validation error itself is a valid test result
-            # Note: ValidationError doesn't have error_type attribute
-            assert isinstance(e, ValidationError)
+    def test_validate_extraction_params_vram_rejects_missing_output(self, app_context, test_data_repo):
+        """VRAM validation should reject params missing required output_base."""
+        manager = app_context.core_operations_manager
 
-        # Test missing required param
-        invalid_params = params.copy()
-        del invalid_params["output_base"]
+        # Get real VRAM extraction test data
+        vram_data = test_data_repo.get_vram_extraction_data("medium")
+
+        # Valid params with real files, then remove required field
+        params = {
+            "vram_path": vram_data["vram_path"],
+            "output_base": vram_data["output_base"],
+            "cgram_path": vram_data["cgram_path"],
+            "oam_path": vram_data["oam_path"],
+        }
+        del params["output_base"]
+
         with pytest.raises(ValidationError, match="Missing required parameters"):
-            manager.validate_extraction_params(invalid_params)
+            manager.validate_extraction_params(params)
 
     def test_validate_extraction_params_rom(self, manager, temp_files):
         """Test ROM extraction parameter validation"""
@@ -214,53 +217,38 @@ class TestExtractionManager:
         with pytest.raises(ValidationError, match="offset must be >= 0"):
             manager.validate_extraction_params(invalid_params)
 
-    def test_extract_from_vram_real_workflow_tdd(self, app_context, test_data_repo, qtbot):
-        """TDD: VRAM extraction should create real image files from VRAM data.
+    def test_extract_from_vram_real_workflow_creates_files(self, app_context, test_data_repo, qtbot):
+        """VRAM extraction should create real image files from valid VRAM data.
 
-        RED: Test complete VRAM extraction workflow with real files
-        GREEN: Verify real image generation with proper format and dimensions
-        REFACTOR: Use test data repository for consistent, realistic test data
+        Tests the success path: valid VRAM data produces valid image output.
         """
         manager = app_context.core_operations_manager
 
         # Get real VRAM extraction test data
         vram_data = test_data_repo.get_vram_extraction_data("medium")
 
-        try:
-            # Test real VRAM extraction workflow
-            files = manager.extract_from_vram(
-                vram_data["vram_path"],
-                vram_data["output_base"],
-                grayscale_mode=True,  # Simplified for reliable testing
-            )
+        # Test real VRAM extraction workflow - should succeed
+        files = manager.extract_from_vram(
+            vram_data["vram_path"],
+            vram_data["output_base"],
+            grayscale_mode=True,  # Simplified for reliable testing
+        )
 
-            # Verify real extraction created actual files
-            assert len(files) >= 1
-            output_png = f"{vram_data['output_base']}.png"
-            assert output_png in files
-            assert Path(output_png).exists()
+        # Verify real extraction created actual files
+        assert len(files) >= 1
+        output_png = f"{vram_data['output_base']}.png"
+        assert output_png in files
+        assert Path(output_png).exists()
 
-            # Verify the extracted image is real with reasonable properties
-            with Image.open(output_png) as img:
-                assert img.mode in ["L", "P", "RGBA"]  # Valid image modes
-                assert img.size[0] > 0 and img.size[1] > 0
-                assert img.size[0] * img.size[1] >= 64  # Reasonable minimum size
+        # Verify the extracted image is real with reasonable properties
+        with Image.open(output_png) as img:
+            assert img.mode in ["L", "P", "RGBA"]  # Valid image modes
+            assert img.size[0] > 0 and img.size[1] > 0
+            assert img.size[0] * img.size[1] >= 64  # Reasonable minimum size
 
-                # Verify file has real image data (not just empty)
-                img_bytes = img.tobytes()
-                assert len(img_bytes) > 0
-
-        except ExtractionError as e:
-            # Real extraction may find issues with test data - this is valuable
-            print(f"Note: Real extraction found issue: {e}")
-            # The extraction error is a valid test result
-            # Note: ExtractionError doesn't have error_type attribute
-            assert isinstance(e, ExtractionError)
-        except Exception as e:
-            # Document any other real issues found
-            print(f"Note: Real workflow found issue: {e}")
-            # Re-raise unexpected exceptions for debugging
-            raise
+            # Verify file has real image data (not just empty)
+            img_bytes = img.tobytes()
+            assert len(img_bytes) > 0
 
     def test_extract_from_vram_validation_error(self, manager):
         """Test VRAM extraction with validation error"""
@@ -281,12 +269,10 @@ class TestExtractionManager:
         # Clean up
         manager._finish_operation("vram_extraction")
 
-    def test_extract_from_rom_real_workflow_validation_tdd(self, app_context, test_data_repo):
-        """TDD: ROM extraction should validate complete workflow parameters.
+    def test_extract_from_rom_real_workflow_validation_succeeds(self, app_context, test_data_repo):
+        """ROM extraction parameter validation should succeed with valid data.
 
-        RED: Test ROM extraction parameter validation with real ROM structure
-        GREEN: Verify parameters are properly validated for real ROM files
-        REFACTOR: Use test data repository instead of fixtures for consistency
+        Tests the success path: valid ROM parameters pass validation.
         """
         manager = app_context.core_operations_manager
 
@@ -300,76 +286,51 @@ class TestExtractionManager:
             "output_base": rom_data["output_base"],
         }
 
-        try:
-            # This tests real parameter validation logic
-            manager.validate_extraction_params(test_params)
+        # Validation should succeed with valid parameters
+        result = manager.validate_extraction_params(test_params)
+        assert result is True
 
-            # Verify the parameters are well-formed for real ROM extraction
-            assert Path(test_params["rom_path"]).exists()
-            assert test_params["offset"] >= 0
-            assert isinstance(test_params["output_base"], str)
+        # Verify the parameters are well-formed for real ROM extraction
+        assert Path(test_params["rom_path"]).exists()
+        assert test_params["offset"] >= 0
+        assert isinstance(test_params["output_base"], str)
 
-            # Verify ROM file has reasonable size
-            rom_size = Path(test_params["rom_path"]).stat().st_size
-            assert rom_size >= 0x80000  # At least 512KB
+        # Verify ROM file has reasonable size
+        rom_size = Path(test_params["rom_path"]).stat().st_size
+        assert rom_size >= 0x80000  # At least 512KB
 
-            # Test that offset is within ROM bounds
-            assert test_params["offset"] < rom_size
-
-        except ValidationError as e:
-            # Real ROM validation may be stricter - this is valuable feedback
-            print(f"Note: Real ROM validation found issue: {e}")
-            # The validation error is a valid test result
-            # Note: ValidationError doesn't have error_type attribute
-            assert isinstance(e, ValidationError)
+        # Test that offset is within ROM bounds
+        assert test_params["offset"] < rom_size
 
     def test_extract_from_rom_validation_error(self, manager):
         """Test ROM extraction with validation error"""
         with pytest.raises(ValidationError):
             manager.extract_from_rom("/non/existent/rom.sfc", 0x1000, "/output/test", "sprite")
 
-    def test_get_sprite_preview_real_rom_data_tdd(self, app_context, test_data_repo):
-        """TDD: Sprite preview should generate real tile data from ROM files.
+    def test_get_sprite_preview_real_rom_data_returns_valid_structure(self, app_context, test_data_repo):
+        """Sprite preview should generate valid tile data structure from ROM files.
 
-        RED: Test sprite preview generation with real ROM file structure
-        GREEN: Verify preview produces reasonable tile data dimensions
-        REFACTOR: Use test data repository for consistent ROM test files
+        Tests the success path: valid ROM data produces valid preview structure.
         """
         manager = app_context.core_operations_manager
 
         # Get real ROM test data
         rom_data = test_data_repo.get_rom_extraction_data("medium")
 
-        try:
-            # Test real sprite preview generation
-            tile_data, width, height = manager.get_sprite_preview(rom_data["rom_path"], 0x1000, "test_sprite")
+        # Test real sprite preview generation - should succeed
+        tile_data, width, height = manager.get_sprite_preview(rom_data["rom_path"], 0x1000, "test_sprite")
 
-            # Verify real tile data structure
-            assert isinstance(tile_data, bytes)
-            assert width > 0 and height > 0
-            assert width <= 512 and height <= 512  # Reasonable bounds
+        # Verify real tile data structure
+        assert isinstance(tile_data, bytes)
+        assert width > 0 and height > 0
+        assert width <= 512 and height <= 512  # Reasonable bounds
 
-            # Verify tile data size makes sense
-            expected_min_size = (width * height // 64) * BYTES_PER_TILE
-            assert len(tile_data) >= expected_min_size
+        # Verify tile data size makes sense
+        expected_min_size = (width * height // 64) * BYTES_PER_TILE
+        assert len(tile_data) >= expected_min_size
 
-            # Note: Synthetic test data may be all zeros - this is expected
-            # The key verification is that the API returns proper structure
-            if all(b == 0 for b in tile_data[: min(64, len(tile_data))]):
-                # This is fine for synthetic test data
-                pass
-
-        except ValidationError as e:
-            # Real ROM validation may find issues - this is valuable
-            print(f"Note: Real ROM validation found issue: {e}")
-            # The validation error is a valid test result
-            # Note: ValidationError doesn't have error_type attribute
-            assert isinstance(e, ValidationError)
-        except Exception as e:
-            # Document other real issues
-            print(f"Note: Real sprite preview found issue: {e}")
-            # Re-raise unexpected exceptions for debugging
-            raise
+        # Note: Synthetic test data may be all zeros - this is expected
+        # The key verification is that the API returns proper structure
 
     def test_get_sprite_preview_validation_error(self, manager):
         """Test sprite preview with validation error"""

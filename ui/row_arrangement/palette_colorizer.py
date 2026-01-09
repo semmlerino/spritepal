@@ -229,6 +229,26 @@ class PaletteColorizer(QObject):
         if self._colorized_cache:
             self._colorized_cache.clear()
 
+    def get_cache_stats(self) -> dict[str, int]:
+        """Get cache statistics.
+
+        Returns:
+            Dictionary with 'size' (current cache entries) and 'max_size' (limit).
+        """
+        return {
+            "size": len(self._colorized_cache),
+            "max_size": self._max_cache_size,
+        }
+
+    def set_max_cache_size(self, size: int) -> None:
+        """Set maximum cache size.
+
+        Args:
+            size: Maximum number of cached colorized images.
+        """
+        self._max_cache_size = size
+        self._enforce_cache_limit()
+
     def _enforce_cache_limit(self) -> None:
         """Enforce maximum cache size to prevent memory issues"""
         if len(self._colorized_cache) > self._max_cache_size:

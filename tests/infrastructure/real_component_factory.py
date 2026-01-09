@@ -175,6 +175,11 @@ class RealComponentFactory:
             settings_manager=ctx.application_state_manager,
             rom_cache=ctx.rom_cache,
             session_manager=ctx.application_state_manager,  # type: ignore[arg-type]  # Protocol vs concrete type mismatch
+            core_operations_manager=ctx.core_operations_manager,
+            log_watcher=ctx.log_watcher,
+            preview_generator=ctx.preview_generator,
+            rom_extractor=ctx.rom_extractor,
+            sprite_library=ctx.sprite_library,
         )
         self._created_components.append(window)
 

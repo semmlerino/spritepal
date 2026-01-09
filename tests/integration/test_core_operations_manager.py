@@ -42,20 +42,27 @@ class TestCoreOperationsManagerInit:
     """Tests for CoreOperationsManager initialization."""
 
     def test_init_creates_manager(self, manager):
-        """Manager should be initialized and ready."""
+        """Manager should be initialized and ready for operations."""
         assert manager is not None
-        assert manager._is_initialized is True
+        # Verify initialization by calling public method that requires it
+        stats = manager.get_cache_stats()
+        assert isinstance(stats, dict)
 
-    def test_manager_name(self, manager):
-        """Manager should have correct name."""
-        assert manager._name == "CoreOperationsManager"
+    def test_services_ready_for_extraction(self, manager, tmp_path):
+        """Core services should be initialized and ready for extraction operations."""
+        # Create valid test files
+        vram_file = tmp_path / "vram.dmp"
+        vram_file.write_bytes(b"\x00" * 0x10000)
 
-    def test_services_initialized(self, manager):
-        """Core services should be initialized after init."""
-        # Extractors and managers should be initialized
-        assert manager._sprite_extractor is not None
-        assert manager._palette_manager is not None
-        assert manager._rom_extractor is not None
+        # Validation requires all services to be initialized
+        # This proves extractors and managers are ready without accessing private attrs
+        params = {
+            "vram_path": str(vram_file),
+            "output_base": "test_output",
+            "grayscale_mode": True,
+        }
+        result = manager.validate_extraction_params(params)
+        assert result is True
 
 
 class TestExtractionValidation:

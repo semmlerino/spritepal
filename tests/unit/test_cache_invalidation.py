@@ -34,7 +34,7 @@ class TestROMCacheInvalidation:
         manager = MagicMock()
         manager.get_cache_enabled.return_value = True
         manager.get_cache_location.return_value = None
-        manager.get_cache_expiry_days.return_value = 30
+        manager.get_cache_expiration_days.return_value = 30  # Note: expiration not expiry
         return manager
 
     @pytest.fixture
@@ -62,17 +62,18 @@ class TestROMCacheInvalidation:
         save_result = rom_cache.save_sprite_locations(str(sample_rom), sprite_data)
         assert save_result is True, "Failed to save sprite locations"
 
-        # Verify cache exists by checking files directly
-        rom_hash = rom_cache._get_rom_hash(str(sample_rom))
-        cache_file = rom_cache.cache_dir / f"{rom_hash}_sprite_locations.json"
-        assert cache_file.exists(), "Cache file was not created"
+        # Verify cache exists by loading data (public API)
+        loaded_data = rom_cache.get_sprite_locations(str(sample_rom))
+        assert loaded_data is not None, "Cache data was not saved"
+        assert loaded_data.get("sprites") == sprite_data["sprites"]
 
         # Invalidate
         removed = rom_cache.invalidate_rom_cache(str(sample_rom))
-
-        # Verify cache file was deleted
         assert removed >= 1
-        assert not cache_file.exists(), "Cache file was not deleted"
+
+        # Verify cache is cleared (data no longer retrievable)
+        loaded_after = rom_cache.get_sprite_locations(str(sample_rom))
+        assert loaded_after is None, "Cache should be cleared after invalidation"
 
     def test_invalidate_clears_rom_info_cache(self, rom_cache, sample_rom: Path) -> None:
         """invalidate_rom_cache() clears rom_info cache."""
@@ -81,57 +82,61 @@ class TestROMCacheInvalidation:
         save_result = rom_cache.save_rom_info(str(sample_rom), rom_info)
         assert save_result is True, "Failed to save ROM info"
 
-        # Verify cache file exists
-        rom_hash = rom_cache._get_rom_hash(str(sample_rom))
-        cache_file = rom_cache.cache_dir / f"{rom_hash}_rom_info.json"
-        assert cache_file.exists(), "Cache file was not created"
+        # Verify cache exists by loading data (public API)
+        loaded_info = rom_cache.get_rom_info(str(sample_rom))
+        assert loaded_info is not None, "ROM info was not cached"
+        assert loaded_info.get("title") == "Test ROM"
 
         # Invalidate
         removed = rom_cache.invalidate_rom_cache(str(sample_rom))
-
-        # Verify cache file was deleted
         assert removed >= 1
-        assert not cache_file.exists(), "Cache file was not deleted"
+
+        # Verify cache is cleared (data no longer retrievable)
+        loaded_after = rom_cache.get_rom_info(str(sample_rom))
+        assert loaded_after is None, "ROM info should be cleared after invalidation"
 
     def test_invalidate_clears_preview_cache(self, rom_cache, sample_rom: Path) -> None:
         """invalidate_rom_cache() clears preview caches."""
         # Save some preview data
         preview_data = b"fake tile data"
+        test_offset = 0x1000
         save_result = rom_cache.save_preview_data(
-            str(sample_rom), offset=0x1000, tile_data=preview_data, width=8, height=8
+            str(sample_rom), offset=test_offset, tile_data=preview_data, width=8, height=8
         )
         assert save_result is True, "Failed to save preview data"
 
-        # Verify cache file exists
-        rom_hash = rom_cache._get_rom_hash(str(sample_rom))
-        preview_files = list(rom_cache.cache_dir.glob(f"{rom_hash}_preview_*.json"))
-        assert len(preview_files) > 0, "Preview cache file was not created"
+        # Verify cache exists by loading data (public API)
+        loaded_preview = rom_cache.get_preview_data(str(sample_rom), offset=test_offset)
+        assert loaded_preview is not None, "Preview data was not cached"
 
         # Invalidate
         removed = rom_cache.invalidate_rom_cache(str(sample_rom))
-
-        # Verify cache files were deleted
         assert removed >= 1
-        preview_files_after = list(rom_cache.cache_dir.glob(f"{rom_hash}_preview_*.json"))
-        assert len(preview_files_after) == 0, "Preview cache files were not deleted"
 
-    def test_invalidate_clears_hash_cache(self, rom_cache, sample_rom: Path) -> None:
-        """invalidate_rom_cache() clears in-memory hash cache entry."""
-        # Access ROM to populate hash cache
-        rom_cache._get_rom_hash(str(sample_rom))
+        # Verify cache is cleared (data no longer retrievable)
+        loaded_after = rom_cache.get_preview_data(str(sample_rom), offset=test_offset)
+        assert loaded_after is None, "Preview data should be cleared after invalidation"
 
-        # Verify hash is cached
-        with rom_cache._hash_cache_lock:
-            cached_keys = [k for k in rom_cache._hash_cache if k.startswith(str(sample_rom))]
-            assert len(cached_keys) > 0
+    def test_invalidate_can_be_called_multiple_times(self, rom_cache, sample_rom: Path) -> None:
+        """invalidate_rom_cache() can be called multiple times safely."""
+        # Save some data
+        rom_cache.save_sprite_locations(str(sample_rom), {"sprites": []})
+        assert rom_cache.get_sprite_locations(str(sample_rom)) is not None
 
-        # Invalidate
-        rom_cache.invalidate_rom_cache(str(sample_rom))
+        # First invalidation clears data
+        removed1 = rom_cache.invalidate_rom_cache(str(sample_rom))
+        assert removed1 >= 1
+        assert rom_cache.get_sprite_locations(str(sample_rom)) is None
 
-        # Verify hash cache was cleared
-        with rom_cache._hash_cache_lock:
-            cached_keys = [k for k in rom_cache._hash_cache if k.startswith(str(sample_rom))]
-            assert len(cached_keys) == 0
+        # Second invalidation is safe (no data to clear)
+        removed2 = rom_cache.invalidate_rom_cache(str(sample_rom))
+        assert removed2 == 0  # Nothing to remove
+
+        # Cache still works after invalidations
+        rom_cache.save_sprite_locations(str(sample_rom), {"sprites": [{"test": 1}]})
+        loaded = rom_cache.get_sprite_locations(str(sample_rom))
+        assert loaded is not None
+        assert loaded.get("sprites") == [{"test": 1}]
 
     def test_invalidate_does_not_affect_other_roms(self, rom_cache, sample_rom: Path, tmp_path: Path) -> None:
         """invalidate_rom_cache() only clears cache for specified ROM."""
@@ -140,25 +145,23 @@ class TestROMCacheInvalidation:
         other_rom.write_bytes(b"OTHER ROM DATA" * 1000)
 
         # Save caches for both ROMs
-        rom_cache.save_sprite_locations(str(sample_rom), {"sprites": []})
-        rom_cache.save_sprite_locations(str(other_rom), {"sprites": []})
+        rom_cache.save_sprite_locations(str(sample_rom), {"sprites": [{"name": "sample"}]})
+        rom_cache.save_sprite_locations(str(other_rom), {"sprites": [{"name": "other"}]})
         rom_cache.save_rom_info(str(sample_rom), {"title": "Sample"})
         rom_cache.save_rom_info(str(other_rom), {"title": "Other"})
 
-        # Verify both have cache files
-        sample_hash = rom_cache._get_rom_hash(str(sample_rom))
-        other_hash = rom_cache._get_rom_hash(str(other_rom))
-        sample_cache = rom_cache.cache_dir / f"{sample_hash}_sprite_locations.json"
-        other_cache = rom_cache.cache_dir / f"{other_hash}_sprite_locations.json"
-        assert sample_cache.exists()
-        assert other_cache.exists()
+        # Verify both have cached data
+        assert rom_cache.get_sprite_locations(str(sample_rom)) is not None
+        assert rom_cache.get_sprite_locations(str(other_rom)) is not None
 
         # Invalidate only sample_rom
         rom_cache.invalidate_rom_cache(str(sample_rom))
 
         # Verify sample_rom cache cleared but other_rom untouched
-        assert not sample_cache.exists()
-        assert other_cache.exists()
+        assert rom_cache.get_sprite_locations(str(sample_rom)) is None
+        other_data = rom_cache.get_sprite_locations(str(other_rom))
+        assert other_data is not None
+        assert other_data.get("sprites") == [{"name": "other"}]
 
     def test_invalidate_returns_zero_when_cache_disabled(self, tmp_path: Path) -> None:
         """invalidate_rom_cache() returns 0 when caching is disabled."""

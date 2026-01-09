@@ -96,8 +96,9 @@ class TestGetLastRomPath:
 
         result = controller.get_last_rom_path()
 
+        # Verify behavior: returns the path when file exists
         assert result == str(rom_file)
-        mock_settings_manager.get.assert_called_once_with(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, "")
+        assert Path(result).exists()
 
     def test_returns_none_if_not_exists(self, tmp_path: Path, mock_settings_manager: MagicMock) -> None:
         """Should return None if file doesn't exist."""
@@ -162,16 +163,31 @@ class TestLoadRomFile:
         assert controller.rom_path == str(rom_file)
         assert controller.rom_size == 1024
 
-    def test_saves_to_settings(self, tmp_path: Path, mock_settings_manager: MagicMock) -> None:
-        """Should save ROM path to settings."""
+    def test_saves_to_settings_round_trip(self, tmp_path: Path, mock_settings_manager: MagicMock) -> None:
+        """Should persist ROM path such that get_last_rom_path returns it."""
         rom_file = tmp_path / "test.sfc"
         rom_file.write_bytes(b"x" * 1024)
+
+        # Set up mock to return saved path on subsequent get calls
+        saved_path = None
+
+        def capture_set(ns, key, value):
+            nonlocal saved_path
+            if key == SETTINGS_KEY_LAST_INPUT_ROM:
+                saved_path = value
+
+        def return_saved(ns, key, default=""):
+            return saved_path if saved_path else default
+
+        mock_settings_manager.set.side_effect = capture_set
+        mock_settings_manager.get.side_effect = return_saved
 
         controller = ROMSessionController(settings_manager=mock_settings_manager)
         controller.load_rom_file(str(rom_file))
 
-        mock_settings_manager.set.assert_any_call(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_INPUT_ROM, str(rom_file))
-        mock_settings_manager.set_last_used_directory.assert_called_once_with(str(tmp_path))
+        # Verify round-trip: loaded path is retrievable
+        result = controller.get_last_rom_path()
+        assert result == str(rom_file)
 
     def test_returns_none_for_empty_path(self, mock_settings_manager: MagicMock) -> None:
         """Should return None for empty path."""

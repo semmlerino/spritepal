@@ -57,7 +57,11 @@ def _apply_vram_output_settings(
     export_palette_files: bool = True,
     include_metadata: bool = True,
 ):
-    """Configure output settings via dialog and apply to MainWindow state."""
+    """Configure output settings via dialog and apply to MainWindow state.
+
+    Note: This does NOT trigger actual extraction. It only configures the UI settings.
+    Tests should call extraction_complete() to simulate successful extraction.
+    """
     dialog = OutputSettingsDialog(parent=main_window, suggested_name="")
     if dialog.output_name_edit:
         dialog.output_name_edit.clear()
@@ -70,11 +74,12 @@ def _apply_vram_output_settings(
     settings = dialog.get_settings()
     dialog.close()
     qt_app.processEvents()
-    main_window._handle_vram_extraction(
-        settings.output_name,
-        settings.export_palette_files,
-        settings.include_metadata,
-    )
+    # Store settings in MainWindow's internal state without triggering extraction
+    # This simulates what _handle_vram_extraction does before calling _start_vram_extraction
+    main_window._vram_output_name = settings.output_name
+    main_window._vram_export_palettes = settings.export_palette_files
+    main_window._vram_include_metadata = settings.include_metadata
+    main_window._output_path = settings.output_name
     return settings
 
 
@@ -205,11 +210,12 @@ class TestRealMainWindowStateIntegration:
             settings = dialog.get_settings()
             dialog.close()
             self.qt_app.processEvents()
-            main_window._handle_vram_extraction(
-                settings.output_name,
-                settings.export_palette_files,
-                settings.include_metadata,
-            )
+            # Store settings in MainWindow's internal state without triggering extraction
+            # (Actual extraction is tested in extraction integration tests)
+            main_window._vram_output_name = settings.output_name
+            main_window._vram_export_palettes = settings.export_palette_files
+            main_window._vram_include_metadata = settings.include_metadata
+            main_window._output_path = settings.output_name
 
             # Test real button click interaction (vs mock click simulation)
             # Note: We can't easily trigger full extraction in test, but we can test the state logic
