@@ -145,8 +145,8 @@ class TestSpriteVisualValidator:
         assert confidence == 0.0
         assert metrics == {}
 
-    def test_calculate_coherence_score_without_cv2(self, validator):
-        """Test coherence calculation without cv2 (fallback mode)"""
+    def test_calculate_coherence_score_without_cv2(self, validator, tmp_path):
+        """Test coherence calculation without cv2 (fallback mode) via validate_sprite_image"""
         # Patch cv2 to None to test fallback
         with patch.object(validator_module, "cv2", None):
             # Create test array with reasonable sprite-like data
@@ -155,13 +155,18 @@ class TestSpriteVisualValidator:
             img_array[10:30, 10:30] = 128
             img_array[40:50, 40:50] = 200
 
-            score = validator._calculate_coherence_score(img_array)
+            img = Image.fromarray(img_array, mode="L")
+            path = tmp_path / "test_coherence.png"
+            img.save(path)
+
+            _, _, metrics = validator.validate_sprite_image(str(path))
+            score = metrics["coherence"]
 
             assert 0.0 <= score <= 1.0
             assert score >= 0.2  # Should have some coherence
 
-    def test_calculate_tile_diversity(self, validator):
-        """Test tile diversity calculation"""
+    def test_calculate_tile_diversity(self, validator, tmp_path):
+        """Test tile diversity calculation via validate_sprite_image"""
         # Create image with varying tiles
         img_array = np.zeros((32, 32), dtype=np.uint8)
 
@@ -172,14 +177,19 @@ class TestSpriteVisualValidator:
         img_array[8:16, 8:16] = 200  # Tile 4
         # Rest are empty (0)
 
-        score = validator._calculate_tile_diversity(img_array)
+        img = Image.fromarray(img_array, mode="L")
+        path = tmp_path / "test_diversity.png"
+        img.save(path)
+
+        _, _, metrics = validator.validate_sprite_image(str(path))
+        score = metrics["tile_diversity"]
 
         assert 0.0 <= score <= 1.0
         # Should have good diversity (not too low, not too high)
         assert score > 0.3
 
-    def test_calculate_edge_score_without_cv2(self, validator):
-        """Test edge score calculation without cv2"""
+    def test_calculate_edge_score_without_cv2(self, validator, tmp_path):
+        """Test edge score calculation without cv2 via validate_sprite_image"""
         with patch.object(validator_module, "cv2", None):
             # Create image with edges
             img_array = np.zeros((32, 32), dtype=np.uint8)
@@ -189,13 +199,18 @@ class TestSpriteVisualValidator:
             img_array[10:20, 10] = 255
             img_array[10:20, 20] = 255
 
-            score = validator._calculate_edge_score(img_array)
+            img = Image.fromarray(img_array, mode="L")
+            path = tmp_path / "test_edges.png"
+            img.save(path)
+
+            _, _, metrics = validator.validate_sprite_image(str(path))
+            score = metrics["edge_score"]
 
             assert 0.0 <= score <= 1.0
             assert score > 0.2  # Should detect some edges
 
-    def test_calculate_symmetry_score(self, validator):
-        """Test symmetry score calculation"""
+    def test_calculate_symmetry_score(self, validator, tmp_path):
+        """Test symmetry score calculation via validate_sprite_image"""
         # Create perfectly symmetric image
         img_array = np.zeros((32, 32), dtype=np.uint8)
         # Draw symmetric pattern
@@ -205,24 +220,34 @@ class TestSpriteVisualValidator:
                 img_array[y, x] = val
                 img_array[y, 31 - x] = val  # Mirror
 
-        score = validator._calculate_symmetry_score(img_array)
+        img = Image.fromarray(img_array, mode="L")
+        path = tmp_path / "test_symmetry.png"
+        img.save(path)
+
+        _, _, metrics = validator.validate_sprite_image(str(path))
+        score = metrics["symmetry"]
 
         assert 0.0 <= score <= 1.0
         assert score > 0.8  # Should have high symmetry
 
-    def test_calculate_empty_space_ratio(self, validator):
-        """Test empty space ratio calculation"""
+    def test_calculate_empty_space_ratio(self, validator, tmp_path):
+        """Test empty space ratio calculation via validate_sprite_image"""
         # Create image with 50% empty space
         img_array = np.zeros((32, 32), dtype=np.uint8)
         img_array[:16, :] = 128  # Fill half
 
-        score = validator._calculate_empty_space_ratio(img_array)
+        img = Image.fromarray(img_array, mode="L")
+        path = tmp_path / "test_empty.png"
+        img.save(path)
+
+        _, _, metrics = validator.validate_sprite_image(str(path))
+        score = metrics["empty_space"]
 
         assert 0.0 <= score <= 1.0
         assert score > 0.8  # 50% is in ideal range
 
-    def test_calculate_pattern_regularity_without_cv2(self, validator):
-        """Test pattern regularity without cv2"""
+    def test_calculate_pattern_regularity_without_cv2(self, validator, tmp_path):
+        """Test pattern regularity without cv2 via validate_sprite_image"""
         with patch.object(validator_module, "cv2", None):
             # Create regular pattern
             img_array = np.zeros((32, 32), dtype=np.uint8)
@@ -232,7 +257,12 @@ class TestSpriteVisualValidator:
                     if ((x // 8) + (y // 8)) % 2 == 0:
                         img_array[y : y + 8, x : x + 8] = 128
 
-            score = validator._calculate_pattern_regularity(img_array)
+            img = Image.fromarray(img_array, mode="L")
+            path = tmp_path / "test_regularity.png"
+            img.save(path)
+
+            _, _, metrics = validator.validate_sprite_image(str(path))
+            score = metrics["pattern_regularity"]
 
             assert 0.0 <= score <= 1.0
 

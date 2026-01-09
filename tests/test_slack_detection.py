@@ -41,11 +41,12 @@ class TestSlackDetection(unittest.TestCase):
         self.assertEqual(slack, 1)  # Only the first FF matches
 
     def test_detect_slack_limit(self):
-        # Data: [Sprite...][FF] * 300
-        # Limit is 256.
-        data = bytearray(b"\x00" * 10 + b"\xff" * 300)
+        # Data: [Sprite...][FF] * (MAX_SLACK_SIZE + 50)
+        # Limit is MAX_SLACK_SIZE.
+        limit = ROMInjector.MAX_SLACK_SIZE
+        data = bytearray(b"\x00" * 10 + b"\xff" * (limit + 50))
         slack = self.injector._detect_slack_space(data, 10)
-        self.assertEqual(slack, 256)
+        self.assertEqual(slack, limit)
 
 
 if __name__ == "__main__":

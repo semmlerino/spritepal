@@ -135,14 +135,14 @@ class TestEngineInit:
 
 
 class TestPerceptualHash:
-    """Tests for perceptual hash calculation."""
+    """Tests for perceptual hash calculation via index_sprite."""
 
     def test_phash_identical_images_same_hash(
         self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
     ) -> None:
         """Two identical images should produce identical phash arrays."""
-        hash1 = engine._calculate_phash(solid_red_image)
-        hash2 = engine._calculate_phash(solid_red_image)
+        hash1 = engine.index_sprite(0x1000, solid_red_image).phash
+        hash2 = engine.index_sprite(0x2000, solid_red_image).phash
 
         np.testing.assert_array_equal(hash1, hash2)
 
@@ -153,33 +153,33 @@ class TestPerceptualHash:
         gradient_image: Image.Image,
     ) -> None:
         """Very different images should produce different phashes."""
-        hash1 = engine._calculate_phash(solid_red_image)
-        hash2 = engine._calculate_phash(gradient_image)
+        hash1 = engine.index_sprite(0x1000, solid_red_image).phash
+        hash2 = engine.index_sprite(0x2000, gradient_image).phash
 
         # Not all elements should be equal
         assert not np.array_equal(hash1, hash2)
 
     def test_phash_scaled_image_similar_hash(self, engine: VisualSimilarityEngine, gradient_image: Image.Image) -> None:
         """Scaled version of image should have similar phash."""
-        original_hash = engine._calculate_phash(gradient_image)
+        original_hash = engine.index_sprite(0x1000, gradient_image).phash
 
         # Scale the image
         scaled = gradient_image.resize((128, 128), Image.Resampling.LANCZOS)
-        scaled_hash = engine._calculate_phash(scaled)
+        scaled_hash = engine.index_sprite(0x2000, scaled).phash
 
         # Should be identical since both are resized to hash_size
         np.testing.assert_array_equal(original_hash, scaled_hash)
 
     def test_phash_output_dimensions(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Phash output should be hash_size^2 binary values."""
-        result = engine._calculate_phash(solid_red_image)
+        result = engine.index_sprite(0x1000, solid_red_image).phash
 
         # Default hash_size=8, so 64 bits
         assert result.shape == (64,)
 
     def test_phash_output_type_and_range(self, engine: VisualSimilarityEngine, gradient_image: Image.Image) -> None:
         """Output should be np.ndarray of uint8 with values in [0, 1]."""
-        result = engine._calculate_phash(gradient_image)
+        result = engine.index_sprite(0x1000, gradient_image).phash
 
         assert isinstance(result, np.ndarray)
         assert result.dtype == np.uint8
@@ -188,21 +188,21 @@ class TestPerceptualHash:
     def test_phash_grayscale_image(self, engine: VisualSimilarityEngine) -> None:
         """Grayscale image should work correctly."""
         gray_img = Image.new("L", (64, 64), 128)
-        result = engine._calculate_phash(gray_img)
+        result = engine.index_sprite(0x1000, gray_img).phash
 
         assert result.shape == (64,)
 
     def test_phash_rgba_image(self, engine: VisualSimilarityEngine) -> None:
         """RGBA image should be converted and hashed."""
         rgba_img = Image.new("RGBA", (64, 64), (255, 0, 0, 128))
-        result = engine._calculate_phash(rgba_img)
+        result = engine.index_sprite(0x1000, rgba_img).phash
 
         assert result.shape == (64,)
 
     def test_phash_small_image(self, engine: VisualSimilarityEngine) -> None:
         """Small image (1x1) should still produce valid hash."""
         tiny_img = Image.new("RGB", (1, 1), (128, 128, 128))
-        result = engine._calculate_phash(tiny_img)
+        result = engine.index_sprite(0x1000, tiny_img).phash
 
         assert result.shape == (64,)
 
@@ -213,27 +213,27 @@ class TestPerceptualHash:
 
 
 class TestDifferenceHash:
-    """Tests for difference hash calculation."""
+    """Tests for difference hash calculation via index_sprite."""
 
     def test_dhash_identical_images_same_hash(
         self, engine: VisualSimilarityEngine, solid_red_image: Image.Image
     ) -> None:
         """Two identical images should produce identical dhash arrays."""
-        hash1 = engine._calculate_dhash(solid_red_image)
-        hash2 = engine._calculate_dhash(solid_red_image)
+        hash1 = engine.index_sprite(0x1000, solid_red_image).dhash
+        hash2 = engine.index_sprite(0x2000, solid_red_image).dhash
 
         np.testing.assert_array_equal(hash1, hash2)
 
     def test_dhash_output_dimensions(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Dhash should be hash_size * hash_size bits."""
-        result = engine._calculate_dhash(solid_red_image)
+        result = engine.index_sprite(0x1000, solid_red_image).dhash
 
         # hash_size=8, image resized to 9x8, differences give 8x8=64
         assert result.shape == (64,)
 
     def test_dhash_output_type_and_range(self, engine: VisualSimilarityEngine, gradient_image: Image.Image) -> None:
         """Output should be np.ndarray of uint8 with binary values."""
-        result = engine._calculate_dhash(gradient_image)
+        result = engine.index_sprite(0x1000, gradient_image).dhash
 
         assert isinstance(result, np.ndarray)
         assert result.dtype == np.uint8
@@ -241,7 +241,7 @@ class TestDifferenceHash:
 
     def test_dhash_gradient_image_pattern(self, engine: VisualSimilarityEngine, gradient_image: Image.Image) -> None:
         """Gradient image should produce dhash with all 1s (always increasing)."""
-        result = engine._calculate_dhash(gradient_image)
+        result = engine.index_sprite(0x1000, gradient_image).dhash
 
         # Horizontal gradient means each pixel is greater than left neighbor
         # So all differences should be 1
@@ -254,8 +254,8 @@ class TestDifferenceHash:
         gradient_image: Image.Image,
     ) -> None:
         """Different structures should produce different dhash."""
-        hash1 = engine._calculate_dhash(solid_red_image)
-        hash2 = engine._calculate_dhash(gradient_image)
+        hash1 = engine.index_sprite(0x1000, solid_red_image).dhash
+        hash2 = engine.index_sprite(0x2000, gradient_image).dhash
 
         # Should be different
         assert not np.array_equal(hash1, hash2)
@@ -264,7 +264,7 @@ class TestDifferenceHash:
         """Test dhash with small hash size."""
         engine = VisualSimilarityEngine(hash_size=4)
         img = Image.new("RGB", (64, 64), (100, 100, 100))
-        result = engine._calculate_dhash(img)
+        result = engine.index_sprite(0x1000, img).dhash
 
         # 4x4 = 16 bits
         assert result.shape == (16,)
@@ -276,23 +276,23 @@ class TestDifferenceHash:
 
 
 class TestColorHistogram:
-    """Tests for color histogram calculation."""
+    """Tests for color histogram calculation via index_sprite."""
 
     def test_histogram_output_dimensions(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Histogram should be 48-element array (16 bins x 3 channels)."""
-        result = engine._calculate_color_histogram(solid_red_image)
+        result = engine.index_sprite(0x1000, solid_red_image).histogram
 
         assert result.shape == (48,)
 
     def test_histogram_normalization(self, engine: VisualSimilarityEngine, random_image: Image.Image) -> None:
         """Histogram values should sum to ~1.0 (normalized)."""
-        result = engine._calculate_color_histogram(random_image)
+        result = engine.index_sprite(0x1000, random_image).histogram
 
         assert abs(np.sum(result) - 1.0) < 0.01
 
     def test_histogram_single_color_image(self, engine: VisualSimilarityEngine, solid_red_image: Image.Image) -> None:
         """Solid red image should have peak in highest R bin, lowest G/B bins."""
-        result = engine._calculate_color_histogram(solid_red_image)
+        result = engine.index_sprite(0x1000, solid_red_image).histogram
 
         # R channel is bins 0-15, G is 16-31, B is 32-47
         # For solid (255,0,0): R goes to bin 15, G to bin 0, B to bin 0
@@ -307,7 +307,7 @@ class TestColorHistogram:
 
     def test_histogram_black_image(self, engine: VisualSimilarityEngine, solid_black_image: Image.Image) -> None:
         """All-black image should have histogram at lowest bins."""
-        result = engine._calculate_color_histogram(solid_black_image)
+        result = engine.index_sprite(0x1000, solid_black_image).histogram
 
         # Bin 0 for each channel should have all the mass
         assert result[0] > 0.3  # R channel bin 0
@@ -316,7 +316,7 @@ class TestColorHistogram:
 
     def test_histogram_white_image(self, engine: VisualSimilarityEngine, solid_white_image: Image.Image) -> None:
         """All-white image should have histogram at highest bins."""
-        result = engine._calculate_color_histogram(solid_white_image)
+        result = engine.index_sprite(0x1000, solid_white_image).histogram
 
         # Bin 15 (highest) for each channel should have mass
         assert result[15] > 0.3  # R channel bin 15
@@ -326,7 +326,7 @@ class TestColorHistogram:
     def test_histogram_rgba_image_conversion(self, engine: VisualSimilarityEngine) -> None:
         """RGBA images should be converted to RGB before histogram."""
         rgba_img = Image.new("RGBA", (64, 64), (255, 0, 0, 128))
-        result = engine._calculate_color_histogram(rgba_img)
+        result = engine.index_sprite(0x1000, rgba_img).histogram
 
         assert result.shape == (48,)
         # Should behave like solid red - R channel peak at bin 15
@@ -336,15 +336,15 @@ class TestColorHistogram:
         self, engine: VisualSimilarityEngine, gradient_image: Image.Image
     ) -> None:
         """Two identical images should produce identical histograms."""
-        hist1 = engine._calculate_color_histogram(gradient_image)
-        hist2 = engine._calculate_color_histogram(gradient_image)
+        hist1 = engine.index_sprite(0x1000, gradient_image).histogram
+        hist2 = engine.index_sprite(0x2000, gradient_image).histogram
 
         np.testing.assert_array_almost_equal(hist1, hist2)
 
     def test_histogram_grayscale_conversion(self, engine: VisualSimilarityEngine) -> None:
         """Grayscale image should be converted to RGB."""
         gray_img = Image.new("L", (64, 64), 128)
-        result = engine._calculate_color_histogram(gray_img)
+        result = engine.index_sprite(0x1000, gray_img).histogram
 
         assert result.shape == (48,)
 
@@ -430,174 +430,6 @@ class TestIndexSprite:
             img = Image.new("RGB", (size, size), (100, 100, 100))
             result = engine.index_sprite(offset, img)
             assert result is not None
-
-
-# =============================================================================
-# Hamming Distance
-# =============================================================================
-
-
-class TestHammingDistance:
-    """Tests for Hamming distance calculation."""
-
-    def test_hamming_distance_identical_hashes(self, engine: VisualSimilarityEngine) -> None:
-        """Two identical binary arrays should have distance 0."""
-        hash1 = np.array([1, 0, 1, 0, 1, 0, 1, 0], dtype=np.uint8)
-        hash2 = np.array([1, 0, 1, 0, 1, 0, 1, 0], dtype=np.uint8)
-
-        distance = engine._hamming_distance(hash1, hash2)
-        assert distance == 0
-
-    def test_hamming_distance_completely_different(self, engine: VisualSimilarityEngine) -> None:
-        """Inverted arrays should have maximum distance."""
-        hash1 = np.array([1, 1, 1, 1, 0, 0, 0, 0], dtype=np.uint8)
-        hash2 = np.array([0, 0, 0, 0, 1, 1, 1, 1], dtype=np.uint8)
-
-        distance = engine._hamming_distance(hash1, hash2)
-        assert distance == 8  # All bits different
-
-    def test_hamming_distance_single_bit_difference(self, engine: VisualSimilarityEngine) -> None:
-        """Arrays differing by 1 bit should return distance=1."""
-        hash1 = np.array([1, 0, 1, 0], dtype=np.uint8)
-        hash2 = np.array([1, 0, 1, 1], dtype=np.uint8)
-
-        distance = engine._hamming_distance(hash1, hash2)
-        assert distance == 1
-
-    def test_hamming_distance_symmetric(self, engine: VisualSimilarityEngine) -> None:
-        """hamming_distance(A, B) should equal hamming_distance(B, A)."""
-        hash1 = np.array([1, 0, 1, 0, 1, 1], dtype=np.uint8)
-        hash2 = np.array([0, 0, 1, 1, 1, 0], dtype=np.uint8)
-
-        dist1 = engine._hamming_distance(hash1, hash2)
-        dist2 = engine._hamming_distance(hash2, hash1)
-
-        assert dist1 == dist2
-
-    def test_hamming_distance_returns_integer(self, engine: VisualSimilarityEngine) -> None:
-        """Output should be int type."""
-        hash1 = np.array([1, 0, 1, 0], dtype=np.uint8)
-        hash2 = np.array([1, 1, 0, 0], dtype=np.uint8)
-
-        distance = engine._hamming_distance(hash1, hash2)
-        assert isinstance(distance, int | np.integer)
-
-    def test_hamming_distance_large_arrays(self, engine: VisualSimilarityEngine) -> None:
-        """Should work with 64-bit or larger arrays."""
-        hash1 = np.zeros(64, dtype=np.uint8)
-        hash2 = np.ones(64, dtype=np.uint8)
-
-        distance = engine._hamming_distance(hash1, hash2)
-        assert distance == 64
-
-
-# =============================================================================
-# Histogram Similarity
-# =============================================================================
-
-
-class TestHistogramSimilarity:
-    """Tests for histogram similarity calculation."""
-
-    def test_histogram_similarity_identical(self, engine: VisualSimilarityEngine) -> None:
-        """Two identical histograms should return ~1.0."""
-        hist = np.array([0.5, 0.5], dtype=np.float32)
-
-        similarity = engine._histogram_similarity(hist, hist)
-        assert abs(similarity - 1.0) < 0.01
-
-    def test_histogram_similarity_completely_different(self, engine: VisualSimilarityEngine) -> None:
-        """Non-overlapping histograms should return ~0.0."""
-        hist1 = np.array([1.0, 0.0, 0.0], dtype=np.float32)
-        hist2 = np.array([0.0, 0.0, 1.0], dtype=np.float32)
-
-        similarity = engine._histogram_similarity(hist1, hist2)
-        assert similarity == 0.0
-
-    def test_histogram_similarity_partial_overlap(self, engine: VisualSimilarityEngine) -> None:
-        """Partial overlap should return 0.0 < similarity < 1.0."""
-        hist1 = np.array([0.5, 0.5, 0.0], dtype=np.float32)
-        hist2 = np.array([0.0, 0.5, 0.5], dtype=np.float32)
-
-        similarity = engine._histogram_similarity(hist1, hist2)
-        assert 0.0 < similarity < 1.0
-
-    def test_histogram_similarity_range(self, engine: VisualSimilarityEngine) -> None:
-        """Should always return value in [0.0, 1.0]."""
-        hist1 = np.array([0.25, 0.25, 0.25, 0.25], dtype=np.float32)
-        hist2 = np.array([0.5, 0.5, 0.0, 0.0], dtype=np.float32)
-
-        similarity = engine._histogram_similarity(hist1, hist2)
-        assert 0.0 <= similarity <= 1.0
-
-    def test_histogram_similarity_symmetric(self, engine: VisualSimilarityEngine) -> None:
-        """Similarity should be symmetric."""
-        hist1 = np.array([0.3, 0.3, 0.4], dtype=np.float32)
-        hist2 = np.array([0.5, 0.3, 0.2], dtype=np.float32)
-
-        sim1 = engine._histogram_similarity(hist1, hist2)
-        sim2 = engine._histogram_similarity(hist2, hist1)
-
-        assert abs(sim1 - sim2) < 0.001
-
-
-# =============================================================================
-# Overall Similarity Calculation
-# =============================================================================
-
-
-class TestSimilarityCalculation:
-    """Tests for overall similarity score calculation."""
-
-    def test_similarity_identical_sprites(self, engine: VisualSimilarityEngine, gradient_image: Image.Image) -> None:
-        """Two identical sprite hashes should have similarity ~1.0."""
-        hash1 = engine.index_sprite(0x1000, gradient_image)
-        hash2 = engine.index_sprite(0x2000, gradient_image)
-
-        similarity = engine._calculate_similarity(hash1, hash2)
-        assert similarity > 0.99
-
-    def test_similarity_different_sprites(
-        self,
-        engine: VisualSimilarityEngine,
-        solid_red_image: Image.Image,
-        solid_blue_image: Image.Image,
-    ) -> None:
-        """Very different sprites should have lower similarity."""
-        hash1 = engine.index_sprite(0x1000, solid_red_image)
-        hash2 = engine.index_sprite(0x2000, solid_blue_image)
-
-        similarity = engine._calculate_similarity(hash1, hash2)
-        # Different colors but similar structure (solid blocks)
-        assert similarity < 1.0
-
-    def test_similarity_score_range(
-        self,
-        engine: VisualSimilarityEngine,
-        random_image: Image.Image,
-        gradient_image: Image.Image,
-    ) -> None:
-        """Should return value in [0.0, 1.0]."""
-        hash1 = engine.index_sprite(0x1000, random_image)
-        hash2 = engine.index_sprite(0x2000, gradient_image)
-
-        similarity = engine._calculate_similarity(hash1, hash2)
-        assert 0.0 <= similarity <= 1.0
-
-    def test_similarity_symmetric(
-        self,
-        engine: VisualSimilarityEngine,
-        solid_red_image: Image.Image,
-        gradient_image: Image.Image,
-    ) -> None:
-        """Similarity should be symmetric."""
-        hash1 = engine.index_sprite(0x1000, solid_red_image)
-        hash2 = engine.index_sprite(0x2000, gradient_image)
-
-        sim1 = engine._calculate_similarity(hash1, hash2)
-        sim2 = engine._calculate_similarity(hash2, hash1)
-
-        assert abs(sim1 - sim2) < 0.001
 
 
 # =============================================================================

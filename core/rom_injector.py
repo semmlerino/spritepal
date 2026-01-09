@@ -44,6 +44,8 @@ class SpritePointer:
 class ROMInjector(SpriteInjector):
     """Handles sprite injection directly into ROM files"""
 
+    MAX_SLACK_SIZE = 256  # Safety limit: never overwrite more than 256 bytes of padding
+
     def __init__(self) -> None:
         super().__init__()
         self.hal_compressor: HALCompressor = HALCompressor()
@@ -276,12 +278,11 @@ class ROMInjector(SpriteInjector):
             start_offset: Offset immediately after the original compressed block (after 0xFF terminator)
 
         Returns:
-            Number of padding bytes found (capped at 256 for safety)
+            Number of padding bytes found (capped at MAX_SLACK_SIZE for safety)
         """
         if start_offset >= len(rom_data):
             return 0
 
-        max_slack = 256  # Safety limit: never overwrite more than 256 bytes of padding
         slack = 0
 
         # Detect padding character from the first byte
@@ -289,7 +290,7 @@ class ROMInjector(SpriteInjector):
         if pad_char not in (0x00, 0xFF):
             return 0
 
-        for i in range(start_offset, min(start_offset + max_slack, len(rom_data))):
+        for i in range(start_offset, min(start_offset + self.MAX_SLACK_SIZE, len(rom_data))):
             if rom_data[i] == pad_char:
                 slack += 1
             else:
