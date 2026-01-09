@@ -7,6 +7,7 @@ from ui.workspaces.sprite_editor_workspace import SpriteEditorWorkspace
 
 # --- Mock Classes (simplified from test_rom_mode_workflow.py) ---
 
+
 class MockEditTab(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__()
@@ -18,6 +19,7 @@ class MockEditTab(QWidget):
 
     def set_controller(self, ctrl):
         pass
+
 
 class MockTab(QWidget):
     def __init__(self, *args, **kwargs):
@@ -48,6 +50,7 @@ class MockTab(QWidget):
     def set_mode(self, mode):
         pass
 
+
 class MockVRAMEditorPage(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__()
@@ -57,8 +60,10 @@ class MockVRAMEditorPage(QWidget):
         self.multi_palette_tab = MockTab()
         self.ready_for_inject = Mock()
         self.ready_for_inject.connect = Mock()
+
     def switch_to_inject_tab(self):
         pass
+
 
 class MockEditWorkspace(QWidget):
     def __init__(self, *args, **kwargs):
@@ -67,8 +72,10 @@ class MockEditWorkspace(QWidget):
         self.saveToRomRequested.connect = Mock()
         self.exportPngRequested = Mock()
         self.exportPngRequested.connect = Mock()
+
     def set_controller(self, ctrl):
         pass
+
 
 class MockROMWorkflowPage(QWidget):
     def __init__(self, *args, **kwargs):
@@ -110,10 +117,13 @@ class MockROMWorkflowPage(QWidget):
         self.offset_slider.valueChanged.connect = Mock()
         self.step_spin = Mock()
         self.step_spin.value = Mock(return_value=1)
+
     def set_rom_size(self, size: int) -> None:
         pass
 
+
 # --- Test Class ---
+
 
 class TestModeSwitchRepro:
     @pytest.fixture
@@ -156,5 +166,6 @@ class TestModeSwitchRepro:
         sprite_editor_workspace.load_rom("test.sfc")
 
         # Assertion: Should have switched to ROM mode
-        assert sprite_editor_workspace._mode_combo.currentData() == "rom", \
+        assert sprite_editor_workspace._mode_combo.currentData() == "rom", (
             "Failed to switch to ROM mode after loading a ROM"
+        )

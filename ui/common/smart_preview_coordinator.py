@@ -384,18 +384,32 @@ class SmartPreviewCoordinator(QObject):
                     # Invalidate old-format cache entry
                     self._cache.remove(cache_key)
                     return False
-                tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded = cached_data
+                tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded = (
+                    cached_data
+                )
 
                 if _validate_tile_data(tile_data):
                     logger.debug(f"Cache hit for 0x{offset:06X}: {len(tile_data)} bytes (hal: {hal_succeeded})")
                     # Emit both signals: preview_cached for statistics, preview_ready for data consumers
                     self.preview_cached.emit(
-                        tile_data, width, height, sprite_name or "", compressed_size, slack_size,
-                        actual_offset, hal_succeeded
+                        tile_data,
+                        width,
+                        height,
+                        sprite_name or "",
+                        compressed_size,
+                        slack_size,
+                        actual_offset,
+                        hal_succeeded,
                     )
                     self.preview_ready.emit(
-                        tile_data, width, height, sprite_name or "", compressed_size, slack_size,
-                        actual_offset, hal_succeeded
+                        tile_data,
+                        width,
+                        height,
+                        sprite_name or "",
+                        compressed_size,
+                        slack_size,
+                        actual_offset,
+                        hal_succeeded,
                     )
                     return True
 
@@ -482,14 +496,19 @@ class SmartPreviewCoordinator(QObject):
                 if provider_result is None:
                     # Emit result even if caching fails
                     self.preview_ready.emit(
-                        tile_data, width, height, sprite_name, compressed_size, slack_size,
-                        actual_offset, hal_succeeded
+                        tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded
                     )
                     return
                 rom_path, _ = provider_result
                 preview_data = (
-                    tile_data, width, height, sprite_name, compressed_size, slack_size,
-                    actual_offset, hal_succeeded
+                    tile_data,
+                    width,
+                    height,
+                    sprite_name,
+                    compressed_size,
+                    slack_size,
+                    actual_offset,
+                    hal_succeeded,
                 )
 
                 # Save to memory cache

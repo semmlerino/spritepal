@@ -370,7 +370,7 @@ The codebase passes basedpyright with zero errors. Key rules:
 
 ```python
 # In _create_workspaces(): service doesn't exist yet
-workspace = SpriteEditorWorkspace(message_service=None)
+workspace = EditWorkspace(message_service=None)
 
 # In _setup_managers(): now inject
 workspace.set_message_service(status_bar_manager)
@@ -533,4 +533,4 @@ class MyDialog(DialogBase):
 
 ---
 
-*Last updated: January 8, 2026 (Fixed initialize_managers→create_app_context, removed obsolete protocols guidance, corrected sprite_editor workspace reference)*
+*Last updated: January 9, 2026 (Verified documentation accuracy, fixed SpriteEditorWorkspace→EditWorkspace class name in code examples)*

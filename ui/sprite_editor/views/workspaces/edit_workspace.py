@@ -180,10 +180,10 @@ class EditWorkspace(QWidget):
             QShortcut(QKeySequence("="), self, self._icon_toolbar.zoom_in_btn.click)  # Handle unshifted +
         if self._icon_toolbar.zoom_out_btn:
             QShortcut(QKeySequence("-"), self, self._icon_toolbar.zoom_out_btn.click)
-        
+
         # Reset zoom
         QShortcut(QKeySequence("Ctrl+0"), self, self._on_zoom_reset)
-        
+
         # Fit to window
         QShortcut(QKeySequence("F"), self, self._on_zoom_fit)
 
@@ -416,10 +416,10 @@ class EditWorkspace(QWidget):
         visible=False means "Show Indices/Greyscale" -> Greyscale ON
         """
         greyscale_mode = not visible
-        
+
         if self._canvas:
             self._canvas.set_greyscale_mode(greyscale_mode)
-            
+
         self._preview_panel.set_greyscale_mode(greyscale_mode)
 
     def _on_zoom_in(self) -> None:
@@ -452,26 +452,26 @@ class EditWorkspace(QWidget):
         image_size = self._controller.get_image_size()
         if not image_size or image_size[0] == 0 or image_size[1] == 0:
             return
-            
+
         width, height = image_size
-        
+
         # Get viewport size minus padding
         viewport = self._scroll_area.viewport()
         vp_width = viewport.width() - 40  # 20px padding on each side
         vp_height = viewport.height() - 40
-        
+
         if vp_width <= 0 or vp_height <= 0:
             return
 
         # Calculate max zoom that fits
         zoom_x = vp_width // width
         zoom_y = vp_height // height
-        
+
         fit_zoom = min(zoom_x, zoom_y)
-        
+
         # Clamp between 1 and 64
         fit_zoom = max(1, min(64, fit_zoom))
-        
+
         self._canvas.set_zoom(fit_zoom)
 
     def _on_zoom_changed_from_canvas(self, zoom: int) -> None:

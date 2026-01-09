@@ -14,7 +14,7 @@ def test_edit_workspace_modes(qtbot):
     # - Save to ROM: Hidden (not applicable)
     # - Export PNG: Visible
     workspace.set_workflow_mode("vram")
-    
+
     assert workspace._inject_btn.isVisible() is True
     assert workspace._save_export_panel.save_to_rom_btn.isVisible() is False
     assert workspace._save_export_panel.export_png_btn.isVisible() is True
@@ -24,7 +24,7 @@ def test_edit_workspace_modes(qtbot):
     # - Save to ROM: Visible (direct injection)
     # - Export PNG: Visible
     workspace.set_workflow_mode("rom")
-    
+
     assert workspace._inject_btn.isVisible() is False
     assert workspace._save_export_panel.save_to_rom_btn.isVisible() is True
     assert workspace._save_export_panel.export_png_btn.isVisible() is True

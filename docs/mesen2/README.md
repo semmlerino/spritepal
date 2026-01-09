@@ -93,4 +93,4 @@ ROM ($E0-$EF banks) → [01:F724 routine] → source buffer (0x1530) → staging
 
 ## Archived Documentation
 
-Historical exploration notes are in `obsoleteArchive/`. These are superseded by the numbered docs above.
+Historical exploration notes from earlier development phases are in `.archived/`. These documents are kept for reference but have been superseded by the numbered docs above. See `[.archived/README.md](.archived/README.md)` for details on what's archived and why.

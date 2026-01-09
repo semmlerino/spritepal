@@ -335,8 +335,15 @@ class PooledPreviewWorker(SpritePreviewWorker):
             f"hal_succeeded={decompression_succeeded}"
         )
         self.preview_ready.emit(
-            request_id, tile_data, width, height, self.sprite_name, compressed_size, slack_size,
-            self.offset, decompression_succeeded
+            request_id,
+            tile_data,
+            width,
+            height,
+            self.sprite_name,
+            compressed_size,
+            slack_size,
+            self.offset,
+            decompression_succeeded,
         )
         logger.debug("[TRACE] PoolWorker emitted preview_ready signal")
 
@@ -538,8 +545,7 @@ class PreviewWorkerPool(QObject):
             f"actual_offset=0x{actual_offset:X}, hal_succeeded={hal_succeeded}"
         )
         self.preview_ready.emit(
-            request_id, tile_data, width, height, sprite_name, compressed_size, slack_size,
-            actual_offset, hal_succeeded
+            request_id, tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded
         )
         logger.debug("[TRACE] Worker pool emitted preview_ready signal")
 

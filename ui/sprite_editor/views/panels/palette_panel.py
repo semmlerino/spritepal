@@ -121,3 +121,7 @@ class PalettePanel(QWidget):
     def clear_mesen_sources(self) -> None:
         """Remove all Mesen2 sources, keeping only "Default"."""
         self.palette_source_selector.clear_mesen_sources()
+
+    def clear_rom_sources(self) -> None:
+        """Remove all ROM palette sources, keeping Default and Mesen sources."""
+        self.palette_source_selector.clear_rom_sources()

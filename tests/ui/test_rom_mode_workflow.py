@@ -183,12 +183,8 @@ class TestRomModeWorkflow:
         # Test switching to ROM mode
         # The mode_changed signal triggers _on_mode_changed_internal which
         # propagates to extraction/injection controllers
-        with patch.object(
-            sprite_editor_workspace._extraction_controller, "set_mode"
-        ) as mock_extract_mode:
-            with patch.object(
-                sprite_editor_workspace._injection_controller, "set_mode"
-            ) as mock_inject_mode:
+        with patch.object(sprite_editor_workspace._extraction_controller, "set_mode") as mock_extract_mode:
+            with patch.object(sprite_editor_workspace._injection_controller, "set_mode") as mock_inject_mode:
                 # Change index to ROM (index 1)
                 combo.setCurrentIndex(1)
 
@@ -214,6 +210,4 @@ class TestRomModeWorkflow:
         assert sprite_editor_workspace._mode_combo.currentData() == "rom"
 
         # Verify rom workflow controller offset set (auto_open=True is default behavior)
-        sprite_editor_workspace._rom_workflow_controller.set_offset.assert_called_with(
-            0x123456, auto_open=True
-        )
+        sprite_editor_workspace._rom_workflow_controller.set_offset.assert_called_with(0x123456, auto_open=True)

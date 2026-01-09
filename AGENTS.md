@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+Always activate the Serena MCP at the start.
+
 ## Project Structure & Module Organization
 - `core/`: business logic, managers, protocols. Core should only import from `utils/`.
 - `ui/`: PySide6 widgets, dialogs, and workers; UI may import from `core/` and `utils/`.

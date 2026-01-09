@@ -282,11 +282,49 @@ class EditingController(QObject):
                 key = (source_type, index)
                 if key in self._palette_sources:
                     self.set_palette(self._palette_sources[key], f"Mesen #{index}")
+            elif source_type == "rom":
+                key = (source_type, index)
+                if key in self._palette_sources:
+                    self.set_palette(self._palette_sources[key], f"ROM Palette {index}")
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
+
             # Use view if available, otherwise None (desktop)
             parent = self._view if self._view else None
             QMessageBox.critical(parent, "Error", f"Failed to change palette source: {e}")
+
+    def register_rom_palettes(
+        self, palettes: dict[int, list[tuple[int, int, int]]]
+    ) -> None:
+        """Register multiple ROM palettes as switchable sources.
+
+        Args:
+            palettes: Dict mapping palette index (8-15) to list of 16 RGB tuples
+        """
+        for index, colors in palettes.items():
+            name = f"ROM Palette {index}"
+            self.register_palette_source("rom", index, colors, name)
+
+    def set_palette_source(self, source_type: str, palette_index: int) -> None:
+        """Programmatically select a palette source.
+
+        This looks up the colors from the registered sources and applies them.
+        Also updates the view's palette source selector if available.
+
+        Args:
+            source_type: Type of source ("default", "mesen", or "rom")
+            palette_index: Palette index
+        """
+        # Apply the palette
+        self.handle_palette_source_changed(source_type, palette_index)
+
+        # Update the view's dropdown if available
+        if self._view:
+            palette_panel = getattr(self._view, "palette_panel", None)
+            if palette_panel:
+                selector = getattr(palette_panel, "_source_selector", None)
+                if selector:
+                    selector.set_selected_source(source_type, palette_index)
 
     def handle_load_palette(self) -> None:
         """Handle load palette button click."""
@@ -309,6 +347,7 @@ class EditingController(QObject):
             colors = []
             if file_path.endswith(".json"):
                 import json
+
                 with open(file_path) as f:
                     data = json.load(f)
                     # Expecting {"colors": [[r,g,b], ...]}
@@ -321,7 +360,7 @@ class EditingController(QObject):
                 with open(file_path) as f:
                     lines = f.readlines()
                     if "JASC-PAL" in lines[0]:
-                        for line in lines[3:]: # Skip header, version, count
+                        for line in lines[3:]:  # Skip header, version, count
                             parts = line.strip().split()
                             if len(parts) >= 3:
                                 colors.append((int(parts[0]), int(parts[1]), int(parts[2])))
@@ -331,7 +370,7 @@ class EditingController(QObject):
                 while len(colors) < 16:
                     colors.append((0, 0, 0))
                 self.set_palette(colors[:16], "Loaded Palette")
-                
+
         except Exception as e:
             QMessageBox.critical(parent, "Error", f"Failed to load palette: {e}")
 
@@ -354,20 +393,18 @@ class EditingController(QObject):
                 return
 
             colors = self.get_current_colors()
-            
+
             if file_path.endswith(".json"):
                 import json
-                data = {
-                    "name": self.palette_model.name,
-                    "colors": colors
-                }
+
+                data = {"name": self.palette_model.name, "colors": colors}
                 with open(file_path, "w") as f:
                     json.dump(data, f, indent=2)
             elif file_path.endswith(".pal"):
                 with open(file_path, "w") as f:
                     f.write("JASC-PAL\n0100\n16\n")
                     f.writelines(f"{r} {g} {b}\n" for r, g, b in colors)
-                        
+
         except Exception as e:
             QMessageBox.critical(parent, "Error", f"Failed to save palette: {e}")
 

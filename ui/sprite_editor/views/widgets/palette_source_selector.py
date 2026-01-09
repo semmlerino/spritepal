@@ -188,3 +188,24 @@ class PaletteSourceSelector(QWidget):
         # Reset to default if nothing selected
         if self._combo_box.currentIndex() < 0:
             self._combo_box.setCurrentIndex(0)
+
+    def clear_rom_sources(self) -> None:
+        """Remove all ROM palette sources, keeping Default and Mesen sources.
+
+        Preserves the default source and any mesen sources.
+        """
+        # Remove all rom sources
+        i = self._combo_box.count() - 1
+        while i >= 0:
+            source_type = self._combo_box.itemData(i, self._SOURCE_TYPE_ROLE)
+            if source_type == "rom":
+                self._combo_box.removeItem(i)
+            i -= 1
+
+        # Ensure "Default" exists
+        if self._combo_box.count() == 0:
+            self.add_palette_source("Default", "default", 0)
+
+        # Reset to default if nothing selected
+        if self._combo_box.currentIndex() < 0:
+            self._combo_box.setCurrentIndex(0)

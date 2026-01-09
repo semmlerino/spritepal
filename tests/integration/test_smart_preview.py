@@ -180,9 +180,7 @@ class TestSmartPreviewMemoryCache:
         coordinator._cache.put.assert_called_once()
         call_args = coordinator._cache.put.call_args
         # Cache format: (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded)
-        assert call_args[0][1] == (
-            tile_data, width, height, sprite_name, compressed_size, slack_size, 0x8000, True
-        )
+        assert call_args[0][1] == (tile_data, width, height, sprite_name, compressed_size, slack_size, 0x8000, True)
 
     def test_stale_preview_not_cached(self, coordinator):
         """Test that stale preview results are not processed."""

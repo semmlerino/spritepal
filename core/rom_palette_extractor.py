@@ -167,7 +167,7 @@ class ROMPaletteExtractor:
 
     def extract_palette_range(
         self, rom_path: str, palette_offset: int, start_idx: int, end_idx: int
-    ) -> dict[int, list[list[int]]]:
+    ) -> dict[int, list[tuple[int, int, int]]]:
         """
         Extract a range of palettes from ROM.
 
@@ -178,9 +178,9 @@ class ROMPaletteExtractor:
             end_idx: Ending palette index (inclusive)
 
         Returns:
-            Dictionary mapping palette index to color list
+            Dictionary mapping palette index to list of 16 RGB tuples
         """
-        palettes = {}
+        palettes: dict[int, list[tuple[int, int, int]]] = {}
 
         try:
             with Path(rom_path).open("rb") as f:
@@ -198,7 +198,9 @@ class ROMPaletteExtractor:
 
             for idx in range(start_idx, end_idx + 1):
                 if 0 <= idx <= 15:
-                    palettes[idx] = self._extract_palette_colors(palette_data, idx)
+                    colors_list = self._extract_palette_colors(palette_data, idx)
+                    # Convert list of lists to list of tuples for consistency
+                    palettes[idx] = [tuple(c) for c in colors_list]  # type: ignore[misc]
 
         except OSError as e:
             logger.warning(f"Failed to extract palette range: {e}")
@@ -232,7 +234,7 @@ class ROMPaletteExtractor:
             if 0 <= palette_index <= 15:
                 colors_list = self._extract_palette_colors(palette_data, palette_index)
                 # Convert list of lists to list of tuples for consistency
-                return [tuple(c) for c in colors_list] # type: ignore
+                return [tuple(c) for c in colors_list]  # type: ignore
 
         except OSError as e:
             logger.warning(f"Failed to extract palette colors: {e}")

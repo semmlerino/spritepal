@@ -591,6 +591,14 @@ class ROMWorkflowController(QObject):
                 self._message_service.show_message("No sprite data to edit")
             return
 
+        # Clear previous ROM palette sources before loading new sprite
+        if self._view:
+            workspace = self._view.workspace
+            if workspace and hasattr(workspace, "palette_panel"):
+                palette_panel = workspace.palette_panel
+                if palette_panel and hasattr(palette_panel, "clear_rom_sources"):
+                    palette_panel.clear_rom_sources()
+
         # Use SpriteRenderer to create PIL image from 4bpp
         from ..core.palette_utils import get_default_snes_palette
         from ..services import SpriteRenderer
@@ -602,8 +610,12 @@ class ROMWorkflowController(QObject):
         # Convert to numpy and load into editor
         image_array = np.array(image, dtype=np.uint8)
 
-        # Try to extract palette from ROM if possible
-        palette = None
+        # Try to extract all ROM palettes if possible
+        palette: list[tuple[int, int, int]] | None = None
+        all_palettes: dict[int, list[tuple[int, int, int]]] = {}
+        detected_palette_index: int | None = None
+        palette_offset: int | None = None
+
         if self.rom_extractor and self.rom_path:
             try:
                 # 1. Get header to identify game
@@ -623,18 +635,34 @@ class ROMWorkflowController(QObject):
                         )
                     )
 
-                    # 4. Extract first palette if available
-                    if palette_offset is not None and palette_indices:
-                        # Use first available palette index
-                        target_index = palette_indices[0]
-                        extracted_palette = self.rom_extractor.rom_palette_extractor.extract_palette_colors_from_rom(
-                            self.rom_path, palette_offset, target_index
+                    # 4. Extract ALL sprite palettes (8-15) if we have an offset
+                    if palette_offset is not None:
+                        all_palettes = self.rom_extractor.rom_palette_extractor.extract_palette_range(
+                            self.rom_path, palette_offset, 8, 15
                         )
-                        if extracted_palette:
-                            palette = extracted_palette
-                            logger.info(f"Loaded ROM palette for {self.current_sprite_name} (index {target_index})")
+
+                        # Register all palettes as switchable sources
+                        if all_palettes:
+                            self._editing_controller.register_rom_palettes(all_palettes)
+                            logger.info(f"Registered {len(all_palettes)} ROM palettes as sources")
+
+                        # Determine which palette to use initially
+                        if palette_indices:
+                            # Use first available from config
+                            detected_palette_index = palette_indices[0]
+                        elif all_palettes:
+                            # Fall back to first available (usually 8)
+                            detected_palette_index = min(all_palettes.keys())
+
+                        # Get the actual palette colors
+                        if detected_palette_index and detected_palette_index in all_palettes:
+                            palette = all_palettes[detected_palette_index]
+                            logger.info(
+                                f"Auto-selected ROM palette {detected_palette_index} for {self.current_sprite_name}"
+                            )
+
             except Exception as e:
-                logger.warning(f"Failed to extract ROM palette: {e}")
+                logger.warning(f"Failed to extract ROM palettes: {e}")
 
         # Fallback to default SNES-style palette
         if palette is None:
@@ -647,6 +675,15 @@ class ROMWorkflowController(QObject):
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self._editing_controller.load_image(image_array, palette)
 
+        # Auto-select the palette source in dropdown if we detected one
+        if detected_palette_index and all_palettes:
+            self._editing_controller.set_palette_source("rom", detected_palette_index)
+            if self._message_service:
+                palette_count = len(all_palettes)
+                self._message_service.show_message(
+                    f"Using ROM Palette {detected_palette_index} ({palette_count} palettes available in dropdown)"
+                )
+
         # Change state
         self.state = "edit"
         if self._view:
@@ -654,8 +691,6 @@ class ROMWorkflowController(QObject):
             self._view.set_workflow_state("edit")
         self.workflow_state_changed.emit("edit")
         logger.debug("[OPEN] Sprite loaded in editor, state changed to 'edit'")
-        if self._message_service:
-            self._message_service.show_message("Sprite loaded in editor")
 
     def prepare_injection(self) -> None:
         """Transition from editing to save confirmation with size comparison."""

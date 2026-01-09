@@ -21,7 +21,7 @@ The embedded sprite editor uses nested containers:
 MainWindow
 └── center_stack (QStackedWidget)
     ├── [0] ExtractionWorkspace (ROM/VRAM extraction tabs)
-    └── [1] SpriteEditorWorkspace
+    └── [1] EditWorkspace
             └── _mode_stack (QStackedWidget)
                 ├── [0] VRAMEditorPage (Extract→Edit→Inject→Multi-Palette)
                 └── [1] ROMWorkflowPage (Asset browser + editor)
@@ -30,11 +30,11 @@ MainWindow
 **Switching views programmatically:**
 
 ```python
-# Switch to Sprite Editor workspace
+# Switch to Sprite Editor workspace (EditWorkspace instance)
 window.switch_to_workspace(1)
 
 # Switch modes within sprite editor
-editor = window._sprite_editor_workspace
+editor = window._sprite_editor_workspace  # Instance of EditWorkspace
 editor._mode_combo.setCurrentIndex(0)  # VRAM Mode
 editor._mode_combo.setCurrentIndex(1)  # ROM Mode
 
