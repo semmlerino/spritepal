@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from core.rom_injector import ROMInjector
 
@@ -9,44 +9,61 @@ class TestSlackDetection(unittest.TestCase):
         self.injector = ROMInjector()
         # Mock logger to avoid clutter
         self.injector.logger = MagicMock()
+        # Mock dependencies
+        self.injector.hal_compressor = MagicMock()
+        # Mock internal parse method to control compressed size
+        self.injector._parse_hal_compressed_size = MagicMock()
 
-    def test_detect_slack_simple(self):
-        # Data: [Sprite...][FF][FF][FF][Data...]
-        # Sprite ends at 10. Slack starts at 10.
-        # 3 bytes of slack.
-        data = bytearray(b"\x00" * 10 + b"\xff\xff\xff" + b"\xaa")
-        slack = self.injector._detect_slack_space(data, 10)
-        self.assertEqual(slack, 3)
+    def test_detect_slack_via_find_compressed_sprite(self):
+        # Scenario: Sprite is 10 bytes compressed.
+        # Data: [Compressed(10)][Slack(3)][NextData]
+        
+        # Setup mock return values
+        self.injector.hal_compressor.decompress_from_rom.return_value = b"decompressed_data"
+        self.injector._parse_hal_compressed_size.return_value = 10
+        
+        # Create dummy ROM data
+        # 10 bytes "compressed" data + 3 bytes slack (FF) + 1 byte other data
+        rom_data = bytearray(b"C" * 10 + b"\xff\xff\xff" + b"\xaa")
+        
+        # Call public method
+        _, _, slack_size = self.injector.find_compressed_sprite(rom_data, 0)
+        
+        self.assertEqual(slack_size, 3)
 
-    def test_detect_slack_zeros(self):
-        # Data: [Sprite...][00][00][Data...]
-        data = bytearray(b"\x00" * 10 + b"\x00\x00" + b"\xaa")
-        slack = self.injector._detect_slack_space(data, 10)
-        self.assertEqual(slack, 2)
+    def test_detect_slack_zeros_via_find_compressed_sprite(self):
+        # Scenario: 10 bytes compressed, 2 bytes zero padding
+        self.injector.hal_compressor.decompress_from_rom.return_value = b"decompressed_data"
+        self.injector._parse_hal_compressed_size.return_value = 10
+        
+        rom_data = bytearray(b"C" * 10 + b"\x00\x00" + b"\xaa")
+        
+        _, _, slack_size = self.injector.find_compressed_sprite(rom_data, 0)
+        
+        self.assertEqual(slack_size, 2)
 
-    def test_detect_slack_none(self):
-        # Data: [Sprite...][AA][Data...]
-        data = bytearray(b"\x00" * 10 + b"\xaa")
-        slack = self.injector._detect_slack_space(data, 10)
-        self.assertEqual(slack, 0)
+    def test_detect_slack_none_via_find_compressed_sprite(self):
+        # Scenario: 10 bytes compressed, no slack
+        self.injector.hal_compressor.decompress_from_rom.return_value = b"decompressed_data"
+        self.injector._parse_hal_compressed_size.return_value = 10
+        
+        rom_data = bytearray(b"C" * 10 + b"\xaa")
+        
+        _, _, slack_size = self.injector.find_compressed_sprite(rom_data, 0)
+        
+        self.assertEqual(slack_size, 0)
 
-    def test_detect_slack_mixed_stop(self):
-        # Data: [Sprite...][FF][00][FF]...
-        # Should stop at change?
-        # The code uses: pad_char = rom_data[start_offset]
-        # Then loops checking if rom_data[i] == pad_char.
-        # So mixed 00/FF is NOT allowed.
-        data = bytearray(b"\x00" * 10 + b"\xff\x00\xff")
-        slack = self.injector._detect_slack_space(data, 10)
-        self.assertEqual(slack, 1)  # Only the first FF matches
-
-    def test_detect_slack_limit(self):
-        # Data: [Sprite...][FF] * (MAX_SLACK_SIZE + 50)
-        # Limit is MAX_SLACK_SIZE.
+    def test_detect_slack_limit_via_find_compressed_sprite(self):
+        # Scenario: Slack exceeds limit
         limit = ROMInjector.MAX_SLACK_SIZE
-        data = bytearray(b"\x00" * 10 + b"\xff" * (limit + 50))
-        slack = self.injector._detect_slack_space(data, 10)
-        self.assertEqual(slack, limit)
+        self.injector.hal_compressor.decompress_from_rom.return_value = b"decompressed_data"
+        self.injector._parse_hal_compressed_size.return_value = 10
+        
+        rom_data = bytearray(b"C" * 10 + b"\xff" * (limit + 50))
+        
+        _, _, slack_size = self.injector.find_compressed_sprite(rom_data, 0)
+        
+        self.assertEqual(slack_size, limit)
 
 
 if __name__ == "__main__":

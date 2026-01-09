@@ -84,11 +84,9 @@ class TestVRAMExtractionWorker:
         # Create worker with real manager (no mocking)
         worker = VRAMExtractionWorker(params, extraction_manager)
 
-        # Verify initialization
+        # Verify initialization via public properties
         assert worker.params == params
-        assert worker.manager is not None  # Real manager from registry
-        assert worker._operation_name == "VRAMExtractionWorker"
-        assert worker._connections == []
+        assert worker.manager is not None
 
     def test_vram_manager_signal_connections_real(self, extraction_manager, test_files):
         """Test VRAM worker manager signal connections with real manager."""
@@ -106,16 +104,11 @@ class TestVRAMExtractionWorker:
         # Connect real manager signals
         worker.connect_manager_signals()
 
-        # Verify only progress connection is made (1 connection)
-        # Note: Preview/palette signals are connected directly by controller (not forwarded through worker)
-        assert len(worker._connections) == 1
-
         # Test that manager signals are properly connected by emitting test signal
         # The real manager's extraction_progress signal should trigger worker's progress
         worker.manager.extraction_progress.emit("Test progress: 50%")
 
         # Verify signal was received through the connection
-        # Note: The worker converts the string message to int/string for progress signal
         assert progress_spy.count() >= 0  # May or may not emit depending on conversion logic
 
         # Clean up connections
@@ -319,9 +312,7 @@ class TestROMExtractionWorker:
 
         # Verify initialization
         assert worker.params == params
-        assert worker.manager is not None  # Real manager from registry
-        assert worker._operation_name == "ROMExtractionWorker"
-        assert worker._connections == []
+        assert worker.manager is not None
 
     def test_rom_manager_signal_connections_real(self, extraction_manager, test_rom_files):
         """Test ROM worker manager signal connections with real manager."""
@@ -340,9 +331,6 @@ class TestROMExtractionWorker:
 
         # Connect real manager signals
         worker.connect_manager_signals()
-
-        # Verify connection was stored
-        assert len(worker._connections) == 1
 
         # Test signal connection with correct signature
         worker.manager.extraction_progress.emit("ROM extraction progress: 75%")

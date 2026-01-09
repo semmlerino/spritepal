@@ -253,17 +253,13 @@ class TestTileHashDatabaseLookup:
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))  # Minimal dummy file
 
-        with patch.object(TileHashDatabase, "__init__", lambda self, path: None):
-            db = object.__new__(TileHashDatabase)
-
-        db.rom_path = dummy_rom
-        db._hal = MagicMock()
+        # Initialize properly via constructor
+        db = TileHashDatabase(dummy_rom)
+        
+        # Populate with dummy data directly or via loading from JSON if preferred
+        # Here we manually populate for testing specific lookup logic
         db._hash_to_match = {}
         db._blocks = []
-        db._rom_header_offset = 0
-        db._rom_checksum = None
-        db._rom_title = None
-        db._rom_size = 0
         return db
 
     @pytest.fixture
@@ -274,6 +270,8 @@ class TestTileHashDatabaseLookup:
         hash1 = TileHashDatabase._hash_tile(tile1)
         hash2 = TileHashDatabase._hash_tile(tile2)
 
+        # Use private access here only to setup test state as we are unit testing the lookup logic specifically
+        # and building a real DB would require HAL compression and a real ROM structure
         mock_db._hash_to_match = {
             hash1: [TileMatch(rom_offset=0x1B0000, tile_index=0, description="Kirby")],
             hash2: [
@@ -393,11 +391,9 @@ class TestTileHashDatabaseStatistics:
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(TileHashDatabase, "__init__", lambda self, path: None):
-            db = object.__new__(TileHashDatabase)
-
-        db.rom_path = dummy_rom
-        db._hal = MagicMock()
+        db = TileHashDatabase(dummy_rom)
+        
+        # Populate for stats testing
         db._hash_to_match = {
             "hash1": [TileMatch(0x1000, 0)],
             "hash2": [TileMatch(0x1000, 1), TileMatch(0x2000, 0)],  # Collision
@@ -406,10 +402,6 @@ class TestTileHashDatabaseStatistics:
             ROMSpriteBlock(rom_offset=0x1000, description="Block1", tile_count=10, decompressed_size=320),
             ROMSpriteBlock(rom_offset=0x2000, description="Block2", tile_count=5, decompressed_size=160),
         ]
-        db._rom_header_offset = 0
-        db._rom_checksum = None
-        db._rom_title = None
-        db._rom_size = 0
         return db
 
     def test_get_statistics_structure(self, db_with_stats: TileHashDatabase) -> None:
@@ -456,15 +448,12 @@ class TestTileHashDatabasePersistence:
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(TileHashDatabase, "__init__", lambda self, path: None):
-            db = object.__new__(TileHashDatabase)
-
-        db.rom_path = dummy_rom
-        db._hal = MagicMock()
+        db = TileHashDatabase(dummy_rom)
+        
+        # Setup specific state for save test
         db._rom_header_offset = 512
         db._rom_checksum = 0x1234
         db._rom_title = "TEST ROM"
-        db._rom_size = 0x200
         db._blocks = [
             ROMSpriteBlock(
                 rom_offset=0x1B0000,
@@ -519,10 +508,12 @@ class TestTileHashDatabasePersistence:
         db_for_save.save_database(output_path)
 
         # Create new database and load
-        new_db = object.__new__(TileHashDatabase)
-        new_db.rom_path = db_for_save.rom_path
+        new_db = TileHashDatabase(db_for_save.rom_path)
+        
+        # Ensure it's clean (though it should be)
         new_db._hash_to_match = {}
-        new_db._blocks = []
+        
+        # Set matching checksums/offset to avoid warnings
         new_db._rom_checksum = 0x1234
         new_db._rom_header_offset = 512
 
@@ -538,10 +529,7 @@ class TestTileHashDatabasePersistence:
         output_path = tmp_path / "db.json"
         db_for_save.save_database(output_path)
 
-        new_db = object.__new__(TileHashDatabase)
-        new_db.rom_path = db_for_save.rom_path
-        new_db._hash_to_match = {}
-        new_db._blocks = []
+        new_db = TileHashDatabase(db_for_save.rom_path)
         new_db._rom_checksum = 0x1234
         new_db._rom_header_offset = 512
 
@@ -556,8 +544,7 @@ class TestTileHashDatabasePersistence:
         output_path = tmp_path / "db.json"
         db_for_save.save_database(output_path)
 
-        new_db = object.__new__(TileHashDatabase)
-        new_db.rom_path = db_for_save.rom_path
+        new_db = TileHashDatabase(db_for_save.rom_path)
         new_db._hash_to_match = {"existing": [TileMatch(0, 0)]}
         new_db._blocks = [ROMSpriteBlock(0, "existing")]
         new_db._rom_checksum = 0x1234
@@ -636,11 +623,7 @@ class TestEdgeCases:
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(TileHashDatabase, "__init__", lambda self, path: None):
-            db = object.__new__(TileHashDatabase)
-        db.rom_path = dummy_rom
-        db._hash_to_match = {}
-        db._blocks = []
+        db = TileHashDatabase(dummy_rom)
 
         tile_data = bytes(BYTES_PER_TILE)
         assert db.lookup_tile(tile_data) is None
@@ -650,11 +633,7 @@ class TestEdgeCases:
         dummy_rom = tmp_path / "dummy.sfc"
         dummy_rom.write_bytes(bytes(0x200))
 
-        with patch.object(TileHashDatabase, "__init__", lambda self, path: None):
-            db = object.__new__(TileHashDatabase)
-        db.rom_path = dummy_rom
-        db._hash_to_match = {}
-        db._blocks = []
+        db = TileHashDatabase(dummy_rom)
 
         result = db.find_rom_offset_for_vram_tiles([])
         assert result == {}
