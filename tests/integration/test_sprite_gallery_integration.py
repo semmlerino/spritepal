@@ -139,7 +139,7 @@ class TestDetachedGalleryWindow:
     """Test the detached gallery window functionality."""
 
     @pytest.mark.gui
-    def test_open_detached_gallery(self, gallery_with_sprites, qtbot):
+    def test_open_detached_gallery(self, gallery_with_sprites, qtbot, managers_initialized):
         """Test opening the detached gallery window."""
         tab = gallery_with_sprites
 
@@ -160,7 +160,7 @@ class TestDetachedGalleryWindow:
         tab.detached_window.close()
 
     @pytest.mark.gui
-    def test_detached_window_signals(self, gallery_with_sprites, qtbot):
+    def test_detached_window_signals(self, gallery_with_sprites, qtbot, managers_initialized):
         """Test that detached window signals are connected properly."""
         tab = gallery_with_sprites
 
@@ -187,7 +187,7 @@ class TestDetachedGalleryWindow:
         tab.detached_window.close()
 
     @pytest.mark.gui
-    def test_detached_window_close_cleanup(self, gallery_with_sprites, qtbot):
+    def test_detached_window_close_cleanup(self, gallery_with_sprites, qtbot, managers_initialized):
         """Test that closing detached window cleans up properly."""
         tab = gallery_with_sprites
 

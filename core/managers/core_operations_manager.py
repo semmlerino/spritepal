@@ -979,6 +979,7 @@ class CoreOperationsManager(BaseManager):
         # Check local worker (kept in facade for backward compatibility)
         return bool(self._current_worker and self._current_worker.isRunning())
 
+    @override
     def is_initialized(self) -> bool:
         """Check if manager is initialized.
 

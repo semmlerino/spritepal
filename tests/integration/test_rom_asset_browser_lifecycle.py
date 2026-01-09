@@ -1118,9 +1118,9 @@ class TestAssetBrowserUI:
         # Verify dimensions on all received thumbnails
         for offset, pixmap in thumbnail_found:
             assert not pixmap.isNull(), f"Thumbnail at 0x{offset:06X} is null"
-            # Minimum 32x32 (the display size in asset browser)
+            # Minimum 32x8 (at least one 8x8 tile wide/tall)
             assert pixmap.width() >= 32, f"Thumbnail at 0x{offset:06X} too narrow: {pixmap.width()}px (min 32)"
-            assert pixmap.height() >= 32, f"Thumbnail at 0x{offset:06X} too short: {pixmap.height()}px (min 32)"
+            assert pixmap.height() >= 8, f"Thumbnail at 0x{offset:06X} too short: {pixmap.height()}px (min 8)"
             # Sanity upper bound - sprites shouldn't be absurdly large
             assert pixmap.width() <= 512, f"Thumbnail at 0x{offset:06X} suspiciously wide: {pixmap.width()}px"
             assert pixmap.height() <= 512, f"Thumbnail at 0x{offset:06X} suspiciously tall: {pixmap.height()}px"

@@ -15,6 +15,10 @@ def test_output_name_provider_pattern(app_context):
         state_manager=app_context.application_state_manager,
         rom_cache=app_context.rom_cache,
     )
+    # Set dummy ROM path to ensure get_extraction_params returns dict
+    panel.rom_path = "dummy.sfc"
+    # Set manual mode to bypass sprite selection requirement (otherwise returns None)
+    panel.set_manual_offset(0)
 
     # Initially, no provider set
     params = panel.get_extraction_params()
