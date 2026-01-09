@@ -29,9 +29,13 @@ class OffsetLineEdit(QLineEdit):
     # Signal emitted when user presses Enter
     return_pressed_with_offset = Signal(int)
 
+    # Signal emitted when offset is out of ROM bounds
+    validation_error = Signal(str)
+
     def __init__(self, default: int = 0, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._last_valid_offset = default
+        self._max_offset: int = 0  # 0 means no limit (ROM not loaded)
         self.setPlaceholderText("Offset (0x..., $..., Bank:Addr)")
         self.setToolTip("Supports Hex (0x/$, SNES ($C0:1234), or Mesen2 paste")
 
@@ -41,13 +45,30 @@ class OffsetLineEdit(QLineEdit):
         if default > 0:
             self.set_offset(default)
 
+    def set_rom_bounds(self, max_offset: int) -> None:
+        """Set ROM size for offset range validation.
+
+        Args:
+            max_offset: Maximum valid offset (ROM size). 0 means no limit.
+        """
+        self._max_offset = max_offset
+        # Re-validate current text with new bounds
+        self._on_text_changed(self.text())
+
     def _on_text_changed(self, text: str) -> None:
         """Parse text and update visual state."""
         offset = self._parse_offset(text)
         if offset is not None:
-            self.setStyleSheet("")
-            self._last_valid_offset = offset
-            self.offset_changed.emit(offset)
+            # Check if offset is within ROM bounds
+            if self._max_offset > 0 and offset >= self._max_offset:
+                self.setStyleSheet("background-color: #442222;")
+                self.validation_error.emit(
+                    f"Offset 0x{offset:06X} exceeds ROM size (0x{self._max_offset:06X})"
+                )
+            else:
+                self.setStyleSheet("")
+                self._last_valid_offset = offset
+                self.offset_changed.emit(offset)
         elif text.strip():
             self.setStyleSheet("background-color: #442222;")
         else:

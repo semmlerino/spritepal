@@ -425,19 +425,23 @@ class SmartPreviewCoordinator(QObject):
         """Request preview from worker pool."""
         logger.debug("_request_worker_preview called")
         if not self._rom_data_provider:
+            self.preview_error.emit("Preview not available: no ROM data provider")
             return
 
         try:
             provider_result = self._rom_data_provider()
             if provider_result is None:
+                self.preview_error.emit("ROM must be loaded first")
                 return
             rom_path, extractor_obj = provider_result
             extractor: ROMExtractor | None = cast("ROMExtractor | None", extractor_obj)
 
             # Check if ROM data is actually valid before proceeding
             if not rom_path or not rom_path.strip():
+                self.preview_error.emit("ROM must be loaded first")
                 return
             if not extractor:
+                self.preview_error.emit("ROM extractor not available")
                 return
 
             with QMutexLocker(self._mutex):

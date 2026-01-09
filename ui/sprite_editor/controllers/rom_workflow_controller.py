@@ -185,6 +185,10 @@ class ROMWorkflowController(QObject):
         self._view = view
         self._connect_view_signals()
 
+        # Initialize ROM availability state (disabled until ROM is loaded)
+        if not self.rom_path:
+            self._view.source_bar.set_rom_available(False)
+
         # Load existing persistent clicks into asset browser
         if self.log_watcher:
             persistent_clicks = self.log_watcher.load_persistent_clicks()
@@ -426,6 +430,39 @@ class ROMWorkflowController(QObject):
         if count > 0:
             logger.info("Loaded %d library sprites for this ROM", count)
 
+    def _load_known_sprite_locations(self) -> None:
+        """Load known sprite locations from config for current ROM."""
+        if not self._view or not self.rom_path or not self.rom_extractor:
+            return
+
+        try:
+            locations = self.rom_extractor.get_known_sprite_locations(self.rom_path)
+            if not locations:
+                logger.debug("No known sprite locations found for this ROM")
+                return
+
+            count = 0
+            for name, pointer in locations.items():
+                # Skip internal notes/documentation entries
+                if name.startswith("_"):
+                    continue
+
+                self._view.asset_browser.add_rom_sprite(name, pointer.offset)
+                # Queue thumbnail generation
+                if self._thumbnail_controller:
+                    self._thumbnail_controller.queue_thumbnail(pointer.offset)
+                count += 1
+
+            if count > 0:
+                logger.info("Loaded %d known sprite locations for this ROM", count)
+                if self._message_service:
+                    self._message_service.show_message(
+                        f"Found {count} known sprite locations"
+                    )
+
+        except Exception:
+            logger.exception("Error loading known sprite locations")
+
     def _load_library_thumbnail(self, sprite: object) -> QPixmap | None:
         """Load thumbnail from library."""
         from core.sprite_library import LibrarySprite
@@ -475,6 +512,7 @@ class ROMWorkflowController(QObject):
         # Update view
         if self._view:
             self._view.source_bar.set_rom_path(path)
+            self._view.source_bar.set_rom_available(True, self.rom_size)
 
         # Get ROM info (checksum/title)
         try:
@@ -496,6 +534,9 @@ class ROMWorkflowController(QObject):
 
         # Load library sprites for this ROM
         self._load_library_sprites()
+
+        # Load known sprite locations from config
+        self._load_known_sprite_locations()
 
         # Request thumbnails for any existing assets
         if self._view and self._thumbnail_controller and self.log_watcher:
@@ -529,7 +570,20 @@ class ROMWorkflowController(QObject):
             offset: ROM offset to navigate to.
             auto_open: If True, automatically open in editor when preview completes.
         """
-        if offset < 0 or (self.rom_size > 0 and offset >= self.rom_size):
+        # Check ROM availability first
+        if not self.rom_path:
+            if self._message_service:
+                self._message_service.show_message(
+                    "ROM must be loaded first. Click '...' to load a ROM file."
+                )
+            return
+
+        # Validate offset is within ROM bounds
+        if offset < 0 or offset >= self.rom_size:
+            if self._message_service:
+                self._message_service.show_message(
+                    f"Offset 0x{offset:06X} is out of range (ROM size: 0x{self.rom_size:06X})"
+                )
             return
 
         # Set flag to auto-open in editor when preview completes

@@ -124,3 +124,21 @@ class SourceBar(QWidget):
         else:
             # Caller should call set_action_text() after this to restore proper text
             self.action_btn.setEnabled(True)
+
+    def set_rom_available(self, available: bool, rom_size: int = 0) -> None:
+        """Enable or disable offset-related controls based on ROM availability.
+
+        Args:
+            available: Whether a ROM is loaded.
+            rom_size: Size of the ROM in bytes (for offset validation).
+        """
+        self.offset_edit.setEnabled(available)
+        self.action_btn.setEnabled(available)
+
+        if available:
+            self.offset_edit.set_rom_bounds(rom_size)
+            self.offset_edit.setPlaceholderText("Offset (0x..., $..., Bank:Addr)")
+        else:
+            self.offset_edit.set_rom_bounds(0)
+            self.offset_edit.setPlaceholderText("Load ROM first")
+            self.action_btn.setToolTip("Load a ROM file to enable")

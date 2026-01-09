@@ -142,6 +142,9 @@ class ROMPaletteExtractor:
         """
         Get palette offset and indices for a specific sprite.
 
+        Falls back to global palette offset with default sprite palette indices (8-15)
+        for manual offset extractions (sprite names like "manual_0x...").
+
         Args:
             game_config: Game configuration from sprite_locations.json
             sprite_name: Name of the sprite
@@ -151,17 +154,32 @@ class ROMPaletteExtractor:
         """
         # Get global palette offset for the game
         palette_info = game_config.get("palettes", {})
-        palette_offset = palette_info.get("offset", None)
-        if palette_offset and isinstance(palette_offset, str):
-            palette_offset = int(palette_offset, 16) if palette_offset.startswith("0x") else int(palette_offset)
+        palette_offset_raw = palette_info.get("offset", None)
+        palette_offset: int | None = None
+
+        if palette_offset_raw and isinstance(palette_offset_raw, str):
+            palette_offset = (
+                int(palette_offset_raw, 16)
+                if palette_offset_raw.startswith("0x")
+                else int(palette_offset_raw)
+            )
+        elif isinstance(palette_offset_raw, int):
+            palette_offset = palette_offset_raw
 
         # Get sprite-specific palette indices
         sprites = game_config.get("sprites", {})
         sprite_info = sprites.get(sprite_name, {})
         palette_indices = sprite_info.get("palette_indices", [])
 
+        # Return sprite-specific config if available
         if palette_offset and palette_indices:
             return palette_offset, palette_indices
+
+        # Fall back to default sprite palette indices (8-15) for manual extractions
+        # These are the standard SNES sprite palettes
+        if palette_offset:
+            default_indices = list(range(8, 16))  # Palettes 8-15 for sprites
+            return palette_offset, default_indices
 
         return None, None
 
