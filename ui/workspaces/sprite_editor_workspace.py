@@ -190,6 +190,10 @@ class SpriteEditorWorkspace(QWidget):
         self.mode_changed.connect(self._on_mode_changed_internal)
         self.mode_changed.connect(self._on_mode_switched)
 
+        # Sync stack to match initial combo state (combo was set before signals were wired)
+        initial_mode = self._mode_combo.currentData()
+        self._on_mode_switched(initial_mode)
+
         logger.debug("Controllers wired to workspace pages")
 
     def _on_mode_changed_internal(self, mode: str) -> None:

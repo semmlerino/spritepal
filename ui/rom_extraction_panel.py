@@ -170,7 +170,7 @@ class ROMExtractionPanel(QWidget):
         """
         self._output_name_provider = provider
 
-    def sync_output_name(self, name: str) -> None:
+    def set_output_name(self, name: str) -> None:
         """Syncs the inline output name field with the main OutputSettingsManager.
 
         Args:

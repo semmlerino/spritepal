@@ -891,21 +891,21 @@ class InjectionDialog(TabbedDialog):
 
     def _set_initial_paths(self) -> None:
         """Set initial paths based on suggestions"""
-        # Set input VRAM if we have a suggestion
-        if self.suggested_input_vram and self.input_vram_selector:
-            self.input_vram_selector.set_path(self.suggested_input_vram)
-        else:
+        # Determine suggested input VRAM
+        suggested_input = self.suggested_input_vram
+        if not suggested_input:
             # Try to find and auto-fill input VRAM
             suggested_input = self.injection_manager.find_suggested_input_vram(
                 self.sprite_path, self.metadata, self.suggested_input_vram
             )
-            return
+
+        # Set input VRAM selector
+        if suggested_input and self.input_vram_selector:
+            self.input_vram_selector.set_path(suggested_input)
 
         # VRAM offset from metadata
         if self.metadata:
             self.extraction_vram_offset = str(self.metadata.get("vram_offset", ""))
-            if suggested_input and self.input_vram_selector:
-                self.input_vram_selector.set_path(suggested_input)
 
         # Set ROM injection parameters from saved settings or metadata
         self._set_rom_injection_defaults()

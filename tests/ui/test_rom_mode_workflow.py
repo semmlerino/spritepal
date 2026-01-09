@@ -49,9 +49,16 @@ class MockTab(QWidget):
         self.save_rom_requested.connect = Mock()
         self.browse_png_requested = Mock()
         self.browse_png_requested.connect = Mock()
+        self.browse_oam_requested = Mock()
+        self.browse_oam_requested.connect = Mock()
+        self.generate_preview_requested = Mock()
+        self.generate_preview_requested.connect = Mock()
 
     def set_extraction_controller(self, ctrl):
         pass
+
+    def get_preview_size(self):
+        return 128
 
     def set_controller(self, ctrl):
         pass
