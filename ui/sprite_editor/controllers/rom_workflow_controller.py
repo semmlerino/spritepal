@@ -316,21 +316,64 @@ class ROMWorkflowController(QObject):
         return None
 
     def _generate_library_thumbnail(self, offset: int) -> Image.Image | None:
-        """Generate PIL Image thumbnail for library storage."""
+        """Generate PIL Image thumbnail for library storage.
+
+        Attempts three strategies in order:
+        1. Use current_tile_data if offset matches (already decompressed from preview)
+        2. Attempt HAL decompression
+        3. Fall back to raw ROM bytes
+        """
         if not self.rom_path:
             return None
+
+        data_to_render: bytes | None = None
+
+        # Strategy 1: Use current decompressed data if available
+        if self.current_offset == offset and self.current_tile_data:
+            data_to_render = self.current_tile_data
+            logger.debug("Using current_tile_data for thumbnail: 0x%06X", offset)
+
+        # Strategy 2: Attempt HAL decompression
+        if not data_to_render and self.rom_extractor:
+            try:
+                with open(self.rom_path, "rb") as f:
+                    f.seek(offset)
+                    chunk = f.read(0x10000)  # Read up to 64KB for decompression
+
+                if chunk and hasattr(self.rom_extractor, "rom_injector"):
+                    rom_injector = self.rom_extractor.rom_injector
+                    _, decompressed_data, _ = rom_injector.find_compressed_sprite(
+                        chunk, 0, expected_size=None
+                    )
+                    if decompressed_data:
+                        data_to_render = decompressed_data
+                        logger.debug(
+                            "HAL decompressed %d bytes for thumbnail: 0x%06X",
+                            len(decompressed_data),
+                            offset,
+                        )
+            except Exception as e:
+                logger.debug("HAL decompression failed for thumbnail at 0x%06X: %s", offset, e)
+
+        # Strategy 3: Fall back to raw ROM bytes (original behavior)
+        if not data_to_render:
+            try:
+                with open(self.rom_path, "rb") as f:
+                    f.seek(offset)
+                    data_to_render = f.read(32 * 64)  # Read up to 64 tiles worth
+                logger.debug("Using raw data for thumbnail: 0x%06X", offset)
+            except OSError as e:
+                logger.error("Failed to read ROM for thumbnail: %s", e)
+                return None
+
+        if not data_to_render:
+            return None
+
+        # Render tiles
         try:
             from core.tile_renderer import TileRenderer
 
-            # Read sprite data from ROM
-            with open(self.rom_path, "rb") as f:
-                f.seek(offset)
-                data = f.read(32 * 64)  # Read up to 64 tiles worth
-
-            if not data:
-                return None
-
-            tile_count = len(data) // 32
+            tile_count = len(data_to_render) // 32
             if tile_count == 0:
                 return None
 
@@ -340,7 +383,9 @@ class ROMWorkflowController(QObject):
 
             # Render using TileRenderer (grayscale)
             renderer = TileRenderer()
-            image = renderer.render_tiles(data, width_tiles, height_tiles, palette_index=None)
+            image = renderer.render_tiles(
+                data_to_render, width_tiles, height_tiles, palette_index=None
+            )
             return image
         except Exception as e:
             logger.error("Failed to generate thumbnail: %s", e)
@@ -499,10 +544,8 @@ class ROMWorkflowController(QObject):
                 self._message_service.show_message(f"Error: ROM file not found: {path}")
             return
 
-        # Clear previous state to prevent stale captures/sprites from appearing in new ROM
-        if self.log_watcher:
-            self.log_watcher.clear_history()
-
+        # Clear ROM-specific state (asset browser) but preserve global Mesen capture history
+        # so F6 workflow and Recent Captures widget persist across ROM loads
         if self._view:
             self._view.asset_browser.clear_all()
 

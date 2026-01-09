@@ -322,7 +322,7 @@ class EditingController(QObject):
         if self._view:
             palette_panel = getattr(self._view, "palette_panel", None)
             if palette_panel:
-                selector = getattr(palette_panel, "_source_selector", None)
+                selector = getattr(palette_panel, "palette_source_selector", None)
                 if selector:
                     selector.set_selected_source(source_type, palette_index)
 

@@ -153,7 +153,7 @@ class IconToolbar(QWidget):
         self.palette_preview_btn.setCheckable(True)
         self.palette_preview_btn.setChecked(True)  # Start with palette preview enabled
         self._apply_icon(self.palette_preview_btn, "palette")
-        self.palette_preview_btn.setToolTip("Toggle Palette Preview (P)")
+        self.palette_preview_btn.setToolTip("Toggle Palette Preview (C)")
         self.palette_preview_btn.setIconSize(self._get_icon_size())
         self.palette_preview_btn.clicked.connect(self._on_palette_preview_toggled)
         layout.addWidget(self.palette_preview_btn)

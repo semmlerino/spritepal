@@ -156,6 +156,7 @@ class SpriteEditorWorkspace(QWidget):
         self._mode_combo = QComboBox()
         self._mode_combo.addItem("VRAM Mode", "vram")
         self._mode_combo.addItem("ROM Mode", "rom")
+        self._mode_combo.setCurrentIndex(1)  # Default to ROM mode (Mesen2 workflow)
         self._mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         layout.addWidget(self._mode_combo)
 

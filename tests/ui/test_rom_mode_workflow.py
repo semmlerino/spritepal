@@ -180,22 +180,25 @@ class TestRomModeWorkflow:
         assert isinstance(combo, QComboBox)
         assert combo.count() == 2
 
-        # Test switching to ROM mode
+        # Default is now ROM mode (index 1). Verify this.
+        assert combo.currentIndex() == 1
+
+        # Test mode switching between VRAM and ROM modes
         # The mode_changed signal triggers _on_mode_changed_internal which
         # propagates to extraction/injection controllers
         with patch.object(sprite_editor_workspace._extraction_controller, "set_mode") as mock_extract_mode:
             with patch.object(sprite_editor_workspace._injection_controller, "set_mode") as mock_inject_mode:
-                # Change index to ROM (index 1)
-                combo.setCurrentIndex(1)
-
-                # Verify controllers received mode change
-                mock_extract_mode.assert_called_with("rom")
-                mock_inject_mode.assert_called_with("rom")
-
-                # Change back to VRAM (index 0)
+                # Switch to VRAM mode first (from default ROM mode)
                 combo.setCurrentIndex(0)
+
+                # Verify controllers received mode change to VRAM
                 mock_extract_mode.assert_called_with("vram")
                 mock_inject_mode.assert_called_with("vram")
+
+                # Change back to ROM mode (index 1)
+                combo.setCurrentIndex(1)
+                mock_extract_mode.assert_called_with("rom")
+                mock_inject_mode.assert_called_with("rom")
 
     def test_jump_to_offset_switches_mode(self, sprite_editor_workspace):
         # Verify jump_to_offset sets mode and offset
