@@ -8,7 +8,6 @@ providing 3-4x speedup on multi-core systems.
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -196,8 +195,6 @@ class ParallelSpriteFinder:
         finder: SpriteFinder,
         rom_data: bytes,
         chunk: SearchChunk,
-        end_offset: int | None = None,
-        progress_callback: Callable[[int, int], None] | None = None,
         cancellation_token: CancellationToken | None = None,
     ) -> list[SearchResult]:
         """Search a single chunk for sprites.

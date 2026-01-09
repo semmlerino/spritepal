@@ -253,13 +253,11 @@ class InjectionController(QObject):
         self._view.append_output(f"Injecting: {params['png_file']}")
         self._view.append_output(f"Into: {params['vram_file']}")
 
-        from typing import cast
-
         # Determine output path
-        output_file = cast(str, params["output_file"])
+        output_file = params["output_file"]
         if not Path(output_file).is_absolute():
             # Make relative to VRAM file directory
-            vram_dir = Path(cast(str, params["vram_file"])).parent
+            vram_dir = Path(params["vram_file"]).parent
             output_file = str(vram_dir / output_file)
 
         # Clean up any existing worker before creating new one
@@ -267,9 +265,9 @@ class InjectionController(QObject):
 
         # Create and start worker
         self._worker = InjectWorker(
-            png_file=cast(str, params["png_file"]),
-            vram_file=cast(str, params["vram_file"]),
-            offset=cast(int, params["offset"]),
+            png_file=params["png_file"],
+            vram_file=params["vram_file"],
+            offset=params["offset"],
             output_file=output_file,
         )
 

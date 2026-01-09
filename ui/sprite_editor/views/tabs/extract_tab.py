@@ -183,7 +183,7 @@ class ExtractTab(QWidget):
         """Set the ROM file path."""
         self.rom_path_edit.setText(path)
 
-    def get_extraction_params(self) -> "ExtractTabParams":
+    def get_extraction_params(self) -> ExtractTabParams:
         """Get the current extraction parameters."""
         use_palette = self.use_palette_check.isChecked()
         return {

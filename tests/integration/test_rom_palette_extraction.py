@@ -104,8 +104,8 @@ class TestROMPaletteExtraction:
                 assert len(palette) == 16, f"Palette {pal_idx} should have 16 colors"
                 # Each color should be an RGB tuple
                 for color in palette:
-                    assert len(color) == 3, f"Color should be RGB tuple"
-                    assert all(0 <= c <= 255 for c in color), f"Color values should be 0-255"
+                    assert len(color) == 3, "Color should be RGB tuple"
+                    assert all(0 <= c <= 255 for c in color), "Color values should be 0-255"
 
     def test_palette_colors_are_reasonable(self, app_context, kirby_rom_path: Path) -> None:
         """Verify extracted palettes have reasonable color values (not all zeros)."""
@@ -142,7 +142,7 @@ class TestROMPaletteExtraction:
 
         # At least one palette should have non-zero colors
         has_nonzero = False
-        for pal_idx, palette in palettes.items():
+        for palette in palettes.values():
             for color in palette:
                 if any(c > 0 for c in color):
                     has_nonzero = True

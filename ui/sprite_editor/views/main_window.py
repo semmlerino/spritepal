@@ -25,6 +25,7 @@ from .tabs import EditTab, ExtractTab, InjectTab, MultiPaletteTab
 
 if TYPE_CHECKING:
     from PIL import Image
+
     from core.managers.application_state_manager import ApplicationStateManager
     from ui.sprite_editor.controllers import (
         EditingController,

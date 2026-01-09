@@ -262,7 +262,7 @@ class LibraryTab(QWidget):
     def _show_context_menu(self, position: QPoint) -> None:
         """Show context menu for grid item."""
         item = self._grid_widget.itemAt(position)
-        if item is None:
+        if item is None:  # type: ignore[reportUnnecessaryComparison]
             return
 
         unique_id = item.data(Qt.ItemDataRole.UserRole)

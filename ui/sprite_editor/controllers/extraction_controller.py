@@ -3,7 +3,7 @@
 Extraction controller for sprite extraction from VRAM dumps.
 """
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QFileDialog
@@ -232,7 +232,8 @@ class ExtractionController(QObject):
                 # Force load to ensure file can be closed/deleted if needed (though temp dir handles it)
                 image.load()
 
-                tile_count = int(info["tile_count"])
+                # info["tile_count"] is object, need to cast for int()
+                tile_count = int(cast(int, info["tile_count"]))
 
                 self._view.append_output(f"Loaded {tile_count} tiles.")
 
@@ -262,15 +263,13 @@ class ExtractionController(QObject):
         self._cleanup_worker()
 
         # Create and start worker
-        from typing import cast
-
         self._worker = ExtractWorker(
-            vram_file=cast(str, params["vram_file"]),
-            offset=cast(int, params["offset"]),
-            size=cast(int, params["size"]),
-            tiles_per_row=cast(int, params["tiles_per_row"]),
-            palette_num=cast(int | None, params.get("palette_num")),
-            cgram_file=cast(str | None, params.get("cgram_file")),
+            vram_file=params["vram_file"],
+            offset=params["offset"],
+            size=params["size"],
+            tiles_per_row=params["tiles_per_row"],
+            palette_num=params.get("palette_num"),
+            cgram_file=params.get("cgram_file"),
         )
 
         self._worker.progress.connect(self._on_progress)
@@ -361,7 +360,7 @@ class ExtractionController(QObject):
             return
 
         # Use new direct image method (efficient, no re-rendering)
-        if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "set_palette_images"):
+        if hasattr(self._multi_palette_view, "set_palette_images"):
             self._multi_palette_view.set_palette_images(palette_images)
             # Use correct field names expected by viewer
             stats: dict[str, int | dict[int, int]] = {"sprite_count": tile_count}
@@ -373,7 +372,7 @@ class ExtractionController(QObject):
             self._multi_palette_view.set_oam_statistics(stats)
 
         # Fallback to old method for backward compatibility
-        elif self._multi_palette_view is not None and hasattr(self._multi_palette_view, "set_single_image_all_palettes"):
+        elif hasattr(self._multi_palette_view, "set_single_image_all_palettes"):
             base_img = palette_images.get("palette_0")
             if base_img and base_img.mode == "P":
                 # Extract palette data from pre-rendered images

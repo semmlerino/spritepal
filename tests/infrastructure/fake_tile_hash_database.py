@@ -18,9 +18,6 @@ from typing import TYPE_CHECKING
 
 from core.mesen_integration.tile_hash_database import TileMatch
 
-if TYPE_CHECKING:
-    pass
-
 
 @dataclass
 class FakeTileHashDatabase:

@@ -25,9 +25,6 @@ from core.mesen_integration.rom_tile_matcher import (
     TileLocation,
 )
 
-if TYPE_CHECKING:
-    pass
-
 
 def create_test_rom_tile_matcher(
     rom_path: Path,

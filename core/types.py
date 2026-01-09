@@ -18,6 +18,7 @@ from PIL import Image
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QWidget
 
+
 @runtime_checkable
 class CancellationToken(Protocol):
     """Protocol for cancellation tokens that provide an is_set() method.

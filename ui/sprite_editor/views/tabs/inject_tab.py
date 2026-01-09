@@ -153,7 +153,7 @@ class InjectTab(QWidget):
         """Set the ROM file path."""
         self.rom_path_edit.setText(path)
 
-    def get_injection_params(self) -> "InjectTabParams":
+    def get_injection_params(self) -> InjectTabParams:
         """Get the current injection parameters."""
         return {
             "png_file": self.png_drop.get_file_path(),
