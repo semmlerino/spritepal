@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from PySide6.QtWidgets import QWidget
 
-
 # --- Mock Classes (reused from test_mode_switch_repro.py) ---
 
 

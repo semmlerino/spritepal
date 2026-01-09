@@ -268,8 +268,7 @@ class TestClear:
         rom_file.write_bytes(b"x" * 1024)
 
         controller = ROMSessionController(settings_manager=mock_settings_manager)
-        controller._current_rom_path = str(rom_file)
-        controller._current_rom_size = 1024
+        controller.load_rom_file(str(rom_file))
 
         controller.clear()
 
