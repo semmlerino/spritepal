@@ -996,7 +996,7 @@ class ROMWorkflowController(QObject):
         logger.debug(f"[PREVIEW] Checking flag: _pending_open_in_editor={self._pending_open_in_editor}")
         if self._pending_open_in_editor:
             # Only auto-open if offset matches (prevents stale opens after errors/navigation)
-            if self._pending_open_offset == -1 or self._pending_open_offset == actual_offset:
+            if self._pending_open_offset in (-1, actual_offset):
                 logger.debug("[PREVIEW] Flag is True and offset matches, calling open_in_editor()")
                 self._pending_open_in_editor = False
                 self._pending_open_offset = -1
