@@ -215,35 +215,32 @@ class TestCompressionRatioValidation:
     """HAL-3.1a: Compression ratio validation."""
 
     def test_low_ratio_warning_logged(self, caplog):
-        """Verify warning when compression ratio < 5%."""
+        """HAL-3.1a: Check that unusually low compression ratios trigger rejection."""
+        # Use DEBUG level to see rejection messages
+        caplog.set_level("DEBUG")
+
         injector = ROMInjector()
 
-        # Mock find_compressed_sprite to return suspicious ratio
-        with patch.object(injector.hal_compressor, "decompress_from_rom") as mock_decompress:
-            # Return 10000 bytes decompressed
-            mock_decompress.return_value = b"\x00" * 10000
+        # Mock the decompressor to return a large block of data
+        # and the parser to return a very small compressed size
+        # This creates an impossible compression ratio (< 1%)
+        with patch.object(HALCompressor, "decompress_from_rom") as mock_decomp:
+            mock_decomp.return_value = b"\x00" * 10000
 
-            # Mock parser to return very small compressed size (1% ratio)
-            with patch.object(injector, "_parse_hal_compressed_size") as mock_parse:
-                mock_parse.return_value = 100  # 1% of 10000
+            with patch.object(ROMInjector, "_parse_hal_compressed_size") as mock_parse:
+                mock_parse.return_value = 100  # 100 bytes compressed -> 10000 bytes uncompressed (1% ratio)
 
-                with tempfile.NamedTemporaryFile(suffix=".sfc", delete=False) as tmp:
-                    tmp.write(b"\x00" * 0x10000)
-                    tmp.flush()
+                # ROM data must be large enough
+                rom_data = b"\x00" * 0x10000
 
-                    # Read ROM data
-                    rom_data = Path(tmp.name).read_bytes()
+                compressed_size, data, slack = injector.find_compressed_sprite(rom_data, 0)
 
-                    try:
-                        compressed_size, data = injector.find_compressed_sprite(rom_data, 0)
-                        # With stricter validation, low ratios now cause rejection
-                        assert compressed_size == 0 and data == b""
-                    except Exception:
-                        pass  # May fail validation, that's ok
+                # Should be rejected (returns 0, b"", 0)
+                assert compressed_size == 0
+                assert data == b""
 
         # Check for rejection due to invalid compression ratio
-        # (Changed from warning to rejection in false positive reduction update)
-        assert any("invalid compression ratio" in r.message.lower() for r in caplog.records)
+        assert any("rejected: invalid compression ratio" in r.message.lower() for r in caplog.records)
 
 
 # ============================================================================

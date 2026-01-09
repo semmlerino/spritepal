@@ -436,11 +436,11 @@ class TestParallelSpriteFinder:
 class TestParallelPerformance:
     """Performance tests for parallel sprite finder."""
 
-    def test_parallel_vs_linear_performance(self, temp_rom_file):
-        """Test that parallel search is faster than linear (when it should be)."""
-        # Note: This is a basic performance test
-        # In real scenarios with CPU-intensive sprite detection,
-        # parallel should be faster
+    def test_parallel_vs_linear_performance(self, app_context, test_rom_file):
+        """Benchmark: Parallel search should be significantly faster than linear."""
+        # Use medium ROM for meaningful benchmark
+        rom_path = test_rom_file(size="medium")
+
 
         # Create parallel finder
         parallel_finder = ParallelSpriteFinder(num_workers=4, chunk_size=0x20000)
@@ -455,7 +455,7 @@ class TestParallelPerformance:
         # Time parallel search
         start_time = time.time()
         parallel_results = parallel_finder.search_parallel(
-            temp_rom_file,
+            rom_path,
             start_offset=0x0,
             end_offset=0x40000,  # Smaller range for test
         )

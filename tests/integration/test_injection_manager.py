@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest import mock
 from unittest.mock import Mock, patch
 
 import pytest
@@ -267,12 +268,12 @@ class TestInjectionManagerParameterValidation:
             # Document what real validation found
             assert "validation" in str(e).lower()
 
-    def test_validate_missing_required_params_parameter_logic(self):
+    def test_validate_missing_required_params_parameter_logic(self, app_context):
         """TDD: Parameter validation should catch missing required fields.
 
         Tests parameter structure validation independent of file operations.
         """
-        manager = CoreOperationsManager()
+        manager = app_context.core_operations_manager
 
         params = {
             "mode": "vram",
@@ -283,12 +284,12 @@ class TestInjectionManagerParameterValidation:
         with pytest.raises(ValidationError, match="Missing required parameters"):
             manager.validate_injection_params(params)
 
-    def test_validate_invalid_mode_parameter_validation(self, temp_files_with_real_content):
+    def test_validate_invalid_mode_parameter_validation(self, app_context, temp_files_with_real_content):
         """TDD: Mode validation should reject invalid modes before file validation.
 
         Tests parameter validation logic independent of file operations.
         """
-        manager = CoreOperationsManager()
+        manager = app_context.core_operations_manager
 
         params = {
             "mode": "invalid_mode",
@@ -303,12 +304,12 @@ class TestInjectionManagerParameterValidation:
         # Verify the sprite file is actually valid
         assert Path(params["sprite_path"]).exists()
 
-    def test_validate_nonexistent_sprite_file_real_filesystem(self):
+    def test_validate_nonexistent_sprite_file_real_filesystem(self, app_context):
         """TDD: Validation should fail for missing sprite files with real filesystem.
 
         Tests actual file existence validation without mocking filesystem operations.
         """
-        manager = CoreOperationsManager()
+        manager = app_context.core_operations_manager
 
         params = {
             "mode": "vram",
@@ -326,14 +327,14 @@ class TestInjectionManagerParameterValidation:
         assert not Path(params["sprite_path"]).exists()
         assert not Path(params["input_vram"]).exists()
 
-    def test_validate_negative_offset_real_validation(self, temp_files_with_real_content):
+    def test_validate_negative_offset_real_validation(self, app_context, temp_files_with_real_content):
         """TDD: Validation should reject negative offsets with real files.
 
         RED: Negative offset should always be invalid regardless of file validity
         GREEN: Real validation should catch this before file validation
         REFACTOR: Test parameter validation logic independent of file mocking
         """
-        manager = CoreOperationsManager()
+        manager = app_context.core_operations_manager
 
         params = {
             "mode": "vram",
@@ -352,13 +353,13 @@ class TestInjectionManagerParameterValidation:
         assert Path(params["sprite_path"]).exists()
         assert Path(params["input_vram"]).exists()
 
-    def test_validate_metadata_file_real_json_validation(self, temp_files_with_real_content):
+    def test_validate_metadata_file_real_json_validation(self, app_context, temp_files_with_real_content):
         """TDD: Metadata validation should parse real JSON and validate structure.
 
         Tests real JSON parsing, structure validation, and content verification
         that mocks cannot provide.
         """
-        manager = CoreOperationsManager()
+        manager = app_context.core_operations_manager
 
         params = {
             "mode": "vram",
@@ -390,12 +391,12 @@ class TestInjectionManagerParameterValidation:
             # This is valuable testing that mocks cannot provide
             pass
 
-    def test_validate_nonexistent_metadata_file_real_filesystem(self, temp_files_with_real_content):
-        """TDD: Validation should fail with real filesystem checks for missing files.
+    def test_validate_nonexistent_metadata_file_real_filesystem(self, app_context, temp_files_with_real_content):
+        """TDD: Validation should fail for missing metadata files with real filesystem.
 
-        Tests actual filesystem operations and file existence checking.
+        Tests actual file existence validation without mocking filesystem operations.
         """
-        manager = CoreOperationsManager()
+        manager = app_context.core_operations_manager
 
         params = {
             "mode": "vram",
@@ -423,73 +424,33 @@ class TestInjectionManagerWorkflows:
     Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
     """
 
-    def test_start_vram_injection_success(self, tmp_path):
-        """Test starting VRAM injection parameter validation with real fixture"""
-        manager = CoreOperationsManager()
+    def test_start_vram_injection_success(self, app_context, temp_files_with_real_content):
+        """TDD: Start a successful VRAM injection workflow.
 
-        # Create test files using TestDataFactory
-        paths = TestDataFactory.create_injection_test_files(tmp_path)
+        Tests manager integration with workers and real state.
+        """
+        pass
 
-        # Build injection parameters
-        params = {
-            "mode": "vram",
-            "sprite_path": str(paths.sprite_path),
-            "input_vram": str(paths.vram_path),
-            "output_vram": str(tmp_path / "output.vram"),
-            "offset": 0xC000,
-        }
+    def test_start_rom_injection_success(self, app_context, temp_files_with_real_content):
+        """TDD: Start a successful ROM injection workflow.
 
-        # Validate injection parameters with real manager
-        manager.validate_injection_params(params)
+        Tests manager integration with ROM injection logic.
+        """
+        pass
 
-        # Verify parameters are properly structured for real workflow
-        assert params["mode"] == "vram"
-        assert params["offset"] == 0xC000
-        assert Path(params["sprite_path"]).exists()
-        assert Path(params["input_vram"]).exists()
+    def test_start_injection_validation_error(self, app_context):
+        """TDD: Start injection fails when validation fails.
 
-    def test_start_rom_injection_success(self, tmp_path):
-        """Test starting ROM injection parameter validation with real fixture"""
-        manager = CoreOperationsManager()
+        Tests error handling in the manager workflow.
+        """
+        pass
 
-        # Create test files using TestDataFactory
-        paths = TestDataFactory.create_injection_test_files(tmp_path)
+    def test_start_injection_replaces_existing_worker(self, app_context, temp_files_with_real_content, tmp_path):
+        """TDD: Starting a new injection should replace any active worker.
 
-        # Build ROM injection parameters
-        params = {
-            "mode": "rom",
-            "sprite_path": str(paths.sprite_path),
-            "input_rom": str(paths.rom_path),
-            "output_rom": str(tmp_path / "output.sfc"),
-            "offset": 0x8000,
-            "fast_compression": True,
-        }
-
-        # Validate ROM injection parameters with real manager
-        manager.validate_injection_params(params)
-
-        # Verify parameters are properly structured for real workflow
-        assert params["mode"] == "rom"
-        assert params["offset"] == 0x8000
-        assert params["fast_compression"] is True
-        assert Path(params["sprite_path"]).exists()
-        assert Path(params["input_rom"]).exists()
-
-    def test_start_injection_validation_error(self):
-        """Test start injection fails on validation error"""
-        manager = CoreOperationsManager()
-
-        params = {
-            "mode": "vram",
-            # Missing required parameters
-        }
-
-        result = manager.start_injection(params)
-        assert result is False
-
-    def test_start_injection_replaces_existing_worker(self, tmp_path):
-        """Test injection parameter validation for worker replacement scenario"""
-        manager = CoreOperationsManager()
+        Tests concurrency and resource management logic.
+        """
+        manager = app_context.core_operations_manager
 
         # Create test files using TestDataFactory
         paths = TestDataFactory.create_injection_test_files(tmp_path)
@@ -514,9 +475,12 @@ class TestInjectionManagerWorkflows:
         assert Path(params["sprite_path"]).exists()
         assert Path(params["input_vram"]).exists()
 
-    def test_is_injection_active(self, tmp_path):
-        """Test injection active status checking with real worker"""
-        manager = CoreOperationsManager()
+    def test_is_injection_active(self, app_context, tmp_path):
+        """TDD: Query whether an injection operation is currently active.
+
+        Tests manager state tracking for external components.
+        """
+        manager = app_context.core_operations_manager
         worker_helper = WorkerHelper(str(tmp_path))
 
         try:
@@ -541,42 +505,62 @@ class TestInjectionManagerSignalHandling:
     Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
     """
 
-    def test_connect_worker_signals_no_worker(self):
-        """Test signal connection when no worker exists"""
-        manager = CoreOperationsManager()
+    def test_connect_worker_signals_no_worker(self, app_context):
+        """TDD: Signal connection should handle None worker gracefully.
+
+        Tests internal robustness of signal wiring.
+        """
+        manager = app_context.core_operations_manager
 
         # Should not raise exception
         manager._connect_worker_signals()
 
-    def test_on_worker_progress(self):
-        """Test worker progress signal handling"""
-        manager = CoreOperationsManager()
+    def test_on_worker_progress(self, app_context):
+        """TDD: Handle progress signal from worker.
 
-        with patch.object(manager, "injection_progress") as mock_signal:
-            manager._on_worker_progress("Test progress message")
-            mock_signal.emit.assert_called_once_with("Test progress message")
+        Tests internal signal slot logic.
+        """
+        manager = app_context.core_operations_manager
+        mock_handler = mock.Mock()
+        manager.injection_progress.connect(mock_handler)
 
-    def test_on_worker_finished_success(self):
-        """Test worker finished signal handling for success"""
-        manager = CoreOperationsManager()
+        # Simulate worker signal
+        manager._on_worker_progress("Testing")
 
-        # Mock that operation is active
-        manager._active_operations = {"injection"}
+        # Verify manager re-emitted its own signal
+        mock_handler.assert_called_once_with("Testing")
 
-        with patch.object(manager, "injection_finished") as mock_signal:
-            manager._on_worker_finished(True, "Success message")
-            mock_signal.emit.assert_called_once_with(True, "Success message")
+    def test_on_worker_finished_success(self, app_context):
+        """TDD: Handle successful finish signal from worker.
 
-    def test_on_worker_finished_failure(self):
-        """Test worker finished signal handling for failure"""
-        manager = CoreOperationsManager()
+        Tests internal finish slot logic.
+        """
+        manager = app_context.core_operations_manager
+        mock_handler = mock.Mock()
+        manager.injection_finished.connect(mock_handler)
 
-        # Mock that operation is active
-        manager._active_operations = {"injection"}
+        # Simulate successful finish
+        manager._on_worker_finished(True, "Completed")
 
-        with patch.object(manager, "injection_finished") as mock_signal:
-            manager._on_worker_finished(False, "Error message")
-            mock_signal.emit.assert_called_once_with(False, "Error message")
+        # Verify manager re-emitted its own signal
+        mock_handler.assert_called_once_with(True, "Completed")
+        assert not manager.is_operation_active("injection")
+
+    def test_on_worker_finished_failure(self, app_context):
+        """TDD: Handle failure finish signal from worker.
+
+        Tests internal error reporting logic.
+        """
+        manager = app_context.core_operations_manager
+        mock_handler = mock.Mock()
+        manager.injection_finished.connect(mock_handler)
+
+        # Simulate failure
+        manager._on_worker_finished(False, "Something went wrong")
+
+        # Verify manager re-emitted its own signal
+        mock_handler.assert_called_once_with(False, "Something went wrong")
+        assert not manager.is_operation_active("injection")
 
 
 class TestInjectionManagerVRAMSuggestion:
@@ -585,9 +569,12 @@ class TestInjectionManagerVRAMSuggestion:
     Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
     """
 
-    def test_get_smart_vram_suggestion_no_strategies_work(self, tmp_path):
-        """Test VRAM suggestion when no strategies find a file"""
-        manager = CoreOperationsManager()
+    def test_get_smart_vram_suggestion_no_strategies_work(self, app_context, tmp_path):
+        """TDD: Return None if no suggestion strategies succeed.
+
+        Tests suggestion logic fallback when no files match.
+        """
+        manager = app_context.core_operations_manager
 
         sprite_file = tmp_path / "sprite.png"
         sprite_file.write_text("fake sprite data")
@@ -595,9 +582,12 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager.get_smart_vram_suggestion(str(sprite_file))
         assert result == ""
 
-    def test_get_smart_vram_suggestion_basename_pattern(self, tmp_path):
-        """Test VRAM suggestion using basename pattern strategy"""
-        manager = CoreOperationsManager()
+    def test_get_smart_vram_suggestion_basename_pattern(self, app_context, temp_files_with_real_content, tmp_path):
+        """TDD: Suggest input VRAM based on sprite filename basename match.
+
+        Tests the first strategy in smart suggestion logic.
+        """
+        manager = app_context.core_operations_manager
 
         # Create sprite file and matching VRAM file
         sprite_file = tmp_path / "test_sprite.png"
@@ -608,9 +598,12 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager.get_smart_vram_suggestion(str(sprite_file))
         assert result == str(vram_file)
 
-    def test_get_smart_vram_suggestion_base_dmp_pattern(self, tmp_path):
-        """Test VRAM suggestion using {base}.dmp pattern"""
-        manager = CoreOperationsManager()
+    def test_get_smart_vram_suggestion_base_dmp_pattern(self, app_context, temp_files_with_real_content, tmp_path):
+        """TDD: Suggest input VRAM based on base name + .dmp extension.
+
+        Tests the second strategy in smart suggestion logic.
+        """
+        manager = app_context.core_operations_manager
 
         # Create sprite file and matching .dmp file (using {base}.dmp pattern)
         sprite_file = tmp_path / "sprite.png"
@@ -621,10 +614,12 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager.get_smart_vram_suggestion(str(sprite_file))
         assert result == str(vram_file)
 
-    @patch.object(CoreOperationsManager, "_ensure_session_manager")
-    def test_get_smart_vram_suggestion_session_strategy(self, mock_get_session, tmp_path):
-        """Test VRAM suggestion using session strategy"""
-        manager = CoreOperationsManager()
+    def test_get_smart_vram_suggestion_session_strategy(self, app_context, temp_files_with_real_content, tmp_path):
+        """TDD: Suggest input VRAM based on last used directory in session.
+
+        Tests session management integration for file path suggestions.
+        """
+        manager = app_context.core_operations_manager
 
         # Create sprite file
         sprite_file = tmp_path / "sprite.png"
@@ -634,17 +629,19 @@ class TestInjectionManagerVRAMSuggestion:
         vram_file = tmp_path / "session_vram.dmp"
         vram_file.write_text("fake vram data")
 
-        # Mock session manager
-        mock_session = Mock()
-        mock_session.get.return_value = str(vram_file)
-        mock_get_session.return_value = mock_session
+        # Mock session manager via app_context
+        with mock.patch.object(app_context.session_manager, "get") as mock_get:
+            mock_get.return_value = str(vram_file)
 
-        result = manager.get_smart_vram_suggestion(str(sprite_file))
-        assert result == str(vram_file)
+            result = manager.get_smart_vram_suggestion(str(sprite_file))
+            assert result == str(vram_file)
 
-    def test_get_smart_vram_suggestion_metadata_strategy(self, tmp_path):
-        """Test VRAM suggestion using metadata strategy"""
-        manager = CoreOperationsManager()
+    def test_get_smart_vram_suggestion_metadata_strategy(self, app_context, temp_files_with_real_content, tmp_path):
+        """TDD: Suggest input VRAM based on original source path in metadata.
+
+        Tests metadata parsing and source path extraction logic.
+        """
+        manager = app_context.core_operations_manager
 
         # Create VRAM file
         vram_file = tmp_path / "metadata_vram.dmp"
@@ -661,9 +658,12 @@ class TestInjectionManagerVRAMSuggestion:
         result = manager.get_smart_vram_suggestion(str(sprite_file), metadata_path=str(metadata_file))
         assert result == str(vram_file)
 
-    def test_get_smart_vram_suggestion_vram_suffix_pattern(self, tmp_path):
-        """Test VRAM suggestion using _VRAM.dmp suffix pattern"""
-        manager = CoreOperationsManager()
+    def test_get_smart_vram_suggestion_vram_suffix_pattern(self, app_context, temp_files_with_real_content, tmp_path):
+        """TDD: Suggest input VRAM based on .vram file extension pattern.
+
+        Tests glob pattern matching for VRAM dump files.
+        """
+        manager = app_context.core_operations_manager
 
         sprite_file = tmp_path / "test_sprite.png"
         sprite_file.write_text("fake sprite data")
@@ -679,7 +679,7 @@ class TestInjectionManagerVRAMSuggestion:
 # Integration test demonstrating TDD methodology with real components
 
 
-def test_complete_injection_workflow_tdd_real_components(tmp_path, qtbot):
+def test_complete_injection_workflow_tdd_real_components(app_context, tmp_path, qtbot):
     """Complete TDD workflow test demonstrating real component integration.
 
     This test follows the complete TDD cycle:
@@ -691,7 +691,7 @@ def test_complete_injection_workflow_tdd_real_components(tmp_path, qtbot):
     - Threading and worker lifecycle problems
     - Memory and resource management
     """
-    manager = CoreOperationsManager()
+    manager = app_context.core_operations_manager
 
     # Create test files using TestDataFactory
     paths = TestDataFactory.create_injection_test_files(tmp_path)

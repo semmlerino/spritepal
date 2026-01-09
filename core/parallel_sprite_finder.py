@@ -68,6 +68,7 @@ class ParallelSpriteFinder:
             chunk_size: Size of each search chunk in bytes
             step_size: Step size for scanning within chunks
         """
+        self._shutdown = False
         self.num_workers = num_workers
         self.chunk_size = chunk_size
         self.step_size = step_size
@@ -76,7 +77,6 @@ class ParallelSpriteFinder:
         # Create sprite finders for each worker
         self.sprite_finders = [SpriteFinder() for _ in range(num_workers)]
 
-        self._shutdown = False
         logger.info(
             f"Initialized ParallelSpriteFinder with {num_workers} workers, "
             f"chunk size: 0x{chunk_size:X}, step: 0x{step_size:X}"

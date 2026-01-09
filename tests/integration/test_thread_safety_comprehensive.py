@@ -129,7 +129,7 @@ class TestThumbnailCacheThreadSafety:
         # Verify cache statistics are reasonable
         stats = cache.get_stats()
         assert stats["hits"] > 0
-        assert stats["size"] <= 100
+        assert stats["cache_size"] <= 100
 
     def test_concurrent_put_operations(self, mock_qimage):
         """Test concurrent put operations maintain cache integrity."""

@@ -214,12 +214,14 @@ class TestBatchThumbnailWorkerMemoryLeaks:
 
         worker = BatchThumbnailWorker(large_rom_file, rom_extractor=mock_rom_extractor)
 
-        # Use context manager multiple times
+        # Use internal loading methods multiple times
         for _ in range(100):
-            with worker._rom_context() as rom_data:
-                # Read some data
-                data = rom_data[0:1024]
+            worker._load_rom_data()
+            if worker._rom_mmap:
+                # Read some data to simulate usage
+                data = worker._rom_mmap[0:1024]
                 assert len(data) == 1024
+            worker._clear_rom_data()
 
         # Check file handles aren't leaked
         open_files = psutil.Process().open_files()

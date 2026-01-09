@@ -80,6 +80,11 @@ class BaseLRUCache(Generic[T]):
             return 0  # Size tracking disabled
         return self._size_fn(value)
 
+    def __contains__(self, key: str) -> bool:
+        """Check if key exists in cache without affecting LRU order."""
+        with self._lock:
+            return key in self._cache
+
     def _maybe_log_stats(self) -> None:
         """Log cache statistics periodically."""
         current_time = time.time()

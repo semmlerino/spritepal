@@ -190,12 +190,12 @@ class TestSmartPreviewCoordinatorPerformance:
             # Mock cache check using current PreviewCache interface
             if hasattr(self.coordinator, "_cache"):
                 cache_key = self.coordinator._cache.make_key(rom_path, offset)
-                if self.coordinator._cache.contains(cache_key):
+                if cache_key in self.coordinator._cache:
                     cache_operations["hits"] += 1
                 else:
                     cache_operations["misses"] += 1
-                    # Simulate adding to cache
-                    self.coordinator._cache.put(cache_key, (b"mock_data", 0, 0, "mock"))
+                    # Simulate adding to cache - needs 8-tuple for SpritePreviewCache
+                    self.coordinator._cache.put(cache_key, (b"mock_data", 0, 0, "mock", 0, 0, -1, True))
 
             # Request preview
             self.coordinator.request_preview(offset)

@@ -69,6 +69,11 @@ class AppContext:
     sprite_preset_manager: SpritePresetManager
     core_operations_manager: CoreOperationsManager
 
+    @property
+    def session_manager(self) -> ApplicationStateManager:
+        """Backward compatibility for session_manager (delegates to application_state_manager)."""
+        return self.application_state_manager
+
     # Lazy-initialized (created on first access)
     _rom_cache: ROMCache | None = field(default=None, repr=False)
     _rom_extractor: ROMExtractor | None = field(default=None, repr=False)
