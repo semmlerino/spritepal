@@ -113,7 +113,7 @@ class InjectionController(QObject):
         params = self._view.get_injection_params()
         rom_file = str(params.get("rom_file", ""))
         png_file = str(params.get("png_file", ""))
-        offset = int(params["offset"])  # type: ignore
+        offset = int(params["offset"])
 
         if not rom_file or not png_file:
             self._view.append_output("ERROR: ROM and PNG files required")

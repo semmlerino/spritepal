@@ -27,6 +27,7 @@ from ..widgets import HexLineEdit
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
+    from core.types import InjectTabParams
 
 
 class InjectTab(QWidget):
@@ -54,7 +55,7 @@ class InjectTab(QWidget):
         layout = QVBoxLayout(self)
 
         # PNG file selection (Drop Zone)
-        self.png_drop = DropZone("PNG", settings_manager=self.settings_manager, required=True)  # type: ignore[arg-type]
+        self.png_drop = DropZone("PNG", settings_manager=self.settings_manager, required=True)
         self.png_drop.file_dropped.connect(lambda p: self.set_png_file(p))
         layout.addWidget(self.png_drop)
 
@@ -75,7 +76,7 @@ class InjectTab(QWidget):
         target_layout = QGridLayout()
 
         # VRAM file (Drop Zone)
-        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)  # type: ignore[arg-type]
+        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)
         self.vram_drop.file_dropped.connect(lambda p: self.set_vram_file(p))
         target_layout.addWidget(self.vram_drop, 0, 0, 1, 3)
 
@@ -152,7 +153,7 @@ class InjectTab(QWidget):
         """Set the ROM file path."""
         self.rom_path_edit.setText(path)
 
-    def get_injection_params(self) -> dict[str, object]:
+    def get_injection_params(self) -> "InjectTabParams":
         """Get the current injection parameters."""
         return {
             "png_file": self.png_drop.get_file_path(),

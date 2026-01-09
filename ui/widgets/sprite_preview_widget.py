@@ -831,9 +831,9 @@ class SpritePreviewWidget(QWidget):
             height = qimage.height()
 
             # Get raw bytes from QImage
-            ptr = qimage.bits()
-            ptr.setsize(height * width * 4)  # type: ignore[attr-defined] # Qt-specific memoryview method
-            img_data = bytes(ptr)
+            # In PySide6, bits() returns a buffer-compatible object that can be 
+            # converted directly to bytes.
+            img_data = bytes(qimage.bits())
 
             # Create PIL image
             pil_image = Image.frombytes("RGBA", (width, height), img_data, "raw", "BGRA")

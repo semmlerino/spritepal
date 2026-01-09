@@ -140,9 +140,11 @@ class PreviewPanel(QWidget):
         argb_data[~mask, 3] = 255  # Alpha = 255 (opaque)
 
         # Copy to QImage buffer
-        buffer_ptr = qimage.bits()
+        # In PySide6, bits() returns a buffer-compatible object.
+        # Use memoryview to ensure correct byte-level access without type warnings.
+        buffer_view = memoryview(qimage.bits())
         argb_bytes = argb_data.tobytes()
-        buffer_ptr[: len(argb_bytes)] = argb_bytes  # type: ignore[reportIndexIssue]
+        buffer_view[: len(argb_bytes)] = argb_bytes
 
         return qimage
 

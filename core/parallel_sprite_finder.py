@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from core.sprite_finder import SpriteFinder
+from core.types import CancellationToken
 from utils.constants import (
     CHUNK_SIZE_PARALLEL,
     DEFAULT_SCAN_STEP,
@@ -100,7 +101,7 @@ class ParallelSpriteFinder:
         start_offset: int = 0,
         end_offset: int | None = None,
         progress_callback: Callable[[int, int], None] | None = None,
-        cancellation_token: threading.Event | None = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> list[SearchResult]:
         """
         Search for sprites in parallel across ROM regions.
@@ -195,7 +196,9 @@ class ParallelSpriteFinder:
         finder: SpriteFinder,
         rom_data: bytes,
         chunk: SearchChunk,
-        cancellation_token: threading.Event | None = None,
+        end_offset: int | None = None,
+        progress_callback: Callable[[int, int], None] | None = None,
+        cancellation_token: CancellationToken | None = None,
     ) -> list[SearchResult]:
         """Search a single chunk for sprites.
 

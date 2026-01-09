@@ -31,6 +31,7 @@ from ..widgets import HexLineEdit
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
+    from core.types import ExtractTabParams
 
 
 class ExtractTab(QWidget):
@@ -61,7 +62,7 @@ class ExtractTab(QWidget):
         layout.setSpacing(SPACING_MEDIUM)
 
         # File selection (Drop Zones for consistency)
-        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)  # type: ignore[arg-type]
+        self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)
         self.vram_drop.file_dropped.connect(lambda p: self.set_vram_file(p))
         layout.addWidget(self.vram_drop)
 
@@ -121,7 +122,7 @@ class ExtractTab(QWidget):
         self.use_palette_check = QCheckBox("Apply CGRAM Palette")
         self.use_palette_check.toggled.connect(self._on_palette_toggle)
 
-        self.cgram_drop = DropZone("CGRAM", settings_manager=self.settings_manager, required=False)  # type: ignore[arg-type]
+        self.cgram_drop = DropZone("CGRAM", settings_manager=self.settings_manager, required=False)
         self.cgram_drop.file_dropped.connect(lambda p: self.set_cgram_file(p))
 
         self.palette_combo = QComboBox()
@@ -182,7 +183,7 @@ class ExtractTab(QWidget):
         """Set the ROM file path."""
         self.rom_path_edit.setText(path)
 
-    def get_extraction_params(self) -> dict[str, object]:
+    def get_extraction_params(self) -> "ExtractTabParams":
         """Get the current extraction parameters."""
         use_palette = self.use_palette_check.isChecked()
         return {

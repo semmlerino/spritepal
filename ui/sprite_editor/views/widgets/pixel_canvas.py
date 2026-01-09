@@ -289,11 +289,13 @@ class PixelCanvas(QWidget):
         argb_data[~mask, 3] = 255  # Alpha = 255 (opaque)
 
         # Copy data directly to QImage buffer for maximum speed
+        # In PySide6, bits() returns a buffer-compatible object.
+        # Use memoryview to ensure correct byte-level access without type warnings.
         buffer_ptr = self._qimage_buffer.bits()
 
         # Convert to bytes and copy to QImage buffer
         argb_bytes = argb_data.tobytes()
-        buffer_ptr[: len(argb_bytes)] = argb_bytes  # type: ignore[reportIndexIssue]
+        memoryview(buffer_ptr)[: len(argb_bytes)] = argb_bytes
 
         self._cached_image_version = self._image_version
 
@@ -338,9 +340,11 @@ class PixelCanvas(QWidget):
         argb_data[~mask, 3] = 255  # Alpha = 255 (opaque)
 
         # Copy to QImage buffer
+        # In PySide6, bits() returns a buffer-compatible object.
+        # Use memoryview to ensure correct byte-level access without type warnings.
         buffer_ptr = self._qimage_scaled.bits()
         argb_bytes = argb_data.tobytes()
-        buffer_ptr[: len(argb_bytes)] = argb_bytes  # type: ignore[reportIndexIssue]
+        memoryview(buffer_ptr)[: len(argb_bytes)] = argb_bytes
 
         self._cached_zoom = self.zoom
         self._cached_scaled_palette_version = self._palette_version

@@ -122,7 +122,7 @@ class AdvancedSearchWorker(BaseWorker):
             rom_path,
             start,
             end,
-            cancellation_token=self,  # type: ignore[arg-type]  # Worker has is_cancelled() method
+            cancellation_token=self,
         )
 
         # Apply filters
@@ -817,10 +817,6 @@ class AdvancedSearchWorker(BaseWorker):
         """Cancel the search."""
         super().cancel()  # Sets _cancellation_requested and calls requestInterruption()
         self._cleanup_finder()
-
-    def is_set(self) -> bool:
-        """Check if cancelled (for cancellation token interface)."""
-        return self.is_cancelled  # Use BaseWorker's property
 
     def _cleanup_finder(self) -> None:
         """Cleanup finder resources."""

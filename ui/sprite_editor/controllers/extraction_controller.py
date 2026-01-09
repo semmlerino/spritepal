@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
     from core.services.rom_cache import ROMCache
 
-    from ..views.tabs import ExtractTab
+    from ..views.tabs import ExtractTab, MultiPaletteTab
 
 
 class ExtractionController(QObject):
@@ -40,7 +40,7 @@ class ExtractionController(QObject):
     ) -> None:
         super().__init__(parent)
         self._view: ExtractTab | None = None
-        self._multi_palette_view: object = None
+        self._multi_palette_view: MultiPaletteTab | None = None
         self._worker: ExtractWorker | None = None
         self._multi_worker: MultiPaletteExtractWorker | None = None
         self.renderer = SpriteRenderer()
@@ -85,24 +85,24 @@ class ExtractionController(QObject):
         self._view = view
         self._connect_view_signals()
 
-    def set_multi_palette_view(self, view: object) -> None:
+    def set_multi_palette_view(self, view: "MultiPaletteTab") -> None:
         """Connect multi-palette tab signals.
 
         Args:
-            view: MultiPaletteTab instance (typed as object to avoid circular import)
+            view: MultiPaletteTab instance
         """
         self._multi_palette_view = view
 
         # Set controller reference in view for prerequisite validation
         if hasattr(view, "set_extraction_controller"):
-            view.set_extraction_controller(self)  # type: ignore[attr-defined]
+            view.set_extraction_controller(self)
 
-        # Check if view has the required signals before connecting
+        # Connect signals
         if hasattr(view, "browse_oam_requested"):
-            view.browse_oam_requested.connect(self.browse_oam_file)  # type: ignore[attr-defined]
+            view.browse_oam_requested.connect(self.browse_oam_file)
 
         if hasattr(view, "generate_preview_requested"):
-            view.generate_preview_requested.connect(self._on_generate_multi_preview)  # type: ignore[attr-defined]
+            view.generate_preview_requested.connect(self._on_generate_multi_preview)
 
         # Controller → Tab: connect completion signal
         self.multi_palette_completed.connect(self._deliver_multi_palette_results)
@@ -112,7 +112,7 @@ class ExtractionController(QObject):
         # Get preview size from view (default 128 tiles if method doesn't exist)
         preview_size = 128
         if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "get_preview_size"):
-            preview_size = self._multi_palette_view.get_preview_size()  # type: ignore[attr-defined]
+            preview_size = self._multi_palette_view.get_preview_size()
 
         self.generate_multi_palette_preview(preview_size)
 
@@ -161,7 +161,7 @@ class ExtractionController(QObject):
                 self._view.set_vram_file(file_path)
             # Trigger validation in multi-palette tab
             if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "_validate_prerequisites"):
-                self._multi_palette_view._validate_prerequisites()  # type: ignore[attr-defined]
+                self._multi_palette_view._validate_prerequisites()
 
     def browse_cgram_file(self) -> None:
         """Open file dialog to select CGRAM dump."""
@@ -177,7 +177,7 @@ class ExtractionController(QObject):
                 self._view.set_cgram_file(file_path)
             # Trigger validation in multi-palette tab
             if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "_validate_prerequisites"):
-                self._multi_palette_view._validate_prerequisites()  # type: ignore[attr-defined]
+                self._multi_palette_view._validate_prerequisites()
 
     def browse_oam_file(self) -> None:
         """Open file dialog to select OAM dump."""
@@ -191,7 +191,7 @@ class ExtractionController(QObject):
             self.oam_file = file_path
             # Update multi-palette view if it exists
             if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "set_oam_file"):
-                self._multi_palette_view.set_oam_file(file_path)  # type: ignore[attr-defined]
+                self._multi_palette_view.set_oam_file(file_path)
 
     def extract_from_rom(self) -> None:
         """Extract sprite directly from ROM."""
@@ -232,7 +232,7 @@ class ExtractionController(QObject):
                 # Force load to ensure file can be closed/deleted if needed (though temp dir handles it)
                 image.load()
 
-                tile_count = int(info["tile_count"])  # type: ignore
+                tile_count = int(info["tile_count"])
 
                 self._view.append_output(f"Loaded {tile_count} tiles.")
 
@@ -339,7 +339,7 @@ class ExtractionController(QObject):
         # Route multi-palette errors to multi-palette tab
         if "multi-palette" in error.lower():
             if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "append_output"):
-                self._multi_palette_view.append_output(f"ERROR: {error}")  # type: ignore[attr-defined]
+                self._multi_palette_view.append_output(f"ERROR: {error}")
         elif self._view:
             # Route to extract tab
             self._view.append_output(f"ERROR: {error}")
@@ -361,8 +361,8 @@ class ExtractionController(QObject):
             return
 
         # Use new direct image method (efficient, no re-rendering)
-        if hasattr(self._multi_palette_view, "set_palette_images"):
-            self._multi_palette_view.set_palette_images(palette_images)  # type: ignore[attr-defined]
+        if self._multi_palette_view is not None and hasattr(self._multi_palette_view, "set_palette_images"):
+            self._multi_palette_view.set_palette_images(palette_images)
             # Use correct field names expected by viewer
             stats: dict[str, int | dict[int, int]] = {"sprite_count": tile_count}
             # Add palette_usage if OAM mapper available
@@ -370,10 +370,10 @@ class ExtractionController(QObject):
                 palette_usage = self.renderer.oam_mapper.get_active_palettes()
                 if palette_usage:
                     stats["palette_usage"] = dict.fromkeys(palette_usage, 1)
-            self._multi_palette_view.set_oam_statistics(stats)  # type: ignore[attr-defined]
+            self._multi_palette_view.set_oam_statistics(stats)
 
         # Fallback to old method for backward compatibility
-        elif hasattr(self._multi_palette_view, "set_single_image_all_palettes"):
+        elif self._multi_palette_view is not None and hasattr(self._multi_palette_view, "set_single_image_all_palettes"):
             base_img = palette_images.get("palette_0")
             if base_img and base_img.mode == "P":
                 # Extract palette data from pre-rendered images
@@ -387,7 +387,7 @@ class ExtractionController(QObject):
                             palettes.append(palette)
 
                 if palettes:
-                    self._multi_palette_view.set_single_image_all_palettes(base_img, palettes)  # type: ignore[attr-defined]
+                    self._multi_palette_view.set_single_image_all_palettes(base_img, palettes)
                     # Use correct field names expected by viewer
                     stats2: dict[str, int | dict[int, int]] = {"sprite_count": tile_count}
                     # Add palette_usage if OAM mapper available
@@ -395,7 +395,7 @@ class ExtractionController(QObject):
                         palette_usage = self.renderer.oam_mapper.get_active_palettes()
                         if palette_usage:
                             stats2["palette_usage"] = dict.fromkeys(palette_usage, 1)
-                    self._multi_palette_view.set_oam_statistics(stats2)  # type: ignore[attr-defined]
+                    self._multi_palette_view.set_oam_statistics(stats2)
 
     def _on_worker_finished(self) -> None:
         """Handle worker completion."""

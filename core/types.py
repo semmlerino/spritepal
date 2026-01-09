@@ -12,11 +12,22 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import Literal, NotRequired, TypeAlias, TypedDict, cast
+from typing import Literal, NotRequired, Protocol, TypeAlias, TypedDict, cast, runtime_checkable
 
 from PIL import Image
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QWidget
+
+@runtime_checkable
+class CancellationToken(Protocol):
+    """Protocol for cancellation tokens that provide an is_set() method.
+    
+    This matches the interface of threading.Event and can be used to
+    check if an operation should be cancelled.
+    """
+    def is_set(self) -> bool:
+        """Return True if cancellation has been requested."""
+        ...
 
 # External library types for better type checking
 # Use concrete PIL Image type to avoid forward reference issues
@@ -75,6 +86,29 @@ class ROMExtractionParams(TypedDict):
     sprite_name: str
     output_base: str
     cgram_path: NotRequired[str | None]
+
+
+class InjectTabParams(TypedDict):
+    """Parameters from the Inject Tab UI."""
+
+    png_file: str
+    vram_file: str
+    rom_file: str
+    offset: int
+    output_file: str
+
+
+class ExtractTabParams(TypedDict):
+    """Parameters from the Extract Tab UI."""
+
+    vram_file: str
+    rom_file: str
+    offset: int
+    size: int
+    tiles_per_row: int
+    use_palette: bool
+    cgram_file: str | None
+    palette_num: int | None
 
 
 class SpriteInfo(TypedDict):

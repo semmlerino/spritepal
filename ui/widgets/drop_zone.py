@@ -86,7 +86,7 @@ class DropZone(QWidget):
         file_type: str,
         parent: QWidget | None = None,
         *,
-        settings_manager: ApplicationStateManager,
+        settings_manager: ApplicationStateManager | None = None,
         required: bool = True,
         file_filter: str | None = None,
     ) -> None:
@@ -95,7 +95,7 @@ class DropZone(QWidget):
         Args:
             file_type: Type of file (e.g., "VRAM", "CGRAM", "OAM")
             parent: Parent widget
-            settings_manager: Application state manager for settings access
+            settings_manager: Optional application state manager for settings access
             required: Whether this file is required
             file_filter: Optional file filter for browse dialog
         """

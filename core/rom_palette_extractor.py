@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from core.types import RGBColor
 from utils.logging_config import get_logger
 from utils.rom_utils import detect_smc_offset_from_size
 
@@ -91,7 +92,7 @@ class ROMPaletteExtractor:
 
         return created_files
 
-    def _extract_palette_colors(self, palette_data: bytes, palette_idx: int) -> list[list[int]]:
+    def _extract_palette_colors(self, palette_data: bytes, palette_idx: int) -> list[RGBColor]:
         """
         Extract 16 colors for a specific palette.
 
@@ -102,7 +103,7 @@ class ROMPaletteExtractor:
         Returns:
             List of 16 RGB color tuples
         """
-        colors = []
+        colors: list[RGBColor] = []
 
         # Each palette has 16 colors, each color is 2 bytes (BGR555 format)
         palette_start = palette_idx * 16 * 2
@@ -127,10 +128,10 @@ class ROMPaletteExtractor:
                 g = (g << 3) | (g >> 2)
                 b = (b << 3) | (b >> 2)
 
-                colors.append([r, g, b])
+                colors.append((r, g, b))
             else:
                 # Default to black if data is missing
-                colors.append([0, 0, 0])
+                colors.append((0, 0, 0))
 
         return colors
 
@@ -216,9 +217,8 @@ class ROMPaletteExtractor:
 
             for idx in range(start_idx, end_idx + 1):
                 if 0 <= idx <= 15:
-                    colors_list = self._extract_palette_colors(palette_data, idx)
-                    # Convert list of lists to list of tuples for consistency
-                    palettes[idx] = [tuple(c) for c in colors_list]
+                    # _extract_palette_colors returns list[RGBColor]
+                    palettes[idx] = self._extract_palette_colors(palette_data, idx)
 
         except OSError as e:
             logger.warning(f"Failed to extract palette range: {e}")
@@ -250,9 +250,8 @@ class ROMPaletteExtractor:
                 palette_data = f.read(512)
 
             if 0 <= palette_index <= 15:
-                colors_list = self._extract_palette_colors(palette_data, palette_index)
-                # Convert list of lists to list of tuples for consistency
-                return [tuple(c) for c in colors_list]
+                # _extract_palette_colors returns list[RGBColor]
+                return self._extract_palette_colors(palette_data, palette_index)
 
         except OSError as e:
             logger.warning(f"Failed to extract palette colors: {e}")

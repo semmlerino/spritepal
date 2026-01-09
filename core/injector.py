@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Iterable, cast
 
 import numpy as np
 from PIL import Image
@@ -124,7 +124,7 @@ class SpriteInjector:
                 if img.mode == "P":
                     # Indexed mode - count actual unique colors used
                     # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-                    unique_colors = len(set(cast(Any, img.getdata())))  # pyright: ignore[reportExplicitAny] - PIL's ImagingCore not properly typed
+                    unique_colors = len(set(cast(Iterable[Any], img.getdata())))
                     logger.debug(f"Indexed mode with {unique_colors} unique colors")
                     if unique_colors > 16:
                         logger.error(f"Too many colors: {unique_colors} (max 16)")
@@ -133,7 +133,7 @@ class SpriteInjector:
                 elif img.mode == "L":
                     # Grayscale mode - verify values are valid (0-255)
                     # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-                    pixels = list(cast(Any, img.getdata()))  # pyright: ignore[reportExplicitAny] - PIL's ImagingCore not properly typed
+                    pixels = list(cast(Iterable[Any], img.getdata()))
                     max_val = max(pixels) if pixels else 0
                     if max_val > 255:
                         logger.error(f"Invalid grayscale value: {max_val}")

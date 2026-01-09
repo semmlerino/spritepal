@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from .tabs import EditTab, ExtractTab, InjectTab, MultiPaletteTab
 
 if TYPE_CHECKING:
+    from PIL import Image
     from core.managers.application_state_manager import ApplicationStateManager
     from ui.sprite_editor.controllers import (
         EditingController,
@@ -273,7 +274,7 @@ class SpriteEditorMainWindow(QMainWindow):
         """Clear the coordinates display."""
         self.coords_label.setText("")
 
-    def _on_sprite_extracted(self, image: object, tile_count: int) -> None:
+    def _on_sprite_extracted(self, image: Image.Image, tile_count: int) -> None:
         """Handle sprite extraction success.
 
         Args:
@@ -286,14 +287,14 @@ class SpriteEditorMainWindow(QMainWindow):
         try:
             # Convert PIL image to numpy array (indices)
             # Ensure we're working with a paletted image
-            if not (hasattr(image, "mode") and image.mode == "P"):  # type: ignore
+            if not (hasattr(image, "mode") and image.mode == "P"):
                 self.set_status("Error: Extracted image is not a valid indexed image.")
                 return
 
             data = np.array(image)
 
             # Extract palette
-            palette_data = image.getpalette()  # type: ignore
+            palette_data = image.getpalette()
             palette: list[tuple[int, int, int]] = []
             if palette_data:
                 # Convert flat list [r,g,b, r,g,b...] to list of tuples

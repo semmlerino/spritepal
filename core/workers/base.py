@@ -220,6 +220,13 @@ class BaseWorker(QThread):
         """Check if operation is paused."""
         return self._is_paused
 
+    def is_set(self) -> bool:
+        """Check if cancelled (for cancellation token interface).
+        
+        Matches threading.Event.is_set() signature.
+        """
+        return self.is_cancelled
+
     def emit_progress(self, percent: int, message: str = "") -> None:
         """
         Emit progress in a standard format.
