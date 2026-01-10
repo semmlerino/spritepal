@@ -1151,12 +1151,12 @@ class ROMWorkflowController(QObject):
                 self._pending_open_offset = -1
                 self.open_in_editor()
             else:
+                # Offset mismatch means a newer request is pending - don't clear flags,
+                # let the matching preview handle them when it arrives
                 logger.debug(
                     f"[PREVIEW] Offset mismatch: pending=0x{self._pending_open_offset:X} "
-                    f"vs actual=0x{actual_offset:X}, clearing flag"
+                    f"vs actual=0x{actual_offset:X}, keeping flags for pending request"
                 )
-                self._pending_open_in_editor = False
-                self._pending_open_offset = -1
 
     def _on_preview_error(self, error_msg: str) -> None:
         """Handle preview error."""

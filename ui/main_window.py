@@ -637,9 +637,7 @@ class MainWindow(QMainWindow):
         # Action zone is always visible with dock content
         pass
 
-    def switch_to_workspace(
-        self, workspace_mode: WorkspaceMode, tab_index: int | None = None
-    ) -> None:
+    def switch_to_workspace(self, workspace_mode: WorkspaceMode, tab_index: int | None = None) -> None:
         """Switch to a specific workspace and optionally a tab within it.
 
         Args:
@@ -1664,8 +1662,15 @@ class MainWindow(QMainWindow):
         if capture and capture.frame:
             capture_name = f"0x{offset:06X} (f{capture.frame})"
 
-        if self.rom_extraction_panel.rom_path:
-            self._sprite_editor_workspace.load_rom(self.rom_extraction_panel.rom_path)
+        # Validate ROM is loaded before switching tabs
+        rom_path = self.rom_extraction_panel.rom_path
+        if not rom_path:
+            self.status_bar_manager.show_message(
+                "Load a ROM first before opening Mesen captures"
+            )
+            return
+
+        self._sprite_editor_workspace.load_rom(rom_path)
 
         # Switch to sprite editor workspace
         self.switch_to_workspace(WorkspaceMode.SPRITE_EDITOR)
