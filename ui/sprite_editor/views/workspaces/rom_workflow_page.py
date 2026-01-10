@@ -51,7 +51,7 @@ class ROMWorkflowPage(QWidget):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        """Create the ROM workflow UI."""
+        """Create the ROM workflow UI with flat 3-pane splitter."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -61,28 +61,43 @@ class ROMWorkflowPage(QWidget):
         self._source_bar.offset_changed.connect(self.offset_changed.emit)
         layout.addWidget(self._source_bar)
 
-        # 2. Main Content (Splitter)
-        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        self._main_splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._main_splitter.setChildrenCollapsible(False)
-
-        # Left Panel: Asset Browser
-        self._left_panel = self._create_left_panel()
-        self._main_splitter.addWidget(self._left_panel)
-
-        # Right Panel: EditWorkspace (owned by this page)
-        self._workspace = EditWorkspace()
+        # 2. Create EditWorkspace in embedded mode (widgets only, no layout)
+        self._workspace = EditWorkspace(embed_mode="embedded")
         self._workspace.set_workflow_mode("rom")
         # Hide detach button in ROM mode (not applicable)
         self._workspace._detach_btn.hide()
-        self._main_splitter.addWidget(self._workspace)
 
-        # Set initial sizes
-        self._main_splitter.setSizes([350, 650])
-        self._main_splitter.setStretchFactor(0, 0)
-        self._main_splitter.setStretchFactor(1, 1)
+        # 3. Icon toolbar from workspace
+        layout.addWidget(self._workspace.icon_toolbar)
+
+        # 4. Main Content: Flat 3-pane splitter
+        # [Asset Browser | Canvas | Right Panels]
+        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._main_splitter.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self._main_splitter.setChildrenCollapsible(False)
+
+        # Pane 0: Asset Browser
+        self._left_panel = self._create_left_panel()
+        self._main_splitter.addWidget(self._left_panel)
+
+        # Pane 1: Canvas (from workspace)
+        self._main_splitter.addWidget(self._workspace.scroll_area)
+
+        # Pane 2: Right panels (from workspace)
+        self._main_splitter.addWidget(self._workspace.right_panel_scroll)
+
+        # Set initial sizes: [350 asset browser, 700 canvas, 250 panels]
+        self._main_splitter.setSizes([350, 700, 250])
+        self._main_splitter.setStretchFactor(0, 0)  # Asset browser: fixed
+        self._main_splitter.setStretchFactor(1, 1)  # Canvas: stretches
+        self._main_splitter.setStretchFactor(2, 0)  # Right panels: fixed
 
         layout.addWidget(self._main_splitter, 1)
+
+        # 5. Status bar from workspace (bottom)
+        layout.addWidget(self._workspace.status_bar)
 
     def _create_left_panel(self) -> QWidget:
         """Create the left panel with asset browser."""

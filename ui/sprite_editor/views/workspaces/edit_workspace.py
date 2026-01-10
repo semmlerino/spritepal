@@ -43,6 +43,12 @@ class EditWorkspace(QWidget):
     The workspace connects to an EditingController for signal wiring.
     Multiple EditWorkspace instances can share the same controller,
     enabling mode switching without reparenting widgets.
+
+    Args:
+        embed_mode: Layout mode for the workspace.
+            - 'standalone': Creates internal splitter for canvas/panels (default, VRAM mode)
+            - 'embedded': Creates widgets without splitter - parent manages layout (ROM flat mode)
+        parent: Parent widget.
     """
 
     # Signals
@@ -52,41 +58,88 @@ class EditWorkspace(QWidget):
     saveToRomRequested = Signal()
     exportPngRequested = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, embed_mode: str = "standalone", parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
+        self._embed_mode = embed_mode
         self._controller: EditingController | None = None
         self._canvas: PixelCanvas | None = None
+        self._splitter: QSplitter | None = None
         self._setup_ui()
         self._setup_shortcuts()
         # Ensure workspace expands to fill parent container
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        # Set minimum width at workspace root (tool panel + canvas)
-        self.setMinimumWidth(600)
 
     def _setup_ui(self) -> None:
         """Create the workspace UI with tool panels and canvas."""
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(PANEL_PADDING, PANEL_PADDING, PANEL_PADDING, PANEL_PADDING)
-        main_layout.setSpacing(SPACING_MEDIUM)
-
-        # Top: Icon toolbar (horizontal, spans full width)
+        # Create all widgets regardless of mode
         self._icon_toolbar = IconToolbar()
-        main_layout.addWidget(self._icon_toolbar)
+        self._scroll_area = self._create_canvas_scroll_area()
+        self._right_scroll = self._create_right_panel_scroll()
+        self._status_bar = EditorStatusBar()
 
-        # Center: Splitter for canvas (left) and panels (right)
-        self._splitter = QSplitter(Qt.Orientation.Horizontal)
-        self._splitter.setChildrenCollapsible(False)
-        self._splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        # Connect SaveExportPanel signals
+        self._save_export_panel.saveToRomClicked.connect(self.saveToRomRequested.emit)
+        self._save_export_panel.exportPngClicked.connect(self.exportPngRequested.emit)
 
-        # Left side of splitter: Canvas in scroll area
-        self._scroll_area = QScrollArea()
-        self._scroll_area.setWidgetResizable(True)
-        self._scroll_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self._scroll_area.setStyleSheet("QScrollArea { background-color: #303030; border: none; }")
+        if self._embed_mode == "standalone":
+            # Standalone mode: Create full layout with internal splitter
+            main_layout = QVBoxLayout(self)
+            main_layout.setContentsMargins(
+                PANEL_PADDING, PANEL_PADDING, PANEL_PADDING, PANEL_PADDING
+            )
+            main_layout.setSpacing(SPACING_MEDIUM)
+
+            # Top: Icon toolbar
+            main_layout.addWidget(self._icon_toolbar)
+
+            # Center: Splitter for canvas/panels
+            self._splitter = QSplitter(Qt.Orientation.Horizontal)
+            self._splitter.setChildrenCollapsible(False)
+            self._splitter.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
+
+            self._splitter.addWidget(self._scroll_area)
+            self._splitter.addWidget(self._right_scroll)
+
+            # Set splitter sizes (canvas: majority, right panel: 250px)
+            self._splitter.setSizes([700, 250])
+            self._splitter.setStretchFactor(0, 1)  # Canvas stretches
+            self._splitter.setStretchFactor(1, 0)  # Right panel fixed
+
+            main_layout.addWidget(self._splitter, 1)
+
+            # Bottom: Status bar
+            main_layout.addWidget(self._status_bar)
+        else:
+            # Embedded mode: Create minimal layout (just for signals/controller)
+            # Parent is responsible for layouting toolbar, canvas, panels, statusbar
+            # We set a minimal layout to avoid Qt warnings about missing layout
+            main_layout = QVBoxLayout(self)
+            main_layout.setContentsMargins(0, 0, 0, 0)
+            main_layout.setSpacing(0)
+            # Don't add any widgets - parent will take them
+
+    def _create_canvas_scroll_area(self) -> QScrollArea:
+        """Create the canvas scroll area with placeholder."""
+        from ui.styles.theme import COLORS
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        scroll_area.setStyleSheet(
+            f"QScrollArea {{ background-color: {COLORS['darker_gray']}; border: none; }}"
+        )
 
         # Container for canvas - must expand to fill scroll area
         self._canvas_container = QWidget()
-        self._canvas_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._canvas_container.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         self._canvas_layout = QVBoxLayout(self._canvas_container)
         self._canvas_layout.setContentsMargins(0, 0, 0, 0)
         self._canvas_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -96,12 +149,15 @@ class EditWorkspace(QWidget):
         self._canvas_placeholder.setMinimumSize(400, 400)
         self._canvas_layout.addWidget(self._canvas_placeholder)
 
-        self._scroll_area.setWidget(self._canvas_container)
-        self._splitter.addWidget(self._scroll_area)
+        scroll_area.setWidget(self._canvas_container)
+        return scroll_area
 
-        # Right side of splitter: Panel stack
+    def _create_right_panel_scroll(self) -> QScrollArea:
+        """Create the right panel with palette, preview, and action buttons."""
         right_panel = QWidget()
-        right_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        right_panel.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
+        )
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(SPACING_SMALL)
@@ -132,31 +188,18 @@ class EditWorkspace(QWidget):
         right_layout.addStretch()
 
         # Wrap right panel in scroll area for small screens
-        self._right_scroll = QScrollArea()
-        self._right_scroll.setWidgetResizable(True)
-        self._right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._right_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self._right_scroll.setWidget(right_panel)
+        right_scroll = QScrollArea()
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        right_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        right_scroll.setWidget(right_panel)
         # Allow user to resize, set reasonable min width
-        self._right_scroll.setMinimumWidth(200)
-        self._right_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        right_scroll.setMinimumWidth(200)
+        right_scroll.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
+        )
 
-        self._splitter.addWidget(self._right_scroll)
-
-        # Set splitter sizes (canvas: majority, right panel: 250px)
-        self._splitter.setSizes([700, 250])
-        self._splitter.setStretchFactor(0, 1)  # Canvas stretches
-        self._splitter.setStretchFactor(1, 0)  # Right panel fixed
-
-        main_layout.addWidget(self._splitter, 1)
-
-        # Bottom: Status bar (spans full width)
-        self._status_bar = EditorStatusBar()
-        main_layout.addWidget(self._status_bar)
-
-        # Connect SaveExportPanel signals
-        self._save_export_panel.saveToRomClicked.connect(self.saveToRomRequested.emit)
-        self._save_export_panel.exportPngClicked.connect(self.exportPngRequested.emit)
+        return right_scroll
 
     def _setup_shortcuts(self) -> None:
         """Setup keyboard shortcuts for tools and actions."""
@@ -219,6 +262,14 @@ class EditWorkspace(QWidget):
     def scroll_area(self) -> QScrollArea:
         """Access the canvas scroll area."""
         return self._scroll_area
+
+    @property
+    def right_panel_scroll(self) -> QScrollArea:
+        """Access the right panel scroll area (palette, preview, save/export).
+
+        Used by parent when embed_mode='embedded' to add to its own splitter.
+        """
+        return self._right_scroll
 
     @property
     def canvas_layout(self) -> QVBoxLayout:

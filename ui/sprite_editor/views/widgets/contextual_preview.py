@@ -10,6 +10,8 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap, QResizeEvent
 from PySide6.QtWidgets import QColorDialog, QComboBox, QLabel, QSizePolicy, QVBoxLayout, QWidget
 
+from ui.styles.theme import COLORS
+
 
 class ContextualPreview(QWidget):
     """Preview widget with configurable background options."""
@@ -51,7 +53,9 @@ class ContextualPreview(QWidget):
         self._preview_label.setMinimumSize(200, 200)
         self._preview_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._preview_label.setStyleSheet("QLabel { border: 1px solid #808080; background-color: #404040; }")
+        self._preview_label.setStyleSheet(
+            f"QLabel {{ border: 1px solid {COLORS['border']}; background-color: {COLORS['dark_gray']}; }}"
+        )
         layout.addWidget(self._preview_label)
 
         # Initial state
