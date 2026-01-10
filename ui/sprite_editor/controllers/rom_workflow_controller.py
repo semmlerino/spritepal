@@ -351,9 +351,7 @@ class ROMWorkflowController(QObject):
 
                 if chunk:
                     rom_injector = self.rom_extractor.rom_injector
-                    _, decompressed_data, _ = rom_injector.find_compressed_sprite(
-                        chunk, 0, expected_size=None
-                    )
+                    _, decompressed_data, _ = rom_injector.find_compressed_sprite(chunk, 0, expected_size=None)
                     if decompressed_data:
                         data_to_render = decompressed_data
                         logger.debug(
@@ -392,9 +390,7 @@ class ROMWorkflowController(QObject):
 
             # Render using TileRenderer (grayscale)
             renderer = TileRenderer()
-            image = renderer.render_tiles(
-                data_to_render, width_tiles, height_tiles, palette_index=None
-            )
+            image = renderer.render_tiles(data_to_render, width_tiles, height_tiles, palette_index=None)
             return image
         except Exception as e:
             logger.error("Failed to generate thumbnail: %s", e)
@@ -510,9 +506,7 @@ class ROMWorkflowController(QObject):
             if count > 0:
                 logger.info("Loaded %d known sprite locations for this ROM", count)
                 if self._message_service:
-                    self._message_service.show_message(
-                        f"Found {count} known sprite locations"
-                    )
+                    self._message_service.show_message(f"Found {count} known sprite locations")
 
         except Exception:
             logger.exception("Error loading known sprite locations")
@@ -640,9 +634,7 @@ class ROMWorkflowController(QObject):
         # Check ROM availability first
         if not self.rom_path:
             if self._message_service:
-                self._message_service.show_message(
-                    "ROM must be loaded first. Click '...' to load a ROM file."
-                )
+                self._message_service.show_message("ROM must be loaded first. Click '...' to load a ROM file.")
             return
 
         # Validate offset is within ROM bounds
@@ -658,27 +650,31 @@ class ROMWorkflowController(QObject):
             self._pending_open_in_editor = True
             self._pending_open_offset = offset
 
-        # Check for unsaved changes if in edit mode
-        if self.state == "edit" and self._editing_controller.undo_manager.can_undo():
-            from PySide6.QtWidgets import QMessageBox
+        # Handle transition from edit state
+        if self.state == "edit":
+            # Check for unsaved changes first
+            if self._editing_controller.undo_manager.can_undo():
+                from PySide6.QtWidgets import QMessageBox
 
-            reply = QMessageBox.question(
-                self._view,
-                "Unsaved Changes",
-                "You have unsaved changes in the editor. Changing the offset will discard them. Continue?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if reply == QMessageBox.StandardButton.No:
-                # Reset to current offset
-                if self._view:
-                    self._view.source_bar.set_offset(self.current_offset)
-                return
+                reply = QMessageBox.question(
+                    self._view,
+                    "Unsaved Changes",
+                    "You have unsaved changes in the editor. Changing the offset will discard them. Continue?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    # Reset to current offset
+                    if self._view:
+                        self._view.source_bar.set_offset(self.current_offset)
+                    return
 
-            # User chose to continue, reset state to preview
+            # Always transition to preview when leaving edit state
+            # (whether or not there were unsaved changes)
             self.state = "preview"
             if self._view:
                 self._view.source_bar.set_action_text("Open in Editor")
                 self._view.set_workflow_state("preview")
+            self.workflow_state_changed.emit("preview")
 
         self.current_offset = offset
         if self._view:
