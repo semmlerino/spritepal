@@ -335,6 +335,7 @@ class EditWorkspace(QWidget):
         controller.colorChanged.connect(self._palette_panel.set_selected_color)
         controller.paletteChanged.connect(self._update_palette)
         controller.paletteSourceAdded.connect(self._palette_panel.add_palette_source)
+        controller.paletteSourceSelected.connect(self._on_palette_source_selected)
 
         # Populate existing palette sources from controller
         existing_sources = controller.get_palette_sources()
@@ -364,6 +365,11 @@ class EditWorkspace(QWidget):
     def _on_image_changed(self) -> None:
         """Handle image change from controller."""
         self.set_image_loaded(True)
+
+    def _on_palette_source_selected(self, source_type: str, palette_index: int) -> None:
+        """Handle programmatic palette source selection from controller."""
+        selector = self._palette_panel.palette_source_selector
+        selector.set_selected_source(source_type, palette_index)
 
     def update_from_controller(self) -> None:
         """Update UI state from controller."""
