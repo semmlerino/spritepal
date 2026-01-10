@@ -173,6 +173,9 @@ class MainWindow(QMainWindow):
         self._setup_managers()  # This creates all UI widgets via managers
         self._connect_signals()
 
+        # Load last ROM AFTER signals are connected, so Sprite Editor receives rom_loaded
+        self.rom_extraction_panel.load_last_rom_deferred()
+
         # Controller will be created on first access via property
         # This breaks the circular dependency: tests can create MainWindow without hanging
 
@@ -1665,9 +1668,7 @@ class MainWindow(QMainWindow):
         # Validate ROM is loaded before switching tabs
         rom_path = self.rom_extraction_panel.rom_path
         if not rom_path:
-            self.status_bar_manager.show_message(
-                "Load a ROM first before opening Mesen captures"
-            )
+            self.status_bar_manager.show_message("Load a ROM first before opening Mesen captures")
             return
 
         self._sprite_editor_workspace.load_rom(rom_path)

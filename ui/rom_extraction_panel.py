@@ -142,7 +142,8 @@ class ROMExtractionPanel(QWidget):
         self._params_controller.mode_changed.connect(self._on_mode_changed)
 
         self._setup_ui()
-        self._load_last_rom()
+        # Note: _load_last_rom() is called by MainWindow.load_last_rom_deferred()
+        # AFTER signals are connected, so Sprite Editor receives the rom_loaded signal
 
     def _connect_orchestrator_signals(self) -> None:
         """Connect signals from the worker orchestrator."""
@@ -386,6 +387,15 @@ class ROMExtractionPanel(QWidget):
         if last_rom:
             logger.info(f"Loading last used ROM: {last_rom}")
             self._load_rom_file(last_rom)
+
+    def load_last_rom_deferred(self) -> None:
+        """Load last ROM - called by MainWindow after signals are connected.
+
+        This method exists to fix an initialization order bug: the rom_loaded
+        signal must fire AFTER MainWindow._connect_signals() so the Sprite
+        Editor receives the notification.
+        """
+        self._load_last_rom()
 
     def _load_rom_file(self, filename: str):
         """Load a ROM file and update UI"""
@@ -678,6 +688,9 @@ class ROMExtractionPanel(QWidget):
             self.sprite_selector_widget.clear()
             self.sprite_selector_widget.add_sprite("Error loading ROM", None)
             self.sprite_selector_widget.set_enabled(False)
+
+        # Update readiness state to disable extraction
+        self._check_extraction_ready()
 
     def _init_similarity_indexing(self):
         """Initialize similarity indexing using orchestrator."""
