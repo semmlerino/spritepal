@@ -38,3 +38,44 @@ def test_palette_source_sync_late_connection(qtbot):
     # Current behavior: Fails because it only has "Default"
     assert combo.count() == 2, f"Expected 2 items, found {combo.count()}"
     assert combo.itemText(1) == "Red Palette"
+
+
+def test_rom_workspace_palette_source_syncs(qtbot):
+    """
+    Contract: Programmatic palette source selection updates the ROM workspace dropdown.
+
+    Verifies that when EditingController.set_palette_source() is called,
+    the ROM EditWorkspace's palette selector also updates (not just VRAM EditTab).
+
+    Regression: Before fix, EditingController only updated self._view (VRAM EditTab),
+    leaving the ROM workspace's dropdown stale.
+    """
+    from ui.sprite_editor.views.tabs.edit_tab import EditTab
+
+    controller = EditingController()
+
+    # Setup VRAM view (like normal initialization in SpriteEditorWorkspace)
+    vram_tab = EditTab()
+    qtbot.addWidget(vram_tab)
+    controller.set_view(vram_tab)
+
+    # Setup ROM workspace (connected separately, like in SpriteEditorWorkspace._wire_controllers)
+    rom_workspace = EditWorkspace()
+    qtbot.addWidget(rom_workspace)
+    rom_workspace.set_controller(controller)
+
+    # Register a ROM palette and select it programmatically
+    colors = [(0, 0, 0)] * 16
+    controller.register_palette_source("rom", 8, colors, "ROM Palette 8")
+    controller.set_palette_source("rom", 8)
+
+    # Verify controller state (source of truth)
+    assert ("rom", 8) in controller.get_palette_sources()
+
+    # Verify ROM workspace dropdown reflects the selection
+    selector = rom_workspace.palette_panel.palette_source_selector
+    selected_source = selector.get_selected_source()
+    assert selected_source == (
+        "rom",
+        8,
+    ), f"Expected ('rom', 8), got {selected_source}"

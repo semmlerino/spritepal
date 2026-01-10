@@ -285,6 +285,7 @@ class EditWorkspace(QWidget):
             safe_disconnect(self._controller.colorChanged)
             safe_disconnect(self._controller.paletteChanged)
             safe_disconnect(self._controller.paletteSourceAdded)
+            safe_disconnect(self._controller.paletteSourceSelected)
             safe_disconnect(self._controller.imageChanged)
 
     def set_controller(self, controller: "EditingController") -> None:
