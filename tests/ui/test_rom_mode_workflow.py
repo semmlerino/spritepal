@@ -181,14 +181,8 @@ class TestRomModeWorkflow:
             return workspace
 
     def test_mode_switch(self, sprite_editor_workspace):
-        # Verify mode combo exists
-        assert hasattr(sprite_editor_workspace, "_mode_combo")
-        combo = sprite_editor_workspace._mode_combo
-        assert isinstance(combo, QComboBox)
-        assert combo.count() == 2
-
         # Default is now ROM mode (index 1). Verify this.
-        assert combo.currentIndex() == 1
+        assert sprite_editor_workspace.current_mode == "rom"
 
         # Test mode switching between VRAM and ROM modes
         # The mode_changed signal triggers _on_mode_changed_internal which
@@ -196,14 +190,21 @@ class TestRomModeWorkflow:
         with patch.object(sprite_editor_workspace._extraction_controller, "set_mode") as mock_extract_mode:
             with patch.object(sprite_editor_workspace._injection_controller, "set_mode") as mock_inject_mode:
                 # Switch to VRAM mode first (from default ROM mode)
-                combo.setCurrentIndex(0)
+                sprite_editor_workspace.set_mode("vram")
+
+                # Verify mode updated
+                assert sprite_editor_workspace.current_mode == "vram"
 
                 # Verify controllers received mode change to VRAM
                 mock_extract_mode.assert_called_with("vram")
                 mock_inject_mode.assert_called_with("vram")
 
                 # Change back to ROM mode (index 1)
-                combo.setCurrentIndex(1)
+                sprite_editor_workspace.set_mode("rom")
+                
+                # Verify mode updated
+                assert sprite_editor_workspace.current_mode == "rom"
+                
                 mock_extract_mode.assert_called_with("rom")
                 mock_inject_mode.assert_called_with("rom")
 
@@ -217,7 +218,7 @@ class TestRomModeWorkflow:
         sprite_editor_workspace.jump_to_offset(0x123456)
 
         # Should have switched to ROM mode
-        assert sprite_editor_workspace._mode_combo.currentData() == "rom"
+        assert sprite_editor_workspace.current_mode == "rom"
 
         # Verify rom workflow controller offset set (auto_open=True is default behavior)
         sprite_editor_workspace._rom_workflow_controller.set_offset.assert_called_with(0x123456, auto_open=True)

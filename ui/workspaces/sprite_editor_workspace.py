@@ -336,6 +336,11 @@ class SpriteEditorWorkspace(QWidget):
         """Access the mode combo box."""
         return self._mode_combo
 
+    @property
+    def current_mode(self) -> str:
+        """Get the current workflow mode ('vram' or 'rom')."""
+        return self._mode_combo.currentData()
+
     def set_mode(self, mode: str) -> None:
         """Programmatically set the mode."""
         index = 0 if mode == "vram" else 1

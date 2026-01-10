@@ -71,7 +71,7 @@ class TestMesenCapturesSection:
         captures_section.add_capture(sample_capture)
 
         # Verify the internal widget received it
-        assert captures_section._captures_widget._list_widget.count() == 1
+        assert captures_section.get_capture_count() == 1
 
     def test_add_multiple_captures(self, captures_section, sample_captures):
         """Test adding multiple captures."""
@@ -79,34 +79,34 @@ class TestMesenCapturesSection:
             captures_section.add_capture(capture)
 
         # Verify all captures were added
-        assert captures_section._captures_widget._list_widget.count() == len(sample_captures)
+        assert captures_section.get_capture_count() == len(sample_captures)
 
     def test_load_persistent(self, captures_section, sample_captures):
         """Test loading persistent captures."""
         captures_section.load_persistent(sample_captures)
 
         # Verify captures were loaded
-        assert captures_section._captures_widget._list_widget.count() == len(sample_captures)
+        assert captures_section.get_capture_count() == len(sample_captures)
 
     def test_load_persistent_empty_list(self, captures_section):
         """Test loading empty persistent captures list."""
         captures_section.load_persistent([])
 
         # Should handle gracefully with no crashes
-        assert captures_section._captures_widget._list_widget.count() == 0
+        assert captures_section.get_capture_count() == 0
 
     def test_clear(self, captures_section, sample_captures):
         """Test clearing all captures."""
         # Add some captures
         for capture in sample_captures:
             captures_section.add_capture(capture)
-        assert captures_section._captures_widget._list_widget.count() > 0
+        assert captures_section.get_capture_count() > 0
 
         # Clear
         captures_section.clear()
 
         # Verify cleared
-        assert captures_section._captures_widget._list_widget.count() == 0
+        assert captures_section.get_capture_count() == 0
         assert captures_section.get_selected_offset() is None
 
     def test_get_selected_offset_none(self, captures_section):
@@ -115,11 +115,13 @@ class TestMesenCapturesSection:
 
     def test_get_selected_offset(self, captures_section, sample_capture, qtbot):
         """Test getting selected offset after user selection."""
+        from PySide6.QtWidgets import QListWidget
+
         # Add a capture
         captures_section.add_capture(sample_capture)
 
         # Simulate user clicking on the item
-        list_widget = captures_section._captures_widget._list_widget
+        list_widget = captures_section.findChild(QListWidget)
         item = list_widget.item(0)
         list_widget.setCurrentItem(item)
 
@@ -145,11 +147,14 @@ class TestMesenCapturesSection:
 
     def test_offset_selected_signal_forwarding(self, captures_section, sample_capture, qtbot):
         """Test that offset_selected signal is forwarded from RecentCapturesWidget."""
+        from PySide6.QtWidgets import QListWidget
+        
         # Add a capture
         captures_section.add_capture(sample_capture)
 
-        # Simulate user clicking on the item
-        list_widget = captures_section._captures_widget._list_widget
+        # Simulate user clicking on the item via finding the QListWidget child
+        list_widget = captures_section.findChild(QListWidget)
+        assert list_widget is not None
         item = list_widget.item(0)
 
         with qtbot.waitSignal(captures_section.offset_selected, timeout=signal_timeout()) as blocker:
@@ -160,11 +165,14 @@ class TestMesenCapturesSection:
 
     def test_offset_activated_signal_forwarding(self, captures_section, sample_capture, qtbot):
         """Test that offset_activated signal is forwarded from RecentCapturesWidget."""
+        from PySide6.QtWidgets import QListWidget
+        
         # Add a capture
         captures_section.add_capture(sample_capture)
 
         # Simulate user double-clicking on the item
-        list_widget = captures_section._captures_widget._list_widget
+        list_widget = captures_section.findChild(QListWidget)
+        assert list_widget is not None
         item = list_widget.item(0)
 
         with qtbot.waitSignal(captures_section.offset_activated, timeout=signal_timeout()) as blocker:
@@ -179,8 +187,12 @@ class TestMesenCapturesSection:
         captures_section.add_capture(sample_capture)
 
         # Directly emit the signal from the internal widget (simulates context menu action)
+        # We can find the RecentCapturesWidget child by type if we don't want to use private member
+        from ui.components.panels.recent_captures_widget import RecentCapturesWidget
+        recent_captures = captures_section.findChild(RecentCapturesWidget)
+        
         with qtbot.waitSignal(captures_section.save_to_library_requested, timeout=signal_timeout()) as blocker:
-            captures_section._captures_widget.save_to_library_requested.emit(sample_capture.offset)
+            recent_captures.save_to_library_requested.emit(sample_capture.offset)
 
         # Verify signal was forwarded with correct offset
         assert blocker.args == [sample_capture.offset]
@@ -226,4 +238,4 @@ class TestMesenCapturesSection:
         log_watcher.offset_discovered.emit(sample_capture)
 
         # Verify the widget received it
-        assert widget._captures_widget._list_widget.count() == 1
+        assert widget.get_capture_count() == 1

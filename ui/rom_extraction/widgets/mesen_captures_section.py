@@ -109,6 +109,14 @@ class MesenCapturesSection(QWidget):
         """
         return self._captures_widget.get_selected_offset()
 
+    def get_capture_count(self) -> int:
+        """Get the number of captured offsets.
+
+        Returns:
+            The number of captured offsets currently displayed.
+        """
+        return self._captures_widget.get_capture_count()
+
     def clear(self) -> None:
         """Clear all captured offsets."""
         self._captures_widget.clear()

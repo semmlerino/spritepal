@@ -165,8 +165,8 @@ class TestModeSwitchRepro:
     def test_load_rom_switches_mode(self, sprite_editor_workspace):
         """Verify that loading a ROM automatically switches to ROM mode."""
         # Ensure we start in VRAM mode (default)
-        sprite_editor_workspace._mode_combo.setCurrentIndex(0)
-        assert sprite_editor_workspace._mode_combo.currentData() == "vram"
+        sprite_editor_workspace.set_mode("vram")
+        assert sprite_editor_workspace.current_mode == "vram"
 
         # Mock the controller's load_rom to do nothing (we just want to check the mode switch)
         # Note: We are testing the workspace's load_rom method, not the controller's.
@@ -176,6 +176,6 @@ class TestModeSwitchRepro:
         sprite_editor_workspace.load_rom("test.sfc")
 
         # Assertion: Should have switched to ROM mode
-        assert sprite_editor_workspace._mode_combo.currentData() == "rom", (
+        assert sprite_editor_workspace.current_mode == "rom", (
             "Failed to switch to ROM mode after loading a ROM"
         )

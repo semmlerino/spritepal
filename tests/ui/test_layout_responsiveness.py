@@ -171,15 +171,51 @@ class TestLayoutResponsiveness:
                 size_hint = child
 
         assert offset_hint is not None, "Offset hint not found"
-        assert offset_hint.wordWrap() is True, "Offset hint should wrap"
+        # Test that label can grow height when text wraps (coarse check)
+        # Use text with spaces to ensure wrapping occurs
+        original_text = offset_hint.text()
+        long_text = "This is a very long text " * 50
+        offset_hint.setText(long_text)
+        
+        # If word wrap is on, heightForWidth should be significant for a narrow width
+        h_narrow = offset_hint.heightForWidth(100)
+        h_wide = offset_hint.heightForWidth(1000)
+        
+        # Restoring text
+        offset_hint.setText(original_text)
+        
+        # If text wraps, narrow width should require more height
+        # Note: heightForWidth returns -1 if the widget doesn't support it or layout not active
+        # But QLabel implements it. 
+        # If it fails, fallback to checking wordWrap property as a proxy for intent, 
+        # acknowledging the limitation of headless layout testing.
+        if h_narrow == -1 or h_wide == -1:
+             # Fallback if height calculation fails in test env
+             assert offset_hint.wordWrap() is True, "Offset hint should have wordWrap enabled"
+        else:
+             assert h_narrow > h_wide, f"Label should wrap text (narrow: {h_narrow}, wide: {h_wide})"
 
         assert size_hint is not None, "Size hint not found"
-        assert size_hint.wordWrap() is True, "Size hint should wrap"
+        # Similarly for size hint
+        size_hint.setText(long_text)
+        h_narrow = size_hint.heightForWidth(100)
+        h_wide = size_hint.heightForWidth(1000)
+        
+        if h_narrow != -1 and h_wide != -1:
+            assert h_narrow > h_wide, "Size hint should wrap text"
+        else:
+            assert size_hint.wordWrap() is True
 
         # Test InjectTab output hint
         inject_tab = InjectTab()
         output_hint = inject_tab.output_hint
 
-        assert output_hint.wordWrap() is True, "Output hint should wrap"
-        # Verify it's in the layout (hard to check row/col spanning via findChildren alone without layout inspection)
-        # But checking wordWrap confirms the property set.
+        # Verify wrapping behavior
+        output_hint.setText(long_text)
+        h_narrow = output_hint.heightForWidth(100)
+        h_wide = output_hint.heightForWidth(1000)
+        
+        if h_narrow != -1 and h_wide != -1:
+            assert h_narrow > h_wide, "Output hint should wrap text"
+        else:
+            assert output_hint.wordWrap() is True

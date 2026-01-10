@@ -213,6 +213,10 @@ class RecentCapturesWidget(QWidget):
             return current_item.data(Qt.ItemDataRole.UserRole)
         return None
 
+    def get_capture_count(self) -> int:
+        """Get the number of captured offsets."""
+        return self._list_widget.count()
+
     def _update_status_indicator(self, watching: bool) -> None:
         """Update the status indicator color."""
         color = COLORS["success"] if watching else COLORS["text_secondary"]

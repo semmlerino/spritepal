@@ -12,7 +12,7 @@ def test_ready_for_inject_hidden_in_rom_mode(qtbot):
     qtbot.waitForWindowShown(page)
 
     # Check initial state
-    assert not page.workspace._inject_btn.isVisible(), "Ready for Inject button should be hidden in ROM mode"
+    assert not page.workspace.is_inject_button_visible, "Ready for Inject button should be hidden in ROM mode"
 
     # Check Save to ROM button visibility (via SaveExportPanel)
     assert page.workspace.save_export_panel.save_to_rom_btn.isVisible(), (
@@ -95,7 +95,7 @@ def test_ready_for_inject_hidden_in_rom_mode(qtbot):
     # Verify set_workflow_mode was called correctly
     # We can't check internal state easily, but we can call it again and verify
     page.workspace.set_workflow_mode("rom")
-    assert not page.workspace._inject_btn.isVisible()
+    assert not page.workspace.is_inject_button_visible
 
     page.workspace.set_workflow_mode("vram")
-    assert page.workspace._inject_btn.isVisible()
+    assert page.workspace.is_inject_button_visible

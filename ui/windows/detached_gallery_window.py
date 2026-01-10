@@ -508,6 +508,15 @@ class DetachedGalleryWindow(QMainWindow):
 
         self.status_bar.showMessage("Ready - Load a ROM to start scanning")
 
+    def load_rom(self, rom_path: str):
+        """Load a ROM file programmatically.
+
+        Args:
+            rom_path: Path to the ROM file.
+        """
+        self._set_rom_file(rom_path)
+        self._save_last_rom(rom_path)
+
     def _load_rom(self):
         """Load a ROM file."""
         filename = browse_for_open_file(self, "Select ROM File", "SNES ROM Files (*.sfc *.smc);;All Files (*.*)")
