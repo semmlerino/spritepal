@@ -372,7 +372,7 @@ class PixelCanvas(QWidget):
         regions_to_update: list[QRect] = []
 
         # Get brush size to calculate full update area
-        brush_size = self.controller.tool_manager.get_brush_size()
+        brush_size = self.controller.get_brush_size()
 
         # Account for pen width in highlight drawing (1 pixel)
         pen_width = 1
@@ -604,8 +604,8 @@ class PixelCanvas(QWidget):
         image_model = self.controller.image_model
         height, width = image_model.data.shape
 
-        # Get brush pixels from tool manager
-        brush_pixels = self.controller.tool_manager.get_brush_pixels(x, y)
+        # Get brush pixels from controller
+        brush_pixels = self.controller.get_brush_pixels(x, y)
 
         # Draw highlight for each pixel in the brush area
         # Use a slightly thinner pen to avoid excessive overlap

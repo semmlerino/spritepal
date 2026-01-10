@@ -267,6 +267,25 @@ class SpriteAssetBrowser(QWidget):
             iterator += 1
         return False
 
+    def find_display_name_by_offset(self, offset: int) -> str | None:
+        """
+        Find the display name for a sprite by ROM offset.
+
+        Args:
+            offset: ROM offset to search for
+
+        Returns:
+            Display name if found, None otherwise
+        """
+        iterator = QTreeWidgetItemIterator(self.tree)
+        while iterator.value():
+            item = iterator.value()
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("offset") == offset:
+                return item.text(0)
+            iterator += 1
+        return None
+
     def _create_category(self, name: str) -> QTreeWidgetItem:
         """
         Create a top-level category item.

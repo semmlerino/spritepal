@@ -214,3 +214,8 @@ class ROMWorkflowPage(QWidget):
     def clear_asset_browser(self) -> None:
         """Clear all items from asset browser."""
         self._asset_browser.clear_all()
+
+    def clear_rom_palette_sources(self) -> None:
+        """Clear ROM palette sources from the workspace palette panel."""
+        if self._workspace and self._workspace.palette_panel:
+            self._workspace.palette_panel.clear_rom_sources()

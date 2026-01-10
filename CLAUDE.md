@@ -1,5 +1,59 @@
 # SpritePal Development Guidelines
 
+**Last updated: January 9, 2026** | See [Table of Contents](#table-of-contents) below
+
+---
+
+## TL;DR - Essential Rules (Read This First)
+
+**1. Environment:**
+- **Framework**: PySide6 | **Python**: 3.12+ | **Package Manager**: uv | **Config**: `pyproject.toml`
+- **Workflow**: `ruff check . && ruff format . && basedpyright core ui utils && pytest` → then **commit**
+
+**2. Critical Don'ts** (⚠️ Will crash or fail tests):
+| ❌ Don't | ✅ Do Instead |
+|---------|-------------|
+| `QPixmap` in worker threads | Use `ThreadSafeTestImage` |
+| Inherit `QDialog` in mocks | Use `QObject` with signals |
+| Hardcode paths like `/tmp/test_output` | Use `tmp_path` fixture |
+| `time.sleep()` in Qt tests | Use `qtbot.wait(ms)` or `qtbot.waitSignal()` |
+| Non-context `waitSignal()` | Always: `with qtbot.waitSignal(signal, timeout=...)` |
+| Mock at wrong location | `@patch('spritepal.ui.panel.Dialog')` not `...dialogs.Dialog` |
+| Multiple `QApplication` instances | Let pytest-qt manage via `qtbot`/`qapp` fixtures |
+
+**3. Testing** (when running tests):
+- Default: parallel via `-n auto` (see `pyproject.toml`)
+- **Flaky?** Run serial: `pytest -n 0 -vv` — if passes, it's a race condition
+- **Quick triage**: `pytest --tb=no -q 2>&1 | tee /tmp/pytest_triage.log` then `pytest --lf -vv`
+
+**4. Fixtures** (when writing tests):
+- Use `app_context` by default (clean state per-test)
+- Use `session_app_context` only with `@pytest.mark.shared_state_safe`
+- Key imports: `from tests.fixtures.timeouts import worker_timeout`
+
+**5. Code Patterns**:
+- **Managers**: Access via `AppContext` (e.g., `context.core_operations_manager`), never instantiate directly
+- **Imports**: UI imports core/utils; Core imports utils only
+- **Behavior changes**: If affecting threading, signals, IO, persistence, or settings → add/adjust tests
+- **DI order**: UI creation happens before manager creation; use deferred injection with setters
+
+**→ For full details, jump to relevant section below**
+
+---
+
+## Table of Contents
+
+1. [Core Principles](#core-principles) — Philosophy behind the codebase
+2. [Critical Rules](#critical-rules-read-first) — Will cause crashes/failures if violated
+3. [Development Workflow](#development-workflow) — Day-to-day commands and checks
+4. [Testing Guide](#testing-guide) — Running, writing, and debugging tests
+5. [Code Patterns & Architecture](#code-patterns--architecture) — Design patterns and import rules
+6. [Reference](#reference) — Key files, managers, fixtures
+7. [Mesen 2 Integration](#mesen-2-integration) — Sprite capture tool (quick start only)
+8. [Advanced Topics](#advanced-topics) — Detailed debugging, type checking, UI screenshots
+
+---
+
 ## Core Principles
 
 1. **Test logic more than widgets** - Put business logic in plain Python classes so tests stay fast and stable. Keep widget tests focused on wiring, signals, and basic interactions.
@@ -8,300 +62,104 @@
 
 3. **Prefer boring determinism** - The fastest dev loop is: small change → run checks → commit.
 
+---
+
 ## Critical Rules (Read First)
 
-These rules prevent crashes and test failures. Each has a solution.
+⚠️ **See the table in [TL;DR](#tldr---essential-rules-read-this-first) above.** These cause crashes (💥) or test failures (🔴).
 
-| Rule | Solution |
-|------|----------|
-| **Never `QPixmap` in worker threads** | Use `ThreadSafeTestImage` from `tests/infrastructure/` |
-| **Never inherit `QDialog` in mocks** | Use `QObject` with signals (see `tests/infrastructure/qt_mocks.py`) |
-| **Use `app_context` fixture by default** | Use `session_app_context` only with `@pytest.mark.shared_state_safe` |
-| **Use `tmp_path` for file operations** | Never hardcode paths like `/tmp/test_output` |
-| **Use `with qtbot.waitSignal():`** | Context manager catches fast signals; non-context form races |
-| **Never `time.sleep()` in Qt tests** | Use `qtbot.wait(ms)` or `qtbot.waitSignal()` |
-| **Mock at import location** | `@patch('spritepal.ui.panel.Dialog')`, not `...dialogs.Dialog` |
-| **One QApplication only** | Let pytest-qt manage it via `qtbot`/`qapp` fixtures |
+**Additional context:**
+- `QPixmap` crash: Qt GUI objects aren't thread-safe. The error "Fatal Python error: Aborted" with no stack trace is the giveaway.
+- `waitSignal()` race: Without context manager, signal may emit before wait starts. Always `with qtbot.waitSignal(...):`.
+- Mock location: Python patches at import site, not definition site. Trace where the code `from X import Y` to find patch target.
 
-## Quick Reference
+---
 
-- **Qt Framework**: PySide6 (not PyQt6)
-- **Python**: 3.12+
-- **Package Manager**: uv
-- **Config**: `pyproject.toml` (ruff, basedpyright, pytest)
-- **Test ROMs**: `roms/` directory contains Kirby Super Star ROMs for testing extraction/injection
-- **Mesen 2**: `tools/mesen2/` - SNES emulator for runtime sprite capture
+## Development Workflow
 
-## Mesen 2 Integration
+### Code Quality Check (Always Do This)
 
-Mesen 2 is used to capture sprites at runtime from VRAM. Location: `tools/mesen2/`
-
-### Running Mesen 2 with Lua Scripts
-
-**Note:** WSL interop may be disabled. Use batch file or PowerShell from Windows.
-
-```batch
-REM From Windows Command Prompt or double-click run_sprite_capture.bat
-cd C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal
-.\tools\mesen2\Mesen2.exe --testrunner "roms\Kirby Super Star (USA).sfc" "mesen2_integration\lua_scripts\test_sprite_capture.lua"
-```
-
-Or use PowerShell:
-```powershell
-cd 'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal'
-.\tools\mesen2\Mesen2.exe --testrunner 'roms\Kirby Super Star (USA).sfc' 'mesen2_integration\lua_scripts\test_sprite_capture.lua'
-```
-
-**Testrunner mode** (`--testrunner`) runs headless and exits when script calls `emu.stop()`.
-
-### Available Lua Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `sprite_rom_finder.lua` | **Click on sprite → get ROM offset** (v34, recommended) |
-| `sprite_identifier.lua` | Identify sprite metadata via idx tracking |
-| `sprite_labeler.lua` | Always-on sprite labeling overlay |
-| `vram_tile_dump.lua` | Dump VRAM tiles for debugging |
-| `gameplay_capture.lua` | Auto-capture at frame 1800 (gameplay with Kirby visible) |
-| `mesen2_sprite_capture.lua` | Manual capture with Start+Select |
-| `test_sprite_capture.lua` | Auto-capture at frame 700 (menu state) |
-| `mesen2_click_extractor.lua` | F9 capture + DMA tracking |
-| `mesen2_sprite_finder_final.lua` | DMA monitoring for ROM offset discovery |
-| `asset_selector_tracer_v3.lua` | Full idx→DMA attribution with session tracking |
-| `per_idx_ablation_v1.lua` | Per-index causal proof via ROM corruption |
-
-### Click-to-Find Sprite ROM Offset (Fastest Method)
-
-```batch
-# Double-click from spritepal directory:
-run_sprite_rom_finder.bat
-```
-
-**Pipeline:** `visible sprite → OAM → VRAM tile → DMA → idx session → ROM offset`
-
-**Usage:**
-1. Wait for gameplay (movie auto-plays)
-2. Pause when target sprite visible
-3. Left-click on sprite
-4. Read `FILE: 0xNNNNNN` from panel/console
-
-**SA-1 full-bank mapping:** `file = (bank - 0xC0) * 0x10000 + addr`
-
-See `mesen2_integration/README.md` for full documentation.
-
-### Quick Capture (Double-click)
-
-- `run_sprite_rom_finder.bat` - Interactive click-to-find sprite ROM offsets (recommended)
-- `run_sprite_rom_finder_manual.bat` - Manual ROM finder without movie playback
-- `run_sprite_capture.bat` - Auto-capture at frame 700 (menu state)
-
-### Running with Movie Playback (for Gameplay)
-
-**Problem:** Testrunner mode (`--testrunner`) runs headless with no input, so the game stays in menus/attract mode. To test actual gameplay asset loading, use a movie file (`.mmo`).
-
-**Movie file location:** `C:\Users\gabri\Documents\Mesen2\Movies\Kirby Super Star (USA).mmo`
-
-**Pattern:** Movie files only play once a ROM is already running. Use two Mesen2 launches:
-
-```batch
-@echo off
-set MESEN_EXE=.\tools\mesen2\Mesen2.exe
-set ROM_PATH=roms\Kirby Super Star (USA).sfc
-set LUA_PATH=mesen2_integration\lua_scripts\your_script.lua
-set MOVIE_PATH=C:\Users\gabri\Documents\Mesen2\Movies\Kirby Super Star (USA).mmo
-
-REM 1. Launch ROM with Lua script
-start "" "%MESEN_EXE%" --enableStdout "%ROM_PATH%" "%LUA_PATH%"
-
-REM 2. Wait for ROM to start
-ping -n 6 127.0.0.1 >NUL
-
-REM 3. Send movie file to running instance (SingleInstance IPC)
-start "" "%MESEN_EXE%" "%MOVIE_PATH%"
-```
-
-**Key differences from testrunner:**
-- Uses `--enableStdout` instead of `--testrunner` (keeps window open)
-- Script must call `emu.stop()` to exit when done
-- Movie provides input to navigate menus and enter gameplay
-
-**Working batch file using this pattern:**
-- `run_sprite_rom_finder.bat` - Uses movie playback for gameplay capture
-
-### Capture Output
-
-Captures are saved to `mesen2_exchange/` as JSON files:
-- `sprite_capture_[timestamp].json` - OAM entries with VRAM tile data
-- `capture_log.txt` - Debug log
-
-### Processing Captures
+**One canonical sequence before committing:**
 
 ```bash
-# Extract sprites from capture
-uv run python scripts/extract_sprite_from_capture.py mesen2_exchange/sprite_capture_*.json
-
-# Output goes to extracted_sprites/
+uv run ruff check .              # Lint
+uv run ruff format .             # Format
+uv run basedpyright core ui utils  # Type check
+uv run pytest                    # Run all tests
 ```
 
-### Frame Analysis: Cutscenes vs Gameplay
+**No silent behavior changes:** If a change affects threading, signals, IO, persistence, or settings → add/adjust tests.
 
-When analyzing Mesen2 capture logs (DMA traces, staging summaries, etc.), **pay attention to frame numbers**:
+### Committing After Quality Checks
 
-| Frame Range | Scene Type | Relevance |
-|-------------|------------|-----------|
-| 0-500 | Boot/logos | Ignore |
-| 500-1200 | Menus/cutscenes | Low - different sprite behavior |
-| **1500+** | **Gameplay** | **High - this is what we care about** |
+**Always commit after completing changes.** When all checks pass, create a commit immediately—don't leave work uncommitted.
 
-**Why this matters:**
-- Cutscene sprites often use different data paths (100% S-CPU, simpler formats)
-- Gameplay sprites show SA-1 involvement (~50% of ROM reads)
-- ROM→VRAM mapping for sprite extraction must be validated on **gameplay frames**
-- Conclusions drawn from cutscene-only data may not apply to gameplay
+**After all checks pass:**
+1. `git status` / `git diff` to review changes
+2. `git add <files>` to stage
+3. `/commit` (or `git commit -m "fix: description"`) — use conventional commits: `fix:`, `feat:`, `refactor:`, `chore:`, `test:`, `docs:`
+4. Example: `fix: resolve race condition in palette sync`
 
-**When grepping logs, filter for gameplay:**
-```bash
-# Gameplay frames only (1500+)
-grep "frame=1[5-9][0-9][0-9]\|frame=[2-9][0-9][0-9][0-9]" dma_probe_log.txt
+**Never commit if:** checks fail, tests are flaky (verify with `-n 0`), or behavior changed without tests.
 
-# Sprite VRAM region (0x4000-0x5FFF)
-grep "vram_word=0x4\|vram_word=0x5" dma_probe_log.txt
-```
+### Committing Facade & Law of Demeter Refactoring
 
-## Claude Code Workflow
+When committing changes that add facade methods or remove reach-through access patterns:
 
-When editing this repo, follow these rules:
+1. **Verify facade completeness:**
+   - Check that all direct reach-through access in callers is now replaced with facade method calls
+   - Confirm new facade methods follow naming convention: `get_*()` for reads, `set_*()` for writes, `clear_*()` for cleanup
+   - Ensure docstrings document the purpose of each facade method
 
-1. **One canonical check sequence**
+2. **Verify reach-through patterns eliminated:**
    ```bash
-   uv run ruff check .
-   uv run ruff format .
-   uv run basedpyright core ui utils
-   uv run pytest
+   # Search for remaining violations (adjust patterns as needed)
+   grep -rn "\.tool_manager\." ui/sprite_editor/views/
+   grep -rn "\.undo_manager\." ui/sprite_editor/controllers/
+   grep -rn "\.asset_browser\.tree" ui/sprite_editor/
    ```
+   All results should return nothing if refactoring is complete.
 
-2. **No silent behavior changes** - If a change affects threading, signals, IO, persistence, or settings: add/adjust tests.
+3. **Use conventional commit message:**
+   - For new facades: `refactor: add Law of Demeter facade methods in X`
+   - For reach-through elimination: `refactor: eliminate reach-through access to X.Y`
+   - Example: `refactor: add SpriteAssetBrowser facades to encapsulate tree structure`
 
-## Running Tests
+4. **Update documentation if needed:**
+   - If public API changed significantly, update the subsystem's CLAUDE.md
+   - If design patterns changed, consider updating docs/architecture.md
 
-All commands run from `spritepal/` directory. Use `~/.local/bin/uv` if `uv` isn't in PATH.
-
-Parallel execution requires pytest-xdist (included in dev dependencies).
-
-### Quick Triage (Start Here)
-
-For large test suites (1900+ tests), get a fast pass/fail summary first:
-
-```bash
-# Fast summary - no tracebacks, just pass/fail counts
-uv run pytest --tb=no -q 2>&1 | tee /tmp/pytest_triage.log
-tail -30 /tmp/pytest_triage.log  # See summary
-
-# Re-run only failures with details
-uv run pytest --lf -vv --tb=short
-```
-
-**Why tee to a file:** Pytest buffers output; piping directly to `head`/`tail` loses the summary. Always capture to file first for large runs.
-
-### Standard Workflow
+### Environment Setup
 
 ```bash
-# 1. Quick triage (see above) - identify what's failing
-uv run pytest --tb=no -q
-
-# 2. Re-run failures with details
-uv run pytest --lf -vv --tb=short
-
-# 3. Drill down on specific test (serial, verbose, full tracebacks)
-uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
-
-# 4. Full suite when stable (override default maxfail=3)
-uv run pytest --maxfail=10
+uv sync              # Sync from lockfile
+uv sync --extra dev  # Include dev dependencies
+uv lock              # Update lockfile after dependency changes
 ```
 
-**Why these flags:**
-- `-vv` - Full test names and assertion details
-- `--tb=long` - Full tracebacks for all frames (pyproject.toml sets `--tb=short`)
-- `-s` - Show print/log output (**only use with `-n 0`**; parallel output interleaves)
-- `-n 0` - Serial execution (pyproject.toml sets `-n auto` for parallel)
+---
 
-**Never use `-q` when debugging** - it hides information you need.
+## Testing Guide
 
-### Useful Shortcuts
+**Comprehensive guide:** [docs/testing_guide.md](docs/testing_guide.md) | **Fixture reference:** [tests/README.md](tests/README.md)
 
-```bash
-# Re-run only last failures
-uv run pytest --lf -vv
+### Quick Commands (Copy-Paste Friendly)
 
-# Stop on first failure (fast iteration)
-uv run pytest -x -vv
+| Goal | Command |
+|------|---------|
+| **Quick pass/fail summary** | `pytest --tb=no -q 2>&1 \| tee /tmp/pytest_triage.log` |
+| **Re-run failures with details** | `pytest --lf -vv --tb=short` |
+| **Drill down on one test** | `pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0` |
+| **Find slow tests** | `pytest --durations=20` |
+| **Filter by pattern** | `pytest -k "extraction and not slow" -vv` |
+| **Stop on first failure** | `pytest -x -vv` |
+| **Serial execution** | `pytest -n 0 -vv` |
 
-# Filter by name pattern
-uv run pytest -k "extraction and not slow" -vv
+**Note:** Pytest buffers output. Always `tee` to file first for large runs.
 
-# Exclude slow/perf tests for faster runs
-uv run pytest -m "not slow and not perf" -vv
+### Writing Tests
 
-# Find slow tests
-uv run pytest --durations=20
-```
-
-### Custom CLI Options
-
-Options defined in conftest.py:
-
-```bash
-# Use real HAL binaries instead of mocks
-uv run pytest --use-real-hal -v
-
-# Fail if real HAL binaries not found (instead of skip)
-uv run pytest --require-real-hal -v
-
-# Control leak detection behavior
-uv run pytest --leak-mode=warn  # Warn on leaks (default local)
-uv run pytest --leak-mode=fail  # Fail on leaks (default CI)
-
-# Regenerate golden data checksums
-uv run pytest tests/test_hal_golden.py --regenerate-golden -v
-```
-
-### Parallel Execution
-
-Tests run parallel by default (pyproject.toml sets `-n auto --dist=loadscope`).
-
-**Note:** The config uses `--dist=loadscope` (groups by module), not `--dist=loadgroup`. The conftest.py applies `xdist_group("serial")` markers to tests using `session_app_context` or `@pytest.mark.parallel_unsafe`, but these only co-locate tests on one worker (not truly serial).
-
-**For truly serial execution:** Use `-n 0`.
-
-### When Tests Fail
-
-**Flaky test (passes sometimes, fails other times):**
-1. Run serial first: `uv run pytest path/to/test.py -n 0 -vv`
-2. If it passes serial, it's a race condition - check for:
-   - Non-context `waitSignal()` (signal emits before wait starts)
-   - Hardcoded timeouts (use `worker_timeout()` functions)
-   - Fixed paths or shared filenames (use `tmp_path` fixture instead)
-
-**Crash with "Fatal Python error: Aborted":**
-- Almost always `QPixmap` in a worker thread
-- Replace with `ThreadSafeTestImage` from `tests/infrastructure/`
-
-**Test hangs forever:**
-- Ctrl-C then re-run with `--full-trace` for useful stack on interrupt
-- Dialog waiting for user input - mock `exec()` on the specific dialog class
-- Infinite loop in worker - check thread cleanup in fixture teardown
-
-**Passes locally, fails in CI:**
-- Usually timeout-related - check if CI uses `PYTEST_TIMEOUT_MULTIPLIER`
-- Or display-related - ensure test doesn't require real display (offscreen mode is default)
-
-## Writing Tests
-
-> **Comprehensive testing guide:** [docs/testing_guide.md](docs/testing_guide.md)
-> **Fixture reference:** [tests/README.md](tests/README.md)
-
-### Quick Template
-
+**Quick template:**
 ```python
 from tests.fixtures.timeouts import worker_timeout
 
@@ -319,32 +177,112 @@ def test_async_op(qtbot, app_context):
         worker.start()
 ```
 
-### Key Imports
-
+**Key imports:**
 ```python
 from tests.fixtures.timeouts import worker_timeout, signal_timeout, ui_timeout, LONG
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 from tests.infrastructure.real_component_factory import RealComponentFactory
 ```
 
-## Other Development Commands
+**Fixture decision tree:**
+- **`app_context`** - Default for unit tests. Provides clean Qt state + managers per-test. Use this 95% of the time.
+- **`session_app_context`** - Only with `@pytest.mark.shared_state_safe`. For tests that need to share state across runs.
+- **`tmp_path`** - Always for file operations. Never hardcode paths.
+- **`qtbot`** - For Qt signal/widget testing.
 
-### Environment Setup
+### Parallel Execution (Default)
+
+Tests run parallel via `-n auto` (see `pyproject.toml`).
+
+- **Config:** `--dist=loadscope` groups by module; `xdist_group("serial")` co-locates marked tests
+- **Not truly serial:** These only prevent parallel workers from running them, but don't guarantee exclusivity
+- **For truly serial:** Use `-n 0`
+
+### Custom CLI Options (in conftest.py)
 
 ```bash
-uv sync              # Sync from lockfile
-uv sync --extra dev  # Include dev dependencies
-uv lock              # Update lockfile after dependency changes
+pytest --use-real-hal -v              # Use real HAL binaries instead of mocks
+pytest --require-real-hal -v          # Fail if HAL binaries not found
+pytest --leak-mode=warn               # Warn on leaks (default local)
+pytest --leak-mode=fail               # Fail on leaks (default CI)
+pytest tests/test_hal_golden.py --regenerate-golden -v  # Update golden checksums
 ```
 
-### Code Quality
+### Debugging Failed Tests
 
-```bash
-uv run ruff check .              # Lint
-uv run ruff check . --fix        # Auto-fix
-uv run ruff format .             # Format
-uv run basedpyright core ui utils  # Type check
+| Symptom | Solution |
+|---------|----------|
+| **Flaky (sometimes passes)** | Run serial: `pytest -n 0 -vv`. If passes → race condition. Check: non-context `waitSignal()`, hardcoded timeouts, `tmp_path` usage |
+| **"Fatal Python error: Aborted"** | `QPixmap` in worker thread. Replace with `ThreadSafeTestImage` |
+| **Hangs forever** | Ctrl-C → `--full-trace`. Check: dialog mocking `exec()`, worker cleanup in fixture teardown |
+| **Passes locally, fails in CI** | Usually timeout. Check `PYTEST_TIMEOUT_MULTIPLIER` or display requirements (offscreen is default) |
+
+---
+
+## Code Patterns & Architecture
+
+### Import Rules (Enforce These)
+
 ```
+UI ──→ Core ──→ Utils ──→ Stdlib only
+        ↓
+      (Core can only import Utils)
+```
+
+- **UI** imports: core, utils, PySide6
+- **Core** imports: utils, stdlib (no UI)
+- **Utils** imports: stdlib only
+
+### Dependency Injection Order
+
+`MainWindow.__init__()` creates UI BEFORE services. Use deferred injection:
+
+```python
+# In _create_workspaces() - service doesn't exist yet
+workspace = SpriteEditorWorkspace(message_service=None)
+
+# In _setup_managers() - now inject
+workspace.set_message_service(status_bar_manager)
+
+# Setter cascades through children
+def set_message_service(self, service):
+    self._message_service = service
+    for child in self.children:
+        child.set_message_service(service)
+```
+
+**Before refactoring DI:** Trace `__init__` → `_setup_ui()` → `_setup_managers()` order.
+
+### Manager Access (Production Code)
+
+Never instantiate managers directly. Access via `AppContext`:
+
+```python
+from core.app_context import get_app_context
+
+context = get_app_context()
+state_mgr = context.application_state_manager
+operations_mgr = context.core_operations_manager
+```
+
+**In tests:**
+```python
+def test_something(app_context):  # Fixture provides this
+    operations_mgr = app_context.core_operations_manager
+```
+
+### Key Patterns
+
+| Pattern | Location | Notes |
+|---------|----------|-------|
+| **Resource cleanup** | `ui/workers/batch_thumbnail_worker.py:_rom_context` | Use `@contextmanager` with try/finally |
+| **Thread safety** | General | Use `QMutex/QMutexLocker`; prefer signals over polling |
+| **Dialog init** | `ui/components/base/dialog_base.py` | Declare instance vars BEFORE `super().__init__()` |
+| **Circular imports** | General | Use local imports in methods when needed |
+
+---
+
+## Reference
 
 ### Environment Variables
 
@@ -354,183 +292,93 @@ uv run basedpyright core ui utils  # Type check
 | `SPRITEPAL_EXHAL_PATH` | Path to real exhal binary | System PATH |
 | `SPRITEPAL_INHAL_PATH` | Path to real inhal binary | System PATH |
 | `SPRITEPAL_LEAK_MODE` | Override leak detection | `fail` (CI), `warn` (local) |
-| `QT_QPA_PLATFORM` | Qt display platform | `offscreen` (set by conftest) |
+| `QT_QPA_PLATFORM` | Qt display platform | `offscreen` (pytest default) |
 
-### Type Checking Notes
+### Type Checking (basedpyright, zero errors)
 
-The codebase passes basedpyright with zero errors. Key rules:
-
-- Use `| None` not `Optional`; Qt signals need annotations: `finished = Signal(str, int)`
-- **Protocols removed:** All protocol definitions were eliminated as over-engineering (commits 0c37f478, ace57d16). Use concrete types instead.
+- Use `| None` instead of `Optional`
+- Qt signals need explicit annotations: `finished = Signal(str, int)`
+- **Protocols removed** (commits 0c37f478, ace57d16 - over-engineering). Use concrete types instead.
 - **Dict invariance:** Use `Mapping[str, object]` for read-only params; never replace `dict[str, Any]` with `dict[str, object]`
 
-### Dependency Injection & Initialization Order
-
-`MainWindow.__init__()` runs `_setup_ui()` (creates workspaces) BEFORE `_setup_managers()` (creates services). Pass `None` initially, inject via setter later:
-
-```python
-# In _create_workspaces(): service doesn't exist yet
-workspace = SpriteEditorWorkspace(message_service=None)
-
-# In _setup_managers(): now inject
-workspace.set_message_service(status_bar_manager)
-
-# Setter cascades through hierarchy
-def set_message_service(self, service):
-    self._message_service = service
-    self.child_controller.set_message_service(service)
-```
-
-**Before any DI refactoring:** Trace `__init__` → `_setup_ui()` → `_setup_managers()` order. If service needed before created → deferred injection required.
-
-### Taking UI Screenshots
-
-For visual debugging and UI iteration, use this script to capture the app window:
-
-```bash
-uv run python -c "
-import sys
-import os
-os.environ['QT_QPA_PLATFORM'] = 'xcb'
-
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer
-
-from core.app_context import create_app_context
-from core.configuration_service import ConfigurationService
-
-config_service = ConfigurationService()
-config_service.ensure_directories_exist()
-context = create_app_context('SpritePal', settings_path=config_service.settings_file)
-
-from launch_spritepal import SpritePalApp
-app = SpritePalApp(sys.argv)
-
-window = app.main_window
-window.show()
-window.resize(1000, 900)
-
-app.processEvents()
-app.processEvents()
-
-def capture():
-    pixmap = window.grab()
-    pixmap.save('/tmp/spritepal_screenshot.png')
-    print(f'Screenshot saved: {pixmap.width()}x{pixmap.height()}')
-    app.quit()
-
-QTimer.singleShot(500, capture)
-app.exec()
-" 2>&1 | tail -5
-```
-
-**Key points:**
-- Uses `xcb` platform for WSL X11 forwarding (not `offscreen`)
-- `window.grab()` captures widget directly (more reliable than `screen.grabWindow()`)
-- 500ms delay allows layout to stabilize before capture
-- View screenshot with: `Read /tmp/spritepal_screenshot.png`
-
-**For debug borders** (visualize widget boundaries):
-```python
-panel = window.rom_extraction_panel
-panel.setStyleSheet('QWidget { border: 1px solid red; }')
-```
-
-## Documentation Pointers
-
-| When you need... | Read |
-|------------------|------|
-| Qt threading rules, error path testing patterns | `docs/testing_guide.md` |
-| Layer boundaries, what imports what | `docs/architecture.md` |
-| Fixture decision tree, RealComponentFactory usage | `tests/README.md` |
-| Sprite format details, ROM structure, compression | `docs/mesen2/00_STABLE_SNES_FACTS.md`, `docs/mesen2/03_GAME_MAPPING_KIRBY_SA1.md` |
-
-## Project Architecture
-
-```
-spritepal/
-├── core/                  # Business logic
-│   ├── managers/          # Manager classes
-│   ├── mesen_integration/ # Mesen 2 capture → ROM offset discovery
-│   └── *.py               # Core logic
-├── ui/                    # Qt UI components
-│   ├── sprite_editor/     # Unified sprite editor (Extract → Edit → Inject)
-│   ├── components/        # Reusable widgets
-│   ├── dialogs/           # Dialog windows
-│   ├── workers/           # Background workers
-│   └── *.py               # Panel files
-├── tests/
-│   ├── fixtures/          # Test fixtures
-│   └── infrastructure/    # RealComponentFactory, ThreadSafeTestImage
-├── mesen2_integration/    # Lua scripts for Mesen 2 emulator
-└── utils/                 # Shared utilities
-```
-
-### Key Files
+### Key Files & Locations
 
 | Looking for... | Location |
 |----------------|----------|
-| **Unified Sprite Editor** | `ui/sprite_editor/` (Extract/Edit/Inject workflow with full documentation) |
-| **Sprite Editor Workspace** | `ui/sprite_editor/views/workspaces/` (Embedded as workspace tabs in MainWindow) |
-| Sprite Editor Quick Start | Run: `python launch_editor.py` from spritepal directory |
-| Sprite Editor Docs | `ui/sprite_editor/README.md` (architecture, formats, components) |
-| Keyboard Shortcuts | Ctrl+1/2/3 for tabs, F6 for last Mesen2 capture |
-| CoreOperationsManager | `core/managers/core_operations_manager.py` (handles extraction and injection) |
-| ApplicationStateManager | `core/managers/application_state_manager.py` (session, settings, state) |
-| DialogBase (init pattern) | `ui/components/base/dialog_base.py` |
-| AppContext, `get_app_context()` | `core/app_context.py` |
-| **Mesen integration subsystem** | `core/mesen_integration/` (ROM offset discovery from Mesen 2 captures) |
-| SA-1 address conversion | `core/mesen_integration/address_space_bridge.py` |
-| ROM tile matching | `core/mesen_integration/rom_tile_matcher.py` |
-| Full correlation pipeline | `core/mesen_integration/full_correlation_pipeline.py` |
-| Test fixtures | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
-| Qt mocks | `tests/infrastructure/qt_mocks.py` |
-| Signal utilities (`safe_disconnect`, etc.) | `ui/common/signal_utils.py` |
-| ThreadSafeTestImage | `tests/infrastructure/thread_safe_test_image.py` |
-| RealComponentFactory | `tests/infrastructure/real_component_factory.py` |
-| Test data repository | `tests/infrastructure/data_repository.py` |
+| **Managers** | `core/managers/core_operations_manager.py`, `core/managers/application_state_manager.py` |
+| **Sprite Editor** | `ui/sprite_editor/` (Extract/Edit/Inject workflow) |
+| **AppContext** | `core/app_context.py` — use `get_app_context()` to access managers |
+| **Base patterns** | `ui/components/base/dialog_base.py` — declare vars BEFORE `super().__init__()` |
+| **Mesen integration** | `core/mesen_integration/` — ROM offset discovery; see address_space_bridge.py, rom_tile_matcher.py |
+| **Test fixtures** | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
+| **Qt mocks** | `tests/infrastructure/qt_mocks.py` |
+| **Safe signals** | `ui/common/signal_utils.py` — `safe_disconnect()`, etc. |
+| **ThreadSafeTestImage** | `tests/infrastructure/thread_safe_test_image.py` — for worker thread testing |
+| **RealComponentFactory** | `tests/infrastructure/real_component_factory.py` — for testing with real components |
 
-### Import Rules
+### Project Structure
 
-- **UI** imports from: `core/`, `utils/`
-- **Core** imports from: `utils/`
-- **Utils** imports from: stdlib only
-
-### Manager Architecture
-
-Use AppContext to access managers, never instantiate directly:
-
-```python
-from core.app_context import get_app_context
-
-# Production code
-context = get_app_context()
-state_mgr = context.application_state_manager
-operations_mgr = context.core_operations_manager
-
-# Tests - use app_context fixture
-def test_extraction(app_context):
-    operations_mgr = app_context.core_operations_manager
 ```
-
-Key managers: `ApplicationStateManager`, `CoreOperationsManager` (handles extraction and injection operations)
-
-### Key Patterns
-
-**Resource management:** Use `@contextmanager` with try/finally for file/mmap cleanup. See `ui/workers/batch_thumbnail_worker.py:_rom_context` for the canonical pattern.
-
-**Thread safety:** Use `QMutex/QMutexLocker` for shared state; prefer signal-based waiting over polling.
-
-**Dialog initialization (DialogBase):** Declare instance variables BEFORE `super().__init__()`:
-```python
-class MyDialog(DialogBase):
-    def __init__(self, parent: QWidget | None = None):
-        self.my_widget: QWidget | None = None  # BEFORE super()
-        super().__init__(parent)  # Calls _setup_ui()
+spritepal/
+├── core/                  # Business logic (no UI)
+│   ├── managers/          # AppContext, state, operations
+│   ├── mesen_integration/ # ROM offset discovery
+│   └── *.py
+├── ui/                    # Qt components
+│   ├── sprite_editor/     # Unified editor (Extract → Edit → Inject)
+│   ├── components/        # Reusable widgets
+│   ├── dialogs/           # Dialog windows
+│   ├── workers/           # Background threads
+│   └── *.py
+├── tests/
+│   ├── fixtures/          # Test fixtures (app_context, qtbot, etc.)
+│   └── infrastructure/    # Mocks, factories, test utilities
+├── utils/                 # Stdlib-only utilities
+└── mesen2_integration/    # Lua scripts for emulator (external tool)
 ```
-
-**Circular imports:** Use local imports in methods when needed.
 
 ---
 
-*Last updated: January 9, 2026 (Verified documentation accuracy, fixed EditWorkspace→SpriteEditorWorkspace class name in code examples, fixed ROM validation and palette issues)*
+## Mesen 2 Integration (Quick Start)
+
+**What:** SNES emulator tool to capture sprite data at runtime. Runs from Windows (WSL interop).
+
+**Location:** `tools/mesen2/` | **Detailed docs:** `mesen2_integration/README.md`
+
+**Quick start:**
+- **To find sprite ROM offset:** Run `run_sprite_rom_finder.bat` → click sprite → read `FILE: 0xNNNNNN`
+- **To capture to JSON:** Run `run_sprite_capture.bat` → captures to `mesen2_exchange/sprite_capture_*.json`
+- **To process captures:** `uv run python scripts/extract_sprite_from_capture.py mesen2_exchange/sprite_capture_*.json`
+
+**Key points:**
+- Testrunner mode (`--testrunner`) runs headless; for gameplay, use movie file (see README for details)
+- Frame analysis: ignore 0-500 (boot), focus on 1500+ (gameplay where SA-1 is active)
+- SA-1 address mapping: `file = (bank - 0xC0) * 0x10000 + addr`
+
+**Available Lua scripts:** `sprite_rom_finder.lua` (recommended), `sprite_identifier.lua`, `vram_tile_dump.lua`, `asset_selector_tracer_v3.lua`, and more in `mesen2_integration/lua_scripts/`
+
+---
+
+## Advanced Topics
+
+### Taking UI Screenshots (for debugging)
+
+```bash
+# Capture app window (requires X11/xcb display)
+QT_QPA_PLATFORM=xcb uv run python -c "
+from PySide6.QtCore import QTimer; from launch_spritepal import SpritePalApp; import sys
+app = SpritePalApp(sys.argv); w = app.main_window; w.show(); w.resize(1000, 900)
+QTimer.singleShot(500, lambda: (w.grab().save('/tmp/spritepal_screenshot.png'), app.quit()))
+app.exec()
+"
+```
+
+**Debug widget boundaries:** `widget.setStyleSheet('QWidget { border: 1px solid red; }')`
+
+### Documentation Pointers
+
+| Topic | Location |
+|-------|----------|
+| Qt threading, error path testing | `docs/testing_guide.md` |
+| Layer boundaries, architecture | `docs/architecture.md` |
+| Sprite format, ROM structure, compression | `docs/mesen2/00_STABLE_SNES_FACTS.md`, `03_GAME_MAPPING_KIRBY_SA1.md` |

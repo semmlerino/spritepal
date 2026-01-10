@@ -310,19 +310,7 @@ class ROMWorkflowController(QObject):
         """Get current display name for offset from browser."""
         if not self._view:
             return None
-
-        # Search browser items for matching offset
-        from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QTreeWidgetItemIterator
-
-        iterator = QTreeWidgetItemIterator(self._view.asset_browser.tree)
-        while iterator.value():
-            item = iterator.value()
-            data = item.data(0, Qt.ItemDataRole.UserRole)
-            if isinstance(data, dict) and data.get("offset") == offset:
-                return item.text(0)
-            iterator += 1
-        return None
+        return self._view.asset_browser.find_display_name_by_offset(offset)
 
     def _generate_library_thumbnail(self, offset: int) -> Image.Image | None:
         """Generate PIL Image thumbnail for library storage.
@@ -439,19 +427,7 @@ class ROMWorkflowController(QObject):
 
         # Remove item from browser tree
         if self._view:
-            from PySide6.QtCore import Qt
-            from PySide6.QtWidgets import QTreeWidgetItemIterator
-
-            iterator = QTreeWidgetItemIterator(self._view.asset_browser.tree)
-            while iterator.value():
-                item = iterator.value()
-                data = item.data(0, Qt.ItemDataRole.UserRole)
-                if isinstance(data, dict) and data.get("offset") == offset:
-                    parent = item.parent()
-                    if parent:
-                        parent.removeChild(item)
-                    break
-                iterator += 1
+            self._view.asset_browser.remove_sprite_by_offset(offset)
 
     def _load_library_sprites(self) -> None:
         """Load sprites from library that match current ROM."""
@@ -652,7 +628,7 @@ class ROMWorkflowController(QObject):
         # Handle transition from edit state
         if self.state == "edit":
             # Check for unsaved changes first
-            if self._editing_controller.undo_manager.can_undo():
+            if self._editing_controller.has_unsaved_changes():
                 from PySide6.QtWidgets import QMessageBox
 
                 reply = QMessageBox.question(
@@ -709,11 +685,7 @@ class ROMWorkflowController(QObject):
 
         # Clear previous ROM palette sources before loading new sprite
         if self._view:
-            workspace = self._view.workspace
-            if workspace:
-                palette_panel = workspace.palette_panel
-                if palette_panel:
-                    palette_panel.clear_rom_sources()
+            self._view.clear_rom_palette_sources()
 
         # Use SpriteRenderer to create PIL image from 4bpp
         from ..core.palette_utils import get_default_snes_palette

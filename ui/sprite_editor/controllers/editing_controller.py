@@ -103,6 +103,14 @@ class EditingController(QObject):
         """Set the brush size."""
         self.tool_manager.set_brush_size(size)
 
+    def get_brush_size(self) -> int:
+        """Get the current brush size."""
+        return self.tool_manager.get_brush_size()
+
+    def get_brush_pixels(self, x: int, y: int) -> list[tuple[int, int]]:
+        """Get the pixel positions affected by the brush at given coordinates."""
+        return self.tool_manager.get_brush_pixels(x, y)
+
     def set_selected_color(self, index: int) -> None:
         """Set the selected color index."""
         if 0 <= index < 16:
@@ -372,7 +380,12 @@ class EditingController(QObject):
                 # Ensure we have at least 16 colors, pad if necessary
                 while len(colors) < 16:
                     colors.append((0, 0, 0))
-                self.set_palette(colors[:16], "Loaded Palette")
+                colors = colors[:16]
+
+                # Register as "file" source and select it
+                # This updates the dropdown via paletteSourceSelected signal
+                self.register_palette_source("file", 0, colors, "Loaded Palette")
+                self.set_palette_source("file", 0)
 
         except Exception as e:
             QMessageBox.critical(parent, "Error", f"Failed to load palette: {e}")
@@ -446,6 +459,10 @@ class EditingController(QObject):
             self.undo_manager.redo(self.image_model)
             self.imageChanged.emit()
             self._emit_undo_state()
+
+    def has_unsaved_changes(self) -> bool:
+        """Check if there are unsaved changes in the undo stack."""
+        return self.undo_manager.can_undo()
 
     def _emit_undo_state(self) -> None:
         """Emit undo state changed signal."""
