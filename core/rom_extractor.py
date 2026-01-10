@@ -157,6 +157,50 @@ class ROMExtractor:
     # Core extraction methods
     # -------------------------------------------------------------------------
 
+    def get_palette_config_from_sprite_config(
+        self,
+        game_config: dict[str, object],
+        sprite_name: str,
+    ) -> tuple[int | None, list[int] | None]:
+        """Get palette configuration for a sprite from game config.
+
+        Delegates to rom_palette_extractor.get_palette_config_from_sprite_config().
+
+        Args:
+            game_config: Game configuration dictionary
+            sprite_name: Name of sprite to get config for
+
+        Returns:
+            Tuple of (palette_offset, palette_indices) or (None, None) if not found
+        """
+        return self.rom_palette_extractor.get_palette_config_from_sprite_config(
+            game_config, sprite_name
+        )
+
+    def extract_palette_range(
+        self,
+        rom_path: str,
+        offset: int,
+        start_index: int,
+        end_index: int,
+    ) -> dict[int, list[tuple[int, int, int]]]:
+        """Extract a range of palettes from ROM.
+
+        Delegates to rom_palette_extractor.extract_palette_range().
+
+        Args:
+            rom_path: Path to ROM file
+            offset: Offset in ROM where palettes start
+            start_index: Starting palette index (inclusive)
+            end_index: Ending palette index (inclusive)
+
+        Returns:
+            Dictionary mapping palette index to list of (R, G, B) tuples
+        """
+        return self.rom_palette_extractor.extract_palette_range(
+            rom_path, offset, start_index, end_index
+        )
+
     def extract_sprite_data(self, rom_path: str, sprite_offset: int) -> bytes:
         """
         Extract raw sprite data from ROM at specified offset.

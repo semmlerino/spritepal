@@ -138,7 +138,7 @@ class ROMWorkflowController(QObject):
         """Handle thumbnail ready from worker."""
         if self._view:
             pixmap = QPixmap.fromImage(thumbnail)
-            self._view.asset_browser.set_thumbnail(offset, pixmap)
+            self._view.set_thumbnail(offset, pixmap)
             logger.debug(f"Thumbnail set for offset 0x{offset:06X}")
 
     def set_message_service(self, service: "StatusBarManager | None") -> None:
@@ -183,7 +183,7 @@ class ROMWorkflowController(QObject):
             return
 
         name = self._get_capture_name(capture)
-        self._view.asset_browser.add_mesen_capture(name, capture.offset)
+        self._view.add_mesen_capture(name, capture.offset)
 
         # Request thumbnail if worker is ready
         if self._thumbnail_controller:
@@ -196,7 +196,7 @@ class ROMWorkflowController(QObject):
 
         # Initialize ROM availability state (disabled until ROM is loaded)
         if not self.rom_path:
-            self._view.source_bar.set_rom_available(False)
+            self._view.set_rom_available(False)
 
         # Load existing persistent clicks into asset browser
         if self.log_watcher:
@@ -300,7 +300,7 @@ class ROMWorkflowController(QObject):
         # Also add to browser's Library category for immediate visibility
         if self._view:
             qpixmap = self._pil_to_qpixmap(pil_thumbnail) if pil_thumbnail else None
-            self._view.asset_browser.add_library_sprite(name, offset, qpixmap)
+            self._view.add_library_sprite(name, offset, qpixmap)
 
         logger.info("Saved to library: %s at 0x%06X", name, offset)
         if self._message_service:
@@ -466,7 +466,7 @@ class ROMWorkflowController(QObject):
             if sprite.rom_hash == rom_hash:
                 # Add to Library category (not ROM Sprites)
                 thumbnail = self._load_library_thumbnail(sprite)
-                self._view.asset_browser.add_library_sprite(
+                self._view.add_library_sprite(
                     sprite.name,
                     sprite.rom_offset,
                     thumbnail=thumbnail,
@@ -496,7 +496,7 @@ class ROMWorkflowController(QObject):
                 if name.startswith("_"):
                     continue
 
-                self._view.asset_browser.add_rom_sprite(name, pointer.offset)
+                self._view.add_rom_sprite(name, pointer.offset)
                 # Queue thumbnail generation
                 if self._thumbnail_controller:
                     self._thumbnail_controller.queue_thumbnail(pointer.offset)
@@ -570,21 +570,21 @@ class ROMWorkflowController(QObject):
         # Clear ROM-specific state (asset browser) but preserve global Mesen capture history
         # so F6 workflow and Recent Captures widget persist across ROM loads
         if self._view:
-            self._view.asset_browser.clear_all()
+            self._view.clear_asset_browser()
 
         self.rom_path = path
         self.rom_size = rom_path.stat().st_size
 
         # Update view
         if self._view:
-            self._view.source_bar.set_rom_path(path)
-            self._view.source_bar.set_rom_available(True, self.rom_size)
+            self._view.set_rom_path(path)
+            self._view.set_rom_available(True, self.rom_size)
 
         # Use validated header info
         title = header.title or "Unknown ROM"
         self.rom_info_updated.emit(title)
         if self._view:
-            self._view.source_bar.set_info(title)
+            self._view.set_info(title)
 
         if self._message_service:
             self._message_service.show_message(f"Loaded ROM: {rom_path.name}")
@@ -664,26 +664,26 @@ class ROMWorkflowController(QObject):
                 if reply == QMessageBox.StandardButton.No:
                     # Reset to current offset
                     if self._view:
-                        self._view.source_bar.set_offset(self.current_offset)
+                        self._view.set_offset(self.current_offset)
                     return
 
             # Always transition to preview when leaving edit state
             # (whether or not there were unsaved changes)
             self.state = "preview"
             if self._view:
-                self._view.source_bar.set_action_text("Open in Editor")
+                self._view.set_action_text("Open in Editor")
                 self._view.set_workflow_state("preview")
             self.workflow_state_changed.emit("preview")
 
         self.current_offset = offset
         if self._view:
-            self._view.source_bar.set_offset(offset)
+            self._view.set_offset(offset)
 
         if self.rom_path:
             # Set loading state before requesting preview
             self._preview_pending = True
             if self._view:
-                self._view.source_bar.set_action_loading(True)
+                self._view.set_action_loading(True)
             self.preview_coordinator.request_manual_preview(offset)
 
     def handle_primary_action(self) -> None:
@@ -745,7 +745,7 @@ class ROMWorkflowController(QObject):
 
                     # 3. Get palette config for this sprite
                     palette_offset, palette_indices = (
-                        self.rom_extractor.rom_palette_extractor.get_palette_config_from_sprite_config(
+                        self.rom_extractor.get_palette_config_from_sprite_config(
                             cast(dict[str, object], game_config),
                             self.current_sprite_name,
                         )
@@ -753,7 +753,7 @@ class ROMWorkflowController(QObject):
 
                     # 4. Extract ALL sprite palettes (8-15) if we have an offset
                     if palette_offset is not None:
-                        all_palettes = self.rom_extractor.rom_palette_extractor.extract_palette_range(
+                        all_palettes = self.rom_extractor.extract_palette_range(
                             self.rom_path, palette_offset, 8, 15
                         )
 
@@ -803,7 +803,7 @@ class ROMWorkflowController(QObject):
         # Change state
         self.state = "edit"
         if self._view:
-            self._view.source_bar.set_action_text("Save to ROM")
+            self._view.set_action_text("Save to ROM")
             self._view.set_workflow_state("edit")
         self.workflow_state_changed.emit("edit")
         logger.debug("[OPEN] Sprite loaded in editor, state changed to 'edit'")
@@ -1011,7 +1011,7 @@ class ROMWorkflowController(QObject):
                 # Back to edit state
                 self.state = "edit"
                 if self._view:
-                    self._view.source_bar.set_action_text("Save to ROM")
+                    self._view.set_action_text("Save to ROM")
                     self._view.set_workflow_state("edit")
                     # Trigger a re-preview to verify
                     self.set_offset(self.current_offset)
@@ -1104,7 +1104,7 @@ class ROMWorkflowController(QObject):
             self.current_offset = actual_offset
             # Update UI
             if self._view:
-                self._view.source_bar.set_offset(actual_offset)
+                self._view.set_offset(actual_offset)
                 if self._message_service:
                     self._message_service.show_message(
                         f"Aligned to valid sprite at 0x{actual_offset:06X} "
@@ -1126,8 +1126,8 @@ class ROMWorkflowController(QObject):
         # Clear loading state
         self._preview_pending = False
         if self._view:
-            self._view.source_bar.set_action_loading(False)
-            self._view.source_bar.set_action_text("Open in Editor")
+            self._view.set_action_loading(False)
+            self._view.set_action_text("Open in Editor")
 
         if self._view:
             if hal_succeeded:
@@ -1167,8 +1167,8 @@ class ROMWorkflowController(QObject):
         # Clear loading state
         self._preview_pending = False
         if self._view:
-            self._view.source_bar.set_action_loading(False)
-            self._view.source_bar.set_action_text("Open in Editor")
+            self._view.set_action_loading(False)
+            self._view.set_action_text("Open in Editor")
         if self._message_service:
             self._message_service.show_message(f"Preview error: {error_msg}")
 

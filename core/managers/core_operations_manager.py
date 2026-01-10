@@ -745,9 +745,8 @@ class CoreOperationsManager(BaseManager):
         try:
             # Validate ROM file exists
             FileValidator.validate_rom_file_exists_or_raise(rom_path)
-            # ROMExtractor has rom_injector with read_rom_header method
             assert self._rom_extractor is not None
-            header = self._rom_extractor.rom_injector.read_rom_header(rom_path)
+            header = self._rom_extractor.read_rom_header(rom_path)
             return asdict(header)
         except (OSError, PermissionError) as e:
             self._handle_file_io_error(e, "read_rom_header", "reading ROM header")

@@ -135,6 +135,53 @@ class MockROMWorkflowPage(QWidget):
 # --- Test Class ---
 
 
+
+    # Delegation methods from source_bar
+    def set_rom_available(self, available: bool, rom_size: int = 0) -> None:
+        """Mock: Update ROM availability state in source bar."""
+        pass
+
+    def set_rom_path(self, path: str) -> None:
+        """Mock: Set ROM file path in source bar."""
+        pass
+
+    def set_info(self, text: str) -> None:
+        """Mock: Set info text in source bar."""
+        pass
+
+    def set_offset(self, offset: int) -> None:
+        """Mock: Update displayed ROM offset in source bar."""
+        pass
+
+    def set_action_text(self, text: str) -> None:
+        """Mock: Set action button text in source bar."""
+        pass
+
+    def set_action_loading(self, loading: bool) -> None:
+        """Mock: Set action button loading state in source bar."""
+        pass
+
+    # Delegation methods from asset_browser
+    def set_thumbnail(self, offset: int, pixmap) -> None:
+        """Mock: Set thumbnail for a sprite in asset browser."""
+        pass
+
+    def add_rom_sprite(self, name: str, offset: int) -> None:
+        """Mock: Add a ROM sprite to the asset browser."""
+        pass
+
+    def add_mesen_capture(self, name: str, offset: int) -> None:
+        """Mock: Add a Mesen capture to the asset browser."""
+        pass
+
+    def add_library_sprite(self, name: str, offset: int, thumbnail=None) -> None:
+        """Mock: Add a library sprite to the asset browser."""
+        pass
+
+    def clear_asset_browser(self) -> None:
+        """Mock: Clear all items from asset browser."""
+        pass
+
 class TestModeSwitchRepro:
     @pytest.fixture
     def mock_deps(self):

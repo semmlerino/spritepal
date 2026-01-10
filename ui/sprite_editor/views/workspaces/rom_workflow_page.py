@@ -13,6 +13,7 @@ instance, eliminating the need for widget reparenting when switching modes.
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QLabel,
     QSizePolicy,
@@ -73,9 +74,7 @@ class ROMWorkflowPage(QWidget):
         # 4. Main Content: Flat 3-pane splitter
         # [Asset Browser | Canvas | Right Panels]
         self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        self._main_splitter.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
+        self._main_splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._main_splitter.setChildrenCollapsible(False)
 
         # Pane 0: Asset Browser
@@ -163,3 +162,55 @@ class ROMWorkflowPage(QWidget):
         elif state == "save":
             self._left_panel.setEnabled(False)
             self._workspace.setEnabled(False)
+
+    # =========================================================================
+    # Delegation methods for SourceBar
+    # =========================================================================
+
+    def set_rom_available(self, available: bool, rom_size: int = 0) -> None:
+        """Update ROM availability state in source bar."""
+        self._source_bar.set_rom_available(available, rom_size)
+
+    def set_rom_path(self, path: str) -> None:
+        """Set ROM file path in source bar."""
+        self._source_bar.set_rom_path(path)
+
+    def set_info(self, text: str) -> None:
+        """Set info text in source bar."""
+        self._source_bar.set_info(text)
+
+    def set_offset(self, offset: int) -> None:
+        """Update displayed ROM offset in source bar."""
+        self._source_bar.set_offset(offset)
+
+    def set_action_text(self, text: str) -> None:
+        """Set action button text in source bar."""
+        self._source_bar.set_action_text(text)
+
+    def set_action_loading(self, loading: bool) -> None:
+        """Set action button loading state in source bar."""
+        self._source_bar.set_action_loading(loading)
+
+    # =========================================================================
+    # Delegation methods for SpriteAssetBrowser
+    # =========================================================================
+
+    def set_thumbnail(self, offset: int, pixmap: QPixmap) -> None:
+        """Set thumbnail for a sprite in asset browser."""
+        self._asset_browser.set_thumbnail(offset, pixmap)
+
+    def add_rom_sprite(self, name: str, offset: int) -> None:
+        """Add a ROM sprite to the asset browser."""
+        self._asset_browser.add_rom_sprite(name, offset)
+
+    def add_mesen_capture(self, name: str, offset: int) -> None:
+        """Add a Mesen capture to the asset browser."""
+        self._asset_browser.add_mesen_capture(name, offset)
+
+    def add_library_sprite(self, name: str, offset: int, thumbnail: QPixmap | None = None) -> None:
+        """Add a library sprite to the asset browser."""
+        self._asset_browser.add_library_sprite(name, offset, thumbnail=thumbnail)
+
+    def clear_asset_browser(self) -> None:
+        """Clear all items from asset browser."""
+        self._asset_browser.clear_all()

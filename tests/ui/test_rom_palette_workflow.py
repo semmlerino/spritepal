@@ -27,13 +27,13 @@ def test_open_in_editor_uses_extracted_palette(qtbot):
     mock_header = MagicMock()
     mock_rom_extractor.rom_injector.read_rom_header.return_value = mock_header
 
-    # We mock the public palette extractor methods.
+    # We mock the public palette extractor façade methods on rom_extractor.
     # _find_game_configuration is an internal detail; if it returns a mock (default behavior),
     # and we mock the next step (get_palette_config_from_sprite_config), the flow should work.
 
     # Setup successful palette config - sprite uses palette 10, with indices [10, 11]
     # This mocks the result of the palette extraction logic regardless of how config was found
-    mock_rom_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.return_value = (
+    mock_rom_extractor.get_palette_config_from_sprite_config.return_value = (
         0x1000,
         [10, 11],
     )
@@ -51,7 +51,7 @@ def test_open_in_editor_uses_extracted_palette(qtbot):
         14: [(0, 0, 0)] * 16,
         15: [(0, 0, 0)] * 16,
     }
-    mock_rom_extractor.rom_palette_extractor.extract_palette_range.return_value = all_palettes
+    mock_rom_extractor.extract_palette_range.return_value = all_palettes
 
     # Execute
     with patch("ui.sprite_editor.core.palette_utils.get_default_snes_palette") as mock_default:
@@ -59,7 +59,7 @@ def test_open_in_editor_uses_extracted_palette(qtbot):
 
         # Verify extract_palette_range was called for all sprite palettes (8-15)
         # This confirms the controller attempted to extract palettes
-        mock_rom_extractor.rom_palette_extractor.extract_palette_range.assert_called_with("test.sfc", 0x1000, 8, 15)
+        mock_rom_extractor.extract_palette_range.assert_called_with("test.sfc", 0x1000, 8, 15)
 
         # Verify all palettes were registered
         mock_editing_controller.register_rom_palettes.assert_called_once_with(all_palettes)
@@ -108,7 +108,7 @@ def test_open_in_editor_fallback_to_default(qtbot):
 
     # Actually, simpler: if we don't mock _find_game_configuration, it returns a MagicMock (truthy).
     # So we need to ensure the next step fails or returns None to trigger fallback.
-    mock_rom_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.return_value = (None, None)
+    mock_rom_extractor.get_palette_config_from_sprite_config.return_value = (None, None)
 
     # OR, we can mock _find_game_configuration to return None IF we assume the controller calls it.
     # But we want to avoid mocking private methods.
@@ -159,7 +159,7 @@ def test_open_in_editor_clears_previous_rom_sources(qtbot):
     # Mock no game config (simpler test)
     mock_rom_extractor.rom_injector.read_rom_header.return_value = MagicMock()
     # Ensure palette extraction returns nothing to trigger fallback (simulating no config)
-    mock_rom_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.return_value = (None, None)
+    mock_rom_extractor.get_palette_config_from_sprite_config.return_value = (None, None)
 
     # Execute
     with patch("ui.sprite_editor.core.palette_utils.get_default_snes_palette") as mock_default:
