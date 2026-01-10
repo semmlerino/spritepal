@@ -171,7 +171,8 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_manager.get_known_sprite_locations.return_value = {}
 
         # Mock scan worker with real signals
-        from PySide6.QtCore import Signal, QObject
+        from PySide6.QtCore import QObject, Signal
+
         class MockScanWorker(QObject):
             sprite_found = Signal(dict)
             finished = Signal()
@@ -179,32 +180,46 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
             error = Signal(str)
             cache_status = Signal(str)
             operation_finished = Signal()
-            
+
             def __init__(self, *args, **kwargs):
                 super().__init__()
                 self.args = args
                 self.kwargs = kwargs
-                
-            def start(self): pass
-            def isRunning(self): return False
-            def quit(self): pass
-            def wait(self, ms=0): return True
-            def requestInterruption(self): pass
-            def isFinished(self): return True
-            def deleteLater(self): pass
+
+            def start(self):
+                pass
+
+            def isRunning(self):
+                return False
+
+            def quit(self):
+                pass
+
+            def wait(self, ms=0):
+                return True
+
+            def requestInterruption(self):
+                pass
+
+            def isFinished(self):
+                return True
+
+            def deleteLater(self):
+                pass
 
         mock_scan_worker = MockScanWorker()
         mock_scan_worker_class.return_value = mock_scan_worker
 
         # Mock thumbnail worker with Qt signals
         mock_thumbnail_worker = Mock()
+
         # Signals need to be usable
         class MockThumbnailWorker(QObject):
             thumbnail_ready = Signal(int, object)  # Accepts QImage
             progress = Signal(int, str)
             finished = Signal()
             error = Signal(str)
-            
+
             def __init__(self):
                 super().__init__()
                 self.queue_thumbnail = Mock()
@@ -212,10 +227,15 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
                 self.cleanup = Mock()
                 self.deleteLater = Mock()
                 self.moveToThread = Mock()
-            
-            def isRunning(self): return False
-            def start(self): pass
-            def stop(self): pass  # Required for cleanup
+
+            def isRunning(self):
+                return False
+
+            def start(self):
+                pass
+
+            def stop(self):
+                pass  # Required for cleanup
 
         mock_thumbnail_worker = MockThumbnailWorker()
         mock_thumbnail_worker_class.return_value = mock_thumbnail_worker
@@ -246,7 +266,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         # We can trigger the scan via the public slot or action.
         scan_action = [a for a in self.gallery_window.findChildren(QAction) if "Scan ROM" in a.text()][0]
         scan_action.trigger()
-        
+
         workflow_steps.append("scan_started")
 
         assert self.gallery_window.scanning
@@ -295,7 +315,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
             # Trigger via menu action
             viewer_action = [a for a in self.gallery_window.findChildren(QAction) if "View Selected" in a.text()][0]
             viewer_action.trigger()
-            
+
             workflow_steps.append("fullscreen_opened")
 
             mock_viewer_class.assert_called_once()
@@ -334,7 +354,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_scan_worker = Mock()
         mock_scan_worker.isRunning.return_value = False
         mock_scan_worker_class.return_value = mock_scan_worker
-        
+
         mock_thumbnail_worker = Mock()
         mock_thumbnail_worker.isRunning.return_value = False
         mock_thumbnail_worker_class.return_value = mock_thumbnail_worker
@@ -609,33 +629,34 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
             mock_worker.error = Mock()  # We need to emit this
             # We can't easily emit from a Mock unless we setup a real signal or call the handler
             # But the requirement is to use public APIs or simulate events
-            
+
             # Trigger a scan
             scan_action = [a for a in self.gallery_window.findChildren(QAction) if "Scan" in a.text()][0]
-            
+
             # Since we can't easily connect a mock signal to the real handler without extra setup,
             # we'll look up the connected slot (handler) for the error signal if we were using a real worker,
             # but here we just want to verify the window handles the error.
             # The window's _on_scan_error is the handler.
             # But we are barred from calling it directly.
-            
+
             # We will use the fact that starting a scan sets self.scanning = True
             # And then we want to assert it becomes False after error.
-            
+
             # Let's mock the start method to emit the error signal immediately if possible
             # Or manually invoke the handler? No, that's private.
-            
+
             # Alternative: Construct a real worker (maybe mocked internals) or just skip the private call part
             # and focus on public state.
-            
-            # If I cannot emit the signal from the mock, I will have to call the handler, 
-            # BUT the instruction says "Drive via public UI actions". 
+
+            # If I cannot emit the signal from the mock, I will have to call the handler,
+            # BUT the instruction says "Drive via public UI actions".
             # If I can't simulate the error signal, I can't trigger the error handling path "publicly".
             # However, I can manually emit the signal if I set it up on the mock.
-            
-            # Let's assume for this refactor I can call the handler if there's no other way, 
+
+            # Let's assume for this refactor I can call the handler if there's no other way,
             # OR I use a real signal object on the mock.
-            from PySide6.QtCore import Signal, QObject
+            from PySide6.QtCore import QObject, Signal
+
             class MockWorker(QObject):
                 error = Signal(str)
                 sprite_found = Signal(dict)
@@ -643,20 +664,31 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
                 progress = Signal(int, str)
                 cache_status = Signal(str)
                 operation_finished = Signal()
-                
-                def start(self): pass
-                def isRunning(self): return True
-                def requestInterruption(self): pass
-                def wait(self, ms): return True
-                def quit(self): pass  # Required for cleanup
-                def isFinished(self): return True
-            
+
+                def start(self):
+                    pass
+
+                def isRunning(self):
+                    return True
+
+                def requestInterruption(self):
+                    pass
+
+                def wait(self, ms):
+                    return True
+
+                def quit(self):
+                    pass  # Required for cleanup
+
+                def isFinished(self):
+                    return True
+
             real_mock_worker = MockWorker()
             mock_scan_worker_class.return_value = real_mock_worker
-            
+
             scan_action.trigger()
             assert self.gallery_window.scanning
-            
+
             real_mock_worker.error.emit("Test scan error")
 
         # Should reset scanning state

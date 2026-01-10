@@ -46,9 +46,7 @@ class FakeTileHashDatabase:
     _lookup_matches_calls: int = field(default=0, init=False)
     _lookup_tiles_seen: list[bytes] = field(default_factory=list, init=False)
 
-    def lookup_tile(
-        self, tile_data: bytes, include_flips: bool = False
-    ) -> TileMatch | None:
+    def lookup_tile(self, tile_data: bytes, include_flips: bool = False) -> TileMatch | None:
         """
         Return pre-seeded result for tile lookup.
 
@@ -64,9 +62,7 @@ class FakeTileHashDatabase:
         tile_hash = self._hash_tile(tile_data)
         return self._lookup_results.get(tile_hash)
 
-    def lookup_tile_matches(
-        self, tile_data: bytes, include_flips: bool = False
-    ) -> list[TileMatch]:
+    def lookup_tile_matches(self, tile_data: bytes, include_flips: bool = False) -> list[TileMatch]:
         """
         Return pre-seeded matches for tile lookup.
 
@@ -82,15 +78,11 @@ class FakeTileHashDatabase:
         tile_hash = self._hash_tile(tile_data)
         return self._lookup_matches_results.get(tile_hash, [])
 
-    def lookup_tiles(
-        self, tiles_data: list[bytes], include_flips: bool = False
-    ) -> list[TileMatch | None]:
+    def lookup_tiles(self, tiles_data: list[bytes], include_flips: bool = False) -> list[TileMatch | None]:
         """Look up multiple tiles, returning single best match for each."""
         return [self.lookup_tile(t, include_flips) for t in tiles_data]
 
-    def lookup_tiles_matches(
-        self, tiles_data: list[bytes], include_flips: bool = False
-    ) -> list[list[TileMatch]]:
+    def lookup_tiles_matches(self, tiles_data: list[bytes], include_flips: bool = False) -> list[list[TileMatch]]:
         """Look up multiple tiles, returning all matches for each."""
         return [self.lookup_tile_matches(t, include_flips) for t in tiles_data]
 
@@ -98,8 +90,7 @@ class FakeTileHashDatabase:
         """Return fake statistics."""
         return {
             "total_blocks": 0,
-            "total_unique_hashes": len(self._lookup_results)
-            + len(self._lookup_matches_results),
+            "total_unique_hashes": len(self._lookup_results) + len(self._lookup_matches_results),
             "hashes_with_collisions": 0,
             "total_matches": sum(len(m) for m in self._lookup_matches_results.values()),
             "total_tiles": 0,
@@ -134,9 +125,7 @@ class FakeTileHashDatabase:
         tile_hash = self._hash_tile(tile_data)
         self._lookup_matches_results[tile_hash] = results
 
-    def verify_called(
-        self, lookup: int | None = None, matches: int | None = None
-    ) -> None:
+    def verify_called(self, lookup: int | None = None, matches: int | None = None) -> None:
         """
         Assert expected call counts.
 
@@ -148,13 +137,11 @@ class FakeTileHashDatabase:
             AssertionError: If actual calls don't match expected
         """
         if lookup is not None:
-            assert (
-                self._lookup_calls == lookup
-            ), f"Expected {lookup} lookup_tile calls, got {self._lookup_calls}"
+            assert self._lookup_calls == lookup, f"Expected {lookup} lookup_tile calls, got {self._lookup_calls}"
         if matches is not None:
-            assert (
-                self._lookup_matches_calls == matches
-            ), f"Expected {matches} lookup_tile_matches calls, got {self._lookup_matches_calls}"
+            assert self._lookup_matches_calls == matches, (
+                f"Expected {matches} lookup_tile_matches calls, got {self._lookup_matches_calls}"
+            )
 
     def reset_call_tracking(self) -> None:
         """Reset call counters and seen tiles for reuse in multiple tests."""

@@ -828,7 +828,7 @@ class SpritePreviewWidget(QWidget):
             height = qimage.height()
 
             # Get raw bytes from QImage
-            # In PySide6, bits() returns a buffer-compatible object that can be 
+            # In PySide6, bits() returns a buffer-compatible object that can be
             # converted directly to bytes.
             img_data = bytes(qimage.bits())
 

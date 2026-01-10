@@ -62,9 +62,7 @@ class OffsetLineEdit(QLineEdit):
             # Check if offset is within ROM bounds
             if self._max_offset > 0 and offset >= self._max_offset:
                 self.setStyleSheet("background-color: #442222;")
-                self.validation_error.emit(
-                    f"Offset 0x{offset:06X} exceeds ROM size (0x{self._max_offset:06X})"
-                )
+                self.validation_error.emit(f"Offset 0x{offset:06X} exceeds ROM size (0x{self._max_offset:06X})")
             else:
                 self.setStyleSheet("")
                 self._last_valid_offset = offset

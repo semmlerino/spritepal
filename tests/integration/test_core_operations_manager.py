@@ -452,7 +452,7 @@ class TestROMValidation:
         """load_rom_info should handle nonexistent files gracefully."""
         # Using load_rom_info which internally validates the ROM
         result = manager.load_rom_info(str(tmp_path / "nonexistent.sfc"))
-        
+
         # It should return a dict with error info
         assert result is not None
         assert "error" in result
@@ -463,35 +463,35 @@ class TestROMValidation:
         rom_file = tmp_path / "test.sfc"
         # Create a valid-ish ROM header (LoROM)
         # Header is at 0x7FC0 for unheadered LoROM
-        
+
         # ROM Data up to header
         rom_data = bytearray(b"\x00" * 0x7FC0)
-        
+
         # Header fields
-        rom_data.extend(b"TEST ROM TITLE       ") # Title (21 bytes)
-        rom_data.extend(b"\x20") # Map Mode (LoROM)
-        rom_data.extend(b"\x00") # ROM Type
-        rom_data.extend(b"\x09") # ROM Size (512KB)
-        rom_data.extend(b"\x00") # SRAM Size
-        rom_data.extend(b"\x01") # Country
-        rom_data.extend(b"\x33") # License
-        rom_data.extend(b"\x00") # Version
-        rom_data.extend(b"\xFF\xFF") # Checksum Complement (dummy)
-        rom_data.extend(b"\x00\x00") # Checksum (dummy)
-        
+        rom_data.extend(b"TEST ROM TITLE       ")  # Title (21 bytes)
+        rom_data.extend(b"\x20")  # Map Mode (LoROM)
+        rom_data.extend(b"\x00")  # ROM Type
+        rom_data.extend(b"\x09")  # ROM Size (512KB)
+        rom_data.extend(b"\x00")  # SRAM Size
+        rom_data.extend(b"\x01")  # Country
+        rom_data.extend(b"\x33")  # License
+        rom_data.extend(b"\x00")  # Version
+        rom_data.extend(b"\xff\xff")  # Checksum Complement (dummy)
+        rom_data.extend(b"\x00\x00")  # Checksum (dummy)
+
         # Fill remainder to make it 1MB total (enough to be valid)
         padding_needed = 0x100000 - len(rom_data)
         rom_data.extend(b"\x00" * padding_needed)
-        
+
         rom_file.write_bytes(rom_data)
 
         # load_rom_info calls _validate_rom_file internally
         result = manager.load_rom_info(str(rom_file))
-        
+
         # If it fails, print the error for debugging
         if "error" in result:
             print(f"ROM Validation Error: {result['error']}")
-            
+
         assert result is not None
         assert "header" in result
         assert "error" not in result
@@ -502,7 +502,7 @@ class TestROMValidation:
         rom_file.write_bytes(b"\x00" * 100)  # Too small
 
         result = manager.load_rom_info(str(rom_file))
-        
+
         assert result is not None
         assert "error" in result
         assert "Validation" in result.get("error_type", "") or "ValidationError" in result.get("error_type", "")
@@ -570,12 +570,12 @@ class TestCleanup:
 
     def test_cleanup_clears_worker(self, manager):
         """cleanup should clear current worker."""
-        # Set a mock worker (using private access just to setup the test state, 
+        # Set a mock worker (using private access just to setup the test state,
         # but verifying via public method)
         mock_worker = MagicMock()
         mock_worker.isRunning.return_value = False
         manager._current_worker = mock_worker
-        
+
         assert manager.has_active_worker()
 
         manager.cleanup()
@@ -586,7 +586,7 @@ class TestCleanup:
         """reset_state should clear active operations."""
         # Setup internal state (unavoidable for white-box testing of reset)
         manager._active_operations.add("test_op")
-        
+
         assert manager.is_operation_active("test_op")
 
         manager.reset_state()
@@ -596,7 +596,7 @@ class TestCleanup:
     def test_reset_state_full_clears_extractors(self, manager):
         """reset_state with full_reset should clear initialized state."""
         assert manager.is_initialized()
-        
+
         manager.reset_state(full_reset=True)
 
         assert not manager.is_initialized()
@@ -662,6 +662,3 @@ class TestROMInjectionSettings:
         assert "sprite_location_name" in result
         assert "sprite_location_index" in result
         assert "custom_offset" in result
-
-
-

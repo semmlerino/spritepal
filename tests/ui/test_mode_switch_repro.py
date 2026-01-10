@@ -176,6 +176,4 @@ class TestModeSwitchRepro:
         sprite_editor_workspace.load_rom("test.sfc")
 
         # Assertion: Should have switched to ROM mode
-        assert sprite_editor_workspace.current_mode == "rom", (
-            "Failed to switch to ROM mode after loading a ROM"
-        )
+        assert sprite_editor_workspace.current_mode == "rom", "Failed to switch to ROM mode after loading a ROM"

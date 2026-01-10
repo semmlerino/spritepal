@@ -160,11 +160,13 @@ class EditWorkspace(QWidget):
 
     def _setup_shortcuts(self) -> None:
         """Setup keyboard shortcuts for tools and actions."""
-        # Tool shortcuts
-        QShortcut(QKeySequence("P"), self, lambda: self._icon_toolbar.tool_buttons["pencil"].click())
-        QShortcut(QKeySequence("B"), self, lambda: self._icon_toolbar.tool_buttons["fill"].click())
-        QShortcut(QKeySequence("K"), self, lambda: self._icon_toolbar.tool_buttons["picker"].click())
-        QShortcut(QKeySequence("E"), self, lambda: self._icon_toolbar.tool_buttons["eraser"].click())
+        # Tool shortcuts are handled by the main window actions to avoid ambiguity
+        # when embedded. If standalone usage is needed, these should be re-enabled
+        # or managed via a shared action manager.
+        # QShortcut(QKeySequence("P"), self, lambda: self._icon_toolbar.tool_buttons["pencil"].click())
+        # QShortcut(QKeySequence("B"), self, lambda: self._icon_toolbar.tool_buttons["fill"].click())
+        # QShortcut(QKeySequence("K"), self, lambda: self._icon_toolbar.tool_buttons["picker"].click())
+        # QShortcut(QKeySequence("E"), self, lambda: self._icon_toolbar.tool_buttons["eraser"].click())
 
         # Toggle shortcuts
         if self._icon_toolbar.grid_btn:
@@ -333,6 +335,15 @@ class EditWorkspace(QWidget):
         controller.colorChanged.connect(self._palette_panel.set_selected_color)
         controller.paletteChanged.connect(self._update_palette)
         controller.paletteSourceAdded.connect(self._palette_panel.add_palette_source)
+
+        # Populate existing palette sources from controller
+        existing_sources = controller.get_palette_sources()
+        # Sort by type and index for consistent display
+        # We want ROM sources, then Mesen sources (arbitrary but consistent)
+        for key, value in sorted(existing_sources.items()):
+            source_type, index = key
+            _colors, name = value
+            self._palette_panel.add_palette_source(name, source_type, index)
 
         # Connect preview panel to controller
         self._preview_panel.controller = controller

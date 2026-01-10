@@ -63,13 +63,13 @@ class TestZoomablePreviewWidget:
         """Test updating pixmap without resetting view"""
         # Set initial state
         widget.set_preview(test_pixmap, 5, 4)
-        
+
         # We can't set _zoom/_pan_offset directly if they are private
         # Skip this test part or rely on set_preview resetting them, then modify them via public API if available
-        # Since we don't have public API to set zoom/pan, we'll skip the state preservation check 
+        # Since we don't have public API to set zoom/pan, we'll skip the state preservation check
         # that relies on setting internal state manually.
         # Instead, we just verify update_pixmap doesn't crash and keeps tile info.
-        
+
         # Create new pixmap
         new_pixmap = QPixmap(32, 32)  # pixmap-ok: main thread test code
         new_pixmap.fill(Qt.GlobalColor.blue)
@@ -93,11 +93,11 @@ class TestZoomablePreviewWidget:
         tile_count, tiles_per_row = widget.get_tile_info()
         assert tile_count == 0
         assert tiles_per_row == 0
-        
+
     def test_reset_view(self, widget, test_pixmap):
         """Test resetting view"""
         widget.set_preview(test_pixmap)
-        
+
         # Simply call reset_view() and verify it doesn't crash
         # We can't verify zoom reset without public API to get zoom
         widget.reset_view()
@@ -113,10 +113,10 @@ class TestZoomablePreviewWidget:
     def test_grid_toggle_keypress(self, widget, qtbot):
         """Test G key toggles grid visibility"""
         # initial_grid = widget._grid_visible # don't access private
-        
+
         # We can't verify internal state toggle without public accessor.
         # Just verify keypress event is handled without error.
-        
+
         # Simulate G key press
         key_event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_G, Qt.KeyboardModifier.NoModifier)
         widget.keyPressEvent(key_event)
@@ -139,14 +139,14 @@ class TestZoomablePreviewWidget:
         test_image.save(test_file)
 
         widget.set_preview_from_file(str(test_file))
-        
+
         # Verify it loaded something via get_tile_info
         # Note: set_preview_from_file internally calls set_preview(pixmap)
-        # Since tiles_count/tiles_per_row default to 0 if not passed to set_preview, 
+        # Since tiles_count/tiles_per_row default to 0 if not passed to set_preview,
         # we can't rely on them if set_preview_from_file doesn't set them.
         # However, checking if it doesn't crash is a start.
         # If set_preview_from_file sets pixmap, it should be successful.
-        
+
         # To strictly avoid _pixmap, we'd need a public way to check "is empty".
         # For now, we'll assume success if no exception and maybe check if we can add a public 'has_content()' method later.
         pass
@@ -243,7 +243,7 @@ class TestPreviewPanel:
 
     def test_pil_to_pixmap_conversion(self, panel, test_grayscale_image):
         """Test PIL image to QPixmap conversion"""
-        # This tests an internal method _pil_to_pixmap. 
+        # This tests an internal method _pil_to_pixmap.
         # Ideally this should be a unit test of a utility function or tested via public API.
         # We will modify it to test via set_grayscale_image which uses it internally,
         # but since we can't check the result, we'll rely on integration tests.
@@ -299,15 +299,15 @@ class TestPreviewPanel:
         # Set up panel with grayscale image
         panel.set_grayscale_image(test_grayscale_image)
 
-        # We can't set private _zoom. 
+        # We can't set private _zoom.
         # This test relies heavily on internal implementation details.
         # We'll simplify to just calling the trigger method and ensuring no crash.
-        
+
         # Call _show_grayscale (triggered by toggle)
         # Note: _show_grayscale is internal. We should trigger via public API if possible.
         # Toggle checkbox off triggers it.
         panel.palette_toggle.setChecked(False)
-        
+
         # Verify it didn't crash
 
     def test_apply_palette_preserves_view(self, panel, test_grayscale_image, test_palettes):
@@ -320,7 +320,7 @@ class TestPreviewPanel:
         # Call _apply_current_palette (triggered by selection change)
         # Trigger via public API
         panel.palette_selector.setCurrentIndex(0)
-        
+
         # Verify it didn't crash
 
     def test_error_handling_in_palette_application(self, panel):

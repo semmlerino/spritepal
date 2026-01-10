@@ -148,7 +148,7 @@ class TestMesenCapturesSection:
     def test_offset_selected_signal_forwarding(self, captures_section, sample_capture, qtbot):
         """Test that offset_selected signal is forwarded from RecentCapturesWidget."""
         from PySide6.QtWidgets import QListWidget
-        
+
         # Add a capture
         captures_section.add_capture(sample_capture)
 
@@ -166,7 +166,7 @@ class TestMesenCapturesSection:
     def test_offset_activated_signal_forwarding(self, captures_section, sample_capture, qtbot):
         """Test that offset_activated signal is forwarded from RecentCapturesWidget."""
         from PySide6.QtWidgets import QListWidget
-        
+
         # Add a capture
         captures_section.add_capture(sample_capture)
 
@@ -189,8 +189,9 @@ class TestMesenCapturesSection:
         # Directly emit the signal from the internal widget (simulates context menu action)
         # We can find the RecentCapturesWidget child by type if we don't want to use private member
         from ui.components.panels.recent_captures_widget import RecentCapturesWidget
+
         recent_captures = captures_section.findChild(RecentCapturesWidget)
-        
+
         with qtbot.waitSignal(captures_section.save_to_library_requested, timeout=signal_timeout()) as blocker:
             recent_captures.save_to_library_requested.emit(sample_capture.offset)
 

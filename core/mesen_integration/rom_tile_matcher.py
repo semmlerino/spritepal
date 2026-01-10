@@ -157,9 +157,7 @@ class ROMTileMatcher:
         self._unique_hashes = 0
         self._two_plane_tiles = 0
         self._hal_two_plane_matches = 0
-        self._two_plane_matches_by_combo: dict[tuple[int, int], int] = dict.fromkeys(
-            TWO_PLANE_COMBOS, 0
-        )
+        self._two_plane_matches_by_combo: dict[tuple[int, int], int] = dict.fromkeys(TWO_PLANE_COMBOS, 0)
 
         if _skip_expensive_init:
             # For testing: skip expensive HAL and file operations

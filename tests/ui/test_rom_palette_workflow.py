@@ -27,10 +27,10 @@ def test_open_in_editor_uses_extracted_palette(qtbot):
     mock_header = MagicMock()
     mock_rom_extractor.rom_injector.read_rom_header.return_value = mock_header
 
-    # We mock the public palette extractor methods. 
-    # _find_game_configuration is an internal detail; if it returns a mock (default behavior), 
+    # We mock the public palette extractor methods.
+    # _find_game_configuration is an internal detail; if it returns a mock (default behavior),
     # and we mock the next step (get_palette_config_from_sprite_config), the flow should work.
-    
+
     # Setup successful palette config - sprite uses palette 10, with indices [10, 11]
     # This mocks the result of the palette extraction logic regardless of how config was found
     mock_rom_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.return_value = (
@@ -59,9 +59,7 @@ def test_open_in_editor_uses_extracted_palette(qtbot):
 
         # Verify extract_palette_range was called for all sprite palettes (8-15)
         # This confirms the controller attempted to extract palettes
-        mock_rom_extractor.rom_palette_extractor.extract_palette_range.assert_called_with(
-            "test.sfc", 0x1000, 8, 15
-        )
+        mock_rom_extractor.rom_palette_extractor.extract_palette_range.assert_called_with("test.sfc", 0x1000, 8, 15)
 
         # Verify all palettes were registered
         mock_editing_controller.register_rom_palettes.assert_called_once_with(all_palettes)
@@ -100,22 +98,22 @@ def test_open_in_editor_fallback_to_default(qtbot):
     # Mock failure at config step
     mock_rom_extractor.rom_injector.read_rom_header.return_value = MagicMock()
     # We don't mock _find_game_configuration. If it returns a mock, the next step needs to fail or return None.
-    # The controller logic: 
+    # The controller logic:
     # game_config = ..._find_game_configuration...
     # if game_config and ...:
     #    ...get_palette_config_from_sprite_config...
-    
+
     # If we want to simulate "no config found", we can make the mock return None implicitly
     # or ensure get_palette_config_from_sprite_config raises or returns None.
-    
+
     # Actually, simpler: if we don't mock _find_game_configuration, it returns a MagicMock (truthy).
     # So we need to ensure the next step fails or returns None to trigger fallback.
     mock_rom_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.return_value = (None, None)
-    
+
     # OR, we can mock _find_game_configuration to return None IF we assume the controller calls it.
     # But we want to avoid mocking private methods.
     # The observable behavior is "if palette extraction fails, use default".
-    # So let's make the public method `get_palette_config_from_sprite_config` return (None, None) 
+    # So let's make the public method `get_palette_config_from_sprite_config` return (None, None)
     # which simulates "no palette config found for this sprite".
 
     # Execute

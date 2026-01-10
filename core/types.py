@@ -22,13 +22,15 @@ from PySide6.QtWidgets import QWidget
 @runtime_checkable
 class CancellationToken(Protocol):
     """Protocol for cancellation tokens that provide an is_set() method.
-    
+
     This matches the interface of threading.Event and can be used to
     check if an operation should be cancelled.
     """
+
     def is_set(self) -> bool:
         """Return True if cancellation has been requested."""
         ...
+
 
 # External library types for better type checking
 # Use concrete PIL Image type to avoid forward reference issues

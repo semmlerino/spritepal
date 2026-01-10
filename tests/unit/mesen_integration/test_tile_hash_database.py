@@ -255,7 +255,7 @@ class TestTileHashDatabaseLookup:
 
         # Initialize properly via constructor
         db = TileHashDatabase(dummy_rom)
-        
+
         # Populate with dummy data directly or via loading from JSON if preferred
         # Here we manually populate for testing specific lookup logic
         db._hash_to_match = {}
@@ -392,7 +392,7 @@ class TestTileHashDatabaseStatistics:
         dummy_rom.write_bytes(bytes(0x200))
 
         db = TileHashDatabase(dummy_rom)
-        
+
         # Populate for stats testing
         db._hash_to_match = {
             "hash1": [TileMatch(0x1000, 0)],
@@ -449,7 +449,7 @@ class TestTileHashDatabasePersistence:
         dummy_rom.write_bytes(bytes(0x200))
 
         db = TileHashDatabase(dummy_rom)
-        
+
         # Setup specific state for save test
         db._rom_header_offset = 512
         db._rom_checksum = 0x1234
@@ -509,10 +509,10 @@ class TestTileHashDatabasePersistence:
 
         # Create new database and load
         new_db = TileHashDatabase(db_for_save.rom_path)
-        
+
         # Ensure it's clean (though it should be)
         new_db._hash_to_match = {}
-        
+
         # Set matching checksums/offset to avoid warnings
         new_db._rom_checksum = 0x1234
         new_db._rom_header_offset = 512

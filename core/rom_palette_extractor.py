@@ -160,9 +160,7 @@ class ROMPaletteExtractor:
 
         if palette_offset_raw and isinstance(palette_offset_raw, str):
             palette_offset = (
-                int(palette_offset_raw, 16)
-                if palette_offset_raw.startswith("0x")
-                else int(palette_offset_raw)
+                int(palette_offset_raw, 16) if palette_offset_raw.startswith("0x") else int(palette_offset_raw)
             )
         elif isinstance(palette_offset_raw, int):
             palette_offset = palette_offset_raw

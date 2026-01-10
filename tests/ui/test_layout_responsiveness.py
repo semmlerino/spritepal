@@ -176,31 +176,31 @@ class TestLayoutResponsiveness:
         original_text = offset_hint.text()
         long_text = "This is a very long text " * 50
         offset_hint.setText(long_text)
-        
+
         # If word wrap is on, heightForWidth should be significant for a narrow width
         h_narrow = offset_hint.heightForWidth(100)
         h_wide = offset_hint.heightForWidth(1000)
-        
+
         # Restoring text
         offset_hint.setText(original_text)
-        
+
         # If text wraps, narrow width should require more height
         # Note: heightForWidth returns -1 if the widget doesn't support it or layout not active
-        # But QLabel implements it. 
-        # If it fails, fallback to checking wordWrap property as a proxy for intent, 
+        # But QLabel implements it.
+        # If it fails, fallback to checking wordWrap property as a proxy for intent,
         # acknowledging the limitation of headless layout testing.
         if h_narrow == -1 or h_wide == -1:
-             # Fallback if height calculation fails in test env
-             assert offset_hint.wordWrap() is True, "Offset hint should have wordWrap enabled"
+            # Fallback if height calculation fails in test env
+            assert offset_hint.wordWrap() is True, "Offset hint should have wordWrap enabled"
         else:
-             assert h_narrow > h_wide, f"Label should wrap text (narrow: {h_narrow}, wide: {h_wide})"
+            assert h_narrow > h_wide, f"Label should wrap text (narrow: {h_narrow}, wide: {h_wide})"
 
         assert size_hint is not None, "Size hint not found"
         # Similarly for size hint
         size_hint.setText(long_text)
         h_narrow = size_hint.heightForWidth(100)
         h_wide = size_hint.heightForWidth(1000)
-        
+
         if h_narrow != -1 and h_wide != -1:
             assert h_narrow > h_wide, "Size hint should wrap text"
         else:
@@ -214,7 +214,7 @@ class TestLayoutResponsiveness:
         output_hint.setText(long_text)
         h_narrow = output_hint.heightForWidth(100)
         h_wide = output_hint.heightForWidth(1000)
-        
+
         if h_narrow != -1 and h_wide != -1:
             assert h_narrow > h_wide, "Output hint should wrap text"
         else:

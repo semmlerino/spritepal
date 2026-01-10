@@ -212,7 +212,7 @@ class TestHALProcessPoolSimplification:
 
             # Verify state is reset
             assert not pool.is_initialized
-            
+
             # Verify we can re-initialize (state is clean)
             assert pool.initialize(exhal_path, inhal_path, pool_size=1)
             assert pool.is_initialized

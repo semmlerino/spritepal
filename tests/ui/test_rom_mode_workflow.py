@@ -201,10 +201,10 @@ class TestRomModeWorkflow:
 
                 # Change back to ROM mode (index 1)
                 sprite_editor_workspace.set_mode("rom")
-                
+
                 # Verify mode updated
                 assert sprite_editor_workspace.current_mode == "rom"
-                
+
                 mock_extract_mode.assert_called_with("rom")
                 mock_inject_mode.assert_called_with("rom")
 

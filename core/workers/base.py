@@ -222,7 +222,7 @@ class BaseWorker(QThread):
 
     def is_set(self) -> bool:
         """Check if cancelled (for cancellation token interface).
-        
+
         Matches threading.Event.is_set() signature.
         """
         return self.is_cancelled

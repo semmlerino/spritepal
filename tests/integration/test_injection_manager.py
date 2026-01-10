@@ -510,45 +510,45 @@ class TestInjectionManagerSignalHandling:
         Tests that the manager correctly re-emits signals from the worker.
         """
         manager = app_context.core_operations_manager
-        
+
         # We need to simulate an active injection to test signal propagation.
         # Since we can't easily start a real injection without files, we'll
         # mock the worker and verify signal connection logic via the public API behavior.
-        
+
         # Create a mock worker that we can control
         mock_worker = mock.Mock()
         mock_worker.isRunning.return_value = True
-        
+
         # Manually attach mock signals to the worker so manager can connect to them
         # Note: In a real scenario, these signals exist on the worker class
         mock_worker.progress = mock.Mock()
         mock_worker.injection_finished = mock.Mock()
         mock_worker.progress_percent = mock.Mock()
         mock_worker.compression_info = mock.Mock()
-        
-        # We need to mock signal connection - this is white-box testing unavoidable 
-        # when not running a full real injection, but we are testing the manager's 
+
+        # We need to mock signal connection - this is white-box testing unavoidable
+        # when not running a full real injection, but we are testing the manager's
         # public signal contract.
-        
+
         # Instead, let's verify the manager HAS the signals we expect clients to use
         assert hasattr(manager, "injection_progress")
         assert hasattr(manager, "injection_finished")
-        
+
         # Verify signal signatures by connecting a mock
         mock_progress_slot = mock.Mock()
         mock_finished_slot = mock.Mock()
-        
+
         manager.injection_progress.connect(mock_progress_slot)
         manager.injection_finished.connect(mock_finished_slot)
-        
+
         # Simulate the signals being emitted (as if by the worker connection)
         # This confirms the manager's signals work as expected
         manager.injection_progress.emit("Test Progress")
         manager.injection_finished.emit(True, "Test Complete")
-        
+
         assert mock_progress_slot.call_count == 1
         mock_progress_slot.assert_called_with("Test Progress")
-        
+
         assert mock_finished_slot.call_count == 1
         mock_finished_slot.assert_called_with(True, "Test Complete")
 

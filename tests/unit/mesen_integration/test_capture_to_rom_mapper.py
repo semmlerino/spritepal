@@ -400,9 +400,7 @@ class TestCaptureToROMMapperMapCapture:
         # All-zero tile is low-information
         low_info_tile = bytes(32)
         # Even if it matches something in DB
-        fake_db.seed_lookup_matches(
-            low_info_tile, [TileMatch(rom_offset=0x1B0000, tile_index=0)]
-        )
+        fake_db.seed_lookup_matches(low_info_tile, [TileMatch(rom_offset=0x1B0000, tile_index=0)])
 
         entry = MockOAMEntry(tiles=[MockTile(low_info_tile)])
         capture = MockCaptureResult(entries=[entry])

@@ -45,7 +45,7 @@ class TestBaseWorker:
 
         assert not worker.is_cancelled
         # file_path is None (checking public property if it exists, BaseWorker in core/workers/base.py doesn't seem to have file_path property based on last read, but let's check)
-        # Actually core/workers/base.py BaseWorker does NOT have file_path. 
+        # Actually core/workers/base.py BaseWorker does NOT have file_path.
         # ui/sprite_editor/workers/base_worker.py DID.
         # This test imports from core.workers.base.
         # So I should probably remove the file_path assertion if it's not there, or check if it has it.

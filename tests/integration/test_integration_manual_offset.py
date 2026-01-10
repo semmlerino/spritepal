@@ -141,10 +141,10 @@ class TestManualOffsetDialog:
 
         # Track preview updates via the preview widget's state or signals
         # Ideally we'd check if the image changed, but here we can check if the widget received data
-        
+
         # We can't easily hook into the private preview_ready signal of the coordinator in a "public" way.
         # But we can check if the preview widget has content.
-        
+
         # Helper to check if preview has updated
         def preview_has_content():
             # Check if preview widget has a valid sprite name or image
@@ -153,8 +153,11 @@ class TestManualOffsetDialog:
             # Check for specific text or property that indicates a loaded sprite
             # Assuming preview_widget has some public state we can check
             # For now, let's assume we can check if the info label is updated or image is set
-            return dialog.preview_widget.has_content() if hasattr(dialog.preview_widget, "has_content") else \
-                   (dialog.preview_widget.preview_label and not dialog.preview_widget.preview_label.pixmap().isNull())
+            return (
+                dialog.preview_widget.has_content()
+                if hasattr(dialog.preview_widget, "has_content")
+                else (dialog.preview_widget.preview_label and not dialog.preview_widget.preview_label.pixmap().isNull())
+            )
 
         # Change offset to trigger preview
         dialog.set_offset(0x10000)
@@ -261,32 +264,32 @@ class TestSpriteScanDialog:
         # Use the Cancel button if available, or simulate the cancel action
         # The dialog usually has a progress dialog with a cancel button
         # But here we mocked the blocking execs.
-        
+
         # We can call the public cancel method if exposed, or verify the worker stops.
         # The UnifiedManualOffsetDialog has _cancel_sprite_scan but it is protected.
         # However, we can simulate closing the progress dialog which triggers cancellation.
         # Since we mocked QDialog.exec, we can't interact with the progress dialog easily.
-        
-        # For the purpose of the test refactoring to avoid private calls, 
+
+        # For the purpose of the test refactoring to avoid private calls,
         # we should use public interactions. If no public cancel button is exposed on the main dialog,
         # we might have to rely on the test tearDown or just assert the state.
-        
+
         # If we must call _cancel_sprite_scan to cleanup, let's check if there's a public alternative.
         # The "Find Sprites" button might toggle to "Cancel"?
-        
+
         # Let's assume for now we just let it run or rely on the dialog cleanup.
         # But to be safe and follow the original test's intent of cleaning up:
         if hasattr(dialog, "cancel_scan"):
-             dialog.cancel_scan()
+            dialog.cancel_scan()
         elif hasattr(dialog, "_search_coordinator"):
-             dialog._search_coordinator.cancel_scan()
+            dialog._search_coordinator.cancel_scan()
         else:
-             # Fallback to the protected method if no public API exists yet, 
-             # but we are trying to remove private calls.
-             # If strictly no public API, we might note it.
-             # But here we can try to rely on the coordinator's public cancel if accessible,
-             # or just close the dialog which should cleanup.
-             pass
+            # Fallback to the protected method if no public API exists yet,
+            # but we are trying to remove private calls.
+            # If strictly no public API, we might note it.
+            # But here we can try to rely on the coordinator's public cancel if accessible,
+            # or just close the dialog which should cleanup.
+            pass
 
         # Give the worker time to clean up
         from PySide6.QtWidgets import QApplication

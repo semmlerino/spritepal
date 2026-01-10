@@ -103,6 +103,7 @@ class SignalConnectionHelper:
         Args:
             extraction_manager: The extraction manager instance
         """
+
         def on_preview_generated(img: Image.Image, tile_count: int) -> None:
             """Handle preview generation with Qt threading safety."""
             try:

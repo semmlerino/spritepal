@@ -176,7 +176,7 @@ class SpriteEditorMainWindow(QMainWindow):
         tools_menu.addAction(self.action_pencil)
 
         self.action_fill = QAction("&Fill", self)
-        self.action_fill.setShortcut("F")
+        self.action_fill.setShortcut("B")
         self.action_fill.setCheckable(True)
         tools_menu.addAction(self.action_fill)
 
@@ -184,6 +184,11 @@ class SpriteEditorMainWindow(QMainWindow):
         self.action_picker.setShortcut("I")
         self.action_picker.setCheckable(True)
         tools_menu.addAction(self.action_picker)
+
+        self.action_eraser = QAction("&Eraser", self)
+        self.action_eraser.setShortcut("E")
+        self.action_eraser.setCheckable(True)
+        tools_menu.addAction(self.action_eraser)
 
         # Help menu
         help_menu = menubar.addMenu("&Help")
@@ -205,6 +210,7 @@ class SpriteEditorMainWindow(QMainWindow):
         toolbar.addAction(self.action_pencil)
         toolbar.addAction(self.action_fill)
         toolbar.addAction(self.action_picker)
+        toolbar.addAction(self.action_eraser)
 
     def _setup_statusbar(self) -> None:
         """Setup the status bar."""
@@ -336,6 +342,11 @@ class SpriteEditorMainWindow(QMainWindow):
         self._injection_controller = injection_controller
         self._rom_workflow_controller = rom_workflow_controller
 
+        # Initialize tabs with controllers
+        self.edit_tab.set_controller(editing_controller)
+        editing_controller.set_view(self.edit_tab)
+        self.inject_tab.set_controller(injection_controller)
+
         # Extraction events
         extraction_controller.sprite_extracted.connect(self._on_sprite_extracted)
 
@@ -350,10 +361,19 @@ class SpriteEditorMainWindow(QMainWindow):
         self.action_undo.triggered.connect(editing_controller.undo)
         self.action_redo.triggered.connect(editing_controller.redo)
 
+        # Undo/Redo state sync
+        editing_controller.undoStateChanged.connect(self._update_undo_redo_actions)
+        # Initialize state
+        self._update_undo_redo_actions(
+            editing_controller.undo_manager.can_undo(),
+            editing_controller.undo_manager.can_redo(),
+        )
+
         # Tools menu
         self.action_pencil.triggered.connect(lambda: editing_controller.set_tool("pencil"))
         self.action_fill.triggered.connect(lambda: editing_controller.set_tool("fill"))
         self.action_picker.triggered.connect(lambda: editing_controller.set_tool("picker"))
+        self.action_eraser.triggered.connect(lambda: editing_controller.set_tool("eraser"))
 
         # Tool state sync
         editing_controller.toolChanged.connect(self._update_tool_menu)
@@ -367,3 +387,9 @@ class SpriteEditorMainWindow(QMainWindow):
         self.action_pencil.setChecked(tool == "pencil")
         self.action_fill.setChecked(tool == "fill")
         self.action_picker.setChecked(tool == "picker")
+        self.action_eraser.setChecked(tool == "eraser")
+
+    def _update_undo_redo_actions(self, can_undo: bool, can_redo: bool) -> None:
+        """Update undo/redo action enabled state."""
+        self.action_undo.setEnabled(can_undo)
+        self.action_redo.setEnabled(can_redo)

@@ -27,6 +27,7 @@ class EditingController(QObject):
     colorChanged = Signal(int)
     undoStateChanged = Signal(bool, bool)  # can_undo, can_redo
     paletteSourceAdded = Signal(str, str, int)  # name, type, index
+    paletteSourceSelected = Signal(str, int)  # source_type, palette_index
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -40,8 +41,8 @@ class EditingController(QObject):
         # Selected color index
         self._selected_color = 1
 
-        # Palette sources registry: (source_type, index) -> [colors]
-        self._palette_sources: dict[tuple[str, int], list[tuple[int, int, int]]] = {}
+        # Palette sources registry: (source_type, index) -> (colors, name)
+        self._palette_sources: dict[tuple[str, int], tuple[list[tuple[int, int, int]], str]] = {}
 
         # View reference
         self._view: EditTab | None = None
@@ -262,12 +263,16 @@ class EditingController(QObject):
 
     # Palette Management
 
+    def get_palette_sources(self) -> dict[tuple[str, int], tuple[list[tuple[int, int, int]], str]]:
+        """Get all registered palette sources."""
+        return self._palette_sources.copy()
+
     def register_palette_source(
         self, source_type: str, index: int, colors: list[tuple[int, int, int]], name: str
     ) -> None:
         """Register a new palette source."""
         key = (source_type, index)
-        self._palette_sources[key] = colors
+        self._palette_sources[key] = (colors, name)
         self.paletteSourceAdded.emit(name, source_type, index)
 
     def handle_palette_source_changed(self, source_type: str, index: int) -> None:
@@ -278,14 +283,11 @@ class EditingController(QObject):
 
                 colors = get_default_snes_palette()
                 self.set_palette(colors, "Default SNES")
-            elif source_type == "mesen":
+            else:
                 key = (source_type, index)
                 if key in self._palette_sources:
-                    self.set_palette(self._palette_sources[key], f"Mesen #{index}")
-            elif source_type == "rom":
-                key = (source_type, index)
-                if key in self._palette_sources:
-                    self.set_palette(self._palette_sources[key], f"ROM Palette {index}")
+                    colors, name = self._palette_sources[key]
+                    self.set_palette(colors, name)
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
 
@@ -293,9 +295,7 @@ class EditingController(QObject):
             parent = self._view if self._view else None
             QMessageBox.critical(parent, "Error", f"Failed to change palette source: {e}")
 
-    def register_rom_palettes(
-        self, palettes: dict[int, list[tuple[int, int, int]]]
-    ) -> None:
+    def register_rom_palettes(self, palettes: dict[int, list[tuple[int, int, int]]]) -> None:
         """Register multiple ROM palettes as switchable sources.
 
         Args:
@@ -318,7 +318,10 @@ class EditingController(QObject):
         # Apply the palette
         self.handle_palette_source_changed(source_type, palette_index)
 
-        # Update the view's dropdown if available
+        # Emit signal for all connected views (e.g., ROM EditWorkspace)
+        self.paletteSourceSelected.emit(source_type, palette_index)
+
+        # Update the primary view's dropdown if available (backward compat for EditTab)
         if self._view:
             palette_panel = getattr(self._view, "palette_panel", None)
             if palette_panel:

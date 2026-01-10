@@ -88,9 +88,7 @@ class TestROMPaletteExtraction:
             pytest.skip("Palette offset not configured for this ROM")
 
         # Extract palettes 8-15 (sprite palette range)
-        palettes = rom_extractor.rom_palette_extractor.extract_palette_range(
-            str(kirby_rom_path), palette_offset, 8, 15
-        )
+        palettes = rom_extractor.rom_palette_extractor.extract_palette_range(str(kirby_rom_path), palette_offset, 8, 15)
 
         # Verify structure
         assert palettes is not None
@@ -133,9 +131,7 @@ class TestROMPaletteExtraction:
         palette_offset, _ = palette_config
         if palette_offset is None or palette_offset == 0:
             pytest.skip("Palette offset not configured")
-        palettes = rom_extractor.rom_palette_extractor.extract_palette_range(
-            str(kirby_rom_path), palette_offset, 8, 15
-        )
+        palettes = rom_extractor.rom_palette_extractor.extract_palette_range(str(kirby_rom_path), palette_offset, 8, 15)
 
         if not palettes:
             pytest.skip("No palettes extracted")

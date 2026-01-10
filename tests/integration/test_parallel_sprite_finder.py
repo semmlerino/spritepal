@@ -313,7 +313,6 @@ class TestParallelPerformance:
         # Use medium ROM for meaningful benchmark
         rom_path = test_rom_file(size="medium")
 
-
         # Create parallel finder
         parallel_finder = ParallelSpriteFinder(num_workers=4, chunk_size=0x20000)
 
