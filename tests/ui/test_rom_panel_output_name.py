@@ -100,3 +100,36 @@ def test_no_duplicate_output_name_field(app_context):
 
     # Verify provider field DOES exist
     assert hasattr(panel, "_output_name_provider")
+
+
+def test_sprite_location_error_disables_extraction(qtbot, app_context):
+    """
+    Verify that sprite location errors disable extraction readiness.
+
+    Regression: Before fix, _on_sprite_locations_error() did not call
+    _check_extraction_ready(), leaving extract button enabled.
+    """
+    from ui.rom_extraction_panel import ROMExtractionPanel
+
+    # Create panel
+    panel = ROMExtractionPanel(
+        extraction_manager=app_context.core_operations_manager,
+        state_manager=app_context.application_state_manager,
+        rom_cache=app_context.rom_cache,
+    )
+    qtbot.addWidget(panel)
+
+    # Track readiness signals
+    ready_states: list[bool] = []
+    panel.extraction_ready.connect(lambda ready, _reason="": ready_states.append(ready))
+
+    # Set ROM path to enable basic readiness
+    panel.rom_path = "test.sfc"
+
+    # Simulate sprite location error
+    panel._on_sprite_locations_error("Test error: failed to load locations")
+
+    # Verify: readiness check was triggered and resulted in not-ready state
+    # The panel should have emitted extraction_ready(False, ...) after error
+    assert len(ready_states) > 0, "Expected extraction_ready signal after sprite error"
+    assert ready_states[-1] is False, "Expected extraction NOT ready after sprite location error"

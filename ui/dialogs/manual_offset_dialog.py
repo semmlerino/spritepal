@@ -759,12 +759,20 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             return (self.rom_path, self.rom_extractor)
 
     def _on_smart_preview_ready(
-        self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int
-    ):
+        self,
+        tile_data: bytes,
+        width: int,
+        height: int,
+        sprite_name: str,
+        compressed_size: int,
+        slack_size: int = 0,
+        actual_offset: int = -1,
+        hal_succeeded: bool = True,
+    ) -> None:
         """Handle preview ready from smart coordinator with guaranteed UI updates."""
         logger.info("[PREVIEW_READY] ========== START ===========")
         logger.info(
-            f"[PREVIEW_READY] data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}, compressed_size={compressed_size}"
+            f"[PREVIEW_READY] data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}, compressed_size={compressed_size}, actual_offset=0x{actual_offset:06X}"
         )
         logger.debug(f"[PREVIEW_READY] tile_data first 20 bytes: {tile_data[:20].hex() if tile_data else 'None'}")
 
@@ -817,8 +825,17 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         try:
             current_offset = self.get_current_offset()
+
+            # Use actual_offset if provided and valid
+            display_offset = actual_offset if actual_offset != -1 else current_offset
+
+            # Sync browse tab if offset was adjusted during alignment
+            if actual_offset not in (-1, current_offset):
+                logger.info(f"[PREVIEW_READY] Offset adjusted from 0x{current_offset:06X} to 0x{actual_offset:06X}")
+                self.set_offset(actual_offset)
+
             cache_status = self._get_cache_status_text()
-            self._update_status(f"High-quality preview at 0x{current_offset:06X} {cache_status}")
+            self._update_status(f"High-quality preview at 0x{display_offset:06X} {cache_status}")
         except Exception as e:
             logger.error(f"[PREVIEW_READY] Error updating status: {e}")
 

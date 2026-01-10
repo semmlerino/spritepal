@@ -58,9 +58,7 @@ class EditWorkspace(QWidget):
     saveToRomRequested = Signal()
     exportPngRequested = Signal()
 
-    def __init__(
-        self, embed_mode: str = "standalone", parent: QWidget | None = None
-    ) -> None:
+    def __init__(self, embed_mode: str = "standalone", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._embed_mode = embed_mode
         self._controller: EditingController | None = None
@@ -86,9 +84,7 @@ class EditWorkspace(QWidget):
         if self._embed_mode == "standalone":
             # Standalone mode: Create full layout with internal splitter
             main_layout = QVBoxLayout(self)
-            main_layout.setContentsMargins(
-                PANEL_PADDING, PANEL_PADDING, PANEL_PADDING, PANEL_PADDING
-            )
+            main_layout.setContentsMargins(PANEL_PADDING, PANEL_PADDING, PANEL_PADDING, PANEL_PADDING)
             main_layout.setSpacing(SPACING_MEDIUM)
 
             # Top: Icon toolbar
@@ -97,9 +93,7 @@ class EditWorkspace(QWidget):
             # Center: Splitter for canvas/panels
             self._splitter = QSplitter(Qt.Orientation.Horizontal)
             self._splitter.setChildrenCollapsible(False)
-            self._splitter.setSizePolicy(
-                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-            )
+            self._splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
             self._splitter.addWidget(self._scroll_area)
             self._splitter.addWidget(self._right_scroll)
@@ -128,18 +122,12 @@ class EditWorkspace(QWidget):
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
-        scroll_area.setStyleSheet(
-            f"QScrollArea {{ background-color: {COLORS['darker_gray']}; border: none; }}"
-        )
+        scroll_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        scroll_area.setStyleSheet(f"QScrollArea {{ background-color: {COLORS['darker_gray']}; border: none; }}")
 
         # Container for canvas - must expand to fill scroll area
         self._canvas_container = QWidget()
-        self._canvas_container.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
-        )
+        self._canvas_container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._canvas_layout = QVBoxLayout(self._canvas_container)
         self._canvas_layout.setContentsMargins(0, 0, 0, 0)
         self._canvas_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -155,9 +143,7 @@ class EditWorkspace(QWidget):
     def _create_right_panel_scroll(self) -> QScrollArea:
         """Create the right panel with palette, preview, and action buttons."""
         right_panel = QWidget()
-        right_panel.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred
-        )
+        right_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(SPACING_SMALL)
@@ -195,9 +181,7 @@ class EditWorkspace(QWidget):
         right_scroll.setWidget(right_panel)
         # Allow user to resize, set reasonable min width
         right_scroll.setMinimumWidth(200)
-        right_scroll.setSizePolicy(
-            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding
-        )
+        right_scroll.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
 
         return right_scroll
 
@@ -322,6 +306,7 @@ class EditWorkspace(QWidget):
         safe_disconnect(self._icon_toolbar.gridToggled)
         safe_disconnect(self._icon_toolbar.tileGridToggled)
         safe_disconnect(self._icon_toolbar.palettePreviewToggled)
+        safe_disconnect(self._icon_toolbar.backgroundChanged)
 
         # Disconnect palette panel signals
         safe_disconnect(self._palette_panel.colorSelected)
@@ -368,6 +353,7 @@ class EditWorkspace(QWidget):
         self._icon_toolbar.zoomOutClicked.connect(self._on_zoom_out)
         self._icon_toolbar.gridToggled.connect(self._canvas.set_grid_visible)
         self._icon_toolbar.tileGridToggled.connect(self._canvas.set_tile_grid_visible)
+        self._icon_toolbar.backgroundChanged.connect(self._canvas.set_background)
 
         # Connect palette preview toggle
         self._icon_toolbar.palettePreviewToggled.connect(self._on_palette_preview_toggled)

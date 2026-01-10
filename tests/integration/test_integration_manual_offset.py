@@ -215,6 +215,46 @@ class TestManualOffsetDialog:
         offset_after_prev = dialog.get_current_offset()
         assert 0 <= offset_after_prev < rom_info["path"].stat().st_size
 
+    def test_preview_ready_syncs_actual_offset(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
+        """
+        Verify that _on_smart_preview_ready syncs the UI when actual_offset differs.
+
+        Regression: Before fix, the dialog ignored actual_offset parameter, showing
+        the requested offset in the status even when preview came from a different offset.
+        """
+        dialog = manual_offset_dialog
+        rom_info = test_rom_with_sprites
+
+        # Set ROM data
+        extraction_manager = get_extraction_manager()
+        dialog.set_rom_data(str(rom_info["path"]), rom_info["path"].stat().st_size, extraction_manager)
+
+        with qtbot.waitExposed(dialog):
+            dialog.show()
+
+        # Set initial offset
+        requested_offset = 0x20000
+        dialog.set_offset(requested_offset)
+        qtbot.waitUntil(lambda: dialog.get_current_offset() == requested_offset, timeout=500)
+
+        # Simulate preview aligning to a different offset
+        actual_offset = 0x20001  # Preview found valid sprite at +1 byte
+        dialog._on_smart_preview_ready(
+            tile_data=b"\x00" * 64,  # Minimal valid tile data
+            width=8,
+            height=8,
+            sprite_name="test_sprite",
+            compressed_size=32,
+            slack_size=0,
+            actual_offset=actual_offset,
+            hal_succeeded=True,
+        )
+
+        # Verify: Dialog should have synced to actual_offset
+        assert dialog.get_current_offset() == actual_offset, (
+            f"Expected offset 0x{actual_offset:06X}, got 0x{dialog.get_current_offset():06X}"
+        )
+
 
 @pytest.mark.integration
 @pytest.mark.gui

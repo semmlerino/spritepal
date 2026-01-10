@@ -5,11 +5,13 @@ Provides horizontal toolbar with tool selection, zoom controls, and grid toggles
 """
 
 from PySide6.QtCore import QSignalBlocker, QSize, Qt, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
+    QColorDialog,
     QHBoxLayout,
+    QMenu,
     QStyle,
     QToolButton,
     QWidget,
@@ -37,6 +39,7 @@ class IconToolbar(QWidget):
     gridToggled = Signal(bool)  # pixel grid visibility
     tileGridToggled = Signal(bool)  # tile grid visibility
     palettePreviewToggled = Signal(bool)  # palette preview visibility
+    backgroundChanged = Signal(str, object)  # type, custom_color (QColor | None)
 
     # Icon configuration: (theme_name, fallback_icon_text, display_label)
     # Theme names follow freedesktop.org icon naming spec
@@ -52,6 +55,7 @@ class IconToolbar(QWidget):
         "grid": ("view-grid", "#", "Show Pixel Grid"),
         "tile_grid": ("view-split-left-right", "T", "Show Tile Grid"),
         "palette": ("preferences-desktop-color", "C", "Toggle Palette Preview"),
+        "background": ("format-fill-color", "B", "Background"),
     }
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -74,6 +78,7 @@ class IconToolbar(QWidget):
         self.grid_btn: QToolButton | None = None
         self.tile_grid_btn: QToolButton | None = None
         self.palette_preview_btn: QToolButton | None = None
+        self.background_btn: QToolButton | None = None
 
         # Track toggle states
         self._grid_visible = False
@@ -158,6 +163,32 @@ class IconToolbar(QWidget):
         self.palette_preview_btn.clicked.connect(self._on_palette_preview_toggled)
         layout.addWidget(self.palette_preview_btn)
 
+        self.background_btn = QToolButton()
+        self._apply_icon(self.background_btn, "background")
+        self.background_btn.setToolTip("Change Background")
+        self.background_btn.setIconSize(self._get_icon_size())
+        self.background_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+
+        bg_menu = QMenu(self)
+        checker_action = QAction("Checkerboard", self)
+        checker_action.triggered.connect(lambda: self.backgroundChanged.emit("checkerboard", None))
+        bg_menu.addAction(checker_action)
+
+        black_action = QAction("Black", self)
+        black_action.triggered.connect(lambda: self.backgroundChanged.emit("black", None))
+        bg_menu.addAction(black_action)
+
+        white_action = QAction("White", self)
+        white_action.triggered.connect(lambda: self.backgroundChanged.emit("white", None))
+        bg_menu.addAction(white_action)
+
+        custom_action = QAction("Custom...", self)
+        custom_action.triggered.connect(self._on_custom_background_clicked)
+        bg_menu.addAction(custom_action)
+
+        self.background_btn.setMenu(bg_menu)
+        layout.addWidget(self.background_btn)
+
         # Add stretch to push everything to the left
         layout.addStretch()
 
@@ -229,6 +260,12 @@ class IconToolbar(QWidget):
         """Handle palette preview toggle."""
         self._palette_preview_enabled = checked
         self.palettePreviewToggled.emit(checked)
+
+    def _on_custom_background_clicked(self) -> None:
+        """Handle custom background selection."""
+        color = QColorDialog.getColor(Qt.GlobalColor.black, self, "Select Background Color")
+        if color.isValid():
+            self.backgroundChanged.emit("custom", color)
 
     def get_current_tool(self) -> str:
         """Get the currently selected tool name.

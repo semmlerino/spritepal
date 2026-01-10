@@ -1,4 +1,5 @@
 """Tests for ROM workflow state transitions."""
+
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -7,9 +8,7 @@ import pytest
 class TestROMWorkflowStateTransitions:
     """Tests for state transitions in ROMWorkflowController."""
 
-    def test_offset_change_in_edit_mode_resets_to_preview(
-        self, qtbot, tmp_path, monkeypatch
-    ):
+    def test_offset_change_in_edit_mode_resets_to_preview(self, qtbot, tmp_path, monkeypatch):
         """
         Contract: Changing offset while in edit mode (no unsaved changes)
         returns workflow to preview state.
@@ -30,9 +29,7 @@ class TestROMWorkflowStateTransitions:
         editing_controller = EditingController()
 
         # Create controller and view
-        controller = ROMWorkflowController(
-            parent=None, editing_controller=editing_controller
-        )
+        controller = ROMWorkflowController(parent=None, editing_controller=editing_controller)
         view = ROMWorkflowPage()
         qtbot.addWidget(view)
         controller.set_view(view)
@@ -89,9 +86,7 @@ class TestROMWorkflowStateTransitions:
         assert not view.workspace.isEnabled(), "Workspace should be disabled in preview state"
         assert "preview" in state_changes, "workflow_state_changed should emit 'preview'"
 
-    def test_offset_change_with_unsaved_changes_shows_dialog(
-        self, qtbot, tmp_path, monkeypatch
-    ):
+    def test_offset_change_with_unsaved_changes_shows_dialog(self, qtbot, tmp_path, monkeypatch):
         """
         Contract: When there ARE unsaved changes, the discard dialog appears.
         If user declines, offset should NOT change.
@@ -106,9 +101,7 @@ class TestROMWorkflowStateTransitions:
 
         # Create controller with mocked undo manager that reports unsaved changes
         editing_controller = EditingController()
-        controller = ROMWorkflowController(
-            parent=None, editing_controller=editing_controller
-        )
+        controller = ROMWorkflowController(parent=None, editing_controller=editing_controller)
         view = ROMWorkflowPage()
         qtbot.addWidget(view)
         controller.set_view(view)
@@ -132,9 +125,7 @@ class TestROMWorkflowStateTransitions:
                 hal_succeeded=True,
             )
 
-        monkeypatch.setattr(
-            controller.preview_coordinator, "request_manual_preview", fake_preview
-        )
+        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", fake_preview)
 
         # Set initial offset
         controller.set_offset(0x1000)

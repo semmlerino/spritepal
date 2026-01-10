@@ -79,3 +79,42 @@ def test_rom_workspace_palette_source_syncs(qtbot):
         "rom",
         8,
     ), f"Expected ('rom', 8), got {selected_source}"
+
+
+def test_load_palette_updates_selector(qtbot, tmp_path):
+    """
+    Verify that loading a palette file registers it as a "file" source
+    and updates the dropdown selector.
+
+    Regression: Before fix, handle_load_palette() bypassed the source system,
+    leaving the dropdown showing "Default" while colors showed the loaded file.
+    """
+    from unittest.mock import patch
+
+    controller = EditingController()
+
+    # Setup workspace
+    workspace = EditWorkspace()
+    qtbot.addWidget(workspace)
+    workspace.set_controller(controller)
+
+    # Create a test JASC-PAL file
+    pal_file = tmp_path / "test.pal"
+    pal_file.write_text("JASC-PAL\n0100\n16\n" + "\n".join(f"{i * 16} {i * 16} {i * 16}" for i in range(16)))
+
+    # Mock the file dialog to return our test file
+    with patch(
+        "PySide6.QtWidgets.QFileDialog.getOpenFileName",
+        return_value=(str(pal_file), ""),
+    ):
+        controller.handle_load_palette()
+
+    # Verify: "file" source should be registered and selected
+    selector = workspace.palette_panel.palette_source_selector
+    selected_source = selector.get_selected_source()
+    assert selected_source == ("file", 0), f"Expected ('file', 0), got {selected_source}"
+
+    # Verify: Dropdown should have "Loaded Palette" item
+    combo = selector.findChild(QComboBox)
+    item_texts = [combo.itemText(i) for i in range(combo.count())]
+    assert "Loaded Palette" in item_texts, f"Expected 'Loaded Palette' in {item_texts}"

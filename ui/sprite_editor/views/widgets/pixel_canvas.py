@@ -36,6 +36,8 @@ class PixelCanvas(QWidget):
         self.grid_visible = False
         self.tile_grid_visible = False
         self.greyscale_mode = False
+        self.background_type = "checkerboard"
+        self.custom_background_color = QColor(Qt.GlobalColor.black)
 
         # Interaction state
         self.drawing = False
@@ -155,6 +157,18 @@ class PixelCanvas(QWidget):
     def set_tile_grid_visible(self, visible: bool) -> None:
         """Toggle tile grid visibility."""
         self.tile_grid_visible = visible
+        self.update()
+
+    def set_background(self, bg_type: str, custom_color: QColor | None = None) -> None:
+        """Set the background type.
+
+        Args:
+            bg_type: Background type ("checkerboard", "black", "white", "custom")
+            custom_color: Custom color for "custom" type
+        """
+        self.background_type = bg_type.lower()
+        if custom_color:
+            self.custom_background_color = custom_color
         self.update()
 
     def set_greyscale_mode(self, greyscale: bool) -> None:
@@ -403,29 +417,6 @@ class PixelCanvas(QWidget):
         for rect in regions_to_update:
             self.update(rect)
 
-    def _draw_checkerboard(self, painter: QPainter, width: int, height: int) -> None:
-        """Draw a checkerboard background for transparency visualization."""
-        checker_size = 8  # Size of each checker square
-        light_color = QColor(220, 220, 220)
-        dark_color = QColor(180, 180, 180)
-
-        for y in range(0, height, checker_size):
-            for x in range(0, width, checker_size):
-                # Alternate colors in checkerboard pattern
-                if (x // checker_size + y // checker_size) % 2 == 0:
-                    color = light_color
-                else:
-                    color = dark_color
-
-                # Draw the checker square
-                painter.fillRect(
-                    x,
-                    y,
-                    min(checker_size, width - x),
-                    min(checker_size, height - y),
-                    color,
-                )
-
     @override
     def paintEvent(self, event: QPaintEvent) -> None:
         """Paint the canvas using optimized viewport-based rendering."""
@@ -450,8 +441,8 @@ class PixelCanvas(QWidget):
         # Set clipping region for efficient rendering
         painter.setClipRect(image_rect)
 
-        # Draw checkerboard background for transparency (only in visible region)
-        self._draw_checkerboard_viewport(painter, image_rect)
+        # Draw background (only in visible region)
+        self._draw_background_viewport(painter, image_rect)
 
         # Enable composition mode for proper transparency
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
@@ -494,8 +485,19 @@ class PixelCanvas(QWidget):
 
         return visible_region
 
-    def _draw_checkerboard_viewport(self, painter: QPainter, rect: QRect) -> None:
-        """Draw checkerboard background only in visible region."""
+    def _draw_background_viewport(self, painter: QPainter, rect: QRect) -> None:
+        """Draw background only in visible region."""
+        if self.background_type == "checkerboard":
+            self._draw_checkerboard_pattern(painter, rect)
+        elif self.background_type == "black":
+            painter.fillRect(rect, Qt.GlobalColor.black)
+        elif self.background_type == "white":
+            painter.fillRect(rect, Qt.GlobalColor.white)
+        elif self.background_type == "custom":
+            painter.fillRect(rect, self.custom_background_color)
+
+    def _draw_checkerboard_pattern(self, painter: QPainter, rect: QRect) -> None:
+        """Draw checkerboard pattern in the given rectangle."""
         checker_size = 8
         light_color = QColor(220, 220, 220)
         dark_color = QColor(180, 180, 180)
