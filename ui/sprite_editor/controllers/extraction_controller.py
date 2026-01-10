@@ -318,8 +318,8 @@ class ExtractionController(QObject):
         if not self.vram_file or not self.cgram_file:
             error_msg = "VRAM and CGRAM files required"
             self.extraction_failed.emit(error_msg)
-            if self._view:
-                self._view.append_output(f"ERROR: {error_msg}")
+            if self._multi_palette_view is not None:
+                self._multi_palette_view.append_output(f"ERROR: {error_msg}")
             return
 
         self.extract_multi_palette(

@@ -28,10 +28,8 @@ def test_shortcuts_exist(workspace):
 
     keys = [s.key().toString() for s in shortcuts]
 
-    assert "P" in keys
-    assert "B" in keys
-    assert "K" in keys
-    assert "E" in keys
+    # Tool shortcuts (P, B, K, E) are commented out in EditWorkspace._setup_shortcuts()
+    # Only grid/zoom shortcuts are active
     assert "G" in keys
     assert "T" in keys
     assert "C" in keys

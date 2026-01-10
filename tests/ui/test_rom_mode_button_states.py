@@ -35,6 +35,7 @@ def test_ready_for_inject_hidden_in_rom_mode(qtbot):
         toolChanged = Signal(str)
         colorChanged = Signal(int)
         paletteSourceAdded = Signal(str, str, int)
+        paletteSourceSelected = Signal(str, int)
 
         def __init__(self):
             super().__init__()
@@ -83,6 +84,9 @@ def test_ready_for_inject_hidden_in_rom_mode(qtbot):
 
         def handle_edit_color(self):
             pass
+
+        def get_palette_sources(self):
+            return {}
 
     controller = MockController()
     page.workspace.set_controller(controller)
