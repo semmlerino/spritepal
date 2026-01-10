@@ -5,6 +5,7 @@ Main window for SpritePal application
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -77,6 +78,14 @@ from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+class WorkspaceMode(IntEnum):
+    """Workspace mode for MainWindow.switch_to_workspace()."""
+
+    EXTRACTION = 0  # ROM/VRAM extraction workspace
+    SPRITE_EDITOR = 1  # Sprite editor workspace
+
 
 # Layout constants for consistent sizing and spacing
 MAIN_WINDOW_MIN_SIZE = (1000, 700)  # Expanded for embedded editor
@@ -341,9 +350,9 @@ class MainWindow(QMainWindow):
         """Handle extraction tab changes."""
         # Workspace switching
         if index == 2:  # Sprite Editor tab
-            self.switch_to_workspace(1)
+            self.switch_to_workspace(WorkspaceMode.SPRITE_EDITOR)
         else:
-            self.switch_to_workspace(0)
+            self.switch_to_workspace(WorkspaceMode.EXTRACTION)
 
         # Tab configuration (inlined from UICoordinator)
         # Guard: Skip configuration during initial setup (before managers are created)
@@ -628,19 +637,21 @@ class MainWindow(QMainWindow):
         # Action zone is always visible with dock content
         pass
 
-    def switch_to_workspace(self, workspace_index: int, tab_index: int | None = None) -> None:
+    def switch_to_workspace(
+        self, workspace_mode: WorkspaceMode, tab_index: int | None = None
+    ) -> None:
         """Switch to a specific workspace and optionally a tab within it.
 
         Args:
-            workspace_index: 0 for Extraction, 1 for Sprite Editor
+            workspace_mode: WorkspaceMode.EXTRACTION or WorkspaceMode.SPRITE_EDITOR
             tab_index: Optional tab index within the workspace
         """
-        if workspace_index == 0:
+        if workspace_mode == WorkspaceMode.EXTRACTION:
             # Extraction Mode
             self.center_stack.setCurrentIndex(0)  # Preview
             self.left_dock.show()
             self._update_undo_redo_state(False, False)  # Disable undo
-        elif workspace_index == 1:
+        elif workspace_mode == WorkspaceMode.SPRITE_EDITOR:
             # Sprite Editor Mode
             self.center_stack.setCurrentIndex(1)  # Editor
             self.left_dock.hide()
@@ -648,7 +659,7 @@ class MainWindow(QMainWindow):
             can_undo, can_redo = self._last_undo_state
             self._update_undo_redo_state(can_undo, can_redo)
 
-        if tab_index is not None and workspace_index == 0:
+        if tab_index is not None and workspace_mode == WorkspaceMode.EXTRACTION:
             # Switch tab within extraction panel
             self.extraction_tabs.setCurrentIndex(tab_index)
 
@@ -663,11 +674,11 @@ class MainWindow(QMainWindow):
             index: Requested tab index (0-2)
         """
         if index == 0:
-            self.switch_to_workspace(0, 0)  # Extraction workspace, ROM tab
+            self.switch_to_workspace(WorkspaceMode.EXTRACTION, 0)  # ROM tab
         elif index == 1:
-            self.switch_to_workspace(0, 1)  # Extraction workspace, VRAM tab
+            self.switch_to_workspace(WorkspaceMode.EXTRACTION, 1)  # VRAM tab
         elif index == 2:
-            self.switch_to_workspace(1)  # Sprite Editor workspace
+            self.switch_to_workspace(WorkspaceMode.SPRITE_EDITOR)
 
     def set_workspace(self, workspace: str) -> None:
         """Switch to specified workspace by name.
@@ -678,9 +689,9 @@ class MainWindow(QMainWindow):
             workspace: 'extraction' for ROM/VRAM extraction, 'editor' for Sprite Editor
         """
         if workspace == "extraction":
-            self.switch_to_workspace(0)
+            self.switch_to_workspace(WorkspaceMode.EXTRACTION)
         elif workspace == "editor":
-            self.switch_to_workspace(1)
+            self.switch_to_workspace(WorkspaceMode.SPRITE_EDITOR)
 
     def _setup_managers(self) -> None:
         """Set up all UI managers"""
@@ -1657,7 +1668,7 @@ class MainWindow(QMainWindow):
             self._sprite_editor_workspace.load_rom(self.rom_extraction_panel.rom_path)
 
         # Switch to sprite editor workspace
-        self.switch_to_workspace(1)
+        self.switch_to_workspace(WorkspaceMode.SPRITE_EDITOR)
 
         # Jump to offset in sprite editor (ensures capture is in browser and selected)
         self._sprite_editor_workspace.jump_to_offset(offset, capture_name=capture_name)

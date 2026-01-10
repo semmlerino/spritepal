@@ -350,8 +350,7 @@ class ROMWorkflowController(QObject):
                     chunk = f.read(0x10000)  # Read up to 64KB for decompression
 
                 if chunk:
-                    rom_injector = self.rom_extractor.rom_injector
-                    _, decompressed_data, _ = rom_injector.find_compressed_sprite(chunk, 0, expected_size=None)
+                    _, decompressed_data, _ = self.rom_extractor.find_compressed_sprite(chunk, 0, expected_size=None)
                     if decompressed_data:
                         data_to_render = decompressed_data
                         logger.debug(
@@ -736,7 +735,7 @@ class ROMWorkflowController(QObject):
         if self.rom_extractor and self.rom_path:
             try:
                 # 1. Get header to identify game
-                header = self.rom_extractor.rom_injector.read_rom_header(self.rom_path)
+                header = self.rom_extractor.read_rom_header(self.rom_path)
 
                 # 2. Get game config
                 game_config = self.rom_extractor._find_game_configuration(header)
@@ -926,11 +925,9 @@ class ROMWorkflowController(QObject):
                 img.save(f.name, "PNG")
                 temp_png = f.name
 
-            # Perform injection with backup
-            rom_injector = self.rom_extractor.rom_injector
-
+            # Perform injection with backup (via facade method)
             # First attempt (standard validation)
-            success, message = rom_injector.inject_sprite_to_rom(
+            success, message = self.rom_extractor.inject_sprite_to_rom(
                 sprite_path=temp_png,
                 rom_path=self.rom_path,
                 output_path=self.rom_path,
@@ -954,7 +951,7 @@ class ROMWorkflowController(QObject):
                 if reply == QMessageBox.StandardButton.Yes:
                     if self._message_service:
                         self._message_service.show_message("Retrying with lenient checksum validation...")
-                    success, message = rom_injector.inject_sprite_to_rom(
+                    success, message = self.rom_extractor.inject_sprite_to_rom(
                         sprite_path=temp_png,
                         rom_path=self.rom_path,
                         output_path=self.rom_path,
@@ -984,7 +981,7 @@ class ROMWorkflowController(QObject):
                 if reply == QMessageBox.StandardButton.Yes:
                     if self._message_service:
                         self._message_service.show_message("Force injecting (backup created)...")
-                    success, message = rom_injector.inject_sprite_to_rom(
+                    success, message = self.rom_extractor.inject_sprite_to_rom(
                         sprite_path=temp_png,
                         rom_path=self.rom_path,
                         output_path=self.rom_path,

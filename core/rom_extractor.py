@@ -80,6 +80,83 @@ class ROMExtractor:
         self.rom_cache = rom_cache
         logger.info("ROMExtractor initialized with HAL compression and palette extraction support")
 
+    # -------------------------------------------------------------------------
+    # Facade methods - delegate to rom_injector to avoid reach-through access
+    # -------------------------------------------------------------------------
+
+    def find_compressed_sprite(
+        self, rom_data: bytes | bytearray, offset: int, expected_size: int | None = None
+    ) -> tuple[int, bytes, int]:
+        """Find and decompress sprite data at given offset.
+
+        Delegates to rom_injector.find_compressed_sprite().
+
+        Args:
+            rom_data: ROM data
+            offset: Offset in ROM where compressed sprite starts
+            expected_size: Expected decompressed size (will truncate if larger)
+
+        Returns:
+            Tuple of (compressed_size, decompressed_data, slack_size)
+        """
+        return self.rom_injector.find_compressed_sprite(rom_data, offset, expected_size)
+
+    def read_rom_header(self, rom_path: str) -> ROMHeader:
+        """Read ROM header information.
+
+        Delegates to rom_injector.read_rom_header().
+
+        Args:
+            rom_path: Path to ROM file
+
+        Returns:
+            ROMHeader with title, rom_type, checksum, etc.
+        """
+        return self.rom_injector.read_rom_header(rom_path)
+
+    def inject_sprite_to_rom(
+        self,
+        sprite_path: str,
+        rom_path: str,
+        output_path: str,
+        sprite_offset: int,
+        fast_compression: bool = False,
+        create_backup: bool = True,
+        ignore_checksum: bool = False,
+        force: bool = False,
+    ) -> tuple[bool, str]:
+        """Inject sprite directly into ROM file with validation and backup.
+
+        Delegates to rom_injector.inject_sprite_to_rom().
+
+        Args:
+            sprite_path: Path to edited sprite PNG
+            rom_path: Path to input ROM
+            output_path: Path for output ROM
+            sprite_offset: Offset in ROM where sprite data is located
+            fast_compression: Use fast compression mode
+            create_backup: Create backup before modification
+            ignore_checksum: If True, warn on checksum mismatch instead of failing
+            force: If True, inject even if compressed size exceeds limit
+
+        Returns:
+            Tuple of (success, message)
+        """
+        return self.rom_injector.inject_sprite_to_rom(
+            sprite_path,
+            rom_path,
+            output_path,
+            sprite_offset,
+            fast_compression,
+            create_backup,
+            ignore_checksum,
+            force,
+        )
+
+    # -------------------------------------------------------------------------
+    # Core extraction methods
+    # -------------------------------------------------------------------------
+
     def extract_sprite_data(self, rom_path: str, sprite_offset: int) -> bytes:
         """
         Extract raw sprite data from ROM at specified offset.
