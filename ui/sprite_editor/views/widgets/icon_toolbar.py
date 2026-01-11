@@ -41,6 +41,9 @@ class IconToolbar(QWidget):
     palettePreviewToggled = Signal(bool)  # palette preview visibility
     backgroundChanged = Signal(str, object)  # type, custom_color (QColor | None)
 
+    # Signals - Actions
+    revertClicked = Signal()  # Revert to original ROM data
+
     # Icon configuration: (theme_name, fallback_icon_text, display_label)
     # Theme names follow freedesktop.org icon naming spec
     # fallback_icon_text is shown when theme icon unavailable
@@ -56,6 +59,7 @@ class IconToolbar(QWidget):
         "tile_grid": ("view-split-left-right", "T", "Show Tile Grid"),
         "palette": ("preferences-desktop-color", "C", "Toggle Palette Preview"),
         "background": ("format-fill-color", "B", "Background"),
+        "revert": ("view-refresh", "↺", "Revert"),
     }
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -79,6 +83,7 @@ class IconToolbar(QWidget):
         self.tile_grid_btn: QToolButton | None = None
         self.palette_preview_btn: QToolButton | None = None
         self.background_btn: QToolButton | None = None
+        self.revert_btn: QToolButton | None = None
 
         # Track toggle states
         self._grid_visible = False
@@ -188,6 +193,17 @@ class IconToolbar(QWidget):
 
         self.background_btn.setMenu(bg_menu)
         layout.addWidget(self.background_btn)
+
+        # Separator before revert action
+        layout.addSpacing(SPACING_SMALL * 2)
+
+        # Revert to original button
+        self.revert_btn = QToolButton()
+        self._apply_icon(self.revert_btn, "revert")
+        self.revert_btn.setToolTip("Revert to Original (Discard All Edits)")
+        self.revert_btn.setIconSize(self._get_icon_size())
+        self.revert_btn.clicked.connect(self.revertClicked.emit)
+        layout.addWidget(self.revert_btn)
 
         # Add stretch to push everything to the left
         layout.addStretch()

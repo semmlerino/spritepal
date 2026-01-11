@@ -189,6 +189,9 @@ class SpriteEditorWorkspace(QWidget):
         # Wire ROM workflow controller to ROM page
         self._rom_workflow_controller.set_view(self._rom_page)
 
+        # Connect revert button to ROM workflow controller
+        self._rom_page.workspace.icon_toolbar.revertClicked.connect(self._rom_workflow_controller.revert_to_original)
+
         # Connect ready_for_inject from VRAM page
         self._vram_page.ready_for_inject.connect(self._on_ready_for_inject)
 
@@ -358,7 +361,10 @@ class SpriteEditorWorkspace(QWidget):
             capture_name: Optional display name for the capture (e.g., "0x3C6EF1 (f1500)").
                           If provided, ensures the capture appears in asset browser.
         """
-        print(f"[DEBUG] SpriteEditorWorkspace.jump_to_offset: offset=0x{offset:06X}, capture_name={capture_name}", flush=True)
+        print(
+            f"[DEBUG] SpriteEditorWorkspace.jump_to_offset: offset=0x{offset:06X}, capture_name={capture_name}",
+            flush=True,
+        )
         # Switch to ROM mode
         self._mode_combo.setCurrentIndex(1)
 

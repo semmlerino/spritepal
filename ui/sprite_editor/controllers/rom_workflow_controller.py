@@ -170,13 +170,18 @@ class ROMWorkflowController(QObject):
 
     def _add_capture_to_browser(self, capture: CapturedOffset) -> None:
         """Add a capture to the browser with thumbnail."""
-        print(f"[DEBUG] _add_capture_to_browser: offset=0x{capture.offset:06X}, view={self._view is not None}", flush=True)
+        print(
+            f"[DEBUG] _add_capture_to_browser: offset=0x{capture.offset:06X}, view={self._view is not None}", flush=True
+        )
         if not self._view:
             print("[DEBUG] _add_capture_to_browser: NO VIEW, skipping", flush=True)
             return
 
         name = self._get_capture_name(capture)
-        print(f"[DEBUG] _add_capture_to_browser: calling view.add_mesen_capture({name}, 0x{capture.offset:06X})", flush=True)
+        print(
+            f"[DEBUG] _add_capture_to_browser: calling view.add_mesen_capture({name}, 0x{capture.offset:06X})",
+            flush=True,
+        )
         self._view.add_mesen_capture(name, capture.offset)
 
         # Request thumbnail if worker is ready
@@ -591,7 +596,10 @@ class ROMWorkflowController(QObject):
         Called when entering the sprite editor workspace to ensure all
         discovered captures are visible in the asset browser.
         """
-        print(f"[DEBUG] sync_captures_from_log_watcher: view={self._view is not None}, log_watcher={self.log_watcher is not None}", flush=True)
+        print(
+            f"[DEBUG] sync_captures_from_log_watcher: view={self._view is not None}, log_watcher={self.log_watcher is not None}",
+            flush=True,
+        )
         if not self._view:
             print("[DEBUG] sync_captures_from_log_watcher: NO VIEW", flush=True)
             logger.warning("sync_captures_from_log_watcher: no view set")
@@ -636,7 +644,10 @@ class ROMWorkflowController(QObject):
             offset: ROM offset of the capture
             name: Display name for the capture (defaults to hex offset)
         """
-        print(f"[DEBUG] ensure_and_select_capture: offset=0x{offset:06X}, name={name}, view={self._view is not None}, log_watcher={self.log_watcher is not None}", flush=True)
+        print(
+            f"[DEBUG] ensure_and_select_capture: offset=0x{offset:06X}, name={name}, view={self._view is not None}, log_watcher={self.log_watcher is not None}",
+            flush=True,
+        )
         logger.info(
             "ensure_and_select_capture called: offset=0x%06X, name=%s, view=%s, log_watcher=%s",
             offset,
@@ -656,7 +667,10 @@ class ROMWorkflowController(QObject):
 
         # Then ensure the specific capture exists and select it
         browser = self._view.asset_browser
-        print(f"[DEBUG] ensure_and_select_capture: calling browser.ensure_mesen_capture(0x{offset:06X}, {name})", flush=True)
+        print(
+            f"[DEBUG] ensure_and_select_capture: calling browser.ensure_mesen_capture(0x{offset:06X}, {name})",
+            flush=True,
+        )
         browser.ensure_mesen_capture(offset, name)
         browser.select_sprite_by_offset(offset)
         print(f"[DEBUG] ensure_and_select_capture: COMPLETED for offset 0x{offset:06X}", flush=True)
@@ -669,7 +683,10 @@ class ROMWorkflowController(QObject):
             offset: ROM offset to navigate to.
             auto_open: If True, automatically open in editor when preview completes.
         """
-        print(f"[DEBUG] set_offset: offset=0x{offset:06X}, rom_path={self.rom_path}, rom_size=0x{self.rom_size:06X}", flush=True)
+        print(
+            f"[DEBUG] set_offset: offset=0x{offset:06X}, rom_path={self.rom_path}, rom_size=0x{self.rom_size:06X}",
+            flush=True,
+        )
         # Check ROM availability first
         if not self.rom_path:
             print("[DEBUG] set_offset: NO ROM LOADED, returning early", flush=True)
@@ -724,7 +741,9 @@ class ROMWorkflowController(QObject):
 
         print("[DEBUG] set_offset: passed edit state check, proceeding", flush=True)
         self.current_offset = offset
-        print(f"[DEBUG] set_offset: setting current_offset to 0x{offset:06X}, view={self._view is not None}", flush=True)
+        print(
+            f"[DEBUG] set_offset: setting current_offset to 0x{offset:06X}, view={self._view is not None}", flush=True
+        )
         if self._view:
             self._view.set_offset(offset)
             print(f"[DEBUG] set_offset: called view.set_offset(0x{offset:06X})", flush=True)
@@ -850,6 +869,40 @@ class ROMWorkflowController(QObject):
             self._view.set_workflow_state("edit")
         self.workflow_state_changed.emit("edit")
         logger.debug("[OPEN] Sprite loaded in editor, state changed to 'edit'")
+
+    def revert_to_original(self) -> None:
+        """Revert the current sprite to its original ROM data.
+
+        Shows a confirmation dialog if there are unsaved changes,
+        then reloads the sprite from the original tile data.
+        """
+        # Check if we're in edit state with data to revert
+        if self.state != "edit" or not self.current_tile_data:
+            if self._message_service:
+                self._message_service.show_message("No sprite loaded to revert")
+            return
+
+        # Check for unsaved changes and confirm with user
+        if self._editing_controller.has_unsaved_changes():
+            from PySide6.QtWidgets import QMessageBox
+
+            reply = QMessageBox.question(
+                self._view,
+                "Revert to Original",
+                "This will discard all your edits and reload the original sprite from ROM.\n\n"
+                "Are you sure you want to revert?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+
+        # Reload the original sprite data
+        logger.info("Reverting sprite to original ROM data at offset 0x%06X", self.current_offset)
+        self.open_in_editor()
+
+        if self._message_service:
+            self._message_service.show_message("Sprite reverted to original ROM data")
 
     def prepare_injection(self) -> None:
         """Transition from editing to save confirmation with size comparison."""
