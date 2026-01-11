@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.spacing_constants import SPACING_STANDARD
+from utils.constants import RomMappingType
 
 from ..widgets.source_bar import SourceBar
 from ..widgets.sprite_asset_browser import SpriteAssetBrowser
@@ -184,6 +185,10 @@ class ROMWorkflowPage(QWidget):
     def set_offset(self, offset: int) -> None:
         """Update displayed ROM offset in source bar."""
         self._source_bar.set_offset(offset)
+
+    def set_mapping_type(self, mapping_type: RomMappingType) -> None:
+        """Set ROM mapping type for SNES address conversion in source bar."""
+        self._source_bar.set_mapping_type(mapping_type)
 
     def set_action_text(self, text: str) -> None:
         """Set action button text in source bar."""

@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.styles import get_muted_text_style, get_section_label_style
+from utils.constants import RomMappingType
 
 from .offset_line_edit import OffsetLineEdit
 
@@ -91,6 +92,10 @@ class SourceBar(QWidget):
     def set_offset(self, offset: int) -> None:
         """Set the offset value."""
         self.offset_edit.set_offset(offset)
+
+    def set_mapping_type(self, mapping_type: RomMappingType) -> None:
+        """Set ROM mapping type for SNES address conversion (LoROM, HiROM, SA-1)."""
+        self.offset_edit.set_mapping_type(mapping_type)
 
     def set_action_text(self, text: str) -> None:
         """Set the primary action button text."""

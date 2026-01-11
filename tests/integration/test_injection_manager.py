@@ -60,9 +60,13 @@ def injection_manager_real(app_context: AppContext):
 @pytest.fixture
 def temp_files_with_real_content(tmp_path):
     """Create temporary files with realistic content for validation."""
-    # Create a real sprite file with actual image data
+    # Create a real sprite file with indexed palette (required for SNES 4bpp)
     sprite_file = tmp_path / "test_sprite.png"
-    img = Image.new("RGBA", (64, 64), color=(255, 0, 0, 255))
+    img = Image.new("P", (64, 64))  # Indexed mode, 8x8 tile multiple
+    # Create a simple 16-color palette
+    palette = [i * 16 for i in range(16)] * 3  # Grayscale palette
+    palette.extend([0] * (768 - len(palette)))  # Pad to 256 colors
+    img.putpalette(palette)
     img.save(sprite_file)
 
     # Create VRAM file with realistic header and tile data

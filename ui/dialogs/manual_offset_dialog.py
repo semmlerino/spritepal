@@ -711,6 +711,15 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             self.browse_tab.set_rom_size(rom_size)
             self.browse_tab.set_rom_path(rom_path)
 
+            # Set header offset and mapping type for accurate copy/paste
+            if self.rom_extractor:
+                try:
+                    header = self.rom_extractor.read_rom_header(rom_path)
+                    self.browse_tab.set_header_offset(header.header_offset)
+                    self.browse_tab.set_mapping_type(header.mapping_type)
+                except Exception as e:
+                    logger.warning(f"Failed to read ROM header for offset config: {e}")
+
         # Update gallery tab with ROM data
         if self.gallery_tab is not None and self.rom_extractor is not None:
             self.gallery_tab.set_rom_data(rom_path, rom_size, self.rom_extractor)

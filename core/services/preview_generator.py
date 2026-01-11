@@ -421,6 +421,14 @@ class PreviewGenerator(QObject):
             request.offset,
         )
 
+        # Validate sprite data plausibility - minimum one 8x8 tile (32 bytes for 4bpp)
+        MIN_SPRITE_BYTES = 32
+        if len(sprite_data) < MIN_SPRITE_BYTES:
+            raise ValueError(
+                f"Decompressed data ({len(sprite_data)} bytes) too small for valid sprite "
+                f"(minimum {MIN_SPRITE_BYTES} bytes for one 8x8 tile)"
+            )
+
         if progress_callback:
             progress_callback(50, "Processing sprite data...")
 

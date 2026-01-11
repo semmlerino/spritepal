@@ -650,6 +650,14 @@ class ROMInjector(SpriteInjector):
             logger.info("Analyzing original sprite data in ROM")
             original_size, original_data, slack_size = self.find_compressed_sprite(self.rom_data, file_offset)
             logger.debug(f"Original sprite: {original_size} bytes compressed, {len(original_data)} bytes decompressed")
+
+            if original_size == 0:
+                return (
+                    False,
+                    f"Failed to decompress original sprite at offset 0x{sprite_offset:X}. "
+                    "Aborting injection to prevent ROM corruption.",
+                )
+
             if slack_size > 0:
                 logger.info(f"Available slack space after sprite: {slack_size} bytes")
 
@@ -753,13 +761,15 @@ class ROMInjector(SpriteInjector):
             logger.info(f"Injecting {compressed_size} bytes of compressed data at ROM offset 0x{sprite_offset:X}")
             modified_rom[file_offset : file_offset + compressed_size] = compressed_data
 
-            # Pad remaining space if needed
-            # IMPORTANT: If we used slack space, original_size might be less than compressed_size
-            # We only pad if we are smaller than the ORIGINAL space we occupied
+            # Preserve original padding bytes if new data is smaller
+            # This maintains idempotency: extract→reinsert→extract produces identical ROM bytes
+            # when sprite data is unchanged, regardless of compression ratio variations
             if compressed_size < original_size:
-                padding = b"\xff" * (original_size - compressed_size)
-                modified_rom[file_offset + compressed_size : file_offset + original_size] = padding
-                logger.info(f"Padded {original_size - compressed_size} bytes with 0xFF")
+                padding_start = file_offset + compressed_size
+                padding_end = file_offset + original_size
+                original_padding = self.rom_data[padding_start:padding_end]
+                modified_rom[padding_start:padding_end] = original_padding
+                logger.info(f"Preserved {len(original_padding)} bytes of original padding")
 
             # Update checksum on the copy
             self.update_rom_checksum(modified_rom)

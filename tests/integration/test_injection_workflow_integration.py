@@ -117,8 +117,12 @@ def test_sprite_png(tmp_path) -> Path:
     """Create a test sprite PNG file with metadata."""
     from PIL import Image
 
-    # Create a small test sprite (32x32 pixels)
-    sprite = Image.new("RGBA", (32, 32), color=(128, 64, 32, 255))
+    # Create a small test sprite (32x32 pixels) in indexed mode (SNES 4bpp requirement)
+    sprite = Image.new("P", (32, 32))
+    # Create a 16-color grayscale palette (valid for 4bpp)
+    palette = [i * 16 for i in range(16)] * 3  # RGB triplets
+    palette.extend([0] * (768 - len(palette)))  # Pad to 256 colors
+    sprite.putpalette(palette)
 
     sprite_path = tmp_path / "test_sprite.png"
     sprite.save(sprite_path)
@@ -273,7 +277,12 @@ class TestMetadataHandling:
 
         from PIL import Image
 
-        Image.new("RGBA", (16, 16)).save(sprite_without_meta)
+        # Create indexed PNG (8x8 multiple for SNES compatibility)
+        img = Image.new("P", (16, 16))
+        palette = [i * 16 for i in range(16)] * 3
+        palette.extend([0] * (768 - len(palette)))
+        img.putpalette(palette)
+        img.save(sprite_without_meta)
 
         metadata = injection_manager.load_metadata(str(sprite_without_meta))
 

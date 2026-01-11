@@ -38,6 +38,7 @@ from utils.constants import (
     ROM_SIZE_1MB,
     ROM_SIZE_2MB,
     ROM_SIZE_4MB,
+    RomMappingType,
     normalize_address,
     parse_address_string,
 )
@@ -84,10 +85,20 @@ class SimpleBrowseTab(QWidget):
         self._rom_size: int = ROM_SIZE_4MB
         self._step_size: int = ROM_MIN_REGION_SIZE
         self._rom_path: str = ""
+        self._header_offset: int = 0  # SMC header size
+        self._mapping_type: RomMappingType = RomMappingType.LOROM  # ROM mapping type for SNES addresses
         self._advanced_search_dialog: AdvancedSearchDialog | None = None
         self._smart_preview_coordinator: SmartPreviewCoordinator | None = None
 
         self._setup_ui()
+
+    def set_header_offset(self, offset: int) -> None:
+        """Set SMC header offset for file offset conversion."""
+        self._header_offset = offset
+
+    def set_mapping_type(self, mapping_type: RomMappingType) -> None:
+        """Set ROM mapping type for SNES address conversion (LoROM, HiROM, SA-1)."""
+        self._mapping_type = mapping_type
 
     def _setup_ui(self) -> None:
         """Set up the browse tab UI with improved layout and spacing."""
@@ -562,15 +573,18 @@ class SimpleBrowseTab(QWidget):
                 mesen2_pattern = re.compile(r"FILE OFFSET:\s*0x([0-9A-Fa-f]{6})")
                 match = mesen2_pattern.search(text)
                 if match:
-                    offset = int(match.group(1), 16)
-                    logger.info(f"Pasted Mesen2 offset from clipboard: 0x{offset:06X}")
+                    file_offset = int(match.group(1), 16)
+                    offset = max(0, file_offset - self._header_offset)
+                    logger.info(
+                        f"Pasted Mesen2 offset from clipboard: 0x{file_offset:06X} (adjusted to 0x{offset:06X})"
+                    )
                     self.set_offset(offset)
                     return
 
                 # Try other address formats from clipboard
                 try:
                     raw_value, fmt = parse_address_string(text)
-                    offset = normalize_address(raw_value, self._rom_size)
+                    offset = normalize_address(raw_value, self._rom_size, mapping_type=self._mapping_type)
                     if fmt.startswith("snes"):
                         logger.info(f"Converted SNES ${raw_value:06X} → File 0x{offset:06X}")
                     else:
@@ -597,7 +611,7 @@ class SimpleBrowseTab(QWidget):
                     raw_value, fmt = parse_address_string(offset_str)
 
                     # Normalize SNES addresses to file offsets
-                    offset = normalize_address(raw_value, self._rom_size)
+                    offset = normalize_address(raw_value, self._rom_size, mapping_type=self._mapping_type)
 
                     # Log conversion info for SNES addresses
                     if fmt.startswith("snes"):

@@ -50,6 +50,7 @@ class ROMWorkflowController(QObject):
     # Signals (originate here, consumed by views)
     rom_info_updated = Signal(str)  # ROM title → ROMWorkflowPage.source_bar.set_info
     workflow_state_changed = Signal(str)  # 'preview'/'edit'/'save' → view state updates
+    sprite_extracted = Signal(object, int)  # image, tile_count - for integration (e.g. history)
 
     def __init__(
         self,
@@ -568,6 +569,8 @@ class ROMWorkflowController(QObject):
         self.rom_info_updated.emit(title)
         if self._view:
             self._view.set_info(title)
+            # Set ROM mapping type for correct SNES address parsing (LoROM, HiROM, SA-1)
+            self._view.set_mapping_type(header.mapping_type)
 
         if self._message_service:
             self._message_service.show_message(f"Loaded ROM: {rom_path.name}")
@@ -868,6 +871,11 @@ class ROMWorkflowController(QObject):
             self._view.set_action_text("Save to ROM")
             self._view.set_workflow_state("edit")
         self.workflow_state_changed.emit("edit")
+        
+        # Emit sprite_extracted for external listeners (e.g. history, status)
+        tile_count = len(self.current_tile_data) // 32 if self.current_tile_data else 0
+        self.sprite_extracted.emit(image, tile_count)
+        
         logger.debug("[OPEN] Sprite loaded in editor, state changed to 'edit'")
 
     def revert_to_original(self) -> None:

@@ -186,8 +186,11 @@ class TestInjectionValidation:
         sprite_file = tmp_path / "sprite.png"
         vram_file = tmp_path / "vram.dmp"
 
-        # Create minimal valid PNG
-        img = Image.new("RGBA", (8, 8), color=(0, 0, 0, 255))
+        # Create minimal valid indexed PNG (SNES 4bpp requires indexed/grayscale)
+        img = Image.new("P", (8, 8))  # Indexed mode
+        palette = [i * 16 for i in range(16)] * 3
+        palette.extend([0] * (768 - len(palette)))
+        img.putpalette(palette)
         img.save(sprite_file)
 
         vram_file.write_bytes(b"\x00" * 0x10000)
@@ -208,7 +211,11 @@ class TestInjectionValidation:
         sprite_file = tmp_path / "sprite.png"
         rom_file = tmp_path / "test.sfc"
 
-        img = Image.new("RGBA", (8, 8), color=(0, 0, 0, 255))
+        # Create minimal valid indexed PNG (SNES 4bpp requires indexed/grayscale)
+        img = Image.new("P", (8, 8))  # Indexed mode
+        palette = [i * 16 for i in range(16)] * 3
+        palette.extend([0] * (768 - len(palette)))
+        img.putpalette(palette)
         img.save(sprite_file)
 
         rom_file.write_bytes(b"\x00" * 0x100000)
@@ -227,7 +234,11 @@ class TestInjectionValidation:
     def test_validate_injection_params_invalid_mode(self, manager, tmp_path):
         """validate_injection_params should reject invalid mode."""
         sprite_file = tmp_path / "sprite.png"
-        img = Image.new("RGBA", (8, 8))
+        # Create valid indexed PNG so we get to the mode validation
+        img = Image.new("P", (8, 8))
+        palette = [i * 16 for i in range(16)] * 3
+        palette.extend([0] * (768 - len(palette)))
+        img.putpalette(palette)
         img.save(sprite_file)
 
         params = {
