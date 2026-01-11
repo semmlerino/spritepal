@@ -297,11 +297,12 @@ class TestIconToolbarSignalContract:
             "backgroundChanged",
         ],
     )
-    def test_signal_exists(self, signal_name: str) -> None:
+    def test_signal_exists(self, qtbot: QtBot, signal_name: str) -> None:
         """Verify all expected public signals exist on IconToolbar."""
         from ui.sprite_editor.views.widgets.icon_toolbar import IconToolbar
 
         toolbar = IconToolbar()
+        qtbot.addWidget(toolbar)
         assert hasattr(toolbar, signal_name), f"SIGNAL CONTRACT: IconToolbar must expose '{signal_name}' signal"
 
     def test_programmatic_set_tool_does_not_emit_signal(self, qtbot: QtBot) -> None:

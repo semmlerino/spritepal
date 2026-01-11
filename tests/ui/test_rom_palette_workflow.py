@@ -147,7 +147,8 @@ def test_open_in_editor_clears_previous_rom_sources(qtbot):
     controller = ROMWorkflowController(
         parent=None, editing_controller=mock_editing_controller, rom_extractor=mock_rom_extractor
     )
-    controller._view = mock_view
+    # Use public setter instead of private attribute
+    controller.set_view(mock_view)
 
     # Setup minimal state
     controller.current_tile_data = b"\x00" * 32
