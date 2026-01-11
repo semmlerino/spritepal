@@ -23,8 +23,9 @@ class EnvironmentInfo:
     def __init__(self) -> None:
         self.platform = sys.platform
         self.is_wsl = self._detect_wsl()
-        self.is_headless = self._detect_headless()
+        self.is_offscreen = self._detect_offscreen()
         self.pyside6_available = self._detect_pyside6()
+        self.is_headless = self._detect_headless()
 
     def _detect_wsl(self) -> bool:
         """Fast WSL detection via filesystem."""
@@ -36,13 +37,28 @@ class EnvironmentInfo:
         except (OSError, AttributeError):
             return False
 
+    def _detect_offscreen(self) -> bool:
+        """True if using Qt offscreen mode (no display but Qt works).
+
+        Offscreen mode is NOT headless - Qt works fully, just without
+        a physical display. Event loops run, signals fire, deleteLater() works.
+        """
+        return os.environ.get("QT_QPA_PLATFORM") == "offscreen"
+
     def _detect_headless(self) -> bool:
-        """Simple headless detection."""
-        if os.environ.get("QT_QPA_PLATFORM") == "offscreen":
+        """True if Qt is completely unavailable (no GUI possible at all).
+
+        Note: Offscreen mode is NOT headless - Qt works fine in offscreen mode.
+        Use is_offscreen for the distinction between display vs no display.
+        """
+        # PySide6 not available = truly headless
+        if not self.pyside6_available:
             return True
-        if self.is_wsl:
+        # WSL without display AND not using offscreen = headless
+        if self.is_wsl and not self.is_offscreen and not os.environ.get("DISPLAY"):
             return True
-        if sys.platform.startswith("linux") and not os.environ.get("DISPLAY"):
+        # Linux without display AND not using offscreen = headless
+        if sys.platform.startswith("linux") and not self.is_offscreen and not os.environ.get("DISPLAY"):
             return True
         return False
 

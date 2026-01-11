@@ -21,18 +21,17 @@ from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
+# Use function-scoped app_context for proper test isolation
+# (migrated from session_app_context to fix shared state and thread cleanup issues)
 pytestmark = [
-    pytest.mark.usefixtures("session_app_context"),
-    pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Uses session_app_context which owns worker threads"),
+    pytest.mark.usefixtures("app_context"),
 ]
 
 
 @pytest.fixture
-def real_factory(tmp_path, session_app_context):
+def real_factory(tmp_path, app_context):
     """Create RealComponentFactory for integration tests."""
-    # context_guaranteed=True because session_app_context fixture guarantees context exists
-    # This avoids race conditions when other fixtures temporarily suspend global context
+    # context_guaranteed=True because app_context fixture guarantees context exists
     with RealComponentFactory(context_guaranteed=True) as factory:
         yield factory
 

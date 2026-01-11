@@ -25,11 +25,10 @@ from tests.infrastructure.qt_real_testing import (
 )
 from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
-# Initialize AppContext for all tests (use session_app_context instead of deprecated session_managers)
+# Use function-scoped app_context for proper test isolation
+# (migrated from session_app_context to fix shared state and thread cleanup issues)
 pytestmark = [
-    pytest.mark.usefixtures("session_app_context"),
-    pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Uses session_app_context which owns worker threads"),
+    pytest.mark.usefixtures("app_context"),
 ]
 
 # Module-level constants for reuse

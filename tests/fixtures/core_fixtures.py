@@ -203,7 +203,10 @@ def clean_registry_state() -> Generator[None, None, None]:
 
     # Context is automatically restored when suspend_app_context exits
 
-    if app and not IS_HEADLESS:
+    # Always process events if QApplication exists - required for deleteLater() cleanup.
+    # Note: IS_HEADLESS means "no Qt at all", not "offscreen mode". Offscreen mode
+    # has a fully functional event loop that needs processing.
+    if app:
         app.processEvents()
 
 

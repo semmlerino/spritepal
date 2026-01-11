@@ -484,6 +484,58 @@ def cleanup_workers(request: pytest.FixtureRequest) -> Generator[None, None, Non
     # WorkerManager.cleanup_all() already handles safe cleanup of Qt objects.
 
 
+@pytest.fixture(autouse=True)
+def assert_worker_cleanup_completed(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """Assert WorkerManager has no workers remaining after cleanup (regression guard).
+
+    This fixture runs AFTER cleanup_workers (due to fixture ordering by dependency)
+    and verifies that all workers were properly cleaned up. It catches:
+    - Workers not responding to cleanup signals
+    - Workers started but not registered with WorkerManager
+    - Race conditions in worker registration
+
+    Opt-out: Use @pytest.mark.skip_thread_cleanup(reason='...') or session_app_context.
+    """
+    yield  # Test runs, cleanup_workers runs
+
+    # Skip for tests that opt out
+    markers = [m.name for m in request.node.iter_markers()]
+    if "skip_thread_cleanup" in markers:
+        return
+
+    # Skip for session_app_context tests (they manage their own workers across tests)
+    fixture_names = set(getattr(request, "fixturenames", []))
+    if "session_app_context" in fixture_names:
+        return
+
+    # Only check for tests that use worker-related fixtures
+    worker_fixtures = {"qtbot", "app_context", "real_factory", "qt_app"}
+    if not worker_fixtures & fixture_names:
+        return
+
+    # Check if Qt is available
+    try:
+        from PySide6.QtCore import QCoreApplication
+
+        if QCoreApplication.instance() is None:
+            return  # No Qt app, nothing to check
+    except ImportError:
+        return
+
+    # Assert cleanup succeeded
+    from core.services.worker_lifecycle import WorkerManager
+
+    try:
+        WorkerManager.assert_no_active_workers(f"Test '{request.node.name}' leaked workers after cleanup")
+    except AssertionError:
+        # Re-raise with additional context about fix
+        raise AssertionError(
+            f"Test '{request.node.name}' has workers still running after cleanup.\n"
+            "Fix: Ensure workers respond to cleanup signals (cancel/interrupt/quit).\n"
+            "Use @pytest.mark.skip_thread_cleanup(reason='...') if truly needed."
+        ) from None
+
+
 # =============================================================================
 # Singleton Cleanup
 # =============================================================================

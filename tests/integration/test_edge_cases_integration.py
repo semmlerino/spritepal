@@ -10,7 +10,7 @@ REAL COMPONENT TESTING:
 - Uses RealComponentFactory where appropriate
 - Tests actual component behavior with edge case inputs
 
-Uses session_app_context fixture from app_context_fixtures.py with shared_state_safe marker.
+Uses app_context fixture for proper test isolation.
 """
 
 from __future__ import annotations
@@ -29,12 +29,12 @@ if TYPE_CHECKING:
     from core.app_context import AppContext
     from core.managers.core_operations_manager import CoreOperationsManager
 
+# Use function-scoped app_context for proper test isolation
+# (migrated from session_app_context to fix shared state and thread cleanup issues)
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.headless,
-    pytest.mark.usefixtures("session_app_context"),
-    pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Uses session_app_context which owns worker threads"),
+    pytest.mark.usefixtures("app_context"),
 ]
 
 
@@ -42,22 +42,19 @@ pytestmark = [
 # Fixtures
 # =============================================================================
 
-# Note: Uses shared session_app_context fixture via module-level pytestmark
-
 
 @pytest.fixture
-def real_factory(tmp_path, session_app_context: AppContext):
+def real_factory(tmp_path, app_context: AppContext):
     """Create RealComponentFactory for integration tests."""
-    # context_guaranteed=True because session_app_context fixture guarantees context exists
-    # This avoids race conditions when other fixtures temporarily suspend global context
+    # context_guaranteed=True because app_context fixture guarantees context exists
     with RealComponentFactory(context_guaranteed=True) as factory:
         yield factory
 
 
 @pytest.fixture
-def core_manager(session_app_context: AppContext) -> CoreOperationsManager:
+def core_manager(app_context: AppContext) -> CoreOperationsManager:
     """Get CoreOperationsManager from AppContext."""
-    return session_app_context.core_operations_manager
+    return app_context.core_operations_manager
 
 
 @pytest.fixture
@@ -420,9 +417,9 @@ class TestWorkflowEdgeCases:
         with pytest.raises((ValidationError, TypeError)):
             manager.validate_extraction_params(params)
 
-    def test_factory_cleanup_on_exit(self, tmp_path, session_app_context: AppContext):
+    def test_factory_cleanup_on_exit(self, tmp_path, app_context: AppContext):
         """Test that factory properly cleans up resources."""
-        # context_guaranteed=True because session_app_context fixture guarantees context exists
+        # context_guaranteed=True because app_context fixture guarantees context exists
         with RealComponentFactory(context_guaranteed=True) as factory:
             cache = factory.create_rom_cache()
             renderer = factory.create_tile_renderer()
