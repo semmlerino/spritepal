@@ -113,7 +113,8 @@ class ROMSessionController(QObject):
         super().__init__(parent)
         self._settings_manager = settings_manager
         self._current_rom_path: str = ""
-        self._current_rom_size: int = 0
+        self._current_rom_size: int = 0  # Actual ROM size (excluding SMC header)
+        self._smc_header_offset: int = 0  # SMC header size (512 or 0)
 
     @property
     def rom_path(self) -> str:
@@ -178,13 +179,20 @@ class ROMSessionController(QObject):
 
             logger.info(f"Loading ROM file: {filename}")
 
-            # Read ROM size
+            # Read ROM size and detect SMC header
             try:
-                rom_size = rom_path.stat().st_size
+                file_size = rom_path.stat().st_size
+                # Detect SMC header: file size % 1024 == 512 indicates 512-byte header
+                smc_offset = 512 if file_size % 1024 == 512 else 0
+                rom_size = file_size - smc_offset
+                self._smc_header_offset = smc_offset
+                if smc_offset:
+                    logger.debug(f"Detected {smc_offset}-byte SMC header")
                 logger.debug(f"ROM size: {rom_size} bytes (0x{rom_size:X})")
             except Exception as e:
                 logger.warning(f"Could not determine ROM size: {e}")
                 rom_size = ROM_SIZE_4MB  # Default 4MB
+                self._smc_header_offset = 0
 
             # Save to settings
             self._save_to_settings(filename)

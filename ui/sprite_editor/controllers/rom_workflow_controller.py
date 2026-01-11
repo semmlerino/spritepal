@@ -82,7 +82,8 @@ class ROMWorkflowController(QObject):
 
         # State
         self.rom_path: str = ""
-        self.rom_size: int = 0
+        self.rom_size: int = 0  # Actual ROM size (excluding SMC header)
+        self.smc_header_offset: int = 0  # SMC header size (512 or 0)
         self.current_offset: int = 0
         self.state: str = "preview"  # 'preview', 'edit', 'save'
 
@@ -547,13 +548,17 @@ class ROMWorkflowController(QObject):
             self._view.clear_asset_browser()
 
         self.rom_path = path
-        self.rom_size = rom_path.stat().st_size
+        # Store SMC header offset and calculate actual ROM size
+        # header.header_offset is 512 for SMC-headered ROMs, 0 otherwise
+        self.smc_header_offset = header.header_offset
+        file_size = rom_path.stat().st_size
+        self.rom_size = file_size - self.smc_header_offset
 
         # Update view
         if self._view:
             self._view.set_rom_path(path)
             self._view.set_rom_available(True, self.rom_size)
-            
+
             # Re-populate Mesen captures (they are global/persistent)
             self.sync_captures_from_log_watcher()
 
@@ -826,11 +831,11 @@ class ROMWorkflowController(QObject):
             self._view.set_action_text("Save to ROM")
             self._view.set_workflow_state("edit")
         self.workflow_state_changed.emit("edit")
-        
+
         # Emit sprite_extracted for external listeners (e.g. history, status)
         tile_count = len(self.current_tile_data) // 32 if self.current_tile_data else 0
         self.sprite_extracted.emit(image, tile_count)
-        
+
         logger.debug("[OPEN] Sprite loaded in editor, state changed to 'edit'")
 
     def revert_to_original(self) -> None:
@@ -975,6 +980,23 @@ class ROMWorkflowController(QObject):
             # Create PIL image for conversion
             img = Image.fromarray(data, mode="P")
             img.putpalette(self._editing_controller.get_flat_palette())
+
+            # Validate image dimensions for SNES compatibility (8-pixel alignment)
+            if img.width % 8 != 0 or img.height % 8 != 0:
+                if self._message_service:
+                    self._message_service.show_message(
+                        f"Image dimensions ({img.width}x{img.height}) must be multiples of 8"
+                    )
+                return
+
+            # Validate color count (4bpp = max 16 colors)
+            colors_used = len(set(data.flatten()))
+            if colors_used > 16:
+                if self._message_service:
+                    self._message_service.show_message(
+                        f"Image uses {colors_used} colors, but SNES 4bpp supports max 16"
+                    )
+                return
 
             # Save to temp PNG for injector
             import tempfile

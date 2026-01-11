@@ -144,6 +144,14 @@ class InjectionController(QObject):
             self._view.append_output("ERROR: ROM and PNG files required")
             return
 
+        # Validate PNG before injection (same validation as VRAM injection)
+        is_valid, issues = self.converter.validate_png(png_file)
+        if not is_valid:
+            error_msg = "PNG validation failed:\n" + "\n".join(f"  • {issue}" for issue in issues)
+            self._view.append_output(f"ERROR: {error_msg}")
+            self.injection_failed.emit(error_msg)
+            return
+
         # Output to same file (or backup handled by injector)
         # Using same file for 'Save to ROM' logic
 

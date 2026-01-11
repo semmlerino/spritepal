@@ -708,8 +708,8 @@ class MainWindow(QMainWindow):
 
         # Connect ROM panel to shared output name via signals (decoupled communication)
         self.output_settings_manager.output_name_changed.connect(self.rom_extraction_panel.set_output_name)
-        # Set provider for ROM panel to read current output name from OutputSettingsManager
-        self.rom_extraction_panel.set_output_name_provider(self.output_settings_manager.get_output_name)
+        # Set provider for ROM panel to read full output path (includes directory if Browse was used)
+        self.rom_extraction_panel.set_output_name_provider(self.output_settings_manager.get_output_path)
         # Initialize with current value
         self.rom_extraction_panel.set_output_name(self.output_settings_manager.get_output_name())
 

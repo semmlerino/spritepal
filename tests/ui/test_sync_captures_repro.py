@@ -60,6 +60,7 @@ class TestSyncCapturesRepro:
         mock_header = MagicMock()
         mock_header.title = "Test ROM"
         mock_header.mapping_type = "LoROM"
+        mock_header.header_offset = 0  # SMC header offset (0 for headerless ROM)
         mock_validate_header.return_value = (mock_header, None)
         
         # 1. Setup initial state: 1 capture in LogWatcher

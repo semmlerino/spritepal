@@ -76,7 +76,7 @@ def test_load_rom_emits_info(qtbot, workflow_controller):
     # Mock validation to pass
     with (
         patch("core.rom_validator.ROMValidator.validate_rom_file", return_value=(True, "")),
-        patch("core.rom_validator.ROMValidator.validate_rom_header", return_value=(Mock(title="Kirby Test"), None)),
+        patch("core.rom_validator.ROMValidator.validate_rom_header", return_value=(Mock(title="Kirby Test", header_offset=0, mapping_type=None), None)),
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
     ):

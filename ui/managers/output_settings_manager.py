@@ -54,6 +54,9 @@ class OutputSettingsManager(QObject):
         self.metadata_check: QCheckBox | None = None
         self.output_info_label: QLabel | None = None
 
+        # Output directory - stores the directory selected by Browse, None = use CWD
+        self._output_directory: str | None = None
+
     def create_output_settings_group(self) -> QGroupBox:
         """Create and return the output settings group box"""
         self.output_group = QGroupBox("Output Settings")
@@ -167,12 +170,34 @@ class OutputSettingsManager(QObject):
             # Update output name without extension
             base_name = Path(filename).stem
             self.output_name_edit.setText(base_name)
+            # Store the selected directory for extraction
+            self._output_directory = str(Path(filename).parent)
 
     def get_output_name(self) -> str:
         """Get current output name"""
         if self.output_name_edit is None:
             return ""
         return self.output_name_edit.text()
+
+    def get_output_directory(self) -> str | None:
+        """Get the selected output directory.
+
+        Returns:
+            The directory path if one was selected via Browse, or None to use CWD.
+        """
+        return self._output_directory
+
+    def get_output_path(self) -> str:
+        """Get the full output path including directory and filename (no extension).
+
+        Returns:
+            Full path to output file base (without extension). If no directory was
+            selected via Browse, returns just the filename (uses CWD).
+        """
+        name = self.get_output_name()
+        if self._output_directory:
+            return str(Path(self._output_directory) / name)
+        return name
 
     def set_output_name(self, name: str) -> None:
         """Set output name without triggering signals"""

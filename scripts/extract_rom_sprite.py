@@ -86,6 +86,11 @@ def main() -> int:
     )
     parser.add_argument("--output", "-d", required=True, help="Output directory for extracted files")
     parser.add_argument("--name", "-n", default="sprite", help="Sprite name (default: sprite)")
+    parser.add_argument(
+        "--no-header-adjust",
+        action="store_true",
+        help="Don't adjust offset for SMC header (use raw file offset)",
+    )
 
     args = parser.parse_args()
 
@@ -104,6 +109,18 @@ def main() -> int:
     if not rom_path.exists():
         print(f"ERROR: ROM file not found: {rom_path}")
         return 1
+
+    # Detect SMC header and adjust offset
+    file_size = rom_path.stat().st_size
+    smc_offset = 512 if file_size % 1024 == 512 else 0
+
+    if smc_offset and not args.no_header_adjust:
+        file_offset = offset + smc_offset
+        print(f"Detected {smc_offset}-byte SMC header")
+        print(f"Adjusting offset: 0x{offset:06X} (ROM) -> 0x{file_offset:06X} (file)")
+        offset = file_offset
+    elif smc_offset:
+        print("SMC header detected but --no-header-adjust specified, using raw offset")
 
     # Create output directory
     output_dir = Path(args.output)

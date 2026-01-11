@@ -421,12 +421,28 @@ class PreviewGenerator(QObject):
             request.offset,
         )
 
-        # Validate sprite data plausibility - minimum one 8x8 tile (32 bytes for 4bpp)
-        MIN_SPRITE_BYTES = 32
+        # Validate sprite data plausibility
+        MIN_SPRITE_BYTES = 32  # Minimum: one 8x8 tile (32 bytes for 4bpp)
+        MAX_SPRITE_BYTES = 256 * 1024  # Maximum: 256KB (reasonable upper bound)
+
         if len(sprite_data) < MIN_SPRITE_BYTES:
             raise ValueError(
                 f"Decompressed data ({len(sprite_data)} bytes) too small for valid sprite "
                 f"(minimum {MIN_SPRITE_BYTES} bytes for one 8x8 tile)"
+            )
+
+        if len(sprite_data) > MAX_SPRITE_BYTES:
+            raise ValueError(
+                f"Decompressed data suspiciously large ({len(sprite_data)} bytes). "
+                f"This may indicate an incorrect ROM offset. "
+                f"Maximum expected: {MAX_SPRITE_BYTES} bytes (256KB)."
+            )
+
+        # Warn if data is not tile-aligned (4bpp = 32 bytes per 8x8 tile)
+        if len(sprite_data) % 32 != 0:
+            logger.warning(
+                f"Sprite data not tile-aligned: {len(sprite_data)} bytes. "
+                f"This may indicate incorrect offset or corrupted data."
             )
 
         if progress_callback:
