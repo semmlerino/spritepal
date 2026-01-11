@@ -249,6 +249,7 @@ class ApplicationStateManager(BaseManager):
                 "window_y": -1,
                 "restore_position": True,
                 "theme": "default",
+                "debug_logging": False,
             },
             "cache": {
                 "enabled": True,
@@ -722,6 +723,15 @@ class ApplicationStateManager(BaseManager):
     def set_cache_expiration_days(self, days: int) -> None:
         """Set cache expiration in days."""
         self.set("cache", "expiration_days", max(CACHE_EXPIRATION_MIN_DAYS, min(CACHE_EXPIRATION_MAX_DAYS, days)))
+        self.save_session()
+
+    def get_debug_logging(self) -> bool:
+        """Check if debug logging is enabled."""
+        return bool(self.get("ui", "debug_logging", False))
+
+    def set_debug_logging(self, enabled: bool) -> None:
+        """Enable or disable debug logging."""
+        self.set("ui", "debug_logging", enabled)
         self.save_session()
 
     def _ensure_default_settings(self) -> None:

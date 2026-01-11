@@ -179,6 +179,13 @@ def main():
         sys.exit(1)
 
     try:
+        # Apply stored debug logging setting
+        from utils.logging_config import set_console_debug_mode
+
+        debug_logging_enabled = context.application_state_manager.get_debug_logging()
+        set_console_debug_mode(debug_logging_enabled)
+        logger.info(f"Console debug logging: {'enabled' if debug_logging_enabled else 'disabled'}")
+
         # Create application with context
         app = SpritePalApp(sys.argv, context=context)
 

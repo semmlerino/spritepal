@@ -8,6 +8,9 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+# Global reference to console handler for dynamic updates
+_console_handler: logging.Handler | None = None
+
 
 def setup_logging(log_dir: Path | None = None, log_level: str = "INFO") -> logging.Logger:
     """
@@ -21,7 +24,8 @@ def setup_logging(log_dir: Path | None = None, log_level: str = "INFO") -> loggi
         Configured logger instance
     """
     # Check for debug mode from environment
-    if os.environ.get("SPRITEPAL_DEBUG", "").lower() in ("1", "true", "yes"):
+    debug_mode = os.environ.get("SPRITEPAL_DEBUG", "").lower() in ("1", "true", "yes")
+    if debug_mode:
         log_level = "DEBUG"
 
     # Use default directory under user's home if not specified
@@ -37,11 +41,21 @@ def setup_logging(log_dir: Path | None = None, log_level: str = "INFO") -> loggi
     # Remove existing handlers to avoid duplicates
     logger.handlers.clear()
 
-    # Console handler with simplified format
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_formatter = logging.Formatter("%(levelname)s - %(name)s - %(message)s")
-    console_handler.setFormatter(console_formatter)
+    # Console handler - use detailed format if debug mode is enabled
+    global _console_handler
+    _console_handler = logging.StreamHandler()
+    _console_handler.setLevel(logging.DEBUG if debug_mode else logging.INFO)
+
+    if debug_mode:
+        # Detailed format for debug mode (matches file format)
+        console_formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s"
+        )
+    else:
+        # Simplified format for normal mode
+        console_formatter = logging.Formatter("%(levelname)s - %(name)s - %(message)s")
+
+    _console_handler.setFormatter(console_formatter)
 
     # File handler with detailed format - clear on startup
     log_file = log_dir / "spritepal.log"
@@ -71,7 +85,7 @@ def setup_logging(log_dir: Path | None = None, log_level: str = "INFO") -> loggi
         # If file handler creation fails, continue with console only
         pass
 
-    logger.addHandler(console_handler)
+    logger.addHandler(_console_handler)
 
     # Log startup banner
     logger.info("=" * 80)
@@ -121,3 +135,37 @@ def get_logger(module_name: str) -> logging.Logger:
         root_spritepal_logger.propagate = True
 
     return logger
+
+
+def set_console_debug_mode(enabled: bool) -> None:
+    """
+    Dynamically update console logging to debug mode.
+
+    This allows toggling detailed console output (with timestamp, filename, line number)
+    without restarting the application.
+
+    Args:
+        enabled: True for detailed debug format, False for simplified format
+    """
+    global _console_handler  # noqa: PLW0602
+
+    if _console_handler is None:
+        # Logging not initialized yet - this can happen during early startup
+        return
+
+    # Update console level
+    _console_handler.setLevel(logging.DEBUG if enabled else logging.INFO)
+
+    # Update console formatter
+    if enabled:
+        # Detailed format for debug mode (matches file format)
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s")
+    else:
+        # Simplified format for normal mode
+        formatter = logging.Formatter("%(levelname)s - %(name)s - %(message)s")
+
+    _console_handler.setFormatter(formatter)
+
+    # Also update root spritepal logger level to allow DEBUG messages
+    spritepal_logger = logging.getLogger("spritepal")
+    spritepal_logger.setLevel(logging.DEBUG if enabled else logging.INFO)

@@ -1695,6 +1695,12 @@ class MainWindow(QMainWindow):
 
     def _on_settings_changed(self) -> None:
         """Handle settings change from settings dialog"""
+        # Update console debug logging based on settings
+        from utils.logging_config import set_console_debug_mode
+
+        debug_logging_enabled = self.settings_manager.get_debug_logging()
+        set_console_debug_mode(debug_logging_enabled)
+
         # Reload any settings that affect the main window
         settings_manager = self.settings_manager
         cache_enabled = settings_manager.get_cache_enabled()

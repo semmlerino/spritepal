@@ -45,6 +45,10 @@ class SettingsDialog(DialogBase):
         # Store original settings to detect changes
         self._original_settings: dict[str, object] = {}
 
+        # Assign dependencies BEFORE super().__init__() because it calls _setup_ui()
+        self.settings_manager = settings_manager
+        self.rom_cache = rom_cache
+
         super().__init__(
             parent=parent,
             title="SpritePal Settings",
@@ -55,14 +59,8 @@ class SettingsDialog(DialogBase):
             with_button_box=True,
         )
 
-        # Assign dependencies
-        self.settings_manager = settings_manager
-        self.rom_cache = rom_cache
-
+        # Load settings into UI (super().__init__ already called _setup_ui)
         self._load_original_settings()
-
-        # Set up the dialog content
-        self._setup_ui()
         self._load_settings()
         self._update_cache_stats()
 
@@ -97,6 +95,10 @@ class SettingsDialog(DialogBase):
 
         self.auto_save_session_check = QCheckBox("Automatically save session", self)
         settings_layout.addRow(self.auto_save_session_check)
+
+        self.debug_logging_check = QCheckBox("Enable debug logging in console", self)
+        self.debug_logging_check.setToolTip("Shows detailed debug information with timestamps and line numbers")
+        settings_layout.addRow(self.debug_logging_check)
 
         # Separator line for visual grouping
         separator = QLabel(self)
@@ -237,6 +239,7 @@ class SettingsDialog(DialogBase):
         self._original_settings = {
             "restore_window": self.settings_manager.get("ui", "restore_position", True),
             "auto_save_session": self.settings_manager.get("session", "auto_save", True),
+            "debug_logging": self.settings_manager.get_debug_logging(),
             "dumps_dir": self.settings_manager.get("paths", "default_dumps_dir", ""),
             "cache_enabled": self.settings_manager.get_cache_enabled(),
             "cache_location": self.settings_manager.get_cache_location(),
@@ -251,6 +254,7 @@ class SettingsDialog(DialogBase):
         # General settings
         self.restore_window_check.setChecked(bool(self.settings_manager.get("ui", "restore_position", True)))
         self.auto_save_session_check.setChecked(bool(self.settings_manager.get("session", "auto_save", True)))
+        self.debug_logging_check.setChecked(self.settings_manager.get_debug_logging())
         self.dumps_dir_edit.setText(str(self.settings_manager.get("paths", "default_dumps_dir", "")))
 
         # Cache settings
@@ -269,6 +273,7 @@ class SettingsDialog(DialogBase):
         # General settings
         self.settings_manager.set("ui", "restore_position", self.restore_window_check.isChecked())
         self.settings_manager.set("session", "auto_save", self.auto_save_session_check.isChecked())
+        self.settings_manager.set_debug_logging(self.debug_logging_check.isChecked())
         self.settings_manager.set("paths", "default_dumps_dir", self.dumps_dir_edit.text())
 
         # Cache settings
@@ -411,6 +416,7 @@ class SettingsDialog(DialogBase):
         current = {
             "restore_window": self.restore_window_check.isChecked(),
             "auto_save_session": self.auto_save_session_check.isChecked(),
+            "debug_logging": self.debug_logging_check.isChecked(),
             "dumps_dir": self.dumps_dir_edit.text(),
             "cache_enabled": self.cache_enabled_check.isChecked(),
             "cache_location": self.cache_location_edit.text(),
