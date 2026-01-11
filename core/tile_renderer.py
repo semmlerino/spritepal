@@ -17,9 +17,23 @@ logger = get_logger(__name__)
 class TileRenderer:
     """Renders 4bpp SNES tile data to images."""
 
-    def __init__(self):
-        """Initialize the tile renderer."""
-        self.palette_loader = DefaultPaletteLoader()
+    def __init__(self, palette_loader: DefaultPaletteLoader | None = None):
+        """Initialize the tile renderer.
+
+        Args:
+            palette_loader: DefaultPaletteLoader instance (uses AppContext or creates new if None).
+        """
+        # Use injected loader or try AppContext, falling back to new instance
+        if palette_loader is None:
+            try:
+                from core.app_context import get_app_context
+
+                palette_loader = get_app_context().default_palette_loader
+            except RuntimeError:
+                # AppContext not initialized, create standalone instance
+                palette_loader = DefaultPaletteLoader()
+
+        self.palette_loader = palette_loader
         # Get all Kirby palettes as a dictionary indexed by palette number
         self.default_palettes = self.palette_loader.get_all_kirby_palettes()
         # If no palettes found, create a default one

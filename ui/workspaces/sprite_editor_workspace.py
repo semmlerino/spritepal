@@ -358,6 +358,8 @@ class SpriteEditorWorkspace(QWidget):
             capture_name: Optional display name for the capture (e.g., "0x3C6EF1 (f1500)").
                           If provided, ensures the capture appears in asset browser.
         """
+        # DEBUG PRINT - bypasses logging to verify code path
+        print(f"[DEBUG PRINT] jump_to_offset: offset=0x{offset:06X}, capture_name={capture_name}", flush=True)
         # Switch to ROM mode
         self._mode_combo.setCurrentIndex(1)
 

@@ -7,7 +7,10 @@ and local files with thumbnail previews and context menu actions.
 
 from __future__ import annotations
 
+import logging
 from typing import override
+
+logger = logging.getLogger(__name__)
 
 from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QPoint, QRect, QSize, Qt, Signal
 from PySide6.QtGui import (
@@ -534,11 +537,19 @@ class SpriteAssetBrowser(QWidget):
         """
         Add a Mesen2 capture to the browser.
 
+        Idempotent: if a capture with this offset already exists, it's skipped.
+
         Args:
             name: Sprite name
             offset: ROM offset
             thumbnail: Optional thumbnail pixmap
         """
+        # Skip if already exists (idempotent)
+        if self.has_mesen_capture(offset):
+            logger.debug("add_mesen_capture: skipping duplicate offset 0x%06X", offset)
+            return
+
+        logger.info("add_mesen_capture: adding %s (0x%06X)", name, offset)
         item = QTreeWidgetItem(self._mesen_category)
         item.setText(0, name)
 
@@ -551,6 +562,10 @@ class SpriteAssetBrowser(QWidget):
         }
         item.setData(0, Qt.ItemDataRole.UserRole, data)
         self._update_placeholder(self._mesen_category)
+        logger.debug(
+            "add_mesen_capture: category now has %d children",
+            self._mesen_category.childCount(),
+        )
 
     def add_local_file(self, name: str, path: str, thumbnail: QPixmap | None = None) -> None:
         """

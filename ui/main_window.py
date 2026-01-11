@@ -1658,6 +1658,7 @@ class MainWindow(QMainWindow):
             offset: ROM offset to open in sprite editor
         """
         logger.info("Opening offset 0x%06X in sprite editor", offset)
+        print(f"[DEBUG] _on_open_in_sprite_editor START: offset=0x{offset:06X}", flush=True)
 
         # Get capture info from log watcher for display name
         capture = self.log_watcher.get_capture_by_offset(offset)
@@ -1671,13 +1672,17 @@ class MainWindow(QMainWindow):
             self.status_bar_manager.show_message("Load a ROM first before opening Mesen captures")
             return
 
+        print(f"[DEBUG] About to call load_rom: {rom_path}", flush=True)
         self._sprite_editor_workspace.load_rom(rom_path)
+        print(f"[DEBUG] load_rom returned, about to call switch_to_workspace", flush=True)
 
         # Switch to sprite editor workspace
         self.switch_to_workspace(WorkspaceMode.SPRITE_EDITOR)
+        print(f"[DEBUG] switch_to_workspace returned, about to call jump_to_offset", flush=True)
 
         # Jump to offset in sprite editor (ensures capture is in browser and selected)
         self._sprite_editor_workspace.jump_to_offset(offset, capture_name=capture_name)
+        print(f"[DEBUG] jump_to_offset returned", flush=True)
 
     # Tab change handling now managed by UICoordinator
 

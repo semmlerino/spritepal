@@ -198,10 +198,16 @@ class ROMWorkflowController(QObject):
         if not self.rom_path:
             self._view.set_rom_available(False)
 
-        # Load existing persistent clicks into asset browser
+        # Load existing captures into asset browser
         if self.log_watcher:
+            # First: load persistent clicks from file (cross-session)
             persistent_clicks = self.log_watcher.load_persistent_clicks()
             for capture in persistent_clicks:
+                self._add_capture_to_browser(capture)
+
+            # Second: sync current session captures (may overlap with persistent,
+            # but _add_capture_to_browser handles duplicates via has_mesen_capture)
+            for capture in self.log_watcher.recent_captures:
                 self._add_capture_to_browser(capture)
 
         # Flush any pending real-time captures (discovered before view was ready)
@@ -583,6 +589,40 @@ class ROMWorkflowController(QObject):
         # Trigger initial preview
         self.set_offset(self.current_offset)
 
+    def sync_captures_from_log_watcher(self) -> None:
+        """Sync all captures from log watcher to the asset browser.
+
+        Called when entering the sprite editor workspace to ensure all
+        discovered captures are visible in the asset browser.
+        """
+        if not self._view:
+            logger.warning("sync_captures_from_log_watcher: no view set")
+            return
+        if not self.log_watcher:
+            logger.warning("sync_captures_from_log_watcher: no log_watcher")
+            return
+
+        captures = self.log_watcher.recent_captures
+        logger.info(
+            "sync_captures_from_log_watcher: found %d captures in log_watcher",
+            len(captures),
+        )
+
+        # Sync all current session captures
+        for capture in captures:
+            logger.debug("  syncing capture: 0x%06X", capture.offset)
+            self._add_capture_to_browser(capture)
+
+        # Also sync persistent clicks
+        persistent = self.log_watcher.load_persistent_clicks()
+        logger.info(
+            "sync_captures_from_log_watcher: found %d persistent clicks",
+            len(persistent),
+        )
+        for capture in persistent:
+            logger.debug("  syncing persistent: 0x%06X", capture.offset)
+            self._add_capture_to_browser(capture)
+
     def ensure_and_select_capture(self, offset: int, name: str | None = None) -> None:
         """Ensure a Mesen capture exists in the asset browser and select it.
 
@@ -593,11 +633,27 @@ class ROMWorkflowController(QObject):
             offset: ROM offset of the capture
             name: Display name for the capture (defaults to hex offset)
         """
+        print(f"[DEBUG PRINT] ensure_and_select_capture: offset=0x{offset:06X}, name={name}, view={self._view is not None}, log_watcher={self.log_watcher is not None}", flush=True)
+        logger.info(
+            "ensure_and_select_capture called: offset=0x%06X, name=%s, view=%s, log_watcher=%s",
+            offset,
+            name,
+            self._view is not None,
+            self.log_watcher is not None,
+        )
+
         if not self._view:
+            logger.warning("ensure_and_select_capture: no view, returning early")
             return
+
+        # First sync all captures from log watcher (idempotent - duplicates are skipped)
+        self.sync_captures_from_log_watcher()
+
+        # Then ensure the specific capture exists and select it
         browser = self._view.asset_browser
         browser.ensure_mesen_capture(offset, name)
         browser.select_sprite_by_offset(offset)
+        logger.info("ensure_and_select_capture: completed for offset 0x%06X", offset)
 
     def set_offset(self, offset: int, *, auto_open: bool = False) -> None:
         """Set current ROM offset and request preview.

@@ -424,6 +424,7 @@ class TestRoundTripModification:
         # Step 4: Inject modified sprite with force=True
         # force=True is safe here because we're working on an isolated copy
         # and this tests the full round-trip functionality
+        # ignore_checksum=True handles patched/modified ROMs with intentional checksum mismatches
         output_rom = tmp_path / "modified_rom.sfc"
         success, message = rom_injector.inject_sprite_to_rom(
             sprite_path=str(png_path),
@@ -432,6 +433,7 @@ class TestRoundTripModification:
             sprite_offset=offset,
             create_backup=False,  # tmp_path already isolated
             force=True,  # Allow slight size variations from compression
+            ignore_checksum=True,  # Handle patched/modified ROMs
         )
 
         assert success, f"Injection failed: {message}"

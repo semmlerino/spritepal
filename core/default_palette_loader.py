@@ -120,6 +120,22 @@ class DefaultPaletteLoader:
 
         return created_files
 
+    def get_all_presets(self) -> list[PaletteEntry]:
+        """
+        Get all available palette presets from the configuration.
+
+        Returns:
+            List of all palette entries across all categories
+        """
+        all_presets: list[PaletteEntry] = []
+        if "palettes" not in self.palette_data:
+            return []
+
+        for category_data in self.palette_data["palettes"].values():
+            all_presets.extend(category_data.get("palettes", []))
+
+        return all_presets
+
     def get_all_kirby_palettes(self) -> dict[int, list[RGBColor]]:
         """
         Get all Kirby palettes as a dictionary for quick access.

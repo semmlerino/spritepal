@@ -34,10 +34,15 @@ def test_palette_source_sync_late_connection(qtbot):
     combo = selector.findChild(QComboBox)
     assert combo is not None, "Could not find QComboBox in PaletteSourceSelector"
 
-    # Expect "Default" (always added by widget init) + "Red Palette" (synced from controller)
-    # Current behavior: Fails because it only has "Default"
-    assert combo.count() == 2, f"Expected 2 items, found {combo.count()}"
-    assert combo.itemText(1) == "Red Palette"
+    # The controller loads presets from default_palettes.json in load_presets(),
+    # plus "Default" from widget init, plus our "Red Palette"
+    # We verify that our registered palette is present in the combo
+    combo_items = [combo.itemText(i) for i in range(combo.count())]
+    assert "Red Palette" in combo_items, f"'Red Palette' not found in combo items: {combo_items[:5]}..."
+
+    # Verify the controller's palette sources include our registered palette
+    sources = controller.get_palette_sources()
+    assert ("rom", 10) in sources, f"('rom', 10) not found in controller sources: {list(sources.keys())[:5]}..."
 
 
 def test_rom_workspace_palette_source_syncs(qtbot):

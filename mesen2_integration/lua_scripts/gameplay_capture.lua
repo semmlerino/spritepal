@@ -242,23 +242,23 @@ emu.addEventCallback(function()
 
     -- Aggressive menu navigation for KSS
     -- Title screen
-    if fr == 60 or fr == 90 then emu.setInput(0, {start=true}) end
+    if fr == 60 or fr == 90 then emu.setInput({start=true}, 0) end
     -- Main menu - select Spring Breeze (first option)
-    if fr == 150 or fr == 180 then emu.setInput(0, {a=true}) end
+    if fr == 150 or fr == 180 then emu.setInput({a=true}, 0) end
     -- File select
-    if fr == 240 or fr == 270 then emu.setInput(0, {a=true}) end
+    if fr == 240 or fr == 270 then emu.setInput({a=true}, 0) end
     -- Skip intro/cutscene
-    if fr == 350 or fr == 400 or fr == 450 or fr == 500 then emu.setInput(0, {start=true}) end
+    if fr == 350 or fr == 400 or fr == 450 or fr == 500 then emu.setInput({start=true}, 0) end
     -- More skips
-    if fr == 600 or fr == 700 or fr == 800 then emu.setInput(0, {start=true}) end
+    if fr == 600 or fr == 700 or fr == 800 then emu.setInput({start=true}, 0) end
     -- Keep pressing A to skip dialogues
-    if fr > 900 and fr < 1200 and fr % 60 == 0 then emu.setInput(0, {a=true}) end
+    if fr > 900 and fr < 1200 and fr % 60 == 0 then emu.setInput({a=true}, 0) end
     -- Move Kirby right during gameplay
     if fr > 1200 and fr < 1700 then
-        if fr % 30 < 20 then emu.setInput(0, {right=true}) else emu.setInput(0, {}) end
+        if fr % 30 < 20 then emu.setInput({right=true}, 0) else emu.setInput({}, 0) end
     end
     -- Release all inputs before capture
-    if fr == 1750 then emu.setInput(0, {}) end
+    if fr == 1750 then emu.setInput({}, 0) end
 
     -- On-screen status
     if fr % 60 == 0 then

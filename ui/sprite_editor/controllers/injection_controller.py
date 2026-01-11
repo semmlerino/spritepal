@@ -41,7 +41,7 @@ class InjectionController(QObject):
         self._view: InjectTab | None = None
         self._worker: InjectWorker | None = None
         self.converter = ImageConverter()
-        self.rom_injector = ROMInjector()
+        self._rom_injector: ROMInjector | None = None  # Lazy init via property
         self._mode = "vram"
 
         # File paths
@@ -51,6 +51,24 @@ class InjectionController(QObject):
 
         # Validation state
         self._png_validation_passed: bool = False
+
+    @property
+    def rom_injector(self) -> ROMInjector:
+        """Lazy access to ROMInjector via AppContext when available.
+
+        Reuses the shared ROMInjector from rom_extractor to share HALCompressor
+        and SpriteConfigLoader instances.
+        """
+        if self._rom_injector is None:
+            try:
+                from core.app_context import get_app_context
+
+                # Reuse rom_extractor's injector to share instances
+                self._rom_injector = get_app_context().rom_extractor.rom_injector
+            except RuntimeError:
+                # AppContext not initialized, create standalone instance
+                self._rom_injector = ROMInjector()
+        return self._rom_injector
 
     def _cleanup_worker(self) -> None:
         """Clean up existing worker before creating new one."""

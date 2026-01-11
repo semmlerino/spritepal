@@ -61,7 +61,7 @@ class SpritePreviewWidget(QWidget):
         self.current_palette_index: int | None = None  # Default to grayscale (None = grayscale)
         self.sprite_data: bytes | None = None
         self._update_in_progress = False  # Guard against concurrent updates
-        self.default_palette_loader = DefaultPaletteLoader()
+        self._default_palette_loader: DefaultPaletteLoader | None = None  # Lazy init via property
 
         # Similarity search related
         self.current_offset: int = 0  # Current sprite offset for similarity search
@@ -82,6 +82,19 @@ class SpritePreviewWidget(QWidget):
 
         # Step 3: Setup UI
         self._setup_ui()
+
+    @property
+    def default_palette_loader(self) -> DefaultPaletteLoader:
+        """Lazy access to DefaultPaletteLoader via AppContext when available."""
+        if self._default_palette_loader is None:
+            try:
+                from core.app_context import get_app_context
+
+                self._default_palette_loader = get_app_context().default_palette_loader
+            except RuntimeError:
+                # AppContext not initialized, create standalone instance
+                self._default_palette_loader = DefaultPaletteLoader()
+        return self._default_palette_loader
 
     def _setup_ui(self) -> None:
         """Initialize the user interface - space-efficient with progressive disclosure"""

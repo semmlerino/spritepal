@@ -167,4 +167,5 @@ def test_open_in_editor_clears_previous_rom_sources(qtbot):
         controller.open_in_editor()
 
         # Verify palette sources were cleared before loading
-        mock_palette_panel.clear_rom_sources.assert_called_once()
+        # The controller calls self._view.clear_rom_palette_sources(), not palette_panel directly
+        mock_view.clear_rom_palette_sources.assert_called_once()

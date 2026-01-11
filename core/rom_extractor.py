@@ -65,18 +65,34 @@ logger: logging.Logger = get_logger(__name__)
 class ROMExtractor:
     """Handles sprite extraction directly from ROM files"""
 
-    def __init__(self, rom_cache: ROMCache) -> None:
+    def __init__(
+        self,
+        rom_cache: ROMCache,
+        hal_compressor: HALCompressor | None = None,
+        sprite_config_loader: SpriteConfigLoader | None = None,
+        default_palette_loader: DefaultPaletteLoader | None = None,
+    ) -> None:
         """Initialize ROM extractor with required components.
 
         Args:
             rom_cache: Required ROM cache for caching scan results and sprite data.
+            hal_compressor: HAL compressor instance (creates new if None for backward compat).
+            sprite_config_loader: Sprite config loader (creates new if None).
+            default_palette_loader: Default palette loader (creates new if None).
         """
         logger.debug("Initializing ROMExtractor")
-        self.hal_compressor: HALCompressor = HALCompressor()
-        self.rom_injector: ROMInjector = ROMInjector()
-        self.default_palette_loader: DefaultPaletteLoader = DefaultPaletteLoader()
-        self.rom_palette_extractor: ROMPaletteExtractor = ROMPaletteExtractor()
-        self.sprite_config_loader: SpriteConfigLoader = SpriteConfigLoader()
+
+        # Use injected or create new (backward compatibility for tests)
+        self.hal_compressor = hal_compressor or HALCompressor()
+        self.sprite_config_loader = sprite_config_loader or SpriteConfigLoader()
+        self.default_palette_loader = default_palette_loader or DefaultPaletteLoader()
+
+        # Share our instances with ROMInjector to avoid duplicate initialization
+        self.rom_injector = ROMInjector(
+            hal_compressor=self.hal_compressor,
+            sprite_config_loader=self.sprite_config_loader,
+        )
+        self.rom_palette_extractor = ROMPaletteExtractor()
         self.rom_cache = rom_cache
         logger.info("ROMExtractor initialized with HAL compression and palette extraction support")
 

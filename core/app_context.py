@@ -30,6 +30,8 @@ if TYPE_CHECKING:
     from PySide6.QtCore import QObject
 
     from core.configuration_service import ConfigurationService
+    from core.default_palette_loader import DefaultPaletteLoader
+    from core.hal_compression import HALCompressor
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.managers.sprite_preset_manager import SpritePresetManager
@@ -37,6 +39,7 @@ if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
     from core.services.preview_generator import PreviewGenerator
     from core.services.rom_cache import ROMCache
+    from core.sprite_config_loader import SpriteConfigLoader
     from core.sprite_library import SpriteLibrary
 
 logger = logging.getLogger(__name__)
@@ -62,6 +65,9 @@ class AppContext:
         preview_generator: Preview image generation service (created on first access)
         log_watcher: Mesen2 log file watcher for sprite offset discovery (created on first access)
         sprite_library: Persistent storage for discovered sprites (created on first access)
+        hal_compressor: HAL compression/decompression service (created on first access)
+        sprite_config_loader: Sprite configuration loader (created on first access)
+        default_palette_loader: Default palette loader (created on first access)
     """
 
     configuration_service: ConfigurationService
@@ -80,6 +86,9 @@ class AppContext:
     _preview_generator: PreviewGenerator | None = field(default=None, repr=False)
     _log_watcher: LogWatcher | None = field(default=None, repr=False)
     _sprite_library: SpriteLibrary | None = field(default=None, repr=False)
+    _hal_compressor: HALCompressor | None = field(default=None, repr=False)
+    _sprite_config_loader: SpriteConfigLoader | None = field(default=None, repr=False)
+    _default_palette_loader: DefaultPaletteLoader | None = field(default=None, repr=False)
 
     # Thread safety for lazy initialization
     _lazy_lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
@@ -97,12 +106,20 @@ class AppContext:
 
     @property
     def rom_extractor(self) -> ROMExtractor:
-        """Lazy-initialize ROMExtractor on first access."""
+        """Lazy-initialize ROMExtractor on first access.
+
+        Injects shared HALCompressor, SpriteConfigLoader, and DefaultPaletteLoader.
+        """
         with self._lazy_lock:
             if self._rom_extractor is None:
                 from core.rom_extractor import ROMExtractor
 
-                self._rom_extractor = ROMExtractor(rom_cache=self.rom_cache)
+                self._rom_extractor = ROMExtractor(
+                    rom_cache=self.rom_cache,
+                    hal_compressor=self.hal_compressor,
+                    sprite_config_loader=self.sprite_config_loader,
+                    default_palette_loader=self.default_palette_loader,
+                )
                 logger.debug("Created ROMExtractor via lazy initialization")
             return self._rom_extractor
 
@@ -154,6 +171,51 @@ class AppContext:
                 logger.debug("Created SpriteLibrary via lazy initialization")
             return self._sprite_library
 
+    @property
+    def hal_compressor(self) -> HALCompressor:
+        """Lazy-initialize HALCompressor on first access.
+
+        Provides HAL compression/decompression for sprite data.
+        Shared across ROMExtractor, ROMInjector, and other components.
+        """
+        with self._lazy_lock:
+            if self._hal_compressor is None:
+                from core.hal_compression import HALCompressor
+
+                self._hal_compressor = HALCompressor()
+                logger.debug("Created HALCompressor via lazy initialization")
+            return self._hal_compressor
+
+    @property
+    def sprite_config_loader(self) -> SpriteConfigLoader:
+        """Lazy-initialize SpriteConfigLoader on first access.
+
+        Loads sprite configuration from config/sprite_locations.json.
+        Shared across ROMExtractor and ROMInjector.
+        """
+        with self._lazy_lock:
+            if self._sprite_config_loader is None:
+                from core.sprite_config_loader import SpriteConfigLoader
+
+                self._sprite_config_loader = SpriteConfigLoader()
+                logger.debug("Created SpriteConfigLoader via lazy initialization")
+            return self._sprite_config_loader
+
+    @property
+    def default_palette_loader(self) -> DefaultPaletteLoader:
+        """Lazy-initialize DefaultPaletteLoader on first access.
+
+        Loads default palettes from config/default_palettes.json.
+        Shared across ROMExtractor, EditingController, and other UI components.
+        """
+        with self._lazy_lock:
+            if self._default_palette_loader is None:
+                from core.default_palette_loader import DefaultPaletteLoader
+
+                self._default_palette_loader = DefaultPaletteLoader()
+                logger.debug("Created DefaultPaletteLoader via lazy initialization")
+            return self._default_palette_loader
+
     def cleanup(self) -> None:
         """Cleanup all managers in reverse initialization order."""
         logger.info("Cleaning up AppContext...")
@@ -179,6 +241,12 @@ class AppContext:
                 logger.debug("Cleaned up PreviewGenerator")
             except Exception:
                 logger.warning("Error cleaning up PreviewGenerator", exc_info=True)
+
+        # Clear shared stateless services (no cleanup needed, just clear references)
+        self._hal_compressor = None
+        self._sprite_config_loader = None
+        self._default_palette_loader = None
+        logger.debug("Cleared shared service references")
 
         # Cleanup managers in reverse order of initialization
         for mgr in [
@@ -306,17 +374,36 @@ def create_app_context(
         )
         logger.debug("SpritePresetManager created")
 
-        # 4. Create ROMCache and ROMExtractor first (needed by CoreOperationsManager)
+        # 4. Create shared stateless services (used by multiple components)
+        from core.default_palette_loader import DefaultPaletteLoader
+        from core.hal_compression import HALCompressor
+        from core.sprite_config_loader import SpriteConfigLoader
+
+        hal_compressor = HALCompressor()
+        logger.debug("HALCompressor created (shared)")
+
+        sprite_config_loader = SpriteConfigLoader()
+        logger.debug("SpriteConfigLoader created (shared)")
+
+        default_palette_loader = DefaultPaletteLoader()
+        logger.debug("DefaultPaletteLoader created (shared)")
+
+        # 5. Create ROMCache and ROMExtractor (needed by CoreOperationsManager)
         from core.rom_extractor import ROMExtractor
         from core.services.rom_cache import ROMCache
 
         rom_cache = ROMCache(state_manager=state_mgr)
         logger.debug("ROMCache created")
 
-        rom_extractor = ROMExtractor(rom_cache=rom_cache)
+        rom_extractor = ROMExtractor(
+            rom_cache=rom_cache,
+            hal_compressor=hal_compressor,
+            sprite_config_loader=sprite_config_loader,
+            default_palette_loader=default_palette_loader,
+        )
         logger.debug("ROMExtractor created")
 
-        # 5. CoreOperationsManager (with explicit dependencies)
+        # 6. CoreOperationsManager (with explicit dependencies)
         core_ops = CoreOperationsManager(
             parent=qt_parent,
             session_manager=state_mgr,
@@ -333,6 +420,9 @@ def create_app_context(
             core_operations_manager=core_ops,
             _rom_cache=rom_cache,
             _rom_extractor=rom_extractor,
+            _hal_compressor=hal_compressor,
+            _sprite_config_loader=sprite_config_loader,
+            _default_palette_loader=default_palette_loader,
         )
 
         # Register cleanup hooks

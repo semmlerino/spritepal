@@ -46,12 +46,22 @@ class ROMInjector(SpriteInjector):
 
     MAX_SLACK_SIZE = 256  # Safety limit: never overwrite more than 256 bytes of padding
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        hal_compressor: HALCompressor | None = None,
+        sprite_config_loader: SpriteConfigLoader | None = None,
+    ) -> None:
+        """Initialize ROM injector with optional shared dependencies.
+
+        Args:
+            hal_compressor: HAL compressor instance (creates new if None for backward compat).
+            sprite_config_loader: Sprite config loader (creates new if None).
+        """
         super().__init__()
-        self.hal_compressor: HALCompressor = HALCompressor()
+        self.hal_compressor = hal_compressor or HALCompressor()
         self.rom_data: bytearray | None = None
         self.header: ROMHeader | None = None
-        self.sprite_config_loader: SpriteConfigLoader = SpriteConfigLoader()
+        self.sprite_config_loader = sprite_config_loader or SpriteConfigLoader()
         logger.debug("ROMInjector initialized with HAL compression support")
 
     def read_rom_header(self, rom_path: str) -> ROMHeader:

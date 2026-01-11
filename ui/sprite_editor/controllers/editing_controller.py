@@ -9,9 +9,14 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 
+from core.default_palette_loader import DefaultPaletteLoader
+from utils.logging_config import get_logger
+
 from ..commands.pixel_commands import BatchCommand, DrawPixelCommand, FloodFillCommand
 from ..managers import ToolManager, ToolType, UndoManager
 from ..models import ImageModel, PaletteModel
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from ..views.tabs import EditTab
@@ -55,6 +60,37 @@ class EditingController(QObject):
 
         # Connect tool manager signals
         self.tool_manager.tool_changed.connect(self._on_tool_changed)
+
+        # Lazy palette loader (defer initialization to property access)
+        self._palette_loader: DefaultPaletteLoader | None = None
+
+        # Load available presets (uses lazy palette_loader property)
+        self.load_presets()
+
+    @property
+    def palette_loader(self) -> DefaultPaletteLoader:
+        """Lazy access to DefaultPaletteLoader via AppContext when available."""
+        if self._palette_loader is None:
+            try:
+                from core.app_context import get_app_context
+
+                self._palette_loader = get_app_context().default_palette_loader
+            except RuntimeError:
+                # AppContext not initialized, create standalone instance
+                self._palette_loader = DefaultPaletteLoader()
+        return self._palette_loader
+
+    def load_presets(self) -> None:
+        """Load all available palette presets from configuration."""
+        presets = self.palette_loader.get_all_presets()
+        for i, preset in enumerate(presets):
+            name = preset.get("name", f"Preset {i}")
+            colors = preset.get("colors", [])
+            if colors:
+                # Convert list of lists to list of exact RGB tuples
+                rgb_colors = [(int(c[0]), int(c[1]), int(c[2])) for c in colors if len(c) >= 3]
+                # Use "preset" as source type and loop index as unique ID
+                self.register_palette_source("preset", i, rgb_colors, name)
 
     def set_view(self, view: "EditTab") -> None:
         """Set the edit tab view."""
@@ -291,11 +327,13 @@ class EditingController(QObject):
 
                 colors = get_default_snes_palette()
                 self.set_palette(colors, "Default SNES")
-            else:
+            elif source_type in ("mesen", "rom", "preset", "file"):
                 key = (source_type, index)
                 if key in self._palette_sources:
                     colors, name = self._palette_sources[key]
                     self.set_palette(colors, name)
+            else:
+                logger.warning(f"Unknown palette source type: {source_type}")
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
 

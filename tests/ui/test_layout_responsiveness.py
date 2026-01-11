@@ -27,6 +27,7 @@ class MockPanel(QWidget):
     zoomOutClicked = Signal()
     tileGridToggled = Signal(bool)
     palettePreviewToggled = Signal(bool)
+    backgroundChanged = Signal(str)  # background name
     # PalettePanel signals
     sourceChanged = Signal(str)
     loadPaletteClicked = Signal()
