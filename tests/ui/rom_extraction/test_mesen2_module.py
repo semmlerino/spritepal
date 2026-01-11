@@ -11,9 +11,10 @@ from typing import TYPE_CHECKING
 from unittest.mock import Mock, PropertyMock, call
 
 import pytest
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QCoreApplication, QObject, Signal
 
 from core.mesen_integration.log_watcher import CapturedOffset
+from tests.fixtures.timeouts import signal_timeout
 from ui.rom_extraction.modules import Mesen2Module
 
 if TYPE_CHECKING:
@@ -172,20 +173,24 @@ class TestMesen2ModuleWidgetConnection:
             raw_line="test line",
         )
         mock_log_watcher.offset_discovered.emit(capture)
-        qtbot.wait(50)  # Allow signal to propagate
+        qtbot.waitUntil(lambda: mock_widget.add_capture.called, timeout=signal_timeout())
         mock_widget.add_capture.assert_called_once_with(capture)
 
         # Emit watch_started - widget should receive it
         mock_log_watcher.watch_started.emit()
-        qtbot.wait(50)
+        qtbot.waitUntil(lambda: mock_widget.set_watching.call_count >= 1, timeout=signal_timeout())
         assert mock_widget.set_watching.call_count >= 1
         # Check that True was passed at some point
         calls = mock_widget.set_watching.call_args_list
         assert any(call_args[0][0] is True for call_args in calls)
 
         # Emit watch_stopped - widget should receive it
+        initial_call_count = mock_widget.set_watching.call_count
         mock_log_watcher.watch_stopped.emit()
-        qtbot.wait(50)
+        qtbot.waitUntil(
+            lambda: mock_widget.set_watching.call_count > initial_call_count,
+            timeout=signal_timeout(),
+        )
         # Check that False was passed
         calls = mock_widget.set_watching.call_args_list
         assert any(call_args[0][0] is False for call_args in calls)
@@ -261,7 +266,8 @@ class TestMesen2ModuleWidgetConnection:
             raw_line="test line",
         )
         mock_log_watcher.offset_discovered.emit(capture)
-        qtbot.wait(50)
+        # Process events but don't wait - widget shouldn't receive the signal
+        QCoreApplication.processEvents()
         mock_widget.add_capture.assert_not_called()
 
     def test_disconnect_widget_handles_not_connected(self, mesen2_module: Mesen2Module, mock_widget: Mock) -> None:
@@ -309,7 +315,10 @@ class TestMesen2ModuleIntegration:
             raw_line="test line",
         )
         mock_log_watcher.offset_discovered.emit(capture)
-        qtbot.wait(50)
+        qtbot.waitUntil(
+            lambda: widget1.add_capture.called and widget2.add_capture.called,
+            timeout=signal_timeout(),
+        )
 
         widget1.add_capture.assert_called_once_with(capture)
         widget2.add_capture.assert_called_once_with(capture)

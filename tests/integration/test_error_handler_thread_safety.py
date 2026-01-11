@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytest
 from PySide6.QtWidgets import QWidget
 
+from tests.fixtures.timeouts import signal_timeout
 from ui.common import ErrorHandler
 
 # Serial execution required: Thread safety concerns
@@ -44,15 +45,19 @@ class TestErrorHandlerThreadSafety:
                 return False
 
         # Launch multiple threads
+        num_emissions = 10
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(emit_error, i) for i in range(10)]
+            futures = [executor.submit(emit_error, i) for i in range(num_emissions)]
             [future.result() for future in as_completed(futures)]
 
-        # Process pending events to ensure signals are delivered
-        qtbot.wait(100)
+        # Wait for all signals to be delivered using deterministic wait
+        qtbot.waitUntil(
+            lambda: len(received_errors) == num_emissions,
+            timeout=signal_timeout(),
+        )
 
         # Verify no errors occurred
         assert not errors, f"Errors in threads: {errors}"
 
-        # Verify signals were received (may be fewer due to Qt event processing timing)
-        assert len(received_errors) > 0, "Expected some errors to be received"
+        # Verify all signals were received
+        assert len(received_errors) == num_emissions, f"Expected {num_emissions} errors, got {len(received_errors)}"

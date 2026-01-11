@@ -10,14 +10,7 @@ from PySide6.QtTest import QSignalSpy
 
 from ui.row_arrangement.palette_colorizer import PaletteColorizer
 
-# Systematic pytest markers applied based on test content analysis
-pytestmark = [
-    pytest.mark.benchmark,
-    pytest.mark.headless,
-    pytest.mark.integration,
-    pytest.mark.performance,
-    pytest.mark.slow,
-]
+pytestmark = [pytest.mark.headless]
 
 
 class TestPaletteColorizerEnhanced:
@@ -641,6 +634,8 @@ class TestPaletteColorizerEnhanced:
         result = colorizer.apply_palette_to_image(single_pixel, single_color_palette)
         assert result is not None
 
+    @pytest.mark.slow
+    @pytest.mark.performance
     def test_performance_characteristics(self):
         """Test performance characteristics"""
         colorizer = PaletteColorizer()

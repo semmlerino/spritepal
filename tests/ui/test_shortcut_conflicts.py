@@ -2,6 +2,7 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget
 
+from tests.fixtures.timeouts import ui_timeout
 from ui.sprite_editor.controllers.editing_controller import EditingController
 from ui.sprite_editor.controllers.extraction_controller import ExtractionController
 from ui.sprite_editor.controllers.injection_controller import InjectionController
@@ -36,31 +37,46 @@ def test_shortcut_conflict_f_key(qtbot):
     workspace = edit_tab.workspace
     canvas = workspace.get_canvas()
 
-    # 3. Focus Canvas
+    # 3. Focus Canvas - activate window and set focus for keyboard events
     main_window.show()
+    main_window.activateWindow()  # Ensure window is active for keyboard events
     main_window.show_edit_tab()
-    qtbot.wait(100)
+    qtbot.waitUntil(lambda: canvas.isVisible(), timeout=ui_timeout())
     canvas.setFocus()
+    qtbot.waitUntil(lambda: canvas.hasFocus(), timeout=ui_timeout())
 
     # Ensure tool starts as Pencil
     editing_controller.set_tool("pencil")
     assert editing_controller.tool_manager.current_tool_type == ToolType.PENCIL
 
-    # 4. Press 'B' (Fill)
+    # 4. Press 'B' (Fill) - use keyClick with focused widget
     qtbot.keyClick(canvas, Qt.Key_B)
-    qtbot.wait(100)
+    # Process events to ensure key event is handled, then check condition
+    from PySide6.QtCore import QCoreApplication
+
+    QCoreApplication.processEvents()
+    # If keyboard shortcuts work, tool should change; if not, this test documents the issue
+    qtbot.waitUntil(
+        lambda: editing_controller.tool_manager.current_tool_type == ToolType.FILL,
+        timeout=ui_timeout(),
+    )
 
     # Assert: Tool changed to FILL
     assert editing_controller.tool_manager.current_tool_type == ToolType.FILL, "Pressing B should select Fill tool"
 
     # 5. Press 'P' (Pencil) to reset
     qtbot.keyClick(canvas, Qt.Key_P)
-    qtbot.wait(100)
+    QCoreApplication.processEvents()
+    qtbot.waitUntil(
+        lambda: editing_controller.tool_manager.current_tool_type == ToolType.PENCIL,
+        timeout=ui_timeout(),
+    )
     assert editing_controller.tool_manager.current_tool_type == ToolType.PENCIL
 
-    # 6. Press 'F' (Fit)
+    # 6. Press 'F' (Fit) - should NOT change tool (F is Zoom Fit, not a tool shortcut)
     qtbot.keyClick(canvas, Qt.Key_F)
-    qtbot.wait(100)
+    # Use processEvents since we expect NO change (no condition to wait for)
+    QCoreApplication.processEvents()
 
     # Assert: Tool remains PENCIL (F should be Zoom Fit, not Fill)
     assert editing_controller.tool_manager.current_tool_type == ToolType.PENCIL, (

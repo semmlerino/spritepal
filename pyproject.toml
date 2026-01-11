@@ -417,8 +417,10 @@ pythonpath = ["."]
 # --strict-markers: error on unknown markers
 # -n auto: parallel execution with pytest-xdist (use -n 0 for serial debugging)
 # --dist=loadscope: group tests by module/class to minimize fixture setup
-# To exclude slow tests: uv run pytest -m "not slow"
-addopts = "-v --tb=short -ra --maxfail=3 --strict-markers -n auto --dist=loadscope"
+# Performance/benchmark tests excluded by default (timing-sensitive, prone to CI variance)
+# To run them: uv run pytest -m "performance or benchmark"
+# To also exclude slow tests: uv run pytest -m "not slow"
+addopts = "-v --tb=short -ra --maxfail=3 --strict-markers -n auto --dist=loadscope -m 'not performance and not benchmark'"
 
 # Qt-specific settings for pytest-qt
 qt_api = "pyside6"

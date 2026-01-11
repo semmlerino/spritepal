@@ -19,7 +19,6 @@ from ui.row_arrangement.grid_image_processor import GridImageProcessor
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
-    pytest.mark.slow,
     pytest.mark.allows_registry_state(reason="Image processing tests don't use managers"),
 ]
 

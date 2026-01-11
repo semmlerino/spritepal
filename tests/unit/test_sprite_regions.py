@@ -8,6 +8,7 @@ import time
 
 import pytest
 
+from tests.fixtures.timeouts import perf_bound
 from utils.sprite_regions import (
     # Systematic pytest markers applied based on test content analysis
     RegionUpdateManager,
@@ -16,12 +17,7 @@ from utils.sprite_regions import (
     SpriteRegionDetector,
 )
 
-pytestmark = [
-    pytest.mark.benchmark,
-    pytest.mark.headless,
-    pytest.mark.performance,
-    pytest.mark.slow,
-]
+pytestmark = [pytest.mark.headless]
 
 
 class TestSpriteRegion:
@@ -456,6 +452,9 @@ class TestRegionUpdateManager:
 class TestPerformance:
     """Test performance with large sprite counts"""
 
+    @pytest.mark.slow
+    @pytest.mark.performance
+    @pytest.mark.benchmark
     def test_large_sprite_count_performance(self):
         """Test performance with many sprites"""
         import random
@@ -475,14 +474,17 @@ class TestPerformance:
         regions = detector.detect_regions(sprites)
         elapsed = time.time() - start_time
 
-        # Should complete quickly
-        assert elapsed < 0.5  # 500ms max
+        # Should complete quickly (scaled for CI variance)
+        assert elapsed < perf_bound(0.5), f"10K sprites took {elapsed:.3f}s"
         assert len(regions) > 0
 
         # Verify all sprites are accounted for
         total_sprites = sum(r.sprite_count for r in regions)
         assert total_sprites == len(sprites)
 
+    @pytest.mark.slow
+    @pytest.mark.performance
+    @pytest.mark.benchmark
     def test_region_lookup_performance(self):
         """Test performance of region lookup operations"""
         # Use smaller gap threshold to ensure regions stay separate
@@ -506,8 +508,8 @@ class TestPerformance:
             detector.find_region_for_offset(offset)
         elapsed = time.time() - start_time
 
-        # Should be very fast
-        assert elapsed < 0.1  # 100ms for 1000 lookups
+        # Should be very fast (scaled for CI variance)
+        assert elapsed < perf_bound(0.1), f"1K lookups took {elapsed:.3f}s"
 
 
 if __name__ == "__main__":

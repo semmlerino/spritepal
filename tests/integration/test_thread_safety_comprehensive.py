@@ -430,9 +430,12 @@ class TestRaceConditionPrevention:
             cache.put(ThumbnailCache.make_key(i, i), mock_qimage)
 
         race_errors = []
+        # Use barrier to ensure all threads start simultaneously for deterministic race
+        barrier = threading.Barrier(3)
 
         def accessor():
             try:
+                barrier.wait()  # Sync start with other threads
                 for _ in range(1000):
                     cache.get(ThumbnailCache.make_key(0, 0))
                     cache.put(ThumbnailCache.make_key(1, 1), mock_qimage)
@@ -441,8 +444,8 @@ class TestRaceConditionPrevention:
 
         def clearer():
             try:
+                barrier.wait()  # Sync start with other threads
                 for _ in range(100):
-                    time.sleep(0.001)  # sleep-ok: race condition test
                     cache.clear()
             except Exception as e:
                 race_errors.append(str(e))
@@ -467,26 +470,30 @@ class TestRaceConditionPrevention:
         with patch("builtins.open", Mock(return_value=Mock(read=Mock(return_value=test_rom_data)))):
             worker = BatchThumbnailWorker("/fake/rom.sfc", mock_worker_dependencies["extractor"])
 
-            # Queue work
+            # Queue initial work
             for i in range(100):
                 worker.queue_thumbnail(i * 0x1000, 128, 0)
 
             cleanup_errors = []
+            # Use event to trigger cleanup deterministically mid-queueing
+            trigger_cleanup = threading.Event()
 
             def cleanup_attempt():
                 try:
-                    time.sleep(0.01)  # sleep-ok: race condition test
+                    trigger_cleanup.wait()  # Wait for signal instead of fixed sleep
                     worker.cleanup()
                 except Exception as e:
                     cleanup_errors.append(str(e))
 
-            # Start cleanup from another thread while queueing
+            # Start cleanup thread (it will wait for signal)
             cleanup_thread = threading.Thread(target=cleanup_attempt)
             cleanup_thread.start()
 
-            # Continue queueing
+            # Queue more work, triggering cleanup partway through
             for i in range(100, 200):
                 worker.queue_thumbnail(i * 0x1000, 128, 0)
+                if i == 150:  # Trigger cleanup mid-queueing
+                    trigger_cleanup.set()
 
             cleanup_thread.join()
 
