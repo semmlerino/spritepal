@@ -351,21 +351,27 @@ class SpriteAssetBrowser(QWidget):
             current: Currently selected item
             previous: Previously selected item
         """
+        print(f"[DEBUG] _on_selection_changed: current={current}, previous={previous}", flush=True)
         if not current:
+            print("[DEBUG] _on_selection_changed: no current item, returning", flush=True)
             return
 
         data = current.data(0, Qt.ItemDataRole.UserRole)
+        print(f"[DEBUG] _on_selection_changed: data={data}", flush=True)
         if not isinstance(data, dict):
+            print("[DEBUG] _on_selection_changed: data not dict, returning", flush=True)
             return
 
         # Skip category items
         if "offset" not in data and "path" not in data:
+            print("[DEBUG] _on_selection_changed: no offset/path, skipping category", flush=True)
             return
 
         # Emit signal with offset and source type
         if "offset" in data:
             offset = data["offset"]
             source_type = data["source_type"]
+            print(f"[DEBUG] _on_selection_changed: EMITTING sprite_selected(0x{offset:06X}, {source_type})", flush=True)
             self.sprite_selected.emit(offset, source_type)
 
     def _on_item_activated(self, item: QTreeWidgetItem, column: int) -> None:

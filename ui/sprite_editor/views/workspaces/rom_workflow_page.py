@@ -157,7 +157,9 @@ class ROMWorkflowPage(QWidget):
             self._left_panel.setEnabled(True)
             self._workspace.setEnabled(False)
         elif state == "edit":
-            self._left_panel.setEnabled(False)  # Lock browser while editing
+            # Keep left panel enabled so user can browse other sprites while editing
+            # Selecting a different sprite will prompt to save unsaved changes
+            self._left_panel.setEnabled(True)
             self._workspace.setEnabled(True)
         elif state == "save":
             self._left_panel.setEnabled(False)
