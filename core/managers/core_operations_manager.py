@@ -601,12 +601,32 @@ class CoreOperationsManager(BaseManager):
             validate_required_params(params, ["output_base"])
         elif "rom_path" in params:
             # ROM extraction
-            validate_required_params(params, ["rom_path", "offset", "output_base"])
+            if "offset" in params:
+                validate_required_params(params, ["rom_path", "offset", "output_base"])
+                validate_type(params["offset"], "offset", int)
+                offset = cast(int, params["offset"])
+                validate_range(offset, "offset", min_val=0)
+            elif "sprite_offset" in params:
+                validate_required_params(params, ["rom_path", "sprite_offset", "output_base"])
+                validate_type(params["sprite_offset"], "sprite_offset", int)
+                offset = cast(int, params["sprite_offset"])
+                validate_range(offset, "sprite_offset", min_val=0)
+            else:
+                raise ValidationError("Missing required parameters: offset (or sprite_offset) is required")
+
             rom_path = cast(str, params["rom_path"])
             FileValidator.validate_rom_file_exists_or_raise(rom_path)
-            validate_type(params["offset"], "offset", int)
-            offset = cast(int, params["offset"])
-            validate_range(offset, "offset", min_val=0)
+
+            # Check if offset is within ROM bounds
+            from utils.rom_utils import detect_smc_offset_from_size
+
+            rom_size = Path(rom_path).stat().st_size
+            header_offset = detect_smc_offset_from_size(rom_size)
+            effective_offset = offset + header_offset
+            if effective_offset >= rom_size:
+                raise ValidationError(
+                    f"Offset 0x{offset:X} (file offset 0x{effective_offset:X}) exceeds ROM size 0x{rom_size:X}"
+                )
         else:
             raise ValidationError("Must provide either vram_path or rom_path")
 
@@ -935,6 +955,14 @@ class CoreOperationsManager(BaseManager):
         sprite_result = FileValidator.validate_image_file(sprite_path)
         if not sprite_result.is_valid:
             raise ValidationError(f"Sprite file validation failed: {sprite_result.error_message}")
+
+        # Validate sprite dimensions early (must be multiples of 8)
+        from core.injector import SpriteInjector
+
+        injector = SpriteInjector()
+        is_valid, error_msg = injector.validate_sprite(sprite_path)
+        if not is_valid:
+            raise ValidationError(f"Invalid sprite image: {error_msg}")
 
         offset = cast(int, params["offset"])
         validate_range(offset, "offset", min_val=0)

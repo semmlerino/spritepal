@@ -11,6 +11,7 @@ from PySide6.QtCore import Signal
 from PySide6.QtGui import QKeyEvent, QKeySequence
 from PySide6.QtWidgets import QLineEdit, QWidget
 
+from utils.constants import RomMappingType
 from utils.rom_utils import snes_to_pc
 
 
@@ -36,6 +37,8 @@ class OffsetLineEdit(QLineEdit):
         super().__init__(parent)
         self._last_valid_offset = default
         self._max_offset: int = 0  # 0 means no limit (ROM not loaded)
+        self._header_offset: int = 0  # SMC header size (512 bytes)
+        self._mapping_type: RomMappingType = RomMappingType.LOROM  # ROM mapping type for address conversion
         self.setPlaceholderText("Offset (0x..., $..., Bank:Addr)")
         self.setToolTip("Supports Hex (0x/$, SNES ($C0:1234), or Mesen2 paste")
 
@@ -44,6 +47,19 @@ class OffsetLineEdit(QLineEdit):
 
         if default > 0:
             self.set_offset(default)
+
+    def set_header_offset(self, offset: int) -> None:
+        """Set SMC header offset (e.g. 512 bytes) to subtract from file offsets."""
+        self._header_offset = offset
+
+    def set_mapping_type(self, mapping_type: RomMappingType) -> None:
+        """Set ROM mapping type for address conversion.
+
+        Args:
+            mapping_type: The ROM mapping type (LOROM, HIROM, SA1).
+                          SA-1 ROMs use linear mapping for banks $C0-$FF.
+        """
+        self._mapping_type = mapping_type
 
     def set_rom_bounds(self, max_offset: int) -> None:
         """Set ROM size for offset range validation.
@@ -88,7 +104,10 @@ class OffsetLineEdit(QLineEdit):
         mesen_match = re.search(r"FILE OFFSET:\s*(?:0x)?([0-9a-fA-F]+)", text, re.IGNORECASE)
         if mesen_match:
             try:
-                return int(mesen_match.group(1), 16)
+                # Parse absolute file offset
+                file_offset = int(mesen_match.group(1), 16)
+                # Convert to ROM offset by subtracting header
+                return max(0, file_offset - self._header_offset)
             except ValueError:
                 pass
 
@@ -98,6 +117,12 @@ class OffsetLineEdit(QLineEdit):
             try:
                 bank = int(snes_match.group(1), 16)
                 addr = int(snes_match.group(2), 16)
+
+                # SA-1 ROMs: Banks $C0-$FF map linearly to ROM
+                if self._mapping_type == RomMappingType.SA1 and 0xC0 <= bank <= 0xFF:
+                    return (bank - 0xC0) * 0x10000 + addr
+
+                # LoROM/HiROM: Use standard conversion
                 return snes_to_pc(bank, addr)
             except (ValueError, TypeError):
                 pass

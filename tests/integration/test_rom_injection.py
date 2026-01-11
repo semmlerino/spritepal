@@ -228,5 +228,61 @@ class TestROMInjectionDialog(unittest.TestCase):
         assert hasattr(dialog, "fast_compression_check")
 
 
+class TestInjectionDimensionValidation:
+    """Test early PNG dimension validation in injection params."""
+
+    @pytest.mark.parametrize("width,height", [(7, 8), (8, 7), (15, 16), (9, 9)])
+    def test_injection_rejects_invalid_dimensions(self, app_context, tmp_path: Path, width: int, height: int):
+        """Verify injection params reject non-multiple-of-8 dimensions."""
+        from PIL import Image
+
+        from core.managers.core_operations_manager import ValidationError
+
+        # Create invalid PNG with non-multiple-of-8 dimensions
+        invalid_png = tmp_path / f"invalid_{width}x{height}.png"
+        img = Image.new("P", (width, height))
+        img.save(invalid_png)
+
+        # Create minimal ROM file for validation
+        rom_file = tmp_path / "test.sfc"
+        rom_file.write_bytes(b"\x00" * 0x8000)
+
+        params = {
+            "mode": "rom",
+            "sprite_path": str(invalid_png),
+            "offset": 0,
+            "input_rom": str(rom_file),
+            "output_rom": str(tmp_path / "output.sfc"),
+        }
+
+        with pytest.raises(ValidationError, match="multiples of 8"):
+            app_context.core_operations_manager.validate_injection_params(params)
+
+    def test_injection_accepts_valid_dimensions(self, app_context, tmp_path: Path):
+        """Verify injection params accept valid multiple-of-8 dimensions."""
+        from PIL import Image
+
+        # Create valid PNG with multiple-of-8 dimensions
+        valid_png = tmp_path / "valid_16x24.png"
+        img = Image.new("P", (16, 24))
+        img.putpalette(list(range(256)) * 3)  # Add palette
+        img.save(valid_png)
+
+        # Create ROM file that meets minimum size requirement (512KB)
+        rom_file = tmp_path / "test.sfc"
+        rom_file.write_bytes(b"\x00" * 0x80000)  # 512KB
+
+        params = {
+            "mode": "rom",
+            "sprite_path": str(valid_png),
+            "offset": 0,
+            "input_rom": str(rom_file),
+            "output_rom": str(tmp_path / "output.sfc"),
+        }
+
+        # Should not raise - no assertion needed, just verify no exception
+        app_context.core_operations_manager.validate_injection_params(params)
+
+
 if __name__ == "__main__":
     unittest.main()

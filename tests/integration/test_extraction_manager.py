@@ -307,6 +307,43 @@ class TestExtractionManager:
         with pytest.raises(ValidationError):
             manager.extract_from_rom("/non/existent/rom.sfc", 0x1000, "/output/test", "sprite")
 
+    def test_extraction_rejects_offset_beyond_rom(self, app_context, tmp_path):
+        """Verify extraction fails gracefully when offset exceeds ROM size."""
+        manager = app_context.core_operations_manager
+
+        # Create a small ROM file (32KB)
+        rom_file = tmp_path / "small_rom.sfc"
+        rom_file.write_bytes(b"\x00" * 0x8000)
+
+        # Try to extract at offset beyond ROM size
+        params = {
+            "rom_path": str(rom_file),
+            "offset": 0xFFFFFF,  # Way beyond 32KB ROM
+            "output_base": str(tmp_path / "output"),
+        }
+
+        with pytest.raises(ValidationError, match="exceeds ROM size"):
+            manager.validate_extraction_params(params)
+
+    def test_extraction_accepts_valid_offset_within_rom(self, app_context, tmp_path):
+        """Verify extraction accepts offset within ROM bounds."""
+        manager = app_context.core_operations_manager
+
+        # Create a ROM file (32KB)
+        rom_file = tmp_path / "valid_rom.sfc"
+        rom_file.write_bytes(b"\x00" * 0x8000)
+
+        # Try to extract at valid offset within ROM
+        params = {
+            "rom_path": str(rom_file),
+            "offset": 0x1000,  # Within 32KB ROM
+            "output_base": str(tmp_path / "output"),
+        }
+
+        # Should not raise
+        result = manager.validate_extraction_params(params)
+        assert result is True
+
     def test_get_sprite_preview_real_rom_data_returns_valid_structure(self, app_context, test_data_repo):
         """Sprite preview should generate valid tile data structure from ROM files.
 

@@ -242,6 +242,9 @@ class ExtractionController(QObject):
 
                 self._view.append_output(f"Loaded {tile_count} tiles.")
 
+                # Emit signal for consumers (e.g., editor, history tracking)
+                self.sprite_extracted.emit(image, tile_count)
+
         except Exception as e:
             self._view.append_output(f"ERROR: {e}")
             self.extraction_failed.emit(str(e))
