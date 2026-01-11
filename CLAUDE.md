@@ -1,6 +1,6 @@
 # SpritePal Development Guidelines
 
-**Last updated: January 9, 2026** | See [Table of Contents](#table-of-contents) below
+**Last updated: January 11, 2026** | See [Table of Contents](#table-of-contents) below
 
 ---
 
@@ -61,6 +61,8 @@
 2. **Parallel by default** - With 1900+ tests, serial runs take 15+ minutes. Tests run parallel via `-n auto`. Mark tests that need isolation with `@pytest.mark.parallel_unsafe` or use `app_context` fixture (which provides clean state per-test).
 
 3. **Prefer boring determinism** - The fastest dev loop is: small change → run checks → commit.
+
+4. **Fix bugs, not tests** - Bias toward fixing actual defects in the implementation, not making tests pass by dilution. Do not relax, delete, or rewrite tests unless they are demonstrably incorrect or asserting non-contractual implementation details. Any test change must be explicitly justified by a mismatch with intended external behavior. When uncertain: run the test in isolation, trace actual vs expected values, and verify whether the test's expectation matches documented/intended behavior.
 
 ---
 

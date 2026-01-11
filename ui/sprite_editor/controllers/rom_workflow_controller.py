@@ -633,7 +633,6 @@ class ROMWorkflowController(QObject):
             offset: ROM offset of the capture
             name: Display name for the capture (defaults to hex offset)
         """
-        print(f"[DEBUG PRINT] ensure_and_select_capture: offset=0x{offset:06X}, name={name}, view={self._view is not None}, log_watcher={self.log_watcher is not None}", flush=True)
         logger.info(
             "ensure_and_select_capture called: offset=0x%06X, name=%s, view=%s, log_watcher=%s",
             offset,
@@ -772,18 +771,14 @@ class ROMWorkflowController(QObject):
                     from typing import cast
 
                     # 3. Get palette config for this sprite
-                    palette_offset, palette_indices = (
-                        self.rom_extractor.get_palette_config_from_sprite_config(
-                            cast(dict[str, object], game_config),
-                            self.current_sprite_name,
-                        )
+                    palette_offset, palette_indices = self.rom_extractor.get_palette_config_from_sprite_config(
+                        cast(dict[str, object], game_config),
+                        self.current_sprite_name,
                     )
 
                     # 4. Extract ALL sprite palettes (8-15) if we have an offset
                     if palette_offset is not None:
-                        all_palettes = self.rom_extractor.extract_palette_range(
-                            self.rom_path, palette_offset, 8, 15
-                        )
+                        all_palettes = self.rom_extractor.extract_palette_range(self.rom_path, palette_offset, 8, 15)
 
                         # Register all palettes as switchable sources
                         if all_palettes:

@@ -189,9 +189,7 @@ class ROMExtractor:
         Returns:
             Tuple of (palette_offset, palette_indices) or (None, None) if not found
         """
-        return self.rom_palette_extractor.get_palette_config_from_sprite_config(
-            game_config, sprite_name
-        )
+        return self.rom_palette_extractor.get_palette_config_from_sprite_config(game_config, sprite_name)
 
     def extract_palette_range(
         self,
@@ -213,9 +211,7 @@ class ROMExtractor:
         Returns:
             Dictionary mapping palette index to list of (R, G, B) tuples
         """
-        return self.rom_palette_extractor.extract_palette_range(
-            rom_path, offset, start_index, end_index
-        )
+        return self.rom_palette_extractor.extract_palette_range(rom_path, offset, start_index, end_index)
 
     def extract_sprite_data(self, rom_path: str, sprite_offset: int) -> bytes:
         """

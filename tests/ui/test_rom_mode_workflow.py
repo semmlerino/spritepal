@@ -150,8 +150,6 @@ class MockROMWorkflowPage(QWidget):
     def set_rom_size(self, size: int) -> None:
         pass
 
-
-
     # Delegation methods from source_bar
     def set_rom_available(self, available: bool, rom_size: int = 0) -> None:
         """Mock: Update ROM availability state in source bar."""
@@ -197,6 +195,7 @@ class MockROMWorkflowPage(QWidget):
     def clear_asset_browser(self) -> None:
         """Mock: Clear all items from asset browser."""
         pass
+
 
 class TestRomModeWorkflow:
     @pytest.fixture

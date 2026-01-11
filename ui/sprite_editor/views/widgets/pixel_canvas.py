@@ -623,7 +623,7 @@ class PixelCanvas(QWidget):
         """Handle mouse press."""
         if event.button() == Qt.MouseButton.LeftButton:
             pos = self._get_pixel_pos(event.position())
-            if pos:
+            if pos is not None:
                 self.drawing = True
                 self.last_draw_pos = pos
                 self.pixelPressed.emit(pos.x(), pos.y())
@@ -631,7 +631,7 @@ class PixelCanvas(QWidget):
         elif event.button() == Qt.MouseButton.RightButton:
             # Temporary color picker
             pos = self._get_pixel_pos(event.position())
-            if pos and self.controller.has_image():
+            if pos is not None and self.controller.has_image():
                 # Store current tool and temporarily switch to picker
                 self.previous_tool = self.controller.get_current_tool_name()
                 self.temporary_picker = True
@@ -651,11 +651,11 @@ class PixelCanvas(QWidget):
             self._update_hover_regions(old_hover_pos, pos)
 
         # Emit hover position changed signal
-        if self.hover_pos:
+        if self.hover_pos is not None:
             self.hoverPositionChanged.emit(self.hover_pos.x(), self.hover_pos.y())
 
         # Handle drawing
-        if self.drawing and pos:
+        if self.drawing and pos is not None:
             self.last_draw_pos = pos
             self.pixelMoved.emit(pos.x(), pos.y())
 
@@ -667,9 +667,9 @@ class PixelCanvas(QWidget):
                 self.drawing = False
                 pos = self._get_pixel_pos(event.position())
                 # Use last known position if release is outside canvas
-                if not pos and self.last_draw_pos:
+                if pos is None and self.last_draw_pos is not None:
                     pos = self.last_draw_pos
-                if pos:
+                if pos is not None:
                     self.pixelReleased.emit(pos.x(), pos.y())
                 self.last_draw_pos = None
 
