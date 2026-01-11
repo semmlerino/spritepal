@@ -361,21 +361,14 @@ class SpriteEditorWorkspace(QWidget):
             capture_name: Optional display name for the capture (e.g., "0x3C6EF1 (f1500)").
                           If provided, ensures the capture appears in asset browser.
         """
-        print(
-            f"[DEBUG] SpriteEditorWorkspace.jump_to_offset: offset=0x{offset:06X}, capture_name={capture_name}",
-            flush=True,
-        )
         # Switch to ROM mode
         self._mode_combo.setCurrentIndex(1)
 
         # Ensure capture is in asset browser and selected (for cross-component sync)
-        print(f"[DEBUG] SpriteEditorWorkspace.jump_to_offset: calling ensure_and_select_capture", flush=True)
         self._rom_workflow_controller.ensure_and_select_capture(offset, capture_name)
 
         # Set offset in ROM workflow controller (auto_open triggers editor after preview)
-        print(f"[DEBUG] SpriteEditorWorkspace.jump_to_offset: calling set_offset", flush=True)
         self._rom_workflow_controller.set_offset(offset, auto_open=auto_open)
-        print(f"[DEBUG] SpriteEditorWorkspace.jump_to_offset: DONE", flush=True)
 
     def load_rom(self, path: str) -> None:
         """Load a ROM into the sprite editor.

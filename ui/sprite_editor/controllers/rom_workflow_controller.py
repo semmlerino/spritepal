@@ -171,23 +171,14 @@ class ROMWorkflowController(QObject):
 
     def _add_capture_to_browser(self, capture: CapturedOffset) -> None:
         """Add a capture to the browser with thumbnail."""
-        print(
-            f"[DEBUG] _add_capture_to_browser: offset=0x{capture.offset:06X}, view={self._view is not None}", flush=True
-        )
         if not self._view:
-            print("[DEBUG] _add_capture_to_browser: NO VIEW, skipping", flush=True)
             return
 
         name = self._get_capture_name(capture)
-        print(
-            f"[DEBUG] _add_capture_to_browser: calling view.add_mesen_capture({name}, 0x{capture.offset:06X})",
-            flush=True,
-        )
         self._view.add_mesen_capture(name, capture.offset)
 
         # Request thumbnail if worker is ready
         if self._thumbnail_controller:
-            print(f"[DEBUG] _add_capture_to_browser: queuing thumbnail for 0x{capture.offset:06X}", flush=True)
             self._thumbnail_controller.queue_thumbnail(capture.offset)
 
     def set_view(self, view: "ROMWorkflowPage") -> None:
@@ -240,7 +231,6 @@ class ROMWorkflowController(QObject):
 
     def _on_sprite_selected(self, offset: int, source_type: str) -> None:
         """Handle sprite selection from asset browser."""
-        print(f"[DEBUG] _on_sprite_selected: offset=0x{offset:06X}, source_type={source_type}", flush=True)
         self.set_offset(offset)
 
     def _on_sprite_activated(self, offset: int, source_type: str) -> None:
@@ -563,6 +553,9 @@ class ROMWorkflowController(QObject):
         if self._view:
             self._view.set_rom_path(path)
             self._view.set_rom_available(True, self.rom_size)
+            
+            # Re-populate Mesen captures (they are global/persistent)
+            self.sync_captures_from_log_watcher()
 
         # Use validated header info
         title = header.title or "Unknown ROM"
@@ -599,21 +592,14 @@ class ROMWorkflowController(QObject):
         Called when entering the sprite editor workspace to ensure all
         discovered captures are visible in the asset browser.
         """
-        print(
-            f"[DEBUG] sync_captures_from_log_watcher: view={self._view is not None}, log_watcher={self.log_watcher is not None}",
-            flush=True,
-        )
         if not self._view:
-            print("[DEBUG] sync_captures_from_log_watcher: NO VIEW", flush=True)
             logger.warning("sync_captures_from_log_watcher: no view set")
             return
         if not self.log_watcher:
-            print("[DEBUG] sync_captures_from_log_watcher: NO LOG_WATCHER", flush=True)
             logger.warning("sync_captures_from_log_watcher: no log_watcher")
             return
 
         captures = self.log_watcher.recent_captures
-        print(f"[DEBUG] sync_captures_from_log_watcher: found {len(captures)} captures", flush=True)
         logger.info(
             "sync_captures_from_log_watcher: found %d captures in log_watcher",
             len(captures),
@@ -621,19 +607,16 @@ class ROMWorkflowController(QObject):
 
         # Sync all current session captures
         for capture in captures:
-            print(f"[DEBUG]   syncing capture: 0x{capture.offset:06X}", flush=True)
             logger.debug("  syncing capture: 0x%06X", capture.offset)
             self._add_capture_to_browser(capture)
 
         # Also sync persistent clicks
         persistent = self.log_watcher.load_persistent_clicks()
-        print(f"[DEBUG] sync_captures_from_log_watcher: found {len(persistent)} persistent clicks", flush=True)
         logger.info(
             "sync_captures_from_log_watcher: found %d persistent clicks",
             len(persistent),
         )
         for capture in persistent:
-            print(f"[DEBUG]   syncing persistent: 0x{capture.offset:06X}", flush=True)
             logger.debug("  syncing persistent: 0x%06X", capture.offset)
             self._add_capture_to_browser(capture)
 
@@ -647,10 +630,6 @@ class ROMWorkflowController(QObject):
             offset: ROM offset of the capture
             name: Display name for the capture (defaults to hex offset)
         """
-        print(
-            f"[DEBUG] ensure_and_select_capture: offset=0x{offset:06X}, name={name}, view={self._view is not None}, log_watcher={self.log_watcher is not None}",
-            flush=True,
-        )
         logger.info(
             "ensure_and_select_capture called: offset=0x%06X, name=%s, view=%s, log_watcher=%s",
             offset,
@@ -660,23 +639,16 @@ class ROMWorkflowController(QObject):
         )
 
         if not self._view:
-            print("[DEBUG] ensure_and_select_capture: NO VIEW, returning early", flush=True)
             logger.warning("ensure_and_select_capture: no view, returning early")
             return
 
         # First sync all captures from log watcher (idempotent - duplicates are skipped)
-        print("[DEBUG] ensure_and_select_capture: calling sync_captures_from_log_watcher", flush=True)
         self.sync_captures_from_log_watcher()
 
         # Then ensure the specific capture exists and select it
         browser = self._view.asset_browser
-        print(
-            f"[DEBUG] ensure_and_select_capture: calling browser.ensure_mesen_capture(0x{offset:06X}, {name})",
-            flush=True,
-        )
         browser.ensure_mesen_capture(offset, name)
         browser.select_sprite_by_offset(offset)
-        print(f"[DEBUG] ensure_and_select_capture: COMPLETED for offset 0x{offset:06X}", flush=True)
         logger.info("ensure_and_select_capture: completed for offset 0x%06X", offset)
 
     def set_offset(self, offset: int, *, auto_open: bool = False) -> None:
@@ -686,27 +658,19 @@ class ROMWorkflowController(QObject):
             offset: ROM offset to navigate to.
             auto_open: If True, automatically open in editor when preview completes.
         """
-        print(
-            f"[DEBUG] set_offset: offset=0x{offset:06X}, rom_path={self.rom_path}, rom_size=0x{self.rom_size:06X}",
-            flush=True,
-        )
         # Check ROM availability first
         if not self.rom_path:
-            print("[DEBUG] set_offset: NO ROM LOADED, returning early", flush=True)
             if self._message_service:
                 self._message_service.show_message("ROM must be loaded first. Click '...' to load a ROM file.")
             return
-        print("[DEBUG] set_offset: passed rom_path check", flush=True)
 
         # Validate offset is within ROM bounds
         if offset < 0 or offset >= self.rom_size:
-            print(f"[DEBUG] set_offset: OFFSET OUT OF RANGE (0x{offset:06X} >= 0x{self.rom_size:06X})", flush=True)
             if self._message_service:
                 self._message_service.show_message(
                     f"Offset 0x{offset:06X} is out of range (ROM size: 0x{self.rom_size:06X})"
                 )
             return
-        print("[DEBUG] set_offset: passed bounds check", flush=True)
 
         # Set flag to auto-open in editor when preview completes
         if auto_open:
@@ -714,9 +678,7 @@ class ROMWorkflowController(QObject):
             self._pending_open_offset = offset
 
         # Handle transition from edit state
-        print(f"[DEBUG] set_offset: current state={self.state}", flush=True)
         if self.state == "edit":
-            print("[DEBUG] set_offset: in edit state, checking unsaved changes", flush=True)
             # Check for unsaved changes first
             if self._editing_controller.has_unsaved_changes():
                 from PySide6.QtWidgets import QMessageBox
@@ -728,7 +690,6 @@ class ROMWorkflowController(QObject):
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 )
                 if reply == QMessageBox.StandardButton.No:
-                    print("[DEBUG] set_offset: user cancelled, returning", flush=True)
                     # Reset to current offset
                     if self._view:
                         self._view.set_offset(self.current_offset)
@@ -742,21 +703,15 @@ class ROMWorkflowController(QObject):
                 self._view.set_workflow_state("preview")
             self.workflow_state_changed.emit("preview")
 
-        print("[DEBUG] set_offset: passed edit state check, proceeding", flush=True)
         self.current_offset = offset
-        print(
-            f"[DEBUG] set_offset: setting current_offset to 0x{offset:06X}, view={self._view is not None}", flush=True
-        )
         if self._view:
             self._view.set_offset(offset)
-            print(f"[DEBUG] set_offset: called view.set_offset(0x{offset:06X})", flush=True)
 
         if self.rom_path:
             # Set loading state before requesting preview
             self._preview_pending = True
             if self._view:
                 self._view.set_action_loading(True)
-            print(f"[DEBUG] set_offset: requesting preview for 0x{offset:06X}", flush=True)
             self.preview_coordinator.request_manual_preview(offset)
 
     def handle_primary_action(self) -> None:

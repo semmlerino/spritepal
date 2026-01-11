@@ -351,27 +351,21 @@ class SpriteAssetBrowser(QWidget):
             current: Currently selected item
             previous: Previously selected item
         """
-        print(f"[DEBUG] _on_selection_changed: current={current}, previous={previous}", flush=True)
         if not current:
-            print("[DEBUG] _on_selection_changed: no current item, returning", flush=True)
             return
 
         data = current.data(0, Qt.ItemDataRole.UserRole)
-        print(f"[DEBUG] _on_selection_changed: data={data}", flush=True)
         if not isinstance(data, dict):
-            print("[DEBUG] _on_selection_changed: data not dict, returning", flush=True)
             return
 
         # Skip category items
         if "offset" not in data and "path" not in data:
-            print("[DEBUG] _on_selection_changed: no offset/path, skipping category", flush=True)
             return
 
         # Emit signal with offset and source type
         if "offset" in data:
             offset = data["offset"]
             source_type = data["source_type"]
-            print(f"[DEBUG] _on_selection_changed: EMITTING sprite_selected(0x{offset:06X}, {source_type})", flush=True)
             self.sprite_selected.emit(offset, source_type)
 
     def _on_item_activated(self, item: QTreeWidgetItem, column: int) -> None:
@@ -550,14 +544,11 @@ class SpriteAssetBrowser(QWidget):
             offset: ROM offset
             thumbnail: Optional thumbnail pixmap
         """
-        print(f"[DEBUG] SpriteAssetBrowser.add_mesen_capture: name={name}, offset=0x{offset:06X}, browser_id={id(self)}", flush=True)
         # Skip if already exists (idempotent)
         if self.has_mesen_capture(offset):
-            print(f"[DEBUG] SpriteAssetBrowser.add_mesen_capture: SKIPPING duplicate 0x{offset:06X}", flush=True)
             logger.debug("add_mesen_capture: skipping duplicate offset 0x%06X", offset)
             return
 
-        print(f"[DEBUG] SpriteAssetBrowser.add_mesen_capture: ADDING {name} (0x{offset:06X})", flush=True)
         logger.info("add_mesen_capture: adding %s (0x%06X)", name, offset)
         item = QTreeWidgetItem(self._mesen_category)
         item.setText(0, name)
@@ -571,7 +562,6 @@ class SpriteAssetBrowser(QWidget):
         }
         item.setData(0, Qt.ItemDataRole.UserRole, data)
         self._update_placeholder(self._mesen_category)
-        print(f"[DEBUG] SpriteAssetBrowser.add_mesen_capture: category now has {self._mesen_category.childCount()} children", flush=True)
         logger.debug(
             "add_mesen_capture: category now has %d children",
             self._mesen_category.childCount(),
@@ -635,9 +625,6 @@ class SpriteAssetBrowser(QWidget):
 
     def clear_all(self) -> None:
         """Clear all items from all categories."""
-        print(f"[DEBUG] SpriteAssetBrowser.clear_all() called, browser_id={id(self)}", flush=True)
-        import traceback
-        traceback.print_stack(limit=5)
         self._rom_category.takeChildren()
         self._update_placeholder(self._rom_category)
 
@@ -659,22 +646,17 @@ class SpriteAssetBrowser(QWidget):
             thumbnail: Thumbnail pixmap
         """
         # Find item with matching offset
-        print(f"[DEBUG] SpriteAssetBrowser.set_thumbnail: looking for 0x{offset:06X}, browser_id={id(self)}", flush=True)
         iterator = QTreeWidgetItemIterator(self.tree)
-        items_checked = 0
         while iterator.value():
             item = iterator.value()
             data = item.data(0, Qt.ItemDataRole.UserRole)
-            items_checked += 1
             if isinstance(data, dict) and data.get("offset") == offset:
-                print(f"[DEBUG] SpriteAssetBrowser.set_thumbnail: FOUND item for 0x{offset:06X}, source_type={data.get('source_type')}", flush=True)
                 data["thumbnail"] = thumbnail
                 item.setData(0, Qt.ItemDataRole.UserRole, data)
                 # Force repaint
                 self.tree.viewport().update()
                 return
             iterator += 1
-        print(f"[DEBUG] SpriteAssetBrowser.set_thumbnail: NOT FOUND 0x{offset:06X} after checking {items_checked} items", flush=True)
 
     def filter_items(self, text: str) -> None:
         """
