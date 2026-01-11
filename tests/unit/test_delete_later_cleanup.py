@@ -107,7 +107,7 @@ class TestEnvironmentDetection:
                 "This would cause processEvents() to be skipped in fixture cleanup."
             )
 
-    def test_qt_is_available_in_offscreen(self) -> None:
+    def test_qt_is_available_in_offscreen(self, qtbot: object) -> None:
         """Qt should be fully functional in offscreen mode."""
         from tests.infrastructure.environment_detection import get_environment_info
 
@@ -115,4 +115,5 @@ class TestEnvironmentDetection:
 
         if info.is_offscreen:
             assert info.pyside6_available, "PySide6 should be available in offscreen mode"
+            # qtbot fixture ensures QApplication exists for this test
             assert QApplication.instance() is not None, "QApplication should exist"
