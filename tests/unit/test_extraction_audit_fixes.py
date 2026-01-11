@@ -22,6 +22,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.hal_compression import HALCompressionError, HALCompressor
+from core.hal_parser import HALParser
 from core.rom_injector import ROMInjector
 from core.rom_validator import ROMValidator
 from utils.constants import (
@@ -170,8 +171,6 @@ class TestConservativeFallback:
 
     def test_fallback_uses_64_byte_threshold(self):
         """Verify fallback requires 64 consecutive bytes, not 32."""
-        injector = ROMInjector()
-
         # Create data filled with non-uniform bytes (cycling 1-254)
         # to avoid false positives on 0x00 or 0xFF runs
         rom_data = bytearray(0x2000)
@@ -187,7 +186,8 @@ class TestConservativeFallback:
         # Place 64-byte 0xFF run at offset 0x500 - should trigger termination
         rom_data[0x500:0x540] = b"\xff" * 64
 
-        size = injector._estimate_compressed_size_conservative(bytes(rom_data), 0)
+        # HALParser.estimate_compressed_size_conservative is a static method
+        size = HALParser.estimate_compressed_size_conservative(bytes(rom_data), 0)
 
         # Should find the 64-byte run at 0x500
         # Note: the function scans from offset 64 (padding_threshold)
@@ -195,12 +195,11 @@ class TestConservativeFallback:
 
     def test_fallback_default_is_8kb(self):
         """Verify fallback default is 8KB when no padding found."""
-        injector = ROMInjector()
-
         # Create data with no padding patterns
         rom_data = bytes(range(256)) * 64  # 16KB of non-uniform data
 
-        size = injector._estimate_compressed_size_conservative(rom_data, 0)
+        # HALParser.estimate_compressed_size_conservative is a static method
+        size = HALParser.estimate_compressed_size_conservative(rom_data, 0)
 
         # Default should be 8KB (0x2000)
         assert size == 0x2000
@@ -211,6 +210,7 @@ class TestConservativeFallback:
 # ============================================================================
 
 
+@pytest.mark.xdist_group("serial")
 class TestCompressionRatioValidation:
     """HAL-3.1a: Compression ratio validation."""
 
@@ -227,7 +227,8 @@ class TestCompressionRatioValidation:
         with patch.object(HALCompressor, "decompress_from_rom") as mock_decomp:
             mock_decomp.return_value = b"\x00" * 10000
 
-            with patch.object(ROMInjector, "_parse_hal_compressed_size") as mock_parse:
+            # Mock HALParser.parse_compressed_size (static method on HALParser)
+            with patch.object(HALParser, "parse_compressed_size") as mock_parse:
                 mock_parse.return_value = 100  # 100 bytes compressed -> 10000 bytes uncompressed (1% ratio)
 
                 # ROM data must be large enough
@@ -239,8 +240,8 @@ class TestCompressionRatioValidation:
                 assert compressed_size == 0
                 assert data == b""
 
-        # Check for rejection due to invalid compression ratio
-        assert any("rejected: invalid compression ratio" in r.message.lower() for r in caplog.records)
+        # Check for rejection due to invalid compression ratio (case-insensitive match)
+        assert any("rejected" in r.message.lower() and "compression ratio" in r.message.lower() for r in caplog.records)
 
 
 # ============================================================================

@@ -99,8 +99,8 @@ class SpriteConfigLoader:
 
         checksum_hex = f"0x{rom_checksum:04X}"
 
-        # Try to find matching game by checksum first (most reliable)
-        checksum_matched_game = None
+        # Collect ALL games that match the checksum (some checksums are shared)
+        checksum_matched_games: list[str] = []
 
         for game_name, game_data in self.config_data["games"].items():
             checksums = game_data.get("checksums", {})
@@ -114,12 +114,9 @@ class SpriteConfigLoader:
                     expected = expected_checksum
 
                 if rom_checksum == expected:
-                    checksum_matched_game = game_name
+                    checksum_matched_games.append(game_name)
                     logger.info(f"Found checksum match: {game_name} ({version}) = {checksum_hex}")
-                    break
-
-            if checksum_matched_game:
-                break
+                    break  # Only break inner loop (stop checking other versions for this game)
 
         # Then try title matching with flexible patterns
         title_matched_games = []
@@ -131,14 +128,38 @@ class SpriteConfigLoader:
         # Decide which game config to use
         selected_game = None
 
-        if checksum_matched_game:
-            selected_game = checksum_matched_game
+        if len(checksum_matched_games) == 1:
+            # Single checksum match - authoritative
+            selected_game = checksum_matched_games[0]
             if selected_game not in title_matched_games:
                 logger.warning(
                     f"ROM checksum {checksum_hex} matches '{selected_game}' but "
                     f"title '{rom_title}' doesn't match expected pattern"
                 )
+        elif len(checksum_matched_games) > 1:
+            # Multiple games share this checksum - use title scoring to disambiguate
+            logger.warning(
+                f"Checksum {checksum_hex} matches {len(checksum_matched_games)} games: "
+                f"{checksum_matched_games}. Using title matching to disambiguate."
+            )
+
+            # Score each checksum-matched game by title quality
+            scored = [(g, self._score_title_match(g, rom_title)) for g in checksum_matched_games]
+            scored.sort(key=lambda x: x[1], reverse=True)
+
+            if scored[0][1] > 0:
+                # At least one title match found
+                selected_game = scored[0][0]
+                logger.info(
+                    f"Selected '{selected_game}' (title score {scored[0][1]}) "
+                    f"from {len(checksum_matched_games)} checksum matches"
+                )
+            else:
+                # No title matches - fall back to first checksum match
+                selected_game = checksum_matched_games[0]
+                logger.warning(f"No title match for any checksum-matched game. Using first: '{selected_game}'")
         elif title_matched_games:
+            # No checksum match, use title matching
             # Score and sort matches by quality (exact > substring > equivalence)
             scored = [(g, self._score_title_match(g, rom_title)) for g in title_matched_games]
             scored.sort(key=lambda x: x[1], reverse=True)
@@ -185,9 +206,8 @@ class SpriteConfigLoader:
         checksum_hex = f"0x{rom_checksum:04X}"
         logger.info(f"Looking for ROM configuration: title='{rom_title}', checksum={checksum_hex}")
 
-        # Try to find matching game by checksum first (most reliable)
-        checksum_matched_game = None
-        checksum_matched_version = None
+        # Collect ALL games that match the checksum (some checksums are shared)
+        checksum_matched_games: list[tuple[str, str]] = []  # List of (game_name, version)
 
         for game_name, game_data in self.config_data["games"].items():
             checksums = game_data.get("checksums", {})
@@ -201,13 +221,9 @@ class SpriteConfigLoader:
                     expected = expected_checksum
 
                 if rom_checksum == expected:
-                    checksum_matched_game = game_name
-                    checksum_matched_version = version
+                    checksum_matched_games.append((game_name, version))
                     logger.info(f"Found checksum match: {game_name} ({version}) = {checksum_hex}")
-                    break
-
-            if checksum_matched_game:
-                break
+                    break  # Only break inner loop (stop checking other versions for this game)
 
         # Then try title matching with flexible patterns
         title_matched_games = []
@@ -221,10 +237,9 @@ class SpriteConfigLoader:
         selected_game = None
         selected_version = None
 
-        if checksum_matched_game:
-            # Prefer checksum match
-            selected_game = checksum_matched_game
-            selected_version = checksum_matched_version
+        if len(checksum_matched_games) == 1:
+            # Single checksum match - authoritative
+            selected_game, selected_version = checksum_matched_games[0]
 
             # Warn if title doesn't match
             if selected_game not in title_matched_games:
@@ -232,10 +247,37 @@ class SpriteConfigLoader:
                     f"ROM checksum {checksum_hex} matches '{selected_game}' but "
                     f"title '{rom_title}' doesn't match expected pattern"
                 )
+        elif len(checksum_matched_games) > 1:
+            # Multiple games share this checksum - use title scoring to disambiguate
+            game_names = [g for g, _v in checksum_matched_games]
+            logger.warning(
+                f"Checksum {checksum_hex} matches {len(checksum_matched_games)} games: "
+                f"{game_names}. Using title matching to disambiguate."
+            )
+
+            # Score each checksum-matched game by title quality
+            scored = [(g, v, self._score_title_match(g, rom_title)) for g, v in checksum_matched_games]
+            scored.sort(key=lambda x: x[2], reverse=True)
+
+            if scored[0][2] > 0:
+                # At least one title match found
+                selected_game, selected_version, score = scored[0]
+                logger.info(
+                    f"Selected '{selected_game}' (title score {score}) "
+                    f"from {len(checksum_matched_games)} checksum matches"
+                )
+            else:
+                # No title matches - fall back to first checksum match
+                selected_game, selected_version = checksum_matched_games[0]
+                logger.warning(f"No title match for any checksum-matched game. Using first: '{selected_game}'")
         elif title_matched_games:
-            # Use title match if no checksum match
-            selected_game = title_matched_games[0]
-            logger.warning(f"No checksum match for {checksum_hex}, using title match: '{selected_game}'")
+            # No checksum match - use title matching with scoring
+            scored = [(g, self._score_title_match(g, rom_title)) for g in title_matched_games]
+            scored.sort(key=lambda x: x[1], reverse=True)
+            selected_game = scored[0][0]
+            logger.warning(
+                f"No checksum match for {checksum_hex}, using title match: '{selected_game}' (score {scored[0][1]})"
+            )
 
             # Log all known checksums for this game
             game_data = self.config_data["games"][selected_game]

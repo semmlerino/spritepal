@@ -136,12 +136,24 @@ class SpriteInjector:
                 if img.mode == "P":
                     # Indexed mode - count actual unique colors used
                     # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
-                    unique_colors = len(set(cast(Iterable[int], img.getdata())))
+                    pixels = list(cast(Iterable[int], img.getdata()))
+                    unique_colors = len(set(pixels))
                     logger.debug(f"Indexed mode with {unique_colors} unique colors")
                     if unique_colors > 16:
                         logger.error(f"Too many colors: {unique_colors} (max 16)")
                         return False, f"Image has too many colors ({unique_colors}, max 16)"
-                    logger.debug(f"Palette validation passed: {unique_colors} colors <= 16")
+
+                    # Validate palette indices for 4bpp compatibility (must be 0-15)
+                    max_index = max(pixels) if pixels else 0
+                    if max_index > 15:
+                        logger.error(f"PNG palette indices exceed 4bpp limit: max index {max_index} (must be 0-15)")
+                        return (
+                            False,
+                            f"PNG has palette indices up to {max_index}, which exceeds SNES 4bpp limit (0-15). "
+                            "Please re-save the PNG with a palette of 16 colors or fewer.",
+                        )
+
+                    logger.debug(f"Palette validation passed: {unique_colors} colors, max index {max_index}")
                 elif img.mode == "L":
                     # Grayscale mode - verify values are valid (0-255)
                     # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
@@ -168,6 +180,10 @@ class SpriteInjector:
         with Image.open(png_path) as img:
             width, height = img.size
 
+            if width % 8 != 0 or height % 8 != 0:
+                logger.error(f"Invalid image dimensions: {width}x{height} (must be multiples of 8)")
+                raise ValueError(f"Image dimensions must be multiples of 8. Found {width}x{height}.")
+
             # Handle different image modes - convert to NumPy array directly
             if img.mode == "L":
                 # Grayscale mode - convert to NumPy and transform to palette indices
@@ -184,17 +200,16 @@ class SpriteInjector:
                 max_index = int(pixels.max()) if pixels.size > 0 else 0
                 logger.debug(f"Using indexed palette directly: max index={max_index}")
 
-                # Validate palette indices for 4-bit compatibility (Issue 7 fix)
+                # Validate palette indices for 4-bit compatibility (strict - no recovery)
                 if max_index > 15:
-                    logger.warning(
+                    logger.error(
                         f"PNG palette has indices up to {max_index}, which exceeds SNES 4bpp limit (15). "
-                        "Attempting to recover by treating as grayscale intensity map."
+                        "This should have been caught during validation."
                     )
-                    # Convert to grayscale to recover indices from intensity
-                    # This handles cases where the image was saved with a linear 0-255 palette
-                    gray = img.convert("L")
-                    pixels = np.array(gray, dtype=np.uint8)
-                    pixels = np.minimum(15, pixels // 17).astype(np.uint8)
+                    raise ValueError(
+                        f"PNG palette indices exceed 4bpp limit: max {max_index} (must be 0-15). "
+                        "Please validate the PNG before conversion."
+                    )
             else:
                 # Convert to indexed mode
                 logger.warning(f"Converting {img.mode} to grayscale to recover indices")

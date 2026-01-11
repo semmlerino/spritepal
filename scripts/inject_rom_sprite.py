@@ -26,7 +26,11 @@ def main() -> int:
         "--offset",
         "-o",
         required=True,
-        help="ROM offset (hex, e.g., 0x29E667 or 29E667)",
+        help=(
+            "ROM offset in hexadecimal (e.g., 0x29E667). "
+            "By default, assumes this is a ROM address (adds 512 for .smc header). "
+            "If using Mesen's 'FILE:' offset output, use --no-header-adjust."
+        ),
     )
     parser.add_argument("--output", "-d", required=True, help="Path for output ROM file")
     parser.add_argument(
@@ -48,7 +52,10 @@ def main() -> int:
     parser.add_argument(
         "--no-header-adjust",
         action="store_true",
-        help="Don't adjust offset for SMC header (use raw file offset)",
+        help=(
+            "Don't adjust offset for SMC header (use raw file offset). "
+            "Use this when providing Mesen 'FILE: 0xNNNNNN' offsets, which already include the header."
+        ),
     )
 
     args = parser.parse_args()

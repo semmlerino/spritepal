@@ -1091,7 +1091,13 @@ class HALCompressor:
             f"Please run 'python compile_hal_tools.py' to build for your platform."
         )
 
-    def decompress_from_rom(self, rom_path: str, offset: int, output_path: str | None = None) -> bytes:
+    def decompress_from_rom(
+        self,
+        rom_path: str,
+        offset: int,
+        output_path: str | None = None,
+        max_decompressed_size: int = 65536,
+    ) -> bytes:
         """
         Decompress data from ROM at specified file offset.
 
@@ -1105,9 +1111,15 @@ class HALCompressor:
                 For .smc files, callers must add the SMC header offset (512)
                 to logical ROM addresses before calling this method.
             output_path: Optional path to save decompressed data
+            max_decompressed_size: Maximum allowed size of decompressed data (default 64KB).
+                Used to prevent decompression bomb attacks by checking file size
+                before reading into memory.
 
         Returns:
             Decompressed data as bytes
+
+        Raises:
+            HALCompressionError: If decompressed size exceeds max_decompressed_size
         """
         logger.info(f"Decompressing from ROM: {rom_path} at offset 0x{offset:X}")
 
@@ -1170,13 +1182,23 @@ class HALCompressor:
                 logger.error(f"Decompression failed with return code {result.returncode}")
                 raise HALCompressionError(f"Decompression failed: {result.stderr}")
 
-            # Read decompressed data
-            data = Path(output_path).read_bytes()
+            # Check file size BEFORE reading into memory (prevents decompression bomb)
+            output_file = Path(output_path)
+            file_size = output_file.stat().st_size
 
-            # Validate decompressed size (HAL max is 64KB)
-            if len(data) > 65536:
-                logger.error(f"Decompression produced {len(data)} bytes, exceeds 64KB HAL limit")
-                raise HALCompressionError(f"Decompression bomb detected: {len(data)} bytes exceeds 64KB limit")
+            if file_size > max_decompressed_size:
+                logger.error(
+                    f"Decompression produced {file_size} bytes, exceeds limit of {max_decompressed_size} bytes"
+                )
+                # Clean up oversized file before raising
+                with contextlib.suppress(Exception):
+                    output_file.unlink()
+                raise HALCompressionError(
+                    f"Decompression bomb detected: {file_size} bytes exceeds {max_decompressed_size} byte limit"
+                )
+
+            # Size is safe - read the file into memory
+            data = output_file.read_bytes()
 
             logger.info(f"Successfully decompressed {len(data)} bytes from ROM offset 0x{offset:X}")
             return data

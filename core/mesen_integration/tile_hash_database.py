@@ -13,7 +13,6 @@ When capturing sprites from Mesen 2:
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -176,7 +175,7 @@ class TileHashDatabase:
         for tile_idx in range(tile_count):
             tile_start = tile_idx * BYTES_PER_TILE
             tile_data = data[tile_start : tile_start + BYTES_PER_TILE]
-            tile_hash = self._hash_tile(tile_data)
+            tile_hash = hash_tile(tile_data)
 
             block.tile_hashes.append(tile_hash)
 
