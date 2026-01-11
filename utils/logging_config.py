@@ -11,6 +11,20 @@ from pathlib import Path
 # Global reference to console handler for dynamic updates
 _console_handler: logging.Handler | None = None
 
+# Track disabled logging categories (relative to spritepal.*, e.g., "core.rom_extractor")
+_disabled_categories: set[str] = set()
+
+# Known noisy categories for UI display
+NOISY_CATEGORIES: dict[str, str] = {
+    "core.rom_extractor": "ROM Extraction",
+    "core.tile_renderer": "Tile Rendering",
+    "ui.workers.batch_thumbnail_worker": "Thumbnail Worker",
+    "core.mesen_integration.tile_hash_database": "Tile Hash Database",
+    "core.mesen_integration.rom_tile_matcher": "ROM Tile Matcher",
+    "core.hal_compression": "HAL Compression",
+    "ui.workers": "All UI Workers",
+}
+
 
 def setup_logging(log_dir: Path | None = None, log_level: str = "INFO") -> logging.Logger:
     """
@@ -28,9 +42,9 @@ def setup_logging(log_dir: Path | None = None, log_level: str = "INFO") -> loggi
     if debug_mode:
         log_level = "DEBUG"
 
-    # Use default directory under user's home if not specified
+    # Use default directory within the spritepal project
     if log_dir is None:
-        log_dir = Path.home() / ".spritepal" / "logs"
+        log_dir = Path(__file__).parent.parent / "logs"
 
     log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -169,3 +183,104 @@ def set_console_debug_mode(enabled: bool) -> None:
     # Also update root spritepal logger level to allow DEBUG messages
     spritepal_logger = logging.getLogger("spritepal")
     spritepal_logger.setLevel(logging.DEBUG if enabled else logging.INFO)
+
+
+def set_category_enabled(category: str, enabled: bool) -> None:
+    """
+    Enable or disable logging for a specific category.
+
+    The category name is relative to 'spritepal.', e.g., 'core.rom_extractor'
+    will control the 'spritepal.core.rom_extractor' logger.
+
+    Disabling a parent category (e.g., 'ui.workers') also silences all children
+    (e.g., 'ui.workers.batch_thumbnail_worker').
+
+    Args:
+        category: The category name relative to spritepal (e.g., 'core.rom_extractor')
+        enabled: True to enable logging, False to disable
+    """
+    full_name = f"spritepal.{category}"
+    logger = logging.getLogger(full_name)
+
+    if enabled:
+        _disabled_categories.discard(category)
+        # Restore to parent's level (inherit from spritepal)
+        logger.setLevel(logging.NOTSET)
+    else:
+        _disabled_categories.add(category)
+        # Set to a level higher than CRITICAL to suppress all output
+        logger.setLevel(logging.CRITICAL + 1)
+
+
+def is_category_enabled(category: str) -> bool:
+    """
+    Check if a logging category is enabled.
+
+    Args:
+        category: The category name relative to spritepal
+
+    Returns:
+        True if the category is enabled, False if disabled
+    """
+    return category not in _disabled_categories
+
+
+def get_disabled_categories() -> set[str]:
+    """
+    Get the set of currently disabled logging categories.
+
+    Returns:
+        Set of disabled category names (relative to spritepal)
+    """
+    return _disabled_categories.copy()
+
+
+def set_disabled_categories(categories: set[str]) -> None:
+    """
+    Set the disabled categories from a collection (typically from saved settings).
+
+    This replaces the current disabled set and updates all affected loggers.
+
+    Args:
+        categories: Set of category names to disable (relative to spritepal)
+    """
+    global _disabled_categories
+
+    # First, re-enable all currently disabled categories
+    for category in _disabled_categories:
+        full_name = f"spritepal.{category}"
+        logging.getLogger(full_name).setLevel(logging.NOTSET)
+
+    # Then set the new disabled categories
+    _disabled_categories = set(categories)
+
+    # Apply the new disabled state
+    for category in _disabled_categories:
+        full_name = f"spritepal.{category}"
+        logging.getLogger(full_name).setLevel(logging.CRITICAL + 1)
+
+
+def enable_all_categories() -> None:
+    """Re-enable all logging categories."""
+    set_disabled_categories(set())
+
+
+def disable_categories(categories: list[str]) -> None:
+    """
+    Disable multiple logging categories at once.
+
+    Args:
+        categories: List of category names to disable
+    """
+    for category in categories:
+        set_category_enabled(category, enabled=False)
+
+
+def get_noisy_categories() -> dict[str, str]:
+    """
+    Get the dictionary of known noisy categories for UI display.
+
+    Returns:
+        Dict mapping category names to human-readable labels
+    """
+    return NOISY_CATEGORIES.copy()

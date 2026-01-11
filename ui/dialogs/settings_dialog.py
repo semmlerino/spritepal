@@ -28,6 +28,7 @@ from core.types import WidgetParent
 from ui.common.file_dialogs import browse_for_directory
 from ui.components.base import DialogBase
 from ui.styles import get_button_style, get_muted_text_style
+from utils.logging_config import get_noisy_categories
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
@@ -72,6 +73,7 @@ class SettingsDialog(DialogBase):
 
         # Add tabs
         self.tab_widget.addTab(self._create_general_tab(), "General")
+        self.tab_widget.addTab(self._create_logging_tab(), "Logging")
         self.tab_widget.addTab(self._create_cache_tab(), "Cache")
 
         # Set the tab widget as content
@@ -95,10 +97,6 @@ class SettingsDialog(DialogBase):
 
         self.auto_save_session_check = QCheckBox("Automatically save session", self)
         settings_layout.addRow(self.auto_save_session_check)
-
-        self.debug_logging_check = QCheckBox("Enable debug logging in console", self)
-        self.debug_logging_check.setToolTip("Shows detailed debug information with timestamps and line numbers")
-        settings_layout.addRow(self.debug_logging_check)
 
         # Separator line for visual grouping
         separator = QLabel(self)
@@ -128,6 +126,83 @@ class SettingsDialog(DialogBase):
 
         widget.setLayout(layout)
         return widget
+
+    def _create_logging_tab(self) -> QWidget:
+        """Create the logging settings tab"""
+        widget = QWidget(self)
+        layout = QVBoxLayout()
+
+        # Debug logging group
+        debug_group = QGroupBox("Debug Output", widget)
+        debug_layout = QVBoxLayout()
+
+        self.debug_logging_check = QCheckBox("Enable debug logging in console", self)
+        self.debug_logging_check.setToolTip("Shows detailed debug information with timestamps and line numbers")
+        self.debug_logging_check.toggled.connect(self._on_debug_logging_changed)
+        debug_layout.addWidget(self.debug_logging_check)
+
+        debug_group.setLayout(debug_layout)
+        layout.addWidget(debug_group)
+
+        # Log categories group
+        categories_group = QGroupBox("Log Categories", widget)
+        categories_layout = QVBoxLayout()
+
+        # Hint label
+        hint_label = QLabel("Uncheck categories to silence them (reduces console noise):", self)
+        hint_label.setStyleSheet(get_muted_text_style())
+        categories_layout.addWidget(hint_label)
+
+        # Create checkboxes for each noisy category
+        self._category_checkboxes: dict[str, QCheckBox] = {}
+        noisy_categories = get_noisy_categories()
+
+        for category, label in noisy_categories.items():
+            checkbox = QCheckBox(f"{label} ({category})", self)
+            checkbox.setChecked(True)  # All enabled by default
+            checkbox.setToolTip(f"Enable/disable logging for spritepal.{category}")
+            self._category_checkboxes[category] = checkbox
+            categories_layout.addWidget(checkbox)
+
+        # Bulk action buttons
+        button_layout = QHBoxLayout()
+
+        enable_all_btn = QPushButton("Enable All", self)
+        enable_all_btn.setStyleSheet(get_button_style())
+        enable_all_btn.clicked.connect(self._enable_all_categories)
+        button_layout.addWidget(enable_all_btn)
+
+        disable_all_btn = QPushButton("Disable All", self)
+        disable_all_btn.setStyleSheet(get_button_style())
+        disable_all_btn.clicked.connect(self._disable_all_categories)
+        button_layout.addWidget(disable_all_btn)
+
+        button_layout.addStretch()
+        categories_layout.addLayout(button_layout)
+
+        categories_group.setLayout(categories_layout)
+        layout.addWidget(categories_group)
+
+        # Add stretch to push content to top
+        layout.addStretch()
+
+        widget.setLayout(layout)
+        return widget
+
+    def _on_debug_logging_changed(self, checked: bool) -> None:
+        """Handle debug logging toggle - enable/disable category checkboxes."""
+        for checkbox in self._category_checkboxes.values():
+            checkbox.setEnabled(checked)
+
+    def _enable_all_categories(self) -> None:
+        """Enable all category checkboxes."""
+        for checkbox in self._category_checkboxes.values():
+            checkbox.setChecked(True)
+
+    def _disable_all_categories(self) -> None:
+        """Disable all category checkboxes."""
+        for checkbox in self._category_checkboxes.values():
+            checkbox.setChecked(False)
 
     def _create_cache_tab(self) -> QWidget:
         """Create the cache settings tab"""
@@ -240,6 +315,7 @@ class SettingsDialog(DialogBase):
             "restore_window": self.settings_manager.get("ui", "restore_position", True),
             "auto_save_session": self.settings_manager.get("session", "auto_save", True),
             "debug_logging": self.settings_manager.get_debug_logging(),
+            "disabled_log_categories": self.settings_manager.get_disabled_log_categories(),
             "dumps_dir": self.settings_manager.get("paths", "default_dumps_dir", ""),
             "cache_enabled": self.settings_manager.get_cache_enabled(),
             "cache_location": self.settings_manager.get_cache_location(),
@@ -254,8 +330,18 @@ class SettingsDialog(DialogBase):
         # General settings
         self.restore_window_check.setChecked(bool(self.settings_manager.get("ui", "restore_position", True)))
         self.auto_save_session_check.setChecked(bool(self.settings_manager.get("session", "auto_save", True)))
-        self.debug_logging_check.setChecked(self.settings_manager.get_debug_logging())
         self.dumps_dir_edit.setText(str(self.settings_manager.get("paths", "default_dumps_dir", "")))
+
+        # Logging settings
+        debug_enabled = self.settings_manager.get_debug_logging()
+        self.debug_logging_check.setChecked(debug_enabled)
+
+        # Load disabled categories and update checkboxes
+        disabled_categories = set(self.settings_manager.get_disabled_log_categories())
+        for category, checkbox in self._category_checkboxes.items():
+            # Checkbox is checked if category is NOT disabled
+            checkbox.setChecked(category not in disabled_categories)
+            checkbox.setEnabled(debug_enabled)
 
         # Cache settings
         self.cache_enabled_check.setChecked(self.settings_manager.get_cache_enabled())
@@ -273,8 +359,22 @@ class SettingsDialog(DialogBase):
         # General settings
         self.settings_manager.set("ui", "restore_position", self.restore_window_check.isChecked())
         self.settings_manager.set("session", "auto_save", self.auto_save_session_check.isChecked())
-        self.settings_manager.set_debug_logging(self.debug_logging_check.isChecked())
         self.settings_manager.set("paths", "default_dumps_dir", self.dumps_dir_edit.text())
+
+        # Logging settings
+        self.settings_manager.set_debug_logging(self.debug_logging_check.isChecked())
+
+        # Collect disabled categories (unchecked = disabled)
+        disabled_categories = [
+            category for category, checkbox in self._category_checkboxes.items() if not checkbox.isChecked()
+        ]
+        self.settings_manager.set_disabled_log_categories(disabled_categories)
+
+        # Apply to logging system immediately
+        from utils.logging_config import set_console_debug_mode, set_disabled_categories
+
+        set_console_debug_mode(self.debug_logging_check.isChecked())
+        set_disabled_categories(set(disabled_categories))
 
         # Cache settings
         self.settings_manager.set_cache_enabled(self.cache_enabled_check.isChecked())
@@ -413,10 +513,16 @@ class SettingsDialog(DialogBase):
 
     def _has_settings_changed(self) -> bool:
         """Check if any settings have changed"""
+        # Collect current disabled categories from checkboxes
+        disabled_log_categories = [
+            category for category, checkbox in self._category_checkboxes.items() if not checkbox.isChecked()
+        ]
+
         current = {
             "restore_window": self.restore_window_check.isChecked(),
             "auto_save_session": self.auto_save_session_check.isChecked(),
             "debug_logging": self.debug_logging_check.isChecked(),
+            "disabled_log_categories": disabled_log_categories,
             "dumps_dir": self.dumps_dir_edit.text(),
             "cache_enabled": self.cache_enabled_check.isChecked(),
             "cache_location": self.cache_location_edit.text(),

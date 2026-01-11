@@ -734,6 +734,18 @@ class ApplicationStateManager(BaseManager):
         self.set("ui", "debug_logging", enabled)
         self.save_session()
 
+    def get_disabled_log_categories(self) -> list[str]:
+        """Get the list of disabled logging categories."""
+        result = self.get("logging", "disabled_categories", [])
+        if isinstance(result, list):
+            return result
+        return []
+
+    def set_disabled_log_categories(self, categories: list[str]) -> None:
+        """Set the list of disabled logging categories."""
+        self.set("logging", "disabled_categories", categories)
+        self.save_session()
+
     def _ensure_default_settings(self) -> None:
         """Ensure default settings exist in persistent storage."""
         # Check and set default cache settings if not present

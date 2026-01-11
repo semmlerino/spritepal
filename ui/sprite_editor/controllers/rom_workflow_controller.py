@@ -4,7 +4,6 @@ ROM Workflow Controller for the Sprite Editor.
 Coordinates ROM loading, previewing, editing, and injection.
 """
 
-import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -15,6 +14,7 @@ from PySide6.QtGui import QImage, QPixmap
 from core.mesen_integration.log_watcher import CapturedOffset
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.mesen_integration.log_watcher import LogWatcher
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from ..views.workspaces.rom_workflow_page import ROMWorkflowPage
     from .editing_controller import EditingController
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ROMWorkflowController(QObject):
@@ -179,14 +179,18 @@ class ROMWorkflowController(QObject):
 
     def _add_capture_to_browser(self, capture: CapturedOffset) -> None:
         """Add a capture to the browser with thumbnail."""
+        print(f"[DEBUG] _add_capture_to_browser: offset=0x{capture.offset:06X}, view={self._view is not None}", flush=True)
         if not self._view:
+            print("[DEBUG] _add_capture_to_browser: NO VIEW, skipping", flush=True)
             return
 
         name = self._get_capture_name(capture)
+        print(f"[DEBUG] _add_capture_to_browser: calling view.add_mesen_capture({name}, 0x{capture.offset:06X})", flush=True)
         self._view.add_mesen_capture(name, capture.offset)
 
         # Request thumbnail if worker is ready
         if self._thumbnail_controller:
+            print(f"[DEBUG] _add_capture_to_browser: queuing thumbnail for 0x{capture.offset:06X}", flush=True)
             self._thumbnail_controller.queue_thumbnail(capture.offset)
 
     def set_view(self, view: "ROMWorkflowPage") -> None:
@@ -595,14 +599,18 @@ class ROMWorkflowController(QObject):
         Called when entering the sprite editor workspace to ensure all
         discovered captures are visible in the asset browser.
         """
+        print(f"[DEBUG] sync_captures_from_log_watcher: view={self._view is not None}, log_watcher={self.log_watcher is not None}", flush=True)
         if not self._view:
+            print("[DEBUG] sync_captures_from_log_watcher: NO VIEW", flush=True)
             logger.warning("sync_captures_from_log_watcher: no view set")
             return
         if not self.log_watcher:
+            print("[DEBUG] sync_captures_from_log_watcher: NO LOG_WATCHER", flush=True)
             logger.warning("sync_captures_from_log_watcher: no log_watcher")
             return
 
         captures = self.log_watcher.recent_captures
+        print(f"[DEBUG] sync_captures_from_log_watcher: found {len(captures)} captures", flush=True)
         logger.info(
             "sync_captures_from_log_watcher: found %d captures in log_watcher",
             len(captures),
@@ -610,16 +618,19 @@ class ROMWorkflowController(QObject):
 
         # Sync all current session captures
         for capture in captures:
+            print(f"[DEBUG]   syncing capture: 0x{capture.offset:06X}", flush=True)
             logger.debug("  syncing capture: 0x%06X", capture.offset)
             self._add_capture_to_browser(capture)
 
         # Also sync persistent clicks
         persistent = self.log_watcher.load_persistent_clicks()
+        print(f"[DEBUG] sync_captures_from_log_watcher: found {len(persistent)} persistent clicks", flush=True)
         logger.info(
             "sync_captures_from_log_watcher: found %d persistent clicks",
             len(persistent),
         )
         for capture in persistent:
+            print(f"[DEBUG]   syncing persistent: 0x{capture.offset:06X}", flush=True)
             logger.debug("  syncing persistent: 0x%06X", capture.offset)
             self._add_capture_to_browser(capture)
 
@@ -633,6 +644,7 @@ class ROMWorkflowController(QObject):
             offset: ROM offset of the capture
             name: Display name for the capture (defaults to hex offset)
         """
+        print(f"[DEBUG] ensure_and_select_capture: offset=0x{offset:06X}, name={name}, view={self._view is not None}, log_watcher={self.log_watcher is not None}", flush=True)
         logger.info(
             "ensure_and_select_capture called: offset=0x%06X, name=%s, view=%s, log_watcher=%s",
             offset,
@@ -642,16 +654,20 @@ class ROMWorkflowController(QObject):
         )
 
         if not self._view:
+            print("[DEBUG] ensure_and_select_capture: NO VIEW, returning early", flush=True)
             logger.warning("ensure_and_select_capture: no view, returning early")
             return
 
         # First sync all captures from log watcher (idempotent - duplicates are skipped)
+        print("[DEBUG] ensure_and_select_capture: calling sync_captures_from_log_watcher", flush=True)
         self.sync_captures_from_log_watcher()
 
         # Then ensure the specific capture exists and select it
         browser = self._view.asset_browser
+        print(f"[DEBUG] ensure_and_select_capture: calling browser.ensure_mesen_capture(0x{offset:06X}, {name})", flush=True)
         browser.ensure_mesen_capture(offset, name)
         browser.select_sprite_by_offset(offset)
+        print(f"[DEBUG] ensure_and_select_capture: COMPLETED for offset 0x{offset:06X}", flush=True)
         logger.info("ensure_and_select_capture: completed for offset 0x%06X", offset)
 
     def set_offset(self, offset: int, *, auto_open: bool = False) -> None:

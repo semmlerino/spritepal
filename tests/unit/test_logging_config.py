@@ -26,20 +26,20 @@ class TestSetupLogging:
     """Test setup_logging function - essential tests only."""
 
     def test_setup_logging_default_directory(self):
-        """Test setup_logging creates log file in default directory."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with patch("pathlib.Path.home", return_value=Path(temp_dir)):
-                logger = setup_logging()
+        """Test setup_logging creates log file in default directory (project-relative)."""
+        # Default log directory is now relative to the project, not user home
+        logger = setup_logging()
 
-                assert logger.name == "spritepal"
-                assert logger.level == logging.INFO
-                # Handler count is implementation detail - verify logging works via file existence
+        assert logger.name == "spritepal"
+        assert logger.level == logging.INFO
 
-                expected_log_dir = Path(temp_dir) / ".spritepal" / "logs"
-                assert expected_log_dir.exists()
+        # The default log directory is the 'logs' folder in the project root
+        # This is 3 levels up from this test file: tests/unit/test_logging_config.py
+        expected_log_dir = Path(__file__).parent.parent.parent / "logs"
+        assert expected_log_dir.exists()
 
-                log_file = expected_log_dir / "spritepal.log"
-                assert log_file.exists()
+        log_file = expected_log_dir / "spritepal.log"
+        assert log_file.exists()
 
     def test_setup_logging_custom_directory(self):
         """Test setup_logging with custom directory."""
