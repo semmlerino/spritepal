@@ -9,6 +9,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import NamedTuple
 
+from core.analysis_utils import (
+    calculate_entropy,
+    calculate_zero_percentage,
+    detect_repeating_patterns,
+)
 from utils.constants import (
     EMPTY_REGION_ENTROPY_THRESHOLD,
     EMPTY_REGION_MAX_UNIQUE_BYTES,
@@ -18,7 +23,6 @@ from utils.constants import (
     ROM_MIN_REGION_SIZE,
 )
 from utils.logging_config import get_logger
-from utils.math_utils import calculate_entropy
 
 logger = get_logger(__name__)
 
@@ -73,10 +77,10 @@ class EmptyRegionDetector:
             return self._cache[cache_key]
 
         # Calculate metrics
-        entropy = self._calculate_entropy(data)
-        zero_percentage = self._calculate_zero_percentage(data)
+        entropy = calculate_entropy(data)
+        zero_percentage = calculate_zero_percentage(data)
         unique_bytes = len(set(data))
-        pattern_score = self._detect_repeating_patterns(data)
+        pattern_score = detect_repeating_patterns(data)
 
         # Determine if region is empty based on thresholds
         is_empty = False
@@ -111,68 +115,6 @@ class EmptyRegionDetector:
         self._cache[cache_key] = result
 
         return result
-
-    def _calculate_entropy(self, data: bytes) -> float:
-        """Calculate Shannon entropy of data.
-
-        Returns value between 0 (uniform) and 8 (random).
-        """
-        return calculate_entropy(data)
-
-    def _calculate_zero_percentage(self, data: bytes) -> float:
-        """Calculate percentage of zero bytes in data."""
-        if not data:
-            return 1.0
-
-        zero_count = data.count(b"\x00")
-        return zero_count / len(data)
-
-    def _detect_repeating_patterns(self, data: bytes) -> float:
-        """
-        Detect repeating patterns in data.
-
-        Returns score between 0 (no patterns) and 1 (highly repetitive).
-        """
-        if len(data) < 16:
-            return 0.0
-
-        # Check for common padding patterns
-        common_patterns = [
-            b"\x00" * 16,  # All zeros
-            b"\xff" * 16,  # All ones
-            b"\x00\xff" * 8,  # Alternating
-            b"\xff\x00" * 8,  # Alternating reverse
-        ]
-
-        # Check if data matches any common pattern
-        for pattern in common_patterns:
-            pattern_len = len(pattern)
-            matches = 0
-
-            for i in range(0, len(data) - pattern_len + 1, pattern_len):
-                if data[i : i + pattern_len] == pattern:
-                    matches += 1
-
-            if matches > 0:
-                coverage = (matches * pattern_len) / len(data)
-                if coverage > 0.8:  # 80% of region is pattern
-                    return coverage
-
-        # Check for any 4-byte repeating pattern
-        if len(data) >= 16:
-            pattern_len = 4
-            first_pattern = data[:pattern_len]
-            matches = 0
-
-            for i in range(0, len(data) - pattern_len + 1, pattern_len):
-                if data[i : i + pattern_len] == first_pattern:
-                    matches += 1
-
-            coverage = (matches * pattern_len) / len(data)
-            if coverage > 0.9:  # 90% repetition
-                return coverage
-
-        return 0.0
 
     def scan_rom_regions(
         self, rom_data: bytes, progress_callback: Callable[[int, int], None] | None = None

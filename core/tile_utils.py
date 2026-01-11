@@ -7,7 +7,13 @@ sprite extraction and rendering components.
 
 from __future__ import annotations
 
+import hashlib
+from typing import TYPE_CHECKING
+
 from utils.constants import BYTES_PER_TILE
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 
 def decode_4bpp_tile(tile_bytes: bytes) -> list[list[int]]:
@@ -65,3 +71,54 @@ def decode_4bpp_tile(tile_bytes: bytes) -> list[list[int]]:
         pixels.append(row_pixels)
 
     return pixels
+
+
+def hash_tile(tile_data: bytes) -> str:
+    """Generate MD5 hash for a tile."""
+    return hashlib.md5(tile_data).hexdigest()
+
+
+def reverse_byte(value: int) -> int:
+    """Reverse bits in a byte."""
+    value = ((value & 0xF0) >> 4) | ((value & 0x0F) << 4)
+    value = ((value & 0xCC) >> 2) | ((value & 0x33) << 2)
+    value = ((value & 0xAA) >> 1) | ((value & 0x55) << 1)
+    return value
+
+
+def flip_tile(tile_data: bytes, flip_h: bool, flip_v: bool) -> bytes:
+    """
+    Flip 4bpp tile data horizontally and/or vertically.
+    
+    Args:
+        tile_data: 32 bytes of 4bpp tile data
+        flip_h: Horizontal flip
+        flip_v: Vertical flip
+        
+    Returns:
+        Flipped tile data
+    """
+    if not flip_h and not flip_v:
+        return tile_data
+    if len(tile_data) != BYTES_PER_TILE:
+        return tile_data
+    
+    out = bytearray(BYTES_PER_TILE)
+    for row in range(8):
+        src_row = 7 - row if flip_v else row
+        for plane_offset in (0, 16):
+            b0 = tile_data[plane_offset + (src_row * 2)]
+            b1 = tile_data[plane_offset + (src_row * 2) + 1]
+            if flip_h:
+                b0 = reverse_byte(b0)
+                b1 = reverse_byte(b1)
+            out[plane_offset + (row * 2)] = b0
+            out[plane_offset + (row * 2) + 1] = b1
+    return bytes(out)
+
+
+def iter_flip_variants(tile_data: bytes) -> Iterator[bytes]:
+    """Yield all flipped variants of a tile (H, V, HV)."""
+    yield flip_tile(tile_data, flip_h=True, flip_v=False)
+    yield flip_tile(tile_data, flip_h=False, flip_v=True)
+    yield flip_tile(tile_data, flip_h=True, flip_v=True)

@@ -1,7 +1,7 @@
 """
 Tests for HAL compression parsing.
 
-This module tests the _parse_hal_compressed_size() method in ROMInjector
+This module tests the HALParser.parse_compressed_size() method
 to verify it correctly parses HAL compression streams and calculates
 compressed block sizes.
 
@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from core.rom_injector import ROMInjector
+from core.hal_parser import HALParser
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -43,12 +43,6 @@ if TYPE_CHECKING:
 # =============================================================================
 # Test Fixtures
 # =============================================================================
-
-
-@pytest.fixture
-def injector() -> ROMInjector:
-    """Create ROMInjector instance for testing."""
-    return ROMInjector()
 
 
 @pytest.fixture
@@ -233,18 +227,18 @@ class HALStreamBuilder:
 class TestShortCommands:
     """Test short command format parsing (5-bit length)."""
 
-    def test_raw_bytes_minimal(self, injector: ROMInjector) -> None:
+    def test_raw_bytes_minimal(self) -> None:
         """Test parsing minimal raw bytes command (1 byte)."""
         # Command 0, length 1: 0x00 | 0 = 0x00, followed by 1 byte, then 0xFF
         stream = bytes([0x00, 0xAB, 0xFF])
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 3  # command + data + terminator
 
-    def test_raw_bytes_max_short(self, injector: ROMInjector) -> None:
+    def test_raw_bytes_max_short(self) -> None:
         """Test parsing max short raw bytes command (32 bytes)."""
         # Command 0, length 32: 0x00 | 31 = 0x1F
         data = bytes(range(32))
@@ -252,62 +246,62 @@ class TestShortCommands:
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 1 + 32 + 1  # command + data + terminator
 
-    def test_8bit_rle(self, injector: ROMInjector) -> None:
+    def test_8bit_rle(self) -> None:
         """Test parsing 8-bit RLE command."""
         # Command 1, length 10: (1 << 5) | 9 = 0x29, followed by 1 byte
         stream = bytes([0x29, 0x42, 0xFF])
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 3
 
-    def test_16bit_rle(self, injector: ROMInjector) -> None:
+    def test_16bit_rle(self) -> None:
         """Test parsing 16-bit RLE command."""
         # Command 2, length 5: (2 << 5) | 4 = 0x44, followed by 2 bytes
         stream = bytes([0x44, 0x12, 0x34, 0xFF])
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 4
 
-    def test_sequence_rle(self, injector: ROMInjector) -> None:
+    def test_sequence_rle(self) -> None:
         """Test parsing sequence RLE command."""
         # Command 3, length 8: (3 << 5) | 7 = 0x67, followed by 1 byte
         stream = bytes([0x67, 0x00, 0xFF])
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 3
 
-    def test_forward_backref(self, injector: ROMInjector) -> None:
+    def test_forward_backref(self) -> None:
         """Test parsing forward backref command (4)."""
         # Command 4, length 16: (4 << 5) | 15 = 0x8F, followed by 2-byte offset
         stream = bytes([0x8F, 0x00, 0x00, 0xFF])
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 4
 
-    def test_backward_backref(self, injector: ROMInjector) -> None:
+    def test_backward_backref(self) -> None:
         """Test parsing backward backref command (6)."""
         # Command 6, length 4: (6 << 5) | 3 = 0xC3, followed by 2-byte offset
         stream = bytes([0xC3, 0x10, 0x00, 0xFF])
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 4
 
@@ -315,7 +309,7 @@ class TestShortCommands:
 class TestLongCommands:
     """Test long command format parsing (10-bit length)."""
 
-    def test_raw_bytes_long_format(self, injector: ROMInjector) -> None:
+    def test_raw_bytes_long_format(self) -> None:
         """Test parsing long format raw bytes (> 32 bytes)."""
         # Long command 0: 0xE0 | (cmd << 2) | (len >> 8) = 0xE0 | 0 | 0 = 0xE0
         # Length 100: stored as (100-1) = 99 = 0x63
@@ -324,11 +318,11 @@ class TestLongCommands:
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 2 + 100 + 1  # cmd+len + data + terminator
 
-    def test_8bit_rle_long_format(self, injector: ROMInjector) -> None:
+    def test_8bit_rle_long_format(self) -> None:
         """Test parsing long format 8-bit RLE."""
         # Long command 1: 0xE0 | (1 << 2) | 0 = 0xE4
         # Length 256: stored as (256-1) = 255 = 0xFF
@@ -336,11 +330,11 @@ class TestLongCommands:
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 4
 
-    def test_16bit_rle_long_format(self, injector: ROMInjector) -> None:
+    def test_16bit_rle_long_format(self) -> None:
         """Test parsing long format 16-bit RLE."""
         # Long command 2: 0xE0 | (2 << 2) | 0 = 0xE8
         # Length 64: stored as 63 = 0x3F
@@ -348,11 +342,11 @@ class TestLongCommands:
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 5
 
-    def test_backref_long_format(self, injector: ROMInjector) -> None:
+    def test_backref_long_format(self) -> None:
         """Test parsing long format backref."""
         # Long command 4: 0xE0 | (4 << 2) | 1 = 0xF1
         # Length 300: stored as 299, high bits in cmd byte: (299 >> 8) = 1
@@ -361,11 +355,11 @@ class TestLongCommands:
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 5
 
-    def test_max_length_long_format(self, injector: ROMInjector) -> None:
+    def test_max_length_long_format(self) -> None:
         """Test parsing maximum length in long format (1024 bytes)."""
         # Max length is 1024 (stored as 1023 = 0x3FF)
         # Command 1 (8-bit RLE): 0xE0 | (1 << 2) | 3 = 0xE7
@@ -374,7 +368,7 @@ class TestLongCommands:
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 4
 
@@ -387,7 +381,7 @@ class TestLongCommands:
 class TestWithBuilder:
     """Tests using HALStreamBuilder for complex streams."""
 
-    def test_simple_rle_sequence(self, injector: ROMInjector) -> None:
+    def test_simple_rle_sequence(self) -> None:
         """Test parsing simple RLE followed by raw bytes."""
         stream = (
             HALStreamBuilder()
@@ -400,7 +394,7 @@ class TestWithBuilder:
         rom_data = bytes(50) + stream + bytes(50)
         offset = 50
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         # Expected: 2 + 6 + 2 + 1 = 11 bytes
         # rle_8bit(16): cmd + byte = 2
@@ -409,7 +403,7 @@ class TestWithBuilder:
         # terminator: 1
         assert size == 2 + 6 + 2 + 1
 
-    def test_mixed_commands(self, injector: ROMInjector) -> None:
+    def test_mixed_commands(self) -> None:
         """Test parsing stream with multiple command types."""
         stream = (
             HALStreamBuilder()
@@ -423,7 +417,7 @@ class TestWithBuilder:
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         # raw_bytes(10): 1 + 10 = 11
         # rle_16bit(8): 1 + 2 = 3
@@ -432,7 +426,7 @@ class TestWithBuilder:
         # terminator: 1
         assert size == 11 + 3 + 2 + 3 + 1
 
-    def test_long_and_short_mixed(self, injector: ROMInjector) -> None:
+    def test_long_and_short_mixed(self) -> None:
         """Test parsing mix of long and short format commands."""
         stream = (
             HALStreamBuilder()
@@ -445,7 +439,7 @@ class TestWithBuilder:
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         # rle_8bit short: 1 + 1 = 2
         # rle_8bit long: 2 + 1 = 3
@@ -462,69 +456,69 @@ class TestWithBuilder:
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
-    def test_empty_stream_only_terminator(self, injector: ROMInjector) -> None:
+    def test_empty_stream_only_terminator(self) -> None:
         """Test parsing stream with only terminator."""
         stream = bytes([0xFF])
         rom_data = bytes(100) + stream + bytes(100)
         offset = 100
 
-        size = injector._parse_hal_compressed_size(rom_data, offset)
+        size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert size == 1
 
-    def test_offset_at_start_of_rom(self, injector: ROMInjector) -> None:
+    def test_offset_at_start_of_rom(self) -> None:
         """Test parsing at offset 0."""
         stream = bytes([0x20, 0x42, 0xFF])  # Simple 8-bit RLE
         rom_data = stream + bytes(100)
 
-        size = injector._parse_hal_compressed_size(rom_data, 0)
+        size = HALParser.parse_compressed_size(rom_data, 0)
 
         assert size == 3
 
-    def test_offset_near_end_of_rom(self, injector: ROMInjector) -> None:
+    def test_offset_near_end_of_rom(self) -> None:
         """Test parsing near end of ROM data."""
         stream = bytes([0x20, 0x42, 0xFF])
         rom_data = bytes(100) + stream
 
-        size = injector._parse_hal_compressed_size(rom_data, 100)
+        size = HALParser.parse_compressed_size(rom_data, 100)
 
         assert size == 3
 
-    def test_truncated_stream_no_terminator(self, injector: ROMInjector) -> None:
+    def test_truncated_stream_no_terminator(self) -> None:
         """Test handling stream that runs into end of data without terminator."""
         # Stream with command but no terminator
         stream = bytes([0x20, 0x42])  # 8-bit RLE, but no terminator
         rom_data = stream
 
-        size = injector._parse_hal_compressed_size(rom_data, 0)
+        size = HALParser.parse_compressed_size(rom_data, 0)
 
         # Should return the size consumed (reaches end)
         assert size == 2
 
-    def test_truncated_long_command(self, injector: ROMInjector) -> None:
+    def test_truncated_long_command(self) -> None:
         """Test handling truncated long command."""
         # Long command header but missing length byte
         stream = bytes([0xE4])  # Long command 1, but missing second byte
         rom_data = stream
 
-        size = injector._parse_hal_compressed_size(rom_data, 0)
+        size = HALParser.parse_compressed_size(rom_data, 0)
 
         # Should return size consumed
         assert size == 1
 
-    def test_64kb_limit(self, injector: ROMInjector) -> None:
+    def test_64kb_limit(self) -> None:
         """Test that parsing stops at 64KB limit."""
         # Create a stream that could theoretically extend beyond 64KB
         # (no terminator within 64KB)
         rom_data = bytes(0x20000)  # 128KB of zeros
         # Zeros are valid as command 0 with length 1
 
-        size = injector._parse_hal_compressed_size(rom_data, 0)
+        size = HALParser.parse_compressed_size(rom_data, 0)
 
         # Should stop at 64KB limit
         assert size <= 0x10000
 
-    def test_all_backref_types(self, injector: ROMInjector) -> None:
+    def test_all_backref_types(self) -> None:
         """Test all backref command types (4, 5, 6, 7)."""
         for cmd in (4, 5, 6, 7):
             stream = HALStreamBuilder().backref(0, 10, command=cmd).build_with_terminator()
@@ -532,7 +526,7 @@ class TestEdgeCases:
             rom_data = bytes(100) + stream + bytes(100)
             offset = 100
 
-            size = injector._parse_hal_compressed_size(rom_data, offset)
+            size = HALParser.parse_compressed_size(rom_data, offset)
 
             # Commands 4-6: short format = 1 (cmd) + 2 (offset) + 1 (term) = 4
             # Command 7: must use long format = 2 (cmd+len) + 2 (offset) + 1 (term) = 5
@@ -633,7 +627,6 @@ class TestRealHALComparison:
 
     def test_simple_rle_pattern(
         self,
-        injector: ROMInjector,
         temp_files: tuple[Path, Path, Path],
     ) -> None:
         """Test parser matches exhal for simple RLE pattern."""
@@ -651,14 +644,13 @@ class TestRealHALComparison:
         offset = 0x1000
 
         # Parse with our implementation
-        parsed_size = injector._parse_hal_compressed_size(rom_data, offset)
+        parsed_size = HALParser.parse_compressed_size(rom_data, offset)
 
         # Compare: our parsed size should match actual compressed size
         assert parsed_size == len(compressed)
 
     def test_mixed_pattern(
         self,
-        injector: ROMInjector,
         temp_files: tuple[Path, Path, Path],
     ) -> None:
         """Test parser matches exhal for mixed pattern data."""
@@ -674,13 +666,12 @@ class TestRealHALComparison:
         rom_data = bytes(0x1000) + compressed + bytes(0x1000)
         offset = 0x1000
 
-        parsed_size = injector._parse_hal_compressed_size(rom_data, offset)
+        parsed_size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert parsed_size == len(compressed)
 
     def test_random_like_pattern(
         self,
-        injector: ROMInjector,
         temp_files: tuple[Path, Path, Path],
     ) -> None:
         """Test parser matches exhal for pseudo-random data."""
@@ -698,7 +689,7 @@ class TestRealHALComparison:
         rom_data = bytes(0x1000) + compressed + bytes(0x1000)
         offset = 0x1000
 
-        parsed_size = injector._parse_hal_compressed_size(rom_data, offset)
+        parsed_size = HALParser.parse_compressed_size(rom_data, offset)
 
         assert parsed_size == len(compressed)
 
@@ -711,7 +702,7 @@ class TestRealHALComparison:
 class TestKnownPatterns:
     """Test known HAL patterns that have caused issues in the past."""
 
-    def test_pattern_starting_with_e0_range(self, injector: ROMInjector) -> None:
+    def test_pattern_starting_with_e0_range(self) -> None:
         """Test patterns where first byte is in 0xE0-0xFF range.
 
         These bytes trigger long command parsing.
@@ -720,23 +711,23 @@ class TestKnownPatterns:
         stream = bytes([0xE0, 0x03, 0x11, 0x22, 0x33, 0x44, 0xFF])
         rom_data = bytes(100) + stream + bytes(100)
 
-        size = injector._parse_hal_compressed_size(rom_data, 100)
+        size = HALParser.parse_compressed_size(rom_data, 100)
 
         # Long cmd 0, length 4: 2 bytes header + 4 bytes data + 1 terminator
         assert size == 7
 
-    def test_pattern_with_ff_in_data(self, injector: ROMInjector) -> None:
+    def test_pattern_with_ff_in_data(self) -> None:
         """Test pattern with 0xFF in raw data (not terminator)."""
         # Raw bytes containing 0xFF should not terminate stream
         stream = bytes([0x02, 0xFF, 0x00, 0xFF, 0xFF])  # 3 raw bytes including 0xFF, then terminator
         rom_data = bytes(100) + stream + bytes(100)
 
-        size = injector._parse_hal_compressed_size(rom_data, 100)
+        size = HALParser.parse_compressed_size(rom_data, 100)
 
         # cmd (1) + 3 raw bytes + terminator (1)
         assert size == 5
 
-    def test_sequential_terminator_look_alike(self, injector: ROMInjector) -> None:
+    def test_sequential_terminator_look_alike(self) -> None:
         """Test that 0xFF in non-command position doesn't terminate."""
         # Build stream with 0xFF values in data positions
         stream = (
@@ -748,7 +739,7 @@ class TestKnownPatterns:
 
         rom_data = bytes(100) + stream + bytes(100)
 
-        size = injector._parse_hal_compressed_size(rom_data, 100)
+        size = HALParser.parse_compressed_size(rom_data, 100)
 
         # rle: 2, raw(2): 3, terminator: 1 = 6
         assert size == 2 + 3 + 1

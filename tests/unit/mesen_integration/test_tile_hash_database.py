@@ -19,6 +19,12 @@ from core.mesen_integration.tile_hash_database import (
     TileMatch,
     build_and_save_database,
 )
+from core.tile_utils import (
+    flip_tile,
+    hash_tile,
+    iter_flip_variants,
+    reverse_byte,
+)
 
 # =============================================================================
 # TileMatch Tests
@@ -104,107 +110,107 @@ class TestTileHashDatabaseStaticMethods:
     def test_hash_tile_basic(self) -> None:
         """_hash_tile returns MD5 hex digest."""
         tile_data = bytes(BYTES_PER_TILE)  # 32 zero bytes
-        hash_result = TileHashDatabase._hash_tile(tile_data)
+        hash_result = hash_tile(tile_data)
         assert isinstance(hash_result, str)
         assert len(hash_result) == 32  # MD5 hex digest length
 
     def test_hash_tile_deterministic(self) -> None:
         """Same data produces same hash."""
         tile_data = bytes(range(BYTES_PER_TILE))
-        hash1 = TileHashDatabase._hash_tile(tile_data)
-        hash2 = TileHashDatabase._hash_tile(tile_data)
+        hash1 = hash_tile(tile_data)
+        hash2 = hash_tile(tile_data)
         assert hash1 == hash2
 
     def test_hash_tile_different_data(self) -> None:
         """Different data produces different hash."""
         tile1 = bytes(BYTES_PER_TILE)
         tile2 = bytes([1] * BYTES_PER_TILE)
-        hash1 = TileHashDatabase._hash_tile(tile1)
-        hash2 = TileHashDatabase._hash_tile(tile2)
+        hash1 = hash_tile(tile1)
+        hash2 = hash_tile(tile2)
         assert hash1 != hash2
 
     def test_reverse_byte_zero(self) -> None:
         """Reversing 0x00 returns 0x00."""
-        assert TileHashDatabase._reverse_byte(0x00) == 0x00
+        assert reverse_byte(0x00) == 0x00
 
     def test_reverse_byte_ff(self) -> None:
         """Reversing 0xFF returns 0xFF."""
-        assert TileHashDatabase._reverse_byte(0xFF) == 0xFF
+        assert reverse_byte(0xFF) == 0xFF
 
     def test_reverse_byte_single_bit(self) -> None:
         """Reversing 0x80 returns 0x01."""
-        assert TileHashDatabase._reverse_byte(0x80) == 0x01
+        assert reverse_byte(0x80) == 0x01
 
     def test_reverse_byte_pattern(self) -> None:
         """Reversing 0xF0 returns 0x0F."""
-        assert TileHashDatabase._reverse_byte(0xF0) == 0x0F
+        assert reverse_byte(0xF0) == 0x0F
 
     def test_reverse_byte_asymmetric(self) -> None:
         """Reversing 0b10110100 (0xB4) returns 0b00101101 (0x2D)."""
         # 0xB4 = 1011 0100
         # Reversed = 0010 1101 = 0x2D
-        assert TileHashDatabase._reverse_byte(0xB4) == 0x2D
+        assert reverse_byte(0xB4) == 0x2D
 
     def test_reverse_byte_double_reverse(self) -> None:
         """Reversing twice returns original value."""
         for value in [0x00, 0xFF, 0xAA, 0x55, 0x12, 0x34]:
-            assert TileHashDatabase._reverse_byte(TileHashDatabase._reverse_byte(value)) == value
+            assert reverse_byte(reverse_byte(value)) == value
 
     def test_flip_tile_no_flip(self) -> None:
         """No flip returns original data."""
         tile_data = bytes(range(BYTES_PER_TILE))
-        result = TileHashDatabase._flip_tile(tile_data, flip_h=False, flip_v=False)
+        result = flip_tile(tile_data, flip_h=False, flip_v=False)
         assert result == tile_data
 
     def test_flip_tile_invalid_size(self) -> None:
         """Invalid tile size returns original data unchanged."""
         tile_data = bytes([1, 2, 3])
-        result = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=False)
+        result = flip_tile(tile_data, flip_h=True, flip_v=False)
         assert result == tile_data
 
     def test_flip_tile_h_produces_different(self) -> None:
         """Horizontal flip produces different data (for non-symmetric tiles)."""
         # Create non-symmetric tile data
         tile_data = bytes(list(range(BYTES_PER_TILE)))
-        result = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=False)
+        result = flip_tile(tile_data, flip_h=True, flip_v=False)
         assert result != tile_data
 
     def test_flip_tile_v_produces_different(self) -> None:
         """Vertical flip produces different data (for non-symmetric tiles)."""
         tile_data = bytes(list(range(BYTES_PER_TILE)))
-        result = TileHashDatabase._flip_tile(tile_data, flip_h=False, flip_v=True)
+        result = flip_tile(tile_data, flip_h=False, flip_v=True)
         assert result != tile_data
 
     def test_flip_tile_hv_produces_different(self) -> None:
         """HV flip produces different data (for non-symmetric tiles)."""
         tile_data = bytes(list(range(BYTES_PER_TILE)))
-        result = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=True)
+        result = flip_tile(tile_data, flip_h=True, flip_v=True)
         assert result != tile_data
 
     def test_flip_tile_double_h_flip(self) -> None:
         """Double horizontal flip returns original."""
         tile_data = bytes(list(range(BYTES_PER_TILE)))
-        flipped_once = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=False)
-        flipped_twice = TileHashDatabase._flip_tile(flipped_once, flip_h=True, flip_v=False)
+        flipped_once = flip_tile(tile_data, flip_h=True, flip_v=False)
+        flipped_twice = flip_tile(flipped_once, flip_h=True, flip_v=False)
         assert flipped_twice == tile_data
 
     def test_flip_tile_double_v_flip(self) -> None:
         """Double vertical flip returns original."""
         tile_data = bytes(list(range(BYTES_PER_TILE)))
-        flipped_once = TileHashDatabase._flip_tile(tile_data, flip_h=False, flip_v=True)
-        flipped_twice = TileHashDatabase._flip_tile(flipped_once, flip_h=False, flip_v=True)
+        flipped_once = flip_tile(tile_data, flip_h=False, flip_v=True)
+        flipped_twice = flip_tile(flipped_once, flip_h=False, flip_v=True)
         assert flipped_twice == tile_data
 
     def test_iter_flip_variants_count(self) -> None:
         """_iter_flip_variants returns 3 variants (H, V, HV)."""
         tile_data = bytes(BYTES_PER_TILE)
-        variants = TileHashDatabase._iter_flip_variants(tile_data)
+        variants = list(iter_flip_variants(tile_data))
         assert len(variants) == 3
 
     def test_iter_flip_variants_all_different_for_asymmetric(self) -> None:
         """All variants are different for asymmetric data."""
         tile_data = bytes(range(BYTES_PER_TILE))
-        variants = TileHashDatabase._iter_flip_variants(tile_data)
+        variants = list(iter_flip_variants(tile_data))
         # All should be different from original
         for variant in variants:
             assert variant != tile_data
@@ -267,8 +273,8 @@ class TestTileHashDatabaseLookup:
         """Database with pre-populated data."""
         tile1 = bytes([0] * BYTES_PER_TILE)
         tile2 = bytes([1] * BYTES_PER_TILE)
-        hash1 = TileHashDatabase._hash_tile(tile1)
-        hash2 = TileHashDatabase._hash_tile(tile2)
+        hash1 = hash_tile(tile1)
+        hash2 = hash_tile(tile2)
 
         # Use private access here only to setup test state as we are unit testing the lookup logic specifically
         # and building a real DB would require HAL compression and a real ROM structure
@@ -312,8 +318,8 @@ class TestTileHashDatabaseLookup:
     def test_lookup_tile_with_flips(self, mock_db: TileHashDatabase) -> None:
         """lookup_tile with include_flips tries flip variants."""
         original = bytes(range(BYTES_PER_TILE))
-        h_flip = TileHashDatabase._flip_tile(original, flip_h=True, flip_v=False)
-        h_flip_hash = TileHashDatabase._hash_tile(h_flip)
+        h_flip = flip_tile(original, flip_h=True, flip_v=False)
+        h_flip_hash = hash_tile(h_flip)
 
         # Store the H-flipped version
         mock_db._hash_to_match = {
@@ -601,9 +607,9 @@ class TestEdgeCases:
     def test_flip_tile_all_zeros(self) -> None:
         """Flipping all-zero tile returns all-zero tile."""
         tile_data = bytes(BYTES_PER_TILE)
-        result_h = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=False)
-        result_v = TileHashDatabase._flip_tile(tile_data, flip_h=False, flip_v=True)
-        result_hv = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=True)
+        result_h = flip_tile(tile_data, flip_h=True, flip_v=False)
+        result_v = flip_tile(tile_data, flip_h=False, flip_v=True)
+        result_hv = flip_tile(tile_data, flip_h=True, flip_v=True)
         assert result_h == tile_data
         assert result_v == tile_data
         assert result_hv == tile_data
@@ -611,9 +617,9 @@ class TestEdgeCases:
     def test_flip_tile_all_ff(self) -> None:
         """Flipping all-FF tile returns all-FF tile."""
         tile_data = bytes([0xFF] * BYTES_PER_TILE)
-        result_h = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=False)
-        result_v = TileHashDatabase._flip_tile(tile_data, flip_h=False, flip_v=True)
-        result_hv = TileHashDatabase._flip_tile(tile_data, flip_h=True, flip_v=True)
+        result_h = flip_tile(tile_data, flip_h=True, flip_v=False)
+        result_v = flip_tile(tile_data, flip_h=False, flip_v=True)
+        result_hv = flip_tile(tile_data, flip_h=True, flip_v=True)
         assert result_h == tile_data
         assert result_v == tile_data
         assert result_hv == tile_data

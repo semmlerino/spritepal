@@ -21,6 +21,7 @@ from pathlib import Path
 
 from core.hal_compression import HALCompressor
 from core.rom_validator import ROMHeaderError, ROMValidator
+from core.tile_utils import hash_tile, iter_flip_variants
 from utils.logging_config import get_logger
 from utils.rom_utils import detect_smc_offset_from_size
 
@@ -220,10 +221,10 @@ class TileHashDatabase:
             logger.warning(f"Invalid tile data size: {len(tile_data)}")
             return []
 
-        hashes = {self._hash_tile(tile_data)}
+        hashes = {hash_tile(tile_data)}
         if include_flips:
-            for variant in self._iter_flip_variants(tile_data):
-                hashes.add(self._hash_tile(variant))
+            for variant in iter_flip_variants(tile_data):
+                hashes.add(hash_tile(variant))
 
         matches: list[TileMatch] = []
         for tile_hash in hashes:
@@ -367,45 +368,6 @@ class TileHashDatabase:
             self._blocks.append(block)
 
         logger.info(f"Loaded database: {len(self._blocks)} blocks, {len(self._hash_to_match)} hashes")
-
-    @staticmethod
-    def _hash_tile(tile_data: bytes) -> str:
-        """Generate hash for a tile."""
-        return hashlib.md5(tile_data).hexdigest()
-
-    @staticmethod
-    def _reverse_byte(value: int) -> int:
-        value = ((value & 0xF0) >> 4) | ((value & 0x0F) << 4)
-        value = ((value & 0xCC) >> 2) | ((value & 0x33) << 2)
-        value = ((value & 0xAA) >> 1) | ((value & 0x55) << 1)
-        return value
-
-    @classmethod
-    def _flip_tile(cls, tile_data: bytes, flip_h: bool, flip_v: bool) -> bytes:
-        if not flip_h and not flip_v:
-            return tile_data
-        if len(tile_data) != BYTES_PER_TILE:
-            return tile_data
-        out = bytearray(BYTES_PER_TILE)
-        for row in range(8):
-            src_row = 7 - row if flip_v else row
-            for plane_offset in (0, 16):
-                b0 = tile_data[plane_offset + (src_row * 2)]
-                b1 = tile_data[plane_offset + (src_row * 2) + 1]
-                if flip_h:
-                    b0 = cls._reverse_byte(b0)
-                    b1 = cls._reverse_byte(b1)
-                out[plane_offset + (row * 2)] = b0
-                out[plane_offset + (row * 2) + 1] = b1
-        return bytes(out)
-
-    @classmethod
-    def _iter_flip_variants(cls, tile_data: bytes) -> list[bytes]:
-        return [
-            cls._flip_tile(tile_data, flip_h=True, flip_v=False),
-            cls._flip_tile(tile_data, flip_h=False, flip_v=True),
-            cls._flip_tile(tile_data, flip_h=True, flip_v=True),
-        ]
 
     @staticmethod
     def _dedupe_matches(matches: list[TileMatch]) -> list[TileMatch]:

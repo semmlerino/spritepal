@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -20,16 +20,18 @@ def test_validate_extraction_params_accepts_sprite_offset(tmp_path):
     mock_rom_cache = MagicMock()
     mock_rom_extractor = MagicMock()
 
-    # Initialize manager
-    manager = CoreOperationsManager(
-        session_manager=mock_session,
-        rom_cache=mock_rom_cache,
-        rom_extractor=mock_rom_extractor
-    )
-    # Mock initialization
-    manager._is_initialized = True
-    manager._sprite_extractor = MagicMock()
-    manager._palette_manager = MagicMock()
+    # Initialize manager with mocked internal dependencies to avoid side effects
+    with patch("core.managers.core_operations_manager.SpriteExtractor"), \
+         patch("core.managers.core_operations_manager.PaletteManager"):
+        
+        manager = CoreOperationsManager(
+            session_manager=mock_session,
+            rom_cache=mock_rom_cache,
+            rom_extractor=mock_rom_extractor
+        )
+
+    # Verify initialization was successful
+    assert manager.is_initialized()
 
     params = {
         "rom_path": str(rom_file),
@@ -52,15 +54,15 @@ def test_validate_extraction_params_accepts_offset(tmp_path):
     mock_rom_cache = MagicMock()
     mock_rom_extractor = MagicMock()
 
-    # Initialize manager
-    manager = CoreOperationsManager(
-        session_manager=mock_session,
-        rom_cache=mock_rom_cache,
-        rom_extractor=mock_rom_extractor
-    )
-    manager._is_initialized = True
-    manager._sprite_extractor = MagicMock()
-    manager._palette_manager = MagicMock()
+    # Initialize manager with mocked internal dependencies
+    with patch("core.managers.core_operations_manager.SpriteExtractor"), \
+         patch("core.managers.core_operations_manager.PaletteManager"):
+        
+        manager = CoreOperationsManager(
+            session_manager=mock_session,
+            rom_cache=mock_rom_cache,
+            rom_extractor=mock_rom_extractor
+        )
 
     params = {
         "rom_path": str(rom_file),

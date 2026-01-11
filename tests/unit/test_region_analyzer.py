@@ -19,6 +19,11 @@ from unittest.mock import Mock
 
 import pytest
 
+from core.analysis_utils import (
+    calculate_entropy,
+    calculate_zero_percentage,
+    detect_repeating_patterns,
+)
 from core.region_analyzer import (
     EmptyRegionConfig,
     EmptyRegionDetector,
@@ -102,40 +107,40 @@ class TestEntropyCalculation:
 
     def test_entropy_empty_data(self, detector: EmptyRegionDetector) -> None:
         """Empty data returns 0.0 entropy."""
-        result = detector._calculate_entropy(b"")
+        result = calculate_entropy(b"")
         assert result == 0.0
 
     def test_entropy_single_byte_repeated(self, detector: EmptyRegionDetector) -> None:
         """Uniform data (all same bytes) returns 0.0 entropy."""
-        result = detector._calculate_entropy(b"\x00" * 100)
+        result = calculate_entropy(b"\x00" * 100)
         assert result == 0.0
 
-        result = detector._calculate_entropy(b"\xff" * 100)
+        result = calculate_entropy(b"\xff" * 100)
         assert result == 0.0
 
     def test_entropy_two_distinct_bytes_equal_distribution(self, detector: EmptyRegionDetector) -> None:
         """Two distinct bytes with equal distribution returns 1.0 entropy."""
         data = b"\x00\xff" * 50  # 50% each
-        result = detector._calculate_entropy(data)
+        result = calculate_entropy(data)
         assert abs(result - 1.0) < 0.01  # ~1.0 for 2 equally distributed bytes
 
     def test_entropy_four_distinct_bytes_equal_distribution(self, detector: EmptyRegionDetector) -> None:
         """Four distinct bytes with equal distribution returns 2.0 entropy."""
         data = b"\x00\x01\x02\x03" * 256
-        result = detector._calculate_entropy(data)
+        result = calculate_entropy(data)
         assert abs(result - 2.0) < 0.01  # ~2.0 for 4 equally distributed bytes
 
     def test_entropy_all_256_bytes_equal_distribution(self, detector: EmptyRegionDetector) -> None:
         """All 256 byte values equally distributed returns ~8.0 entropy."""
         data = bytes(range(256)) * 4  # Each byte value appears 4 times
-        result = detector._calculate_entropy(data)
+        result = calculate_entropy(data)
         assert abs(result - 8.0) < 0.01  # Max entropy for bytes
 
     def test_entropy_skewed_distribution(self, detector: EmptyRegionDetector) -> None:
         """Skewed distribution returns low entropy."""
         # 90% zeros, 10% 0xFF
         data = b"\x00" * 90 + b"\xff" * 10
-        result = detector._calculate_entropy(data)
+        result = calculate_entropy(data)
         assert result < 1.0  # Low entropy due to skew
 
     def test_entropy_range_validation(self, detector: EmptyRegionDetector) -> None:
@@ -148,7 +153,7 @@ class TestEntropyCalculation:
             b"Hello, World!",
         ]
         for data in test_cases:
-            result = detector._calculate_entropy(data)
+            result = calculate_entropy(data)
             assert 0.0 <= result <= 8.0
 
 
@@ -162,38 +167,38 @@ class TestZeroPercentage:
 
     def test_zero_percentage_empty_data(self, detector: EmptyRegionDetector) -> None:
         """Empty data returns 1.0 (100% zeros by convention)."""
-        result = detector._calculate_zero_percentage(b"")
+        result = calculate_zero_percentage(b"")
         assert result == 1.0
 
     def test_zero_percentage_all_zeros(self, detector: EmptyRegionDetector) -> None:
         """All zeros returns 1.0."""
-        result = detector._calculate_zero_percentage(b"\x00" * 100)
+        result = calculate_zero_percentage(b"\x00" * 100)
         assert result == 1.0
 
     def test_zero_percentage_no_zeros(self, detector: EmptyRegionDetector) -> None:
         """No zeros returns 0.0."""
-        result = detector._calculate_zero_percentage(b"\xff" * 100)
+        result = calculate_zero_percentage(b"\xff" * 100)
         assert result == 0.0
 
     def test_zero_percentage_half_zeros(self, detector: EmptyRegionDetector) -> None:
         """Half zeros returns 0.5."""
-        result = detector._calculate_zero_percentage(b"\x00\xff" * 50)
+        result = calculate_zero_percentage(b"\x00\xff" * 50)
         assert result == 0.5
 
     def test_zero_percentage_90_percent_zeros(self, detector: EmptyRegionDetector) -> None:
         """90% zeros returns 0.9."""
         data = b"\x00" * 90 + b"\xff" * 10
-        result = detector._calculate_zero_percentage(data)
+        result = calculate_zero_percentage(data)
         assert result == 0.9
 
     def test_zero_percentage_single_byte_zero(self, detector: EmptyRegionDetector) -> None:
         """Single zero byte returns 1.0."""
-        result = detector._calculate_zero_percentage(b"\x00")
+        result = calculate_zero_percentage(b"\x00")
         assert result == 1.0
 
     def test_zero_percentage_single_byte_nonzero(self, detector: EmptyRegionDetector) -> None:
         """Single nonzero byte returns 0.0."""
-        result = detector._calculate_zero_percentage(b"\x01")
+        result = calculate_zero_percentage(b"\x01")
         assert result == 0.0
 
 
@@ -209,12 +214,12 @@ class TestPatternDetection:
 
     def test_pattern_data_too_small(self, detector: EmptyRegionDetector) -> None:
         """Data < 16 bytes returns 0.0."""
-        result = detector._detect_repeating_patterns(b"\x00" * 15)
+        result = detect_repeating_patterns(b"\x00" * 15)
         assert result == 0.0
 
     def test_pattern_exactly_16_bytes(self, detector: EmptyRegionDetector) -> None:
         """Exactly 16 bytes with pattern is properly analyzed."""
-        result = detector._detect_repeating_patterns(b"\x00" * 16)
+        result = detect_repeating_patterns(b"\x00" * 16)
         assert result > 0.0  # Should detect pattern
 
     # Common pattern detection
@@ -222,32 +227,32 @@ class TestPatternDetection:
     def test_pattern_all_zeros(self, detector: EmptyRegionDetector) -> None:
         """All zeros pattern detected with high coverage."""
         data = b"\x00" * 64
-        result = detector._detect_repeating_patterns(data)
+        result = detect_repeating_patterns(data)
         assert result > 0.8
 
     def test_pattern_all_ones(self, detector: EmptyRegionDetector) -> None:
         """All 0xFF pattern detected with high coverage."""
         data = b"\xff" * 64
-        result = detector._detect_repeating_patterns(data)
+        result = detect_repeating_patterns(data)
         assert result > 0.8
 
     def test_pattern_alternating_00ff(self, detector: EmptyRegionDetector) -> None:
         """Alternating 0x00 0xFF pattern detected."""
         data = b"\x00\xff" * 32
-        result = detector._detect_repeating_patterns(data)
+        result = detect_repeating_patterns(data)
         assert result > 0.8
 
     def test_pattern_alternating_ff00(self, detector: EmptyRegionDetector) -> None:
         """Alternating 0xFF 0x00 pattern detected."""
         data = b"\xff\x00" * 32
-        result = detector._detect_repeating_patterns(data)
+        result = detect_repeating_patterns(data)
         assert result > 0.8
 
     def test_pattern_partial_coverage_below_threshold(self, detector: EmptyRegionDetector) -> None:
         """Pattern covering < 80% returns 0.0 for common patterns."""
         # 50% zeros, 50% random - less than 80% threshold
         data = b"\x00" * 32 + bytes(range(32))
-        result = detector._detect_repeating_patterns(data)
+        result = detect_repeating_patterns(data)
         # Won't match common patterns (need 80%) or 4-byte repeat (need 90%)
         # The 4-byte repeat check will fail because first 4 bytes are zeros
         # but the rest doesn't match
@@ -259,7 +264,7 @@ class TestPatternDetection:
         """4-byte repeating pattern detected at >90% coverage."""
         pattern = b"\x12\x34\x56\x78"
         data = pattern * 16  # 100% coverage
-        result = detector._detect_repeating_patterns(data)
+        result = detect_repeating_patterns(data)
         assert result > 0.9
 
     def test_pattern_4byte_repeat_low_coverage(self, detector: EmptyRegionDetector) -> None:
@@ -267,7 +272,7 @@ class TestPatternDetection:
         pattern = b"\x12\x34\x56\x78"
         # Only first 70% matches
         data = pattern * 11 + b"\x99\x99\x99\x99" * 5
-        result = detector._detect_repeating_patterns(data)
+        result = detect_repeating_patterns(data)
         # Won't reach 90% threshold
         assert result < 0.9
 
@@ -277,7 +282,7 @@ class TestPatternDetection:
         """Random-ish bytes return 0.0."""
         # Use bytes that don't form repeating patterns
         data = bytes([i ^ (i >> 1) for i in range(64)])
-        result = detector._detect_repeating_patterns(data)
+        result = detect_repeating_patterns(data)
         assert result == 0.0
 
 
