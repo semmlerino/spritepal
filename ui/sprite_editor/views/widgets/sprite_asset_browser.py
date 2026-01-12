@@ -457,6 +457,12 @@ class SpriteAssetBrowser(QWidget):
                 if isinstance(data, dict) and "offset" in data:
                     new_name = item.text(0)
                     offset = data["offset"]
+
+                    # Update the UserRole data to sync name with display text
+                    # This ensures exports and lookups use the correct name
+                    data["name"] = new_name
+                    item.setData(0, Qt.ItemDataRole.UserRole, data)
+
                     self.rename_requested.emit(offset, new_name)
 
                 # Disable editing after rename
@@ -657,6 +663,35 @@ class SpriteAssetBrowser(QWidget):
                 self.tree.viewport().update()
                 return
             iterator += 1
+
+    def clear_thumbnail(self, offset: int) -> bool:
+        """
+        Clear (invalidate) thumbnail for a sprite.
+
+        After calling this, the item will show a placeholder until a new
+        thumbnail is loaded. This should be called after ROM data changes
+        to force a fresh thumbnail generation.
+
+        Args:
+            offset: ROM offset
+
+        Returns:
+            True if thumbnail was cleared, False if offset not found
+        """
+        # Find item with matching offset
+        iterator = QTreeWidgetItemIterator(self.tree)
+        while iterator.value():
+            item = iterator.value()
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("offset") == offset:
+                data["thumbnail"] = None
+                item.setData(0, Qt.ItemDataRole.UserRole, data)
+                # Force repaint to show placeholder
+                self.tree.viewport().update()
+                logger.debug("Cleared thumbnail for 0x%06X", offset)
+                return True
+            iterator += 1
+        return False
 
     def filter_items(self, text: str) -> None:
         """

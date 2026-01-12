@@ -221,7 +221,7 @@ class SpriteLibrary(QObject):
         thumbnail: Image.Image | None = None,
         notes: str = "",
         tags: list[str] | None = None,
-    ) -> LibrarySprite:
+    ) -> LibrarySprite | None:
         """
         Add a sprite to the library.
 
@@ -234,7 +234,7 @@ class SpriteLibrary(QObject):
             tags: Optional list of tags
 
         Returns:
-            The created LibrarySprite
+            The created LibrarySprite, or None if persistence failed.
         """
         rom_hash = self._compute_rom_hash(Path(rom_path))
 
@@ -252,7 +252,12 @@ class SpriteLibrary(QObject):
             sprite.thumbnail_path = thumbnail_path
 
         self._sprites[sprite.unique_id] = sprite
-        self.save()
+
+        # Persist to disk - if this fails, rollback and return None
+        if not self.save():
+            logger.error("Failed to persist sprite to library, rolling back: %s", name)
+            del self._sprites[sprite.unique_id]
+            return None
 
         logger.info("Added sprite to library: %s at %s", name, sprite.offset_hex)
         self.sprite_added.emit(sprite)

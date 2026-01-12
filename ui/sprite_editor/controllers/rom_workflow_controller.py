@@ -85,6 +85,7 @@ class ROMWorkflowController(QObject):
         self.rom_path: str = ""
         self.rom_size: int = 0  # Actual ROM size (excluding SMC header)
         self.smc_header_offset: int = 0  # SMC header size (512 or 0)
+        self._rom_mtime: float | None = None  # ROM file mtime for external modification detection
         self.current_offset: int = 0
         self._checksum_valid: bool = True
         self.state: str = "preview"  # 'preview', 'edit', 'save'
@@ -110,6 +111,9 @@ class ROMWorkflowController(QObject):
 
         # Queue for captures discovered before view is ready
         self._pending_captures: list[CapturedOffset] = []
+
+        # Connect editing controller validation signal
+        self._editing_controller.validationChanged.connect(self._on_validation_changed)
 
         # Connect LogWatcher
         self._connect_log_watcher()
@@ -295,12 +299,19 @@ class ROMWorkflowController(QObject):
         pil_thumbnail = self._generate_library_thumbnail(offset)
 
         # Add to library (persistent storage)
-        library.add_sprite(
+        # Returns None if persistence failed - in that case, don't update UI
+        sprite = library.add_sprite(
             rom_offset=offset,
             rom_path=self.rom_path,
             name=name,
             thumbnail=pil_thumbnail,
         )
+
+        if sprite is None:
+            logger.error("Failed to save sprite to library: persistence failed for 0x%06X", offset)
+            if self._message_service:
+                self._message_service.show_message("Failed to save sprite to library (disk write error)")
+            return
 
         # Also add to browser's Library category for immediate visibility
         if self._view:
@@ -557,8 +568,10 @@ class ROMWorkflowController(QObject):
         # Store SMC header offset and calculate actual ROM size
         # header.header_offset is 512 for SMC-headered ROMs, 0 otherwise
         self.smc_header_offset = header.header_offset
-        file_size = rom_path.stat().st_size
+        stat_result = rom_path.stat()
+        file_size = stat_result.st_size
         self.rom_size = file_size - self.smc_header_offset
+        self._rom_mtime = stat_result.st_mtime  # Track for external modification detection
 
         # Update view
         if self._view:
@@ -921,6 +934,37 @@ class ROMWorkflowController(QObject):
             if reply == QMessageBox.StandardButton.No:
                 return
 
+        # Check if ROM file was modified externally since we loaded it
+        from pathlib import Path
+
+        rom_mtime_changed = False
+        if self.rom_path and self._rom_mtime is not None:
+            try:
+                current_mtime = Path(self.rom_path).stat().st_mtime
+                rom_mtime_changed = current_mtime != self._rom_mtime
+            except OSError:
+                pass  # File may have been deleted - will fail on open_in_editor anyway
+
+        if rom_mtime_changed:
+            from PySide6.QtWidgets import QMessageBox
+
+            reply = QMessageBox.warning(
+                self._view,
+                "ROM Modified Externally",
+                "The ROM file has been modified by another program since it was loaded.\n\n"
+                "The cached sprite data may be out of date.\n\n"
+                "Do you want to reload from the current ROM file?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                # Update mtime and re-extract fresh data from ROM
+                self._rom_mtime = Path(self.rom_path).stat().st_mtime
+                self.set_offset(self.current_offset)  # Re-extract from ROM
+                if self._message_service:
+                    self._message_service.show_message("Reloading sprite from modified ROM...")
+                return
+
         # Reload the original sprite data
         logger.info("Reverting sprite to original ROM data at offset 0x%06X", self.current_offset)
         self.open_in_editor()
@@ -1029,6 +1073,13 @@ class ROMWorkflowController(QObject):
                 self._message_service.show_message("No image to save")
             return
 
+        # Pre-save validation check (should already be disabled if invalid, but safety check)
+        if not self._editing_controller.is_valid_for_rom():
+            errors = self._editing_controller.get_validation_errors()
+            if self._message_service:
+                self._message_service.show_message(f"Cannot save: {'; '.join(errors)}")
+            return
+
         try:
             if self._message_service:
                 self._message_service.show_message(f"Saving to ROM at 0x{self.current_offset:06X}...")
@@ -1036,23 +1087,6 @@ class ROMWorkflowController(QObject):
             # Create PIL image for conversion
             img = Image.fromarray(data, mode="P")
             img.putpalette(self._editing_controller.get_flat_palette())
-
-            # Validate image dimensions for SNES compatibility (8-pixel alignment)
-            if img.width % 8 != 0 or img.height % 8 != 0:
-                if self._message_service:
-                    self._message_service.show_message(
-                        f"Image dimensions ({img.width}x{img.height}) must be multiples of 8"
-                    )
-                return
-
-            # Validate color count (4bpp = max 16 colors)
-            colors_used = len(set(data.flatten()))
-            if colors_used > 16:
-                if self._message_service:
-                    self._message_service.show_message(
-                        f"Image uses {colors_used} colors, but SNES 4bpp supports max 16"
-                    )
-                return
 
             # Save to temp PNG for injector
             import tempfile
@@ -1136,8 +1170,16 @@ class ROMWorkflowController(QObject):
             if success:
                 # Update our knowledge of checksum validity after successful injection
                 self._checksum_valid = True
+                # Update ROM mtime since we just modified it
+                try:
+                    self._rom_mtime = Path(self.rom_path).stat().st_mtime
+                except OSError:
+                    pass  # File should exist since injection succeeded
+
                 if self._view:
                     self._view.set_checksum_valid(True)
+                    # Invalidate thumbnail cache so it regenerates with updated sprite
+                    self._view.asset_browser.clear_thumbnail(self.current_offset)
 
                 if self._message_service:
                     self._message_service.show_message(f"Successfully saved: {message}")
@@ -1343,6 +1385,33 @@ class ROMWorkflowController(QObject):
             self._view.set_action_text("Open in Editor")
         if self._message_service:
             self._message_service.show_message(f"Preview error: {error_msg}")
+
+    def _on_validation_changed(self, is_valid: bool, errors: list[str]) -> None:
+        """Handle validation state change from editing controller.
+
+        Updates the UI to show validation warnings and enable/disable save button.
+
+        Args:
+            is_valid: Whether the current image meets ROM constraints
+            errors: List of validation error messages
+        """
+        if not self._view:
+            return
+
+        # Update the workspace's save button state
+        if self._view.workspace:
+            self._view.workspace.set_save_enabled(is_valid)
+
+        # Show/hide validation warning in status bar
+        if errors:
+            error_text = "; ".join(errors)
+            if self._message_service:
+                self._message_service.show_message(f"ROM Warning: {error_text}")
+            logger.debug("ROM validation failed: %s", error_text)
+        elif self.state == "edit":
+            # Clear warning when valid and in edit mode
+            if self._message_service:
+                self._message_service.show_message("Ready to save to ROM")
 
     def _on_manual_palette_requested(self) -> None:
         """Handle request to manually specify a palette offset.

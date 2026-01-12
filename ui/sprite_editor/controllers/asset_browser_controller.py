@@ -352,6 +352,28 @@ class AssetBrowserController(QObject):
 
         logger.debug("Thumbnail loaded for 0x%06X", offset)
 
+    def invalidate_thumbnail(self, offset: int) -> None:
+        """
+        Invalidate (clear) the cached thumbnail for a sprite.
+
+        Call this after ROM data changes to force a fresh thumbnail
+        to be generated on next request.
+
+        Args:
+            offset: ROM offset of sprite whose thumbnail should be invalidated
+        """
+        # Update metadata
+        for metadata in self._assets.values():
+            if metadata.offset == offset:
+                metadata.has_thumbnail = False
+                break
+
+        # Clear from browser widget
+        if self._browser:
+            self._browser.clear_thumbnail(offset)
+
+        logger.debug("Invalidated thumbnail for 0x%06X", offset)
+
     def get_all_assets(self) -> dict[str, list[dict[str, object]]]:
         """
         Get all assets organized by category.

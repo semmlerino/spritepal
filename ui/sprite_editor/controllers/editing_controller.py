@@ -25,6 +25,10 @@ if TYPE_CHECKING:
 class EditingController(QObject):
     """Controller for pixel editing operations."""
 
+    # SNES hardware constraints for ROM injection
+    MAX_SNES_COLORS = 16  # 4bpp = max 16 colors per sprite
+    TILE_ALIGNMENT = 8  # SNES tiles are 8x8 pixels
+
     # Signals
     imageChanged = Signal()
     paletteChanged = Signal()
@@ -33,6 +37,8 @@ class EditingController(QObject):
     undoStateChanged = Signal(bool, bool)  # can_undo, can_redo
     paletteSourceAdded = Signal(str, str, int, object, bool)  # name, type, index, colors, is_active
     paletteSourceSelected = Signal(str, int)  # source_type, palette_index
+    # Emitted when ROM validation state changes: (is_valid, list of error messages)
+    validationChanged = Signal(bool, list)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -58,8 +64,15 @@ class EditingController(QObject):
         # Last save path for Save operation
         self._last_save_path: str = ""
 
+        # ROM validation state
+        self._validation_errors: list[str] = []
+        self._is_valid_for_rom: bool = True
+
         # Connect tool manager signals
         self.tool_manager.tool_changed.connect(self._on_tool_changed)
+
+        # Connect image changes to validation
+        self.imageChanged.connect(self._validate_rom_constraints)
 
         # Lazy palette loader (defer initialization to property access)
         self._palette_loader: DefaultPaletteLoader | None = None
@@ -208,12 +221,18 @@ class EditingController(QObject):
             return
 
         # Handle fill tool - single command
+        # NOTE: We DON'T call tool.on_press() here because FloodFillCommand.execute()
+        # handles the fill and populates old_data for proper undo support.
         if tool_type == ToolType.FILL:
             old_color = self.image_model.get_pixel(x, y)
-            result = tool.on_press(x, y, self._selected_color, self.image_model)
-            if result:
-                # Record fill command with old/new color info
-                cmd = FloodFillCommand(x=x, y=y, old_color=old_color, new_color=self._selected_color)
+            # Don't fill if clicking same color
+            if old_color == self._selected_color:
+                return
+            # Create command and execute it (this populates old_data for undo)
+            cmd = FloodFillCommand(x=x, y=y, old_color=old_color, new_color=self._selected_color)
+            cmd.execute(self.image_model)
+            # Only record if fill actually changed something
+            if cmd.old_data is not None:
                 self.undo_manager.record_command(cmd)
                 self.imageChanged.emit()
                 self._emit_undo_state()
@@ -596,3 +615,63 @@ class EditingController(QObject):
             if self.save_image(file_path):
                 return file_path
         return None
+
+    # ROM Validation
+
+    def _validate_rom_constraints(self) -> None:
+        """
+        Validate that current image meets SNES ROM constraints.
+
+        Checks:
+        - Dimensions are multiples of 8 (tile alignment)
+        - Color count <= 16 (4bpp limit)
+
+        Emits validationChanged signal when state changes.
+        """
+        if not self.has_image():
+            # No image = valid (nothing to save)
+            if self._validation_errors or not self._is_valid_for_rom:
+                self._validation_errors = []
+                self._is_valid_for_rom = True
+                self.validationChanged.emit(True, [])
+            return
+
+        errors: list[str] = []
+        data = self.image_model.data
+
+        # Check dimensions for tile alignment
+        width, height = self.get_image_size()
+        if width % self.TILE_ALIGNMENT != 0:
+            errors.append(f"Width ({width}px) must be a multiple of {self.TILE_ALIGNMENT}")
+        if height % self.TILE_ALIGNMENT != 0:
+            errors.append(f"Height ({height}px) must be a multiple of {self.TILE_ALIGNMENT}")
+
+        # Check color count (data is guaranteed non-None since has_image() passed)
+        unique_colors = len(np.unique(data))
+        if unique_colors > self.MAX_SNES_COLORS:
+            errors.append(f"Uses {unique_colors} colors (SNES 4bpp max: {self.MAX_SNES_COLORS})")
+
+        # Emit signal only if validation state changed
+        is_valid = len(errors) == 0
+        if errors != self._validation_errors or is_valid != self._is_valid_for_rom:
+            self._validation_errors = errors
+            self._is_valid_for_rom = is_valid
+            self.validationChanged.emit(is_valid, errors)
+            if not is_valid:
+                logger.warning("ROM validation failed: %s", "; ".join(errors))
+
+    def is_valid_for_rom(self) -> bool:
+        """Check if current image can be saved to ROM without errors."""
+        return self._is_valid_for_rom
+
+    def get_validation_errors(self) -> list[str]:
+        """Get list of current validation error messages."""
+        return self._validation_errors.copy()
+
+    def force_validation(self) -> None:
+        """
+        Force re-validation of ROM constraints.
+
+        Call this after loading a new image to ensure validation state is up-to-date.
+        """
+        self._validate_rom_constraints()

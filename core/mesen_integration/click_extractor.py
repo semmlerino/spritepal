@@ -3,11 +3,18 @@ Parser for Mesen 2 sprite capture JSON files.
 
 Parses the sprite_capture.json output from mesen2_sprite_capture.lua
 into typed Python dataclasses for use in extraction pipeline.
+
+Validation is performed at parse time to catch malformed data early:
+- Coordinate bounds: X ∈ [-256, 255] (signed 9-bit), Y ∈ [0, 255] (unsigned 8-bit)
+- Palette index: ∈ [0, 7] (SNES OBJ uses palettes 0-7)
+- Tile hex length: exactly 64 chars (32 bytes of 4bpp data)
+- VRAM address: ∈ [0, 0xFFFF] (64KB byte-addressed VRAM)
 """
 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -15,6 +22,25 @@ from typing import Any
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+# Validation constants for SNES hardware limits
+MIN_OAM_X = -256  # Signed 9-bit coordinate (allows off-screen left)
+MAX_OAM_X = 255
+MIN_OAM_Y = 0  # Unsigned 8-bit coordinate
+MAX_OAM_Y = 255
+MIN_PALETTE = 0
+MAX_PALETTE = 7  # OBJ uses palettes 0-7
+MIN_VRAM_ADDR = 0
+MAX_VRAM_ADDR = 0xFFFF  # 64KB byte-addressed
+TILE_HEX_LENGTH = 64  # 32 bytes = 64 hex chars
+HEX_PATTERN = re.compile(r"^[0-9A-Fa-f]+$")
+
+
+class CaptureValidationError(ValueError):
+    """Raised when capture data fails validation."""
+
+    pass
 
 
 @dataclass
@@ -197,7 +223,11 @@ class MesenCaptureParser:
         self,
         data: dict[str, Any],  # pyright: ignore[reportExplicitAny] - JSON data
     ) -> CaptureResult:
-        """Parse raw JSON dict into CaptureResult."""
+        """Parse raw JSON dict into CaptureResult.
+
+        Validates all data at parse time to catch malformed captures early.
+        Raises CaptureValidationError for invalid data.
+        """
         # Parse OBSEL config
         obsel_data = data.get("obsel", {})
         obsel = OBSELConfig(
@@ -210,20 +240,70 @@ class MesenCaptureParser:
             oam_addr_offset=obsel_data.get("oam_addr_offset", 0),
         )
 
-        # Parse OAM entries
+        # Parse OAM entries with validation
         entries = []
-        for entry_data in data.get("entries", []):
-            # Parse tile data
+        for entry_idx, entry_data in enumerate(data.get("entries", [])):
+            entry_id = entry_data.get("id", entry_idx)
+
+            # Parse and validate tile data
             tiles = []
-            for tile_data in entry_data.get("tiles", []):
+            for tile_idx, tile_data in enumerate(entry_data.get("tiles", [])):
+                # Validate tile hex data
+                data_hex = tile_data.get("data_hex", "")
+                if data_hex:  # Only validate non-empty tiles
+                    if len(data_hex) != TILE_HEX_LENGTH:
+                        raise CaptureValidationError(
+                            f"Entry {entry_id}, tile {tile_idx}: data_hex must be exactly "
+                            f"{TILE_HEX_LENGTH} chars (32 bytes), got {len(data_hex)}"
+                        )
+                    if not HEX_PATTERN.match(data_hex):
+                        raise CaptureValidationError(
+                            f"Entry {entry_id}, tile {tile_idx}: data_hex contains "
+                            f"invalid characters (must be hex: 0-9, A-F)"
+                        )
+
+                # Validate VRAM address
+                vram_addr = tile_data.get("vram_addr", 0)
+                if not (MIN_VRAM_ADDR <= vram_addr <= MAX_VRAM_ADDR):
+                    raise CaptureValidationError(
+                        f"Entry {entry_id}, tile {tile_idx}: vram_addr={vram_addr:#x} "
+                        f"out of range [0x{MIN_VRAM_ADDR:04X}, 0x{MAX_VRAM_ADDR:04X}]"
+                    )
+
                 tile = TileData(
                     tile_index=tile_data.get("tile_index", 0),
-                    vram_addr=tile_data.get("vram_addr", 0),
+                    vram_addr=vram_addr,
                     pos_x=tile_data.get("pos_x", 0),
                     pos_y=tile_data.get("pos_y", 0),
-                    data_hex=tile_data.get("data_hex", ""),
+                    data_hex=data_hex,
                 )
                 tiles.append(tile)
+
+            # Validate OAM entry coordinates
+            x = entry_data.get("x", 0)
+            y = entry_data.get("y", 0)
+            if not (MIN_OAM_X <= x <= MAX_OAM_X):
+                raise CaptureValidationError(f"Entry {entry_id}: x={x} out of range [{MIN_OAM_X}, {MAX_OAM_X}]")
+            if not (MIN_OAM_Y <= y <= MAX_OAM_Y):
+                raise CaptureValidationError(f"Entry {entry_id}: y={y} out of range [{MIN_OAM_Y}, {MAX_OAM_Y}]")
+
+            # Validate palette index
+            palette = entry_data.get("palette", 0)
+            if not (MIN_PALETTE <= palette <= MAX_PALETTE):
+                raise CaptureValidationError(
+                    f"Entry {entry_id}: palette={palette} out of range [{MIN_PALETTE}, {MAX_PALETTE}]"
+                )
+
+            # Validate tile count vs dimensions
+            width = entry_data.get("width", 8)
+            height = entry_data.get("height", 8)
+            expected_tiles = (width // 8) * (height // 8)
+            if tiles and len(tiles) != expected_tiles:
+                # Log warning but don't fail - some captures have incomplete tile data
+                logger.warning(
+                    f"Entry {entry_id}: tile count mismatch - expected {expected_tiles} "
+                    f"tiles for {width}x{height} sprite, got {len(tiles)}"
+                )
 
             tile_page = entry_data.get("tile_page")
             name_table = tile_page if tile_page is not None else entry_data.get("name_table", 0)
@@ -234,18 +314,18 @@ class MesenCaptureParser:
                 try:
                     rom_offset = int(rom_offset_raw)
                 except (TypeError, ValueError):
-                    logger.warning("Invalid rom_offset value for entry %s: %r", entry_data.get("id"), rom_offset_raw)
+                    logger.warning("Invalid rom_offset value for entry %s: %r", entry_id, rom_offset_raw)
                     rom_offset = None
             entry = OAMEntry(
-                id=entry_data.get("id", 0),
-                x=entry_data.get("x", 0),
-                y=entry_data.get("y", 0),
+                id=entry_id,
+                x=x,
+                y=y,
                 tile=entry_data.get("tile", 0),
-                width=entry_data.get("width", 8),
-                height=entry_data.get("height", 8),
-                flip_h=entry_data.get("flip_h", False),
-                flip_v=entry_data.get("flip_v", False),
-                palette=entry_data.get("palette", 0),
+                width=width,
+                height=height,
+                flip_h=bool(entry_data.get("flip_h", False)),
+                flip_v=bool(entry_data.get("flip_v", False)),
+                palette=palette,
                 rom_offset=rom_offset,
                 priority=entry_data.get("priority", 0),
                 name_table=name_table,
@@ -254,12 +334,14 @@ class MesenCaptureParser:
             )
             entries.append(entry)
 
-        # Parse palettes
+        # Parse palettes with validation
         palettes: dict[int, list[int]] = {}
         palettes_data = data.get("palettes", {})
         for pal_key, colors in palettes_data.items():
             try:
                 pal_idx = int(pal_key)
+                if not (MIN_PALETTE <= pal_idx <= MAX_PALETTE):
+                    logger.warning(f"Palette index {pal_idx} outside standard OBJ range [0-7]")
                 palettes[pal_idx] = list(colors)
             except (ValueError, TypeError):
                 logger.warning(f"Invalid palette key: {pal_key}")

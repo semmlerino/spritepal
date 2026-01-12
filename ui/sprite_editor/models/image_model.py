@@ -2,8 +2,14 @@
 """
 Image data model for the pixel editor.
 Handles indexed images with 4bpp format using numpy arrays.
+
+Includes checksum functionality for data integrity verification:
+- Checksum is computed when data is loaded via set_data()
+- verify_integrity() can be called to detect external modifications
+- Useful for round-trip verification (extract → edit → save → extract)
 """
 
+import hashlib
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -14,6 +20,8 @@ class ImageModel:
     """
     Model for managing image data and operations.
     Handles indexed images with 4bpp format (16 colors).
+
+    Includes checksum tracking for data integrity verification.
     """
 
     width: int = 8
@@ -21,6 +29,9 @@ class ImageModel:
     data: np.ndarray = field(default_factory=lambda: np.zeros((8, 8), dtype=np.uint8))
     modified: bool = False
     file_path: str | None = None
+
+    # Checksum of data at load time (for integrity verification)
+    _initial_checksum: str = field(default="", init=False)
 
     def __post_init__(self) -> None:
         """Ensure data array matches dimensions."""
@@ -87,8 +98,69 @@ class ImageModel:
         """Color picker - get color at coordinates."""
         return self.get_pixel(x, y)
 
-    def set_data(self, data: np.ndarray) -> None:
-        """Set image data from numpy array."""
+    def set_data(self, data: np.ndarray, *, store_checksum: bool = True) -> None:
+        """Set image data from numpy array.
+
+        Args:
+            data: The image data as a 2D numpy array of palette indices
+            store_checksum: If True, compute and store checksum for integrity tracking
+        """
         self.data = data
         self.height, self.width = data.shape
         self.modified = True
+
+        if store_checksum:
+            self._initial_checksum = self._compute_checksum()
+
+    def _compute_checksum(self) -> str:
+        """Compute SHA256 checksum of current data.
+
+        Returns:
+            Hex string of SHA256 hash (first 32 chars for efficiency)
+        """
+        return hashlib.sha256(self.data.tobytes()).hexdigest()[:32]
+
+    def get_initial_checksum(self) -> str:
+        """Get the checksum computed when data was loaded.
+
+        Returns:
+            Empty string if no checksum was stored, otherwise the hex checksum
+        """
+        return self._initial_checksum
+
+    def get_current_checksum(self) -> str:
+        """Compute checksum of current data state.
+
+        Returns:
+            Hex string of current data's SHA256 hash
+        """
+        return self._compute_checksum()
+
+    def verify_integrity(self) -> bool:
+        """Verify that data hasn't been corrupted since load.
+
+        Compares current data checksum against the checksum stored at load time.
+        This is useful for detecting external modifications or data corruption.
+
+        Returns:
+            True if data is intact (or no initial checksum was stored),
+            False if data appears corrupted
+        """
+        if not self._initial_checksum:
+            # No checksum stored, can't verify
+            return True
+        return self._compute_checksum() == self._initial_checksum
+
+    def has_been_modified_since_load(self) -> bool:
+        """Check if data has been modified since load (using checksum comparison).
+
+        Different from `modified` flag which tracks any edit. This compares
+        actual data content against the initial load state.
+
+        Returns:
+            True if data differs from initial load state,
+            False if unchanged or no checksum stored
+        """
+        if not self._initial_checksum:
+            return self.modified
+        return self._compute_checksum() != self._initial_checksum

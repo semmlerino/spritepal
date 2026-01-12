@@ -203,7 +203,19 @@ end
 - For 239-line or 240-line modes, adjust `VISIBLE_Y_EXCLUDE_*` accordingly
 
 ## Validation / Fail-Fast Rules
+
+**Implementation:** `core/mesen_integration/click_extractor.py:MesenCaptureParser._parse_capture_data()`
+raises `CaptureValidationError` for violations of the rules below.
+
+**Tests:** `tests/unit/mesen_integration/test_capture_parser_validation.py`
+
 - `data_hex` length must be 64 hex chars (32 bytes) for 4bpp.
+- `data_hex` must contain only valid hex characters (0-9, A-F, a-f).
+- `entries[].x` must be in range [-256, 255] (signed 9-bit).
+- `entries[].y` must be in range [0, 255] (unsigned 8-bit).
+- `entries[].palette` must be in range [0, 7].
+- `tiles[].vram_addr` must be in range [0x0000, 0xFFFF].
+- Tile count vs dimensions mismatch logs a warning but does not fail (captures may have incomplete data).
 - If **all odd bytes are zero** across **many tiles**, abort the capture. This is a strong
   indicator of a bad VRAM read path but not a mathematical impossibility for a single tile.
 - If tiles are not 32 bytes, do not hash them.
