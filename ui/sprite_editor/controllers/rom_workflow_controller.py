@@ -270,6 +270,7 @@ class ROMWorkflowController(QObject):
         self._view.asset_browser.save_to_library_requested.connect(self._on_save_to_library)
         self._view.asset_browser.rename_requested.connect(self._on_asset_renamed)
         self._view.asset_browser.delete_requested.connect(self._on_asset_deleted)
+        self._view.asset_browser.item_offset_changed.connect(self._on_item_offset_changed)
 
         # EditWorkspace signals (save/export)
         self._view.workspace.saveToRomRequested.connect(self.prepare_injection)
@@ -483,6 +484,16 @@ class ROMWorkflowController(QObject):
         # Remove item from browser tree
         if self._view:
             self._view.asset_browser.remove_sprite_by_offset(offset)
+
+    def _on_item_offset_changed(self, old_offset: int, new_offset: int) -> None:
+        """Re-queue thumbnail when item's offset changes due to alignment.
+
+        This handler is automatically triggered when update_sprite_offset() changes
+        a browser item's offset, ensuring the thumbnail matches the new offset.
+        """
+        if self._thumbnail_controller:
+            self._thumbnail_controller.queue_thumbnail(new_offset)
+            logger.debug("Re-queued thumbnail for aligned offset 0x%06X (was 0x%06X)", new_offset, old_offset)
 
     def _load_library_sprites(self) -> None:
         """Load sprites from library that match current ROM."""
@@ -1333,7 +1344,8 @@ class ROMWorkflowController(QObject):
             # Update UI
             if self._view:
                 self._view.set_offset(actual_offset)
-                # Update asset browser item offset so thumbnail operations use aligned offset
+                # Update asset browser item offset - this emits item_offset_changed signal
+                # which automatically re-queues thumbnail for the new offset
                 self._view.asset_browser.update_sprite_offset(old_offset, actual_offset)
                 if self._message_service:
                     self._message_service.show_message(

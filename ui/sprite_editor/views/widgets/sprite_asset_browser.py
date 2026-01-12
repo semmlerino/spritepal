@@ -154,6 +154,7 @@ class SpriteAssetBrowser(QWidget):
     rename_requested = Signal(int, str)  # offset, new_name
     delete_requested = Signal(int, str)  # offset, source_type
     save_to_library_requested = Signal(int, str)  # offset, source_type
+    item_offset_changed = Signal(int, int)  # old_offset, new_offset (e.g., alignment correction)
 
     # Category names
     CATEGORY_ROM = "ROM Sprites"
@@ -843,6 +844,7 @@ class SpriteAssetBrowser(QWidget):
                 data["offset"] = new_offset
                 item.setData(0, Qt.ItemDataRole.UserRole, data)
                 logger.debug("update_sprite_offset: 0x%06X -> 0x%06X", old_offset, new_offset)
+                self.item_offset_changed.emit(old_offset, new_offset)
                 return True
             iterator += 1
         return False

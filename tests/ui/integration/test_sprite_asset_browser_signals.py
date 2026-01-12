@@ -286,3 +286,28 @@ class TestSpriteAssetBrowserOffsetUpdate:
             args = list(spy.at(spy.count() - 1))
             assert args[0] == 0x1001, "Selected item should emit updated offset"
             assert args[1] == "rom"
+
+    def test_update_sprite_offset_emits_item_offset_changed(self, qtbot: QtBot, asset_browser) -> None:
+        """Verify update_sprite_offset emits item_offset_changed signal with old and new offsets."""
+        spy = QSignalSpy(asset_browser.item_offset_changed)
+
+        # Update offset from 0x1000 to 0x1005
+        result = asset_browser.update_sprite_offset(0x1000, 0x1005)
+
+        assert result is True
+        assert spy.count() == 1, "item_offset_changed signal must be emitted exactly once"
+        args = list(spy.at(0))
+        assert args[0] == 0x1000, "First argument should be old offset"
+        assert args[1] == 0x1005, "Second argument should be new offset"
+
+    def test_update_sprite_offset_does_not_emit_when_not_found(
+        self, qtbot: QtBot, asset_browser
+    ) -> None:
+        """Verify item_offset_changed is NOT emitted when offset is not found."""
+        spy = QSignalSpy(asset_browser.item_offset_changed)
+
+        # Try to update non-existent offset
+        result = asset_browser.update_sprite_offset(0x9999, 0x9999 + 1)
+
+        assert result is False
+        assert spy.count() == 0, "item_offset_changed should not emit when update fails"
