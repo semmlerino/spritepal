@@ -181,9 +181,7 @@ class TestSMCHeaderConfiguration:
         view.set_header_offset(512)
         view.set_header_offset(0)
 
-    def test_controller_stores_smc_header_offset_on_rom_load(
-        self, qtbot, tmp_path, monkeypatch
-    ):
+    def test_controller_stores_smc_header_offset_on_rom_load(self, qtbot, tmp_path, monkeypatch):
         """
         Verify that controller.smc_header_offset is updated when ROM loads.
 
@@ -260,9 +258,7 @@ class TestSMCHeaderConfiguration:
         file_offset = 0x3C6EF1
         expected_rom_offset = file_offset - 512
 
-        with qtbot.waitSignal(
-            widget.offset_changed, check_params_cb=lambda val: val == expected_rom_offset
-        ):
+        with qtbot.waitSignal(widget.offset_changed, check_params_cb=lambda val: val == expected_rom_offset):
             widget.setText(f"FILE OFFSET: 0x{file_offset:06X}")
 
         assert widget.offset() == expected_rom_offset

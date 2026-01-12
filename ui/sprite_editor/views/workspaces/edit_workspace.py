@@ -564,3 +564,13 @@ class EditWorkspace(QWidget):
         colors = self._controller.get_current_colors()
         if 0 <= color_index < len(colors):
             self._status_bar.update_color(colors[color_index])
+
+    # Validation facade methods
+
+    def set_save_enabled(self, enabled: bool) -> None:
+        """Enable or disable the save to ROM button based on validation state.
+
+        Args:
+            enabled: Whether the save button should be enabled
+        """
+        self._save_export_panel.set_save_enabled(enabled)

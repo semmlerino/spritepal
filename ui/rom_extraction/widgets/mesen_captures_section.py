@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from ui.common.spacing_constants import SPACING_SMALL
@@ -44,6 +45,7 @@ class MesenCapturesSection(QWidget):
     offset_selected = Signal(int)
     offset_activated = Signal(int)
     save_to_library_requested = Signal(int)
+    thumbnail_requested = Signal(int)  # Forwarded: capture needs thumbnail
 
     # Additional signal for status bar integration
     watching_changed = Signal(bool)
@@ -70,6 +72,7 @@ class MesenCapturesSection(QWidget):
         self._captures_widget.offset_selected.connect(self.offset_selected.emit)
         self._captures_widget.offset_activated.connect(self.offset_activated.emit)
         self._captures_widget.save_to_library_requested.connect(self.save_to_library_requested.emit)
+        self._captures_widget.thumbnail_requested.connect(self.thumbnail_requested.emit)
 
     # Public methods for parent to call
 
@@ -120,3 +123,16 @@ class MesenCapturesSection(QWidget):
     def clear(self) -> None:
         """Clear all captured offsets."""
         self._captures_widget.clear()
+
+    def set_thumbnail(self, offset: int, thumbnail: QPixmap) -> None:
+        """Set thumbnail for a capture.
+
+        Args:
+            offset: ROM offset to match
+            thumbnail: Thumbnail pixmap to display
+        """
+        self._captures_widget.set_thumbnail(offset, thumbnail)
+
+    def request_all_thumbnails(self) -> None:
+        """Request thumbnails for all current captures."""
+        self._captures_widget.request_all_thumbnails()

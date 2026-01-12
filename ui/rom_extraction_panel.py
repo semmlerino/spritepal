@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
 from PySide6.QtCore import Signal
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent, QImage, QPixmap
 from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 
 from ui.common.file_dialogs import browse_for_open_file
 from ui.common.signal_utils import safe_disconnect
+from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
@@ -130,6 +131,9 @@ class ROMExtractionPanel(QWidget):
         self._manual_offset_dialog: UnifiedManualOffsetDialog | None = None
         self._scan_controller = ScanController(parent=self, cache=self.rom_cache, state_manager=self.state_manager)
         self._scan_controller.sprite_selected.connect(self._add_selected_sprite)
+
+        # Thumbnail worker controller for Mesen captures (created here, started when ROM loads)
+        self._thumbnail_controller: ThumbnailWorkerController | None = None
 
         # Connect orchestrator signals
         self._connect_orchestrator_signals()
@@ -262,6 +266,7 @@ class ROMExtractionPanel(QWidget):
         self.mesen_captures_section.offset_selected.connect(self._on_mesen2_offset_selected)
         self.mesen_captures_section.offset_activated.connect(self._on_mesen2_offset_activated)
         self.mesen_captures_section.watching_changed.connect(self.mesen2_watching_changed.emit)
+        self.mesen_captures_section.thumbnail_requested.connect(self._on_thumbnail_requested)
 
         # Wire up log watcher if module provided (dependency injection)
         if self._mesen2_module is not None:
@@ -294,6 +299,51 @@ class ROMExtractionPanel(QWidget):
         logger.info("Mesen2 offset activated: 0x%06X - opening in sprite editor", offset)
         # Emit signal for MainWindow to switch to sprite editor tab
         self.open_in_sprite_editor.emit(offset)
+
+    def _on_thumbnail_requested(self, offset: int) -> None:
+        """Handle thumbnail request from captures widget.
+
+        Args:
+            offset: ROM offset to generate thumbnail for
+        """
+        if self._thumbnail_controller is not None:
+            self._thumbnail_controller.queue_thumbnail(offset)
+            logger.debug("Queued thumbnail for offset 0x%06X", offset)
+
+    def _on_capture_thumbnail_ready(self, offset: int, qimage: QImage) -> None:
+        """Handle thumbnail ready from worker.
+
+        Args:
+            offset: ROM offset the thumbnail is for
+            qimage: Generated thumbnail image
+        """
+        if not qimage.isNull() and hasattr(self, "mesen_captures_section"):
+            pixmap = QPixmap.fromImage(qimage)
+            self.mesen_captures_section.set_thumbnail(offset, pixmap)
+            logger.debug("Set thumbnail for capture at offset 0x%06X", offset)
+
+    def _setup_capture_thumbnail_worker(self) -> None:
+        """Setup thumbnail worker for Mesen captures after ROM is loaded."""
+        # Cleanup existing worker if any
+        if self._thumbnail_controller is not None:
+            self._thumbnail_controller.cleanup()
+            self._thumbnail_controller = None
+
+        if not self.rom_path or not self.rom_extractor:
+            return
+
+        # Create and start new thumbnail worker
+        self._thumbnail_controller = ThumbnailWorkerController(self)
+        self._thumbnail_controller.start_worker(self.rom_path, self.rom_extractor)
+
+        # Connect ready signal
+        if self._thumbnail_controller.worker:
+            self._thumbnail_controller.worker.thumbnail_ready.connect(self._on_capture_thumbnail_ready)
+            logger.debug("Capture thumbnail worker started for %s", self.rom_path)
+
+        # Request thumbnails for all existing captures
+        if hasattr(self, "mesen_captures_section"):
+            self.mesen_captures_section.request_all_thumbnails()
 
     def _add_mode_controls(self, layout: QVBoxLayout):
         """Add sprite selector controls to the layout (always visible, preset mode is default).
@@ -431,6 +481,9 @@ class ROMExtractionPanel(QWidget):
             # Notify that files changed
             self.files_changed.emit()
             self.rom_loaded.emit(filename)
+
+            # Setup thumbnail worker for Mesen captures
+            self._setup_capture_thumbnail_worker()
 
             # Auto-fill output name from ROM filename if not already set
             if not self._get_output_name():
@@ -930,6 +983,11 @@ class ROMExtractionPanel(QWidget):
 
         # Use orchestrator cleanup
         self._worker_orchestrator.cleanup()
+
+        # Cleanup thumbnail worker
+        if self._thumbnail_controller is not None:
+            self._thumbnail_controller.cleanup()
+            self._thumbnail_controller = None
 
     def _disconnect_signals(self) -> None:
         """Disconnect all signals to prevent stale handler calls after close."""

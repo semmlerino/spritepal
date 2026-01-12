@@ -1,4 +1,3 @@
-
 """Tests for OffsetLineEdit widget."""
 
 from __future__ import annotations
@@ -33,7 +32,7 @@ class TestOffsetLineEditParsing:
         """Parse valid hex strings."""
         with qtbot.waitSignal(widget.offset_changed, check_params_cb=lambda val: val == 0x1234):
             widget.setText("0x1234")
-            
+
         assert widget.offset() == 0x1234
 
     def test_parse_invalid(self, widget: OffsetLineEdit) -> None:
@@ -54,7 +53,7 @@ class TestOffsetLineEditRecursionFix:
         # Using qtbot.assertNotEmitted context manager
         with qtbot.assertNotEmitted(widget.offset_changed):
             widget.set_offset(0x5678)
-            
+
         assert widget.offset() == 0x5678
         assert widget.text() == "0x005678"
 
@@ -79,9 +78,7 @@ class TestSMCHeaderOffsetHandling:
     header offset when parsing Mesen2 "FILE OFFSET: 0x..." format inputs.
     """
 
-    def test_mesen2_format_with_smc_header_subtracts_offset(
-        self, widget: OffsetLineEdit, qtbot: QtBot
-    ) -> None:
+    def test_mesen2_format_with_smc_header_subtracts_offset(self, widget: OffsetLineEdit, qtbot: QtBot) -> None:
         """
         Contract: When SMC header offset is set, parsing "FILE OFFSET: 0x..."
         should subtract the header offset to get the ROM offset.
@@ -99,16 +96,12 @@ class TestSMCHeaderOffsetHandling:
         file_offset = 0x3C6EF1
         expected_rom_offset = file_offset - 512  # 0x3C6CF1
 
-        with qtbot.waitSignal(
-            widget.offset_changed, check_params_cb=lambda val: val == expected_rom_offset
-        ):
+        with qtbot.waitSignal(widget.offset_changed, check_params_cb=lambda val: val == expected_rom_offset):
             widget.setText(f"FILE OFFSET: 0x{file_offset:06X}")
 
         assert widget.offset() == expected_rom_offset
 
-    def test_mesen2_format_with_zero_header_passes_through(
-        self, widget: OffsetLineEdit, qtbot: QtBot
-    ) -> None:
+    def test_mesen2_format_with_zero_header_passes_through(self, widget: OffsetLineEdit, qtbot: QtBot) -> None:
         """
         Contract: When SMC header offset is 0 (headerless ROM), parsing
         "FILE OFFSET: 0x..." should return the offset unchanged.
@@ -119,16 +112,12 @@ class TestSMCHeaderOffsetHandling:
         # Parse Mesen2 format with file offset
         file_offset = 0x3C6EF1
 
-        with qtbot.waitSignal(
-            widget.offset_changed, check_params_cb=lambda val: val == file_offset
-        ):
+        with qtbot.waitSignal(widget.offset_changed, check_params_cb=lambda val: val == file_offset):
             widget.setText(f"FILE OFFSET: 0x{file_offset:06X}")
 
         assert widget.offset() == file_offset
 
-    def test_mesen2_format_header_offset_cannot_go_negative(
-        self, widget: OffsetLineEdit, qtbot: QtBot
-    ) -> None:
+    def test_mesen2_format_header_offset_cannot_go_negative(self, widget: OffsetLineEdit, qtbot: QtBot) -> None:
         """
         Contract: If file offset < header offset, result should be clamped to 0.
         """
@@ -138,16 +127,12 @@ class TestSMCHeaderOffsetHandling:
         # Parse Mesen2 format with small file offset (in header region)
         file_offset = 0x100  # 256 bytes, less than 512-byte header
 
-        with qtbot.waitSignal(
-            widget.offset_changed, check_params_cb=lambda val: val == 0
-        ):
+        with qtbot.waitSignal(widget.offset_changed, check_params_cb=lambda val: val == 0):
             widget.setText(f"FILE OFFSET: 0x{file_offset:03X}")
 
         assert widget.offset() == 0  # Clamped to 0, not negative
 
-    def test_plain_hex_input_not_affected_by_header_offset(
-        self, widget: OffsetLineEdit, qtbot: QtBot
-    ) -> None:
+    def test_plain_hex_input_not_affected_by_header_offset(self, widget: OffsetLineEdit, qtbot: QtBot) -> None:
         """
         Contract: Plain hex input (e.g., "0x3C6EF1") should NOT be adjusted
         for header offset, as it's assumed to be a ROM offset already.
@@ -158,9 +143,7 @@ class TestSMCHeaderOffsetHandling:
         # Parse plain hex format (NOT Mesen2 format)
         rom_offset = 0x3C6EF1
 
-        with qtbot.waitSignal(
-            widget.offset_changed, check_params_cb=lambda val: val == rom_offset
-        ):
+        with qtbot.waitSignal(widget.offset_changed, check_params_cb=lambda val: val == rom_offset):
             widget.setText(f"0x{rom_offset:06X}")
 
         # Plain hex should NOT have header subtracted

@@ -44,10 +44,10 @@ pytestmark = [
 
 
 @pytest.fixture
-def real_factory(tmp_path, app_context: AppContext):
+def real_factory(tmp_path, app_context: AppContext, isolated_data_repository):
     """Create RealComponentFactory for integration tests."""
     # context_guaranteed=True because app_context fixture guarantees context exists
-    with RealComponentFactory(context_guaranteed=True) as factory:
+    with RealComponentFactory(context_guaranteed=True, data_repository=isolated_data_repository) as factory:
         yield factory
 
 
@@ -417,10 +417,10 @@ class TestWorkflowEdgeCases:
         with pytest.raises((ValidationError, TypeError)):
             manager.validate_extraction_params(params)
 
-    def test_factory_cleanup_on_exit(self, tmp_path, app_context: AppContext):
+    def test_factory_cleanup_on_exit(self, tmp_path, app_context: AppContext, isolated_data_repository):
         """Test that factory properly cleans up resources."""
         # context_guaranteed=True because app_context fixture guarantees context exists
-        with RealComponentFactory(context_guaranteed=True) as factory:
+        with RealComponentFactory(context_guaranteed=True, data_repository=isolated_data_repository) as factory:
             cache = factory.create_rom_cache()
             renderer = factory.create_tile_renderer()
             assert cache is not None

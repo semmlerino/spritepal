@@ -92,16 +92,16 @@ class TestRealMainWindowStateIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers, session_data_repository):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application
         self.qt_app = QApplication.instance()
 
         # Initialize real manager factory with proper test isolation
-        self.manager_factory = RealComponentFactory()
+        self.manager_factory = RealComponentFactory(data_repository=isolated_data_repository)
 
-        # Use session-scoped test data repository (read-only, shared across tests)
-        self.test_data = session_data_repository
+        # Use isolated test data repository
+        self.test_data = isolated_data_repository
 
         yield
 
@@ -388,17 +388,11 @@ class TestRealMainWindowStateIntegration:
             # Validate dialog coordinator integration
             assert main_window.dialog_coordinator is not None, "Should have dialog coordinator"
 
-
-class TestRealMainWindowWorkflowIntegration:
-    """
-    Test complete real workflows vs mocked workflow simulation.
-    """
-
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure."""
         self.qt_app = QApplication.instance()
-        self.manager_factory = RealComponentFactory()
+        self.manager_factory = RealComponentFactory(data_repository=isolated_data_repository)
 
         yield
 
@@ -511,10 +505,10 @@ class TestBugDiscoveryRealVsMocked:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure."""
         self.qt_app = QApplication.instance()
-        self.manager_factory = RealComponentFactory()
+        self.manager_factory = RealComponentFactory(data_repository=isolated_data_repository)
 
         yield
 

@@ -8,10 +8,10 @@ allowing users to quickly jump to discovered sprites without manual copy-paste.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
-from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QAction
+from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtGui import QAction, QColor, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMenu,
     QPushButton,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QVBoxLayout,
     QWidget,
 )
@@ -33,6 +35,86 @@ if TYPE_CHECKING:
     from core.mesen_integration.log_watcher import CapturedOffset
 
 logger = logging.getLogger(__name__)
+
+
+class CaptureThumbnailDelegate(QStyledItemDelegate):
+    """Delegate for rendering thumbnails in the captures list."""
+
+    THUMBNAIL_SIZE = 32
+    ITEM_PADDING = 4
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        """Initialize the thumbnail delegate."""
+        super().__init__(parent)
+        self._placeholder_bg = QColor(COLORS["darker_gray"])
+        self._placeholder_grid = QColor(COLORS["border"])
+
+    @override
+    def paint(
+        self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex
+    ) -> None:
+        """Paint the list item with thumbnail."""
+        # Let default paint handle selection/hover effects
+        super().paint(painter, option, index)
+
+        # Get item data
+        item_data = index.data(Qt.ItemDataRole.UserRole)
+        if not isinstance(item_data, dict):
+            return
+
+        painter.save()
+
+        # Calculate thumbnail rectangle (left side of item)
+        item_rect = option.rect  # type: ignore[attr-defined]
+        thumbnail_rect = QRect(
+            item_rect.x() + self.ITEM_PADDING,
+            item_rect.y() + self.ITEM_PADDING,
+            self.THUMBNAIL_SIZE,
+            self.THUMBNAIL_SIZE,
+        )
+
+        # Draw thumbnail or placeholder
+        thumbnail = item_data.get("thumbnail")
+        if thumbnail and isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
+            # Scale to fit
+            scaled = thumbnail.scaled(
+                thumbnail_rect.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            # Center in rectangle
+            x = thumbnail_rect.x() + (thumbnail_rect.width() - scaled.width()) // 2
+            y = thumbnail_rect.y() + (thumbnail_rect.height() - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
+        else:
+            # Draw placeholder
+            self._draw_placeholder(painter, thumbnail_rect)
+
+        painter.restore()
+
+    def _draw_placeholder(self, painter: QPainter, rect: QRect) -> None:
+        """Draw a placeholder for items without thumbnails."""
+        # Fill background
+        painter.fillRect(rect, self._placeholder_bg)
+
+        # Draw border
+        painter.setPen(QPen(self._placeholder_grid, 1))
+        painter.drawRect(rect.adjusted(0, 0, -1, -1))
+
+        # Draw grid pattern
+        grid_size = 8
+        for x in range(rect.x(), rect.right(), grid_size):
+            painter.drawLine(x, rect.y(), x, rect.bottom())
+        for y in range(rect.y(), rect.bottom(), grid_size):
+            painter.drawLine(rect.x(), y, rect.right(), y)
+
+    @override
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
+        """Return size hint for the item."""
+        base_size = super().sizeHint(option, index)
+        # Ensure enough height for thumbnail + padding
+        min_height = self.THUMBNAIL_SIZE + 2 * self.ITEM_PADDING
+        return QSize(base_size.width(), max(base_size.height(), min_height))
 
 
 class RecentCapturesWidget(QWidget):
@@ -56,6 +138,7 @@ class RecentCapturesWidget(QWidget):
     offset_selected = Signal(int)
     offset_activated = Signal(int)
     save_to_library_requested = Signal(int)
+    thumbnail_requested = Signal(int)  # Emitted when a capture needs a thumbnail
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -101,7 +184,12 @@ class RecentCapturesWidget(QWidget):
         self._list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._list_widget.setMinimumHeight(100)
 
-        # Style the list
+        # Set custom delegate for thumbnail rendering
+        self._delegate = CaptureThumbnailDelegate(self._list_widget)
+        self._list_widget.setItemDelegate(self._delegate)
+
+        # Style the list - add left padding for thumbnail area
+        thumbnail_padding = CaptureThumbnailDelegate.THUMBNAIL_SIZE + 2 * CaptureThumbnailDelegate.ITEM_PADDING + 8
         self._list_widget.setStyleSheet(f"""
             QListWidget {{
                 background-color: {COLORS["background"]};
@@ -111,7 +199,7 @@ class RecentCapturesWidget(QWidget):
                 font-size: 12px;
             }}
             QListWidget::item {{
-                padding: 4px 8px;
+                padding: 4px 8px 4px {thumbnail_padding}px;
             }}
             QListWidget::item:selected {{
                 background-color: {COLORS["accent"]};
@@ -142,19 +230,24 @@ class RecentCapturesWidget(QWidget):
         self._list_widget.customContextMenuRequested.connect(self._show_context_menu)
         self._clear_btn.clicked.connect(self.clear)
 
-    def add_capture(self, capture: CapturedOffset) -> None:
+    def add_capture(self, capture: CapturedOffset, request_thumbnail: bool = True) -> None:
         """
         Add a new captured offset to the list.
 
         Args:
             capture: The captured offset from LogWatcher.
+            request_thumbnail: If True, emit thumbnail_requested signal.
         """
         # Insert at beginning (most recent first)
         self._captures.insert(0, capture)
 
-        # Create list item
+        # Create list item with dict data for delegate
         item = QListWidgetItem()
-        item.setData(Qt.ItemDataRole.UserRole, capture.offset)
+        item_data = {
+            "offset": capture.offset,
+            "thumbnail": None,  # Will be set later via set_thumbnail
+        }
+        item.setData(Qt.ItemDataRole.UserRole, item_data)
 
         # Format: "0x3C6EF1  12:34:56"
         time_str = capture.timestamp.strftime("%H:%M:%S")
@@ -172,6 +265,10 @@ class RecentCapturesWidget(QWidget):
 
         self._update_empty_state()
         logger.debug("Added capture: %s", capture.offset_hex)
+
+        # Request thumbnail generation
+        if request_thumbnail:
+            self.thumbnail_requested.emit(capture.offset)
 
     def load_persistent(self, captures: list[CapturedOffset]) -> None:
         """
@@ -210,8 +307,38 @@ class RecentCapturesWidget(QWidget):
         """Get the currently selected offset, if any."""
         current_item = self._list_widget.currentItem()
         if current_item is not None:  # type: ignore[reportUnnecessaryComparison]
-            return current_item.data(Qt.ItemDataRole.UserRole)
+            data = current_item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict):
+                return data.get("offset")
+            # Legacy: direct int storage
+            return data
         return None
+
+    def set_thumbnail(self, offset: int, thumbnail: QPixmap) -> None:
+        """
+        Set or update the thumbnail for a capture.
+
+        Args:
+            offset: ROM offset to match
+            thumbnail: Thumbnail pixmap to display
+        """
+        for i in range(self._list_widget.count()):
+            item = self._list_widget.item(i)
+            if item is None:  # type: ignore[reportUnnecessaryComparison]
+                continue
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("offset") == offset:
+                data["thumbnail"] = thumbnail
+                item.setData(Qt.ItemDataRole.UserRole, data)
+                # Force repaint
+                self._list_widget.viewport().update()
+                logger.debug("Set thumbnail for offset 0x%06X", offset)
+                return
+
+    def request_all_thumbnails(self) -> None:
+        """Request thumbnails for all current captures."""
+        for capture in self._captures:
+            self.thumbnail_requested.emit(capture.offset)
 
     def get_capture_count(self) -> int:
         """Get the number of captured offsets."""
@@ -236,13 +363,15 @@ class RecentCapturesWidget(QWidget):
 
     def _on_item_clicked(self, item: QListWidgetItem) -> None:
         """Handle single-click on list item."""
-        offset = item.data(Qt.ItemDataRole.UserRole)
+        data = item.data(Qt.ItemDataRole.UserRole)
+        offset = data.get("offset") if isinstance(data, dict) else data
         if offset is not None:
             self.offset_selected.emit(offset)
 
     def _on_item_double_clicked(self, item: QListWidgetItem) -> None:
         """Handle double-click on list item."""
-        offset = item.data(Qt.ItemDataRole.UserRole)
+        data = item.data(Qt.ItemDataRole.UserRole)
+        offset = data.get("offset") if isinstance(data, dict) else data
         if offset is not None:
             self.offset_activated.emit(offset)
 
@@ -252,7 +381,8 @@ class RecentCapturesWidget(QWidget):
         if item is None:  # type: ignore[reportUnnecessaryComparison]
             return
 
-        offset = item.data(Qt.ItemDataRole.UserRole)
+        data = item.data(Qt.ItemDataRole.UserRole)
+        offset = data.get("offset") if isinstance(data, dict) else data
         if offset is None:
             return
 

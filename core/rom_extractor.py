@@ -22,6 +22,7 @@ from core.rom_injector import ROMInjector, SpritePointer
 from core.rom_palette_extractor import ROMPaletteExtractor
 from core.rom_validator import ROMHeader
 from core.sprite_config_loader import SpriteConfigLoader
+from core.tile_utils import decode_4bpp_tile
 from core.types import CompressionType, ExtractionMetadata, SpriteInfo
 from utils.constants import (
     BUFFER_SIZE_1KB,
@@ -750,40 +751,19 @@ class ROMExtractor:
             tile_offset = tile_idx * BYTES_PER_TILE
             tile_bytes = tile_data[tile_offset : tile_offset + BYTES_PER_TILE]
 
-            # Convert 4bpp planar to pixels
+            # Decode tile using shared utility
+            pixels = decode_4bpp_tile(tile_bytes)
+
+            # Copy pixels to image
             for y in range(TILE_HEIGHT):
                 for x in range(TILE_WIDTH):
-                    # Get pixel value from 4bpp planar format (0-15)
-                    pixel = self._get_4bpp_pixel(tile_bytes, x, y)
-                    # Set pixel index directly
-                    img.putpixel((tile_x + x, tile_y + y), pixel)
+                    img.putpixel((tile_x + x, tile_y + y), pixels[y][x])
 
         # Save as indexed PNG
         img.save(output_path, "PNG")
 
         logger.info(f"Saved PNG: {output_path} ({img.width}x{img.height} pixels, {num_tiles} tiles)")
         return num_tiles
-
-    def _get_4bpp_pixel(self, tile_data: bytes, x: int, y: int) -> int:
-        """
-        Get pixel value from 4bpp planar tile data.
-
-        SNES 4bpp format stores 2 bitplanes together:
-        - Planes 0,1 are interleaved in first {TILE_PLANE_SIZE} bytes
-        - Planes 2,3 are interleaved in next {TILE_PLANE_SIZE} bytes
-        """
-        # Calculate byte positions
-        row = y
-        bit = 7 - (x % 8)
-
-        # Get bits from each plane
-        plane0 = (tile_data[row * 2] >> bit) & 1
-        plane1 = (tile_data[row * 2 + 1] >> bit) & 1
-        plane2 = (tile_data[TILE_PLANE_SIZE + row * 2] >> bit) & 1
-        plane3 = (tile_data[TILE_PLANE_SIZE + row * 2 + 1] >> bit) & 1
-
-        # Combine bits to get 4-bit value
-        return (plane3 << 3) | (plane2 << 2) | (plane1 << 1) | plane0
 
     def get_known_sprite_locations(self, rom_path: str) -> dict[str, SpritePointer]:
         """

@@ -13,6 +13,7 @@ from typing import cast
 import numpy as np
 from PIL import Image
 
+from core.tile_utils import encode_4bpp_tile
 from core.types import ExtractionMetadata
 from utils.constants import (
     IMAGE_DIMENSION_MULTIPLE,
@@ -25,55 +26,6 @@ from utils.file_validator import atomic_write
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-
-
-def encode_4bpp_tile(tile_pixels: list[int] | np.ndarray) -> bytes:
-    """
-    Encode an 8x8 tile to SNES 4bpp format using NumPy vectorization.
-
-    Args:
-        tile_pixels: 64 pixel values (either list or numpy array)
-
-    Returns:
-        32 bytes of SNES 4bpp tile data
-    """
-    # Convert to numpy array if needed
-    if isinstance(tile_pixels, list):
-        pixels = np.array(tile_pixels, dtype=np.uint8)
-    else:
-        pixels = tile_pixels.astype(np.uint8)
-
-    if len(pixels) != 64:
-        logger.error(f"Invalid tile size: expected 64 pixels, got {len(pixels)}")
-        raise ValueError(f"Expected 64 pixels, got {len(pixels)}")
-
-    # Reshape to 8x8 and mask to 4-bit
-    pixels = pixels.reshape(8, 8) & PIXEL_MASK_4BIT
-
-    # Extract bitplanes (vectorized bit extraction)
-    # Each bitplane is an 8x8 array of 0s and 1s
-    bp0_bits = (pixels & 1).astype(np.uint8)
-    bp1_bits = ((pixels >> 1) & 1).astype(np.uint8)
-    bp2_bits = ((pixels >> 2) & 1).astype(np.uint8)
-    bp3_bits = ((pixels >> 3) & 1).astype(np.uint8)
-
-    # Pack each row of 8 bits into 1 byte using np.packbits
-    # np.packbits packs bits in big-endian order (MSB first), which matches SNES format
-    bp0 = np.packbits(bp0_bits, axis=1).flatten()  # 8 bytes
-    bp1 = np.packbits(bp1_bits, axis=1).flatten()  # 8 bytes
-    bp2 = np.packbits(bp2_bits, axis=1).flatten()  # 8 bytes
-    bp3 = np.packbits(bp3_bits, axis=1).flatten()  # 8 bytes
-
-    # Interleave bitplanes in SNES 4bpp format:
-    # First 16 bytes: bp0[0], bp1[0], bp0[1], bp1[1], ...
-    # Next 16 bytes: bp2[0], bp3[0], bp2[1], bp3[1], ...
-    output = np.zeros(32, dtype=np.uint8)
-    output[0:16:2] = bp0  # Even indices 0,2,4,6,8,10,12,14
-    output[1:16:2] = bp1  # Odd indices 1,3,5,7,9,11,13,15
-    output[16:32:2] = bp2  # Even indices 16,18,20,22,24,26,28,30
-    output[17:32:2] = bp3  # Odd indices 17,19,21,23,25,27,29,31
-
-    return bytes(output)
 
 
 class SpriteInjector:

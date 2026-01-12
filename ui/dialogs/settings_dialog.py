@@ -139,7 +139,10 @@ class SettingsDialog(DialogBase):
         settings_layout.addRow("Mesen2 output:", mesen_layout)
 
         # Help text for Mesen2 directory
-        mesen_help = QLabel("Directory where Mesen2 Lua scripts write log files. Can be overridden by SPRITEPAL_MESEN_OUTPUT_DIR env var.", self)
+        mesen_help = QLabel(
+            "Directory where Mesen2 Lua scripts write log files. Can be overridden by SPRITEPAL_MESEN_OUTPUT_DIR env var.",
+            self,
+        )
         mesen_help.setWordWrap(True)
         mesen_help.setStyleSheet(get_muted_text_style())
         settings_layout.addRow("", mesen_help)
