@@ -2,7 +2,7 @@
 -- Press F9 to capture all visible OAM entries with their VRAM tile data
 -- Output: sprite_capture.json for SpritePal to process
 
-local OUTPUT_DIR = "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
+local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
 local LOG_FILE = OUTPUT_DIR .. "capture_log.txt"
 local MEM = {
     oam = emu.memType.snesOam or emu.memType.snesSpriteRam,

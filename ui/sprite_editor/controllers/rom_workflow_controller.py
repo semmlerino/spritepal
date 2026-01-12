@@ -232,6 +232,10 @@ class ROMWorkflowController(QObject):
         self._view.workspace.saveToRomRequested.connect(self.prepare_injection)
         self._view.workspace.exportPngRequested.connect(self.export_png)
 
+        # Palette panel signals
+        if self._view.workspace and self._view.workspace.palette_panel:
+            self._view.workspace.palette_panel.manualPaletteRequested.connect(self._on_manual_palette_requested)
+
     def _on_sprite_selected(self, offset: int, source_type: str) -> None:
         """Handle sprite selection from asset browser."""
         self.set_offset(offset)
@@ -728,7 +732,7 @@ class ROMWorkflowController(QObject):
         self.current_offset = offset
         if self._view:
             self._view.set_offset(offset)
-        
+
         # Emit change for external listeners (e.g. MainWindow toolbar)
         self.offset_changed.emit(offset)
 
@@ -737,7 +741,12 @@ class ROMWorkflowController(QObject):
             self._preview_pending = True
             if self._view:
                 self._view.set_action_loading(True)
-            self.preview_coordinator.request_manual_preview(offset)
+            # Use full decompression if we're going to open in editor (prevents 4KB truncation)
+            if self._pending_open_in_editor:
+                logger.debug(f"[SET_OFFSET] Using full preview for offset 0x{offset:06X} (pending open)")
+                self.preview_coordinator.request_full_preview(offset)
+            else:
+                self.preview_coordinator.request_manual_preview(offset)
 
     def handle_primary_action(self) -> None:
         """Handle the state-dependent primary action button."""
@@ -1269,9 +1278,34 @@ class ROMWorkflowController(QObject):
         if self._pending_open_in_editor:
             # Only auto-open if offset matches (prevents stale opens after errors/navigation)
             if self._pending_open_offset in (-1, actual_offset):
-                logger.debug("[PREVIEW] Flag is True and offset matches, calling open_in_editor()")
                 self._pending_open_in_editor = False
                 self._pending_open_offset = -1
+
+                # Validation: Don't auto-open if HAL decompression failed
+                if not hal_succeeded:
+                    logger.warning(f"[PREVIEW] HAL decompression failed for 0x{actual_offset:06X}, not auto-opening")
+                    if self._message_service:
+                        self._message_service.show_message(
+                            f"Cannot open: offset 0x{actual_offset:06X} is not HAL-compressed data"
+                        )
+                    return
+
+                # Validation: Warn if size is not a multiple of 32 bytes (SNES tile size)
+                if len(tile_data) % 32 != 0:
+                    from PySide6.QtWidgets import QMessageBox
+
+                    reply = QMessageBox.warning(
+                        self._view,
+                        "Unusual Sprite Size",
+                        f"Decompressed data is {len(tile_data)} bytes, which is not a multiple of 32.\n"
+                        "This may not be valid 4bpp tile data.\n\n"
+                        "Open in editor anyway?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    )
+                    if reply == QMessageBox.StandardButton.No:
+                        return
+
+                logger.debug("[PREVIEW] Flag is True and offset matches, calling open_in_editor()")
                 self.open_in_editor()
             else:
                 # Offset mismatch means a newer request is pending - don't clear flags,
@@ -1294,6 +1328,78 @@ class ROMWorkflowController(QObject):
             self._view.set_action_text("Open in Editor")
         if self._message_service:
             self._message_service.show_message(f"Preview error: {error_msg}")
+
+    def _on_manual_palette_requested(self) -> None:
+        """Handle request to manually specify a palette offset.
+
+        Shows a dialog for the user to enter a ROM offset where sprite
+        palette data is located. Extracts and registers the palette.
+        """
+        if not self.rom_path or not self._view:
+            if self._message_service:
+                self._message_service.show_message("Load a ROM first before selecting a manual palette")
+            return
+
+        from ui.dialogs import ManualPaletteOffsetDialog
+
+        dialog = ManualPaletteOffsetDialog(self._view, rom_size=self.rom_size)
+        dialog.palette_offset_selected.connect(self._apply_manual_palette)
+        dialog.exec()
+
+    def _apply_manual_palette(self, offset: int, start_index: int, count: int) -> None:
+        """Apply a manually specified palette from ROM.
+
+        Args:
+            offset: ROM offset where palette data starts
+            start_index: First palette index (e.g., 8 for sprites)
+            count: Number of palettes to load
+        """
+        if not self.rom_path or not self.rom_extractor:
+            return
+
+        try:
+            # Extract palettes from the specified offset
+            end_index = start_index + count - 1
+            all_palettes = self.rom_extractor.extract_palette_range(self.rom_path, offset, start_index, end_index)
+
+            if not all_palettes:
+                if self._message_service:
+                    self._message_service.show_message(f"No palette data found at offset 0x{offset:X}")
+                return
+
+            # Clear previous ROM palette sources
+            if self._view and self._view.workspace and self._view.workspace.palette_panel:
+                self._view.workspace.palette_panel.palette_source_selector.clear_rom_sources()
+
+            # Register the extracted palettes
+            if self._editing_controller:
+                descriptions: dict[int, str] = {i: f"Manual Palette {i}" for i in all_palettes}
+                self._editing_controller.register_rom_palettes(
+                    all_palettes,
+                    descriptions=descriptions,
+                    active_indices=[],
+                )
+
+                # Select the first extracted palette
+                first_index = min(all_palettes.keys())
+                self._editing_controller.set_palette_source("rom", first_index)
+
+                logger.info(
+                    f"Manual palette loaded: offset=0x{offset:X}, "
+                    f"indices={start_index}-{end_index}, found {len(all_palettes)} palettes"
+                )
+
+                if self._message_service:
+                    self._message_service.show_message(f"Loaded {len(all_palettes)} palettes from offset 0x{offset:X}")
+
+            # Hide the default palette warning since we now have a palette
+            if self._view:
+                self._view.hide_palette_warning()
+
+        except Exception as e:
+            logger.exception(f"Failed to extract manual palette from 0x{offset:X}")
+            if self._message_service:
+                self._message_service.show_message(f"Failed to load palette: {e}")
 
     def cleanup(self) -> None:
         """Clean up resources."""

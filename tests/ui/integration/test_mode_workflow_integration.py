@@ -29,6 +29,7 @@ class MockPreviewCoordinator(QObject):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.request_manual_preview_called = False
+        self.request_full_preview_called = False
         self.last_requested_offset = -1
 
     def set_rom_data_provider(self, provider: object) -> None:
@@ -36,6 +37,11 @@ class MockPreviewCoordinator(QObject):
 
     def request_manual_preview(self, offset: int) -> None:
         self.request_manual_preview_called = True
+        self.last_requested_offset = offset
+
+    def request_full_preview(self, offset: int) -> None:
+        """Request full decompression preview (not truncated to 4KB)."""
+        self.request_full_preview_called = True
         self.last_requested_offset = offset
 
     def cleanup(self) -> None:

@@ -260,6 +260,7 @@ class ApplicationStateManager(BaseManager):
             },
             "paths": {
                 "default_dumps_dir": str(Path.home() / "Documents" / "Mesen2" / "Debugger"),
+                "mesen_output_dir": "",  # Mesen2 exchange dir (empty = use project default)
                 "last_used_dir": "",
                 "last_export_dir": "",
                 "last_import_dir": "",
@@ -675,6 +676,25 @@ class ApplicationStateManager(BaseManager):
         if directory and Path(directory).exists():
             self.set("paths", "last_used_dir", directory)
             self.save_session()
+
+    def get_mesen_output_dir(self) -> str:
+        """Get the Mesen2 output directory.
+
+        Returns:
+            Configured Mesen2 output directory, or empty string if using default.
+            Empty string means LogWatcher should use the project's mesen2_exchange/ directory.
+        """
+        return str(self.get("paths", "mesen_output_dir", ""))
+
+    def set_mesen_output_dir(self, directory: str) -> None:
+        """Set the Mesen2 output directory.
+
+        Args:
+            directory: Path to the Mesen2 exchange directory.
+                      Empty string means use the project default (mesen2_exchange/).
+        """
+        self.set("paths", "mesen_output_dir", directory)
+        self.save_session()
 
     def get_cache_settings(self) -> dict[str, object]:
         """Get all cache settings."""

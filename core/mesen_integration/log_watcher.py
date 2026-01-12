@@ -3,12 +3,18 @@ File watcher for Mesen2 sprite_rom_finder.lua log output.
 
 Monitors mesen2_exchange/sprite_rom_finder.log for new ROM offset discoveries
 and emits signals when offsets are found.
+
+Output directory resolution order:
+1. SPRITEPAL_MESEN_OUTPUT_DIR environment variable (if set and non-empty)
+2. Settings value from ApplicationStateManager.get_mesen_output_dir() (if non-empty)
+3. Project default: {project_root}/mesen2_exchange/
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -53,12 +59,15 @@ class LogWatcher(QObject):
         watch_started: Emitted when file watching begins.
         watch_stopped: Emitted when file watching stops.
         error_occurred: Emitted on errors. Args: (error_message: str)
+        directory_warning: Emitted when watched directory doesn't exist.
+                          Args: (warning_message: str)
     """
 
     offset_discovered = Signal(object)  # CapturedOffset
     watch_started = Signal()
     watch_stopped = Signal()
     error_occurred = Signal(str)
+    directory_warning = Signal(str)
 
     # Polling interval in milliseconds (for WSL/Windows cross-filesystem compatibility)
     POLL_INTERVAL_MS = 500
@@ -113,21 +122,61 @@ class LogWatcher(QObject):
                 return capture
         return None
 
-    def start_watching(self, log_path: Path | str | None = None) -> bool:
+    def _resolve_output_directory(self, output_dir: Path | str | None = None) -> Path:
+        """Resolve the Mesen2 output directory.
+
+        Resolution order:
+        1. SPRITEPAL_MESEN_OUTPUT_DIR environment variable (if set and non-empty)
+        2. output_dir parameter (if provided and non-empty)
+        3. Project default: {project_root}/mesen2_exchange/
+
+        Args:
+            output_dir: Optional directory passed by caller (e.g., from settings)
+
+        Returns:
+            Resolved Path to the output directory
+        """
+        # 1. Check environment variable first
+        env_dir = os.environ.get("SPRITEPAL_MESEN_OUTPUT_DIR", "").strip()
+        if env_dir:
+            resolved = Path(env_dir)
+            logger.debug("Using output directory from SPRITEPAL_MESEN_OUTPUT_DIR: %s", resolved)
+            return resolved
+
+        # 2. Use provided output_dir if non-empty
+        if output_dir:
+            dir_str = str(output_dir).strip()
+            if dir_str:
+                resolved = Path(dir_str)
+                logger.debug("Using output directory from parameter: %s", resolved)
+                return resolved
+
+        # 3. Fall back to project default
+        project_root = Path(__file__).parent.parent.parent
+        resolved = project_root / "mesen2_exchange"
+        logger.debug("Using default output directory: %s", resolved)
+        return resolved
+
+    def start_watching(
+        self, log_path: Path | str | None = None, *, output_dir: Path | str | None = None
+    ) -> bool:
         """
         Start watching the Mesen2 log file.
 
         Args:
-            log_path: Path to sprite_rom_finder.log. If None, uses default
-                     location (mesen2_exchange/sprite_rom_finder.log).
+            log_path: Full path to sprite_rom_finder.log. If None, resolves using
+                     output_dir or environment variable.
+            output_dir: Base directory containing log files. If None and log_path
+                       is None, checks SPRITEPAL_MESEN_OUTPUT_DIR env var first,
+                       then falls back to project's mesen2_exchange/ directory.
 
         Returns:
             True if watching started successfully, False otherwise.
         """
         if log_path is None:
-            # Default to project's mesen2_exchange directory
-            project_root = Path(__file__).parent.parent.parent
-            log_path = project_root / "mesen2_exchange" / "sprite_rom_finder.log"
+            # Resolution order: env var > output_dir param > project default
+            resolved_dir = self._resolve_output_directory(output_dir)
+            log_path = resolved_dir / "sprite_rom_finder.log"
 
         log_path = Path(log_path)
 
@@ -145,6 +194,14 @@ class LogWatcher(QObject):
         if self._watching_dir.exists():
             self._watcher.addPath(str(self._watching_dir))
             logger.debug("Watching directory: %s", self._watching_dir)
+        else:
+            # Emit warning - directory doesn't exist
+            warning_msg = (
+                f"Mesen2 output directory does not exist: {self._watching_dir}\n"
+                "Captures from Mesen2 will not be detected until this directory is created."
+            )
+            logger.warning(warning_msg)
+            self.directory_warning.emit(warning_msg)
 
         if log_path.exists():
             stat = log_path.stat()

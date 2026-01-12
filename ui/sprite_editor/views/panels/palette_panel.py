@@ -101,6 +101,7 @@ class PalettePanel(QWidget):
     savePaletteClicked = Signal()  # Emitted when "Save Palette..." button is clicked
     editColorClicked = Signal()  # Emitted when "Edit Color" button is clicked
     galleryPaletteSelected = Signal(int)  # Emitted when palette selected from gallery
+    manualPaletteRequested = Signal()  # Emitted when manual palette offset is requested
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -126,6 +127,7 @@ class PalettePanel(QWidget):
         self.palette_source_selector.loadPaletteClicked.connect(self.loadPaletteClicked.emit)
         self.palette_source_selector.savePaletteClicked.connect(self.savePaletteClicked.emit)
         self.palette_source_selector.editColorClicked.connect(self.editColorClicked.emit)
+        self.palette_source_selector.manualPaletteRequested.connect(self.manualPaletteRequested.emit)
         palette_layout.addWidget(self.palette_source_selector)
 
         # View All button (opens gallery popup)

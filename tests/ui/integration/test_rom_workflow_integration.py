@@ -17,6 +17,7 @@ class MockPreviewCoordinator(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.request_manual_preview_called = False
+        self.request_full_preview_called = False
         self.last_requested_offset = -1
 
     def set_rom_data_provider(self, provider):
@@ -24,6 +25,11 @@ class MockPreviewCoordinator(QObject):
 
     def request_manual_preview(self, offset):
         self.request_manual_preview_called = True
+        self.last_requested_offset = offset
+
+    def request_full_preview(self, offset):
+        """Request full decompression preview (not truncated to 4KB)."""
+        self.request_full_preview_called = True
         self.last_requested_offset = offset
 
     def cleanup(self):
@@ -104,10 +110,8 @@ def test_auto_open_workflow(qtbot, workflow_controller, mock_editing_controller)
     # Action 1: Set Offset with auto_open
     workflow_controller.set_offset(0x100, auto_open=True)
 
-    # Verify preview requested (internal check to ensure flow is moving,
-    # though strict interpretation might say NO internal checks,
-    # but this is checking the Mock's state which is the test harness)
-    assert workflow_controller._mock_coordinator.request_manual_preview_called is True
+    # Verify full preview requested (auto_open=True uses full decompression)
+    assert workflow_controller._mock_coordinator.request_full_preview_called is True
     assert workflow_controller._mock_coordinator.last_requested_offset == 0x100
 
     # State should still be 'preview' (or unset/initial) before preview returns

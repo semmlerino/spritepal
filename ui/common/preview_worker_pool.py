@@ -60,14 +60,17 @@ class PooledPreviewWorker(SpritePreviewWorker):
         self._is_processing = False
         self._signals_connected = False
         self._being_destroyed = False  # Flag to prevent signal processing during cleanup
+        self._full_decompression = False  # If True, don't limit decompression to 4KB
 
     def setup_request(self, request: PendingPreviewRequest, extractor: ROMExtractor) -> None:
         """Setup worker for new request."""
         self.rom_path = request.rom_path
         self.offset = request.offset
         self.sprite_name = f"manual_0x{request.offset:X}"
+        self._full_decompression = request.full_decompression
         logger.debug(
-            f"[WORKER] setup_request: offset=0x{request.offset:X}, request_id={request.request_id}, sprite_name={self.sprite_name}"
+            f"[WORKER] setup_request: offset=0x{request.offset:X}, request_id={request.request_id}, "
+            f"sprite_name={self.sprite_name}, full_decompression={self._full_decompression}"
         )
         self.extractor = extractor
         self.sprite_config = None
@@ -181,8 +184,14 @@ class PooledPreviewWorker(SpritePreviewWorker):
             logger.debug(f"Request {request_id} cancelled before decompression")
             return
 
-        # Use conservative size for manual offsets during dragging
-        expected_size = 4096  # 4KB for fast preview during dragging
+        # Use conservative size for manual offsets during dragging, unless full decompression requested
+        if self._full_decompression:
+            # Full decompression for opening sprite in editor - no size limit (HAL has 64KB safety limit)
+            expected_size = None
+            logger.debug(f"[WORKER] Using full decompression (no size limit) for offset 0x{self.offset:X}")
+        else:
+            # 4KB limit for fast preview during slider dragging
+            expected_size = 4096
 
         # For manual offset browsing, try HAL decompression first
         # This allows Lua-captured offsets (which are compressed sprite offsets) to work correctly
@@ -285,8 +294,10 @@ class PooledPreviewWorker(SpritePreviewWorker):
 
                 # Read raw bytes from ROM at the offset
                 # This is for manual browsing of non-compressed areas
-                if self.offset + expected_size <= len(rom_data):
-                    tile_data = rom_data[self.offset : self.offset + expected_size]
+                # Use 4KB default for raw reads (fallback path when HAL decompression fails)
+                raw_read_size = expected_size if expected_size is not None else 4096
+                if self.offset + raw_read_size <= len(rom_data):
+                    tile_data = rom_data[self.offset : self.offset + raw_read_size]
                     logger.debug(
                         f"[TRACE] Extracted {len(tile_data)} bytes of raw tile data from offset 0x{self.offset:X}"
                     )

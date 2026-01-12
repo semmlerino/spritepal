@@ -14,7 +14,7 @@ local state = {
     obsel_config = nil,         -- OBSEL register state
     last_f9_state = false,      -- For edge detection
     capture_pending = false,    -- Waiting for clean frame to capture
-    output_dir = ".",           -- Output directory for JSON
+    output_dir = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\",  -- Output directory for JSON
     last_dma_enable = 0,        -- For DMA polling edge detection
 }
 

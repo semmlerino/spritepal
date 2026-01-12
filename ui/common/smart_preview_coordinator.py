@@ -72,12 +72,15 @@ class PendingPreviewRequest:
         offset: int,
         rom_path: str,
         callback: Callable[..., object] | None = None,
+        *,
+        full_decompression: bool = False,
     ):
         self.request_id = request_id
         self.offset = offset
         self.rom_path = rom_path
         self.callback = callback
         self.cancelled = False
+        self.full_decompression = full_decompression  # If True, don't truncate at 4KB
 
     def cancel(self) -> None:
         """Mark this request as cancelled."""
@@ -116,6 +119,7 @@ class SmartPreviewCoordinator(QObject):
         self._current_offset = 0
         self._request_counter = 0
         self._mutex = QMutex()
+        self._pending_full_decompression = False  # If True, next request uses full decompression
 
         # Slider reference (weak to prevent circular references)
         self._slider_ref: weakref.ReferenceType[Any] | None = None  # pyright: ignore[reportExplicitAny] - Weak reference to QSlider
@@ -222,6 +226,23 @@ class SmartPreviewCoordinator(QObject):
         logger.debug(f"[DEBUG] request_manual_preview called for offset 0x{offset:06X}")
 
         # Request preview for immediate response
+        self.request_preview(offset)
+
+    def request_full_preview(self, offset: int) -> None:
+        """
+        Request full decompression preview (not truncated to 4KB).
+
+        Use this when opening a sprite in the editor, where you need the complete
+        decompressed data, not just a preview. Normal previews are limited to 4KB
+        for performance during slider dragging.
+
+        Args:
+            offset: ROM offset for preview
+        """
+        logger.debug(f"[DEBUG] request_full_preview called for offset 0x{offset:06X}")
+        with QMutexLocker(self._mutex):
+            self._pending_full_decompression = True
+        # Request preview with immediate response (bypasses debouncing)
         self.request_preview(offset)
 
     def request_background_preload(self, offset: int) -> None:
@@ -447,14 +468,20 @@ class SmartPreviewCoordinator(QObject):
             with QMutexLocker(self._mutex):
                 offset = self._current_offset
                 request_id = self._request_counter
+                full_decompression = self._pending_full_decompression
+                self._pending_full_decompression = False  # Reset after reading
 
-            logger.debug(f"[COORD] Creating preview request: offset=0x{offset:06X}, request_id={request_id}")
+            logger.debug(
+                f"[COORD] Creating preview request: offset=0x{offset:06X}, "
+                f"request_id={request_id}, full_decompression={full_decompression}"
+            )
 
             # Create preview request
             request = PendingPreviewRequest(
                 request_id=request_id,
                 offset=offset,
                 rom_path=rom_path,
+                full_decompression=full_decompression,
             )
 
             # Submit to worker pool

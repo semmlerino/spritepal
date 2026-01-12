@@ -39,6 +39,7 @@ class PaletteSourceSelector(QWidget):
         loadPaletteClicked: Emitted when "Load Palette..." button is clicked.
         savePaletteClicked: Emitted when "Save Palette..." button is clicked.
         editColorClicked: Emitted when "Edit Color" button is clicked.
+        manualPaletteRequested: Emitted when "Manual Palette Offset..." is selected.
     """
 
     # Signals
@@ -46,10 +47,12 @@ class PaletteSourceSelector(QWidget):
     loadPaletteClicked = Signal()
     savePaletteClicked = Signal()
     editColorClicked = Signal()
+    manualPaletteRequested = Signal()  # Emitted when "Manual Palette Offset..." selected
 
     # Data keys for combo box items
     _SOURCE_TYPE_ROLE = 100
     _PALETTE_INDEX_ROLE = 101
+    _MANUAL_PALETTE_MARKER = "manual"  # Special marker for manual palette entry
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize the palette source selector.
@@ -59,6 +62,7 @@ class PaletteSourceSelector(QWidget):
         """
         super().__init__(parent)
         self.setObjectName("paletteSourceSelector")
+        self._separator_index = -1  # Index of the separator before manual entry
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -109,7 +113,34 @@ class PaletteSourceSelector(QWidget):
         main_layout.addLayout(button_layout)
 
         # Add default "Default" source to start
-        self.add_palette_source("Default", "default", 0)
+        self._add_initial_source("Default", "default", 0)
+
+        # Add separator and manual palette option (tracked for insertion logic)
+        self._separator_index = self._combo_box.count()
+        self._combo_box.insertSeparator(self._separator_index)
+        self._add_manual_palette_entry()
+
+    def _add_initial_source(
+        self,
+        display_name: str,
+        source_type: str,
+        palette_index: int,
+    ) -> None:
+        """Add an initial palette source during setup (appends to end).
+
+        This is used during initialization before the separator is added.
+        """
+        self._combo_box.addItem(display_name)
+        index = self._combo_box.count() - 1
+        self._combo_box.setItemData(index, source_type, self._SOURCE_TYPE_ROLE)
+        self._combo_box.setItemData(index, palette_index, self._PALETTE_INDEX_ROLE)
+
+    def _add_manual_palette_entry(self) -> None:
+        """Add the 'Manual Palette Offset...' entry to the combo box."""
+        self._combo_box.addItem("Manual Palette Offset...")
+        index = self._combo_box.count() - 1
+        self._combo_box.setItemData(index, self._MANUAL_PALETTE_MARKER, self._SOURCE_TYPE_ROLE)
+        self._combo_box.setItemData(index, -1, self._PALETTE_INDEX_ROLE)
 
     def _on_combo_changed(self, index: int) -> None:
         """Handle combo box selection change.
@@ -122,6 +153,17 @@ class PaletteSourceSelector(QWidget):
 
         source_type = self._combo_box.itemData(index, self._SOURCE_TYPE_ROLE)
         palette_index = self._combo_box.itemData(index, self._PALETTE_INDEX_ROLE)
+
+        # Check for manual palette selection
+        if source_type == self._MANUAL_PALETTE_MARKER:
+            # Emit signal for controller to show dialog
+            self.manualPaletteRequested.emit()
+            # Revert to previous selection (or default)
+            # The controller will update the selection once a manual palette is loaded
+            self._combo_box.blockSignals(True)
+            self._combo_box.setCurrentIndex(0)  # Revert to Default
+            self._combo_box.blockSignals(False)
+            return
 
         if source_type is not None and palette_index is not None:
             self.sourceChanged.emit(source_type, palette_index)
@@ -170,6 +212,9 @@ class PaletteSourceSelector(QWidget):
     ) -> None:
         """Add a palette source to the dropdown.
 
+        New sources are inserted before the separator (which precedes the
+        "Manual Palette Offset..." entry), keeping the manual option at the end.
+
         Args:
             display_name: Display name for the source (e.g., "Default", "ROM Palette 8")
             source_type: Type of source ("default", "mesen", or "rom")
@@ -177,8 +222,16 @@ class PaletteSourceSelector(QWidget):
             colors: Optional list of RGB tuples for preview swatches (first 4 used)
             is_active: Whether this palette is actively used (detected via OAM)
         """
-        self._combo_box.addItem(display_name)
-        index = self._combo_box.count() - 1
+        # Insert before the separator (or append if no separator exists yet)
+        if self._separator_index >= 0:
+            self._combo_box.insertItem(self._separator_index, display_name)
+            index = self._separator_index
+            # Update separator index since we inserted before it
+            self._separator_index += 1
+        else:
+            self._combo_box.addItem(display_name)
+            index = self._combo_box.count() - 1
+
         self._combo_box.setItemData(index, source_type, self._SOURCE_TYPE_ROLE)
         self._combo_box.setItemData(index, palette_index, self._PALETTE_INDEX_ROLE)
 
@@ -195,12 +248,15 @@ class PaletteSourceSelector(QWidget):
         Preserves the default source and clears all mesen sources.
         If "Default" is removed, adds it back at index 0.
         """
-        # Remove all mesen sources
+        # Remove all mesen sources (iterate backwards to handle index changes)
         i = self._combo_box.count() - 1
         while i >= 0:
             source_type = self._combo_box.itemData(i, self._SOURCE_TYPE_ROLE)
             if source_type == "mesen":
                 self._combo_box.removeItem(i)
+                # Adjust separator index if we removed an item before it
+                if i < self._separator_index:
+                    self._separator_index -= 1
             i -= 1
 
         # Ensure "Default" exists
@@ -216,12 +272,15 @@ class PaletteSourceSelector(QWidget):
 
         Preserves the default source and any mesen sources.
         """
-        # Remove all rom sources
+        # Remove all rom sources (iterate backwards to handle index changes)
         i = self._combo_box.count() - 1
         while i >= 0:
             source_type = self._combo_box.itemData(i, self._SOURCE_TYPE_ROLE)
             if source_type == "rom":
                 self._combo_box.removeItem(i)
+                # Adjust separator index if we removed an item before it
+                if i < self._separator_index:
+                    self._separator_index -= 1
             i -= 1
 
         # Ensure "Default" exists

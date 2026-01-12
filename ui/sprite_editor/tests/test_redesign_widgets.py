@@ -305,8 +305,8 @@ class TestPaletteSourceSelector:
         selector.add_palette_source("Mesen Palette 0", "mesen", 0)
         selector.add_palette_source("Mesen Palette 1", "mesen", 1)
 
-        # Should have 3 items now (Default + 2 Mesen)
-        assert selector._combo_box.count() == 3
+        # Should have 5 items: Default + 2 Mesen + Separator + Manual entry
+        assert selector._combo_box.count() == 5
 
     def test_source_changed_signal(self, qtbot: QtBot) -> None:
         """Verify sourceChanged signal emits source_type and palette_index."""
@@ -351,7 +351,7 @@ class TestPaletteSourceSelector:
         edit_spy.assert_called_once()
 
     def test_clear_mesen_sources(self, qtbot: QtBot) -> None:
-        """Verify clear_mesen_sources keeps only Default."""
+        """Verify clear_mesen_sources keeps only Default and the manual palette entry."""
         from ui.sprite_editor.views.widgets.palette_source_selector import PaletteSourceSelector
 
         selector = PaletteSourceSelector()
@@ -360,13 +360,14 @@ class TestPaletteSourceSelector:
         # Add mesen sources
         selector.add_palette_source("Mesen Palette 0", "mesen", 0)
         selector.add_palette_source("Mesen Palette 1", "mesen", 1)
-        assert selector._combo_box.count() == 3
+        # Should have 5 items: Default + 2 Mesen + Separator + Manual entry
+        assert selector._combo_box.count() == 5
 
         # Clear mesen sources
         selector.clear_mesen_sources()
 
-        # Should only have Default
-        assert selector._combo_box.count() == 1
+        # Should have 3 items: Default + Separator + Manual entry
+        assert selector._combo_box.count() == 3
         source_type, _ = selector.get_selected_source()
         assert source_type == "default"
 

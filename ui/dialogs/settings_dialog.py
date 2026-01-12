@@ -118,6 +118,32 @@ class SettingsDialog(DialogBase):
 
         settings_layout.addRow("Dumps directory:", dumps_layout)
 
+        # Mesen2 output directory
+        mesen_layout = QHBoxLayout()
+        self.mesen_dir_edit = QLineEdit(self)
+        self.mesen_dir_edit.setReadOnly(True)
+        self.mesen_dir_edit.setPlaceholderText("Default: project's mesen2_exchange/ directory")
+        mesen_layout.addWidget(self.mesen_dir_edit, 1)
+
+        self.mesen_dir_button = QPushButton("Browse...", self)
+        self.mesen_dir_button.setStyleSheet(get_button_style())
+        self.mesen_dir_button.clicked.connect(self._browse_mesen_directory)
+        mesen_layout.addWidget(self.mesen_dir_button)
+
+        self.mesen_dir_clear_button = QPushButton("Reset", self)
+        self.mesen_dir_clear_button.setStyleSheet(get_button_style())
+        self.mesen_dir_clear_button.setToolTip("Reset to default (project's mesen2_exchange/ directory)")
+        self.mesen_dir_clear_button.clicked.connect(self._clear_mesen_directory)
+        mesen_layout.addWidget(self.mesen_dir_clear_button)
+
+        settings_layout.addRow("Mesen2 output:", mesen_layout)
+
+        # Help text for Mesen2 directory
+        mesen_help = QLabel("Directory where Mesen2 Lua scripts write log files. Can be overridden by SPRITEPAL_MESEN_OUTPUT_DIR env var.", self)
+        mesen_help.setWordWrap(True)
+        mesen_help.setStyleSheet(get_muted_text_style())
+        settings_layout.addRow("", mesen_help)
+
         settings_group.setLayout(settings_layout)
         layout.addWidget(settings_group)
 
@@ -331,6 +357,7 @@ class SettingsDialog(DialogBase):
         self.restore_window_check.setChecked(bool(self.settings_manager.get("ui", "restore_position", True)))
         self.auto_save_session_check.setChecked(bool(self.settings_manager.get("session", "auto_save", True)))
         self.dumps_dir_edit.setText(str(self.settings_manager.get("paths", "default_dumps_dir", "")))
+        self.mesen_dir_edit.setText(self.settings_manager.get_mesen_output_dir())
 
         # Logging settings
         debug_enabled = self.settings_manager.get_debug_logging()
@@ -360,6 +387,7 @@ class SettingsDialog(DialogBase):
         self.settings_manager.set("ui", "restore_position", self.restore_window_check.isChecked())
         self.settings_manager.set("session", "auto_save", self.auto_save_session_check.isChecked())
         self.settings_manager.set("paths", "default_dumps_dir", self.dumps_dir_edit.text())
+        self.settings_manager.set_mesen_output_dir(self.mesen_dir_edit.text())
 
         # Logging settings
         self.settings_manager.set_debug_logging(self.debug_logging_check.isChecked())
@@ -461,6 +489,19 @@ class SettingsDialog(DialogBase):
 
         if dir_path:
             self.dumps_dir_edit.setText(dir_path)
+
+    def _browse_mesen_directory(self):
+        """Browse for Mesen2 output directory"""
+        current_dir = self.mesen_dir_edit.text() or str(Path.home())
+
+        dir_path = browse_for_directory(self, "Select Mesen2 Output Directory", current_dir)
+
+        if dir_path:
+            self.mesen_dir_edit.setText(dir_path)
+
+    def _clear_mesen_directory(self):
+        """Clear the Mesen2 directory setting to use the default"""
+        self.mesen_dir_edit.clear()
 
     def _browse_cache_location(self):
         """Browse for cache directory"""

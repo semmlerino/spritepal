@@ -1,6 +1,6 @@
 -- Gameplay Capture: Navigates to Spring Breeze gameplay and captures
 -- Waits until frame 1800 (~30 seconds) to ensure we're in actual gameplay
-local OUTPUT_DIR = "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
+local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
 local MEM = {
     oam = emu.memType.snesOam or emu.memType.snesSpriteRam,
     vram = emu.memType.snesVram or emu.memType.snesVideoRam,

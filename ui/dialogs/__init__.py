@@ -7,6 +7,7 @@ from __future__ import annotations
 # Import dialog components
 # UnifiedManualOffsetDialog has smart selection built-in based on environment variable
 from .manual_offset_dialog import UnifiedManualOffsetDialog
+from .manual_palette_offset_dialog import ManualPaletteOffsetDialog
 from .output_settings_dialog import OutputSettings, OutputSettingsDialog
 from .resume_scan_dialog import ResumeScanDialog
 from .settings_dialog import SettingsDialog
@@ -17,6 +18,7 @@ ManualOffsetDialog = UnifiedManualOffsetDialog
 
 __all__ = [
     "ManualOffsetDialog",  # Primary interface (unified dialog)
+    "ManualPaletteOffsetDialog",  # Manual palette offset selection
     "OutputSettings",  # Output settings namedtuple
     "OutputSettingsDialog",  # Output settings dialog
     "ResumeScanDialog",
