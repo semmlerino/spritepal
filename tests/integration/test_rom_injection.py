@@ -111,8 +111,16 @@ class TestROMInjector(unittest.TestCase):
 
         checksum, complement = self.injector.calculate_checksum(self.test_rom)
 
+        # Expected byte sum for the 32KB test_rom initialized in setUp
+        # It has a header at 0x7FC0 and most of it is 0x00
+        # checksum = sum(self.test_rom) & 0xFFFF
+
         # Verify checksum and complement XOR to 0xFFFF
         assert checksum ^ complement == 65535
+
+        # Verify it matches our direct byte sum
+        expected_checksum = sum(self.test_rom) & 0xFFFF
+        assert checksum == expected_checksum
 
     def test_sprite_location_finding_synthetic_rom(self):
         """Test finding sprite locations with synthetic ROM (deterministic, always runs)"""

@@ -254,14 +254,7 @@ class ROMValidator:
             Tuple of (checksum, complement)
         """
         data = rom_data[header_offset:]
-        checksum = 0
-        for i in range(0, len(data), 2):
-            if i + 1 < len(data):
-                word = (data[i + 1] << 8) | data[i]
-            else:
-                word = data[i]
-            checksum = (checksum + word) & ROM_CHECKSUM_COMPLEMENT_MASK
-
+        checksum = sum(data) & ROM_CHECKSUM_COMPLEMENT_MASK
         complement = checksum ^ ROM_CHECKSUM_COMPLEMENT_MASK
         return checksum, complement
 

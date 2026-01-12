@@ -21,13 +21,12 @@ def test_validate_extraction_params_accepts_sprite_offset(tmp_path):
     mock_rom_extractor = MagicMock()
 
     # Initialize manager with mocked internal dependencies to avoid side effects
-    with patch("core.managers.core_operations_manager.SpriteExtractor"), \
-         patch("core.managers.core_operations_manager.PaletteManager"):
-        
+    with (
+        patch("core.managers.core_operations_manager.SpriteExtractor"),
+        patch("core.managers.core_operations_manager.PaletteManager"),
+    ):
         manager = CoreOperationsManager(
-            session_manager=mock_session,
-            rom_cache=mock_rom_cache,
-            rom_extractor=mock_rom_extractor
+            session_manager=mock_session, rom_cache=mock_rom_cache, rom_extractor=mock_rom_extractor
         )
 
     # Verify initialization was successful
@@ -36,7 +35,7 @@ def test_validate_extraction_params_accepts_sprite_offset(tmp_path):
     params = {
         "rom_path": str(rom_file),
         "sprite_offset": 0x1000,  # Valid offset within ROM bounds
-        "output_base": "output"
+        "output_base": "output",
     }
 
     # Should not raise - validates that sprite_offset is accepted
@@ -55,19 +54,18 @@ def test_validate_extraction_params_accepts_offset(tmp_path):
     mock_rom_extractor = MagicMock()
 
     # Initialize manager with mocked internal dependencies
-    with patch("core.managers.core_operations_manager.SpriteExtractor"), \
-         patch("core.managers.core_operations_manager.PaletteManager"):
-        
+    with (
+        patch("core.managers.core_operations_manager.SpriteExtractor"),
+        patch("core.managers.core_operations_manager.PaletteManager"),
+    ):
         manager = CoreOperationsManager(
-            session_manager=mock_session,
-            rom_cache=mock_rom_cache,
-            rom_extractor=mock_rom_extractor
+            session_manager=mock_session, rom_cache=mock_rom_cache, rom_extractor=mock_rom_extractor
         )
 
     params = {
         "rom_path": str(rom_file),
         "offset": 0x1000,  # Using original 'offset' name
-        "output_base": "output"
+        "output_base": "output",
     }
 
     # Should not raise

@@ -84,13 +84,7 @@ def create_test_rom(
 
     # Calculate and update checksum if requested
     if calculate_checksum:
-        checksum = 0
-        for i in range(0, len(rom_data), 2):
-            if i + 1 < len(rom_data):
-                word = (rom_data[i + 1] << 8) | rom_data[i]
-            else:
-                word = rom_data[i]
-            checksum = (checksum + word) & 0xFFFF
+        checksum = sum(rom_data) & 0xFFFF
 
         # Update checksum in header
         checksum_complement = checksum ^ 0xFFFF

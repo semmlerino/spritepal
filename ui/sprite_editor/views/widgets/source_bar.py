@@ -89,6 +89,20 @@ class SourceBar(QWidget):
         """Set the ROM info text (checksum, title)."""
         self.info_label.setText(text)
 
+    def set_checksum_valid(self, valid: bool) -> None:
+        """Set the checksum validity status with color coding."""
+        current_text = self.info_label.text()
+        # Strip existing status if present
+        if " [" in current_text:
+            current_text = current_text.split(" [")[0]
+
+        if valid:
+            status = '<span style="color: #4CAF50;">[Checksum: OK]</span>'
+        else:
+            status = '<span style="color: #F44336;">[Checksum: INVALID]</span>'
+
+        self.info_label.setText(f"{current_text} {status}")
+
     def set_offset(self, offset: int) -> None:
         """Set the offset value."""
         self.offset_edit.set_offset(offset)

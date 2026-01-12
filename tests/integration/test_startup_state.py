@@ -89,6 +89,11 @@ class MockEditWorkspace(QWidget):
         self.exportPngRequested = Mock()
         self.exportPngRequested.connect = Mock()
 
+        # Mock icon toolbar
+        self.icon_toolbar = Mock()
+        self.icon_toolbar.revertClicked = Mock()
+        self.icon_toolbar.revertClicked.connect = Mock()
+
     def set_controller(self, ctrl):
         pass
 

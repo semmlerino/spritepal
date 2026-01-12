@@ -110,7 +110,7 @@ class ConfigurationService:
             settings_file=(
                 Path(settings_dir) / self.SETTINGS_FILENAME if settings_dir else self._app_root / self.SETTINGS_FILENAME
             ),
-            log_directory=Path(log_dir) if log_dir else self._app_root / "logs",
+            log_directory=Path(log_dir) if log_dir else Path.home() / self.LOG_DIR_NAME,
             cache_directory=(Path(cache_dir) if cache_dir else Path.home() / self.CACHE_DIR_NAME),
             config_directory=self._app_root / self.CONFIG_DIR_NAME,
             default_dumps_directory=Path.home() / self.DEFAULT_DUMPS_SUBPATH,

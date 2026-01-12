@@ -102,7 +102,16 @@ class RealComponentFactory:
             Use the `app_context` or `session_app_context` fixture to ensure
             managers are properly initialized.
         """
-        self._data_repo = data_repository or get_test_data_repository()
+        if data_repository is not None:
+            self._data_repo = data_repository
+        else:
+            warnings.warn(
+                "RealComponentFactory without data_repository uses deprecated singleton. "
+                "Pass data_repository=isolated_data_repository for per-test isolation.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self._data_repo = get_test_data_repository()
         self._temp_dirs: list[Path] = []
         self._created_components: list[QObject] = []
         self._fail_on_leaks = fail_on_leaks if fail_on_leaks is not None else self.FAIL_ON_LEAKS

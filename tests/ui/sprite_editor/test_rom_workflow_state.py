@@ -67,7 +67,8 @@ class TestROMWorkflowStateTransitions:
         # Enter edit mode manually (simulating what open_in_editor does)
         controller.state = "edit"
         view.set_workflow_state("edit")
-        assert not view.left_panel.isEnabled()  # Verify edit state applied
+        # Left panel should stay enabled so user can navigate (triggers unsaved changes prompt)
+        assert view.left_panel.isEnabled()
 
         # Ensure no unsaved changes (undo_manager.can_undo() returns False)
         assert not editing_controller.undo_manager.can_undo()

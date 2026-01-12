@@ -89,12 +89,12 @@ def reverse_byte(value: int) -> int:
 def flip_tile(tile_data: bytes, flip_h: bool, flip_v: bool) -> bytes:
     """
     Flip 4bpp tile data horizontally and/or vertically.
-    
+
     Args:
         tile_data: 32 bytes of 4bpp tile data
         flip_h: Horizontal flip
         flip_v: Vertical flip
-        
+
     Returns:
         Flipped tile data
     """
@@ -102,7 +102,7 @@ def flip_tile(tile_data: bytes, flip_h: bool, flip_v: bool) -> bytes:
         return tile_data
     if len(tile_data) != BYTES_PER_TILE:
         return tile_data
-    
+
     out = bytearray(BYTES_PER_TILE)
     for row in range(8):
         src_row = 7 - row if flip_v else row
