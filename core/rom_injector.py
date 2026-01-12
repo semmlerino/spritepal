@@ -66,6 +66,48 @@ class ROMInjector(SpriteInjector):
         self.sprite_config_loader = sprite_config_loader or SpriteConfigLoader()
         logger.debug("ROMInjector initialized with HAL compression support")
 
+    @staticmethod
+    def get_modified_rom_path(rom_path: str) -> str:
+        """Generate output ROM path with _modified suffix.
+
+        Args:
+            rom_path: Path to original ROM file
+
+        Returns:
+            Path to modified ROM (e.g., "game.sfc" -> "game_modified.sfc")
+        """
+        rom_path_obj = Path(rom_path)
+        modified_path = rom_path_obj.parent / f"{rom_path_obj.stem}_modified{rom_path_obj.suffix}"
+        return str(modified_path)
+
+    @staticmethod
+    def copy_rom_for_injection(rom_path: str, output_path: str | None = None) -> str:
+        """Create a copy of ROM for safe injection.
+
+        If output_path is not provided, creates a copy with _modified suffix.
+
+        Args:
+            rom_path: Path to source ROM
+            output_path: Optional path for output ROM (default: add _modified suffix)
+
+        Returns:
+            Path to the copy
+
+        Raises:
+            OSError: If copy operation fails
+        """
+        if output_path is None:
+            output_path = ROMInjector.get_modified_rom_path(rom_path)
+
+        output_obj = Path(output_path)
+        output_obj.parent.mkdir(parents=True, exist_ok=True)
+
+        import shutil
+
+        shutil.copy2(rom_path, output_path)
+        logger.info(f"Created ROM copy: {rom_path} -> {output_path}")
+        return output_path
+
     def read_rom_header(self, rom_path: str) -> ROMHeader:
         """Read and parse SNES ROM header (delegates to ROMValidator)."""
         logger.info(f"Reading ROM header from: {rom_path}")
@@ -494,9 +536,19 @@ class ROMInjector(SpriteInjector):
                 rom_path, sprite_offset, lenient_checksum=ignore_checksum
             )
 
-            # Create backup if requested - ABORT if backup fails
-            backup_path = None
-            if create_backup:
+            # Create ROM copy for injection if output differs from input
+            # The original ROM remains untouched as a backup
+            if output_path != rom_path:
+                try:
+                    self.copy_rom_for_injection(rom_path, output_path)
+                except Exception as e:
+                    logger.error(f"ROM copy creation failed: {e}")
+                    return False, (
+                        f"Cannot proceed: failed to create ROM copy ({e}). "
+                        "Ensure you have write permissions in the ROM directory."
+                    )
+            elif create_backup:
+                # Legacy behavior: if output_path == rom_path, create timestamped backup
                 try:
                     backup_path = ROMBackupManager.create_backup(rom_path)
                     logger.info(f"Created backup: {backup_path}")

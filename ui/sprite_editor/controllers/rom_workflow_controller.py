@@ -1182,14 +1182,19 @@ class ROMWorkflowController(QObject):
                 img.save(f.name, "PNG")
                 temp_png = f.name
 
-            # Perform injection with backup (via facade method)
+            # Generate output path with _modified suffix
+            from core.rom_injector import ROMInjector
+
+            output_path = ROMInjector.get_modified_rom_path(self.rom_path)
+
+            # Perform injection to modified copy (original ROM remains untouched)
             # First attempt (standard validation)
             success, message = self.rom_extractor.inject_sprite_to_rom(
                 sprite_path=temp_png,
                 rom_path=self.rom_path,
-                output_path=self.rom_path,
+                output_path=output_path,
                 sprite_offset=self.current_offset,
-                create_backup=True,
+                create_backup=False,
                 compression_type=self.current_compression_type,
             )
 
@@ -1212,9 +1217,9 @@ class ROMWorkflowController(QObject):
                     success, message = self.rom_extractor.inject_sprite_to_rom(
                         sprite_path=temp_png,
                         rom_path=self.rom_path,
-                        output_path=self.rom_path,
+                        output_path=output_path,
                         sprite_offset=self.current_offset,
-                        create_backup=True,
+                        create_backup=False,
                         ignore_checksum=True,
                         compression_type=self.current_compression_type,
                     )
@@ -1239,13 +1244,13 @@ class ROMWorkflowController(QObject):
 
                 if reply == QMessageBox.StandardButton.Yes:
                     if self._message_service:
-                        self._message_service.show_message("Force injecting (backup created)...")
+                        self._message_service.show_message("Force injecting...")
                     success, message = self.rom_extractor.inject_sprite_to_rom(
                         sprite_path=temp_png,
                         rom_path=self.rom_path,
-                        output_path=self.rom_path,
+                        output_path=output_path,
                         sprite_offset=self.current_offset,
-                        create_backup=True,
+                        create_backup=False,
                         force=True,
                         compression_type=self.current_compression_type,
                     )
@@ -1259,11 +1264,6 @@ class ROMWorkflowController(QObject):
             if success:
                 # Update our knowledge of checksum validity after successful injection
                 self._checksum_valid = True
-                # Update ROM mtime since we just modified it
-                try:
-                    self._rom_mtime = Path(self.rom_path).stat().st_mtime
-                except OSError:
-                    pass  # File should exist since injection succeeded
 
                 if self._view:
                     self._view.set_checksum_valid(True)
@@ -1273,14 +1273,16 @@ class ROMWorkflowController(QObject):
                     self.preview_coordinator.invalidate_preview_cache(self.current_offset)
 
                 if self._message_service:
-                    self._message_service.show_message(f"Successfully saved: {message}")
+                    self._message_service.show_message(f"Successfully saved to: {output_path}")
                 # Show success in view
                 from PySide6.QtWidgets import QMessageBox
 
+                output_filename = Path(output_path).name
                 QMessageBox.information(
                     self._view,
                     "Save Successful",
-                    f"Sprite injected successfully at 0x{self.current_offset:06X}.\n\n{message}",
+                    f"Sprite injected successfully at 0x{self.current_offset:06X}.\n\n"
+                    f"Modified ROM saved to:\n{output_filename}\n\n{message}",
                 )
 
                 # Back to edit state

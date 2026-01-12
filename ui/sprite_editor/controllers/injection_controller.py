@@ -152,18 +152,24 @@ class InjectionController(QObject):
             self.injection_failed.emit(error_msg)
             return
 
-        # Output to same file (or backup handled by injector)
-        # Using same file for 'Save to ROM' logic
+        # Create output path with _modified suffix
+        from pathlib import Path
+
+        from core.rom_injector import ROMInjector
+
+        output_path = ROMInjector.get_modified_rom_path(rom_file)
+        output_filename = Path(output_path).name
 
         self._view.append_output(f"Saving to ROM: {rom_file} at 0x{offset:X}")
+        self._view.append_output(f"Output file: {output_filename}")
 
         try:
             success, message = self.rom_injector.inject_sprite_to_rom(
                 sprite_path=png_file,
                 rom_path=rom_file,
-                output_path=rom_file,  # Overwrite
+                output_path=output_path,
                 sprite_offset=offset,
-                create_backup=True,
+                create_backup=False,
             )
 
             if not success and "ROM checksum mismatch" in message:
@@ -183,16 +189,17 @@ class InjectionController(QObject):
                     success, message = self.rom_injector.inject_sprite_to_rom(
                         sprite_path=png_file,
                         rom_path=rom_file,
-                        output_path=rom_file,
+                        output_path=output_path,
                         sprite_offset=offset,
-                        create_backup=True,
+                        create_backup=False,
                         ignore_checksum=True,
                     )
 
             if success:
                 self._view.append_output("Success!")
+                self._view.append_output(f"Modified ROM saved to: {output_filename}")
                 self._view.append_output(message)
-                self.injection_completed.emit(rom_file)
+                self.injection_completed.emit(output_path)
             else:
                 self._view.append_output(f"Failed: {message}")
                 self.injection_failed.emit(message)
