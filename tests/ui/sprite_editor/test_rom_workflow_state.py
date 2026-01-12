@@ -151,3 +151,118 @@ class TestROMWorkflowStateTransitions:
         # Offset should NOT have changed
         assert controller.current_offset == 0x1000, "Offset should not change when user declines"
         assert controller.state == "edit", "State should remain 'edit' when user declines"
+
+
+class TestSMCHeaderConfiguration:
+    """Tests for SMC header offset configuration during ROM load.
+
+    REGRESSION: These tests ensure the controller properly configures the view
+    with SMC header offset after ROM load, fixing offset misalignment bugs when
+    manually pasting Mesen2 "FILE OFFSET: 0x..." values.
+    """
+
+    def test_view_has_set_header_offset_method(self, qtbot):
+        """
+        Verify that the view chain has set_header_offset method.
+
+        This is a prerequisite for the fix to work - ensures the delegation
+        chain exists from ROMWorkflowPage -> SourceBar -> OffsetLineEdit.
+        """
+        from ui.sprite_editor.views.workspaces.rom_workflow_page import ROMWorkflowPage
+
+        view = ROMWorkflowPage()
+        qtbot.addWidget(view)
+
+        # Verify the method exists and is callable
+        assert hasattr(view, "set_header_offset")
+        assert callable(view.set_header_offset)
+
+        # Verify it doesn't raise
+        view.set_header_offset(512)
+        view.set_header_offset(0)
+
+    def test_controller_stores_smc_header_offset_on_rom_load(
+        self, qtbot, tmp_path, monkeypatch
+    ):
+        """
+        Verify that controller.smc_header_offset is updated when ROM loads.
+
+        This confirms the controller correctly extracts header offset from
+        the ROM validator's response.
+        """
+        from core.rom_validator import ROMHeader, RomMappingType
+        from ui.sprite_editor.controllers.editing_controller import EditingController
+        from ui.sprite_editor.controllers.rom_workflow_controller import (
+            ROMWorkflowController,
+        )
+        from ui.sprite_editor.views.workspaces.rom_workflow_page import ROMWorkflowPage
+
+        # Create controller and view
+        editing_controller = EditingController()
+        controller = ROMWorkflowController(parent=None, editing_controller=editing_controller)
+        view = ROMWorkflowPage()
+        qtbot.addWidget(view)
+        controller.set_view(view)
+
+        # Create mock header with SMC header present
+        mock_header = ROMHeader(
+            title="TEST ROM",
+            rom_type=0x00,
+            rom_size=0x08,
+            sram_size=0x00,
+            checksum=0x0000,
+            checksum_complement=0xFFFF,
+            header_offset=512,  # SMC header
+            rom_type_offset=0x7FC0,
+            mapping_type=RomMappingType.SA1,
+        )
+
+        # Create a dummy ROM file
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(b"\x00" * 0x10000)
+
+        # Patch the validation to return our mock header
+        with (
+            patch(
+                "core.rom_validator.ROMValidator.validate_rom_file",
+                return_value=(True, None),
+            ),
+            patch(
+                "core.rom_validator.ROMValidator.validate_rom_header",
+                return_value=(mock_header, None),
+            ),
+            patch(
+                "core.rom_validator.ROMValidator.verify_rom_checksum",
+                return_value=True,
+            ),
+        ):
+            controller.load_rom(str(rom_path))
+
+        # Verify controller state was updated
+        assert controller.smc_header_offset == 512
+
+    def test_widget_header_offset_affects_mesen2_parsing(self, qtbot):
+        """
+        Verify the offset widget correctly adjusts for header offset when
+        parsing Mesen2 format input.
+
+        This is the end-to-end behavior we want to ensure works.
+        """
+        from ui.sprite_editor.views.widgets.offset_line_edit import OffsetLineEdit
+
+        widget = OffsetLineEdit()
+        qtbot.addWidget(widget)
+
+        # Set header offset (as controller would do after ROM load)
+        widget.set_header_offset(512)
+
+        # Parse Mesen2 format
+        file_offset = 0x3C6EF1
+        expected_rom_offset = file_offset - 512
+
+        with qtbot.waitSignal(
+            widget.offset_changed, check_params_cb=lambda val: val == expected_rom_offset
+        ):
+            widget.setText(f"FILE OFFSET: 0x{file_offset:06X}")
+
+        assert widget.offset() == expected_rom_offset

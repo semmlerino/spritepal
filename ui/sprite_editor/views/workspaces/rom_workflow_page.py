@@ -194,6 +194,10 @@ class ROMWorkflowPage(QWidget):
         """Set ROM mapping type for SNES address conversion in source bar."""
         self._source_bar.set_mapping_type(mapping_type)
 
+    def set_header_offset(self, offset: int) -> None:
+        """Set SMC header offset (e.g. 512 bytes) for file-to-ROM offset conversion."""
+        self._source_bar.set_header_offset(offset)
+
     def set_action_text(self, text: str) -> None:
         """Set action button text in source bar."""
         self._source_bar.set_action_text(text)

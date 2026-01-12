@@ -71,7 +71,10 @@ local LOG_FILE = OUTPUT_DIR .. "sprite_rom_finder.log"
 local OFFSET_FILE = OUTPUT_DIR .. "last_offset.txt"  -- Simple file for SpritePal to watch
 local CLICKS_FILE = OUTPUT_DIR .. "recent_clicks.json"  -- Persistent last 5 clicks
 
-local ROM_HEADER = 0  -- Set to 0x200 if your .sfc has a copier header
+-- SMC header offset: Keep this at 0 when using with SpritePal.
+-- SpritePal automatically handles SMC headers based on ROM file analysis.
+-- Only change to 0x200 if you need raw file offsets for use with external tools.
+local ROM_HEADER = 0
 
 local log_handle = nil
 local frame_count = 0

@@ -246,8 +246,8 @@ class ROMWorkflowController(QObject):
 
         # If we already have tile data for this offset, open directly without re-requesting preview
         if self.current_offset == offset and self.current_tile_data:
-            logger.debug("[DOUBLE-CLICK] Already have data for this offset, opening directly")
-            self.open_in_editor()
+            logger.debug("[DOUBLE-CLICK] Already have data for this offset, requesting full preview before opening")
+            self.set_offset(offset, auto_open=True)
             return
 
         # If we are already waiting for this offset (preview pending), just set the flag
@@ -575,6 +575,8 @@ class ROMWorkflowController(QObject):
             self._view.set_info(title)
             # Set ROM mapping type for correct SNES address parsing (LoROM, HiROM, SA-1)
             self._view.set_mapping_type(header.mapping_type)
+            # Set SMC header offset for file-to-ROM offset conversion
+            self._view.set_header_offset(self.smc_header_offset)
 
         # Check ROM checksum early and warn user if invalid
         self._checksum_valid = ROMValidator.verify_rom_checksum(path, header, lenient=True)
@@ -754,7 +756,8 @@ class ROMWorkflowController(QObject):
         if self._preview_pending:
             return
         if self.state == "preview":
-            self.open_in_editor()
+            # Always request full decompression before opening to avoid truncated previews.
+            self.set_offset(self.current_offset, auto_open=True)
         elif self.state == "edit":
             self.prepare_injection()
         elif self.state == "save":
@@ -767,6 +770,13 @@ class ROMWorkflowController(QObject):
             logger.debug("[OPEN] No tile data, returning early")
             if self._message_service:
                 self._message_service.show_message("No sprite data to edit")
+            return
+        if not self.hal_decompression_succeeded:
+            logger.debug("[OPEN] HAL decompression failed, refusing to open raw data")
+            if self._message_service:
+                self._message_service.show_message(
+                    "Cannot open: HAL decompression failed. Use a valid compressed offset."
+                )
             return
 
         # Clear previous ROM palette sources and warnings before loading new sprite
@@ -1228,10 +1238,14 @@ class ROMWorkflowController(QObject):
         # Check if offset was adjusted during preview (e.g. alignment correction)
         offset_adjusted = actual_offset != self.current_offset
         if offset_adjusted:
+            offset_delta = actual_offset - self.current_offset
             logger.info(
                 f"[PREVIEW] Offset adjusted from 0x{self.current_offset:06X} to 0x{actual_offset:06X} "
-                f"(delta: {actual_offset - self.current_offset:+d})"
+                f"(delta: {offset_delta:+d})"
             )
+            # Keep pending auto-open aligned with the adjusted offset.
+            if self._pending_open_in_editor and self._pending_open_offset not in (-1, actual_offset):
+                self._pending_open_offset = actual_offset
             # Update current offset to match reality
             self.current_offset = actual_offset
             # Update UI
@@ -1240,7 +1254,7 @@ class ROMWorkflowController(QObject):
                 if self._message_service:
                     self._message_service.show_message(
                         f"Aligned to valid sprite at 0x{actual_offset:06X} "
-                        f"(adjusted by {actual_offset - self.current_offset:+d} bytes)"
+                        f"(adjusted by {offset_delta:+d} bytes)"
                     )
 
         logger.debug(
