@@ -142,6 +142,7 @@ class ROMExtractor:
         ignore_checksum: bool = False,
         force: bool = False,
         compression_type: CompressionType = CompressionType.HAL,
+        header_bytes: bytes = b"",
     ) -> tuple[bool, str]:
         """Inject sprite directly into ROM file with validation and backup.
 
@@ -157,6 +158,7 @@ class ROMExtractor:
             ignore_checksum: If True, warn on checksum mismatch instead of failing
             force: If True, inject even if compressed size exceeds limit
             compression_type: Type of compression to use (HAL or RAW)
+            header_bytes: Leading bytes to prepend to tile data before injection
 
         Returns:
             Tuple of (success, message)
@@ -171,6 +173,7 @@ class ROMExtractor:
             ignore_checksum,
             force,
             compression_type,
+            header_bytes,
         )
 
     # -------------------------------------------------------------------------

@@ -47,8 +47,8 @@ class PooledPreviewWorker(SpritePreviewWorker):
 
     # Enhanced signals with request ID
     preview_ready = Signal(
-        int, bytes, int, int, str, int, int, int, bool
-    )  # request_id, tile_data, width, height, name, compressed_size, slack_size, actual_offset, hal_succeeded
+        int, bytes, int, int, str, int, int, int, bool, bytes
+    )  # request_id, tile_data, width, height, name, compressed_size, slack_size, actual_offset, hal_succeeded, header_bytes
     preview_error = Signal(int, str)  # request_id, error_msg
 
     def __init__(self, pool_ref: ReferenceType[PreviewWorkerPool]) -> None:
@@ -199,6 +199,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
         tile_data = None
         compressed_size = 0
         decompression_succeeded = False
+        header_bytes = b""  # Stores leading bytes stripped during alignment for injection restoration
 
         # First, try HAL decompression (for Lua-captured offsets and known sprites)
         # Try the exact offset first, then nearby offsets if it fails
@@ -261,12 +262,15 @@ class PooledPreviewWorker(SpritePreviewWorker):
 
                         # Align tile data to 32-byte boundaries
                         # Some HAL-compressed assets have header bytes that cause misalignment
+                        # Store header bytes for restoration during injection (prevents color shift bug)
                         original_len = len(tile_data)
+                        header_bytes_count = original_len % 32
+                        header_bytes = tile_data[:header_bytes_count] if header_bytes_count > 0 else b""
                         tile_data = align_tile_data(tile_data)
                         if len(tile_data) != original_len:
                             logger.debug(
                                 f"[TRACE] Aligned tile data: {original_len} -> {len(tile_data)} bytes "
-                                f"(removed {original_len - len(tile_data)} header byte(s))"
+                                f"(removed {original_len - len(tile_data)} header byte(s), stored for injection)"
                             )
 
                         # Update the actual offset used for display purposes
@@ -355,7 +359,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
             f"[WORKER] Emitting preview_ready: request_id={request_id}, "
             f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}, sprite_name={self.sprite_name}, "
             f"compressed_size={compressed_size}, slack_size={slack_size}, actual_offset=0x{self.offset:X}, "
-            f"hal_succeeded={decompression_succeeded}"
+            f"hal_succeeded={decompression_succeeded}, header_bytes={len(header_bytes)}"
         )
         self.preview_ready.emit(
             request_id,
@@ -367,6 +371,7 @@ class PooledPreviewWorker(SpritePreviewWorker):
             slack_size,
             self.offset,
             decompression_succeeded,
+            header_bytes,
         )
         logger.debug("[TRACE] PoolWorker emitted preview_ready signal")
 
@@ -384,8 +389,8 @@ class PreviewWorkerPool(QObject):
 
     # Signals for completed previews
     preview_ready = Signal(
-        int, bytes, int, int, str, int, int, int, bool
-    )  # request_id, tile_data, width, height, name, compressed_size, slack_size, actual_offset, hal_succeeded
+        int, bytes, int, int, str, int, int, int, bool, bytes
+    )  # request_id, tile_data, width, height, name, compressed_size, slack_size, actual_offset, hal_succeeded, header_bytes
     preview_error = Signal(int, str)  # request_id, error_msg
 
     def __init__(self, max_workers: int = 2, idle_timeout: int = 30000):
@@ -561,16 +566,27 @@ class PreviewWorkerPool(QObject):
         slack_size: int,
         actual_offset: int,
         hal_succeeded: bool,
+        header_bytes: bytes,
     ) -> None:
         """Handle worker preview ready."""
         logger.debug(
             f"[TRACE] Worker pool received preview: request_id={request_id}, "
             f"data_len={len(tile_data) if tile_data else 0}, {width}x{height}, "
             f"compressed_size={compressed_size}, slack_size={slack_size}, "
-            f"actual_offset=0x{actual_offset:X}, hal_succeeded={hal_succeeded}"
+            f"actual_offset=0x{actual_offset:X}, hal_succeeded={hal_succeeded}, "
+            f"header_bytes={len(header_bytes)}"
         )
         self.preview_ready.emit(
-            request_id, tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded
+            request_id,
+            tile_data,
+            width,
+            height,
+            sprite_name,
+            compressed_size,
+            slack_size,
+            actual_offset,
+            hal_succeeded,
+            header_bytes,
         )
         logger.debug("[TRACE] Worker pool emitted preview_ready signal")
 

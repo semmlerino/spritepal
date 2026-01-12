@@ -100,6 +100,8 @@ class ROMWorkflowController(QObject):
         self.original_compressed_size: int = 0
         self.available_slack: int = 0
         self.current_compression_type: CompressionType = CompressionType.UNKNOWN
+        # Header bytes stripped during alignment (prepended back during injection to prevent color shift)
+        self.current_header_bytes: bytes = b""
 
         # Flag for auto-opening in editor after preview completes (double-click)
         self._pending_open_in_editor: bool = False
@@ -1196,6 +1198,7 @@ class ROMWorkflowController(QObject):
                 sprite_offset=self.current_offset,
                 create_backup=False,
                 compression_type=self.current_compression_type,
+                header_bytes=self.current_header_bytes,  # Restore stripped bytes to prevent color shift
             )
 
             # Handle failure due to checksum mismatch
@@ -1222,6 +1225,7 @@ class ROMWorkflowController(QObject):
                         create_backup=False,
                         ignore_checksum=True,
                         compression_type=self.current_compression_type,
+                        header_bytes=self.current_header_bytes,
                     )
 
             # Handle failure due to sprite size too large (HAL: "Compressed", RAW: "Tile")
@@ -1253,6 +1257,7 @@ class ROMWorkflowController(QObject):
                         create_backup=False,
                         force=True,
                         compression_type=self.current_compression_type,
+                        header_bytes=self.current_header_bytes,
                     )
 
             # Cleanup temp file
@@ -1364,6 +1369,7 @@ class ROMWorkflowController(QObject):
         slack_size: int = 0,
         actual_offset: int = -1,
         hal_succeeded: bool = True,
+        header_bytes: bytes = b"",
     ) -> None:
         """Handle preview ready from coordinator."""
         # Use current offset if actual_offset not provided
@@ -1396,7 +1402,8 @@ class ROMWorkflowController(QObject):
 
         logger.debug(
             f"[PREVIEW] _on_preview_ready called: {len(tile_data)} bytes, {width}x{height}, "
-            f"pending_open={self._pending_open_in_editor}, offset=0x{actual_offset:06X}, hal={hal_succeeded}"
+            f"pending_open={self._pending_open_in_editor}, offset=0x{actual_offset:06X}, hal={hal_succeeded}, "
+            f"header_bytes={len(header_bytes)}"
         )
         self.current_tile_data = tile_data
         self.current_width = width
@@ -1406,6 +1413,8 @@ class ROMWorkflowController(QObject):
         self.available_slack = slack_size
         # Track compression type for injection
         self.current_compression_type = CompressionType.HAL if hal_succeeded else CompressionType.RAW
+        # Store header bytes for restoration during injection (prevents color shift bug)
+        self.current_header_bytes = header_bytes
 
         # Clear loading state
         self._preview_pending = False

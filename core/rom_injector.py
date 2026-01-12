@@ -507,6 +507,7 @@ class ROMInjector(SpriteInjector):
         ignore_checksum: bool = False,
         force: bool = False,
         compression_type: CompressionType = CompressionType.HAL,
+        header_bytes: bytes = b"",
     ) -> tuple[bool, str]:
         """
         Inject sprite directly into ROM file with validation and backup.
@@ -522,6 +523,9 @@ class ROMInjector(SpriteInjector):
             force: If True, inject even if compressed size exceeds limit (may corrupt ROM)
             compression_type: Type of compression to use (HAL or RAW). RAW writes
                              tile data directly without compression.
+            header_bytes: Leading bytes stripped during extraction that must be prepended
+                         back to the tile data before compression/injection to preserve
+                         the original byte sequence and prevent color shift.
 
         Returns:
             Tuple of (success, message)
@@ -580,6 +584,15 @@ class ROMInjector(SpriteInjector):
             logger.info("Converting PNG to 4bpp tile data")
             tile_data = self.convert_png_to_4bpp(sprite_path)
             logger.debug(f"Converted to {len(tile_data)} bytes of 4bpp data")
+
+            # Prepend header bytes that were stripped during extraction
+            # This restores the original byte sequence to prevent color shift
+            if header_bytes:
+                tile_data = header_bytes + tile_data
+                logger.info(
+                    f"Prepended {len(header_bytes)} header byte(s) for injection alignment: "
+                    f"tile data now {len(tile_data)} bytes"
+                )
 
             # Find and decompress original sprite for size comparison
             logger.info("Analyzing original sprite data in ROM")
