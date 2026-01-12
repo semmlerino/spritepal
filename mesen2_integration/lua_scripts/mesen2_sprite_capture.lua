@@ -24,6 +24,15 @@ end
 
 log("SpritePal capture script loaded")
 
+-- BGR555 to RGB888 conversion function
+-- Converts SNES CGRAM 15-bit color to 8-bit RGB
+local function bgr555_to_rgb888(bgr555)
+    local r = (bgr555 & 0x1F) * 255 // 31
+    local g = ((bgr555 >> 5) & 0x1F) * 255 // 31
+    local b = ((bgr555 >> 10) & 0x1F) * 255 // 31
+    return {r, g, b}
+end
+
 -- Frame counter (emu.getState().ppu doesn't exist for SNES in Mesen 2)
 local frameCount = 0
 
@@ -366,12 +375,13 @@ local function capture_sprites()
     end
     f:write('  ],\n')
 
-    -- Write palettes
+    -- Write palettes (converted to RGB888)
     f:write('  "palettes": {\n')
     for pal_idx = 0, 7 do
         f:write(string.format('    "%d": [', pal_idx))
-        for col_idx, color in ipairs(palettes[pal_idx]) do
-            f:write(tostring(color))
+        for col_idx, bgr555_color in ipairs(palettes[pal_idx]) do
+            local rgb = bgr555_to_rgb888(bgr555_color)
+            f:write(string.format('[%d, %d, %d]', rgb[1], rgb[2], rgb[3]))
             if col_idx < #palettes[pal_idx] then f:write(', ') end
         end
         f:write(']')
