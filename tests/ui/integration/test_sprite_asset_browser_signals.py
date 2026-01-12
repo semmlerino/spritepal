@@ -200,3 +200,89 @@ class TestSpriteAssetBrowserSignalContract:
             # Category selection should not emit sprite_selected
             # (category items have no offset data, so signal shouldn't fire)
             assert spy.count() == 0, "Category selection should not emit sprite_selected signal"
+
+
+class TestSpriteAssetBrowserOffsetUpdate:
+    """Tests for update_sprite_offset() - ensures thumbnail/selection sync after alignment."""
+
+    def test_update_sprite_offset_updates_rom_sprite(self, qtbot: QtBot, asset_browser) -> None:
+        """Verify ROM sprite item offset is updated when alignment is detected."""
+        # ROM sprite at 0x1000 should be updated to 0x1001
+        result = asset_browser.update_sprite_offset(0x1000, 0x1001)
+
+        assert result is True
+        # Verify item now has new offset
+        assert asset_browser.find_display_name_by_offset(0x1001) == "Test Sprite 1"
+        assert asset_browser.find_display_name_by_offset(0x1000) is None
+
+    def test_update_sprite_offset_updates_mesen_capture(self, qtbot: QtBot, asset_browser) -> None:
+        """Verify Mesen capture item offset is updated when alignment is detected."""
+        # Mesen capture at 0x3000 should be updated to 0x3001
+        result = asset_browser.update_sprite_offset(0x3000, 0x3001)
+
+        assert result is True
+        assert asset_browser.find_display_name_by_offset(0x3001) == "Capture 1"
+        assert asset_browser.find_display_name_by_offset(0x3000) is None
+
+    def test_update_sprite_offset_returns_false_for_unknown_offset(self, qtbot: QtBot, asset_browser) -> None:
+        """Verify update_sprite_offset returns False if offset not found."""
+        result = asset_browser.update_sprite_offset(0x9999, 0x9999 + 1)
+
+        assert result is False
+
+    def test_set_thumbnail_after_offset_update(self, qtbot: QtBot, asset_browser) -> None:
+        """Verify set_thumbnail finds item after offset update."""
+        from PySide6.QtGui import QPixmap
+
+        # Update offset from 0x1000 to 0x1001
+        asset_browser.update_sprite_offset(0x1000, 0x1001)
+
+        # Create a test pixmap and set it
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(Qt.GlobalColor.red)
+        asset_browser.set_thumbnail(0x1001, pixmap)
+
+        # Verify thumbnail was set by checking item data
+        rom_category = asset_browser.tree.topLevelItem(0)
+        if rom_category:
+            for i in range(rom_category.childCount()):
+                item = rom_category.child(i)
+                data = item.data(0, Qt.ItemDataRole.UserRole)
+                if isinstance(data, dict) and data.get("offset") == 0x1001:
+                    assert data.get("thumbnail") is not None, "Thumbnail should be set after offset update"
+                    break
+
+    def test_clear_thumbnail_after_offset_update(self, qtbot: QtBot, asset_browser) -> None:
+        """Verify clear_thumbnail finds item after offset update."""
+        from PySide6.QtGui import QPixmap
+
+        # First set a thumbnail on the original offset
+        pixmap = QPixmap(64, 64)
+        pixmap.fill(Qt.GlobalColor.blue)
+        asset_browser.set_thumbnail(0x1000, pixmap)
+
+        # Update offset from 0x1000 to 0x1001
+        asset_browser.update_sprite_offset(0x1000, 0x1001)
+
+        # Now clear thumbnail using the new offset
+        result = asset_browser.clear_thumbnail(0x1001)
+
+        assert result is True, "clear_thumbnail should find item after offset update"
+
+    def test_selection_uses_updated_offset(self, qtbot: QtBot, asset_browser) -> None:
+        """Verify re-selecting item after offset update emits new offset."""
+        # Update offset from 0x1000 to 0x1001
+        asset_browser.update_sprite_offset(0x1000, 0x1001)
+
+        spy = QSignalSpy(asset_browser.sprite_selected)
+
+        # Find and select the updated item
+        rom_category = asset_browser.tree.topLevelItem(0)
+        if rom_category and rom_category.childCount() > 0:
+            first_sprite = rom_category.child(0)
+            asset_browser.tree.setCurrentItem(first_sprite)
+
+            assert spy.count() >= 1
+            args = list(spy.at(spy.count() - 1))
+            assert args[0] == 0x1001, "Selected item should emit updated offset"
+            assert args[1] == "rom"

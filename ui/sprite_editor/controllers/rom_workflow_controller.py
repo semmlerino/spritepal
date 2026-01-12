@@ -618,9 +618,6 @@ class ROMWorkflowController(QObject):
             self._view.set_rom_path(path)
             self._view.set_rom_available(True, self.rom_size)
 
-            # Re-populate Mesen captures (they are global/persistent)
-            self.sync_captures_from_log_watcher()
-
         # Use validated header info
         title = header.title or "Unknown ROM"
         self.rom_info_updated.emit(title)
@@ -658,11 +655,11 @@ class ROMWorkflowController(QObject):
         # Load known sprite locations from config
         self._load_known_sprite_locations()
 
-        # Request thumbnails for any existing assets
-        if self._view and self._thumbnail_controller and self.log_watcher:
-            persistent_clicks = self.log_watcher.load_persistent_clicks()
-            for capture in persistent_clicks:
-                self._thumbnail_controller.queue_thumbnail(capture.offset)
+        # Re-populate Mesen captures after clear_asset_browser() removed them
+        # This must happen AFTER _setup_thumbnail_worker() so _add_capture_to_browser()
+        # can queue thumbnail requests (the queue is a no-op if worker doesn't exist)
+        if self._view:
+            self.sync_captures_from_log_watcher()
 
         # Trigger initial preview
         self.set_offset(self.current_offset)
@@ -1336,8 +1333,8 @@ class ROMWorkflowController(QObject):
             # Update UI
             if self._view:
                 self._view.set_offset(actual_offset)
-                # Also update asset browser item if it was a Mesen capture
-                self._view.asset_browser.update_mesen_capture_offset(old_offset, actual_offset)
+                # Update asset browser item offset so thumbnail operations use aligned offset
+                self._view.asset_browser.update_sprite_offset(old_offset, actual_offset)
                 if self._message_service:
                     self._message_service.show_message(
                         f"Aligned to valid sprite at 0x{actual_offset:06X} (adjusted by {offset_delta:+d} bytes)"

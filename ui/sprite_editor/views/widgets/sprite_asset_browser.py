@@ -820,6 +820,33 @@ class SpriteAssetBrowser(QWidget):
                 return True
         return False
 
+    def update_sprite_offset(self, old_offset: int, new_offset: int) -> bool:
+        """Update any sprite item's offset after alignment adjustment.
+
+        Searches all categories (ROM, Mesen, Library) for an item with
+        old_offset and updates it to new_offset. This should be called
+        when preview discovers the actual sprite offset differs from
+        the requested offset.
+
+        Args:
+            old_offset: Original requested offset
+            new_offset: Actual aligned offset
+
+        Returns:
+            True if item was found and updated, False otherwise
+        """
+        iterator = QTreeWidgetItemIterator(self.tree)
+        while iterator.value():
+            item = iterator.value()
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("offset") == old_offset:
+                data["offset"] = new_offset
+                item.setData(0, Qt.ItemDataRole.UserRole, data)
+                logger.debug("update_sprite_offset: 0x%06X -> 0x%06X", old_offset, new_offset)
+                return True
+            iterator += 1
+        return False
+
     def ensure_mesen_capture(self, offset: int, name: str | None = None) -> None:
         """Ensure a Mesen capture exists, adding if not present.
 
