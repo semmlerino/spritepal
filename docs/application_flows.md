@@ -446,6 +446,51 @@ MainWindow._connect_signals()
 StatusBarManager.set_mesen2_watching(bool)
 ```
 
+### 5.5 Revert to Original Workflow
+
+The "Revert to Original" button allows users to discard all edits and reload the original sprite data from the ROM.
+
+**Flow:**
+```
+User clicks "Revert to Original" button in Sprite Editor
+         │
+         ▼
+ROMWorkflowController.revert_to_original()
+         │
+         ├─ Check state: must be "edit" with current_tile_data
+         │
+         ├─ If state invalid: show message "No sprite loaded to revert"
+         │                     → return
+         │
+         └─ If editing_controller.has_unsaved_changes():
+             │
+             ├─ Show confirmation dialog:
+             │  "This will discard all your edits and reload the original sprite from ROM."
+             │  "Are you sure you want to revert?"
+             │
+             └─ If user confirms (QMessageBox.Yes):
+                 │
+                 ├─ Clear editing controller undo/redo history
+                 │
+                 ├─ Call open_in_editor() to reload original sprite
+                 │  (uses current_tile_data, current_rom_path, current_offset)
+                 │
+                 └─ Asset browser remains enabled for continuous browsing
+```
+
+**Implementation**: `ui/sprite_editor/controllers/rom_workflow_controller.py:revert_to_original()`
+
+**Key Signals:**
+- `has_unsaved_changes()`: Checks if sprite has been modified since loading
+- `open_in_editor()`: Re-extracts and displays sprite from original ROM data
+- UI auto-updates when confirmation is accepted
+
+**Notes:**
+- Asset browser stays enabled in edit mode (commit b904054a)
+- Confirmation dialog appears only if unsaved changes exist
+- If no changes, button silently reloads original sprite
+- Prompt message guides user on impact of action
+
 ---
 
 ## Quick Reference
@@ -466,4 +511,4 @@ StatusBarManager.set_mesen2_watching(bool)
 
 ---
 
-*Last updated: January 8, 2026 (Fixed PreviewCoordinator file path reference)*
+*Last updated: January 12, 2026 (Added Revert to Original Workflow section)*

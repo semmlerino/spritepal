@@ -12,6 +12,10 @@ A PySide6-based sprite extraction and editing tool for SNES ROM hacking.
 - **Keyboard shortcuts** for tab navigation (Ctrl+1/2/3) and quick capture access (F6)
 - **WCAG 2.1 compliant** keyboard navigation
 - **Session persistence** saves window state, file paths, and recent captures
+- **Toggleable backgrounds** in sprite editor for better visibility during editing
+- **Revert to Original** button to restore a sprite from ROM if edits go wrong
+- **Per-category logging** control via Settings → Logging tab for detailed debugging
+- **100+ UI integration tests** for signal-driven workflow validation
 
 ## Keyboard Shortcuts
 
@@ -139,4 +143,4 @@ MIT
 
 ---
 
-*Last updated: January 6, 2026 (Added Keyboard Shortcuts, Sprite Editor, and Mesen 2 features)*
+*Last updated: January 12, 2026 (Added Toggleable Backgrounds, Revert to Original, Per-Category Logging, and UI Integration Tests)*

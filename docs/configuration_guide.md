@@ -186,17 +186,74 @@ def test_something(app_context):
 
 ---
 
-## 8. Common Settings Keys
+## 8. Logging Configuration
+
+SpritePal provides per-category logging control via **Settings → Logging tab**. This feature allows developers and advanced users to enable detailed logging for specific subsystems without flooding the logs with noise from unrelated components.
+
+### Logging Categories
+
+The following categories can be toggled independently:
+
+| Category | Component | Purpose |
+|----------|-----------|---------|
+| **ROM Extraction** | `core/rom_extractor.py` | Track sprite extraction from ROM files |
+| **Tile Rendering** | `core/tile_utils.py` | Monitor 4bpp tile decoding/encoding operations |
+| **Thumbnail Worker** | `ui/workers/batch_thumbnail_worker.py` | Log thumbnail generation progress and caching |
+| **Tile Hash Database** | `core/services/tile_hash_database.py` | Track tile deduplication and matching |
+| **ROM Tile Matcher** | `core/mesen_integration/rom_tile_matcher.py` | Monitor ROM offset discovery via Mesen2 |
+| **HAL Compression** | `core/hal_compression.py` | Log HAL (de)compression operations |
+| **All UI Workers** | `ui/workers/` | Toggle all UI worker threads collectively |
+| **Debug Logging** | Global | Global debug mode (additional verbose output across all categories) |
+
+### Accessing Logging Settings
+
+```python
+from core.app_context import get_app_context
+from utils.logging_config import get_noisy_categories
+
+# Get current logging state
+app_state = get_app_context().application_state_manager
+logging_settings = app_state.settings.get("logging", {})
+
+# Check if a specific category is enabled
+rom_extraction_enabled = logging_settings.get("rom_extraction", False)
+
+# Query available categories
+noisy_categories = get_noisy_categories()
+for category, description in noisy_categories.items():
+    print(f"{category}: {description}")
+```
+
+### Settings UI
+
+The Logging tab in Settings → Logging provides:
+- Checkbox for each logging category (ROM Extraction, Tile Rendering, etc.)
+- Global "Debug Logging" toggle for comprehensive output
+- All settings persist via `ApplicationStateManager`
+
+**Implementation**: `ui/dialogs/settings_dialog.py:_create_logging_tab()`
+
+### Default Behavior
+
+- **Production**: All logging categories disabled by default (clean logs)
+- **Tests**: Isolated logging state per-test via `app_context` fixture
+- **Configuration**: Persisted in `.spritepal_settings.json` under `logging` key
+
+---
+
+## 9. Common Settings Keys
 
 | Key Path | Type | Description |
 |----------|------|-------------|
 | `rom_injection.last_input_rom` | str | Last loaded ROM file path |
 | `vram_extraction.default_offset` | int | Default VRAM offset |
 | `ui.window_geometry` | dict | Main window position/size |
+| `logging.<category>` | bool | Per-category logging toggle (see Logging Configuration section) |
+| `debug_logging` | bool | Global debug mode toggle |
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 **Settings not persisting?**
 - Check file permissions on `.spritepal_settings.json`
@@ -213,4 +270,4 @@ def test_something(app_context):
 
 ---
 
-*Last updated: December 26, 2025 (Replaced inject() with get_app_context() pattern)*
+*Last updated: January 12, 2026 (Added Logging Configuration section)*

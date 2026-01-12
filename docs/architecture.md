@@ -761,4 +761,4 @@ This subsystem is used by:
 
 ---
 
-*Last updated: January 4, 2026 (Added Mesen Integration Subsystem documentation)*
+*Last updated: January 12, 2026 (Service consolidation in AppContext documented in CLAUDE.md)*

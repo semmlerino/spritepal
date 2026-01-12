@@ -418,6 +418,86 @@ uv run pytest -m real_hal --require-real-hal -v
 
 ---
 
+## UI Integration Tests
+
+UI integration tests validate signal-driven workflows and observable behavior through public APIs rather than mocking internal state. Located in `tests/ui/integration/` with 100+ tests covering:
+
+### Coverage Areas
+
+| Area | Test File | Purpose |
+|------|-----------|---------|
+| **Canvas interactions** | `test_pixel_canvas_interaction.py` | Mouse events, zoom, hover behavior |
+| **Tool selection** | `test_icon_toolbar.py` | Icon toolbar signals, tool switching |
+| **Color/palette selection** | `test_color_palette_selection.py` | Palette widget signal emissions |
+| **Asset browser** | `test_sprite_asset_browser.py` | Tree selection, context menu actions |
+| **Extract/Inject workflows** | `test_sprite_editor_workflows.py` | Complete extraction and injection pipelines |
+| **ROM workflow** | `test_rom_workflow_integration.py` | Revert to Original, state transitions |
+| **Signal ordering** | `test_multi_signal_recorder.py` | Multi-component signal coordination |
+
+### Testing Philosophy
+
+**Signal-driven, not state-introspecting:**
+```python
+# ❌ Bad - Introspects private state
+def test_color_changed():
+    widget.set_color(Qt.red)
+    assert widget._color == Qt.red  # Testing implementation detail
+
+# ✅ Good - Observes public signals
+def test_color_changed(qtbot):
+    with qtbot.waitSignal(widget.color_changed):
+        widget.set_color(Qt.red)
+```
+
+### Key Utilities
+
+**MultiSignalRecorder** (`tests/ui/integration/helpers/signal_spy_utils.py`):
+```python
+from tests.ui.integration.helpers.signal_spy_utils import MultiSignalRecorder
+
+def test_workflow_signal_order(qtbot, app_context):
+    """Verify multiple signals emit in correct order."""
+    recorder = MultiSignalRecorder(qtbot)
+
+    # Track multiple signals
+    recorder.add_signal(editor.sprite_loaded, "sprite_loaded")
+    recorder.add_signal(palette.updated, "palette_updated")
+    recorder.add_signal(canvas.redrawn, "canvas_redrawn")
+
+    # Execute workflow
+    editor.load_sprite(sprite_data)
+
+    # Verify order and payloads
+    assert recorder.signals == [
+        ("sprite_loaded", (sprite_data,)),
+        ("palette_updated", (palettes,)),
+        ("canvas_redrawn", ()),
+    ]
+```
+
+### Running UI Integration Tests
+
+```bash
+# Run all UI integration tests
+uv run pytest tests/ui/integration/ -v
+
+# Run single test with verbose output
+uv run pytest tests/ui/integration/test_rom_workflow_integration.py::test_revert_to_original -vv
+
+# Run with captured output for debugging
+uv run pytest tests/ui/integration/ -s --tb=short
+```
+
+### Guidelines
+
+1. **Test observable behavior** - Verify signals emit, UI updates, and workflows complete
+2. **Use fixtures** - `app_context` for managers, `qtbot` for signals/widgets
+3. **Explicit waits** - Always use `qtbot.waitSignal()` with timeout for async operations
+4. **No mocking widgets** - Test real components (use `app_context` for services)
+5. **Verify workflows end-to-end** - Extract → Edit → Inject tests should use real managers
+
+---
+
 ## RealComponentFactory
 
 For integration tests with real components:
@@ -451,4 +531,4 @@ def test_with_workers(app_context, isolated_data_repository):
 
 ---
 
-*Last updated: January 5, 2026 (Added Test Data Sources section with consolidation guidance)*
+*Last updated: January 12, 2026 (Added UI Integration Tests section with signal-driven testing patterns)*

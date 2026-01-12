@@ -86,4 +86,4 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
 ---
 
-*Last updated: January 6, 2026 (Added Sprite Editor Tab, keyboard shortcuts, and Mesen2 integration features)*
+*Last updated: January 12, 2026 (Documentation consolidation: Added logging, UI integration tests, Revert to Original, toggleable backgrounds)*

@@ -28,6 +28,7 @@ uv run python launch_editor.py
   - Fixed brush size (1x1 pixel)
   - Undo/Redo system
   - Real-time grid overlay
+  - Toggleable backgrounds for visibility (checkerboard, black, transparent)
 
 - **Inject Tab**: Inject edited sprites back into VRAM dumps
   - PNG to SNES 4bpp tile conversion
@@ -44,6 +45,7 @@ uv run python launch_editor.py
   - Context menu: Rename, Delete, Save to Library, Copy Offset
   - Persistent sprite library across sessions
   - Thumbnail previews with context-aware naming (Boot/Menu/Cutscene/Gameplay)
+  - **Revert to Original** button: Discard edits and reload sprite from original ROM with confirmation dialog
 
 ## Architecture
 
@@ -410,4 +412,4 @@ class MyApp(QMainWindow):
 
 ---
 
-*Last updated: January 8, 2026 (Added Asset Browser context menu, Sprite Library integration, ROM Mode documentation)*
+*Last updated: January 12, 2026 (Added Toggleable Backgrounds and Revert to Original button documentation)*
