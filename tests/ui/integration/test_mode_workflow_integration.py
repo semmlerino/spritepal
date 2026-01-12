@@ -250,12 +250,11 @@ class TestLoadRomModeSwitch:
         assert workspace.current_mode == "vram"
 
         # Mock ROM validation to pass
+        mock_header = Mock(title="Test ROM", header_offset=0, mapping_type=None, checksum=0x1234)
         with (
             patch("core.rom_validator.ROMValidator.validate_rom_file", return_value=(True, "")),
-            patch(
-                "core.rom_validator.ROMValidator.validate_rom_header",
-                return_value=(Mock(title="Test ROM", header_offset=0, mapping_type=None), None),
-            ),
+            patch("core.rom_validator.ROMValidator.validate_rom_header", return_value=(mock_header, None)),
+            patch("core.rom_validator.ROMValidator.verify_rom_checksum", return_value=True),
             patch("pathlib.Path.exists", return_value=True),
             patch("pathlib.Path.stat", return_value=Mock(st_size=32768)),
         ):
@@ -284,12 +283,11 @@ class TestLoadRomModeSwitch:
         recorder.connect_signal(workspace.rom_workflow_controller.rom_info_updated, "rom_info_updated")
 
         # Mock ROM validation to pass
+        mock_header = Mock(title="Test ROM", header_offset=0, mapping_type=None, checksum=0x1234)
         with (
             patch("core.rom_validator.ROMValidator.validate_rom_file", return_value=(True, "")),
-            patch(
-                "core.rom_validator.ROMValidator.validate_rom_header",
-                return_value=(Mock(title="Test ROM", header_offset=0, mapping_type=None), None),
-            ),
+            patch("core.rom_validator.ROMValidator.validate_rom_header", return_value=(mock_header, None)),
+            patch("core.rom_validator.ROMValidator.verify_rom_checksum", return_value=True),
             patch("pathlib.Path.exists", return_value=True),
             patch("pathlib.Path.stat", return_value=Mock(st_size=32768)),
         ):

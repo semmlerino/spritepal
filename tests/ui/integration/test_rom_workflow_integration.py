@@ -74,9 +74,11 @@ def test_load_rom_emits_info(qtbot, workflow_controller):
     spy_info = QSignalSpy(workflow_controller.rom_info_updated)
 
     # Mock validation to pass
+    mock_header = Mock(title="Kirby Test", header_offset=0, mapping_type=None, checksum=0x1234)
     with (
         patch("core.rom_validator.ROMValidator.validate_rom_file", return_value=(True, "")),
-        patch("core.rom_validator.ROMValidator.validate_rom_header", return_value=(Mock(title="Kirby Test", header_offset=0, mapping_type=None), None)),
+        patch("core.rom_validator.ROMValidator.validate_rom_header", return_value=(mock_header, None)),
+        patch("core.rom_validator.ROMValidator.verify_rom_checksum", return_value=True),
         patch("pathlib.Path.exists", return_value=True),
         patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
     ):

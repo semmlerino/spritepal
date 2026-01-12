@@ -67,6 +67,8 @@ def test_palette_source_update(qtbot):
     workspace.set_controller(controller)
 
     # Emit signal from controller
-    controller.paletteSourceAdded.emit("New Source", "mesen", 2)
+    # Signal signature: (name, type, index, colors, is_active)
+    test_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
+    controller.paletteSourceAdded.emit("New Source", "mesen", 2, test_colors, True)
 
-    workspace.palette_panel.add_palette_source.assert_called_with("New Source", "mesen", 2)
+    workspace.palette_panel.add_palette_source.assert_called_with("New Source", "mesen", 2, test_colors, True)
