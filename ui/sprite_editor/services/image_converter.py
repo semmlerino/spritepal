@@ -163,9 +163,14 @@ class ImageConverter:
                     issues.append(f"Height ({height}) must be multiple of {TILE_HEIGHT}")
 
                 if img.mode == "P":
-                    colors_used = len(set(cast(Iterable[int], img.getdata())))
+                    pixels = list(cast(Iterable[int], img.getdata()))
+                    colors_used = len(set(pixels))
                     if colors_used > 16:
                         issues.append(f"Too many colors ({colors_used}), maximum is 16")
+                    if pixels:
+                        max_index = max(pixels)
+                        if max_index > 15:
+                            issues.append(f"Palette index {max_index} exceeds 4bpp limit (15)")
                 elif img.mode in ("RGB", "RGBA", "L", "LA"):
                     colors_used = len(set(cast(Iterable[object], img.getdata())))
                     if colors_used > 16:

@@ -651,6 +651,12 @@ class EditingController(QObject):
         if unique_colors > self.MAX_SNES_COLORS:
             errors.append(f"Uses {unique_colors} colors (SNES 4bpp max: {self.MAX_SNES_COLORS})")
 
+        # Check palette index range explicitly (unique count alone is insufficient)
+        if data.size > 0:
+            max_index = int(np.max(data))
+            if max_index > 15:
+                errors.append(f"Uses palette index {max_index} (SNES 4bpp max: 15)")
+
         # Emit signal only if validation state changed
         is_valid = len(errors) == 0
         if errors != self._validation_errors or is_valid != self._is_valid_for_rom:

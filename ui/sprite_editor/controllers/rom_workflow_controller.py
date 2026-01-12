@@ -1231,6 +1231,8 @@ class ROMWorkflowController(QObject):
                     self._view.set_checksum_valid(True)
                     # Invalidate thumbnail cache so it regenerates with updated sprite
                     self._view.asset_browser.clear_thumbnail(self.current_offset)
+                if self.preview_coordinator:
+                    self.preview_coordinator.invalidate_preview_cache(self.current_offset)
 
                 if self._message_service:
                     self._message_service.show_message(f"Successfully saved: {message}")

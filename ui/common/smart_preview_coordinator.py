@@ -189,6 +189,29 @@ class SmartPreviewCoordinator(QObject):
         """
         self._rom_data_provider = provider
 
+    def invalidate_preview_cache(self, offset: int | None = None) -> None:
+        """Invalidate cached preview data for a specific offset.
+
+        Args:
+            offset: ROM offset to invalidate. Defaults to current offset.
+        """
+        if not self._rom_data_provider:
+            return
+
+        provider_result = self._rom_data_provider()
+        if provider_result is None:
+            return
+
+        rom_path, _ = provider_result
+        if not rom_path:
+            return
+
+        target_offset = self._current_offset if offset is None else offset
+        cache_key = self._cache.make_key(rom_path, target_offset)
+        removed = self._cache.remove(cache_key)
+        if removed:
+            logger.debug(f"Invalidated preview cache for 0x{target_offset:06X}")
+
     def request_preview(self, offset: int) -> None:
         """
         Request preview update with intelligent timing and memory caching.
