@@ -112,13 +112,13 @@ class ROMInjector(SpriteInjector):
         logger.info(f"ROM header checksum updated: 0x{old_checksum:04X} -> 0x{checksum:04X}")
 
     def find_compressed_sprite(
-        self, rom_data: bytes | bytearray, offset: int, expected_size: int | None = None
+        self, rom_data: bytes | bytearray | memoryview, offset: int, expected_size: int | None = None
     ) -> tuple[int, bytes, int]:
         """
         Find and decompress sprite data at given offset.
 
         Args:
-            rom_data: ROM data
+            rom_data: ROM data (bytes, bytearray, or memoryview)
             offset: Offset in ROM where compressed sprite starts
             expected_size: Expected decompressed size (will truncate if larger)
 
@@ -210,18 +210,19 @@ class ROMInjector(SpriteInjector):
                 )
 
             # Check if data size is valid for sprite tiles (should be multiple of tile size)
+            # Note: Extra bytes are common in valid sprites due to padding - not an error
             extra_bytes = len(decompressed) % BYTES_PER_TILE
             if extra_bytes != 0:
-                logger.warning(
+                logger.debug(
                     f"Decompressed data size ({len(decompressed)} bytes) is not a multiple of {BYTES_PER_TILE}. "
-                    f"Extra bytes: {extra_bytes}. This may indicate incorrect offset or corrupted data."
+                    f"Extra bytes: {extra_bytes}. This is informational - padding bytes are normal."
                 )
 
-                # If more than half a tile of extra data, likely wrong offset
+                # If more than half a tile of extra data, note it for debugging
                 if extra_bytes > BYTES_PER_TILE // 2:
-                    logger.warning(
-                        f"Significant data misalignment detected ({extra_bytes} extra bytes). "
-                        f"The sprite offset 0x{offset:X} may be incorrect for this ROM version."
+                    logger.debug(
+                        f"Data misalignment detected ({extra_bytes} extra bytes) at offset 0x{offset:X}. "
+                        f"This is normal for some sprite formats."
                     )
 
             # Parse HAL format to find actual compressed block size

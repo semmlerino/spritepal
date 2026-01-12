@@ -117,6 +117,9 @@ class BatchThumbnailWorker(QObject):
         self._rom_file = None
         self._rom_mmap = None
         self._smc_offset = 0  # SMC header offset (0 or 512)
+        # Cached ROM data without SMC header for HAL decompression (created once in _load_rom_data)
+        # Uses memoryview for mmap (zero-copy) or bytes for BytesMMAPWrapper fallback
+        self._rom_data_for_hal: bytes | memoryview | None = None
 
         # Multi-threading for parallel thumbnail generation
         self._use_multithreading = True
@@ -126,7 +129,7 @@ class BatchThumbnailWorker(QObject):
         # Cleanup tracking for idempotent cleanup
         self._cleanup_called = False
 
-    def queue_thumbnail(self, offset: int, size: int = 128, priority: int = 0) -> None:
+    def queue_thumbnail(self, offset: int, size: int = 384, priority: int = 0) -> None:
         """
         Queue a thumbnail for generation.
 
@@ -141,7 +144,7 @@ class BatchThumbnailWorker(QObject):
             self._request_queue.put(request)
             self._pending_count += 1
 
-    def queue_batch(self, offsets: list[int], size: int = 128, priority_start: int = 0) -> None:
+    def queue_batch(self, offsets: list[int], size: int = 384, priority_start: int = 0) -> None:
         """
         Queue multiple thumbnails for generation.
 
@@ -352,6 +355,8 @@ class BatchThumbnailWorker(QObject):
                 self._smc_offset = detect_smc_offset(self._rom_mmap)
                 if self._smc_offset > 0:
                     logger.info(f"Detected {self._smc_offset}-byte SMC header in ROM")
+                # Cache ROM data without SMC header for HAL decompression (zero-copy memoryview)
+                self._rom_data_for_hal = memoryview(self._rom_mmap)[self._smc_offset :]
                 logger.info(f"ROM data mapped: {file_size} bytes (SMC offset: {self._smc_offset})")
             except Exception as mmap_error:
                 # Memory mapping failed - close file and use fallback
@@ -369,6 +374,8 @@ class BatchThumbnailWorker(QObject):
                 # Use BytesMMAPWrapper from rom_utils for mmap-compatible interface
                 self._rom_mmap = BytesMMAPWrapper(rom_data)
                 self._rom_file = None
+                # Cache ROM data without SMC header for HAL decompression (single copy)
+                self._rom_data_for_hal = rom_data[self._smc_offset :]
                 logger.info(f"ROM data loaded (fallback): {file_size} bytes (SMC offset: {self._smc_offset})")
 
         except Exception as e:
@@ -506,20 +513,18 @@ class BatchThumbnailWorker(QObject):
             # Try to decompress sprite at offset
             decompressed_data = None
 
-            if self.rom_extractor:
-                # Try HAL decompression
+            if self.rom_extractor and self._rom_data_for_hal:
+                # Try HAL decompression using cached ROM data (without SMC header) with actual offset
+                # (matches preview_worker_pool approach for consistent decompression)
                 try:
-                    # Read chunk for decompression
-                    chunk = self._read_rom_chunk(request.offset, 0x10000)  # Read up to 64KB
-                    if chunk:
-                        rom_injector = self.rom_extractor.rom_injector
-                        _, decompressed_data, _ = rom_injector.find_compressed_sprite(
-                            chunk,
-                            0,  # Offset within chunk
-                            expected_size=None,
-                        )
-                        if decompressed_data:
-                            logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{request.offset:06X}")
+                    rom_injector = self.rom_extractor.rom_injector
+                    _, decompressed_data, _ = rom_injector.find_compressed_sprite(
+                        self._rom_data_for_hal,  # Pre-cached ROM data without SMC header
+                        request.offset,  # ROM offset (not file offset)
+                        expected_size=None,
+                    )
+                    if decompressed_data:
+                        logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{request.offset:06X}")
                 except Exception as e:
                     # Log decompression failures for debugging, but continue with fallback to raw data
                     logger.debug(f"HAL decompression failed for offset 0x{request.offset:06X}: {e}")
@@ -670,6 +675,9 @@ class BatchThumbnailWorker(QObject):
                 # Reset SMC offset
                 self._smc_offset = 0
 
+                # Clear cached HAL data
+                self._rom_data_for_hal = None
+
                 if rom_size > 0:
                     logger.debug(f"Cleared ROM data: freed {rom_size} bytes")
             except Exception as e:
@@ -759,12 +767,12 @@ class ThumbnailWorkerController(QObject):
             pixmap = QPixmap.fromImage(qimage)
             self.thumbnail_ready.emit(offset, pixmap)
 
-    def queue_thumbnail(self, offset: int, size: int = 128, priority: int = 0) -> None:
+    def queue_thumbnail(self, offset: int, size: int = 384, priority: int = 0) -> None:
         """Queue a thumbnail for generation."""
         if self.worker:
             self.worker.queue_thumbnail(offset, size, priority)
 
-    def queue_batch(self, offsets: list[int], size: int = 128, priority_start: int = 0) -> None:
+    def queue_batch(self, offsets: list[int], size: int = 384, priority_start: int = 0) -> None:
         """Queue multiple thumbnails for generation."""
         if self.worker:
             self.worker.queue_batch(offsets, size, priority_start)
