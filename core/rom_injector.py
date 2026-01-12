@@ -17,6 +17,7 @@ from core.hal_parser import HALParser
 from core.injector import SpriteInjector
 from core.rom_validator import ROMHeader, ROMValidator
 from core.sprite_config_loader import SpriteConfigLoader
+from core.types import CompressionType
 from utils.constants import (
     BYTES_PER_TILE,
     DECOMPRESSION_WINDOW_SIZE,
@@ -462,6 +463,7 @@ class ROMInjector(SpriteInjector):
         create_backup: bool = True,
         ignore_checksum: bool = False,
         force: bool = False,
+        compression_type: CompressionType = CompressionType.HAL,
     ) -> tuple[bool, str]:
         """
         Inject sprite directly into ROM file with validation and backup.
@@ -471,10 +473,12 @@ class ROMInjector(SpriteInjector):
             rom_path: Path to input ROM
             output_path: Path for output ROM
             sprite_offset: Offset in ROM where sprite data is located
-            fast_compression: Use fast compression mode
+            fast_compression: Use fast compression mode (HAL only)
             create_backup: Create backup before modification
             ignore_checksum: If True, warn on checksum mismatch instead of failing
             force: If True, inject even if compressed size exceeds limit (may corrupt ROM)
+            compression_type: Type of compression to use (HAL or RAW). RAW writes
+                             tile data directly without compression.
 
         Returns:
             Tuple of (success, message)
@@ -482,6 +486,7 @@ class ROMInjector(SpriteInjector):
         try:
             start_time = time.time()
             logger.info(f"Starting ROM injection: {Path(sprite_path).name} -> offset 0x{sprite_offset:X}")
+            logger.info(f"Compression mode: {compression_type.value}")
 
             # Validate ROM before modification
             _header_info, _header_offset = ROMValidator.validate_rom_for_injection(
@@ -538,104 +543,131 @@ class ROMInjector(SpriteInjector):
             if slack_size > 0:
                 logger.info(f"Available slack space after sprite: {slack_size} bytes")
 
-            # Compress new sprite data
-            # FIX #1: Use try-finally to guarantee temp file cleanup on any error
-            compressed_path: str | None = None
-            try:
-                compression_start = time.time()
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as tmp:
-                    compressed_path = tmp.name
+            # Prepare data for injection based on compression type
+            uncompressed_size = len(tile_data)
+            if uncompressed_size == 0:
+                return False, "Cannot inject empty sprite data"
 
-                compressed_size = self.hal_compressor.compress_to_file(
-                    tile_data, compressed_path, fast=fast_compression
-                )
-                compression_time = time.time() - compression_start
-                logger.debug(f"Compression took {compression_time:.2f} seconds")
+            # Variables to track injection data
+            compressed_data: bytes
+            compressed_size: int
+            compression_ratio: float
+            compression_mode: str
 
-                # Calculate compression statistics
-                uncompressed_size = len(tile_data)
-                if uncompressed_size == 0:
-                    return False, "Cannot compress empty sprite data"
-                compression_ratio = (uncompressed_size - compressed_size) / uncompressed_size * 100
-                space_saved = original_size - compressed_size
-                compression_mode = "fast" if fast_compression else "standard"
+            if compression_type == CompressionType.RAW:
+                # RAW mode: write tile data directly without compression
+                logger.info("Using RAW mode - no compression applied")
+                compressed_data = tile_data
+                compressed_size = len(tile_data)
+                compression_ratio = 0.0  # No compression
+                compression_mode = "raw (uncompressed)"
 
-                logger.info(f"Compression statistics ({compression_mode} mode):")
-                logger.info(f"  - Uncompressed size: {uncompressed_size} bytes")
-                logger.info(f"  - Compressed size: {compressed_size} bytes")
-                logger.info(f"  - Compression ratio: {compression_ratio:.1f}%")
-                logger.info(f"  - Space saved vs original: {space_saved} bytes")
+                # For RAW sprites, we compare against uncompressed original size
+                # (since the original was also raw)
+                logger.info("RAW injection statistics:")
+                logger.info(f"  - Tile data size: {compressed_size} bytes")
+                logger.info(f"  - Original size in ROM: {original_size} bytes")
 
-                # Check if compressed data fits
-                # We allow using slack space up to 32 bytes by default
-                max_slack_usage = 32
-                effective_limit = original_size + min(slack_size, max_slack_usage)
+            else:
+                # HAL mode: compress the tile data
+                # Use try-finally to guarantee temp file cleanup on any error
+                compressed_path: str | None = None
+                try:
+                    compression_start = time.time()
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".bin") as tmp:
+                        compressed_path = tmp.name
 
-                overflow_bytes = compressed_size - effective_limit
-                if compressed_size > effective_limit:
+                    compressed_size = self.hal_compressor.compress_to_file(
+                        tile_data, compressed_path, fast=fast_compression
+                    )
+                    compression_time = time.time() - compression_start
+                    logger.debug(f"Compression took {compression_time:.2f} seconds")
+
+                    # Calculate compression statistics
+                    compression_ratio = (uncompressed_size - compressed_size) / uncompressed_size * 100
+                    compression_mode = "fast" if fast_compression else "standard"
+
+                    logger.info(f"Compression statistics ({compression_mode} mode):")
+                    logger.info(f"  - Uncompressed size: {uncompressed_size} bytes")
+                    logger.info(f"  - Compressed size: {compressed_size} bytes")
+                    logger.info(f"  - Compression ratio: {compression_ratio:.1f}%")
+
+                    # Read compressed data
+                    with Path(compressed_path).open("rb") as f:
+                        compressed_data = f.read()
+                finally:
+                    # Always clean up temp file, even on exception or early return
+                    if compressed_path is not None:
+                        Path(compressed_path).unlink(missing_ok=True)
+
+            # Check if data fits in available space
+            space_saved = original_size - compressed_size
+            logger.info(f"  - Space saved vs original: {space_saved} bytes")
+
+            # We allow using slack space up to 32 bytes by default
+            max_slack_usage = 32
+            effective_limit = original_size + min(slack_size, max_slack_usage)
+
+            overflow_bytes = compressed_size - effective_limit
+            if compressed_size > effective_limit:
+                if compression_type == CompressionType.RAW:
+                    suggestion = "This sprite may need to be edited to use fewer tiles"
+                else:
                     suggestion = (
                         "standard compression" if fast_compression else "a smaller sprite or split it into parts"
                     )
-                    slack_msg = f" (including {min(slack_size, max_slack_usage)} bytes slack)" if slack_size > 0 else ""
+                slack_msg = f" (including {min(slack_size, max_slack_usage)} bytes slack)" if slack_size > 0 else ""
 
-                    # Enhanced diagnostics for 0 slack
-                    diag_msg = ""
-                    if slack_size == 0:
-                        next_byte_offset = file_offset + original_size
-                        if next_byte_offset < len(self.rom_data):
-                            next_byte = self.rom_data[next_byte_offset]
-                            diag_msg = f" No slack detected. Next byte at 0x{next_byte_offset:X} is 0x{next_byte:02X}."
-                        else:
-                            diag_msg = " No slack detected (end of ROM)."
-
-                    if not force:
-                        return False, (
-                            f"Compressed sprite too large: {compressed_size} bytes "
-                            f"(original limit: {original_size} bytes{slack_msg}).{diag_msg}\n"
-                            f"Compression ratio: {compression_ratio:.1f}%\n"
-                            f"Try using {suggestion}."
-                        )
+                # Enhanced diagnostics for 0 slack
+                diag_msg = ""
+                if slack_size == 0:
+                    next_byte_offset = file_offset + original_size
+                    if next_byte_offset < len(self.rom_data):
+                        next_byte = self.rom_data[next_byte_offset]
+                        diag_msg = f" No slack detected. Next byte at 0x{next_byte_offset:X} is 0x{next_byte:02X}."
                     else:
-                        # Force injection - warn but proceed
-                        logger.warning(
-                            f"FORCE INJECTION: Overwriting {overflow_bytes} bytes of adjacent data! "
-                            f"Compressed: {compressed_size}, Limit: {effective_limit}"
-                        )
-                        # Show what data will be overwritten
-                        overwrite_start = file_offset + effective_limit
-                        overwrite_end = min(overwrite_start + overflow_bytes, len(self.rom_data))
-                        overwritten_data = self.rom_data[overwrite_start:overwrite_end]
-                        logger.warning(
-                            f"Data being overwritten at 0x{overwrite_start:X}: "
-                            f"{overwritten_data[:16].hex(' ').upper()}{'...' if len(overwritten_data) > 16 else ''}"
-                        )
+                        diag_msg = " No slack detected (end of ROM)."
 
-                if compressed_size > original_size:
+                if not force:
+                    return False, (
+                        f"{'Tile' if compression_type == CompressionType.RAW else 'Compressed'} data too large: "
+                        f"{compressed_size} bytes "
+                        f"(original limit: {original_size} bytes{slack_msg}).{diag_msg}\n"
+                        f"Try using {suggestion}."
+                    )
+                else:
+                    # Force injection - warn but proceed
                     logger.warning(
-                        f"New sprite ({compressed_size} bytes) is larger than original ({original_size} bytes). "
-                        f"Using {compressed_size - original_size} bytes of slack space."
+                        f"FORCE INJECTION: Overwriting {overflow_bytes} bytes of adjacent data! "
+                        f"Data size: {compressed_size}, Limit: {effective_limit}"
+                    )
+                    # Show what data will be overwritten
+                    overwrite_start = file_offset + effective_limit
+                    overwrite_end = min(overwrite_start + overflow_bytes, len(self.rom_data))
+                    overwritten_data = self.rom_data[overwrite_start:overwrite_end]
+                    logger.warning(
+                        f"Data being overwritten at 0x{overwrite_start:X}: "
+                        f"{overwritten_data[:16].hex(' ').upper()}{'...' if len(overwritten_data) > 16 else ''}"
                     )
 
-                # Read compressed data
-                with Path(compressed_path).open("rb") as f:
-                    compressed_data = f.read()
-            finally:
-                # FIX #1: Always clean up temp file, even on exception or early return
-                if compressed_path is not None:
-                    Path(compressed_path).unlink(missing_ok=True)
+            if compressed_size > original_size:
+                logger.warning(
+                    f"New sprite ({compressed_size} bytes) is larger than original ({original_size} bytes). "
+                    f"Using {compressed_size - original_size} bytes of slack space."
+                )
 
-            # FIX #4: Work on a copy of ROM data to prevent state corruption on write failure
+            # Work on a copy of ROM data to prevent state corruption on write failure
             # Only update self.rom_data after successful write
             modified_rom = bytearray(self.rom_data)
 
-            # Inject compressed data into ROM copy
+            # Inject data into ROM copy
             # Bounds validation to prevent ROM corruption
             if file_offset + compressed_size > len(modified_rom):
                 raise ValueError(
                     f"Sprite data would overflow ROM: file offset 0x{file_offset:X} + "
                     f"{compressed_size} bytes exceeds ROM size {len(modified_rom)}"
                 )
-            logger.info(f"Injecting {compressed_size} bytes of compressed data at ROM offset 0x{sprite_offset:X}")
+            logger.info(f"Injecting {compressed_size} bytes of data at ROM offset 0x{sprite_offset:X}")
             modified_rom[file_offset : file_offset + compressed_size] = compressed_data
 
             # Preserve original padding bytes if new data is smaller
@@ -656,7 +688,7 @@ class ROMInjector(SpriteInjector):
             atomic_write(output_path, bytes(modified_rom))
             logger.debug(f"Successfully wrote {len(modified_rom)} bytes to output ROM")
 
-            # FIX #4: Only commit changes after successful write
+            # Only commit changes after successful write
             self.rom_data = modified_rom
 
             total_time = time.time() - start_time
@@ -678,15 +710,26 @@ class ROMInjector(SpriteInjector):
                     "Test the ROM carefully - game may crash or show glitches."
                 )
 
-            return True, (
-                f"Successfully injected sprite at 0x{sprite_offset:X}{slack_info}\n"
-                f"Original size: {original_size} bytes\n"
-                f"New size: {compressed_size} bytes ({compression_ratio:.1f}% compression)\n"
-                f"Space saved: {space_saved} bytes\n"
-                f"Compression mode: {compression_mode}\n"
-                f"ROM header checksum updated: 0x{self.header.checksum:04X}\n"
-                f"Total time: {total_time:.2f} seconds{force_warning}"
-            )
+            # Build mode-specific success message
+            if compression_type == CompressionType.RAW:
+                return True, (
+                    f"Successfully injected RAW sprite at 0x{sprite_offset:X}{slack_info}\n"
+                    f"Original size: {original_size} bytes\n"
+                    f"New size: {compressed_size} bytes (no compression)\n"
+                    f"Space difference: {space_saved} bytes\n"
+                    f"ROM header checksum updated: 0x{self.header.checksum:04X}\n"
+                    f"Total time: {total_time:.2f} seconds{force_warning}"
+                )
+            else:
+                return True, (
+                    f"Successfully injected sprite at 0x{sprite_offset:X}{slack_info}\n"
+                    f"Original size: {original_size} bytes\n"
+                    f"New size: {compressed_size} bytes ({compression_ratio:.1f}% compression)\n"
+                    f"Space saved: {space_saved} bytes\n"
+                    f"Compression mode: {compression_mode}\n"
+                    f"ROM header checksum updated: 0x{self.header.checksum:04X}\n"
+                    f"Total time: {total_time:.2f} seconds{force_warning}"
+                )
 
     def find_sprite_locations(self, rom_path: str) -> dict[str, SpritePointer]:
         """

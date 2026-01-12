@@ -1,5 +1,6 @@
--- sprite_rom_finder.lua v34
+-- sprite_rom_finder.lua v35
 -- Click on any sprite to get its ROM source offset
+-- v35: Output ROM checksum for identity validation in SpritePal
 -- v33: Always-on automatic attribution mode
 --
 -- LEFT-CLICK on sprite = lookup ROM offset (topmost wins)
@@ -93,11 +94,32 @@ local function log(msg)
     emu.log(msg)
 end
 
+-- Read ROM checksum from SNES internal header
+-- For HiROM/SA-1 (Kirby Super Star), checksum is at $FFDE-$FFDF
+local function read_rom_checksum()
+    -- Try to read checksum from HiROM location first (covers SA-1 games)
+    local ok, checksum_lo = pcall(emu.read, 0xFFDE, emu.memType.snesMemory)
+    if not ok then
+        log("[WARN] Could not read ROM checksum (lo byte)")
+        return nil
+    end
+    local ok2, checksum_hi = pcall(emu.read, 0xFFDF, emu.memType.snesMemory)
+    if not ok2 then
+        log("[WARN] Could not read ROM checksum (hi byte)")
+        return nil
+    end
+    return checksum_lo + (checksum_hi * 256)
+end
+
 -- Write offset to a simple file for SpritePal integration
 local function write_offset_file(offset, frame)
     local f = io.open(OFFSET_FILE, "w")
     if f then
         f:write(string.format("FILE OFFSET: 0x%06X\n", offset))
+        local checksum = read_rom_checksum()
+        if checksum then
+            f:write(string.format("ROM_CHECKSUM: 0x%04X\n", checksum))
+        end
         f:write(string.format("frame=%d\n", frame or 0))
         f:write(string.format("timestamp=%d\n", os.time()))
         f:close()
@@ -114,14 +136,29 @@ local function load_recent_clicks()
     f:close()
     if not content or content == "" then return end
 
-    -- Simple JSON array parser for our format
+    -- Simple JSON array parser for our format (supports optional checksum field)
     recent_clicks = {}
-    for offset_str, frame_str, ts_str in content:gmatch('{"offset":(%d+),"frame":(%d+),"timestamp":(%d+)}') do
-        table.insert(recent_clicks, {
+    -- Match with optional checksum field
+    for offset_str, frame_str, ts_str, checksum_str in content:gmatch('{"offset":(%d+),"frame":(%d+),"timestamp":(%d+)"?[,}]?[^}]*"?rom_checksum"?:?(%d*)"?}?') do
+        local click = {
             offset = tonumber(offset_str),
             frame = tonumber(frame_str),
             timestamp = tonumber(ts_str)
-        })
+        }
+        if checksum_str and checksum_str ~= "" then
+            click.rom_checksum = tonumber(checksum_str)
+        end
+        table.insert(recent_clicks, click)
+    end
+    -- Fallback: try simpler pattern for legacy files without checksum
+    if #recent_clicks == 0 then
+        for offset_str, frame_str, ts_str in content:gmatch('{"offset":(%d+),"frame":(%d+),"timestamp":(%d+)}') do
+            table.insert(recent_clicks, {
+                offset = tonumber(offset_str),
+                frame = tonumber(frame_str),
+                timestamp = tonumber(ts_str)
+            })
+        end
     end
 end
 
@@ -129,11 +166,16 @@ local function save_recent_clicks()
     local f = io.open(CLICKS_FILE, "w")
     if not f then return end
 
-    -- Write as JSON array
+    -- Write as JSON array (include checksum if present)
     f:write("[\n")
     for i, click in ipairs(recent_clicks) do
-        f:write(string.format('  {"offset":%d,"frame":%d,"timestamp":%d}',
-            click.offset, click.frame, click.timestamp))
+        if click.rom_checksum then
+            f:write(string.format('  {"offset":%d,"frame":%d,"timestamp":%d,"rom_checksum":%d}',
+                click.offset, click.frame, click.timestamp, click.rom_checksum))
+        else
+            f:write(string.format('  {"offset":%d,"frame":%d,"timestamp":%d}',
+                click.offset, click.frame, click.timestamp))
+        end
         if i < #recent_clicks then f:write(",") end
         f:write("\n")
     end
@@ -142,6 +184,9 @@ local function save_recent_clicks()
 end
 
 local function add_recent_click(offset, frame)
+    -- Get current ROM checksum
+    local checksum = read_rom_checksum()
+
     -- Remove duplicates of same offset
     local new_clicks = {}
     for _, click in ipairs(recent_clicks) do
@@ -151,11 +196,12 @@ local function add_recent_click(offset, frame)
     end
     recent_clicks = new_clicks
 
-    -- Add to front
+    -- Add to front (include checksum if available)
     table.insert(recent_clicks, 1, {
         offset = offset,
         frame = frame,
-        timestamp = os.time()
+        timestamp = os.time(),
+        rom_checksum = checksum  -- may be nil if read failed
     })
 
     -- Keep only last 5

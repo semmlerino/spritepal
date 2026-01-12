@@ -22,7 +22,7 @@ from core.rom_injector import ROMInjector, SpritePointer
 from core.rom_palette_extractor import ROMPaletteExtractor
 from core.rom_validator import ROMHeader
 from core.sprite_config_loader import SpriteConfigLoader
-from core.types import ExtractionMetadata, SpriteInfo
+from core.types import CompressionType, ExtractionMetadata, SpriteInfo
 from utils.constants import (
     BUFFER_SIZE_1KB,
     BUFFER_SIZE_2KB,
@@ -140,6 +140,7 @@ class ROMExtractor:
         create_backup: bool = True,
         ignore_checksum: bool = False,
         force: bool = False,
+        compression_type: CompressionType = CompressionType.HAL,
     ) -> tuple[bool, str]:
         """Inject sprite directly into ROM file with validation and backup.
 
@@ -150,10 +151,11 @@ class ROMExtractor:
             rom_path: Path to input ROM
             output_path: Path for output ROM
             sprite_offset: Offset in ROM where sprite data is located
-            fast_compression: Use fast compression mode
+            fast_compression: Use fast compression mode (HAL only)
             create_backup: Create backup before modification
             ignore_checksum: If True, warn on checksum mismatch instead of failing
             force: If True, inject even if compressed size exceeds limit
+            compression_type: Type of compression to use (HAL or RAW)
 
         Returns:
             Tuple of (success, message)
@@ -167,6 +169,7 @@ class ROMExtractor:
             create_backup,
             ignore_checksum,
             force,
+            compression_type,
         )
 
     # -------------------------------------------------------------------------
@@ -264,6 +267,111 @@ class ROMExtractor:
         except Exception as e:
             logger.error(f"Failed to extract sprite data at offset 0x{sprite_offset:X}: {e}")
             raise HALCompressionError(f"Sprite extraction failed: {e}") from e
+
+    def extract_sprite_data_with_type(
+        self, rom_path: str, sprite_offset: int, *, max_raw_tiles: int = 256
+    ) -> tuple[bytes, CompressionType]:
+        """
+        Extract sprite data from ROM with compression type detection.
+
+        Tries HAL decompression first; if that fails, falls back to raw tile extraction.
+        This enables support for both compressed and uncompressed sprites.
+
+        Args:
+            rom_path: Path to ROM file
+            sprite_offset: Offset in ROM where sprite data is located (logical offset)
+            max_raw_tiles: Maximum number of raw tiles to read if HAL fails (default 256)
+
+        Returns:
+            Tuple of (sprite_data, compression_type)
+
+        Raises:
+            HALCompressionError: If both HAL decompression and raw extraction fail
+        """
+        logger.debug(f"Extracting sprite data (with type) from ROM: offset=0x{sprite_offset:X}")
+
+        try:
+            # Check for SMC header to adjust offset
+            header = self.rom_injector.read_rom_header(rom_path)
+            smc_offset = header.header_offset
+            file_offset = sprite_offset + smc_offset
+
+            if smc_offset > 0:
+                logger.debug(f"Adjusting for {smc_offset}-byte SMC header: 0x{sprite_offset:X} -> 0x{file_offset:X}")
+
+            # Strategy 1: Try HAL decompression
+            try:
+                decompressed_data = self.hal_compressor.decompress_from_rom(rom_path, file_offset)
+                if decompressed_data:
+                    logger.info(f"HAL decompression succeeded: {len(decompressed_data)} bytes")
+                    return decompressed_data, CompressionType.HAL
+            except Exception as hal_error:
+                logger.info(f"HAL decompression failed at 0x{sprite_offset:X}: {hal_error}")
+
+            # Strategy 2: Fall back to raw tile extraction
+            logger.info(f"Attempting raw tile extraction at 0x{sprite_offset:X}")
+            raw_data = self._read_raw_tiles(rom_path, file_offset, max_tiles=max_raw_tiles)
+            if raw_data:
+                logger.info(f"Raw extraction succeeded: {len(raw_data)} bytes ({len(raw_data) // 32} tiles)")
+                return raw_data, CompressionType.RAW
+
+            # Neither strategy worked
+            raise HALCompressionError(
+                f"Cannot extract sprite at 0x{sprite_offset:X}: "
+                "HAL decompression failed and raw extraction returned no data. "
+                "This offset may not contain valid sprite data."
+            )
+
+        except HALCompressionError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to extract sprite data at offset 0x{sprite_offset:X}: {e}")
+            raise HALCompressionError(f"Sprite extraction failed at 0x{sprite_offset:X}: {e}") from e
+
+    def _read_raw_tiles(self, rom_path: str, file_offset: int, *, max_tiles: int = 256) -> bytes | None:
+        """
+        Read raw (uncompressed) tile data from ROM.
+
+        Reads a fixed number of 4bpp tiles (32 bytes each) from the ROM.
+        Used as fallback when HAL decompression fails.
+
+        Args:
+            rom_path: Path to ROM file
+            file_offset: Absolute file offset to read from
+            max_tiles: Maximum number of tiles to read (default 256)
+
+        Returns:
+            Raw tile data bytes, or None if read fails
+        """
+        bytes_per_tile = 32  # 4bpp SNES tile = 32 bytes
+        read_size = max_tiles * bytes_per_tile
+
+        try:
+            with open(rom_path, "rb") as f:
+                # Check file size
+                f.seek(0, 2)  # Seek to end
+                file_size = f.tell()
+
+                if file_offset >= file_size:
+                    logger.warning(f"Raw read offset 0x{file_offset:X} exceeds file size {file_size}")
+                    return None
+
+                # Clamp read size to available data
+                available = file_size - file_offset
+                actual_read = min(read_size, available)
+
+                f.seek(file_offset)
+                data = f.read(actual_read)
+
+                if len(data) < bytes_per_tile:
+                    logger.warning(f"Read only {len(data)} bytes, need at least {bytes_per_tile} for one tile")
+                    return None
+
+                return data
+
+        except OSError as e:
+            logger.error(f"Failed to read raw tiles at 0x{file_offset:X}: {e}")
+            return None
 
     def extract_sprite_from_rom(
         self, rom_path: str, sprite_offset: int, output_base: str, sprite_name: str = ""

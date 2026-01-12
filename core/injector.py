@@ -162,6 +162,14 @@ class SpriteInjector:
                     if max_val > 255:
                         logger.error(f"Invalid grayscale value: {max_val}")
                         return False, f"Invalid grayscale values (max: {max_val})"
+
+                    # Warn about precision loss for grayscale with values > 15
+                    if max_val > 15:
+                        logger.warning(
+                            f"Grayscale PNG will be quantized (max {max_val} → index {max_val // 17}). "
+                            "For lossless import, use indexed PNG with 16-color palette."
+                        )
+
                     logger.debug(f"Grayscale validation passed: max value {max_val} <= 255")
 
                 self.sprite_path = sprite_path

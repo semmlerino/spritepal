@@ -12,6 +12,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage, QPixmap
 
 from core.mesen_integration.log_watcher import CapturedOffset
+from core.types import CompressionType
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 from utils.logging_config import get_logger
@@ -88,6 +89,7 @@ class ROMWorkflowController(QObject):
         self._rom_mtime: float | None = None  # ROM file mtime for external modification detection
         self.current_offset: int = 0
         self._checksum_valid: bool = True
+        self._loaded_rom_checksum: int | None = None  # SNES internal checksum for capture validation
         self.state: str = "preview"  # 'preview', 'edit', 'save'
 
         # Current sprite data
@@ -97,7 +99,7 @@ class ROMWorkflowController(QObject):
         self.current_sprite_name: str = ""
         self.original_compressed_size: int = 0
         self.available_slack: int = 0
-        self.hal_decompression_succeeded: bool = False
+        self.current_compression_type: CompressionType = CompressionType.UNKNOWN
 
         # Flag for auto-opening in editor after preview completes (double-click)
         self._pending_open_in_editor: bool = False
@@ -176,10 +178,47 @@ class ROMWorkflowController(QObject):
         # Process immediately
         self._add_capture_to_browser(capture)
 
+    def _validate_capture_rom_match(self, capture: CapturedOffset) -> bool:
+        """Check if capture's ROM checksum matches the currently loaded ROM.
+
+        Returns True if:
+        - Checksums match
+        - Capture has no checksum (legacy capture, backward compatible)
+        - No ROM is loaded yet
+
+        Returns False (with warning) if checksums differ, indicating the capture
+        may be from a different ROM than the one currently loaded.
+        """
+        if capture.rom_checksum is None:
+            # Legacy capture without checksum - allow silently
+            return True
+        if self._loaded_rom_checksum is None:
+            # No ROM loaded yet - can't validate
+            return True
+        if capture.rom_checksum == self._loaded_rom_checksum:
+            return True
+
+        # Checksum mismatch - show warning
+        if self._message_service:
+            self._message_service.show_message(
+                f"Warning: Capture 0x{capture.offset:06X} may be from a different ROM "
+                f"(capture: 0x{capture.rom_checksum:04X}, loaded: 0x{self._loaded_rom_checksum:04X})"
+            )
+        logger.warning(
+            "ROM checksum mismatch for capture 0x%06X: capture=0x%04X, loaded=0x%04X",
+            capture.offset,
+            capture.rom_checksum,
+            self._loaded_rom_checksum,
+        )
+        return False
+
     def _add_capture_to_browser(self, capture: CapturedOffset) -> None:
         """Add a capture to the browser with thumbnail."""
         if not self._view:
             return
+
+        # Validate ROM identity (warn if mismatch but still add)
+        self._validate_capture_rom_match(capture)
 
         name = self._get_capture_name(capture)
         self._view.add_mesen_capture(name, capture.offset)
@@ -572,6 +611,7 @@ class ROMWorkflowController(QObject):
         file_size = stat_result.st_size
         self.rom_size = file_size - self.smc_header_offset
         self._rom_mtime = stat_result.st_mtime  # Track for external modification detection
+        self._loaded_rom_checksum = header.checksum  # Store for capture validation
 
         # Update view
         if self._view:
@@ -784,13 +824,11 @@ class ROMWorkflowController(QObject):
             if self._message_service:
                 self._message_service.show_message("No sprite data to edit")
             return
-        if not self.hal_decompression_succeeded:
-            logger.debug("[OPEN] HAL decompression failed, refusing to open raw data")
+        # Warn if raw sprite (no HAL compression)
+        if self.current_compression_type == CompressionType.RAW:
+            logger.info("[OPEN] Opening raw sprite (no HAL compression)")
             if self._message_service:
-                self._message_service.show_message(
-                    "Cannot open: HAL decompression failed. Use a valid compressed offset."
-                )
-            return
+                self._message_service.show_message("Opening raw sprite (will be injected without compression)")
 
         # Clear previous ROM palette sources and warnings before loading new sprite
         if self._view:
@@ -974,19 +1012,21 @@ class ROMWorkflowController(QObject):
 
     def prepare_injection(self) -> None:
         """Transition from editing to save confirmation with size comparison."""
-        # Block injection if HAL decompression failed (raw fallback was used)
-        if not self.hal_decompression_succeeded:
+        # For RAW sprites, show a warning about no compression being applied
+        if self.current_compression_type == CompressionType.RAW:
             from PySide6.QtWidgets import QMessageBox
 
-            QMessageBox.warning(
+            reply = QMessageBox.question(
                 self._view,
-                "Cannot Inject",
-                "This offset doesn't contain a valid HAL-compressed sprite.\n\n"
-                "The preview was generated from raw ROM bytes because HAL decompression failed.\n"
-                "Injecting at this offset would corrupt the ROM.\n\n"
-                "Please select a valid sprite offset.",
+                "Raw Sprite Injection",
+                "This sprite was extracted as raw tile data (no HAL compression).\n\n"
+                "It will be injected without compression. The sprite size must exactly\n"
+                "match the original, or adjacent ROM data may be overwritten.\n\n"
+                "Proceed with raw injection?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
-            return
+            if reply != QMessageBox.StandardButton.Yes:
+                return
 
         data = self._editing_controller.get_image_data()
         if data is None:
@@ -1104,6 +1144,7 @@ class ROMWorkflowController(QObject):
                 output_path=self.rom_path,
                 sprite_offset=self.current_offset,
                 create_backup=True,
+                compression_type=self.current_compression_type,
             )
 
             # Handle failure due to checksum mismatch
@@ -1129,10 +1170,11 @@ class ROMWorkflowController(QObject):
                         sprite_offset=self.current_offset,
                         create_backup=True,
                         ignore_checksum=True,
+                        compression_type=self.current_compression_type,
                     )
 
-            # Handle failure due to compressed size too large
-            if not success and "Compressed sprite too large" in message:
+            # Handle failure due to sprite size too large (HAL: "Compressed", RAW: "Tile")
+            if not success and ("too large" in message):
                 from PySide6.QtWidgets import QMessageBox
 
                 reply = QMessageBox.warning(
@@ -1159,6 +1201,7 @@ class ROMWorkflowController(QObject):
                         sprite_offset=self.current_offset,
                         create_backup=True,
                         force=True,
+                        compression_type=self.current_compression_type,
                     )
 
             # Cleanup temp file
@@ -1310,7 +1353,8 @@ class ROMWorkflowController(QObject):
         self.current_sprite_name = sprite_name
         self.original_compressed_size = compressed_size
         self.available_slack = slack_size
-        self.hal_decompression_succeeded = hal_succeeded
+        # Track compression type for injection
+        self.current_compression_type = CompressionType.HAL if hal_succeeded else CompressionType.RAW
 
         # Clear loading state
         self._preview_pending = False
@@ -1325,7 +1369,8 @@ class ROMWorkflowController(QObject):
                 if offset_adjusted:
                     msg += f" (Aligned to 0x{actual_offset:06X})"
             else:
-                msg = "Raw data preview (HAL decompression failed). Cannot inject at this offset."
+                # Raw sprite - can be edited and injected without compression
+                msg = f"Raw sprite data at 0x{actual_offset:06X} ({len(tile_data)} bytes, no HAL compression)"
 
             if self._message_service:
                 self._message_service.show_message(msg)
@@ -1338,14 +1383,13 @@ class ROMWorkflowController(QObject):
                 self._pending_open_in_editor = False
                 self._pending_open_offset = -1
 
-                # Validation: Don't auto-open if HAL decompression failed
+                # Warn user about raw sprites (they can still edit/inject but without compression)
                 if not hal_succeeded:
-                    logger.warning(f"[PREVIEW] HAL decompression failed for 0x{actual_offset:06X}, not auto-opening")
+                    logger.info(f"[PREVIEW] Raw sprite at 0x{actual_offset:06X}, allowing edit")
                     if self._message_service:
                         self._message_service.show_message(
-                            f"Cannot open: offset 0x{actual_offset:06X} is not HAL-compressed data"
+                            f"Opening raw sprite at 0x{actual_offset:06X} (will be injected without compression)"
                         )
-                    return
 
                 # Validation: Warn if size is not a multiple of 32 bytes (SNES tile size)
                 if len(tile_data) % 32 != 0:

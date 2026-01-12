@@ -12,11 +12,24 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Literal, NotRequired, Protocol, TypeAlias, TypedDict, cast, runtime_checkable
 
 from PIL import Image
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QWidget
+
+
+class CompressionType(Enum):
+    """Type of compression used for sprite data.
+
+    Used to track whether extracted sprite data was HAL-compressed or raw,
+    which affects how injection should be performed.
+    """
+
+    HAL = "hal"  # HAL compression (standard for Kirby games)
+    RAW = "raw"  # Uncompressed raw tile data
+    UNKNOWN = "unknown"  # Compression type not yet determined
 
 
 @runtime_checkable

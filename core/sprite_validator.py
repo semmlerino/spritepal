@@ -137,12 +137,21 @@ class SpriteValidator:
                     warnings.append(f"Image has {transparency_percent:.1f}% transparent pixels (index 0)")
 
         elif img.mode == "L":
-            # Grayscale values should map to 16 discrete levels (0, 17, 34, ..., 255)
-            # to match SNES 4bpp color depth
+            # Grayscale values 0-255 will be quantized to 0-15 via division by 17
+            # This is lossy: 256 levels → 16 levels
             # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
             pixels = list(cast(Iterable[int], img.getdata()))
             unique_values = set(pixels)
 
+            max_val = max(unique_values) if unique_values else 0
+            if max_val > 15:
+                # Precision loss warning - grayscale values > 15 will be quantized
+                warnings.append(
+                    f"Grayscale PNG will be quantized to 16 levels (max value {max_val} → index {max_val // 17}). "
+                    "For lossless import, use indexed PNG with 16-color palette."
+                )
+
+            # Also check for non-standard values that won't map cleanly
             non_standard_values = []
             for val in unique_values:
                 expected_index = round(val / 17)
@@ -150,8 +159,11 @@ class SpriteValidator:
                 if abs(val - expected_value) > 1:
                     non_standard_values.append(val)
 
-            if non_standard_values:
-                warnings.append(f"Image contains non-standard grayscale values: {sorted(non_standard_values)[:5]}...")
+            if non_standard_values and len(non_standard_values) > 3:
+                warnings.append(
+                    f"Image contains grayscale values that don't map cleanly to SNES indices: "
+                    f"{sorted(non_standard_values)[:5]}{'...' if len(non_standard_values) > 5 else ''}"
+                )
 
         return errors, warnings
 

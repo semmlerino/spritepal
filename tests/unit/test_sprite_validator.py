@@ -133,7 +133,10 @@ class TestSpriteValidator:
             is_valid, errors, warnings = SpriteValidator.validate_sprite_comprehensive(sprite_path)
 
             assert is_valid  # Still valid, just has warnings
-            assert any("non-standard grayscale values" in w for w in warnings)
+            # Check for quantization warning (max value 255 > 15)
+            assert any("quantized" in w.lower() for w in warnings)
+            # Check for non-standard values warning
+            assert any("don't map cleanly" in w for w in warnings)
 
     def test_validate_large_sprite_warning(self):
         """Test validation warns about large sprites"""

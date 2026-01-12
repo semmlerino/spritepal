@@ -30,6 +30,9 @@ OFFSET_PATTERN = re.compile(r"FILE OFFSET:\s*0x([0-9A-Fa-f]{6})")
 # Pattern to match frame info for context
 FRAME_PATTERN = re.compile(r"frame=(\d+)")
 
+# Pattern to match ROM checksum for identity validation
+CHECKSUM_PATTERN = re.compile(r"ROM_CHECKSUM:\s*0x([0-9A-Fa-f]{4})")
+
 
 @dataclass(frozen=True)
 class CapturedOffset:
@@ -39,11 +42,19 @@ class CapturedOffset:
     frame: int | None
     timestamp: datetime
     raw_line: str
+    rom_checksum: int | None = None  # SNES internal checksum for ROM identity validation
 
     @property
     def offset_hex(self) -> str:
         """Offset as hex string (e.g., '0x3C6EF1')."""
         return f"0x{self.offset:06X}"
+
+    @property
+    def checksum_hex(self) -> str | None:
+        """ROM checksum as hex string (e.g., '0xA1B2'), or None if unavailable."""
+        if self.rom_checksum is None:
+            return None
+        return f"0x{self.rom_checksum:04X}"
 
 
 class LogWatcher(QObject):
@@ -157,9 +168,7 @@ class LogWatcher(QObject):
         logger.debug("Using default output directory: %s", resolved)
         return resolved
 
-    def start_watching(
-        self, log_path: Path | str | None = None, *, output_dir: Path | str | None = None
-    ) -> bool:
+    def start_watching(self, log_path: Path | str | None = None, *, output_dir: Path | str | None = None) -> bool:
         """
         Start watching the Mesen2 log file.
 
@@ -298,6 +307,7 @@ class LogWatcher(QObject):
 
                 frame = item.get("frame")
                 timestamp_unix = item.get("timestamp")
+                rom_checksum = item.get("rom_checksum")  # Optional for backward compat
 
                 # Convert Unix timestamp to datetime
                 if timestamp_unix:
@@ -311,6 +321,7 @@ class LogWatcher(QObject):
                         frame=frame,
                         timestamp=timestamp,
                         raw_line=f"persistent: 0x{offset:06X}",
+                        rom_checksum=rom_checksum,
                     )
                 )
 
@@ -453,9 +464,14 @@ class LogWatcher(QObject):
         frame_match = FRAME_PATTERN.search(line)
         frame = int(frame_match.group(1)) if frame_match else None
 
+        # Try to extract ROM checksum for identity validation
+        checksum_match = CHECKSUM_PATTERN.search(line)
+        rom_checksum = int(checksum_match.group(1), 16) if checksum_match else None
+
         return CapturedOffset(
             offset=offset,
             frame=frame,
             timestamp=datetime.now(tz=UTC),
             raw_line=line.strip(),
+            rom_checksum=rom_checksum,
         )
