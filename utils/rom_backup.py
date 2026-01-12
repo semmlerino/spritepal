@@ -40,15 +40,12 @@ class ROMBackupManager:
         if not Path(rom_path).exists():
             raise ROMBackupError(f"ROM file not found: {rom_path}")
 
-        # Determine backup directory
         if backup_dir is None:
             backup_dir = str(Path(rom_path).parent)
 
-        # Create backup subdirectory
         backup_subdir = Path(backup_dir) / "spritepal_backups"
         backup_subdir.mkdir(exist_ok=True)
 
-        # Generate backup filename
         rom_path_obj = Path(rom_path)
         rom_base = rom_path_obj.stem
         rom_ext = rom_path_obj.suffix
@@ -57,11 +54,9 @@ class ROMBackupManager:
         backup_path = backup_subdir / backup_name
 
         try:
-            # Copy ROM to backup
             _ = shutil.copy2(rom_path, str(backup_path))
             logger.info(f"Created backup: {backup_name}")
 
-            # Clean up old backups
             cls._cleanup_old_backups(backup_subdir, rom_base, rom_ext)
 
         except Exception as e:
@@ -73,7 +68,6 @@ class ROMBackupManager:
     def _cleanup_old_backups(cls, backup_dir: Path, rom_base: str, rom_ext: str) -> None:
         """Remove old backups keeping only the most recent ones"""
         try:
-            # Find all backups for this ROM
             backups = []
 
             for file_path in backup_dir.iterdir():
@@ -81,10 +75,8 @@ class ROMBackupManager:
                     mtime = file_path.stat().st_mtime
                     backups.append((mtime, file_path))
 
-            # Sort by modification time (newest first)
             backups.sort(reverse=True)
 
-            # Remove old backups
             for _, backup_path in backups[cls.MAX_BACKUPS_PER_ROM :]:
                 backup_path.unlink()
                 logger.info(f"Removed old backup: {backup_path.name}")

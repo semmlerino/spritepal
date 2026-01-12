@@ -135,10 +135,8 @@ class MainWindow(QMainWindow):
         self.sprite_preview: PreviewPanel
         self.palette_preview: PalettePreviewWidget
 
-        # Create error handler (owned by MainWindow)
         self._error_handler = ErrorHandler(parent=self)
 
-        # Store injected dependencies
         self.settings_manager = settings_manager
         self.rom_cache = rom_cache
         self.session_manager = session_manager
@@ -163,7 +161,6 @@ class MainWindow(QMainWindow):
         self._vram_worker: VRAMExtractionWorker | None = None
         self._rom_worker: ROMExtractionWorker | None = None
         self._manager_connections: list[object] = []
-        # Extraction result storage
         self._extracted_palettes: dict[int, list[list[int]]] = {}
         self._active_palettes: list[int] = []
         # Injection state (Phase 4e)
@@ -190,14 +187,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("SpritePal - Sprite Extraction Tool")
         self.setMinimumSize(*MAIN_WINDOW_MIN_SIZE)
 
-        # Create main toolbar
         self._create_main_toolbar()
 
-        # Center Stack (replaces Splitter)
         self.center_stack = QStackedWidget()
         self.setCentralWidget(self.center_stack)
 
-        # Left Dock
         self.left_dock = QDockWidget("Controls", self)
         self.left_dock.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         self.left_dock.setFeatures(
@@ -205,16 +199,13 @@ class MainWindow(QMainWindow):
         )
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.left_dock)
 
-        # Pre-create preview widgets (needed for preview panel creation)
         self.sprite_preview = PreviewPanel()
         self.palette_preview = PalettePreviewWidget()
         self.preview_info = QLabel("No sprites loaded")
         self.preview_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Create workspaces
         self._create_workspaces()
 
-        # Status bar
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Ready to extract sprites")
@@ -257,28 +248,19 @@ class MainWindow(QMainWindow):
 
     def _on_global_offset_changed(self, offset: int) -> None:
         """Handle global offset change from toolbar."""
-        # Check active mode
         if self.center_stack.currentIndex() == 1:
-            # Editor Mode
             self._sprite_editor_workspace.jump_to_offset(offset)
         else:
-            # Extraction Mode
-            # Switch to ROM tab if not active (assuming ROM offset)
             if not self.is_rom_tab_active():
                 self.switch_to_rom_tab()
-
-            # Set offset in ROM panel
             self.rom_extraction_panel.set_manual_offset(offset)
 
     def _create_workspaces(self) -> None:
         """Create workspace widgets."""
         from ui.rom_extraction.modules import Mesen2Module
 
-        # Get dependencies from instance attributes
         mesen2_module = Mesen2Module(log_watcher=self.log_watcher, parent=self)
 
-        # 1. Extraction UI (Dock Content) - inline, no wrapper class
-        # Create tab widget for extraction methods
         self.extraction_tabs = QTabWidget()
         self.extraction_tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.extraction_tabs.currentChanged.connect(self._on_extraction_tab_changed)
@@ -309,7 +291,6 @@ class MainWindow(QMainWindow):
         self.extraction_tabs.addTab(vram_scroll, "VRAM Extraction")
         self.extraction_tabs.setTabToolTip(1, "Extract from emulator memory dumps (VRAM/CGRAM/OAM)")
 
-        # Action zone (fixed height, pinned to bottom)
         self.action_zone = QWidget()
         self.action_zone.setObjectName("actionZone")
         self.action_zone.setStyleSheet(get_action_zone_style())
@@ -327,12 +308,9 @@ class MainWindow(QMainWindow):
         container_layout.addWidget(self.action_zone)
         self.left_dock.setWidget(extraction_container)
 
-        # Connect manual offset changed from ROM panel
         self.rom_extraction_panel.manual_offset_changed.connect(self.toolbar_offset_edit.set_offset)
 
-        # 2. Sprite Editor Workspace (Center Content)
-        # Note: message_service is None here because status_bar_manager hasn't been created yet.
-        # It will be injected later in _setup_managers() after status_bar_manager exists.
+        # message_service is None here; injected in _setup_managers() after status_bar_manager exists
         self._sprite_editor_workspace = SpriteEditorWorkspace(
             parent=self,
             settings_manager=self.settings_manager,
@@ -342,7 +320,6 @@ class MainWindow(QMainWindow):
             log_watcher=self.log_watcher,
             sprite_library=self.sprite_library,
         )
-        # Connect directly to sources (no workspace relay)
         self._sprite_editor_workspace.editing_controller.undoStateChanged.connect(self._update_undo_redo_state)
         self._sprite_editor_workspace.rom_page.offset_changed.connect(self.toolbar_offset_edit.set_offset)
 
@@ -351,13 +328,11 @@ class MainWindow(QMainWindow):
 
     def _on_extraction_tab_changed(self, index: int) -> None:
         """Handle extraction tab changes."""
-        # Workspace switching
-        if index == 2:  # Sprite Editor tab
+        if index == 2:
             self.switch_to_workspace(WorkspaceMode.SPRITE_EDITOR)
         else:
             self.switch_to_workspace(WorkspaceMode.EXTRACTION)
 
-        # Tab configuration (inlined from UICoordinator)
         # Guard: Skip configuration during initial setup (before managers are created)
         if not hasattr(self, "toolbar_manager"):
             return
@@ -405,56 +380,44 @@ class MainWindow(QMainWindow):
         """Configure UI for ROM extraction tab."""
         self._restore_toolbar_state()
 
-        # Check extraction readiness
         params = self.get_rom_extraction_params()
         if params is not None:
             self.toolbar_manager.set_extract_enabled(True)
         else:
             self.toolbar_manager.set_extract_enabled(False, "Load a ROM file")
 
-        # Sync output name from ROM panel to main output field
         if params and params.get("output_base"):
             self.output_settings_manager.set_output_name(params["output_base"])
 
-        # Configure output settings for ROM mode
         self.output_settings_manager.set_rom_extraction_mode()
 
     def _configure_vram_extraction_tab(self) -> None:
         """Configure UI for VRAM extraction tab."""
         self._restore_toolbar_state()
 
-        # Check extraction readiness based on mode
         ready = self.is_vram_extraction_ready()
         if ready:
             self.toolbar_manager.set_extract_enabled(True)
         else:
             self.toolbar_manager.set_extract_enabled(False, "Load VRAM file")
 
-        # Update output info label
         is_grayscale_mode = self.is_grayscale_mode()
         self.output_settings_manager.update_output_info_label(is_vram_tab=True, is_grayscale_mode=is_grayscale_mode)
 
-        # Update checkbox states based on mode
         self.output_settings_manager.set_extraction_mode_options(is_grayscale_mode)
 
-        # Configure output settings for VRAM mode
         self.output_settings_manager.set_vram_extraction_mode()
 
     def _configure_sprite_editor_tab(self) -> None:
         """Configure UI for Sprite Editor tab."""
-        # Disable main Extract button - the editor has its own extract controls
         self.toolbar_manager.set_extract_enabled(False, "Use editor's Extract")
-
-        # Clarify workflow: Rename Open Editor -> Open External, Disable Inject
         self.toolbar_manager.set_open_editor_button_label("Open External")
         self.toolbar_manager.set_inject_button_enabled(False)
 
     def _restore_toolbar_state(self) -> None:
         """Restore toolbar state when leaving editor tab."""
         self.toolbar_manager.set_open_editor_button_label("Open Editor")
-        # Restore inject button state to match open editor button (both enabled after extraction)
-        is_enabled = self.toolbar_manager.open_editor_button.isEnabled()
-        self.toolbar_manager.set_inject_button_enabled(is_enabled)
+        self.toolbar_manager.set_inject_button_enabled(self.toolbar_manager.open_editor_button.isEnabled())
 
     # =========================================================================
     # Session Methods (inlined from UICoordinator)

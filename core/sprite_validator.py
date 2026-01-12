@@ -38,30 +38,24 @@ class SpriteValidator:
         errors: list[str] = []
         warnings: list[str] = []
 
-        # Check file exists
         if not Path(sprite_path).exists():
             errors.append(f"Sprite file not found: {sprite_path}")
             return False, errors, warnings
 
         try:
-            # Load image with context manager to prevent resource leak
             with Image.open(sprite_path) as img:
-                # Validate format
                 format_errors, format_warnings = SpriteValidator._validate_format(img)
                 errors.extend(format_errors)
                 warnings.extend(format_warnings)
 
-                # Validate dimensions
                 dim_errors, dim_warnings = SpriteValidator._validate_dimensions(img)
                 errors.extend(dim_errors)
                 warnings.extend(dim_warnings)
 
-                # Validate colors
                 color_errors, color_warnings = SpriteValidator._validate_colors(img)
                 errors.extend(color_errors)
                 warnings.extend(color_warnings)
 
-                # Validate against metadata if provided
                 if metadata_path and Path(metadata_path).exists():
                     meta_errors, meta_warnings = SpriteValidator._validate_against_metadata(img, metadata_path)
                     errors.extend(meta_errors)
@@ -78,11 +72,9 @@ class SpriteValidator:
         errors: list[str] = []
         warnings: list[str] = []
 
-        # Check mode
         if img.mode not in ["P", "L"]:
             errors.append(f"Image must be in indexed (P) or grayscale (L) mode, found: {img.mode}")
 
-        # Check if has transparency
         if img.mode == "P" and "transparency" in img.info:
             warnings.append("Image has transparency which will be ignored")
 
@@ -96,14 +88,13 @@ class SpriteValidator:
 
         width, height = img.size
 
-        # Check if multiples of 8
+        # SNES tiles are 8x8 pixels
         if width % 8 != 0:
             errors.append(f"Width must be a multiple of 8 (found: {width})")
         if height % 8 != 0:
             errors.append(f"Height must be a multiple of 8 (found: {height})")
 
-        # Check reasonable size limits
-        max_tiles = 1024  # Reasonable limit for sprite sheets
+        max_tiles = 1024
         total_tiles = (width // 8) * (height // 8)
 
         if total_tiles > max_tiles:
@@ -111,7 +102,6 @@ class SpriteValidator:
                 f"Sprite sheet has {total_tiles} tiles, which is quite large (max recommended: {max_tiles})"
             )
 
-        # Check common sprite sheet dimensions
         if width > 256 or height > 256:
             warnings.append(f"Sprite dimensions ({width}x{height}) are larger than typical (256x256)")
 
@@ -124,21 +114,19 @@ class SpriteValidator:
         warnings: list[str] = []
 
         if img.mode == "P":
-            # Get unique colors used
             # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
             pixels = list(cast(Iterable[int], img.getdata()))
             unique_colors = set(pixels)
 
-            # Check color count
+            # SNES 4bpp sprites support max 16 colors (indices 0-15)
             if len(unique_colors) > 16:
                 errors.append(f"Image uses {len(unique_colors)} colors, maximum is 16")
 
-            # Check color indices
             max_index = max(unique_colors) if unique_colors else 0
             if max_index > 15:
                 errors.append(f"Image uses color index {max_index}, maximum allowed is 15")
 
-            # Check if using index 0 (usually transparent)
+            # Index 0 is typically transparent in SNES sprites
             if 0 in unique_colors:
                 # Count how many pixels use index 0
                 transparent_pixels = pixels.count(0)
@@ -149,17 +137,17 @@ class SpriteValidator:
                     warnings.append(f"Image has {transparency_percent:.1f}% transparent pixels (index 0)")
 
         elif img.mode == "L":
-            # For grayscale, check if values are multiples of 17
+            # Grayscale values should map to 16 discrete levels (0, 17, 34, ..., 255)
+            # to match SNES 4bpp color depth
             # Cast needed: PIL's ImagingCore is iterable at runtime but not typed as such
             pixels = list(cast(Iterable[int], img.getdata()))
             unique_values = set(pixels)
 
             non_standard_values = []
             for val in unique_values:
-                # Check if it's a standard grayscale value (0, 17, 34, ..., 255)
                 expected_index = round(val / 17)
                 expected_value = expected_index * 17
-                if abs(val - expected_value) > 1:  # Allow small rounding errors
+                if abs(val - expected_value) > 1:
                     non_standard_values.append(val)
 
             if non_standard_values:
@@ -180,7 +168,6 @@ class SpriteValidator:
             if "extraction" in metadata:
                 extraction_info = metadata["extraction"]
 
-                # Check if dimensions match expected
                 if "tile_count" in extraction_info:
                     expected_tiles = extraction_info["tile_count"]
                     width, height = img.size

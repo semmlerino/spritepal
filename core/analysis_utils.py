@@ -10,7 +10,7 @@ from utils.math_utils import calculate_entropy as calc_entropy_math
 def calculate_entropy(data: bytes) -> float:
     """
     Calculate Shannon entropy of data.
-    
+
     Returns value between 0 (uniform) and 8 (random).
     """
     return calc_entropy_math(data)
@@ -34,15 +34,14 @@ def detect_repeating_patterns(data: bytes) -> float:
     if len(data) < 16:
         return 0.0
 
-    # Check for common padding patterns
+    # Padding patterns indicate compressible/empty regions in ROM data
     common_patterns = [
-        b"\x00" * 16,  # All zeros
-        b"\xff" * 16,  # All ones
-        b"\x00\xff" * 8,  # Alternating
-        b"\xff\x00" * 8,  # Alternating reverse
+        b"\x00" * 16,
+        b"\xff" * 16,
+        b"\x00\xff" * 8,
+        b"\xff\x00" * 8,
     ]
 
-    # Check if data matches any common pattern
     for pattern in common_patterns:
         pattern_len = len(pattern)
         matches = 0
@@ -53,10 +52,9 @@ def detect_repeating_patterns(data: bytes) -> float:
 
         if matches > 0:
             coverage = (matches * pattern_len) / len(data)
-            if coverage > 0.8:  # 80% of region is pattern
+            if coverage > 0.8:
                 return coverage
 
-    # Check for any 4-byte repeating pattern
     if len(data) >= 16:
         pattern_len = 4
         first_pattern = data[:pattern_len]

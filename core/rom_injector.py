@@ -89,17 +89,14 @@ class ROMInjector(SpriteInjector):
             raise ValueError("ROM header not loaded")
 
         logger.info("Updating ROM checksum after modification")
-        # Calculate new checksum
         checksum, complement = self.calculate_checksum(rom_data)
 
         # Use the validated header offset stored during read_rom_header()
         header_base = self.header.header_offset + self.header.rom_type_offset
 
-        # Update checksum in ROM
         struct.pack_into("<H", rom_data, header_base + 28, complement)
         struct.pack_into("<H", rom_data, header_base + 30, checksum)
 
-        # Verify write was successful
         written_complement = struct.unpack_from("<H", rom_data, header_base + 28)[0]
         written_checksum = struct.unpack_from("<H", rom_data, header_base + 30)[0]
         if written_complement != complement or written_checksum != checksum:
@@ -108,11 +105,10 @@ class ROMInjector(SpriteInjector):
                 f"got {written_complement:04X}/{written_checksum:04X}"
             )
 
-        # Update header
         old_checksum = self.header.checksum
         self.header.checksum = checksum
         self.header.checksum_complement = complement
-        logger.info(f"ROM checksum updated: 0x{old_checksum:04X} -> 0x{checksum:04X}")
+        logger.info(f"ROM header checksum updated: 0x{old_checksum:04X} -> 0x{checksum:04X}")
 
     def find_compressed_sprite(
         self, rom_data: bytes | bytearray, offset: int, expected_size: int | None = None
@@ -688,7 +684,7 @@ class ROMInjector(SpriteInjector):
                 f"New size: {compressed_size} bytes ({compression_ratio:.1f}% compression)\n"
                 f"Space saved: {space_saved} bytes\n"
                 f"Compression mode: {compression_mode}\n"
-                f"Checksum updated: 0x{self.header.checksum:04X}\n"
+                f"ROM header checksum updated: 0x{self.header.checksum:04X}\n"
                 f"Total time: {total_time:.2f} seconds{force_warning}"
             )
 
