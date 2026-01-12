@@ -154,9 +154,23 @@ class OffsetLineEdit(QLineEdit):
         return self._last_valid_offset
 
     def set_offset(self, offset: int) -> None:
-        """Set offset value and update text."""
-        self.setText(f"0x{offset:06X}")
+        """Set offset value and update text without emitting signals."""
+        text = f"0x{offset:06X}"
+
+        # Block signals to prevent recursion (e.g. MainWindow -> Controller -> View -> MainWindow)
+        was_blocked = self.blockSignals(True)
+        try:
+            self.setText(text)
+        finally:
+            self.blockSignals(was_blocked)
+
         self._last_valid_offset = offset
+
+        # Manually update styling (logic from _on_text_changed)
+        if self._max_offset > 0 and offset >= self._max_offset:
+            self.setStyleSheet("background-color: #442222;")
+        else:
+            self.setStyleSheet("")
 
     @override
     def keyPressEvent(self, event: QKeyEvent) -> None:
