@@ -166,6 +166,38 @@ class TestSpriteAssetBrowser:
         assert current is not None
         assert current.text(0) == "Second"
 
+    def test_update_mesen_capture_offset(self, qtbot: QtBot) -> None:
+        """Asset browser updates Mesen capture offset after alignment adjustment."""
+        from ui.sprite_editor.views.widgets.sprite_asset_browser import SpriteAssetBrowser
+
+        browser = SpriteAssetBrowser()
+        qtbot.addWidget(browser)
+
+        # Add capture at original offset
+        browser.add_mesen_capture("Test Capture", 0x100)
+        QCoreApplication.processEvents()
+        assert browser.has_mesen_capture(0x100)
+        assert not browser.has_mesen_capture(0x102)
+
+        # Update offset (simulating alignment adjustment)
+        result = browser.update_mesen_capture_offset(0x100, 0x102)
+
+        assert result is True
+        assert not browser.has_mesen_capture(0x100)  # Old offset gone
+        assert browser.has_mesen_capture(0x102)  # New offset present
+
+    def test_update_mesen_capture_offset_not_found(self, qtbot: QtBot) -> None:
+        """Asset browser returns False when updating non-existent capture."""
+        from ui.sprite_editor.views.widgets.sprite_asset_browser import SpriteAssetBrowser
+
+        browser = SpriteAssetBrowser()
+        qtbot.addWidget(browser)
+
+        # Try to update non-existent capture
+        result = browser.update_mesen_capture_offset(0x100, 0x102)
+
+        assert result is False
+
 
 class TestIconToolbar:
     """Tests for IconToolbar widget."""

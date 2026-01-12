@@ -1238,10 +1238,10 @@ class ROMWorkflowController(QObject):
         # Check if offset was adjusted during preview (e.g. alignment correction)
         offset_adjusted = actual_offset != self.current_offset
         if offset_adjusted:
-            offset_delta = actual_offset - self.current_offset
+            old_offset = self.current_offset  # Capture before update
+            offset_delta = actual_offset - old_offset
             logger.info(
-                f"[PREVIEW] Offset adjusted from 0x{self.current_offset:06X} to 0x{actual_offset:06X} "
-                f"(delta: {offset_delta:+d})"
+                f"[PREVIEW] Offset adjusted from 0x{old_offset:06X} to 0x{actual_offset:06X} (delta: {offset_delta:+d})"
             )
             # Keep pending auto-open aligned with the adjusted offset.
             if self._pending_open_in_editor and self._pending_open_offset not in (-1, actual_offset):
@@ -1251,10 +1251,11 @@ class ROMWorkflowController(QObject):
             # Update UI
             if self._view:
                 self._view.set_offset(actual_offset)
+                # Also update asset browser item if it was a Mesen capture
+                self._view.asset_browser.update_mesen_capture_offset(old_offset, actual_offset)
                 if self._message_service:
                     self._message_service.show_message(
-                        f"Aligned to valid sprite at 0x{actual_offset:06X} "
-                        f"(adjusted by {offset_delta:+d} bytes)"
+                        f"Aligned to valid sprite at 0x{actual_offset:06X} (adjusted by {offset_delta:+d} bytes)"
                     )
 
         logger.debug(

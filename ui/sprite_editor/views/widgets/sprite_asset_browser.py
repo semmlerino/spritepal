@@ -761,6 +761,30 @@ class SpriteAssetBrowser(QWidget):
                 return True
         return False
 
+    def update_mesen_capture_offset(self, old_offset: int, new_offset: int) -> bool:
+        """Update a Mesen capture item's offset after alignment adjustment.
+
+        When preview discovers the actual aligned offset differs from the requested
+        offset, this updates the stored data so re-selecting the item uses the
+        correct offset.
+
+        Args:
+            old_offset: Original requested offset
+            new_offset: Actual aligned offset
+
+        Returns:
+            True if item was found and updated, False otherwise
+        """
+        for i in range(self._mesen_category.childCount()):
+            item = self._mesen_category.child(i)
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("offset") == old_offset:
+                data["offset"] = new_offset
+                item.setData(0, Qt.ItemDataRole.UserRole, data)
+                logger.debug("update_mesen_capture_offset: 0x%06X -> 0x%06X", old_offset, new_offset)
+                return True
+        return False
+
     def ensure_mesen_capture(self, offset: int, name: str | None = None) -> None:
         """Ensure a Mesen capture exists, adding if not present.
 
