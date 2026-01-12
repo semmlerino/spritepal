@@ -952,3 +952,81 @@ REM 5. Compare hash values in the PROOF DATA sections
 - `mesen2_integration/lua_scripts/per_idx_ablation_v1.lua` — Per-idx ablation test
 - `run_asset_selector_v3.bat` — Run v3 tracer with movie
 - `run_idx_ablation.bat` — Run ablation test
+
+---
+
+## HAL-Compressed Asset Header Bytes (2026-01-12)
+
+> **Added 2026-01-12:** Discovery and fix for tile alignment issues in HAL-decompressed assets.
+
+### Problem
+
+When HAL-decompressing sprite assets from Kirby Super Star, the decompressed data often
+contains **leading header bytes** that cause tile misalignment. This results in corrupted
+sprite rendering because the 4bpp bitplane decoding starts at the wrong byte offset.
+
+### Observed Cases
+
+| ROM Offset | Decompressed Size | Extra Bytes | Header Value |
+|------------|-------------------|-------------|--------------|
+| 0x25AD84 | 2209 bytes | 1 | `0x02` |
+| 0x25B000 | 2546 bytes | 18 | varies |
+| 0x25C000 | 2223 bytes | 15 | varies |
+| 0x200000 | 7744 bytes | 0 | (aligned) |
+
+### Root Cause
+
+HAL-compressed assets in Kirby games may include metadata/header bytes at the start:
+- **Asset type/ID byte** — e.g., `0x02` indicating sprite data
+- **Length prefixes** — For variable-size assets
+- **Palette hints** — Which palette index to use
+- **Unknown metadata** — Game-specific flags
+
+These bytes are NOT tile data but were being decoded as such, causing:
+1. **Bitplane corruption** — First tile has wrong pixel values
+2. **Cascading misalignment** — All subsequent tiles are off by N bytes
+3. **Wrong colors** — Palette indices don't map to intended colors
+
+### Solution
+
+SpritePal now automatically aligns HAL-decompressed tile data to 32-byte boundaries:
+
+```python
+from core.tile_utils import align_tile_data
+
+# After HAL decompression
+raw_data = hal.decompress_from_rom(rom_path, offset)  # 2209 bytes
+aligned_data = align_tile_data(raw_data)               # 2208 bytes (69 tiles)
+```
+
+The `align_tile_data()` function:
+1. Checks if data size is a multiple of 32 (BYTES_PER_TILE)
+2. If not, strips leading bytes to achieve alignment
+3. Assumes header bytes are at the START, not end
+
+### Verification
+
+After alignment, sprite tiles from HAL decompression match VRAM tiles byte-for-byte:
+
+```
+VRAM tile $6C @ $CD80:  00 00 FF FF BB C7 FE 01 ED 03 D2 17 B4 3F A0 2F ...
+Aligned tile 17:        00 00 FF FF BB C7 FE 01 ED 03 D2 17 B4 3F A0 2F ...
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        EXACT MATCH (confirmed via VRAM dump comparison)
+```
+
+### Files
+
+- `core/tile_utils.py` — `align_tile_data()`, `get_tile_alignment_info()` functions
+- `ui/common/preview_worker_pool.py` — Applies alignment after HAL decompression
+- `ui/workers/batch_thumbnail_worker.py` — Applies alignment for thumbnails
+- `tests/unit/test_tile_alignment.py` — Unit tests for alignment functions
+
+### Implications for Future Work
+
+1. **Header byte semantics** — The `0x02` header at 0x25AD84 may indicate asset type.
+   Investigating this could enable automatic palette selection.
+2. **Variable header sizes** — Different assets have 1, 15, or 18 extra bytes.
+   A more sophisticated parser could use the first bytes to determine header length.
+3. **Injection consideration** — When re-injecting modified sprites, the header bytes
+   must be preserved or the game may fail to load the asset.

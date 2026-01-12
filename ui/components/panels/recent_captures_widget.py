@@ -146,9 +146,32 @@ class RecentCapturesWidget(QWidget):
 
         self._captures: list[CapturedOffset] = []
         self._max_items: int = 20
+        self._smc_offset: int = 0  # SMC header offset for normalizing Mesen FILE offsets
 
         self._setup_ui()
         self._connect_signals()
+
+    def set_smc_offset(self, offset: int) -> None:
+        """Set the SMC header offset for normalizing Mesen FILE offsets to ROM offsets.
+
+        Args:
+            offset: SMC header size in bytes (typically 0 or 512).
+        """
+        self._smc_offset = offset
+        logger.debug("SMC offset set to %d bytes", offset)
+
+    def _normalize_offset(self, offset: int) -> int:
+        """Normalize a Mesen FILE offset to a ROM offset (headerless).
+
+        Args:
+            offset: Raw offset from Mesen (FILE offset).
+
+        Returns:
+            Normalized ROM offset.
+        """
+        if self._smc_offset <= 0 or offset < self._smc_offset:
+            return offset
+        return offset - self._smc_offset
 
     def _setup_ui(self) -> None:
         """Initialize the widget UI."""
@@ -241,19 +264,23 @@ class RecentCapturesWidget(QWidget):
         # Insert at beginning (most recent first)
         self._captures.insert(0, capture)
 
+        # Normalize offset for internal use (thumbnail matching)
+        # Mesen reports FILE offsets; we need ROM offsets for decompression
+        rom_offset = self._normalize_offset(capture.offset)
+
         # Create list item with dict data for delegate
         item = QListWidgetItem()
         item_data = {
-            "offset": capture.offset,
+            "offset": rom_offset,  # Store normalized ROM offset for thumbnail matching
             "thumbnail": None,  # Will be set later via set_thumbnail
         }
         item.setData(Qt.ItemDataRole.UserRole, item_data)
 
-        # Format: "0x3C6EF1  12:34:56"
+        # Format: "0x3C6EF1  12:34:56" - display shows original Mesen FILE offset
         time_str = capture.timestamp.strftime("%H:%M:%S")
         frame_str = f" (f{capture.frame})" if capture.frame else ""
         item.setText(f"{capture.offset_hex}  {time_str}{frame_str}")
-        item.setToolTip(f"ROM Offset: {capture.offset_hex}\nFrame: {capture.frame or 'N/A'}\n{capture.raw_line}")
+        item.setToolTip(f"ROM Offset: 0x{rom_offset:06X}\nMesen FILE: {capture.offset_hex}\nFrame: {capture.frame or 'N/A'}\n{capture.raw_line}")
 
         self._list_widget.insertItem(0, item)
 
@@ -264,11 +291,11 @@ class RecentCapturesWidget(QWidget):
                 self._captures.pop()
 
         self._update_empty_state()
-        logger.debug("Added capture: %s", capture.offset_hex)
+        logger.debug("Added capture: %s (ROM: 0x%06X)", capture.offset_hex, rom_offset)
 
-        # Request thumbnail generation
+        # Request thumbnail generation with normalized ROM offset
         if request_thumbnail:
-            self.thumbnail_requested.emit(capture.offset)
+            self.thumbnail_requested.emit(rom_offset)
 
     def load_persistent(self, captures: list[CapturedOffset]) -> None:
         """
@@ -336,9 +363,16 @@ class RecentCapturesWidget(QWidget):
                 return
 
     def request_all_thumbnails(self) -> None:
-        """Request thumbnails for all current captures."""
-        for capture in self._captures:
-            self.thumbnail_requested.emit(capture.offset)
+        """Request thumbnails for all current captures using normalized ROM offsets."""
+        for i in range(self._list_widget.count()):
+            item = self._list_widget.item(i)
+            if item is None:  # type: ignore[reportUnnecessaryComparison]
+                continue
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict):
+                rom_offset = data.get("offset")
+                if rom_offset is not None:
+                    self.thumbnail_requested.emit(rom_offset)
 
     def get_capture_count(self) -> int:
         """Get the number of captured offsets."""

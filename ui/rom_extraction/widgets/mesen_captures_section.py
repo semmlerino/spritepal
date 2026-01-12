@@ -135,6 +135,14 @@ class MesenCapturesSection(QWidget):
         """Clear all captured offsets."""
         self._captures_widget.clear()
 
+    def set_smc_offset(self, offset: int) -> None:
+        """Set the SMC header offset for normalizing Mesen FILE offsets to ROM offsets.
+
+        Args:
+            offset: SMC header size in bytes (typically 0 or 512).
+        """
+        self._captures_widget.set_smc_offset(offset)
+
     def set_thumbnail(self, offset: int, thumbnail: QPixmap) -> None:
         """Set thumbnail for a capture.
 

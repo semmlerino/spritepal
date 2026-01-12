@@ -32,6 +32,7 @@ from PySide6.QtGui import QImage, QPixmap
 
 from core.services.image_utils import pil_to_qimage
 from core.tile_renderer import TileRenderer
+from core.tile_utils import align_tile_data
 from utils.constants import (
     THREAD_POOL_TIMEOUT_SECONDS,
     WORKER_IDLE_CHECK_INTERVAL_MS,
@@ -524,7 +525,17 @@ class BatchThumbnailWorker(QObject):
                         expected_size=None,
                     )
                     if decompressed_data:
-                        logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{request.offset:06X}")
+                        # Align tile data to 32-byte boundaries (some assets have header bytes)
+                        original_len = len(decompressed_data)
+                        decompressed_data = align_tile_data(decompressed_data)
+                        if len(decompressed_data) != original_len:
+                            logger.debug(
+                                f"Aligned HAL data: {original_len} -> {len(decompressed_data)} bytes "
+                                f"(removed {original_len - len(decompressed_data)} header byte(s)) "
+                                f"from 0x{request.offset:06X}"
+                            )
+                        else:
+                            logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{request.offset:06X}")
                 except Exception as e:
                     # Log decompression failures for debugging, but continue with fallback to raw data
                     logger.debug(f"HAL decompression failed for offset 0x{request.offset:06X}: {e}")

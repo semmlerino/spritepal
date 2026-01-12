@@ -117,6 +117,9 @@ class ROMWorkflowController(QObject):
         # Connect editing controller validation signal
         self._editing_controller.validationChanged.connect(self._on_validation_changed)
 
+        # Connect palette source changes to hide warning when user loads custom palette
+        self._editing_controller.paletteSourceSelected.connect(self._on_palette_source_changed)
+
         # Connect LogWatcher
         self._connect_log_watcher()
 
@@ -155,14 +158,30 @@ class ROMWorkflowController(QObject):
         """Inject message service after construction (for deferred initialization)."""
         self._message_service = service
 
+    def normalize_mesen_offset(self, offset: int) -> int:
+        """Convert Mesen FILE OFFSET (file-based) to ROM offset (headerless)."""
+        if self.smc_header_offset <= 0:
+            return offset
+        if offset < self.smc_header_offset:
+            return offset
+        normalized = offset - self.smc_header_offset
+        logger.debug(
+            "[CAPTURE] Normalized Mesen FILE OFFSET 0x%06X -> 0x%06X (SMC header %d bytes)",
+            offset,
+            normalized,
+            self.smc_header_offset,
+        )
+        return normalized
+
     def _get_capture_name(self, capture: CapturedOffset) -> str:
         """Generate display name for captured sprite."""
+        rom_offset = self.normalize_mesen_offset(capture.offset)
         if capture.frame is not None:
-            return f"0x{capture.offset:06X} (F{capture.frame})"
+            return f"0x{rom_offset:06X} (F{capture.frame})"
         else:
             # Fallback to timestamp if no frame
             timestamp_str = capture.timestamp.strftime("%H:%M:%S")
-            return f"0x{capture.offset:06X} ({timestamp_str})"
+            return f"0x{rom_offset:06X} ({timestamp_str})"
 
     def _on_offset_discovered(self, capture: object) -> None:
         """Handle new offset discovered from Mesen2 log."""
@@ -220,12 +239,13 @@ class ROMWorkflowController(QObject):
         # Validate ROM identity (warn if mismatch but still add)
         self._validate_capture_rom_match(capture)
 
+        rom_offset = self.normalize_mesen_offset(capture.offset)
         name = self._get_capture_name(capture)
-        self._view.add_mesen_capture(name, capture.offset)
+        self._view.add_mesen_capture(name, rom_offset)
 
         # Request thumbnail if worker is ready
         if self._thumbnail_controller:
-            self._thumbnail_controller.queue_thumbnail(capture.offset)
+            self._thumbnail_controller.queue_thumbnail(rom_offset)
 
     def set_view(self, view: "ROMWorkflowPage") -> None:
         """Set the view and connect signals."""
@@ -1485,6 +1505,22 @@ class ROMWorkflowController(QObject):
             # Clear warning when valid and in edit mode
             if self._message_service:
                 self._message_service.show_message("Ready to save to ROM")
+
+    def _on_palette_source_changed(self, source_type: str, palette_index: int) -> None:
+        """Handle palette source change from editing controller.
+
+        When user loads a custom palette file, hide the 'Using default palette' warning
+        since the user has explicitly chosen their palette.
+
+        Args:
+            source_type: Type of palette source ('file', 'rom', 'mesen', 'default', 'preset')
+            palette_index: Index of the palette within the source
+        """
+        # Hide palette warning when user explicitly loads a palette file
+        if source_type == "file" and self._view:
+            self._view.hide_palette_warning()
+            if self._message_service:
+                self._message_service.show_message("Custom palette loaded")
 
     def _on_manual_palette_requested(self) -> None:
         """Handle request to manually specify a palette offset.

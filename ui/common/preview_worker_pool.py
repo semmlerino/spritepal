@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, override
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QTimer, Signal
 
 from core.services.worker_lifecycle import WorkerManager
+from core.tile_utils import align_tile_data
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
 from utils.logging_config import get_logger
 from utils.rom_utils import detect_smc_offset
@@ -257,6 +258,17 @@ class PooledPreviewWorker(SpritePreviewWorker):
                         logger.debug(
                             f"[TRACE] First 20 bytes of decompressed data: {tile_data[:20].hex() if tile_data else 'None'}"
                         )
+
+                        # Align tile data to 32-byte boundaries
+                        # Some HAL-compressed assets have header bytes that cause misalignment
+                        original_len = len(tile_data)
+                        tile_data = align_tile_data(tile_data)
+                        if len(tile_data) != original_len:
+                            logger.debug(
+                                f"[TRACE] Aligned tile data: {original_len} -> {len(tile_data)} bytes "
+                                f"(removed {original_len - len(tile_data)} header byte(s))"
+                            )
+
                         # Update the actual offset used for display purposes
                         self.offset = try_offset
                         break

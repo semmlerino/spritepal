@@ -176,3 +176,96 @@ def iter_flip_variants(tile_data: bytes) -> Iterator[bytes]:
     yield flip_tile(tile_data, flip_h=True, flip_v=False)
     yield flip_tile(tile_data, flip_h=False, flip_v=True)
     yield flip_tile(tile_data, flip_h=True, flip_v=True)
+
+
+def align_tile_data(tile_data: bytes, bytes_per_tile: int = BYTES_PER_TILE) -> bytes:
+    """
+    Align tile data to tile boundaries by removing leading header bytes.
+
+    Some HAL-compressed sprite assets in Kirby games include metadata/header bytes
+    at the start of the decompressed data (e.g., asset ID, length prefix, palette hints).
+    These extra bytes cause tile misalignment, corrupting the bitplane interpretation.
+
+    This function detects and removes leading bytes to ensure the data starts at a
+    valid tile boundary (multiple of bytes_per_tile, typically 32 for 4bpp).
+
+    Args:
+        tile_data: Raw decompressed tile data that may have leading header bytes
+        bytes_per_tile: Bytes per tile (default 32 for 4bpp SNES tiles)
+
+    Returns:
+        Tile data aligned to tile boundaries. If already aligned, returns unchanged.
+        If misaligned, strips leading bytes to achieve alignment.
+
+    Example:
+        >>> data = b'\\x02' + b'\\x00' * 64  # 1 header byte + 2 tiles
+        >>> aligned = align_tile_data(data)
+        >>> len(aligned) % 32
+        0
+    """
+    if not tile_data:
+        return tile_data
+
+    remainder = len(tile_data) % bytes_per_tile
+
+    if remainder == 0:
+        # Already aligned
+        return tile_data
+
+    # Strip leading bytes to align
+    # The assumption is that header bytes are at the START, not end
+    # This is based on observed Kirby Super Star asset format
+    header_size = remainder
+    aligned_data = tile_data[header_size:]
+
+    if len(aligned_data) >= bytes_per_tile:
+        logger.debug(
+            f"Aligned tile data: removed {header_size} header byte(s), "
+            f"{len(tile_data)} -> {len(aligned_data)} bytes "
+            f"({len(aligned_data) // bytes_per_tile} tiles)"
+        )
+        return aligned_data
+    else:
+        # Not enough data left after stripping - return original
+        logger.warning(
+            f"Cannot align tile data: only {len(aligned_data)} bytes remain after removing {header_size} header byte(s)"
+        )
+        return tile_data
+
+
+def get_tile_alignment_info(tile_data: bytes, bytes_per_tile: int = BYTES_PER_TILE) -> dict[str, int | bool]:
+    """
+    Analyze tile data alignment and return diagnostic information.
+
+    Args:
+        tile_data: Raw tile data to analyze
+        bytes_per_tile: Bytes per tile (default 32 for 4bpp SNES tiles)
+
+    Returns:
+        Dictionary with alignment info:
+        - 'size': Total size in bytes
+        - 'tile_count': Number of complete tiles
+        - 'remainder': Extra bytes beyond tile boundary
+        - 'is_aligned': True if perfectly aligned
+        - 'header_bytes': Likely header size (same as remainder if not aligned)
+    """
+    if not tile_data:
+        return {
+            "size": 0,
+            "tile_count": 0,
+            "remainder": 0,
+            "is_aligned": True,
+            "header_bytes": 0,
+        }
+
+    size = len(tile_data)
+    remainder = size % bytes_per_tile
+    tile_count = size // bytes_per_tile
+
+    return {
+        "size": size,
+        "tile_count": tile_count,
+        "remainder": remainder,
+        "is_aligned": remainder == 0,
+        "header_bytes": max(0, remainder),
+    }

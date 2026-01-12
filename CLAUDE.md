@@ -337,6 +337,12 @@ def test_something(app_context):  # Fixture provides this
 | `SPRITEPAL_LEAK_MODE` | Override leak detection | `fail` (CI), `warn` (local) |
 | `QT_QPA_PLATFORM` | Qt display platform | `offscreen` (pytest default) |
 
+### Test Resources
+
+| Resource | Path |
+|----------|------|
+| Test ROM | `roms/Kirby Super Star (USA).sfc` |
+
 ### Logging Control
 
 Per-category logging control accessible via **Settings → Logging tab**. Supported categories: ROM Extraction, Tile Rendering, Thumbnail Worker, Tile Hash Database, ROM Tile Matcher, HAL Compression, All UI Workers. Persists via `ApplicationStateManager`.

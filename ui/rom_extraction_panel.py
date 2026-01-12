@@ -332,6 +332,15 @@ class ROMExtractionPanel(QWidget):
         if not self.rom_path or not self.rom_extractor:
             return
 
+        # Set SMC header offset on captures widget for offset normalization
+        # Mesen reports FILE offsets; we need ROM offsets for thumbnail generation
+        if hasattr(self, "mesen_captures_section"):
+            smc_offset = 0
+            if self.rom_extractor.rom_injector and self.rom_extractor.rom_injector.header:
+                smc_offset = self.rom_extractor.rom_injector.header.header_offset
+            self.mesen_captures_section.set_smc_offset(smc_offset)
+            logger.debug("Set SMC offset %d for Mesen captures", smc_offset)
+
         # Create and start new thumbnail worker
         self._thumbnail_controller = ThumbnailWorkerController(self)
         self._thumbnail_controller.start_worker(self.rom_path, self.rom_extractor)
