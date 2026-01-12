@@ -31,10 +31,7 @@ pytest.importorskip("pytest_benchmark")
 from typing import TYPE_CHECKING
 
 from core.managers import ValidationError
-from tests.infrastructure.data_repository import (
-    DataRepository,
-    get_test_data_repository,
-)
+from tests.infrastructure.data_repository import DataRepository
 
 if TYPE_CHECKING:
     from core.app_context import AppContext
@@ -47,9 +44,9 @@ pytestmark = [
 
 
 @pytest.fixture
-def test_data_repo() -> DataRepository:
+def test_data_repo(isolated_data_repository: DataRepository) -> DataRepository:
     """Provide test data repository for performance tests."""
-    return get_test_data_repository()
+    return isolated_data_repository
 
 
 class TestManagerPerformanceBenchmarksTDD:
@@ -204,7 +201,7 @@ class TestManagerPerformanceBenchmarksTDD:
             # Extraction operations
             for i in range(3):
                 op_name = f"vram_extraction_{i}"
-                if operations_mgr._start_operation(op_name):
+                if operations_mgr.simulate_operation_start(op_name):
                     operations.append(("extraction", op_name))
 
             # Verify concurrent state
@@ -217,7 +214,7 @@ class TestManagerPerformanceBenchmarksTDD:
             # Cleanup operations
             for op_type, op_name in operations:
                 if op_type == "extraction":
-                    operations_mgr._finish_operation(op_name)
+                    operations_mgr.simulate_operation_finish(op_name)
 
             return active_count
 
@@ -243,13 +240,13 @@ class TestManagerPerformanceBenchmarksTDD:
             # Create and cleanup multiple operations
             for i in range(3):
                 # Set up some state
-                operations_mgr._start_operation(f"test_op_{i}")
+                operations_mgr.simulate_operation_start(f"test_op_{i}")
 
                 # Verify state was created
                 assert operations_mgr.is_operation_active(f"test_op_{i}")
 
                 # Cleanup operation
-                operations_mgr._finish_operation(f"test_op_{i}")
+                operations_mgr.simulate_operation_finish(f"test_op_{i}")
 
                 operations_completed += 1
 
@@ -345,14 +342,14 @@ class TestManagerMemoryPerformanceTDD:
                 injection_mgr = app_context.core_operations_manager  # Same manager
 
                 # Do some work to allocate memory
-                extraction_mgr._start_operation(f"stress_test_{i}")
+                extraction_mgr.simulate_operation_start(f"stress_test_{i}")
 
                 # Verify functionality
                 assert extraction_mgr.is_initialized()
                 assert injection_mgr.is_initialized()
 
                 # Cleanup operation state
-                extraction_mgr._finish_operation(f"stress_test_{i}")
+                extraction_mgr.simulate_operation_finish(f"stress_test_{i}")
 
                 managers_accessed += 1
 
@@ -438,8 +435,8 @@ def test_real_vs_mock_performance_comparison_tdd(benchmark, app_context: AppCont
             operations_mgr.extraction_progress.emit("Performance test")
 
             # Real state management
-            operations_mgr._start_operation("perf_test")
-            operations_mgr._finish_operation("perf_test")
+            operations_mgr.simulate_operation_start("perf_test")
+            operations_mgr.simulate_operation_finish("perf_test")
 
             return True
 

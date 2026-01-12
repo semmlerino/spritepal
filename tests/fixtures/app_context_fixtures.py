@@ -116,19 +116,42 @@ def session_app_context(
     Session-scoped shared AppContext for performance-sensitive tests.
 
     Creates an AppContext that persists across all tests in the session.
-    Use this for integration tests where manager initialization cost matters.
+    Use this for integration tests where manager initialization cost matters
+    (typically 100+ test suite with read-only operations).
 
     IMPORTANT: Tests using this fixture should:
     - Be marked with @pytest.mark.shared_state_safe
-    - Avoid mutating shared state
-    - Be read-only or clean up after themselves
+    - Avoid mutating shared state (settings, cache, ROM data)
+    - Be read-only or clean up after themselves explicitly
+
+    PARALLEL SAFETY: xdist workers are isolated - each worker has its own
+    session_app_context. State sharing only happens within a worker, not
+    across workers. Workers run in separate processes.
+
+    WHEN TO MIGRATE TO app_context:
+    - Test fails intermittently in parallel runs (state mutation bug)
+    - Test verifies initialization behavior
+    - Test needs predictable starting state
+    - State mutation is unavoidable
+
+    MIGRATION PATTERN (if state bugs emerge):
+        # Before (session scope - shared state):
+        @pytest.mark.shared_state_safe
+        def test_extraction(session_app_context):
+            manager = session_app_context.core_operations_manager
+            # ... test modifies manager state ...
+
+        # After (function scope - isolated):
+        def test_extraction(app_context):
+            manager = app_context.core_operations_manager
+            # ... test now has clean manager state ...
 
     Usage:
         @pytest.mark.shared_state_safe
         def test_integration(session_app_context):
             manager = session_app_context.core_operations_manager
-            result = manager.read_only_operation()
-            # ... test code ...
+            result = manager.validate_params(...)  # Read-only
+            assert result is True
     """
     from PySide6.QtWidgets import QApplication
 

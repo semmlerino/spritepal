@@ -32,10 +32,7 @@ from core.exceptions import ValidationError
 from tests.fixtures.timeouts import LONG, signal_timeout, worker_timeout
 
 # Phase 2 Real Component Testing Infrastructure
-from tests.infrastructure.data_repository import (
-    DataRepository,
-    get_test_data_repository,
-)
+from tests.infrastructure.data_repository import DataRepository
 
 pytestmark = [
     pytest.mark.integration,
@@ -48,9 +45,9 @@ class TestManagerIntegrationTDD:
     """TDD tests for cross-manager integration with real components."""
 
     @pytest.fixture
-    def test_data_repo(self) -> DataRepository:
+    def test_data_repo(self, isolated_data_repository: DataRepository) -> DataRepository:
         """Provide test data repository for integration tests."""
-        return get_test_data_repository()
+        return isolated_data_repository
 
     def test_extraction_to_injection_workflow_tdd(self, test_data_repo, qtbot, app_context):
         """TDD: Complete sprite round-trip through extraction and injection managers.
@@ -220,7 +217,7 @@ class TestManagerIntegrationTDD:
         injection_data = test_data_repo.get_injection_data("small")
 
         # Start operations on both managers
-        extraction_mgr._start_operation("vram_extraction")
+        extraction_mgr.simulate_operation_start("vram_extraction")
 
         # Create temporary VRAM file for injection if needed
         vram_input = injection_data["vram_input"]
@@ -252,7 +249,7 @@ class TestManagerIntegrationTDD:
         # Injection operation state depends on implementation
 
         # Cleanup
-        extraction_mgr._finish_operation("vram_extraction")
+        extraction_mgr.simulate_operation_finish("vram_extraction")
 
         # Verify clean concurrent state
         assert not extraction_mgr.is_operation_active("vram_extraction")
@@ -272,12 +269,12 @@ class TestManagerIntegrationTDD:
         assert extraction_mgr._rom_extractor is not None
 
         # Test that managers maintain independent state
-        extraction_mgr._start_operation("test_op")
+        extraction_mgr.simulate_operation_start("test_op")
         assert extraction_mgr.is_operation_active("test_op")
         assert not injection_mgr.is_injection_active()
 
         # Test cleanup doesn't affect other managers
-        extraction_mgr._finish_operation("test_op")
+        extraction_mgr.simulate_operation_finish("test_op")
         extraction_mgr.cleanup()
 
         # Injection manager should be unaffected
@@ -319,7 +316,7 @@ class TestManagerLifecycleIntegrationTDD:
         session_mgr = app_context.application_state_manager
 
         # Set up some state in each manager
-        extraction_mgr._start_operation("test_extraction")
+        extraction_mgr.simulate_operation_start("test_extraction")
         session_mgr.set("test", "test_key", "test_value")
 
         # Verify state is set

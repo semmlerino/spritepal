@@ -172,31 +172,82 @@ def test_datetime_dependent(monkeypatch):
 
 ---
 
-## When to Mock
+## When to Mock: Layer-Based Strategy
 
-| Test Type | Mock | Use Real |
-|-----------|------|----------|
-| **Unit** | Boundaries: network, subprocess, slow/nondeterministic deps | Class under test, value objects, internal methods |
-| **Integration** | Truly external systems you can't control | Components being integrated, signals, cache |
-| **E2E** | Third-party services when reliability > realism | Everything within your control |
+| Test Layer | Mock | Use Real | Example |
+|------------|------|----------|---------|
+| **Unit** | Everything except class under test | Class logic, pure functions | Test `TileRenderer` with mock image data |
+| **Integration** | System boundaries (HAL, disk I/O errors) | Managers, cache, workers, signals | Test `ExtractionManager` → `TileRenderer` → `HALCompressor` (mocked) |
+| **UI** | Dialogs, file pickers, clipboard | Widgets, layouts, signals | Test button click → signal → manager call (mock manager) |
 
 > **Note**: "Mock nothing in E2E" is an ideal, not a rule. In real pipelines, stub external services, licensing APIs, or nondeterministic dependencies when CI reliability matters more than perfect realism.
 
-### Practical Example
+### Unit Testing - Mock External Dependencies
 ```python
-def test_sprite_extraction_workflow():
-    # Real components
-    rom_cache = ROMCache(tmp_path)
-    extraction_manager = ExtractionManager(cache=rom_cache)
-    
-    # Test double for external HAL compression
-    extraction_manager._hal_compressor = MockHALCompressor()
-    
-    # Test real integration
-    result = extraction_manager.extract_sprites(rom_path, params)
-    assert result.success
-    assert rom_cache.get_cached_sprites() is not None  # Real cache works
+def test_tile_renderer_unit():
+    """Test TileRenderer logic without real image library."""
+    renderer = TileRenderer()
+
+    # Mock the image creation (boundary)
+    with patch('PIL.Image.new') as mock_image:
+        mock_image.return_value = Mock(width=8, height=8)
+
+        # Test real logic
+        result = renderer.render_tile(tile_data)
+        assert result is not None
 ```
+
+### Integration Testing - Mock System Boundaries
+```python
+def test_extraction_workflow_integration(app_context, tmp_path):
+    """Test real manager → worker → renderer, mock HAL subprocess."""
+    manager = app_context.core_operations_manager
+
+    # Real components
+    rom_path = tmp_path / "test.sfc"
+    create_test_rom(rom_path)
+
+    # Mock system boundary (HAL compressor subprocess)
+    with patch('core.hal_compressor.HALCompressor.decompress') as mock_hal:
+        mock_hal.return_value = create_test_tile_data()
+
+        # Test real integration
+        result = manager.extract_from_rom(rom_path, offset=0x200000)
+        assert result.success
+        assert len(result.files) > 0  # Real file creation via tmp_path
+```
+
+### UI Testing - Mock Managers, Test Widget Behavior
+```python
+def test_extract_button_ui(qtbot):
+    """Test UI wiring without running full extraction."""
+    mock_manager = Mock(spec=CoreOperationsManager)
+    mock_manager.extract_from_vram.return_value = ExtractResult(success=True)
+
+    widget = ExtractionTab(manager=mock_manager)
+    qtbot.addWidget(widget)
+
+    # Test real UI behavior
+    qtbot.mouseClick(widget.extract_button, Qt.LeftButton)
+
+    # Verify UI called manager correctly
+    mock_manager.extract_from_vram.assert_called_once()
+    assert widget.status_label.text() == "Extraction complete"
+```
+
+### Deciding What to Mock
+
+**Mock when:**
+- Dependency is slow (subprocess, network, large file I/O)
+- Dependency is nondeterministic (system time, random data)
+- Testing error paths (simulate disk full, permission denied)
+- Isolating layer under test (UI tests shouldn't run real extraction)
+
+**Keep real when:**
+- Fast and deterministic (memory cache, data structures)
+- Integration point being tested (manager → worker communication)
+- Behavior depends on real implementation (signal emission order)
+- `tmp_path` makes real I/O feasible
 
 ---
 
@@ -270,6 +321,116 @@ def test_async_operation(qtbot):
     
     assert blocker.signal_triggered
     assert blocker.args[0] == "success"
+```
+
+### MultiSignalRecorder (Complex Workflows)
+
+For verifying complex multi-signal workflows with ordering:
+```python
+from tests.ui.integration.helpers.signal_spy_utils import MultiSignalRecorder
+
+def test_extract_workflow_signals(qtbot, app_context):
+    """Verify complete extraction signal workflow."""
+    manager = app_context.core_operations_manager
+
+    recorder = MultiSignalRecorder()
+    recorder.add_signal(manager.extraction_progress, "progress")
+    recorder.add_signal(manager.palettes_extracted, "palettes")
+    recorder.add_signal(manager.files_created, "files")
+
+    manager.extract_from_vram(params)
+
+    # Verify all signals fired
+    assert recorder.was_emitted("progress")
+    assert recorder.was_emitted("palettes")
+    assert recorder.was_emitted("files")
+
+    # Verify order
+    recorder.verify_order(["progress", "palettes", "files"])
+
+    # Verify count
+    assert recorder.emission_count("progress") >= 3
+```
+
+**When to use which approach:**
+| Goal | Use |
+|------|-----|
+| Wait for single async operation | `qtbot.waitSignal()` |
+| Verify signal emitted N times | `QSignalSpy` |
+| Inspect signal payloads | `QSignalSpy` |
+| Verify multi-signal order | `MultiSignalRecorder` |
+| Test pure Python callbacks | `TestSignal` or mock |
+
+---
+
+## Private Method Testing
+
+### When It's Acceptable
+
+Some private methods are **worth testing directly** despite implementation coupling:
+
+1. **Pure algorithms:** Color conversion, compression, parsing
+2. **Complex calculations:** Offset calculations, coordinate transforms
+3. **Data structure manipulation:** Tree balancing, graph algorithms
+
+**Example - Testing color conversion algorithm:**
+```python
+def test_bgr555_to_rgb888_conversion(palette_manager):
+    """Direct algorithm test avoids I/O overhead."""
+    palette_manager.cgram_data = create_test_cgram([0x7FFF, 0x0000, 0x001F])
+    palette_manager._extract_palettes()  # Private method with pure algorithm
+
+    assert palette_manager.palettes[0][0] == [255, 255, 255]  # White
+    assert palette_manager.palettes[0][1] == [0, 0, 0]        # Black
+    assert palette_manager.palettes[0][2] == [255, 0, 0]      # Red
+```
+
+**Justification:** Testing `_extract_palettes()` directly avoids:
+- File I/O for CGRAM dumps
+- Full manager initialization
+- External dependencies (HAL, ROM cache)
+
+This keeps tests **fast, focused, and deterministic**.
+
+### When to Avoid Private Method Testing
+
+Avoid testing private methods when:
+- A **public API** exists that exercises the same logic
+- The method is **implementation detail** that may change
+- Tests can achieve the same coverage through **signal-based testing**
+
+**Instead of:**
+```python
+# Couples test to implementation
+widget._browse_file()  # Private UI action
+```
+
+**Prefer:**
+```python
+# Test via public API/signals
+with qtbot.waitSignal(widget.file_selected, timeout=1000):
+    qtbot.mouseClick(widget.browse_button, Qt.LeftButton)
+```
+
+### Test-Support Methods for Concurrency
+
+For testing concurrency control without running actual operations, use the public
+test-support methods on `BaseManager`:
+
+```python
+def test_concurrent_operations(app_context):
+    manager = app_context.core_operations_manager
+
+    # Start simulated operations
+    assert manager.simulate_operation_start("vram_extraction")
+    assert manager.simulate_operation_start("rom_extraction")
+
+    # Verify conflict detection
+    assert not manager.simulate_operation_start("vram_extraction")  # Already running
+
+    # Cleanup
+    manager.simulate_operation_finish("vram_extraction")
+    manager.simulate_operation_finish("rom_extraction")
 ```
 
 ---

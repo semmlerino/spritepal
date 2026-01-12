@@ -45,10 +45,7 @@ from PIL import Image
 from core.managers import ExtractionError, ValidationError
 from core.managers.core_operations_manager import CoreOperationsManager
 from tests.fixtures.timeouts import signal_timeout, worker_timeout
-from tests.infrastructure.data_repository import (
-    DataRepository,
-    get_test_data_repository,
-)
+from tests.infrastructure.data_repository import DataRepository
 from utils.constants import BYTES_PER_TILE
 
 
@@ -62,9 +59,9 @@ class TestExtractionManager:
     """
 
     @pytest.fixture
-    def test_data_repo(self) -> DataRepository:
+    def test_data_repo(self, isolated_data_repository: DataRepository) -> DataRepository:
         """Provide test data repository for consistent test data."""
-        return get_test_data_repository()
+        return isolated_data_repository
 
     @pytest.fixture
     def manager(self, app_context):
@@ -260,14 +257,14 @@ class TestExtractionManager:
         output_base = str(Path(temp_files["output_dir"]) / "test")
 
         # Start an extraction
-        manager._start_operation("vram_extraction")
+        manager.simulate_operation_start("vram_extraction")
 
         # Try to start another
         with pytest.raises(ExtractionError, match="already in progress"):
             manager.extract_from_vram(temp_files["vram"], output_base)
 
         # Clean up
-        manager._finish_operation("vram_extraction")
+        manager.simulate_operation_finish("vram_extraction")
 
     def test_extract_from_rom_real_workflow_validation_succeeds(self, app_context, test_data_repo):
         """ROM extraction parameter validation should succeed with valid data.
@@ -384,9 +381,9 @@ class TestExtractionManager:
         manager = app_context.core_operations_manager
 
         # Test real concurrent operation tracking
-        assert manager._start_operation("vram_extraction")
-        assert manager._start_operation("rom_extraction")
-        assert manager._start_operation("sprite_preview")
+        assert manager.simulate_operation_start("vram_extraction")
+        assert manager.simulate_operation_start("rom_extraction")
+        assert manager.simulate_operation_start("sprite_preview")
 
         # Verify real state tracking
         assert manager.is_operation_active("vram_extraction")
@@ -394,15 +391,15 @@ class TestExtractionManager:
         assert manager.is_operation_active("sprite_preview")
 
         # Test operation conflict detection
-        assert not manager._start_operation("vram_extraction")  # Should conflict
+        assert not manager.simulate_operation_start("vram_extraction")  # Should conflict
 
         # Verify state remains consistent
         assert manager.is_operation_active("vram_extraction")
 
         # Test real cleanup
-        manager._finish_operation("vram_extraction")
-        manager._finish_operation("rom_extraction")
-        manager._finish_operation("sprite_preview")
+        manager.simulate_operation_finish("vram_extraction")
+        manager.simulate_operation_finish("rom_extraction")
+        manager.simulate_operation_finish("sprite_preview")
 
         # Verify clean state
         assert not manager.is_operation_active("vram_extraction")
@@ -471,7 +468,7 @@ class TestExtractionManager:
         manager = app_context.core_operations_manager
 
         # Set up some real state
-        manager._start_operation("test_operation")
+        manager.simulate_operation_start("test_operation")
         assert manager.is_operation_active("test_operation")
 
         # Test real cleanup

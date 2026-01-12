@@ -116,6 +116,135 @@ Benefits:
 | `qtbot` | Qt widget testing |
 | `tmp_path` | Temporary files |
 
+## Fixture Lifecycle Map
+
+Reference for fixture scopes, state management, and cleanup. Critical for onboarding and debugging test isolation issues.
+
+⚠️ **Risky Pattern:** Session-scoped fixtures create shared state that can surprise new maintainers. Always use `app_context` (function-scoped, clean per-test) unless you have a specific reason for `session_app_context` AND use `@pytest.mark.shared_state_safe`.
+
+### Session-Scoped Fixtures (⚠️ Shared State)
+
+| Fixture | Location | State | Cleanup | Risk |
+|---------|----------|-------|---------|------|
+| `qt_app` | `qt_fixtures.py:96` | Single `QApplication` instance | Session end | Qt app singleton; reused across all tests |
+| `session_app_context` | `app_context_fixtures.py:29` | Shared `AppContext` + managers | Session end via `reset_app_context()` | State leaks between tests without `@pytest.mark.shared_state_safe` |
+| `session_data_repository` | `core_fixtures.py:148` | Shared test data files | Session end (files in system temp) | Real ROM data may not be found in CI |
+| `capture_thread_baseline` | `qt_fixtures.py:96` | Thread count snapshot | Session end | Detects worker cleanup failures |
+| `worker_temp_root` | `xdist_fixtures.py:46` | Temp directory per xdist worker | Session end | Parallel safety: each worker gets isolated temp |
+| `configure_worker_environment` | `xdist_fixtures.py:46` | Environment variables (PYTEST_TIMEOUT_MULTIPLIER, etc.) | Session end (cleared) | Affects all tests in worker |
+
+**When to use session fixtures:**
+- Test is read-only (no state mutations)
+- You explicitly add `@pytest.mark.shared_state_safe`
+- You understand parallel execution implications (workers are isolated; tests within a worker share state)
+
+### Function-Scoped Fixtures (✅ Clean Per-Test)
+
+| Fixture | Location | State | Cleanup | Notes |
+|---------|----------|-------|---------|-------|
+| `app_context` | `app_context_fixtures.py:29` | Fresh `AppContext` + managers | Auto-reset + event processing | **Preferred**. Creates new context if none exists; suspends session context if present |
+| `clean_registry_state` | `core_fixtures.py:148` | Manager singletons (HAL, config, palette) | Suspend/reset + processes events (if not headless) | Ensures managers start clean |
+| `isolated_data_repository` | `core_fixtures.py:148` | Test files in `tmp_path` | Auto-cleanup via `tmp_path` | Parallel-safe; files deleted after test |
+| `main_window` | `qt_fixtures.py:96` | `QMainWindow` instance | Destroyed at test end | Requires `qtbot` fixture |
+| `cleanup_workers` | `qt_fixtures.py:96` | `WorkerManager` shutdown | Checks for leaks + stops active workers | Autouse; detects threading bugs |
+| `cleanup_singleton` | `qt_fixtures.py:96` | Qt singleton state | Clears singleton on teardown | Prevents cross-test contamination |
+| `real_extraction_manager` | `core_fixtures.py:148` | Real `ExtractionManager` instance | Auto-cleanup | Accessor; uses `app_context` internally |
+| `real_injection_manager` | `core_fixtures.py:148` | Real `InjectionManager` instance | Auto-cleanup | Accessor; uses `app_context` internally |
+| `real_session_manager` | `core_fixtures.py:148` | Real `SessionManager` instance | Auto-cleanup | Accessor; uses `app_context` internally |
+| `hal_pool` | `hal_fixtures.py:63` | HAL compression pool (mock or real) | Shutdown pool on teardown | Real mode with `@pytest.mark.real_hal` |
+| `hal_compressor` | `hal_fixtures.py:63` | `HALCompressor` singleton | Reset + shutdown on teardown | Real/mock per config |
+| `test_rom_file` | `test_data_fixtures.py:87` | ROM file in `tmp_path` | Auto-cleanup | Factory; pass `size="default"` etc. |
+| `test_vram_file` | `test_data_fixtures.py:87` | VRAM file in `tmp_path` | Auto-cleanup | Factory; pass `size=...` in bytes |
+| `rom_cache` | `core_fixtures.py:148` | ROM cache in `tmp_path` | Auto-cleanup | Isolated per-test cache |
+| `multi_signal_recorder` | `ui/integration/conftest.py:19` | Signal recorder factory | Clears recorders on teardown | Returns callable to create `MultiSignalRecorder` instances |
+
+### Autouse Fixtures (Always Active)
+
+| Fixture | Location | Purpose | Applies To | Notes |
+|---------|----------|---------|------------|-------|
+| `skip_requires_display` | `conftest.py:451` | Skip tests marked `@pytest.mark.requires_display` in headless mode | All tests | Checks `QT_QPA_PLATFORM=offscreen` |
+| `verify_cleanup` | `conftest.py:451` | Assert no active operations at test end | All tests | Catches resource leaks |
+| `enforce_shared_state_safe` | `conftest.py:451` | Enforce `@pytest.mark.shared_state_safe` with `session_app_context` | All tests using `session_app_context` | Prevents accidental state sharing |
+| `reset_hal_singletons` | `hal_fixtures.py:63` | Clear HAL singleton state between tests | All tests (if HAL fixture used) | Prevents cross-test contamination |
+| `capture_thread_baseline` | `qt_fixtures.py:96` | Detect worker/thread leaks | All Qt tests | Session autouse; checks final thread count |
+
+### Utility Functions (No Scope)
+
+| Function | Location | Returns | Cleanup |
+|----------|----------|---------|---------|
+| `test_data_factory` | `conftest.py:451` | Bytearray factory | No persistent state |
+| `temp_files` | `conftest.py:451` | `NamedTemporaryFile` wrapper | Deletes on teardown |
+| `standard_test_params` | `conftest.py:451` | Test parameters (uses `temp_files` + `tmp_path`) | Via `temp_files` |
+| `mock_manager_registry` | `conftest.py:451` | Mock registry | No cleanup needed (Mock) |
+| `wait_for`, `process_events`, etc. | `qt_waits.py:52` | Signal wait utilities | Semantic timeout helpers |
+
+### Dependency Graph
+
+```
+qt_app (session)
+  ↓
+  ├─ session_app_context (session, depends on qt_app)
+  │   └─ app_context (function, auto-suspends session if present)
+  │       └─ clean_registry_state (function, resets singletons)
+  │
+  ├─ capture_thread_baseline (session autouse, detects leaks)
+  │   └─ cleanup_workers (function autouse, stops leaks)
+  │
+  ├─ reset_hal_singletons (autouse)
+  │   └─ hal_pool (function)
+  │
+  └─ worker_temp_root (session)
+      └─ configure_worker_environment (session autouse, sets env vars)
+
+test_rom_file, test_vram_file (function)
+  └─ tmp_path (pytest built-in)
+```
+
+### Key Patterns
+
+**Rule 1: Use `app_context` by default**
+```python
+def test_extraction(app_context):  # Clean state, auto-reset
+    manager = app_context.core_operations_manager
+    result = manager.extract(...)
+    assert result is not None
+```
+
+**Rule 2: Use `session_app_context` only with marker**
+```python
+@pytest.mark.shared_state_safe  # REQUIRED
+def test_shared_data(session_app_context):
+    # Shared managers reused across test
+    result = session_app_context.core_operations_manager.extract(...)
+```
+
+**Rule 3: Autouse fixtures are transparent**
+```python
+def test_anything(app_context):
+    # skip_requires_display, verify_cleanup, reset_hal_singletons
+    # all run automatically—no explicit dependency needed
+    pass
+```
+
+**Rule 4: tmp_path is always available**
+```python
+def test_files(tmp_path):  # pytest built-in, always clean
+    output = tmp_path / "result.bin"
+    # Files auto-deleted after test
+```
+
+### Debugging Fixture Issues
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| Test passes in isolation, fails parallel | Shared session state | Add `@pytest.mark.shared_state_safe` or use `app_context` |
+| "Fatal Python error: Aborted" | `QPixmap` in worker thread | Use `ThreadSafeTestImage` instead |
+| Hangs or timeout | Worker not cleaned up | Check `cleanup_workers` fixture; verify no threads spawned without cleanup |
+| State leaks to next test | Session fixture reused | Use function-scoped fixture (default: `app_context`) |
+| Real ROM data not found | `session_data_repository` in CI | Use `DataRepository.find_real_kirby_rom()` with fallback |
+
+---
+
 ## Test Data Sources
 
 SpritePal has three test data generation systems. Use the right one for your needs:
@@ -190,38 +319,37 @@ def test_injection_workflow(tmp_path):
 
 #### 3. Centralized Data - `DataRepository`
 
-Use `DataRepository` when you need **session-scoped shared data** or **real test data lookup**:
+Use the `isolated_data_repository` fixture for **per-test isolated data** with automatic cleanup:
 
 ```python
-from tests.infrastructure.data_repository import get_test_data_repository
-
-@pytest.mark.shared_state_safe
-def test_with_repository(session_app_context):
-    """Access centralized test data repository."""
-    repo = get_test_data_repository()
-
+def test_with_repository(app_context, isolated_data_repository):
+    """Access test data repository with per-test isolation."""
     # Get pre-configured extraction params
-    params = repo.get_vram_extraction_data("medium")
+    params = isolated_data_repository.get_vram_extraction_data("medium")
     # Returns dict with: vram_path, cgram_path, oam_path, output_base, etc.
 
-    result = session_app_context.core_operations_manager.extract(**params)
+    result = app_context.core_operations_manager.extract(**params)
 ```
 
 **When to use:**
-- Multiple tests need the **same files** (avoid duplication)
+- Tests need **generated test files** (VRAM, ROM, CGRAM)
 - Tests access **real Kirby ROM data** (DataRepository finds it)
 - You need **consistent parameters** across tests (e.g., offset, size)
 
-**Isolation:** Use `get_isolated_data_repository(tmp_path)` for parallel-safe DataRepository:
+**DEPRECATED:** The `get_test_data_repository()` singleton is deprecated. It accumulates
+temp directories across the session and doesn't provide parallel test isolation.
+Use `isolated_data_repository` fixture instead.
 
 ```python
-from tests.infrastructure.data_repository import get_isolated_data_repository
+# DEPRECATED - do not use in new tests
+from tests.infrastructure.data_repository import get_test_data_repository
+repo = get_test_data_repository()  # Emits DeprecationWarning
 
-def test_isolated_repo(tmp_path):
+# RECOMMENDED - use fixture
+def test_isolated_repo(isolated_data_repository):
     """Isolated DataRepository (no conflicts in parallel tests)."""
-    repo = get_isolated_data_repository(tmp_path)  # Fresh instance
-    params = repo.get_vram_extraction_data("small")
-    # Files live in tmp_path, auto-cleaned
+    params = isolated_data_repository.get_vram_extraction_data("small")
+    # Files live in tmp_path, auto-cleaned after test
 ```
 
 ### Test Data Patterns
@@ -232,8 +360,8 @@ def test_isolated_repo(tmp_path):
 | Single VRAM file | `test_vram_file(size=...)` fixture |
 | Complete test setup | `TestDataFactory.create_test_files(tmp_path)` |
 | Injection test files | `TestDataFactory.create_injection_test_files(tmp_path)` |
-| Shared data (session-scoped) | `get_test_data_repository()` |
-| Parallel-safe shared data | `get_isolated_data_repository(tmp_path)` |
+| **Per-test data (recommended)** | `isolated_data_repository` fixture |
+| ~~Shared data (session-scoped)~~ | ~~`get_test_data_repository()`~~ (deprecated) |
 
 **Note:** `app_context` and `session_app_context` can safely coexist in the same test run. When `app_context` detects an existing session context, it uses `suspend_app_context()` to temporarily hide it, creates an isolated context for the test, then restores the session context afterward. This prevents function-scoped tests from destroying session-scoped contexts.
 
@@ -296,20 +424,19 @@ For integration tests with real components:
 
 ```python
 from tests.infrastructure.real_component_factory import RealComponentFactory
-from tests.infrastructure.data_repository import get_test_data_repository
 
-def test_workflow(app_context):
+def test_workflow(app_context, isolated_data_repository):
     # Access managers directly from app_context
     manager = app_context.core_operations_manager
 
-    # Use DataRepository for test data
-    data_repo = get_test_data_repository()
-    params = data_repo.get_vram_extraction_data("small")
+    # Use isolated_data_repository fixture for test data
+    params = isolated_data_repository.get_vram_extraction_data("small")
     result = manager.validate_extraction_params(params)
 
-# For Qt component creation, use RealComponentFactory
-def test_with_workers(app_context):
-    with RealComponentFactory() as factory:
+# For Qt component creation, use RealComponentFactory with explicit data_repository
+def test_with_workers(app_context, isolated_data_repository):
+    with RealComponentFactory(data_repository=isolated_data_repository) as factory:
+        params = isolated_data_repository.get_vram_extraction_data("small")
         worker = factory.create_extraction_worker(params)
         # ... test code ...
 ```

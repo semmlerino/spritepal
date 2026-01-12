@@ -65,15 +65,15 @@ class TestBaseManager:
         assert not manager.is_operation_active("test_op")
 
         # Start operation
-        assert manager._start_operation("test_op")
+        assert manager.simulate_operation_start("test_op")
         assert manager.has_active_operations()
         assert manager.is_operation_active("test_op")
 
         # Can't start same operation twice
-        assert not manager._start_operation("test_op")
+        assert not manager.simulate_operation_start("test_op")
 
         # Finish operation
-        manager._finish_operation("test_op")
+        manager.simulate_operation_finish("test_op")
         assert not manager.has_active_operations()
         assert not manager.is_operation_active("test_op")
 
@@ -125,7 +125,7 @@ class TestBaseManager:
         manager = ConcreteManager()
 
         # Start an operation
-        manager._start_operation("test_op")
+        manager.simulate_operation_start("test_op")
         assert manager.is_operation_active("test_op")
 
         # Handle error for that operation with timeout to prevent hanging

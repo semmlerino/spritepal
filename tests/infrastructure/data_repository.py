@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -513,7 +514,26 @@ class _DataRepositorySingleton:
 
 
 def get_test_data_repository() -> DataRepository:
-    """Get the global test data repository instance."""
+    """Get the global test data repository instance.
+
+    DEPRECATED: Use the `isolated_data_repository` fixture instead for per-test
+    isolation and automatic cleanup. The singleton accumulates temp directories
+    across the session and doesn't provide parallel test isolation.
+
+    Example migration:
+        # Old (deprecated):
+        repo = get_test_data_repository()
+
+        # New (recommended):
+        def test_something(isolated_data_repository):
+            repo = isolated_data_repository
+    """
+    warnings.warn(
+        "get_test_data_repository() is deprecated. Use the isolated_data_repository "
+        "fixture for per-test isolation and automatic cleanup.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return _DataRepositorySingleton.get()
 
 

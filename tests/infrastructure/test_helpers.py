@@ -6,14 +6,16 @@ These replace the factory pattern with straightforward functions.
 All functions take explicit dependencies (AppContext) - no global state.
 
 Usage:
-    def test_extraction(app_context):
-        worker = create_extraction_worker(app_context)
+    def test_extraction(app_context, isolated_data_repository):
+        params = isolated_data_repository.get_vram_extraction_data("small")
+        worker = create_extraction_worker(app_context, params)
         with qtbot.waitSignal(worker.finished):
             worker.start()
 """
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -21,6 +23,8 @@ if TYPE_CHECKING:
     from core.tile_renderer import TileRenderer
     from core.workers import ROMExtractionWorker, VRAMExtractionWorker, VRAMInjectionWorker
     from ui.main_window import MainWindow
+
+    from .data_repository import DataRepository
 
 
 def create_main_window(context: AppContext) -> MainWindow:
@@ -46,6 +50,8 @@ def create_extraction_worker(
     context: AppContext,
     params: dict[str, Any] | None = None,
     worker_type: str = "vram",
+    *,
+    data_repository: DataRepository | None = None,
 ) -> VRAMExtractionWorker | ROMExtractionWorker:
     """
     Create an extraction worker with proper manager dependencies.
@@ -54,16 +60,28 @@ def create_extraction_worker(
         context: The test AppContext
         params: Optional extraction parameters (defaults to small test data)
         worker_type: "vram" or "rom"
+        data_repository: Optional DataRepository for default params (preferred over singleton)
 
     Returns:
         Extraction worker instance
     """
     from core.workers import ROMExtractionWorker, VRAMExtractionWorker
 
-    from .data_repository import get_test_data_repository
-
     if params is None:
-        data_repo = get_test_data_repository()
+        if data_repository is not None:
+            data_repo = data_repository
+        else:
+            # Deprecated fallback to singleton
+            from .data_repository import get_test_data_repository
+
+            warnings.warn(
+                "Calling create_extraction_worker without params or data_repository "
+                "uses deprecated singleton. Pass data_repository=isolated_data_repository.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            data_repo = get_test_data_repository()
+
         if worker_type == "vram":
             params = data_repo.get_vram_extraction_data("small")
         else:
@@ -80,6 +98,8 @@ def create_extraction_worker(
 def create_injection_worker(
     context: AppContext,
     params: dict[str, Any] | None = None,
+    *,
+    data_repository: DataRepository | None = None,
 ) -> VRAMInjectionWorker:
     """
     Create an injection worker with proper manager dependencies.
@@ -87,16 +107,28 @@ def create_injection_worker(
     Args:
         context: The test AppContext
         params: Optional injection parameters (defaults to small test data)
+        data_repository: Optional DataRepository for default params (preferred over singleton)
 
     Returns:
         VRAMInjectionWorker instance
     """
     from core.workers import VRAMInjectionWorker
 
-    from .data_repository import get_test_data_repository
-
     if params is None:
-        data_repo = get_test_data_repository()
+        if data_repository is not None:
+            data_repo = data_repository
+        else:
+            # Deprecated fallback to singleton
+            from .data_repository import get_test_data_repository
+
+            warnings.warn(
+                "Calling create_injection_worker without params or data_repository "
+                "uses deprecated singleton. Pass data_repository=isolated_data_repository.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            data_repo = get_test_data_repository()
+
         params = data_repo.get_injection_data("small")
 
     injection_manager = context.core_operations_manager

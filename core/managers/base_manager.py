@@ -149,6 +149,42 @@ class BaseManager(QObject):
                 self.operation_finished.emit(operation)
                 self._logger.debug(f"Finished operation: {operation}")
 
+    # --- Test Support Methods ---
+    # These methods expose operation lifecycle control for testing concurrency behavior.
+    # They are NOT for production use - only for verifying operation conflict handling.
+
+    def simulate_operation_start(self, operation_name: str) -> bool:
+        """Test-support method to simulate operation start.
+
+        Use this in tests to verify concurrent operation behavior without
+        running actual operations. This is a public wrapper around _start_operation().
+
+        Args:
+            operation_name: Name of the operation to simulate starting
+
+        Returns:
+            True if operation started, False if already in progress
+
+        Example:
+            def test_concurrent_operations(app_context):
+                manager = app_context.core_operations_manager
+                assert manager.simulate_operation_start("test_op")
+                assert not manager.simulate_operation_start("test_op")  # Already running
+                manager.simulate_operation_finish("test_op")
+        """
+        return self._start_operation(operation_name)
+
+    def simulate_operation_finish(self, operation_name: str) -> None:
+        """Test-support method to simulate operation completion.
+
+        Pairs with simulate_operation_start() for testing concurrency control.
+        Finishes an operation that was started with simulate_operation_start().
+
+        Args:
+            operation_name: Name of the operation to finish
+        """
+        self._finish_operation(operation_name)
+
     def _with_operation_lock(self, operation: str, func: Callable[[], object]) -> object:
         """
         Execute a function with operation-specific locking

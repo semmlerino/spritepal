@@ -1,6 +1,6 @@
 # SpritePal Development Guidelines
 
-**Last updated: January 11, 2026** | See [Table of Contents](#table-of-contents) below
+**Last updated: January 11, 2026 — Recent updates: Revert to Original button, per-category logging control, UI integration tests (100+), AppContext service consolidation** | See [Table of Contents](#table-of-contents) below
 
 ---
 
@@ -20,6 +20,7 @@
 | Non-context `waitSignal()` | Always: `with qtbot.waitSignal(signal, timeout=...)` |
 | Mock at wrong location | `@patch('spritepal.ui.panel.Dialog')` not `...dialogs.Dialog` |
 | Multiple `QApplication` instances | Let pytest-qt manage via `qtbot`/`qapp` fixtures |
+| `if pos:` for QPoint checks | Use `if pos is not None:` (QPoint(0,0) is falsy!) |
 
 **3. Testing** (when running tests):
 - Default: parallel via `-n auto` (see `pyproject.toml`)
@@ -64,6 +65,8 @@
 
 4. **Fix bugs, not tests** - Bias toward fixing actual defects in the implementation, not making tests pass by dilution. Do not relax, delete, or rewrite tests unless they are demonstrably incorrect or asserting non-contractual implementation details. Any test change must be explicitly justified by a mismatch with intended external behavior. When uncertain: run the test in isolation, trace actual vs expected values, and verify whether the test's expectation matches documented/intended behavior.
 
+5. **Bug reports: test first** - When a user reports a bug, prefer writing a failing test that reproduces it before implementing the fix.
+
 ---
 
 ## Critical Rules (Read First)
@@ -91,6 +94,17 @@ uv run pytest                    # Run all tests
 ```
 
 **No silent behavior changes:** If a change affects threading, signals, IO, persistence, or settings → add/adjust tests.
+
+### Definition of Done
+
+A task is complete **only when**:
+1. All checks pass: `ruff check . && ruff format . && basedpyright && pytest`
+2. Changes are committed: `git add <files> && git commit -m "..."`
+3. `git status` shows clean working directory
+
+**Do not consider work "done" until committed.** Uncommitted changes = incomplete task.
+
+**Commit triggers:** After each logical task completion when all checks pass. Use conventional commits (`fix:`, `feat:`, `refactor:`, etc.).
 
 ### Committing After Quality Checks
 
@@ -210,6 +224,19 @@ pytest --leak-mode=fail               # Fail on leaks (default CI)
 pytest tests/test_hal_golden.py --regenerate-golden -v  # Update golden checksums
 ```
 
+### UI Integration Tests
+
+Signal-driven workflow tests in `tests/ui/integration/` verify observable Qt behavior through public APIs (100+ tests):
+- Mouse/canvas interactions (PixelCanvas, hover, zoom)
+- Tool selection and icon toolbar signals
+- Color/palette selection
+- Sprite asset browser selection
+- Extract/Inject workflow signals
+- ROM workflow integration
+- Multi-component signal ordering
+
+Use `helpers/signal_spy_utils.py:MultiSignalRecorder` to track and validate multiple signal emissions with order verification.
+
 ### Debugging Failed Tests
 
 | Symptom | Solution |
@@ -281,6 +308,8 @@ def test_something(app_context):  # Fixture provides this
 | **Thread safety** | General | Use `QMutex/QMutexLocker`; prefer signals over polling |
 | **Dialog init** | `ui/components/base/dialog_base.py` | Declare instance vars BEFORE `super().__init__()` |
 | **Circular imports** | General | Use local imports in methods when needed |
+| **Workflow state changes** | `rom_workflow_controller.py` | Keep asset browser enabled in edit mode; prompt to save on sprite selection if unsaved changes |
+| **Revert to Original** | `rom_workflow_controller.py:revert_to_original()` | Shows confirmation if unsaved changes exist; reloads original sprite via `open_in_editor()` |
 
 ---
 
@@ -296,6 +325,10 @@ def test_something(app_context):  # Fixture provides this
 | `SPRITEPAL_LEAK_MODE` | Override leak detection | `fail` (CI), `warn` (local) |
 | `QT_QPA_PLATFORM` | Qt display platform | `offscreen` (pytest default) |
 
+### Logging Control
+
+Per-category logging control accessible via **Settings → Logging tab**. Supported categories: ROM Extraction, Tile Rendering, Thumbnail Worker, Tile Hash Database, ROM Tile Matcher, HAL Compression, All UI Workers. Persists via `ApplicationStateManager`.
+
 ### Type Checking (basedpyright, zero errors)
 
 - Use `| None` instead of `Optional`
@@ -309,14 +342,18 @@ def test_something(app_context):  # Fixture provides this
 |----------------|----------|
 | **Managers** | `core/managers/core_operations_manager.py`, `core/managers/application_state_manager.py` |
 | **Sprite Editor** | `ui/sprite_editor/` (Extract/Edit/Inject workflow) |
-| **AppContext** | `core/app_context.py` — use `get_app_context()` to access managers |
+| **AppContext** | `core/app_context.py` — use `get_app_context()` to access managers; provides lazy-initialized shared services (HALCompressor, SpriteConfigLoader, DefaultPaletteLoader) |
+| **Settings UI** | `ui/dialogs/settings_dialog.py` — includes logging control tab for per-category logging |
+| **Logging config** | `utils/logging_config.py` — logging setup and category control API |
 | **Base patterns** | `ui/components/base/dialog_base.py` — declare vars BEFORE `super().__init__()` |
 | **Mesen integration** | `core/mesen_integration/` — ROM offset discovery; see address_space_bridge.py, rom_tile_matcher.py |
+| **ROM Workflow** | `ui/sprite_editor/controllers/rom_workflow_controller.py` — Revert to Original, edit mode management, capture sync |
 | **Test fixtures** | `tests/fixtures/core_fixtures.py`, `tests/fixtures/qt_fixtures.py` |
 | **Qt mocks** | `tests/infrastructure/qt_mocks.py` |
 | **Safe signals** | `ui/common/signal_utils.py` — `safe_disconnect()`, etc. |
 | **ThreadSafeTestImage** | `tests/infrastructure/thread_safe_test_image.py` — for worker thread testing |
 | **RealComponentFactory** | `tests/infrastructure/real_component_factory.py` — for testing with real components |
+| **UI Integration Tests** | `tests/ui/integration/` — 100+ signal-driven workflow tests; see `helpers/signal_spy_utils.py` for MultiSignalRecorder |
 
 ### Project Structure
 
