@@ -106,8 +106,6 @@ class SourceBar(QWidget):
     def set_offset(self, offset: int) -> None:
         """Set the offset value."""
         self.offset_edit.set_offset(offset)
-        # Manually emit signal since OffsetLineEdit.set_offset is silent
-        self.offset_changed.emit(offset)
 
     def set_mapping_type(self, mapping_type: RomMappingType) -> None:
         """Set ROM mapping type for SNES address conversion (LoROM, HiROM, SA-1)."""

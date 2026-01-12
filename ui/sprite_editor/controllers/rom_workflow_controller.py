@@ -51,6 +51,7 @@ class ROMWorkflowController(QObject):
     rom_info_updated = Signal(str)  # ROM title → ROMWorkflowPage.source_bar.set_info
     workflow_state_changed = Signal(str)  # 'preview'/'edit'/'save' → view state updates
     sprite_extracted = Signal(object, int)  # image, tile_count - for integration (e.g. history)
+    offset_changed = Signal(int)  # Emitted when offset changes (for sync with other UI)
 
     def __init__(
         self,
@@ -727,6 +728,9 @@ class ROMWorkflowController(QObject):
         self.current_offset = offset
         if self._view:
             self._view.set_offset(offset)
+        
+        # Emit change for external listeners (e.g. MainWindow toolbar)
+        self.offset_changed.emit(offset)
 
         if self.rom_path:
             # Set loading state before requesting preview

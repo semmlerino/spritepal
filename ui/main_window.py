@@ -321,7 +321,8 @@ class MainWindow(QMainWindow):
             sprite_library=self.sprite_library,
         )
         self._sprite_editor_workspace.editing_controller.undoStateChanged.connect(self._update_undo_redo_state)
-        self._sprite_editor_workspace.rom_page.offset_changed.connect(self.toolbar_offset_edit.set_offset)
+        # Connect to controller directly for sync (avoids view-level recursion loops)
+        self._sprite_editor_workspace.rom_workflow_controller.offset_changed.connect(self.toolbar_offset_edit.set_offset)
 
         self.center_stack.addWidget(self._sprite_editor_workspace)
         self.sprite_edit_tab = self._sprite_editor_workspace
