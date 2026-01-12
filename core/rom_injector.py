@@ -142,7 +142,7 @@ class ROMInjector(SpriteInjector):
         else:
             # Apply default size limit to prevent the 42KB issue
             expected_size = default_max_sprite_size
-            logger.warning(f"No expected size provided, using default max limit: {expected_size} bytes")
+            logger.debug(f"No expected size provided, using default max limit: {expected_size} bytes")
 
         # Create temp file for decompression with only the relevant portion
         # Extract a window from offset to offset + 128KB (or end of ROM)
@@ -204,9 +204,9 @@ class ROMInjector(SpriteInjector):
                     else:
                         logger.warning("Could not find valid sprite data. Consider using sprite scanner.")
             elif expected_size and len(decompressed) < expected_size:
-                logger.warning(
-                    f"Decompressed data ({original_size} bytes) is smaller than expected "
-                    f"({expected_size} bytes). This may indicate a problem."
+                logger.debug(
+                    f"Decompressed data ({original_size} bytes) is smaller than max limit "
+                    f"({expected_size} bytes). Normal for most sprites."
                 )
 
             # Check if data size is valid for sprite tiles (should be multiple of tile size)
@@ -219,9 +219,9 @@ class ROMInjector(SpriteInjector):
 
                 # If more than half a tile of extra data, likely wrong offset
                 if extra_bytes > BYTES_PER_TILE // 2:
-                    logger.error(
+                    logger.warning(
                         f"Significant data misalignment detected ({extra_bytes} extra bytes). "
-                        f"The sprite offset 0x{offset:X} is likely incorrect for this ROM version."
+                        f"The sprite offset 0x{offset:X} may be incorrect for this ROM version."
                     )
 
             # Parse HAL format to find actual compressed block size

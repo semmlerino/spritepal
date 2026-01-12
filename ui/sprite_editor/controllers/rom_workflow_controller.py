@@ -849,6 +849,24 @@ class ROMWorkflowController(QObject):
 
         renderer = SpriteRenderer()
 
+        # Recalculate dimensions from actual tile_data to ensure correctness
+        # This handles edge cases where cached dimensions came from truncated preview data
+        num_tiles = len(self.current_tile_data) // 32
+        if num_tiles > 0:
+            TILES_PER_ROW = 16
+            tile_rows = (num_tiles + TILES_PER_ROW - 1) // TILES_PER_ROW
+            calculated_width = min(TILES_PER_ROW * 8, 384)
+            calculated_height = min(tile_rows * 8, 384)
+
+            # Update stored dimensions if they differ (indicates truncation issue)
+            if calculated_width != self.current_width or calculated_height != self.current_height:
+                logger.info(
+                    f"[OPEN] Correcting dimensions from {self.current_width}x{self.current_height} "
+                    f"to {calculated_width}x{calculated_height} ({num_tiles} tiles)"
+                )
+                self.current_width = calculated_width
+                self.current_height = calculated_height
+
         image = renderer.render_4bpp(self.current_tile_data, self.current_width, self.current_height)
 
         # Convert to numpy and load into editor
