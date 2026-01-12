@@ -85,6 +85,7 @@ class ROMWorkflowController(QObject):
         self.rom_size: int = 0  # Actual ROM size (excluding SMC header)
         self.smc_header_offset: int = 0  # SMC header size (512 or 0)
         self.current_offset: int = 0
+        self._checksum_valid: bool = True
         self.state: str = "preview"  # 'preview', 'edit', 'save'
 
         # Current sprite data
@@ -570,6 +571,21 @@ class ROMWorkflowController(QObject):
             # Set ROM mapping type for correct SNES address parsing (LoROM, HiROM, SA-1)
             self._view.set_mapping_type(header.mapping_type)
 
+        # Check ROM checksum early and warn user if invalid
+        self._checksum_valid = ROMValidator.verify_rom_checksum(path, header, lenient=True)
+        if self._view:
+            self._view.set_checksum_valid(self._checksum_valid)
+            if not self._checksum_valid:
+                from PySide6.QtWidgets import QMessageBox
+
+                QMessageBox.warning(
+                    self._view,
+                    "ROM Checksum Mismatch",
+                    f"The ROM '{rom_path.name}' has an invalid checksum.\n\n"
+                    "This usually means the ROM has been modified or patched.\n"
+                    "Injecting sprites into this ROM will require confirmation to skip validation.",
+                )
+
         if self._message_service:
             self._message_service.show_message(f"Loaded ROM: {rom_path.name}")
 
@@ -740,9 +756,10 @@ class ROMWorkflowController(QObject):
                 self._message_service.show_message("No sprite data to edit")
             return
 
-        # Clear previous ROM palette sources before loading new sprite
+        # Clear previous ROM palette sources and warnings before loading new sprite
         if self._view:
             self._view.clear_rom_palette_sources()
+            self._view.hide_palette_warning()
 
         # Use SpriteRenderer to create PIL image from 4bpp
         from ..core.palette_utils import get_default_snes_palette
@@ -782,9 +799,18 @@ class ROMWorkflowController(QObject):
                     if palette_offset is not None:
                         all_palettes = self.rom_extractor.extract_palette_range(self.rom_path, palette_offset, 8, 15)
 
-                        # Register all palettes as switchable sources
+                        # Get semantic descriptions for palettes (if available in config)
+                        descriptions = self.rom_extractor.get_palette_descriptions_from_config(
+                            cast(dict[str, object], game_config)
+                        )
+
+                        # Register all palettes as switchable sources with descriptions
                         if all_palettes:
-                            self._editing_controller.register_rom_palettes(all_palettes)
+                            self._editing_controller.register_rom_palettes(
+                                all_palettes,
+                                active_indices=None,  # TODO: Get from OAM analysis when available
+                                descriptions=descriptions,
+                            )
                             logger.info(f"Registered {len(all_palettes)} ROM palettes as sources")
 
                         # Determine which palette to use initially
@@ -809,9 +835,16 @@ class ROMWorkflowController(QObject):
         if palette is None:
             palette = get_default_snes_palette()
             logger.debug("Using default SNES palette")
-            # Inform user about default palette for manual offsets
+            # Show warning banner and status message for fallback
+            if self._view:
+                self._view.show_palette_warning(
+                    "Using default palette. ROM palette configuration not available for this offset."
+                )
             if self._message_service and self.current_sprite_name.startswith("manual_0x"):
                 self._message_service.show_message("Using default palette (ROM palette not available for this offset)")
+        elif self._view:
+            # Hide any previous warning when we have proper palette
+            self._view.hide_palette_warning()
 
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self._editing_controller.load_image(image_array, palette)
@@ -1078,6 +1111,11 @@ class ROMWorkflowController(QObject):
                 pass
 
             if success:
+                # Update our knowledge of checksum validity after successful injection
+                self._checksum_valid = True
+                if self._view:
+                    self._view.set_checksum_valid(True)
+
                 if self._message_service:
                     self._message_service.show_message(f"Successfully saved: {message}")
                 # Show success in view

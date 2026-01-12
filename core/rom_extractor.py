@@ -191,6 +191,22 @@ class ROMExtractor:
         """
         return self.rom_palette_extractor.get_palette_config_from_sprite_config(game_config, sprite_name)
 
+    def get_palette_descriptions_from_config(
+        self,
+        game_config: dict[str, object],
+    ) -> dict[int, str]:
+        """Get semantic descriptions for sprite palettes from game config.
+
+        Delegates to rom_palette_extractor.get_palette_descriptions_from_config().
+
+        Args:
+            game_config: Game configuration dictionary
+
+        Returns:
+            Dictionary mapping palette index (int) to description string.
+        """
+        return self.rom_palette_extractor.get_palette_descriptions_from_config(game_config)
+
     def extract_palette_range(
         self,
         rom_path: str,

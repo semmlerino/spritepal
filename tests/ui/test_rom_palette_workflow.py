@@ -1,6 +1,4 @@
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import ANY, MagicMock, patch
 
 from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
 
@@ -61,8 +59,10 @@ def test_open_in_editor_uses_extracted_palette(qtbot):
         # This confirms the controller attempted to extract palettes
         mock_rom_extractor.extract_palette_range.assert_called_with("test.sfc", 0x1000, 8, 15)
 
-        # Verify all palettes were registered
-        mock_editing_controller.register_rom_palettes.assert_called_once_with(all_palettes)
+        # Verify all palettes were registered (with optional metadata)
+        mock_editing_controller.register_rom_palettes.assert_called_once_with(
+            all_palettes, active_indices=ANY, descriptions=ANY
+        )
 
         # Verify the correct palette source was selected (first from config: 10)
         mock_editing_controller.set_palette_source.assert_called_with("rom", 10)

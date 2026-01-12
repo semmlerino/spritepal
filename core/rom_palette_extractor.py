@@ -182,6 +182,38 @@ class ROMPaletteExtractor:
 
         return None, None
 
+    def get_palette_descriptions_from_config(
+        self,
+        game_config: Mapping[str, Any],  # pyright: ignore[reportExplicitAny] - JSON config
+    ) -> dict[int, str]:
+        """
+        Get semantic descriptions for sprite palettes from game config.
+
+        Args:
+            game_config: Game configuration from sprite_locations.json
+
+        Returns:
+            Dictionary mapping palette index (int) to description string.
+            Example: {8: "Kirby (pink - default)", 9: "Power-up variants"}
+        """
+        descriptions: dict[int, str] = {}
+
+        palette_info = game_config.get("palettes", {})
+        sprite_palettes = palette_info.get("sprite_palettes", {})
+
+        for idx_str, desc in sprite_palettes.items():
+            # Skip non-palette entries (like notes)
+            if idx_str.startswith("_"):
+                continue
+            try:
+                idx = int(idx_str)
+                if isinstance(desc, str):
+                    descriptions[idx] = desc
+            except ValueError:
+                continue
+
+        return descriptions
+
     def extract_palette_range(
         self, rom_path: str, palette_offset: int, start_idx: int, end_idx: int
     ) -> dict[int, list[tuple[int, int, int]]]:

@@ -19,6 +19,11 @@ from ui.common.spacing_constants import (
     MEDIUM_WIDTH,
     SPACING_SMALL,
 )
+from ui.sprite_editor.views.widgets.palette_preview_delegate import (
+    PALETTE_COLORS_ROLE,
+    PALETTE_IS_ACTIVE_ROLE,
+    PalettePreviewDelegate,
+)
 
 
 class PaletteSourceSelector(QWidget):
@@ -72,6 +77,7 @@ class PaletteSourceSelector(QWidget):
 
         self._combo_box = QComboBox()
         self._combo_box.setMinimumWidth(MEDIUM_WIDTH)
+        self._combo_box.setItemDelegate(PalettePreviewDelegate(self._combo_box))
         self._combo_box.currentIndexChanged.connect(self._on_combo_changed)
         combo_layout.addWidget(self._combo_box)
         combo_layout.addStretch()
@@ -154,18 +160,34 @@ class PaletteSourceSelector(QWidget):
                 self._combo_box.setCurrentIndex(i)
                 return
 
-    def add_palette_source(self, display_name: str, source_type: str, palette_index: int) -> None:
+    def add_palette_source(
+        self,
+        display_name: str,
+        source_type: str,
+        palette_index: int,
+        colors: list[tuple[int, int, int]] | None = None,
+        is_active: bool = False,
+    ) -> None:
         """Add a palette source to the dropdown.
 
         Args:
-            display_name: Display name for the source (e.g., "Default")
-            source_type: Type of source ("default" or "mesen")
-            palette_index: Palette index (0-7)
+            display_name: Display name for the source (e.g., "Default", "ROM Palette 8")
+            source_type: Type of source ("default", "mesen", or "rom")
+            palette_index: Palette index (0-15)
+            colors: Optional list of RGB tuples for preview swatches (first 4 used)
+            is_active: Whether this palette is actively used (detected via OAM)
         """
         self._combo_box.addItem(display_name)
         index = self._combo_box.count() - 1
         self._combo_box.setItemData(index, source_type, self._SOURCE_TYPE_ROLE)
         self._combo_box.setItemData(index, palette_index, self._PALETTE_INDEX_ROLE)
+
+        # Store color preview data (first 4 colors for delegate rendering)
+        if colors:
+            self._combo_box.setItemData(index, colors[:4], PALETTE_COLORS_ROLE)
+
+        # Store OAM-active flag
+        self._combo_box.setItemData(index, is_active, PALETTE_IS_ACTIVE_ROLE)
 
     def clear_mesen_sources(self) -> None:
         """Remove all Mesen2 sources, keeping only "Default".

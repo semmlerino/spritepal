@@ -31,7 +31,7 @@ class EditingController(QObject):
     toolChanged = Signal(str)
     colorChanged = Signal(int)
     undoStateChanged = Signal(bool, bool)  # can_undo, can_redo
-    paletteSourceAdded = Signal(str, str, int)  # name, type, index
+    paletteSourceAdded = Signal(str, str, int, object, bool)  # name, type, index, colors, is_active
     paletteSourceSelected = Signal(str, int)  # source_type, palette_index
 
     def __init__(self, parent: QObject | None = None) -> None:
@@ -312,12 +312,25 @@ class EditingController(QObject):
         return self._palette_sources.copy()
 
     def register_palette_source(
-        self, source_type: str, index: int, colors: list[tuple[int, int, int]], name: str
+        self,
+        source_type: str,
+        index: int,
+        colors: list[tuple[int, int, int]],
+        name: str,
+        is_active: bool = False,
     ) -> None:
-        """Register a new palette source."""
+        """Register a new palette source.
+
+        Args:
+            source_type: Type of source ("default", "mesen", "rom", "preset", "file")
+            index: Palette index
+            colors: List of 16 RGB tuples
+            name: Display name for the source
+            is_active: Whether this palette is OAM-active (detected in use)
+        """
         key = (source_type, index)
         self._palette_sources[key] = (colors, name)
-        self.paletteSourceAdded.emit(name, source_type, index)
+        self.paletteSourceAdded.emit(name, source_type, index, colors, is_active)
 
     def handle_palette_source_changed(self, source_type: str, index: int) -> None:
         """Handle palette source selection change."""
@@ -341,15 +354,28 @@ class EditingController(QObject):
             parent = self._view if self._view else None
             QMessageBox.critical(parent, "Error", f"Failed to change palette source: {e}")
 
-    def register_rom_palettes(self, palettes: dict[int, list[tuple[int, int, int]]]) -> None:
+    def register_rom_palettes(
+        self,
+        palettes: dict[int, list[tuple[int, int, int]]],
+        active_indices: list[int] | None = None,
+        descriptions: dict[int, str] | None = None,
+    ) -> None:
         """Register multiple ROM palettes as switchable sources.
 
         Args:
             palettes: Dict mapping palette index (8-15) to list of 16 RGB tuples
+            active_indices: Optional list of palette indices detected in OAM (marked as active)
+            descriptions: Optional dict of semantic descriptions per palette index
         """
+        active_set = set(active_indices) if active_indices else set()
         for index, colors in palettes.items():
+            # Build name with optional semantic description
             name = f"ROM Palette {index}"
-            self.register_palette_source("rom", index, colors, name)
+            if descriptions and index in descriptions:
+                name = f"ROM Palette {index} - {descriptions[index]}"
+
+            is_active = index in active_set
+            self.register_palette_source("rom", index, colors, name, is_active)
 
     def set_palette_source(self, source_type: str, palette_index: int) -> None:
         """Programmatically select a palette source.

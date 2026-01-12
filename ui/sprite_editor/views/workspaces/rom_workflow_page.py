@@ -182,6 +182,10 @@ class ROMWorkflowPage(QWidget):
         """Set info text in source bar."""
         self._source_bar.set_info(text)
 
+    def set_checksum_valid(self, valid: bool) -> None:
+        """Set checksum validity in source bar."""
+        self._source_bar.set_checksum_valid(valid)
+
     def set_offset(self, offset: int) -> None:
         """Update displayed ROM offset in source bar."""
         self._source_bar.set_offset(offset)
@@ -226,3 +230,17 @@ class ROMWorkflowPage(QWidget):
         """Clear ROM palette sources from the workspace palette panel."""
         if self._workspace and self._workspace.palette_panel:
             self._workspace.palette_panel.clear_rom_sources()
+
+    def show_palette_warning(self, message: str) -> None:
+        """Show a warning banner in the palette panel.
+
+        Args:
+            message: Warning message to display
+        """
+        if self._workspace and self._workspace.palette_panel:
+            self._workspace.palette_panel.show_palette_warning(message)
+
+    def hide_palette_warning(self) -> None:
+        """Hide the palette warning banner."""
+        if self._workspace and self._workspace.palette_panel:
+            self._workspace.palette_panel.hide_palette_warning()
