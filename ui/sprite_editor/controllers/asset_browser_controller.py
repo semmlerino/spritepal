@@ -324,7 +324,7 @@ class AssetBrowserController(QObject):
 
         # If worker is available, queue directly
         if self._thumbnail_worker:
-            self._thumbnail_worker.queue_thumbnail(offset, size=128, priority=0)
+            self._thumbnail_worker.queue_thumbnail(offset, size=384, priority=0)
         else:
             # Fall back to signal-based approach
             self.thumbnailRequested.emit(offset, source_type)

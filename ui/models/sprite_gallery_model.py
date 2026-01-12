@@ -49,8 +49,8 @@ class SpriteGalleryModel(QAbstractListModel):
         self._selected_offsets: set[int] = set()
 
         # Display settings
-        self._thumbnail_size = 256
-        self._columns = 4
+        self._thumbnail_size = 768
+        self._columns = 2
 
         # Filter settings
         self._filter_text = ""

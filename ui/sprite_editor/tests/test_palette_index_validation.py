@@ -8,7 +8,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-
 def test_editing_controller_rejects_out_of_range_indices() -> None:
     from ui.sprite_editor.controllers.editing_controller import EditingController
 

@@ -72,7 +72,7 @@ class TestMesen2ModuleInit:
     def test_init_stores_log_watcher(self, mock_log_watcher: Mock, qapp: QObject) -> None:
         """Module stores log watcher reference."""
         module = Mesen2Module(log_watcher=mock_log_watcher)
-        assert module._log_watcher is mock_log_watcher
+        assert module.log_watcher is mock_log_watcher
 
     def test_init_forwards_signals(self, qtbot: QtBot, mock_log_watcher: Mock) -> None:
         """Module forwards LogWatcher signals."""
@@ -275,14 +275,14 @@ class TestMesen2ModuleWidgetConnection:
         # Should not raise exception
         mesen2_module.disconnect_widget(mock_widget)
 
-    def test_cleanup_stops_watching(self, mesen2_module: Mesen2Module, mock_log_watcher: Mock) -> None:
+    def cleanup_stops_watching(self, mesen2_module: Mesen2Module, mock_log_watcher: Mock) -> None:
         """cleanup stops watching and clears connected widgets."""
         mock_log_watcher.is_watching = True
 
         mesen2_module.cleanup()
 
         mock_log_watcher.stop_watching.assert_called_once()
-        assert len(mesen2_module._connected_widgets) == 0
+        assert mesen2_module.get_connected_widget_count() == 0
 
 
 class TestMesen2ModuleIntegration:

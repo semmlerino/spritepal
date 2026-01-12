@@ -63,8 +63,8 @@ class SpriteGalleryWidget(QWidget):
         super().__init__(parent)
 
         # Display settings
-        self.thumbnail_size = 256  # Default to actually visible size
-        self.columns = 4  # Default columns for better visibility
+        self.thumbnail_size = 768  # Default to actually visible size (was 256)
+        self.columns = 2  # Fewer columns for much larger thumbnails
         self.spacing = 16  # Proper visual separation
 
         # Model/View components
@@ -283,9 +283,9 @@ class SpriteGalleryWidget(QWidget):
         layout.addWidget(size_label)
 
         self.size_slider = QSlider(Qt.Orientation.Horizontal)
-        self.size_slider.setRange(128, 768)  # Actually useful range
+        self.size_slider.setRange(256, 1024)  # Expanded range for larger thumbnails
         self.size_slider.setValue(self.thumbnail_size)
-        self.size_slider.setTickInterval(64)  # Bigger steps for bigger range
+        self.size_slider.setTickInterval(128)  # Bigger steps for bigger range
         self.size_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.size_slider.setMinimumWidth(MEDIUM_WIDTH)  # Use minimum instead of fixed
         self.size_slider.valueChanged.connect(self._on_size_changed)

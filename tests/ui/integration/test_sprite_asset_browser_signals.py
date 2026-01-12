@@ -300,9 +300,7 @@ class TestSpriteAssetBrowserOffsetUpdate:
         assert args[0] == 0x1000, "First argument should be old offset"
         assert args[1] == 0x1005, "Second argument should be new offset"
 
-    def test_update_sprite_offset_does_not_emit_when_not_found(
-        self, qtbot: QtBot, asset_browser
-    ) -> None:
+    def test_update_sprite_offset_does_not_emit_when_not_found(self, qtbot: QtBot, asset_browser) -> None:
         """Verify item_offset_changed is NOT emitted when offset is not found."""
         spy = QSignalSpy(asset_browser.item_offset_changed)
 

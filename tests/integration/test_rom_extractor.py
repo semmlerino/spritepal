@@ -57,9 +57,6 @@ class TestROMExtractorInit:
         assert isinstance(extractor.sprite_config_loader, SpriteConfigLoader)
 
 
-
-
-
 class TestROMExtractorSpriteLocations:
     """Test sprite location discovery functionality"""
 

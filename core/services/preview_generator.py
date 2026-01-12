@@ -61,7 +61,7 @@ class PreviewRequest:
     offset: int  # Offset within the data
     sprite_name: str = ""  # Optional sprite name
     palette: PaletteData | None = None  # Optional palette data
-    size: tuple[int, int] = (128, 128)  # Preview size (width, height)
+    size: tuple[int, int] = (384, 384)  # Preview size (width, height)
     sprite_config: object | None = None  # Optional sprite configuration
 
     def cache_key(self) -> str:
@@ -664,7 +664,7 @@ class PreviewGenerator(QObject):
 
 
 def create_vram_preview_request(
-    vram_path: str, offset: int, sprite_name: str = "", size: tuple[int, int] = (128, 128)
+    vram_path: str, offset: int, sprite_name: str = "", size: tuple[int, int] = (384, 384)
 ) -> PreviewRequest:
     """Create a VRAM preview request."""
     return PreviewRequest(
@@ -677,7 +677,7 @@ def create_vram_preview_request(
 
 
 def create_rom_preview_request(
-    rom_path: str, offset: int, sprite_name: str = "", sprite_config: object = None, size: tuple[int, int] = (128, 128)
+    rom_path: str, offset: int, sprite_name: str = "", sprite_config: object = None, size: tuple[int, int] = (384, 384)
 ) -> PreviewRequest:
     """Create a ROM preview request."""
     return PreviewRequest(

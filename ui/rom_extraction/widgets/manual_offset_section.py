@@ -134,3 +134,43 @@ class ManualOffsetSection(QWidget):
             enabled: Whether to enable the button
         """
         self._browse_button.setEnabled(enabled)
+
+    def is_browse_visible(self) -> bool:
+        """Check if browse button is currently visible.
+
+        Returns:
+            True if browse button is visible
+        """
+        return self._browse_button.isVisible()
+
+    def is_browse_enabled(self) -> bool:
+        """Check if browse button is currently enabled.
+
+        Returns:
+            True if browse button is enabled
+        """
+        return self._browse_button.isEnabled()
+
+    def is_offset_display_visible(self) -> bool:
+        """Check if offset display label is currently visible.
+
+        Returns:
+            True if offset display is visible
+        """
+        return self._offset_display.isVisible()
+
+    def get_offset_display_text(self) -> str:
+        """Get the current offset display text.
+
+        Returns:
+            Current offset text
+        """
+        return self._offset_display.text()
+
+    def get_toggle_arrow_type(self) -> Qt.ArrowType:
+        """Get the current arrow type of the toggle button.
+
+        Returns:
+            Current arrow type
+        """
+        return self._toggle_button.arrowType()

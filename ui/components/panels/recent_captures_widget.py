@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 class CaptureThumbnailDelegate(QStyledItemDelegate):
     """Delegate for rendering thumbnails in the captures list."""
 
-    THUMBNAIL_SIZE = 32
+    THUMBNAIL_SIZE = 96
     ITEM_PADDING = 4
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -343,6 +343,17 @@ class RecentCapturesWidget(QWidget):
     def get_capture_count(self) -> int:
         """Get the number of captured offsets."""
         return self._list_widget.count()
+
+    def has_capture(self, offset: int) -> bool:
+        """Check if a specific offset is already in the list.
+
+        Args:
+            offset: The offset to check.
+
+        Returns:
+            True if present, False otherwise.
+        """
+        return any(c.offset == offset for c in self._captures)
 
     def _update_status_indicator(self, watching: bool) -> None:
         """Update the status indicator color."""

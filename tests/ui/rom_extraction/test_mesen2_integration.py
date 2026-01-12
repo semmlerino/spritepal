@@ -80,8 +80,8 @@ class TestMesen2Integration:
         # Should start watching
         assert mesen2_module.is_watching
 
-        # Widget exists and is connected (visual state not exposed via API)
-        assert captures_widget._captures_widget is not None
+        # Widget is registered in module
+        assert mesen2_module.is_widget_connected(captures_widget)
 
     def test_offset_discovered_propagates_to_widget(
         self,
@@ -105,9 +105,9 @@ class TestMesen2Integration:
         mock_log_watcher.offset_discovered.emit(capture)
         qtbot.wait(50)  # Allow signal to propagate
 
-        # Widget should have received the capture
-        assert len(captures_widget._captures_widget._captures) == 1
-        assert captures_widget._captures_widget._captures[0].offset == 0x100000
+        # Widget should have received the capture via public has_capture check
+        assert captures_widget.has_capture(0x100000)
+        assert captures_widget.get_capture_count() == 1
 
     def test_watch_state_changes_propagate(
         self,
@@ -140,6 +140,7 @@ class TestMesen2Integration:
         self, qtbot: QtBot, mesen2_module: Mesen2Module, captures_widget: MesenCapturesSection
     ) -> None:
         """Widget signals still work after module connection."""
+        from PySide6.QtWidgets import QListWidget
         mesen2_module.connect_to_widget(captures_widget)
 
         # Add a capture manually
@@ -153,6 +154,7 @@ class TestMesen2Integration:
 
         # Listen for widget signal
         with qtbot.waitSignal(captures_widget.offset_selected, timeout=1000):
-            # Simulate user clicking on the capture
-            captures_widget._captures_widget._list_widget.setCurrentRow(0)
-            captures_widget._captures_widget._on_item_clicked(captures_widget._captures_widget._list_widget.item(0))
+            # Simulate user clicking on the capture via findChild
+            list_widget = captures_widget.findChild(QListWidget)
+            item = list_widget.item(0)
+            list_widget.itemClicked.emit(item)

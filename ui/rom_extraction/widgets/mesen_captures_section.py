@@ -120,6 +120,17 @@ class MesenCapturesSection(QWidget):
         """
         return self._captures_widget.get_capture_count()
 
+    def has_capture(self, offset: int) -> bool:
+        """Check if a specific offset is already in the list.
+
+        Args:
+            offset: The offset to check.
+
+        Returns:
+            True if present, False otherwise.
+        """
+        return self._captures_widget.has_capture(offset)
+
     def clear(self) -> None:
         """Clear all captured offsets."""
         self._captures_widget.clear()

@@ -256,8 +256,8 @@ class SpritePreviewWorker(BaseWorker):
             tiles_per_row = 16
             tile_rows = (num_tiles + tiles_per_row - 1) // tiles_per_row
 
-            width = min(tiles_per_row * 8, 128)
-            height = min(tile_rows * 8, 128)
+            width = min(tiles_per_row * 8, 384)
+            height = min(tile_rows * 8, 384)
 
             self.preview_ready.emit(tile_data, width, height, self.sprite_name, compressed_size, slack_size)
             self.operation_finished.emit(True, f"Preview loaded for {self.sprite_name}")

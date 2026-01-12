@@ -126,8 +126,8 @@ class TestExtractionControllerSignalFix:
         # Trigger cleanup
         controller._cleanup_worker()
 
-        # Verify worker was cleared
-        assert controller._worker is None
+        # Verify worker was cleared via public API
+        assert not controller.is_busy()
 
 
 class TestInjectionControllerSignalFix:
@@ -195,8 +195,8 @@ class TestInjectionControllerSignalFix:
         # Trigger cleanup
         controller._cleanup_worker()
 
-        # Verify worker was cleared
-        assert controller._worker is None
+        # Verify worker was cleared via public API
+        assert not controller.is_busy()
 
 
 class TestMultiPaletteTabClickableLabelFix:

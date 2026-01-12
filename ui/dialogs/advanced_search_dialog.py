@@ -304,7 +304,7 @@ class AdvancedSearchDialog(QDialog):
         ref_layout.addWidget(preview_label)
 
         self.ref_preview_label = QLabel("No reference selected")
-        self.ref_preview_label.setMinimumHeight(128)
+        self.ref_preview_label.setMinimumHeight(384)
         self.ref_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.ref_preview_label.setStyleSheet(
             f"border: 1px solid {COLORS['border']}; background-color: {COLORS['background']};"
@@ -1075,10 +1075,10 @@ class AdvancedSearchDialog(QDialog):
             pixmap = QPixmap()
             pixmap.loadFromData(buffer.getvalue())
 
-            # Scale for display (max 128 pixels)
-            if pixmap.width() > 128 or pixmap.height() > 128:
+            # Scale for display (max 384 pixels)
+            if pixmap.width() > 384 or pixmap.height() > 384:
                 pixmap = pixmap.scaled(
-                    128, 128, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+                    384, 384, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
                 )
 
             if self.ref_preview_label:
@@ -1118,7 +1118,7 @@ class AdvancedSearchDialog(QDialog):
         """Update the reference sprite preview."""
         try:
             # Create a preview request
-            request = PreviewRequest(source_type="rom", data_path=self.rom_path, offset=offset, size=(128, 128))
+            request = PreviewRequest(source_type="rom", data_path=self.rom_path, offset=offset, size=(384, 384))
 
             # Generate preview using the preview service (via AppContext for proper ROM extractor)
             preview_generator = get_app_context().preview_generator
@@ -1127,7 +1127,7 @@ class AdvancedSearchDialog(QDialog):
             if result and result.pixmap and not result.pixmap.isNull():
                 # Scale preview to fit the label
                 scaled_pixmap = result.pixmap.scaled(
-                    128, 128, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+                    384, 384, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
                 )
                 if self.ref_preview_label:
                     self.ref_preview_label.setPixmap(scaled_pixmap)

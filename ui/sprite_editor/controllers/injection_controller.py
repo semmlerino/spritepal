@@ -335,3 +335,11 @@ class InjectionController(QObject):
         if self._view:
             self._view.set_inject_enabled(True)
         self._worker = None
+
+    def is_busy(self) -> bool:
+        """Check if an injection worker is currently running.
+
+        Returns:
+            True if a worker is active, False otherwise.
+        """
+        return self._worker is not None

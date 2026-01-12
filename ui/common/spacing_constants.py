@@ -134,7 +134,7 @@ PATH_EDIT_MIN_WIDTH = 250  # Minimum width for path input fields
 SPRITE_COMBO_MIN_WIDTH = 300  # Minimum width for sprite combo boxes
 
 # Thumbnail sizing
-THUMBNAIL_SIZE = 80  # Standard thumbnail size (80x80)
+THUMBNAIL_SIZE = 240  # Standard thumbnail size (240x240, was 80)
 
 # Dialog sizing
 ADVANCED_SEARCH_MIN_SIZE = (800, 600)  # Minimum size for advanced search dialog

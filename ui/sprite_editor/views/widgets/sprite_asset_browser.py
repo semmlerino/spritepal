@@ -39,7 +39,7 @@ from ui.styles.theme import COLORS
 class ThumbnailDelegate(QStyledItemDelegate):
     """Delegate for rendering thumbnails in tree items."""
 
-    THUMBNAIL_SIZE = 32
+    THUMBNAIL_SIZE = 96
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """Initialize the thumbnail delegate."""

@@ -388,27 +388,6 @@ class TestRealMainWindowStateIntegration:
             # Validate dialog coordinator integration
             assert main_window.dialog_coordinator is not None, "Should have dialog coordinator"
 
-    @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
-        """Set up real testing infrastructure."""
-        self.qt_app = QApplication.instance()
-        self.manager_factory = RealComponentFactory(data_repository=isolated_data_repository)
-
-        yield
-
-        self.manager_factory.cleanup()
-        # Manager cleanup handled by fixtures
-
-    @contextmanager
-    def main_window_test(self) -> Generator[MainWindow, None, None]:
-        """Context manager for creating MainWindow with proper DI dependencies."""
-        main_window = self.manager_factory.create_main_window()
-        try:
-            yield main_window
-        finally:
-            main_window.close()
-            self.qt_app.processEvents()
-
     def test_real_extraction_workflow_end_to_end(self):
         """
         Test real extraction workflow vs 500+ lines of mocked workflow.

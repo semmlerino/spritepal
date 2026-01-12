@@ -414,7 +414,7 @@ class SpriteGalleryTab(QWidget):
             self.thumbnail_controller.start_worker(self.rom_path, self.rom_extractor)
 
         # Queue thumbnail with priority
-        self.thumbnail_controller.queue_thumbnail(offset, 128, priority)
+        self.thumbnail_controller.queue_thumbnail(offset, self.gallery_widget.thumbnail_size, priority)
 
     def _on_sprite_selected(self, offset: int):
         """Handle sprite selection in gallery."""

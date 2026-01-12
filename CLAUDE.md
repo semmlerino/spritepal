@@ -1,6 +1,6 @@
 # SpritePal Development Guidelines
 
-**Last updated: January 11, 2026 — Recent updates: Revert to Original button, per-category logging control, UI integration tests (100+), AppContext service consolidation** | See [Table of Contents](#table-of-contents) below
+**Last updated: January 12, 2026 — Recent updates: Bug-first TDD workflow (mandatory), Revert to Original button, per-category logging control, UI integration tests (100+)** | See [Table of Contents](#table-of-contents) below
 
 ---
 
@@ -38,6 +38,11 @@
 - **Behavior changes**: If affecting threading, signals, IO, persistence, or settings → add/adjust tests
 - **DI order**: UI creation happens before manager creation; use deferred injection with setters
 
+**6. Bug Reports → Test First** (⚠️ MANDATORY):
+- **When user reports a bug:** Write a failing test BEFORE fixing it
+- **Workflow:** Reproduce bug → Write failing test → Verify it fails → Fix code → Test passes
+- **Why:** Prevents regressions, documents the bug, proves the fix works
+
 **→ For full details, jump to relevant section below**
 
 ---
@@ -57,15 +62,22 @@
 
 ## Core Principles
 
-1. **Test logic more than widgets** - Put business logic in plain Python classes so tests stay fast and stable. Keep widget tests focused on wiring, signals, and basic interactions.
+1. **🚨 Bug reports → failing test FIRST** - When the user reports a bug, you MUST write a failing test that reproduces it BEFORE attempting any fix. This is not optional. The workflow is:
+   1. Understand and reproduce the bug
+   2. Write a test that fails due to the bug
+   3. Run the test and verify it fails for the right reason
+   4. Fix the bug in the implementation
+   5. Run the test and verify it now passes
 
-2. **Parallel by default** - With 1900+ tests, serial runs take 15+ minutes. Tests run parallel via `-n auto`. Mark tests that need isolation with `@pytest.mark.parallel_unsafe` or use `app_context` fixture (which provides clean state per-test).
+   **Why mandatory:** Skipping this step has repeatedly led to fixes that don't actually address the bug, or fixes that break later because there's no regression test. A failing test proves you understand the bug and proves your fix works.
 
-3. **Prefer boring determinism** - The fastest dev loop is: small change → run checks → commit.
+2. **Fix bugs, not tests** - Bias toward fixing actual defects in the implementation, not making tests pass by dilution. Do not relax, delete, or rewrite tests unless they are demonstrably incorrect or asserting non-contractual implementation details. Any test change must be explicitly justified by a mismatch with intended external behavior. When uncertain: run the test in isolation, trace actual vs expected values, and verify whether the test's expectation matches documented/intended behavior.
 
-4. **Fix bugs, not tests** - Bias toward fixing actual defects in the implementation, not making tests pass by dilution. Do not relax, delete, or rewrite tests unless they are demonstrably incorrect or asserting non-contractual implementation details. Any test change must be explicitly justified by a mismatch with intended external behavior. When uncertain: run the test in isolation, trace actual vs expected values, and verify whether the test's expectation matches documented/intended behavior.
+3. **Test logic more than widgets** - Put business logic in plain Python classes so tests stay fast and stable. Keep widget tests focused on wiring, signals, and basic interactions.
 
-5. **Bug reports: test first** - When a user reports a bug, prefer writing a failing test that reproduces it before implementing the fix.
+4. **Parallel by default** - With 1900+ tests, serial runs take 15+ minutes. Tests run parallel via `-n auto`. Mark tests that need isolation with `@pytest.mark.parallel_unsafe` or use `app_context` fixture (which provides clean state per-test).
+
+5. **Prefer boring determinism** - The fastest dev loop is: small change → run checks → commit.
 
 ---
 

@@ -43,6 +43,8 @@ def test_output_name_provider_pattern(app_context):
 
 def test_set_output_name_syncs_inline_field(app_context):
     """Test that set_output_name updates the inline field."""
+    from PySide6.QtWidgets import QLineEdit
+
     from ui.rom_extraction_panel import ROMExtractionPanel
 
     # Create panel
@@ -57,11 +59,14 @@ def test_set_output_name_syncs_inline_field(app_context):
     panel.set_output_name(test_name)
 
     # Verify inline field was updated
-    assert panel.output_name_edit.text() == test_name
+    edit = panel.findChild(QLineEdit)
+    assert edit.text() == test_name
 
 
 def test_inline_field_emits_signal(qtbot, app_context):
     """Test that typing in inline field emits signal."""
+    from PySide6.QtWidgets import QLineEdit
+
     from ui.rom_extraction_panel import ROMExtractionPanel
 
     # Create panel
@@ -77,29 +82,12 @@ def test_inline_field_emits_signal(qtbot, app_context):
 
     # Type in inline field
     test_name = "my_output"
-    panel.output_name_edit.setText(test_name)
+    edit = panel.findChild(QLineEdit)
+    edit.setText(test_name)
 
     # Verify signal was emitted (textChanged emits for each character change)
     assert len(signal_spy) > 0
     assert signal_spy[-1] == test_name  # Last emission has full text
-
-
-def test_no_duplicate_output_name_field(app_context):
-    """Test that _output_name field no longer exists (removed)."""
-    from ui.rom_extraction_panel import ROMExtractionPanel
-
-    # Create panel
-    panel = ROMExtractionPanel(
-        extraction_manager=app_context.core_operations_manager,
-        state_manager=app_context.application_state_manager,
-        rom_cache=app_context.rom_cache,
-    )
-
-    # Verify _output_name field does NOT exist
-    assert not hasattr(panel, "_output_name")
-
-    # Verify provider field DOES exist
-    assert hasattr(panel, "_output_name_provider")
 
 
 def test_sprite_location_error_disables_extraction(qtbot, app_context):
@@ -126,10 +114,10 @@ def test_sprite_location_error_disables_extraction(qtbot, app_context):
     # Set ROM path to enable basic readiness
     panel.rom_path = "test.sfc"
 
-    # Simulate sprite location error
-    panel._on_sprite_locations_error("Test error: failed to load locations")
+    # Simulate sprite location error via orchestrator signal
+    # This is the public way the panel receives this error
+    panel._worker_orchestrator.sprite_locations_error.emit("Test error: failed to load locations")
 
     # Verify: readiness check was triggered and resulted in not-ready state
-    # The panel should have emitted extraction_ready(False, ...) after error
     assert len(ready_states) > 0, "Expected extraction_ready signal after sprite error"
     assert ready_states[-1] is False, "Expected extraction NOT ready after sprite location error"

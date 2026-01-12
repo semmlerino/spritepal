@@ -41,7 +41,7 @@ class SpriteGalleryDelegate(QStyledItemDelegate):
         super().__init__(parent)
 
         # Display settings
-        self._thumbnail_size = 256
+        self._thumbnail_size = 768
         self._spacing = 8
         self._label_height = 40
 

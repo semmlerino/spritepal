@@ -77,6 +77,16 @@ class Mesen2Module(QObject):
         self._log_watcher.error_occurred.connect(self.error_occurred.emit)
 
     @property
+    def log_watcher(self) -> LogWatcher:
+        """
+        Get the managed LogWatcher instance.
+
+        Returns:
+            The managed LogWatcher instance.
+        """
+        return self._log_watcher
+
+    @property
     def is_watching(self) -> bool:
         """
         True if currently watching a log file.
@@ -205,6 +215,27 @@ class Mesen2Module(QObject):
         # Remove from tracking
         self._connected_widgets.remove(widget)
         logger.debug("Disconnected widget from Mesen2Module")
+
+    def is_widget_connected(self, widget: MesenCapturesSection) -> bool:
+        """
+        Check if a widget is already connected to this module.
+
+        Args:
+            widget: The widget to check.
+
+        Returns:
+            True if connected, False otherwise.
+        """
+        return widget in self._connected_widgets
+
+    def get_connected_widget_count(self) -> int:
+        """
+        Get the number of widgets currently connected to this module.
+
+        Returns:
+            The number of connected widgets.
+        """
+        return len(self._connected_widgets)
 
     def cleanup(self) -> None:
         """Clean up resources when module is destroyed."""

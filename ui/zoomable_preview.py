@@ -348,6 +348,38 @@ class ZoomablePreviewWidget(QWidget):
         self._pan_offset = QPointF(0, 0)
         self.update()
 
+    def is_grid_visible(self) -> bool:
+        """Check if grid is currently visible.
+
+        Returns:
+            True if grid is visible
+        """
+        return self._grid_visible
+
+    def get_zoom(self) -> float:
+        """Get current zoom level.
+
+        Returns:
+            Current zoom factor
+        """
+        return self._zoom
+
+    def get_pan_offset(self) -> QPointF:
+        """Get current pan offset.
+
+        Returns:
+            Current pan offset as QPointF
+        """
+        return self._pan_offset
+
+    def has_pixmap(self) -> bool:
+        """Check if widget has a pixmap loaded.
+
+        Returns:
+            True if pixmap is not None
+        """
+        return self._pixmap is not None
+
 
 class PreviewPanel(QWidget):
     """Panel containing the zoomable preview with controls"""
@@ -578,6 +610,12 @@ class PreviewPanel(QWidget):
         """Set the grayscale PIL image for palette application"""
         self._grayscale_image = pil_image
 
+        # Refresh display
+        if self.is_palette_applied():
+            self._apply_current_palette()
+        else:
+            self._show_grayscale()
+
     def set_palettes(self, palettes_dict: dict[int, list[tuple[int, int, int]]]) -> None:
         """Set the available palettes"""
         self.colorizer.set_palettes(palettes_dict)
@@ -636,3 +674,19 @@ class PreviewPanel(QWidget):
             Dictionary mapping palette index to RGB color lists
         """
         return self.colorizer.get_palettes() if self.colorizer else {}
+
+    def has_grayscale_image(self) -> bool:
+        """Check if a grayscale image is currently loaded.
+
+        Returns:
+            True if grayscale image is present
+        """
+        return self._grayscale_image is not None
+
+    def is_palette_applied(self) -> bool:
+        """Check if palette mode is currently active.
+
+        Returns:
+            True if palette mode is enabled
+        """
+        return self.palette_toggle.isChecked() if self.palette_toggle else False

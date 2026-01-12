@@ -485,9 +485,8 @@ class DetachedGalleryWindow(QMainWindow):
         """Reset to default view settings."""
         if self.gallery_widget:
             # Reset thumbnail size
-            self.gallery_widget.thumbnail_size = 256
-            self.gallery_widget.size_slider.setValue(256)
-
+            self.gallery_widget.thumbnail_size = 768
+            self.gallery_widget.size_slider.setValue(768)
             # Reset filters
             self.gallery_widget.filter_input.clear()
             self.gallery_widget.compressed_check.setChecked(False)

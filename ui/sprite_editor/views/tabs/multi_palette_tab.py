@@ -111,8 +111,8 @@ class MultiPaletteViewer(QWidget):
             label = ClickableLabel(i)
             label.setPixmap(
                 pixmap.scaled(
-                    128,
-                    128,
+                    384,
+                    384,
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.FastTransformation,
                 )
@@ -170,8 +170,8 @@ class MultiPaletteViewer(QWidget):
             label = ClickableLabel(i)
             label.setPixmap(
                 pixmap.scaled(
-                    128,
-                    128,
+                    384,
+                    384,
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.FastTransformation,
                 )
@@ -274,7 +274,7 @@ class MultiPaletteTab(QWidget):
         controls_layout.addWidget(QLabel("Preview Size:"))
         self.preview_size_spin = QSpinBox()
         self.preview_size_spin.setRange(16, 512)
-        self.preview_size_spin.setValue(64)  # Default to 64 tiles (2KB)
+        self.preview_size_spin.setValue(192)  # Default to 192 tiles (6KB)
         self.preview_size_spin.setSuffix(" tiles")
         controls_layout.addWidget(self.preview_size_spin)
 

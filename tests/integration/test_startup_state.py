@@ -94,6 +94,9 @@ class MockEditWorkspace(QWidget):
         self.icon_toolbar.revertClicked = Mock()
         self.icon_toolbar.revertClicked.connect = Mock()
 
+        # Added to satisfy ROMWorkflowController
+        self.palette_panel = None
+
     def set_controller(self, ctrl):
         pass
 

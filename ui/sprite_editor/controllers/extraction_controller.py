@@ -116,7 +116,7 @@ class ExtractionController(QObject):
     def _on_generate_multi_preview(self) -> None:
         """Handle preview generation request from tab."""
         # Get preview size from view
-        preview_size = 128
+        preview_size = 384
         if self._multi_palette_view is not None:
             preview_size = self._multi_palette_view.get_preview_size()
 
@@ -385,3 +385,11 @@ class ExtractionController(QObject):
             self._view.set_extract_enabled(True)
         self._worker = None
         self._multi_worker = None
+
+    def is_busy(self) -> bool:
+        """Check if an extraction worker is currently running.
+
+        Returns:
+            True if a worker is active, False otherwise.
+        """
+        return self._worker is not None or self._multi_worker is not None

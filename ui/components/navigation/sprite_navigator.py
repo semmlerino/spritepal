@@ -46,8 +46,8 @@ from utils.sprite_regions import SpriteRegion, SpriteRegionDetector
 
 logger = get_logger(__name__)
 
-# Navigation constants
-THUMBNAIL_SIZE = 64
+# Nearby sprite previews
+THUMBNAIL_SIZE = 192
 MAX_THUMBNAILS = 5
 NAVIGATION_STEP_SMALL = 0x100
 NAVIGATION_STEP_MEDIUM = 0x1000

@@ -64,7 +64,8 @@ def workflow_controller(qtbot, mock_editing_controller):
         )
 
         # Expose the coordinator mock for tests to drive
-        ctrl._mock_coordinator = mock_instance
+        # Use the public attribute name from ROMWorkflowController
+        ctrl.preview_coordinator = mock_instance
 
         yield ctrl
 
@@ -111,8 +112,8 @@ def test_auto_open_workflow(qtbot, workflow_controller, mock_editing_controller)
     workflow_controller.set_offset(0x100, auto_open=True)
 
     # Verify full preview requested (auto_open=True uses full decompression)
-    assert workflow_controller._mock_coordinator.request_full_preview_called is True
-    assert workflow_controller._mock_coordinator.last_requested_offset == 0x100
+    assert workflow_controller.preview_coordinator.request_full_preview_called is True
+    assert workflow_controller.preview_coordinator.last_requested_offset == 0x100
 
     # State should still be 'preview' (or unset/initial) before preview returns
     assert spy_state.count() == 0
@@ -128,7 +129,7 @@ def test_auto_open_workflow(qtbot, workflow_controller, mock_editing_controller)
         MockRenderer.return_value.render_4bpp.return_value = mock_image
 
         # signature: tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded
-        workflow_controller._mock_coordinator.preview_ready.emit(dummy_data, 8, 8, "Sprite 100", 32, 0, 0x100, True)
+        workflow_controller.preview_coordinator.preview_ready.emit(dummy_data, 8, 8, "Sprite 100", 32, 0, 0x100, True)
 
     # Assert Final State
     # Should have transitioned to 'edit' because auto_open was True
@@ -153,7 +154,7 @@ def test_preview_only_workflow(qtbot, workflow_controller, mock_editing_controll
 
     # Trigger Preview
     dummy_data = b"\x00" * 32
-    workflow_controller._mock_coordinator.preview_ready.emit(dummy_data, 8, 8, "Sprite 200", 32, 0, 0x200, True)
+    workflow_controller.preview_coordinator.preview_ready.emit(dummy_data, 8, 8, "Sprite 200", 32, 0, 0x200, True)
 
     # Assert
     # Should NOT have transitioned to 'edit'

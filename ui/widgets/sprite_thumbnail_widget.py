@@ -22,11 +22,11 @@ class SpriteThumbnailWidget(QWidget):
     """Compact sprite thumbnail for gallery display."""
 
     # Signals
-    clicked = Signal(int)  # Emits offset when clicked
-    double_clicked = Signal(int)  # Emits offset when double-clicked
-    selected = Signal(bool)  # Emits selection state
+    clicked = Signal(int)  # offset
+    double_clicked = Signal(int)  # offset
+    selected = Signal(bool)  # selection state
 
-    def __init__(self, offset: int = 0, size: int = 128, parent: QWidget | None = None):
+    def __init__(self, offset: int = 0, size: int = 384, parent: QWidget | None = None):
         """
         Initialize sprite thumbnail widget.
 
@@ -126,7 +126,7 @@ class SpriteThumbnailWidget(QWidget):
 
         # Scale pixmap to fit thumbnail
         if pixmap and not pixmap.isNull():
-            label_size = self.thumbnail_label.size() if self.thumbnail_label else QSize(128, 128)
+            label_size = self.thumbnail_label.size() if self.thumbnail_label else QSize(384, 384)
             scaled = pixmap.scaled(
                 label_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
             )
@@ -138,7 +138,7 @@ class SpriteThumbnailWidget(QWidget):
 
     def _show_placeholder(self):
         """Show a placeholder when no sprite is loaded."""
-        label_size = self.thumbnail_label.size() if self.thumbnail_label else QSize(128, 128)
+        label_size = self.thumbnail_label.size() if self.thumbnail_label else QSize(384, 384)
         placeholder = QPixmap(label_size)
         placeholder.fill(QColor(35, 35, 35))
 

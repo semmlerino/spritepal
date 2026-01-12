@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, override
 if TYPE_CHECKING:
     from PySide6.QtCore import QPoint
 
-    from core.rom_extractor import ROMExtractor
     from core.visual_similarity_search import SimilarityMatch
 
 from PIL import Image
@@ -204,7 +203,7 @@ class SpritePreviewWidget(QWidget):
             # Small sprites: scale up moderately
             scale_factor = min(4, max_width // original_width, max_height // original_height)
             scale_width, scale_height = original_width * scale_factor, original_height * scale_factor
-        elif original_width <= 128 and original_height <= 128:
+        elif original_width <= 384 and original_height <= 384:
             # Medium sprites: scale up to use available space
             scale_factor = min(3, max_width // original_width, max_height // original_height)
             scale_width, scale_height = original_width * scale_factor, original_height * scale_factor
@@ -420,8 +419,8 @@ class SpritePreviewWidget(QWidget):
     def load_sprite_from_4bpp(
         self,
         tile_data: bytes,
-        width: int = 128,
-        height: int = 128,
+        width: int = 384,
+        height: int = 384,
         sprite_name: str | None = None,
     ) -> None:
         """Load sprite from 4bpp tile data with guaranteed Qt widget updates"""
@@ -481,17 +480,6 @@ class SpritePreviewWidget(QWidget):
                     self.info_label.setText("Unable to display sprite - data appears corrupted")
                 return
 
-            # Try to get ROM extractor - handle case where it's not available
-            extractor: ROMExtractor | None
-            try:
-                from core.app_context import get_app_context
-
-                extraction_manager = get_app_context().core_operations_manager
-                extractor = extraction_manager.get_rom_extractor()
-            except Exception as e:
-                logger.warning(f"ROM extractor not available: {e}")
-                extractor = None
-
             # Create temporary image from 4bpp data
             img = Image.new("L", (width, height), 0)
 
@@ -511,9 +499,6 @@ class SpritePreviewWidget(QWidget):
             pixel_count = 0
             non_zero_pixels = 0
 
-            # Choose decoding method based on extractor availability
-            decode_method = "rom_extractor" if extractor is not None else "fallback"
-
             for tile_idx in range(num_tiles):
                 tile_x = (tile_idx % tiles_per_row) * 8
                 tile_y = (tile_idx // tiles_per_row) * 8
@@ -524,14 +509,10 @@ class SpritePreviewWidget(QWidget):
                 tile_offset = tile_idx * bytes_per_tile
                 tile_bytes = tile_data[tile_offset : tile_offset + bytes_per_tile]
 
-                # Decode 4bpp tile using available method
+                # Decode 4bpp tile using fallback 4bpp decoding method
                 for y in range(8):
                     for x in range(8):
-                        if decode_method == "rom_extractor" and extractor:
-                            pixel = extractor._get_4bpp_pixel(tile_bytes, x, y)
-                        else:
-                            # Fallback 4bpp decoding method
-                            pixel = self._decode_4bpp_pixel_fallback(tile_bytes, x, y)
+                        pixel = self._decode_4bpp_pixel_fallback(tile_bytes, x, y)
 
                         gray_value = pixel * 17  # Convert to grayscale
                         pixel_count += 1

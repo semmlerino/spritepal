@@ -60,7 +60,8 @@ class TestMesenCapturesSection:
     def test_initialization(self, captures_section):
         """Test widget initializes correctly."""
         assert captures_section is not None
-        assert captures_section._captures_widget is not None
+        # Verify it has a capture count (proxy for internal widget existence)
+        assert captures_section.get_capture_count() == 0
 
     def test_add_capture(self, captures_section, sample_capture):
         """Test adding a capture to the widget."""
