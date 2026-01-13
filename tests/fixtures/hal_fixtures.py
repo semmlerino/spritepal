@@ -30,14 +30,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.infrastructure.mock_hal import (
-    MockHALCompressor,
-    MockHALProcessPool,
-    create_mock_hal_tools,
-)
-
 if TYPE_CHECKING:
     from pytest import FixtureRequest
+    from tests.infrastructure.mock_hal import (
+        MockHALCompressor,
+        MockHALProcessPool,
+    )
 
 
 def _find_real_hal_binaries() -> tuple[str, str] | None:
@@ -175,6 +173,8 @@ def hal_pool(request: FixtureRequest, tmp_path: Path) -> Generator[MockHALProces
         HALProcessPool.reset_singleton()
     else:
         # Use mock HAL process pool
+        from tests.infrastructure.mock_hal import MockHALProcessPool
+
         MockHALProcessPool.reset_singleton()
         pool = MockHALProcessPool()
 
@@ -236,6 +236,8 @@ def hal_compressor(request: FixtureRequest, tmp_path: Path) -> Generator[MockHAL
             compressor._pool.shutdown()
     else:
         # Use mock HAL compressor
+        from tests.infrastructure.mock_hal import MockHALCompressor
+
         compressor = MockHALCompressor(use_pool=True)
 
         yield compressor
@@ -270,6 +272,11 @@ def mock_hal(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     not just the source module. Python's `from X import Y` creates a new
     binding in the importing module, so we must patch each location.
     """
+    from tests.infrastructure.mock_hal import (
+        MockHALCompressor,
+        MockHALProcessPool,
+    )
+
     # Reset any existing real HAL singletons FIRST (before patching)
     with contextlib.suppress(Exception):
         from core.hal_compression import HALProcessPool as RealHALProcessPool
@@ -304,6 +311,8 @@ def mock_hal_tools(tmp_path: Path) -> tuple[Path, Path]:
 
     Returns tuple of (exhal_path, inhal_path).
     """
+    from tests.infrastructure.mock_hal import create_mock_hal_tools
+
     return create_mock_hal_tools(tmp_path)
 
 

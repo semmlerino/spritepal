@@ -41,9 +41,6 @@ from PySide6.QtWidgets import QApplication, QWidget
 
 from core.app_context import is_context_initialized
 from core.managers import is_initialized
-from core.services.rom_cache import ROMCache
-from ui.common import WorkerManager
-from ui.main_window import MainWindow
 
 from .data_repository import DataRepository, get_test_data_repository
 
@@ -51,6 +48,8 @@ if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
     from core.tile_renderer import TileRenderer
     from core.workers import ROMExtractionWorker, VRAMExtractionWorker
+    from core.services.rom_cache import ROMCache
+    from ui.main_window import MainWindow
 
 
 class RealComponentFactory:
@@ -176,8 +175,8 @@ class RealComponentFactory:
             if not is_initialized():
                 create_app_context(app_name="TestApp", settings_path=self._settings_path)
 
-        # B.7: Create MainWindow with explicit AppContext dependencies
         from core.app_context import get_app_context
+        from ui.main_window import MainWindow
 
         ctx = get_app_context()
         window = MainWindow(
@@ -260,8 +259,9 @@ class RealComponentFactory:
                 cache_dir = Path(tempfile.mkdtemp(prefix="spritepal_cache_"))
                 self._temp_dirs.append(cache_dir)
 
-        # Create mock settings manager that returns appropriate values
         from unittest.mock import MagicMock
+
+        from core.services.rom_cache import ROMCache
 
         mock_settings = MagicMock()
         mock_settings.get_cache_enabled.return_value = True
@@ -354,6 +354,8 @@ class RealComponentFactory:
         """
         # Step 1: Clean up all WorkerManager-registered workers FIRST
         # This is the primary goal - ensure worker threads are properly stopped
+        from ui.common import WorkerManager
+
         try:
             cleanup_count = WorkerManager.cleanup_all()
             if cleanup_count > 0:

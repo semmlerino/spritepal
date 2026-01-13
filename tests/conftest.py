@@ -44,18 +44,9 @@ For most tests, use `app_context` for complete isolation between tests.
 
 from __future__ import annotations
 
-# CRITICAL: Verify PySide6 is available BEFORE any Qt configuration
-# Tests should FAIL LOUDLY if Qt is unavailable, not silently pass via stubs
-import sys
-
-try:
-    import PySide6  # noqa: F401
-except ImportError as e:
-    sys.exit(f"FATAL: PySide6 is required for tests but not installed.\nRun: uv sync --extra dev\nImport error: {e}")
-
-# CRITICAL: Set offscreen mode BEFORE any Qt imports to prevent dialogs
 import os
 
+# Set offscreen mode early
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import importlib
@@ -108,6 +99,12 @@ def pytest_configure(config):
 
     Note: Custom markers are defined in pyproject.toml (single source of truth).
     """
+    # CRITICAL: Verify PySide6 is available
+    try:
+        import PySide6  # noqa: F401
+    except ImportError as e:
+        pytest.exit(f"FATAL: PySide6 is required for tests but not installed.\nRun: uv sync --extra dev\nImport error: {e}")
+
     # Install QPixmap guard via import hook - guarantees guard is installed even for late Qt imports
     _install_qpixmap_guard_unconditional()
 
@@ -247,81 +244,49 @@ def pytest_addoption(parser: Any) -> None:
 def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     """Validate marker usage and enforce PARALLEL BY DEFAULT xdist policy.
 
-    This hook performs:
-    1. Tracks real_hal marked tests for reporting
-    2. Validates that skip_thread_cleanup markers have a reason argument
-    3. Validates that allows_registry_state markers have a reason argument
-    4. Enforces xdist policy - tests marked @pytest.mark.parallel_unsafe are serialized
-
-    Tests run in parallel by default. Only tests marked @pytest.mark.parallel_unsafe
-    are grouped to a 'serial' worker.
-
-    Args:
-        config: pytest config object (required by hook signature)
-        items: list of test items being collected
+    This hook performs validation and configuration in a single pass over items.
     """
-    # === Track real_hal tests for CI visibility ===
-    real_hal_tests = [item for item in items if item.get_closest_marker("real_hal")]
-    config._real_hal_test_count = len(real_hal_tests)
-    config._real_hal_test_nodeids = [item.nodeid for item in real_hal_tests]
-
-    # === Validate skip_thread_cleanup markers ===
-    for item in items:
-        marker = item.get_closest_marker("skip_thread_cleanup")
-        if marker is not None:
-            # Check if reason kwarg is provided
-            reason = marker.kwargs.get("reason")
-            if not reason:
-                raise pytest.UsageError(
-                    f"Test {item.nodeid} uses @pytest.mark.skip_thread_cleanup "
-                    "without a reason. Add reason='...' explaining why thread "
-                    "cleanup should be skipped for this test.\n"
-                    "Example: @pytest.mark.skip_thread_cleanup(reason='Worker threads outlive test scope')"
-                )
-
-    # === Validate allows_registry_state markers ===
-    for item in items:
-        marker = item.get_closest_marker("allows_registry_state")
-        if marker is not None:
-            # Check if reason kwarg is provided
-            reason = marker.kwargs.get("reason")
-            if not reason:
-                raise pytest.UsageError(
-                    f"Test {item.nodeid} uses @pytest.mark.allows_registry_state "
-                    "without a reason. Add reason='...' explaining why registry "
-                    "state pollution is acceptable for this test.\n"
-                    "Example: @pytest.mark.allows_registry_state(reason='Tests manager lifecycle')"
-                )
-
-    # === Apply xdist serialization for parallel_unsafe tests ===
-    # Only apply when xdist plugin is active and -n option is used
-    if not config.pluginmanager.has_plugin("xdist"):
-        return
-
-    # Check if -n option is being used (workers > 0)
-    try:
-        worker_count = config.getoption("-n", default=None)
-    except ValueError:
-        # Option not registered (xdist not properly loaded)
-        return
-
-    if not worker_count or worker_count == "0":
-        return
-
-    # PARALLEL BY DEFAULT: Only parallel_unsafe tests are serialized
-    serial_group = pytest.mark.xdist_group("serial")
+    # Initialize tracking
+    real_hal_nodeids = []
+    
+    # Check xdist status once
+    xdist_active = config.pluginmanager.has_plugin("xdist")
+    worker_count = None
+    if xdist_active:
+        try:
+            worker_count = config.getoption("-n", default=None)
+        except ValueError:
+            xdist_active = False
+            
+    serial_group = pytest.mark.xdist_group("serial") if xdist_active and worker_count and worker_count != "0" else None
 
     for item in items:
-        # Skip tests already marked with xdist_group
-        if item.get_closest_marker("xdist_group"):
-            continue
+        # 1. Track real_hal tests
+        if item.get_closest_marker("real_hal"):
+            real_hal_nodeids.append(item.nodeid)
 
-        # Force serial if marked parallel_unsafe
-        if item.get_closest_marker("parallel_unsafe"):
-            item.add_marker(serial_group)
-            continue
+        # 2. Validate skip_thread_cleanup markers
+        skip_marker = item.get_closest_marker("skip_thread_cleanup")
+        if skip_marker is not None and not skip_marker.kwargs.get("reason"):
+            raise pytest.UsageError(
+                f"Test {item.nodeid} uses @pytest.mark.skip_thread_cleanup without a reason."
+            )
 
-        # DEFAULT: No marker = runs in parallel
+        # 3. Validate allows_registry_state markers
+        allow_marker = item.get_closest_marker("allows_registry_state")
+        if allow_marker is not None and not allow_marker.kwargs.get("reason"):
+            raise pytest.UsageError(
+                f"Test {item.nodeid} uses @pytest.mark.allows_registry_state without a reason."
+            )
+
+        # 4. Apply xdist serialization
+        if serial_group and not item.get_closest_marker("xdist_group"):
+            if item.get_closest_marker("parallel_unsafe"):
+                item.add_marker(serial_group)
+
+    # Store results on config
+    config._real_hal_test_count = len(real_hal_nodeids)
+    config._real_hal_test_nodeids = real_hal_nodeids
 
 
 def pytest_sessionfinish(session: Any, exitstatus: int) -> None:

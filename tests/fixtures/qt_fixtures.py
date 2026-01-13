@@ -33,26 +33,23 @@ if TYPE_CHECKING:
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
-from tests.infrastructure.environment_detection import (
-    get_environment_info,
-)
+# Get environment info lazily
+def _get_env_info():
+    from tests.infrastructure.environment_detection import get_environment_info
+    return get_environment_info()
 
-# Get environment info - Qt config is set in conftest.py (os.environ.setdefault)
-_environment_info = get_environment_info()
-IS_HEADLESS = _environment_info.is_headless
+def is_headless() -> bool:
+    return _get_env_info().is_headless
 
-# Thread baseline captured IMMEDIATELY at module load time (before any tests run)
-# This avoids race conditions where:
-# 1. Multiple parallel test collections try to set the baseline simultaneously
-# 2. Baseline is captured after prior tests have already spawned threads
-_SESSION_THREAD_BASELINE: int = threading.active_count()
+# Thread baseline captured lazily
+_SESSION_THREAD_BASELINE: int | None = None
+_SESSION_THREAD_IDENTITIES: dict[int, str] | None = None
 
-# IMPROVED: Capture thread IDENTITIES not just count
-# Identity-based detection is more reliable than count-based:
-# - Detects specific threads that leaked vs just "count increased"
-# - Can report leaked thread names and stack traces
-# - Not confused by Qt/pytest helper threads that fluctuate
-_SESSION_THREAD_IDENTITIES: dict[int, str] = {t.ident: t.name for t in threading.enumerate() if t.ident is not None}
+def _capture_baseline_if_needed():
+    global _SESSION_THREAD_BASELINE, _SESSION_THREAD_IDENTITIES
+    if _SESSION_THREAD_BASELINE is None:
+        _SESSION_THREAD_BASELINE = threading.active_count()
+        _SESSION_THREAD_IDENTITIES = {t.ident: t.name for t in threading.enumerate() if t.ident is not None}
 
 # Module logger for fixture diagnostics
 _logger = logging.getLogger(__name__)
@@ -83,6 +80,10 @@ def _get_session_thread_baseline(request: pytest.FixtureRequest | None = None) -
                 return baseline
         except AttributeError:
             pass
+    
+    _capture_baseline_if_needed()
+    assert _SESSION_THREAD_BASELINE is not None
+
     # Fallback to module-load baseline (may cause false positives under xdist)
     _logger.warning(
         "Thread baseline fallback to module-load time (%d threads). "
@@ -116,6 +117,10 @@ def _get_session_thread_identities(request: pytest.FixtureRequest | None = None)
                 return identities.copy()
         except AttributeError:
             pass
+    
+    _capture_baseline_if_needed()
+    assert _SESSION_THREAD_IDENTITIES is not None
+
     # Fallback to module-load identities (may cause false positives under xdist)
     _logger.warning(
         "Thread identities fallback to module-load time (%d threads). "

@@ -34,8 +34,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from tests.infrastructure.real_component_factory import RealComponentFactory
-
 if TYPE_CHECKING:
     from pytest import FixtureRequest, TempPathFactory
 
@@ -44,13 +42,10 @@ if TYPE_CHECKING:
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.services.rom_cache import ROMCache
     from ui.main_window import MainWindow
+    from tests.infrastructure.real_component_factory import RealComponentFactory
 
-# Import Qt fixtures for IS_HEADLESS constant
-try:
-    from tests.fixtures.qt_fixtures import IS_HEADLESS
-except ImportError:
-    # Fallback if qt_fixtures can't be imported
-    IS_HEADLESS = not os.environ.get("DISPLAY") and os.name != "nt"
+# Import Qt fixtures for is_headless helper
+from tests.fixtures.qt_fixtures import is_headless
 
 # Module logger for fixture diagnostics
 _logger = logging.getLogger(__name__)
@@ -271,6 +266,8 @@ def real_factory(
     Depends on app_context to ensure managers are properly initialized.
     The app_context fixture handles initialization and cleanup.
     """
+    from tests.infrastructure.real_component_factory import RealComponentFactory
+
     _ = app_context  # Ensures fixture runs first to initialize managers
     fail_on_leaks = _should_fail_on_leaks(request.config)
     factory = RealComponentFactory(
@@ -336,6 +333,8 @@ def rom_cache(
 
     Provides a real ROM cache with common caching functionality.
     """
+    from tests.infrastructure.real_component_factory import RealComponentFactory
+
     _ = app_context  # Ensures fixture runs first
     factory = RealComponentFactory(
         fail_on_leaks=_should_fail_on_leaks(request.config),
