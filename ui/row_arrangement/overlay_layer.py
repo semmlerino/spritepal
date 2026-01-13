@@ -28,6 +28,7 @@ class OverlayLayer(QObject):
 
     position_changed = Signal(int, int)
     opacity_changed = Signal(float)
+    scale_changed = Signal(float)
     visibility_changed = Signal(bool)
     image_changed = Signal()
 
@@ -38,6 +39,7 @@ class OverlayLayer(QObject):
         self._x: int = 0
         self._y: int = 0
         self._opacity: float = 0.5
+        self._scale: float = 1.0
         self._visible: bool = True
 
     @property
@@ -69,6 +71,11 @@ class OverlayLayer(QObject):
     def opacity(self) -> float:
         """Opacity of overlay (0.0 = transparent, 1.0 = opaque)."""
         return self._opacity
+
+    @property
+    def scale(self) -> float:
+        """Scale factor of overlay (1.0 = original size)."""
+        return self._scale
 
     @property
     def visible(self) -> bool:
@@ -138,6 +145,17 @@ class OverlayLayer(QObject):
             self._opacity = opacity
             self.opacity_changed.emit(opacity)
 
+    def set_scale(self, scale: float) -> None:
+        """Set the overlay scale.
+
+        Args:
+            scale: Scale factor (0.1 to 10.0).
+        """
+        scale = max(0.1, min(10.0, scale))
+        if self._scale != scale:
+            self._scale = scale
+            self.scale_changed.emit(scale)
+
     def toggle_visibility(self) -> bool:
         """Toggle overlay visibility.
 
@@ -173,6 +191,7 @@ class OverlayLayer(QObject):
             "x": self._x,
             "y": self._y,
             "opacity": self._opacity,
+            "scale": self._scale,
             "visible": self._visible,
         }
 
@@ -203,6 +222,11 @@ class OverlayLayer(QObject):
             if isinstance(opacity, (int, float)):
                 self.set_opacity(float(opacity))
 
+            # Restore scale
+            scale = state.get("scale", 1.0)
+            if isinstance(scale, (int, float)):
+                self.set_scale(float(scale))
+
             # Restore visibility
             visible = state.get("visible", True)
             if isinstance(visible, bool):
@@ -215,7 +239,7 @@ class OverlayLayer(QObject):
     def sample_region(self, tile_x: int, tile_y: int, tile_width: int, tile_height: int) -> Image.Image | None:
         """Sample a tile-sized region from the overlay at the given canvas position.
 
-        Used during Apply operation to extract pixels for a tile.
+        Accounts for overlay scale.
 
         Args:
             tile_x: X position of tile on canvas (pixels).
@@ -229,23 +253,39 @@ class OverlayLayer(QObject):
         if self._image is None:
             return None
 
-        # Calculate the region to sample from overlay coordinates
-        # The tile is at (tile_x, tile_y) on the canvas
-        # The overlay is at (self._x, self._y) on the canvas
-        # So the corresponding overlay coordinates are:
-        sample_x = tile_x - self._x
-        sample_y = tile_y - self._y
+        # When the overlay is scaled, we need to find the corresponding region 
+        # in the original full-resolution overlay image.
+        
+        # Coordinates relative to overlay top-left on canvas
+        rel_x = tile_x - self._x
+        rel_y = tile_y - self._y
+        
+        # Scale these relative coordinates to original image space
+        # If scale=0.5, then rel_x=10 means sample_x=20 in the original image
+        sample_x = rel_x / self._scale
+        sample_y = rel_y / self._scale
+        
+        # Also scale the tile dimensions to original image space
+        sample_w = tile_width / self._scale
+        sample_h = tile_height / self._scale
 
-        # Check if the region is within bounds
-        if sample_x < 0 or sample_y < 0:
+        # Check if the region is within bounds (with small epsilon for float precision)
+        eps = 1e-6
+        if sample_x < -eps or sample_y < -eps:
             return None
-        if sample_x + tile_width > self._image.width:
+        if sample_x + sample_w > self._image.width + eps:
             return None
-        if sample_y + tile_height > self._image.height:
+        if sample_y + sample_h > self._image.height + eps:
             return None
 
-        # Crop the region from the overlay
-        return self._image.crop((sample_x, sample_y, sample_x + tile_width, sample_y + tile_height))
+        # Crop the region from the original overlay
+        crop_box = (int(sample_x), int(sample_y), int(sample_x + sample_w), int(sample_y + sample_h))
+        region = self._image.crop(crop_box)
+        
+        # Resize the cropped region back to the tile size (8x8)
+        # using Lanczos (high quality) or nearest if indices matter
+        # Since this is an overlay (RGB/RGBA), we use high quality scaling.
+        return region.resize((tile_width, tile_height), Image.Resampling.LANCZOS)
 
     def covers_tile(self, tile_x: int, tile_y: int, tile_width: int, tile_height: int) -> bool:
         """Check if the overlay fully covers a tile region.
@@ -262,15 +302,21 @@ class OverlayLayer(QObject):
         if self._image is None:
             return False
 
-        sample_x = tile_x - self._x
-        sample_y = tile_y - self._y
+        # Same logic as sample_region: check if the mapped region is within bounds
+        rel_x = tile_x - self._x
+        rel_y = tile_y - self._y
+        
+        sample_x = rel_x / self._scale
+        sample_y = rel_y / self._scale
+        sample_w = tile_width / self._scale
+        sample_h = tile_height / self._scale
 
-        # Check all four corners are within overlay bounds
-        if sample_x < 0 or sample_y < 0:
+        eps = 1e-6
+        if sample_x < -eps or sample_y < -eps:
             return False
-        if sample_x + tile_width > self._image.width:
+        if sample_x + sample_w > self._image.width + eps:
             return False
-        if sample_y + tile_height > self._image.height:
+        if sample_y + sample_h > self._image.height + eps:
             return False
 
         return True

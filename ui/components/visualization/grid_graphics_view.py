@@ -229,6 +229,23 @@ class GridGraphicsView(QGraphicsView):
         if not event:
             return
 
+        # Check for interactive items at this position (e.g. overlay)
+        # We want to prioritize items that have the ItemIsMovable flag
+        scene_pos = self.mapToScene(event.pos())
+        items = self.scene().items(scene_pos) if self.scene() else []
+        
+        # Filter for items that should handle events instead of the grid
+        interactive_items = [
+            i for i in items 
+            if i.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable 
+            and i != self.pixmap_item
+            and not isinstance(i, (QGraphicsLineItem, QGraphicsRectItem))
+        ]
+        
+        if interactive_items and event.button() == Qt.MouseButton.LeftButton:
+            super().mousePressEvent(event)
+            return
+
         if event.button() == Qt.MouseButton.LeftButton:
             pos = self.mapToScene(event.pos())
             tile_pos = self._pos_to_tile(pos)

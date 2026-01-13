@@ -52,6 +52,7 @@ from .row_arrangement.grid_arrangement_manager import (
 )
 from .row_arrangement.grid_image_processor import GridImageProcessor
 from .row_arrangement.grid_preview_generator import GridPreviewGenerator
+from .row_arrangement.overlay_item import OverlayGraphicsItem
 from .row_arrangement.undo_redo import (
     AddGroupCommand,
     AddMultipleTilesCommand,
@@ -133,6 +134,9 @@ class GridArrangementDialog(SplitterDialog):
 
         # Apply operation result (set by _apply_overlay())
         self._apply_result: ApplyResult | None = None
+        
+        # Persistent overlay item
+        self.overlay_item: OverlayGraphicsItem | None = None
 
         # Step 2: Call parent init (this will call _setup_ui)
         super().__init__(
@@ -953,6 +957,14 @@ class GridArrangementDialog(SplitterDialog):
 
     def _on_overlay_changed(self, *_: object) -> None:
         """Handle overlay property changes (position, opacity, visibility, image)."""
+        # If the overlay item is being moved by the mouse, we don't want to 
+        # trigger a full scene clear/redraw as it can be expensive and 
+        # potentially interrupt the drag operation.
+        if self.overlay_item and self.overlay_item.is_dragging:
+            # The item itself is already updating its position on screen.
+            # We just need to ensure other things that might depend on it are okay.
+            return
+
         self._update_arrangement_canvas()
 
     def _on_palette_mode_changed(self, enabled: bool):
@@ -1193,6 +1205,19 @@ class GridArrangementDialog(SplitterDialog):
         self.arrangement_grid._update_hover(TilePosition(-1, -1))
 
         scene = self.arrangement_scene
+        
+        # Temporarily remove overlay item to protect it from scene.clear()
+        if self.overlay_item is not None:
+            if self.overlay_item.scene() == scene:
+                scene.removeItem(self.overlay_item)
+        else:
+            # Try to find it if we lost the reference (e.g. after a direct clear)
+            for item in scene.items():
+                if isinstance(item, OverlayGraphicsItem):
+                    scene.removeItem(item)
+                    self.overlay_item = item
+                    break
+
         scene.clear()
 
         mapping = self.arrangement_manager.get_grid_mapping()
@@ -1209,16 +1234,24 @@ class GridArrangementDialog(SplitterDialog):
         if self.overlay_layer.visible and self.overlay_layer.has_image():
             overlay_image = self.overlay_layer.image
             if overlay_image is not None:
-                # Convert PIL Image to QPixmap
+                if self.overlay_item is None:
+                    self.overlay_item = OverlayGraphicsItem(self.overlay_layer)
+                
+                # Update pixmap if it might have changed (or just always for simplicity here)
+                # Ideally OverlayLayer would have a dirty flag for image
                 overlay_pixmap = self._create_pixmap_from_image(overlay_image)
-                if overlay_pixmap:
-                    overlay_item = QGraphicsPixmapItem(overlay_pixmap)
-                    overlay_item.setPos(self.overlay_layer.x, self.overlay_layer.y)
-                    overlay_item.setOpacity(self.overlay_layer.opacity)
-                    scene.addItem(overlay_item)
+                self.overlay_item.setPixmap(overlay_pixmap)
+                
+                # Sync position and other properties
+                self.overlay_item.setPos(self.overlay_layer.x, self.overlay_layer.y)
+                self.overlay_item.setOpacity(self.overlay_layer.opacity)
+                self.overlay_item.setVisible(True)
+                
+                scene.addItem(self.overlay_item)
+        elif self.overlay_item is not None:
+            self.overlay_item.setVisible(False)
 
         # Restore background grid lines ON TOP of the items
-        # (matching the appearance of the source grid)
         self.arrangement_grid.update_grid()
 
     def _get_item_preview_full(self, arr_type: ArrangementType, key: str) -> QPixmap | None:
@@ -1616,6 +1649,8 @@ class GridArrangementDialog(SplitterDialog):
         # Clear graphics scene items
         if self.scene:
             self.scene.clear()
+            
+        self.overlay_item = None
 
         # Clear processor data
         self.processor.tiles.clear()

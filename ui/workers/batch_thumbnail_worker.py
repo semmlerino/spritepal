@@ -673,6 +673,10 @@ class BatchThumbnailWorker(QObject):
             try:
                 rom_size = len(self._rom_mmap)
 
+                # Clear cached HAL data FIRST to release memoryview references to mmap
+                # This prevents BufferError: cannot close exported pointers exist
+                self._rom_data_for_hal = None
+
                 # Close memory map
                 if hasattr(self._rom_mmap, "close") and callable(getattr(self._rom_mmap, "close", None)):
                     self._rom_mmap.close()
@@ -685,9 +689,6 @@ class BatchThumbnailWorker(QObject):
 
                 # Reset SMC offset
                 self._smc_offset = 0
-
-                # Clear cached HAL data
-                self._rom_data_for_hal = None
 
                 if rom_size > 0:
                     logger.debug(f"Cleared ROM data: freed {rom_size} bytes")

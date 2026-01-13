@@ -74,6 +74,21 @@ class OverlayControls(QGroupBox):
         pos_row.addWidget(self.y_spin)
         layout.addLayout(pos_row)
 
+        # Scale slider
+        scale_row = QHBoxLayout()
+        scale_row.addWidget(QLabel("Scale:"))
+        self.scale_slider = QSlider(Qt.Orientation.Horizontal)
+        self.scale_slider.setRange(10, 1000)  # 10% to 1000%
+        self.scale_slider.setValue(100)
+        self.scale_slider.setToolTip("Overlay scale (10-1000%)")
+        scale_row.addWidget(self.scale_slider)
+        self.scale_spin = QSpinBox()
+        self.scale_spin.setRange(10, 1000)
+        self.scale_spin.setValue(100)
+        self.scale_spin.setSuffix("%")
+        scale_row.addWidget(self.scale_spin)
+        layout.addLayout(scale_row)
+
         # Opacity slider
         opacity_row = QHBoxLayout()
         opacity_row.addWidget(QLabel("Opacity:"))
@@ -105,12 +120,15 @@ class OverlayControls(QGroupBox):
         self.clear_btn.clicked.connect(self._on_clear_clicked)
         self.x_spin.valueChanged.connect(self._on_position_changed)
         self.y_spin.valueChanged.connect(self._on_position_changed)
+        self.scale_slider.valueChanged.connect(self._on_scale_slider_changed)
+        self.scale_spin.valueChanged.connect(self._on_scale_spin_changed)
         self.opacity_slider.valueChanged.connect(self._on_opacity_changed)
         self.visible_check.toggled.connect(self._on_visibility_changed)
 
         # Overlay -> UI
         self._overlay.position_changed.connect(self._update_position_spinboxes)
         self._overlay.opacity_changed.connect(self._update_opacity_slider)
+        self._overlay.scale_changed.connect(self._update_scale_controls)
         self._overlay.visibility_changed.connect(self._update_visibility_checkbox)
         self._overlay.image_changed.connect(self._update_enabled_state)
 
@@ -140,6 +158,20 @@ class OverlayControls(QGroupBox):
         # Emit position_changed manually since we blocked it
         self._overlay.position_changed.emit(x, y)
 
+    def _on_scale_slider_changed(self, value: int) -> None:
+        """Handle scale slider changes."""
+        self.scale_spin.blockSignals(True)
+        self.scale_spin.setValue(value)
+        self.scale_spin.blockSignals(False)
+        self._overlay.set_scale(value / 100.0)
+
+    def _on_scale_spin_changed(self, value: int) -> None:
+        """Handle scale spinbox changes."""
+        self.scale_slider.blockSignals(True)
+        self.scale_slider.setValue(value)
+        self.scale_slider.blockSignals(False)
+        self._overlay.set_scale(value / 100.0)
+
     def _on_opacity_changed(self, value: int) -> None:
         """Handle opacity slider changes."""
         opacity = value / 100.0
@@ -167,6 +199,16 @@ class OverlayControls(QGroupBox):
         self.opacity_slider.blockSignals(False)
         self.opacity_label.setText(f"{value}%")
 
+    def _update_scale_controls(self, scale: float) -> None:
+        """Update scale controls from overlay state."""
+        value = int(scale * 100)
+        self.scale_slider.blockSignals(True)
+        self.scale_slider.setValue(value)
+        self.scale_slider.blockSignals(False)
+        self.scale_spin.blockSignals(True)
+        self.scale_spin.setValue(value)
+        self.scale_spin.blockSignals(False)
+
     def _update_visibility_checkbox(self, visible: bool) -> None:
         """Update checkbox from overlay state."""
         self.visible_check.blockSignals(True)
@@ -179,5 +221,7 @@ class OverlayControls(QGroupBox):
         self.clear_btn.setEnabled(has_image)
         self.x_spin.setEnabled(has_image)
         self.y_spin.setEnabled(has_image)
+        self.scale_slider.setEnabled(has_image)
+        self.scale_spin.setEnabled(has_image)
         self.opacity_slider.setEnabled(has_image)
         self.visible_check.setEnabled(has_image)
