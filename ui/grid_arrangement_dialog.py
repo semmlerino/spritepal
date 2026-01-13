@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from ui.sprite_editor.services.arrangement_bridge import ArrangementBridge
 
 from PIL import Image
-from PySide6.QtCore import QMimeData, QModelIndex, QPoint, QPointF, QRectF, QSize, Qt, Signal
+from PySide6.QtCore import QMimeData, QObject, QPoint, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QCloseEvent,
@@ -25,10 +25,9 @@ from PySide6.QtGui import (
     QDragMoveEvent,
     QDropEvent,
     QFocusEvent,
-    QFont,
-    QIcon,
     QKeyEvent,
     QMouseEvent,
+    QPainter,
     QPainterPath,
     QPen,
     QPixmap,
@@ -36,23 +35,19 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
-    QButtonGroup,
     QFrame,
+    QGraphicsItem,
     QGraphicsLineItem,
     QGraphicsPathItem,
     QGraphicsPixmapItem,
     QGraphicsRectItem,
     QGraphicsScene,
-    QGraphicsSimpleTextItem,
     QGraphicsView,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QMessageBox,
     QPushButton,
-    QRadioButton,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -75,14 +70,12 @@ from .row_arrangement.grid_arrangement_manager import (
 from .row_arrangement.grid_image_processor import GridImageProcessor
 from .row_arrangement.grid_preview_generator import GridPreviewGenerator
 from .row_arrangement.undo_redo import (
-    AddColumnTilesCommand,
     AddGroupCommand,
     AddMultipleTilesCommand,
-    AddRowTilesCommand,
+    CanvasMoveItemsCommand,
+    CanvasPlaceItemsCommand,
+    CanvasRemoveItemCommand,
     ClearGridCommand,
-    InsertTileCommand,
-    RemoveMultipleTilesCommand,
-    ReorderGridCommand,
     UndoRedoStack,
 )
 from .utils.accessibility import AccessibilityHelper
@@ -151,11 +144,9 @@ class GridGraphicsView(QGraphicsView):
 
         # Visual elements
         self.grid_lines: list[QGraphicsLineItem] = []
-        self.path_items: list[QGraphicsLineItem | QGraphicsRectItem] = []
         self.selection_rects: dict[TilePosition, QGraphicsRectItem] = {}
-        self.order_labels: dict[TilePosition, QGraphicsSimpleTextItem] = {}
         self.hover_rect: QGraphicsRectItem | None = None
-        self.drop_placeholder: QGraphicsRectItem | None = None
+        self.drop_placeholder: QGraphicsItem | None = None
         self.dimming_overlay: QGraphicsPathItem | None = None
         self.pixmap_item: QGraphicsPixmapItem | None = None  # Set by load_image
 
@@ -165,12 +156,9 @@ class GridGraphicsView(QGraphicsView):
         self.hover_color = QColor(0, 255, 255, 64)
         self.arranged_color = QColor(0, 255, 0, 64)
         self.dim_color = QColor(0, 0, 0, 120)  # Semi-transparent black for dimming
-        self.path_color = QColor(0, 255, 0, 180)  # Bright green for path
         self.keyboard_focus_color = QColor(0, 0, 255, 128)  # Blue border for keyboard focus
         self.marquee_color = QColor(0, 120, 215, 40)  # Windows-style blue
         self.marquee_border_color = QColor(0, 120, 215)
-        self.index_text_color = QColor(255, 255, 255)
-        self.index_bg_color = QColor(0, 0, 0, 160)
         self.drop_target_color = QColor(255, 255, 255, 128)
 
         self.group_colors = [
@@ -208,18 +196,14 @@ class GridGraphicsView(QGraphicsView):
         if scene:
             for rect in self.selection_rects.values():
                 scene.removeItem(rect)
-            for label in self.order_labels.values():
-                scene.removeItem(label)
-            for item in self.path_items:
-                scene.removeItem(item)
             if self.drop_placeholder:
                 scene.removeItem(self.drop_placeholder)
                 self.drop_placeholder = None
+            if self.dimming_overlay:
+                scene.removeItem(self.dimming_overlay)
+                self.dimming_overlay = None
         if self.selection_rects:
             self.selection_rects.clear()
-        if self.order_labels:
-            self.order_labels.clear()
-        self.path_items.clear()
 
     def highlight_arranged_tiles(
         self,
@@ -236,138 +220,56 @@ class GridGraphicsView(QGraphicsView):
             return
 
         # Track which tiles we've already processed to avoid duplicates
-        processed_tiles = set()
+        processed_tiles = set(tiles)
+        
+        # Update dimming for unarranged tiles
+        self.set_unarranged_opacity(list(processed_tiles))
+
+        # Track which tiles we've already highlighted to avoid duplicate labels
+        rendered_tiles = set()
 
         for _, tile_pos in enumerate(tiles):
-            if tile_pos in processed_tiles:
+            if tile_pos in rendered_tiles:
                 continue
-            processed_tiles.add(tile_pos)
+            rendered_tiles.add(tile_pos)
 
             if tile_pos not in self.selection_rects:
                 rect = self._create_tile_rect(tile_pos, color)
                 scene.addItem(rect)
                 self.selection_rects[tile_pos] = rect
 
-            # Show index if manager is provided
-            if manager:
-                # Find the logical index in arrangement_order
-                logical_index = -1
-                for idx, (arr_type, key) in enumerate(manager.get_arrangement_order()):
-                    if (arr_type == ArrangementType.TILE and key == f"{tile_pos.row},{tile_pos.col}") or (
-                        arr_type == ArrangementType.ROW and int(key) == tile_pos.row
-                    ):
-                        logical_index = idx
-                        break
-                    if arr_type == ArrangementType.COLUMN and int(key) == tile_pos.col:
-                        logical_index = idx
-                        break
-                    if arr_type == ArrangementType.GROUP:
-                        group = manager.get_groups().get(key)
-                        if group and tile_pos in group.tiles:
-                            logical_index = idx
-                            break
-
-                if logical_index != -1:
-                    self._update_tile_index_label(tile_pos, logical_index + 1)
-
-        # Draw path between arranged items if manager is provided
-        if manager:
-            self.draw_arrangement_path(manager)
-
-    def draw_arrangement_path(self, manager: GridArrangementManager):
-        """Draw a path connecting arranged items in order"""
-        scene = self.scene()
-        if not scene:
-            return
-
-        # Clear existing path items
-        for item in self.path_items:
-            scene.removeItem(item)
-        self.path_items.clear()
-
-        order = manager.get_arrangement_order()
-        if len(order) < 2:
-            return
-
-        # Calculate center points for each arrangement item
-        centers: list[QPointF] = []
-        for arr_type, key in order:
-            if arr_type == ArrangementType.TILE:
-                row, col = map(int, key.split(","))
-                centers.append(self._get_tile_center(TilePosition(row, col)))
-            elif arr_type == ArrangementType.ROW:
-                row = int(key)
-                # For a row, use a point slightly into the row
-                centers.append(QPointF(self.tile_width * self.grid_cols / 4, (row + 0.5) * self.tile_height))
-            elif arr_type == ArrangementType.COLUMN:
-                col = int(key)
-                centers.append(QPointF((col + 0.5) * self.tile_width, self.tile_height * self.grid_rows / 4))
-            elif arr_type == ArrangementType.GROUP:
-                group = manager.get_groups().get(key)
-                if group and group.tiles:
-                    # Average of all tile centers in group
-                    avg_x = sum(t.col for t in group.tiles) / len(group.tiles)
-                    avg_y = sum(t.row for t in group.tiles) / len(group.tiles)
-                    centers.append(QPointF((avg_x + 0.5) * self.tile_width, (avg_y + 0.5) * self.tile_height))
-
-        # Draw lines connecting centers
-        pen = QPen(self.path_color, 1.5, Qt.PenStyle.DashLine)
-        for i in range(len(centers) - 1):
-            line = QGraphicsLineItem(centers[i].x(), centers[i].y(), centers[i + 1].x(), centers[i + 1].y())
-            line.setPen(pen)
-            line.setZValue(15)  # Between selection rects and index labels
-            scene.addItem(line)
-            self.path_items.append(line)
-
-            # Add a small arrowhead or dot at the destination
-            dot = QGraphicsRectItem(centers[i + 1].x() - 1, centers[i + 1].y() - 1, 2, 2)
-            dot.setBrush(QBrush(self.path_color))
-            dot.setPen(Qt.PenStyle.NoPen)
-            dot.setZValue(16)
-            scene.addItem(dot)
-            self.path_items.append(dot)
-
-    def _get_tile_center(self, pos: TilePosition) -> QPointF:
-        """Get the center point of a tile in scene coordinates"""
-        return QPointF((pos.col + 0.5) * self.tile_width, (pos.row + 0.5) * self.tile_height)
-
     def set_unarranged_opacity(self, arranged_tiles: list[TilePosition]):
         """Dim unarranged tiles to make arranged ones pop"""
-        if not self.pixmap_item:
-            return
-
-        # This is tricky with a single pixmap item.
-        # Instead, we can add a semi-transparent overlay and then "punch holes" in it,
-        # or use a shader. Since this is Qt, adding a darkening overlay with holes is easiest.
-        # But even simpler: if we have any arranged tiles, we can add a darkening rect
-        # to the whole scene and then clear areas for arranged tiles.
-        # However, for now let's just use the bright selection rects.
-        pass
-
-    def _update_tile_index_label(self, tile_pos: TilePosition, index: int):
-        """Update or create the index label for a tile"""
         scene = self.scene()
-        if not scene:
+        if not scene or not self.pixmap_item:
             return
 
-        if tile_pos in self.order_labels:
-            label = self.order_labels[tile_pos]
-            label.setText(str(index))
-        else:
-            label = QGraphicsSimpleTextItem(str(index))
-            font = QFont("Arial", 6)
-            font.setBold(True)
-            label.setFont(font)
-            label.setBrush(QBrush(self.index_text_color))
-            label.setZValue(20)  # High Z-value
+        # Remove existing dimming
+        if self.dimming_overlay:
+            scene.removeItem(self.dimming_overlay)
+            self.dimming_overlay = None
 
-            # Center text in tile
-            x = tile_pos.col * self.tile_width + 1
-            y = tile_pos.row * self.tile_height + 1
-            label.setPos(x, y)
+        if not arranged_tiles:
+            return
 
-            scene.addItem(label)
-            self.order_labels[tile_pos] = label
+        # Create a path that covers the whole grid minus the arranged tiles
+        full_rect = QRectF(0, 0, self.grid_cols * self.tile_width, self.grid_rows * self.tile_height)
+        path = QPainterPath()
+        path.addRect(full_rect)
+        
+        # Subtract arranged tiles from the path
+        for tile in arranged_tiles:
+            tile_rect = QRectF(tile.col * self.tile_width, tile.row * self.tile_height, self.tile_width, self.tile_height)
+            # Using addRect with OddEvenFill rule in a single path creates holes
+            path.addRect(tile_rect)
+        
+        path.setFillRule(Qt.FillRule.OddEvenFill)
+        
+        self.dimming_overlay = QGraphicsPathItem(path)
+        self.dimming_overlay.setBrush(QBrush(self.dim_color))
+        self.dimming_overlay.setPen(Qt.PenStyle.NoPen)
+        self.dimming_overlay.setZValue(5)  # Above pixmap, below selections
+        scene.addItem(self.dimming_overlay)
 
     @override
     def mousePressEvent(self, event: QMouseEvent | None):
@@ -458,42 +360,86 @@ class GridGraphicsView(QGraphicsView):
         drag = QDrag(self)
         mime_data = QMimeData()
 
-        # Store tile position and its index in the arrangement
-        tile_str = f"{self._drag_tile.row},{self._drag_tile.col}"
-        mime_data.setText(tile_str)
-        mime_data.setData("application/x-spritepal-tile", tile_str.encode())
+        # Determine tiles to drag
+        drag_tiles = [self._drag_tile]
+        if self._drag_tile in self.current_selection:
+            drag_tiles = list(self.current_selection)
+        
+        # Serialize tiles: "anchor_r,anchor_c|r,c;r,c;..."
+        anchor_str = f"{self._drag_tile.row},{self._drag_tile.col}"
+        tiles_str = ";".join(f"{t.row},{t.col}" for t in drag_tiles)
+        payload = f"{anchor_str}|{tiles_str}"
+        
+        mime_data.setText(payload)
+        mime_data.setData("application/x-spritepal-tiles", payload.encode())
 
         drag.setMimeData(mime_data)
 
-        # Create a ghost pixmap of the tile for the drag cursor
-        rect = QRectF(
-            self._drag_tile.col * self.tile_width,
-            self._drag_tile.row * self.tile_height,
-            self.tile_width,
-            self.tile_height,
-        )
-
-        # Try to get clean tile from original pixmap
-        clean_pixmap = None
+        # Create a pixmap for the drag cursor (visual feedback)
+        # We'll create a composite pixmap of all dragged tiles
+        
+        # Calculate bounding box of dragged tiles
+        min_r = min(t.row for t in drag_tiles)
+        max_r = max(t.row for t in drag_tiles)
+        min_c = min(t.col for t in drag_tiles)
+        max_c = max(t.col for t in drag_tiles)
+        
+        width_tiles = max_c - min_c + 1
+        height_tiles = max_r - min_r + 1
+        
+        pixmap = QPixmap(width_tiles * self.tile_width, height_tiles * self.tile_height)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        
+        painter = QPainter(pixmap)
+        
         if hasattr(self, "pixmap_item") and self.pixmap_item:
-            # The pixmap item contains the original image
             source_pixmap = self.pixmap_item.pixmap()
-            # Convert scene rect to pixmap coords
-            clean_pixmap = source_pixmap.copy(rect.toRect())
-
-        if clean_pixmap and not clean_pixmap.isNull():
-            # Scale it up so it's clearly visible (e.g. 64x64)
-            pixmap = clean_pixmap.scaled(
-                64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation
-            )
+            for t in drag_tiles:
+                # Source rect in pixmap
+                src_rect = QRectF(
+                    t.col * self.tile_width, 
+                    t.row * self.tile_height,
+                    self.tile_width, 
+                    self.tile_height
+                )
+                # Target rect in drag pixmap
+                dst_x = (t.col - min_c) * self.tile_width
+                dst_y = (t.row - min_r) * self.tile_height
+                dst_rect = QRectF(dst_x, dst_y, self.tile_width, self.tile_height)
+                
+                painter.drawPixmap(dst_rect, source_pixmap, src_rect)
         else:
-            pixmap = self.grab(self.mapFromScene(rect).boundingRect())
+            # Fallback if no source pixmap (e.g. empty canvas)
+            # Draw placeholder rects
+            painter.setBrush(QBrush(QColor(100, 100, 255, 128)))
+            for t in drag_tiles:
+                dst_x = (t.col - min_c) * self.tile_width
+                dst_y = (t.row - min_r) * self.tile_height
+                painter.drawRect(dst_x, dst_y, self.tile_width, self.tile_height)
+                
+        painter.end()
+
+        # Scale if too large
+        if pixmap.width() > 200 or pixmap.height() > 200:
+            pixmap = pixmap.scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio)
 
         drag.setPixmap(pixmap)
-        drag.setHotSpot(QPoint(pixmap.width() // 2, pixmap.height() // 2))
+        
+        # Hotspot should be relative to the anchor tile
+        anchor_x = (self._drag_tile.col - min_c) * self.tile_width + self.tile_width // 2
+        anchor_y = (self._drag_tile.row - min_r) * self.tile_height + self.tile_height // 2
+        
+        # Adjust hotspot for scaling if applied
+        if pixmap.width() != width_tiles * self.tile_width:
+             scale_x = pixmap.width() / (width_tiles * self.tile_width)
+             scale_y = pixmap.height() / (height_tiles * self.tile_height)
+             anchor_x *= scale_x
+             anchor_y *= scale_y
+
+        drag.setHotSpot(QPoint(int(anchor_x), int(anchor_y)))
 
         # Reset drag state
-        self._marquee_active = False  # Cancel marquee if dragging tile
+        self._marquee_active = False
         self._drag_tile = None
 
         drag.exec(Qt.DropAction.MoveAction)
@@ -501,39 +447,62 @@ class GridGraphicsView(QGraphicsView):
     @override
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         """Handle drag enter"""
-        if event.mimeData().hasFormat("application/x-spritepal-tile"):
+        if event.mimeData().hasFormat("application/x-spritepal-tiles"):
             event.acceptProposedAction()
 
     @override
     def dragMoveEvent(self, event: QDragMoveEvent) -> None:
         """Handle drag move with placeholder feedback"""
-        if event.mimeData().hasFormat("application/x-spritepal-tile"):
+        if event.mimeData().hasFormat("application/x-spritepal-tiles"):
             event.acceptProposedAction()
 
             # Update drop placeholder
             pos = self.mapToScene(event.pos())
-            tile_pos = self._pos_to_tile(pos)
-
+            target_tile = self._pos_to_tile(pos)
+            
             scene = self.scene()
-            if tile_pos and self._is_valid_tile(tile_pos) and scene:
+            if not scene:
+                return
+
+            if target_tile and self._is_valid_tile(target_tile):
+                # Parse mime data to get relative offsets
+                data = str(event.mimeData().data("application/x-spritepal-tiles").data(), encoding="utf-8")
+                anchor_str, tiles_str = data.split("|")
+                ar, ac = map(int, anchor_str.split(","))
+                anchor = TilePosition(ar, ac)
+                
+                tiles = []
+                for t_str in tiles_str.split(";"):
+                    r, c = map(int, t_str.split(","))
+                    tiles.append(TilePosition(r, c))
+                
+                # Calculate placeholder shape
+                path = QPainterPath()
+                for t in tiles:
+                    # Calculate target position for this tile
+                    # offset from anchor
+                    dr = t.row - anchor.row
+                    dc = t.col - anchor.col
+                    
+                    target_r = target_tile.row + dr
+                    target_c = target_tile.col + dc
+                    
+                    # Add rect if within bounds
+                    if 0 <= target_r < self.grid_rows and 0 <= target_c < self.grid_cols:
+                        x = target_c * self.tile_width
+                        y = target_r * self.tile_height
+                        path.addRect(QRectF(x, y, self.tile_width, self.tile_height))
+                
                 if self.drop_placeholder is None:
-                    self.drop_placeholder = QGraphicsRectItem(
-                        tile_pos.col * self.tile_width,
-                        tile_pos.row * self.tile_height,
-                        self.tile_width,
-                        self.tile_height,
-                    )
+                    self.drop_placeholder = QGraphicsPathItem()
                     self.drop_placeholder.setPen(QPen(Qt.GlobalColor.white, 2, Qt.PenStyle.DashLine))
                     self.drop_placeholder.setBrush(QBrush(self.drop_target_color))
                     self.drop_placeholder.setZValue(100)
                     scene.addItem(self.drop_placeholder)
-                else:
-                    self.drop_placeholder.setRect(
-                        tile_pos.col * self.tile_width,
-                        tile_pos.row * self.tile_height,
-                        self.tile_width,
-                        self.tile_height,
-                    )
+                
+                if isinstance(self.drop_placeholder, QGraphicsPathItem):
+                    self.drop_placeholder.setPath(path)
+                
             elif self.drop_placeholder:
                 scene.removeItem(self.drop_placeholder)
                 self.drop_placeholder = None
@@ -557,24 +526,31 @@ class GridGraphicsView(QGraphicsView):
                 scene.removeItem(self.drop_placeholder)
             self.drop_placeholder = None
 
-        if event.mimeData().hasFormat("application/x-spritepal-tile"):
+        if event.mimeData().hasFormat("application/x-spritepal-tiles"):
             pos = self.mapToScene(event.pos())
             target_tile = self._pos_to_tile(pos)
 
             if target_tile and self._is_valid_tile(target_tile):
-                # Signal that we want to move the tile to this target position
-                mime_data = event.mimeData().data("application/x-spritepal-tile")
-                source_tile_str = str(mime_data, encoding="utf-8")  # type: ignore[arg-type]
-                r, c = map(int, source_tile_str.split(","))
-                source_tile = TilePosition(r, c)
+                data = str(event.mimeData().data("application/x-spritepal-tiles").data(), encoding="utf-8")
+                anchor_str, tiles_str = data.split("|")
+                # We don't need anchor here if we pass the whole list and target
+                # But for reordering logic in dialog, knowing the structure matters.
+                # Let's pass the source tiles list and the target anchor position.
+                
+                source_tiles = []
+                for t_str in tiles_str.split(";"):
+                    r, c = map(int, t_str.split(","))
+                    source_tiles.append(TilePosition(r, c))
+                
+                # Also pass the anchor from the source
+                ar, ac = map(int, anchor_str.split(","))
+                anchor = TilePosition(ar, ac)
 
-                # Find the target index
-                # We emit a signal for the dialog to handle the actual manager update
-                self.tile_reordered.emit(source_tile, target_tile)
+                self.tiles_dropped.emit(source_tiles, anchor, target_tile, event.source())
                 event.acceptProposedAction()
 
-    # Signals (add to GridGraphicsView class)
-    tile_reordered = Signal(TilePosition, TilePosition)
+    # Signals
+    tiles_dropped = Signal(list, TilePosition, TilePosition, QObject)  # sources, source_anchor, target_anchor, drag_source
 
     @override
     def wheelEvent(self, event: QWheelEvent | None):
@@ -1253,7 +1229,7 @@ class GridArrangementDialog(SplitterDialog):
         return left_widget
 
     def _create_right_panel(self) -> QWidget:
-        """Create the right panel containing arrangement list and preview.
+        """Create the right panel containing arrangement grid and preview.
 
         Returns:
             QWidget: The configured right panel widget
@@ -1263,15 +1239,49 @@ class GridArrangementDialog(SplitterDialog):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(SPACING_COMPACT_SMALL)
 
-        # Add arrangement list
-        list_group = self._create_arrangement_list_group(right_widget)
-        right_layout.addWidget(list_group)
+        # Add arrangement grid
+        grid_group = self._create_arrangement_grid_group(right_widget)
+        right_layout.addWidget(grid_group, 1)
 
         # Add preview
         preview_group = self._create_preview_group(right_widget)
         right_layout.addWidget(preview_group, 1)
 
         return right_widget
+
+    def _create_arrangement_grid_group(self, parent: QWidget) -> QGroupBox:
+        """Create the arrangement grid group.
+
+        Args:
+            parent: Parent widget for the group
+
+        Returns:
+            QGroupBox: The configured arrangement grid group
+        """
+        grid_group = QGroupBox("Current Arrangement", parent)
+        grid_layout = QVBoxLayout()
+
+        # Create arrangement scene and view
+        self.arrangement_scene = QGraphicsScene(self)
+        self.arrangement_grid = GridGraphicsView(self)
+        self.arrangement_grid.setScene(self.arrangement_scene)
+        
+        # Configure arrangement grid
+        width = self.width_spin.value() if hasattr(self, "width_spin") else 16
+        self.arrangement_grid.set_grid_dimensions(
+            width,
+            32,  # Large enough height to start
+            self.processor.tile_width,
+            self.processor.tile_height,
+        )
+
+        # Connect arrangement grid signals
+        self.arrangement_grid.tiles_dropped.connect(self._on_tiles_dropped_on_canvas)
+        self.arrangement_grid.tile_clicked.connect(self._on_arrangement_tile_clicked)
+
+        grid_layout.addWidget(self.arrangement_grid)
+        grid_group.setLayout(grid_layout)
+        return grid_group
 
     def _apply_accessibility_enhancements(self) -> None:
         """Apply comprehensive accessibility enhancements to the dialog"""
@@ -1313,7 +1323,7 @@ class GridArrangementDialog(SplitterDialog):
             (SelectionMode.RECTANGLE, "Rectangle", "G", "Select rectangular regions"),
         ]
 
-        for mode, label, shortcut_key, description in mode_options:
+        for mode, label, _, _ in mode_options:
             self.mode_toggle.add_option(label, mode, checked=(mode == SelectionMode.TILE))
 
         self.mode_toggle.selection_changed.connect(self._on_mode_changed)
@@ -1339,6 +1349,7 @@ class GridArrangementDialog(SplitterDialog):
         self.scene = QGraphicsScene(self)
         self.grid_view = GridGraphicsView(self)
         self.grid_view.setScene(self.scene)
+        self.grid_view.setAcceptDrops(False)  # Disable drops on source grid
 
         # Initialize grid view
         self._initialize_grid_view()
@@ -1370,7 +1381,7 @@ class GridArrangementDialog(SplitterDialog):
         self.grid_view.tile_clicked.connect(self._on_tile_clicked)
         self.grid_view.tiles_selected.connect(self._on_tiles_selected)
         self.grid_view.zoom_changed.connect(self._on_zoom_changed)
-        self.grid_view.tile_reordered.connect(self._on_tile_reordered)
+        self.grid_view.tiles_dropped.connect(self._on_tiles_dropped_on_canvas)
         self._update_zoom_level_display()
 
     def _create_actions_group(self, parent: QWidget) -> QGroupBox:
@@ -1477,32 +1488,6 @@ class GridArrangementDialog(SplitterDialog):
         self.zoom_reset_btn.setMaximumWidth(40)
         layout.addWidget(self.zoom_reset_btn)
 
-    def _create_arrangement_list_group(self, parent: QWidget) -> QGroupBox:
-        """Create the arrangement list group with reordering support.
-
-        Args:
-            parent: Parent widget for the group
-
-        Returns:
-            QGroupBox: The configured arrangement list group
-        """
-        list_group = QGroupBox("Current Arrangement", parent)
-        list_layout = QVBoxLayout()
-
-        self.arrangement_list: QListWidget = QListWidget(self)
-        self.arrangement_list.setViewMode(QListWidget.ViewMode.IconMode)
-        self.arrangement_list.setIconSize(QSize(64, 64))
-        self.arrangement_list.setGridSize(QSize(80, 100))
-        self.arrangement_list.setResizeMode(QListWidget.ResizeMode.Adjust)
-        self.arrangement_list.setWrapping(True)
-        self.arrangement_list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
-        self.arrangement_list.model().rowsMoved.connect(self._on_list_rows_moved)
-        self.arrangement_list.itemSelectionChanged.connect(self._on_list_selection_changed)
-        list_layout.addWidget(self.arrangement_list)
-
-        list_group.setLayout(list_layout)
-        return list_group
-
     def _create_preview_group(self, parent: QWidget) -> ScrollablePreviewGroup:
         """Create the preview group with scrollable area.
 
@@ -1520,95 +1505,15 @@ class GridArrangementDialog(SplitterDialog):
         self.preview_label = preview_group.preview_label
         return preview_group
 
-    def _on_list_rows_moved(
-        self, parent: QModelIndex, start: int, end: int, destination: QModelIndex, row: int
-    ) -> None:
-        """Handle reordering via list drag-and-drop"""
-        # Note: Qt rowsMoved parameters:
-        # row is the destination row index BEFORE the move
-        old_index = start
-        new_index = row
-        if old_index < new_index:
-            new_index -= 1  # Adjust because item was removed from its old position
-
-        if old_index != new_index:
-            # Wrap in command for undo support
-            old_order = self.arrangement_manager.get_arrangement_order()
-            self.arrangement_manager.move_item(old_index, new_index)
-            new_order = self.arrangement_manager.get_arrangement_order()
-
-            command = ReorderGridCommand(
-                manager=self.arrangement_manager,
-                old_order=old_order,
-                new_order=new_order,
-            )
-            # Push without executing because it's already done
-            self.undo_stack._undo_stack.append(command)
-            self.undo_stack._redo_stack.clear()
-            self.undo_stack.can_undo_changed.emit(True)
-            self.undo_stack.can_redo_changed.emit(False)
-            self.undo_stack.stack_changed.emit()
-
-    def _on_tile_reordered(self, source_tile: TilePosition, target_tile: TilePosition):
-        """Handle tile reordering or insertion via grid drag-and-drop"""
-        # Find indices of source and target in arrangement_order
-        source_idx = -1
-        target_idx = -1
-
-        order = self.arrangement_manager.get_arrangement_order()
-
-        # Helper to check if a tile is part of an arrangement item
-        def tile_in_item(tile: TilePosition, arr_type: ArrangementType, key: str) -> bool:
-            if arr_type == ArrangementType.TILE:
-                return key == f"{tile.row},{tile.col}"
-            if arr_type == ArrangementType.ROW:
-                return int(key) == tile.row
-            if arr_type == ArrangementType.COLUMN:
-                return int(key) == tile.col
-            # ArrangementType.GROUP
-            group = self.arrangement_manager.get_groups().get(key)
-            return group is not None and tile in group.tiles
-
-        for i, (arr_type, key) in enumerate(order):
-            if tile_in_item(source_tile, arr_type, key):
-                source_idx = i
-            if tile_in_item(target_tile, arr_type, key):
-                target_idx = i
-
-        if target_idx != -1:
-            if source_idx != -1:
-                # REORDER: Move source item to target item's position
-                if source_idx != target_idx:
-                    old_order = self.arrangement_manager.get_arrangement_order()
-                    self.arrangement_manager.move_item(source_idx, target_idx)
-                    new_order = self.arrangement_manager.get_arrangement_order()
-
-                    command = ReorderGridCommand(
-                        manager=self.arrangement_manager,
-                        old_order=old_order,
-                        new_order=new_order,
-                    )
-                    self.undo_stack._undo_stack.append(command)
-                    self.undo_stack.can_undo_changed.emit(True)
-                    self.undo_stack._redo_stack.clear()
-                    self.undo_stack.can_redo_changed.emit(False)
-                    self.undo_stack.stack_changed.emit()
-            else:
-                # INSERT: Add new tile at target's position
-
-                command = InsertTileCommand(
-                    manager=self.arrangement_manager,
-                    tile=source_tile,
-                    index=target_idx,
-                )
-                self.undo_stack.push(command)
-        elif source_idx == -1:
-            # APPEND: If dropped on unarranged tile and source was also unarranged
-            # Regular add_tile handles this, but let's allow dragging to the end
-            self.arrangement_manager.add_tile(source_tile)
-
     def _on_arrangement_width_changed(self, value: int):
         """Handle arrangement width change"""
+        if hasattr(self, "arrangement_grid"):
+            self.arrangement_grid.set_grid_dimensions(
+                value,
+                32,
+                self.processor.tile_width,
+                self.processor.tile_height
+            )
         self._update_preview()
 
     def _add_all_tiles(self):
@@ -1675,158 +1580,67 @@ class GridArrangementDialog(SplitterDialog):
         self.grid_view.set_selection_mode(mode)
         self._update_status(f"Selection mode: {mode.value}")
 
-    def _on_list_selection_changed(self) -> None:
-        """Handle selection change in the arrangement list to highlight in grid"""
-        if not self.arrangement_list:
-            return
-
-        selected_items = self.arrangement_list.selectedItems()
-        if not selected_items:
-            # Optionally clear highlights or keep them
-            return
-
-        # Clear current grid selection if we want to show only the list selection
-        self.grid_view.clear_selection()
-
-        order = self.arrangement_manager.get_arrangement_order()
-
-        for item in selected_items:
-            idx = self.arrangement_list.row(item)
-            if 0 <= idx < len(order):
-                arr_type, key = order[idx]
-                if arr_type == ArrangementType.TILE:
-                    row, col = map(int, key.split(","))
-                    self.grid_view.current_selection.add(TilePosition(row, col))
-                elif arr_type == ArrangementType.ROW:
-                    row = int(key)
-                    for col in range(self.grid_view.grid_cols):
-                        self.grid_view.current_selection.add(TilePosition(row, col))
-                elif arr_type == ArrangementType.COLUMN:
-                    col = int(key)
-                    for row in range(self.grid_view.grid_rows):
-                        self.grid_view.current_selection.add(TilePosition(row, col))
-                elif arr_type == ArrangementType.GROUP:
-                    group = self.arrangement_manager.get_groups().get(key)
-                    if group:
-                        for tile in group.tiles:
-                            self.grid_view.current_selection.add(tile)
-
-        self.grid_view._update_selection_display()
-
     def _on_tile_clicked(self, tile_pos: TilePosition) -> None:
-        """Handle single tile click"""
+        """Handle single tile click in source grid"""
         # In tile mode, immediately add/remove the tile
         if self.grid_view.selection_mode == SelectionMode.TILE:
             if self.arrangement_manager.is_tile_arranged(tile_pos):
-                self.arrangement_manager.remove_tile(tile_pos)
+                # Find where it is and remove it
+                mapping = self.arrangement_manager.get_grid_mapping()
+                for (tr, tc), (arr_type, key) in mapping.items():
+                    if arr_type == ArrangementType.TILE and key == f"{tile_pos.row},{tile_pos.col}":
+                        self.arrangement_manager.remove_item_at(tr, tc)
+                        break
             else:
                 self.arrangement_manager.add_tile(tile_pos)
+        
+        # Highlight in canvas if already arranged
+        # (Implementation of canvas highlighting could go here)
 
-        # Sync with list: Find if this tile is part of any arrangement item
-        if self.arrangement_manager.is_tile_arranged(tile_pos):
-            order = self.arrangement_manager.get_arrangement_order()
-            for idx, (arr_type, key) in enumerate(order):
-                found = False
-                if arr_type == ArrangementType.TILE and key == f"{tile_pos.row},{tile_pos.col}":
-                    found = True
-                elif arr_type == ArrangementType.ROW and int(key) == tile_pos.row:
-                    found = True
-                elif arr_type == ArrangementType.COLUMN and int(key) == tile_pos.col:
-                    found = True
-                elif arr_type == ArrangementType.GROUP:
-                    group = self.arrangement_manager.get_groups().get(key)
-                    if group and tile_pos in group.tiles:
-                        found = True
-
-                if found:
-                    self.arrangement_list.blockSignals(True)
-                    self.arrangement_list.clearSelection()
-                    item = self.arrangement_list.item(idx)
-                    if item:
-                        item.setSelected(True)
-                        self.arrangement_list.scrollToItem(item)
-                    self.arrangement_list.blockSignals(False)
-                    break
 
     def _on_tiles_selected(self, tiles: list[TilePosition]) -> None:
         """Handle tile selection"""
         self._update_status(f"Selected {len(tiles)} tiles")
 
     def _add_selection(self):
-        """Add current selection to arrangement"""
+        """Add current selection to arrangement canvas (next available slots)"""
         selection = list(self.grid_view.current_selection)
 
         if not selection:
             return
 
-        if self.grid_view.selection_mode == SelectionMode.ROW:
-            # Add as row - find tiles that aren't already arranged
-            row = selection[0].row
-            tiles_to_add = [
-                TilePosition(row, col)
-                for col in range(self.arrangement_manager.total_cols)
-                if not self.arrangement_manager.is_tile_arranged(TilePosition(row, col))
-            ]
-            if tiles_to_add:
-                command = AddRowTilesCommand(
-                    manager=self.arrangement_manager,
-                    row=row,
-                    tiles_added=tiles_to_add,
-                )
-                self.undo_stack.push(command)
+        # Sort selection to add in a sensible order
+        selection.sort(key=lambda t: (t.row, t.col))
 
-        elif self.grid_view.selection_mode == SelectionMode.COLUMN:
-            # Add as column - find tiles that aren't already arranged
-            col = selection[0].col
-            tiles_to_add = [
-                TilePosition(row, col)
-                for row in range(self.arrangement_manager.total_rows)
-                if not self.arrangement_manager.is_tile_arranged(TilePosition(row, col))
-            ]
-            if tiles_to_add:
-                command = AddColumnTilesCommand(
-                    manager=self.arrangement_manager,
-                    col=col,
-                    tiles_added=tiles_to_add,
-                )
-                self.undo_stack.push(command)
-
-        else:
-            # Add individual tiles - filter out already arranged ones
-            tiles_to_add = [tile for tile in selection if not self.arrangement_manager.is_tile_arranged(tile)]
-            if tiles_to_add:
-                command = AddMultipleTilesCommand(
-                    manager=self.arrangement_manager,
-                    tiles=tiles_to_add,
-                )
-                self.undo_stack.push(command)
+        for tile in selection:
+            if not self.arrangement_manager.is_tile_arranged(tile):
+                self.arrangement_manager.add_tile(tile)
 
         self.grid_view.clear_selection()
+        self._update_displays()
 
     def _remove_selection(self):
-        """Remove current selection from arrangement"""
+        """Remove current selection from arrangement grid mapping"""
         selection = list(self.grid_view.current_selection)
 
         if not selection:
             return
 
-        # Filter to only tiles that are arranged and not part of groups
-        tiles_to_remove: list[tuple[TilePosition, int]] = []
-        for tile in selection:
-            if self.arrangement_manager.is_tile_arranged(tile):
-                # Skip tiles that are part of groups (those need group removal)
-                if self.arrangement_manager.get_tile_group(tile) is None:
-                    position = self.arrangement_manager.get_tile_position(tile)
-                    tiles_to_remove.append((tile, position))
+        # Find tiles in grid mapping that match these source tiles
+        mapping = self.arrangement_manager.get_grid_mapping()
+        to_remove = []
+        for (tr, tc), (arr_type, key) in mapping.items():
+            if arr_type == ArrangementType.TILE:
+                row, col = map(int, key.split(","))
+                if TilePosition(row, col) in selection:
+                    to_remove.append((tr, tc))
+            # Support for other types could go here
 
-        if tiles_to_remove:
-            command = RemoveMultipleTilesCommand(
-                manager=self.arrangement_manager,
-                tiles_with_positions=tiles_to_remove,
-            )
-            self.undo_stack.push(command)
+        for tr, tc in to_remove:
+            self.arrangement_manager.remove_item_at(tr, tc)
 
         self.grid_view.clear_selection()
+        self._update_displays()
 
     def _create_group(self):
         """Create a group from current selection"""
@@ -1990,49 +1804,158 @@ class GridArrangementDialog(SplitterDialog):
         empty.fill(Qt.GlobalColor.transparent)
         return empty
 
+    def _on_tiles_dropped_on_canvas(self, source_tiles: list[TilePosition], anchor: TilePosition, target_anchor: TilePosition, source_widget: QObject):
+        """Handle tiles dropped on the arrangement canvas"""
+        
+        # Calculate offset from anchor for each tile
+        # target_tile = target_anchor + (tile - anchor)
+        
+        # Check source
+        is_internal = (source_widget == self.arrangement_grid)
+        
+        if is_internal:
+            # MOVE tiles within canvas
+            # Moving multiple tiles is complex if they overlap.
+            # Strategy: Collect all moves, execute them.
+            # For Undo: We need a CompositeCommand or just push multiple commands.
+            # But pushing multiple fills the stack.
+            # Better: One command that moves multiple?
+            # For now, let's just handle them one by one.
+            
+            # To prevent overwriting ourselves during the move (e.g. shift right),
+            # we should process based on direction, or remove all first then add.
+            # Remove all first is safer.
+            
+            # Actually, `CanvasMoveItemsCommand` handles one item.
+            # Let's iterate.
+            
+            for src_tile in source_tiles:
+                # Calculate target
+                dr = src_tile.row - anchor.row
+                dc = src_tile.col - anchor.col
+                target_r = target_anchor.row + dr
+                target_c = target_anchor.col + dc
+                
+                # Check bounds
+                if not (0 <= target_r < 32 and 0 <= target_c < self.arrangement_grid.grid_cols): # Use dynamic height?
+                    continue
+                    
+                src_pos = (src_tile.row, src_tile.col)
+                tgt_pos = (target_r, target_c)
+                
+                if src_pos == tgt_pos:
+                    continue
+                    
+                # Skip if src not in mapping (shouldn't happen)
+                if not self.arrangement_manager.get_item_at(*src_pos):
+                    continue
+                
+                command = CanvasMoveItemsCommand(
+                    manager=self.arrangement_manager,
+                    source_pos=src_pos,
+                    target_pos=tgt_pos
+                )
+                self.undo_stack.push(command)
+                
+        else:
+            # ADD tiles from source grid
+            for src_tile in source_tiles:
+                # Calculate target
+                dr = src_tile.row - anchor.row
+                dc = src_tile.col - anchor.col
+                target_r = target_anchor.row + dr
+                target_c = target_anchor.col + dc
+                
+                # Check bounds
+                # We used 32 as fixed height in _create_arrangement_grid_group, 
+                # but we should probably allow expansion or check against limits.
+                # GridGraphicsView has grid_rows/cols.
+                if not (0 <= target_r < self.arrangement_grid.grid_rows and 0 <= target_c < self.arrangement_grid.grid_cols):
+                    continue
+                
+                # Create Place Command
+                # We need to know what we are placing.
+                # From source grid, it's always TILE type for now.
+                # (unless we support dragging rows/groups from source list - but that's gone)
+                
+                item_key = f"{src_tile.row},{src_tile.col}"
+                
+                command = CanvasPlaceItemsCommand(
+                    manager=self.arrangement_manager,
+                    target_pos=(target_r, target_c),
+                    item_type=ArrangementType.TILE,
+                    item_key=item_key
+                )
+                self.undo_stack.push(command)
+    
+        self._update_displays()
+
+    def _on_arrangement_tile_clicked(self, tile_pos: TilePosition) -> None:
+        """Handle click in arrangement canvas (e.g. to remove)"""
+        if self.arrangement_manager.get_item_at(tile_pos.row, tile_pos.col):
+            command = CanvasRemoveItemCommand(
+                manager=self.arrangement_manager,
+                target_pos=(tile_pos.row, tile_pos.col)
+            )
+            self.undo_stack.push(command)
+            self._update_displays()
     def _update_displays(self):
         """Update all display elements"""
-        # Update grid view highlights with manager for index visualization
+        # Update source grid view (highlights/dimming)
         arranged_tiles = self.arrangement_manager.get_arranged_tiles()
         self.grid_view.highlight_arranged_tiles(arranged_tiles, manager=self.arrangement_manager)
 
-        # Update arrangement list
-        self._update_arrangement_list()
+        # Update arrangement canvas
+        self._update_arrangement_canvas()
 
         # Update preview
         self._update_preview()
 
-    def _update_arrangement_list(self):
-        """Update the arrangement list widget"""
-        if not self.arrangement_list:
+    def _update_arrangement_canvas(self):
+        """Update the arrangement canvas view"""
+        if not hasattr(self, "arrangement_grid"):
             return
 
-        # Block signals to prevent _on_list_rows_moved from being triggered
-        self.arrangement_list.blockSignals(True)
-        try:
-            self.arrangement_list.clear()
+        scene = self.arrangement_scene
+        scene.clear()
+        
+        # Re-add background grid or placeholder if needed
+        # (GridGraphicsView handles its own grid lines)
+        
+        mapping = self.arrangement_manager.get_grid_mapping()
+        
+        for (r, c), (arr_type, key) in mapping.items():
+            # Get the image for this item
+            pixmap = self._get_item_preview_full(arr_type, key)
+            if pixmap:
+                item = QGraphicsPixmapItem(pixmap)
+                item.setPos(c * self.processor.tile_width, r * self.processor.tile_height)
+                scene.addItem(item)
+                
+                # Add a border or highlight
+                rect = QGraphicsRectItem(
+                    c * self.processor.tile_width,
+                    r * self.processor.tile_height,
+                    self.processor.tile_width,
+                    self.processor.tile_height
+                )
+                rect.setPen(QPen(self.grid_view.arranged_color, 1))
+                scene.addItem(rect)
 
-            for arr_type, key in self.arrangement_manager.get_arrangement_order():
-                if arr_type == ArrangementType.ROW:
-                    item_text = f"Row {key}"
-                elif arr_type == ArrangementType.COLUMN:
-                    item_text = f"Col {key}"
-                elif arr_type == ArrangementType.TILE:
-                    row, col = key.split(",")
-                    item_text = f"({row},{col})"
-                elif arr_type == ArrangementType.GROUP:
-                    group = self.arrangement_manager.get_groups().get(key)
-                    item_text = group.name if group else f"Group {key}"
-                else:
-                    item_text = str(key)
-
-                if item_text:
-                    pixmap = self._get_item_preview(arr_type, key)
-                    item = QListWidgetItem(QIcon(pixmap), item_text)
-                    item.setToolTip(item_text)
-                    self.arrangement_list.addItem(item)
-        finally:
-            self.arrangement_list.blockSignals(False)
+    def _get_item_preview_full(self, arr_type: ArrangementType, key: str) -> QPixmap | None:
+        """Get the full-size preview pixmap for an arrangement item"""
+        img = None
+        if arr_type == ArrangementType.TILE:
+            row, col = map(int, key.split(","))
+            pos = TilePosition(row, col)
+            img = self.tiles.get(pos)
+            if img and self.colorizer.is_palette_mode():
+                img = self.colorizer.get_display_image(row, img)
+        # Support for ROW/COLUMN could be added here if needed for canvas placement
+        
+        if img:
+            return self._create_pixmap_from_image(img)
+        return None
 
     def _update_preview(self):
         """Update the arrangement preview"""
@@ -2088,7 +2011,10 @@ class GridArrangementDialog(SplitterDialog):
 
         try:
             # Create arranged image
-            arranged_image = self.preview_generator.create_grid_arranged_image(self.processor, self.arrangement_manager)
+            width = self.width_spin.value() if hasattr(self, "width_spin") else min(16, self.processor.grid_cols)
+            arranged_image = self.preview_generator.create_grid_arranged_image(
+                self.processor, self.arrangement_manager, width=width
+            )
 
             if arranged_image:
                 self.output_path = self.preview_generator.export_grid_arrangement(
@@ -2217,8 +2143,8 @@ class GridArrangementDialog(SplitterDialog):
         # Disconnect colorizer signals
         safe_disconnect(self.colorizer.palette_mode_changed)
 
-        # Disconnect mode button signals
-        safe_disconnect(self.mode_buttons.buttonClicked)
+        # Disconnect mode toggle signals
+        safe_disconnect(self.mode_toggle.selection_changed)
 
         # Disconnect grid view signals
         safe_disconnect(self.grid_view.tile_clicked)

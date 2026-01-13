@@ -75,8 +75,86 @@ class GridArrangementManager(QObject):
         self._groups: dict[str, TileGroup] = {}
         self._tile_to_group: dict[TilePosition, str] = {}  # Map tiles to their group
 
-        # Arrangement order tracking
+        # Arrangement order tracking (linear sequence for ROM)
         self._arrangement_order: list[tuple[ArrangementType, str]] = []
+
+        # Grid-based placement mapping: (target_row, target_col) -> (ArrangementType, key)
+        # This allows free placement and dragging in the arrangement grid
+        self._grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = {}
+
+    def set_item_at(self, target_row: int, target_col: int, arr_type: ArrangementType, key: str) -> bool:
+        """Place an arrangement item at a specific grid position on the canvas.
+
+        This handles the "free dragging" in the target grid.
+        If another item is there, it will be replaced/moved.
+        """
+        # We don't strictly validate target bounds here as the canvas can be large,
+        # but we might want to if we have a fixed-width constraint.
+        pos = (target_row, target_col)
+
+        # Update mapping
+        self._grid_mapping[pos] = (arr_type, key)
+
+        # Re-derive linear arrangement order from grid mapping
+        self._derive_order_from_grid()
+
+        self.arrangement_changed.emit()
+        return True
+
+    def remove_item_at(self, target_row: int, target_col: int) -> bool:
+        """Remove whatever is at the target grid position."""
+        pos = (target_row, target_col)
+        if pos in self._grid_mapping:
+            del self._grid_mapping[pos]
+            self._derive_order_from_grid()
+            self.arrangement_changed.emit()
+            return True
+        return False
+
+    def move_grid_item(self, source_pos: tuple[int, int], target_pos: tuple[int, int]) -> bool:
+        """Move an item from one grid slot to another."""
+        if source_pos not in self._grid_mapping:
+            return False
+
+        item = self._grid_mapping.pop(source_pos)
+
+        # If target has an item, we can swap or just overwrite. Overwrite for now.
+        self._grid_mapping[target_pos] = item
+
+        self._derive_order_from_grid()
+        self.arrangement_changed.emit()
+        return True
+
+    def get_item_at(self, row: int, col: int) -> tuple[ArrangementType, str] | None:
+        """Get the item at a specific grid position."""
+        return self._grid_mapping.get((row, col))
+
+    def get_grid_mapping(self) -> dict[tuple[int, int], tuple[ArrangementType, str]]:
+        """Get copy of current grid mapping."""
+        return self._grid_mapping.copy()
+
+    def _derive_order_from_grid(self) -> None:
+        """Re-derive the linear ROM order by scanning the grid (row-major)."""
+        if not self._grid_mapping:
+            self._arrangement_order = []
+            self._rebuild_arranged_tiles()
+            return
+
+        # Find bounds of the grid mapping
+        rows = [p[0] for p in self._grid_mapping.keys()]
+        cols = [p[1] for p in self._grid_mapping.keys()]
+        min_r, max_r = min(rows), max(rows)
+        min_c, max_c = min(cols), max(cols)
+
+        new_order: list[tuple[ArrangementType, str]] = []
+        for r in range(min_r, max_r + 1):
+            for c in range(min_c, max_c + 1):
+                item = self._grid_mapping.get((r, c))
+                if item:
+                    new_order.append(item)
+
+        self._arrangement_order = new_order
+        self._rebuild_arranged_tiles()
 
     def add_tile(self, position: TilePosition) -> bool:
         """Add a single tile to the arrangement"""
@@ -87,9 +165,32 @@ class GridArrangementManager(QObject):
         if position in self._tile_set or position in self._tile_to_group:
             return False
 
-        self._arranged_tiles.append(position)
-        self._tile_set.add(position)
-        self._arrangement_order.append((ArrangementType.TILE, f"{position.row},{position.col}"))
+        # Find next available slot in grid mapping (simple append logic for non-drag adds)
+        target_row = 0
+        target_col = 0
+        if self._grid_mapping:
+            # For simplicity, we can't easily know "arrangement width" here,
+            # so we just find the highest row/col and increment.
+            # But usually add_tile is called by double-click.
+            # Let's just find the first empty slot in row-major order.
+            found = False
+            # Assume a reasonable search width, or just append to end
+            max_r = max(p[0] for p in self._grid_mapping.keys()) if self._grid_mapping else 0
+            # We don't know the preferred width here, so let's just use the current grid_cols
+            # from the source as a hint, or just 16.
+            width_hint = 16
+            
+            for r in range(max_r + 2):
+                for c in range(width_hint):
+                    if (r, c) not in self._grid_mapping:
+                        target_row, target_col = r, c
+                        found = True
+                        break
+                if found: break
+        
+        item = (ArrangementType.TILE, f"{position.row},{position.col}")
+        self._grid_mapping[(target_row, target_col)] = item
+        self._derive_order_from_grid()
 
         self.tile_added.emit(position)
         self.arrangement_changed.emit()
@@ -386,6 +487,8 @@ class GridArrangementManager(QObject):
             self._tile_to_group.clear()
         if self._arrangement_order:
             self._arrangement_order.clear()
+        if self._grid_mapping:
+            self._grid_mapping.clear()
 
         self.arrangement_cleared.emit()
         self.arrangement_changed.emit()

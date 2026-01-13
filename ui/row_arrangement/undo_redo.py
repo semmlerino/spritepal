@@ -562,3 +562,91 @@ class ClearGridCommand:
             self.previous_tile_to_group,
             self.previous_order,
         )
+
+
+@dataclass
+class CanvasMoveItemsCommand:
+    """Command to move an item within the arrangement canvas."""
+
+    manager: GridArrangementManager
+    source_pos: tuple[int, int]
+    target_pos: tuple[int, int]
+    # We might overwrite something at target, so we need to store it
+    overwritten_item: tuple[ArrangementType, str] | None = None
+    
+    @property
+    def description(self) -> str:
+        return f"Move item to ({self.target_pos[0]}, {self.target_pos[1]})"
+
+    def execute(self) -> None:
+        # Save overwritten item if any (only on first execute, theoretically)
+        # But for robust undo/redo, we should capture it before execution if not provided.
+        # Here we assume the caller provides it or we check it now.
+        if self.overwritten_item is None:
+            self.overwritten_item = self.manager.get_item_at(*self.target_pos)
+            
+        self.manager.move_grid_item(self.source_pos, self.target_pos)
+
+    def undo(self) -> None:
+        # Move back
+        self.manager.move_grid_item(self.target_pos, self.source_pos)
+        
+        # Restore overwritten item at target if any
+        if self.overwritten_item:
+            arr_type, key = self.overwritten_item
+            self.manager.set_item_at(self.target_pos[0], self.target_pos[1], arr_type, key)
+
+
+@dataclass
+class CanvasPlaceItemsCommand:
+    """Command to place a new item on the arrangement canvas (from source)."""
+
+    manager: GridArrangementManager
+    target_pos: tuple[int, int]
+    item_type: ArrangementType
+    item_key: str
+    overwritten_item: tuple[ArrangementType, str] | None = None
+
+    @property
+    def description(self) -> str:
+        return f"Place item at ({self.target_pos[0]}, {self.target_pos[1]})"
+
+    def execute(self) -> None:
+        if self.overwritten_item is None:
+            self.overwritten_item = self.manager.get_item_at(*self.target_pos)
+            
+        self.manager.set_item_at(self.target_pos[0], self.target_pos[1], self.item_type, self.item_key)
+
+    def undo(self) -> None:
+        # Remove placed item
+        self.manager.remove_item_at(self.target_pos[0], self.target_pos[1])
+        
+        # Restore overwritten item if any
+        if self.overwritten_item:
+            arr_type, key = self.overwritten_item
+            self.manager.set_item_at(self.target_pos[0], self.target_pos[1], arr_type, key)
+
+
+@dataclass
+class CanvasRemoveItemCommand:
+    """Command to remove an item from the arrangement canvas."""
+
+    manager: GridArrangementManager
+    target_pos: tuple[int, int]
+    removed_item: tuple[ArrangementType, str] | None = None
+
+    @property
+    def description(self) -> str:
+        return f"Remove item at ({self.target_pos[0]}, {self.target_pos[1]})"
+
+    def execute(self) -> None:
+        if self.removed_item is None:
+            self.removed_item = self.manager.get_item_at(*self.target_pos)
+            
+        self.manager.remove_item_at(self.target_pos[0], self.target_pos[1])
+
+    def undo(self) -> None:
+        if self.removed_item:
+            arr_type, key = self.removed_item
+            self.manager.set_item_at(self.target_pos[0], self.target_pos[1], arr_type, key)
+

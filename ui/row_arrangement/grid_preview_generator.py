@@ -48,6 +48,7 @@ class GridPreviewGenerator(ArrangementPreviewGenerator):
         processor: GridImageProcessor,
         manager: GridArrangementManager,
         spacing: int = 0,
+        width: int | None = None,
     ) -> Image.Image | None:
         """Create image from grid arrangement
 
@@ -55,6 +56,7 @@ class GridPreviewGenerator(ArrangementPreviewGenerator):
             processor: Grid image processor with extracted tiles
             manager: Grid arrangement manager with arrangement data
             spacing: Spacing between tiles in pixels
+            width: Width of the arrangement in tiles (None for default)
 
         Returns:
             Arranged image or None if no arrangement
@@ -98,13 +100,14 @@ class GridPreviewGenerator(ArrangementPreviewGenerator):
             return None
 
         # Calculate output dimensions
-        # For now, use a default width that creates a reasonable layout
-        default_width = min(16, processor.grid_cols)  # Max 16 tiles wide
+        if width is None:
+            width = min(16, processor.grid_cols)  # Max 16 tiles wide
+            
         return self._create_arranged_image_with_spacing(
             arranged_tiles,
             processor.tile_width,
             processor.tile_height,
-            default_width,
+            width,
             spacing,
         )
 
