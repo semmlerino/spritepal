@@ -57,6 +57,7 @@ class OverlayGraphicsItem(QGraphicsPixmapItem):
         """Update item properties from the overlay layer."""
         self.setPos(QPointF(float(self._overlay_layer.x), float(self._overlay_layer.y)))
         self.setOpacity(self._overlay_layer.opacity)
+        self.setScale(self._overlay_layer.scale)
         self.setVisible(self._overlay_layer.visible)
 
     @override

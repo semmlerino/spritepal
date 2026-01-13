@@ -157,6 +157,7 @@ class GridArrangementDialog(SplitterDialog):
         # Connect overlay signals to update canvas when overlay changes
         self.overlay_layer.position_changed.connect(self._on_overlay_changed)
         self.overlay_layer.opacity_changed.connect(self._on_overlay_changed)
+        self.overlay_layer.scale_changed.connect(self._on_overlay_changed)
         self.overlay_layer.visibility_changed.connect(self._on_overlay_changed)
         self.overlay_layer.image_changed.connect(self._on_overlay_changed)
 
@@ -1245,6 +1246,7 @@ class GridArrangementDialog(SplitterDialog):
                 # Sync position and other properties
                 self.overlay_item.setPos(self.overlay_layer.x, self.overlay_layer.y)
                 self.overlay_item.setOpacity(self.overlay_layer.opacity)
+                self.overlay_item.setScale(self.overlay_layer.scale)
                 self.overlay_item.setVisible(True)
                 
                 scene.addItem(self.overlay_item)

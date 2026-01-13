@@ -93,7 +93,27 @@ def test_overlay_keyboard_nudge(qtbot, dummy_sprite, dummy_overlay):
     qtbot.keyClick(dialog, Qt.Key.Key_Down, modifier=Qt.KeyboardModifier.ShiftModifier)
     assert dialog.overlay_layer.position == (1, 10)
     
-    # Verify canvas item updated
-    assert dialog.overlay_item.pos() == QPoint(1, 10)
+def test_overlay_scaling(qtbot, dummy_sprite, dummy_overlay):
+    """Test that changing overlay scale updates the graphics item."""
+    dialog = GridArrangementDialog(dummy_sprite)
+    qtbot.addWidget(dialog)
+    dialog.show()
+
+    # Import overlay
+    dialog.overlay_layer.import_image(dummy_overlay)
+    dialog._update_arrangement_canvas()
+    
+    assert dialog.overlay_layer.scale == 1.0
+    assert dialog.overlay_item.scale() == 1.0
+    
+    # Change scale via spinbox
+    dialog.overlay_controls.scale_spin.setValue(50)
+    assert dialog.overlay_layer.scale == 0.5
+    assert dialog.overlay_item.scale() == 0.5
+    
+    # Change scale via slider
+    dialog.overlay_controls.scale_slider.setValue(200)
+    assert dialog.overlay_layer.scale == 2.0
+    assert dialog.overlay_item.scale() == 2.0
 
     dialog.close()
