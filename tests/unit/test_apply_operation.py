@@ -200,7 +200,7 @@ class TestApplyOperationExecution:
 
         assert result.success is True
         assert len(result.modified_tiles) == 4
-        for pos, img in result.modified_tiles.items():
+        for img in result.modified_tiles.values():
             assert img.size == (8, 8)
             # Should be converted to grayscale
             assert img.mode == "L"

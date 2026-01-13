@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.apply_operation import ApplyOperation, ApplyResult, ApplyWarning, WarningType
 from core.services.image_utils import pil_to_qimage
 from ui.common.signal_utils import safe_disconnect
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL
@@ -119,6 +120,9 @@ class GridArrangementDialog(SplitterDialog):
 
         # Create overlay layer for reference images
         self.overlay_layer = OverlayLayer()
+
+        # Apply operation result (set by _apply_overlay())
+        self._apply_result: ApplyResult | None = None
 
         # Step 2: Call parent init (this will call _setup_ui)
         super().__init__(
@@ -422,6 +426,22 @@ class GridArrangementDialog(SplitterDialog):
         _ = self.clear_btn.clicked.connect(self._clear_arrangement)
         layout.addWidget(self.clear_btn)
 
+        # Add separator before Apply
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.VLine)
+        sep2.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(sep2)
+
+        self.reset_layout_btn = QPushButton("Reset Layout", self)
+        self.reset_layout_btn.setToolTip("Reset tiles to original extracted positions")
+        _ = self.reset_layout_btn.clicked.connect(self._reset_layout)
+        layout.addWidget(self.reset_layout_btn)
+
+        self.apply_overlay_btn = QPushButton("Apply Overlay", self)
+        self.apply_overlay_btn.setToolTip("Sample overlay image and write pixels to tiles")
+        _ = self.apply_overlay_btn.clicked.connect(self._apply_overlay)
+        layout.addWidget(self.apply_overlay_btn)
+
     def _add_zoom_controls(self, layout: QHBoxLayout):
         """Add zoom control buttons to the given layout.
 
@@ -686,6 +706,142 @@ class GridArrangementDialog(SplitterDialog):
 
         self.grid_view.clear_selection()
         self._update_status("Cleared all arrangements")
+
+    def _reset_layout(self) -> None:
+        """Reset tiles to original extracted positions (clear all arrangement)."""
+        if not self.arrangement_manager:
+            return
+
+        # Check if there's anything to reset
+        if not self.arrangement_manager.get_arranged_tiles():
+            self._update_status("Layout already at original position")
+            return
+
+        # Ask for confirmation
+        result = QMessageBox.question(
+            self,
+            "Reset Layout",
+            "Reset all tiles to their original extracted positions?\n\n"
+            "This will clear the current arrangement but can be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if result != QMessageBox.StandardButton.Yes:
+            return
+
+        # Use the existing clear mechanism with undo support
+        self._clear_arrangement()
+        self._update_status("Layout reset to original positions")
+
+    def _apply_overlay(self) -> None:
+        """Apply overlay image to tiles, sampling and quantizing pixels."""
+        if not self.overlay_layer.has_image():
+            _ = QMessageBox.warning(
+                self,
+                "No Overlay",
+                "Please import an overlay image first.\n\n"
+                "The overlay image provides the new pixel data that will be "
+                "written to each tile at its current canvas position.",
+            )
+            return
+
+        if not self.arrangement_manager.get_arranged_tiles():
+            _ = QMessageBox.warning(
+                self,
+                "No Tiles Placed",
+                "Please arrange some tiles on the canvas first.\n\n"
+                "Drag tiles from the source grid to the canvas to position them.",
+            )
+            return
+
+        # Get palette for quantization (if palette mode is enabled)
+        palette: list[tuple[int, int, int]] | None = None
+        if self.colorizer.is_palette_mode() and self.colorizer.has_palettes():
+            palette_idx = self.colorizer.get_selected_palette_index()
+            palettes = self.colorizer.get_palettes()
+            if palette_idx in palettes:
+                palette = palettes[palette_idx]
+
+        # Create ApplyOperation
+        operation = ApplyOperation(
+            overlay=self.overlay_layer,
+            grid_mapping=self.arrangement_manager.get_grid_mapping(),
+            tiles=self.tiles,
+            tile_width=self.processor.tile_width,
+            tile_height=self.processor.tile_height,
+            palette=palette,
+        )
+
+        # Validate first
+        warnings = operation.validate()
+
+        if warnings:
+            # Show warning dialog with details
+            if not self._show_apply_warnings_dialog(warnings):
+                return  # User cancelled
+
+        # Execute Apply operation
+        result = operation.execute(force=True)
+
+        if not result.success:
+            _ = QMessageBox.critical(
+                self,
+                "Apply Failed",
+                f"Failed to apply overlay:\n\n{result.error_message}",
+            )
+            return
+
+        # Store the result for retrieval
+        self._apply_result = result
+
+        # Update status with result summary
+        num_modified = len(result.modified_tiles)
+        warning_count = len(result.warnings)
+        status = f"Applied overlay to {num_modified} tile(s)"
+        if warning_count > 0:
+            status += f" ({warning_count} warning(s))"
+        self._update_status(status)
+
+        # Show success message
+        _ = QMessageBox.information(
+            self,
+            "Apply Complete",
+            f"Successfully applied overlay to {num_modified} tile(s).\n\n"
+            "The modified tile data is available for export.",
+        )
+
+    def _show_apply_warnings_dialog(self, warnings: list[ApplyWarning]) -> bool:
+        """Show warning dialog for Apply operation.
+
+        Args:
+            warnings: List of ApplyWarning objects
+
+        Returns:
+            True if user wants to proceed, False to cancel
+        """
+        # Build warning message
+        lines = ["The following issues were detected:\n"]
+        for warning in warnings:
+            if warning.type == WarningType.UNCOVERED:
+                lines.append(f"• {warning.message}")
+                lines.append("  Uncovered tiles will be skipped.\n")
+            elif warning.type == WarningType.UNPLACED:
+                lines.append(f"• {warning.message}")
+                lines.append("  Unplaced tiles will not be modified.\n")
+            elif warning.type == WarningType.PALETTE_MISMATCH:
+                lines.append(f"• {warning.message}")
+                lines.append("  Some colors may be approximated.\n")
+
+        lines.append("\nDo you want to proceed anyway?")
+
+        result = QMessageBox.warning(
+            self,
+            "Apply Warnings",
+            "\n".join(lines),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return result == QMessageBox.StandardButton.Yes
 
     def _on_arrangement_changed(self):
         """Handle arrangement change"""
@@ -1139,6 +1295,15 @@ class GridArrangementDialog(SplitterDialog):
     def arrangement_result(self) -> ArrangementResult | None:
         """Access stored arrangement result after dialog closes."""
         return getattr(self, "_arrangement_result", None)
+
+    @property
+    def apply_result(self) -> ApplyResult | None:
+        """Access the Apply operation result (modified tiles) after Apply is executed.
+
+        Returns:
+            ApplyResult containing modified tiles, or None if Apply wasn't executed.
+        """
+        return self._apply_result
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:
