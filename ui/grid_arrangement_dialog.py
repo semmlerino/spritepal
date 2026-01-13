@@ -219,6 +219,7 @@ class GridArrangementDialog(SplitterDialog):
             QWidget: The configured left panel widget
         """
         left_widget = QWidget(self)
+        left_widget.setMinimumWidth(400)
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(SPACING_COMPACT_SMALL)
@@ -240,6 +241,7 @@ class GridArrangementDialog(SplitterDialog):
             QWidget: The configured right panel widget
         """
         right_widget = QWidget(self)
+        right_widget.setMinimumWidth(400)
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(SPACING_COMPACT_SMALL)
@@ -279,7 +281,6 @@ class GridArrangementDialog(SplitterDialog):
             QGroupBox: The configured arrangement grid group
         """
         grid_group = QGroupBox("Arrangement Grid", parent)
-        grid_group.setMinimumWidth(200)
         grid_layout = QVBoxLayout()
 
         # Create arrangement scene and view
@@ -331,7 +332,6 @@ class GridArrangementDialog(SplitterDialog):
             QGroupBox: The configured grid view group
         """
         grid_group = QGroupBox("Sprite Grid", parent)
-        grid_group.setMinimumWidth(200)
         grid_layout = QVBoxLayout()
 
         # Create graphics scene and view
@@ -383,21 +383,27 @@ class GridArrangementDialog(SplitterDialog):
             QGroupBox: The configured actions group
         """
         actions_group = QGroupBox("Actions", parent)
-        actions_layout = QHBoxLayout()
+        main_actions_layout = QVBoxLayout(actions_group)
+        main_actions_layout.setSpacing(4)
 
-        # Add action buttons
-        self._add_action_buttons(actions_layout)
+        # Row 1: Main edit actions
+        row1_layout = QHBoxLayout()
+        self._add_action_buttons(row1_layout)
+        main_actions_layout.addLayout(row1_layout)
 
-        # Add separator
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.VLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
-        actions_layout.addWidget(separator)
+        # Row 2: Layout and Zoom controls
+        row2_layout = QHBoxLayout()
+        
+        # Add zoom and target controls
+        self._add_zoom_controls(row2_layout)
+        
+        row2_layout.addStretch()
+        
+        # Add collapsible shortcut legend to the right of row 2
+        self._add_shortcut_legend(row2_layout)
+        
+        main_actions_layout.addLayout(row2_layout)
 
-        # Add zoom controls
-        self._add_zoom_controls(actions_layout)
-
-        actions_group.setLayout(actions_layout)
         return actions_group
 
     def _add_action_buttons(self, layout: QHBoxLayout):
@@ -456,11 +462,6 @@ class GridArrangementDialog(SplitterDialog):
         self.palette_toggle_btn.setToolTip("Toggle palette preview on/off [C]")
         _ = self.palette_toggle_btn.toggled.connect(self._on_palette_toggle_clicked)
         layout.addWidget(self.palette_toggle_btn)
-
-        layout.addStretch()
-
-        # Add collapsible shortcut legend
-        self._add_shortcut_legend(layout)
 
     def _add_shortcut_legend(self, layout: QHBoxLayout):
         """Add a collapsible shortcut legend to the given layout."""
