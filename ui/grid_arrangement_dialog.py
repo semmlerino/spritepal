@@ -14,12 +14,14 @@ if TYPE_CHECKING:
     from ui.sprite_editor.services.arrangement_bridge import ArrangementBridge
 
 from PIL import Image
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QMimeData, QPoint, QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QCloseEvent,
     QColor,
+    QDrag,
     QFocusEvent,
+    QFont,
     QKeyEvent,
     QMouseEvent,
     QPen,
@@ -27,11 +29,13 @@ from PySide6.QtGui import (
     QWheelEvent,
 )
 from PySide6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QFrame,
     QGraphicsLineItem,
     QGraphicsRectItem,
     QGraphicsScene,
+    QGraphicsSimpleTextItem,
     QGraphicsView,
     QGroupBox,
     QHBoxLayout,
@@ -135,6 +139,7 @@ class GridGraphicsView(QGraphicsView):
         # Visual elements
         self.grid_lines: list[QGraphicsLineItem] = []
         self.selection_rects: dict[TilePosition, QGraphicsRectItem] = {}
+        self.order_labels: dict[TilePosition, QGraphicsSimpleTextItem] = {}
         self.hover_rect: QGraphicsRectItem | None = None
 
         # Colors
@@ -145,6 +150,9 @@ class GridGraphicsView(QGraphicsView):
         self.keyboard_focus_color = QColor(0, 0, 255, 128)  # Blue border for keyboard focus
         self.marquee_color = QColor(0, 120, 215, 40)  # Windows-style blue
         self.marquee_border_color = QColor(0, 120, 215)
+        self.index_text_color = QColor(255, 255, 255)
+        self.index_bg_color = QColor(0, 0, 0, 160)
+
         self.group_colors = [
             QColor(255, 0, 0, 64),
             QColor(0, 0, 255, 64),
@@ -153,6 +161,7 @@ class GridGraphicsView(QGraphicsView):
         ]
 
         self.setMouseTracking(True)
+        self.setAcceptDrops(True)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
 
         # Enable keyboard focus
@@ -179,28 +188,100 @@ class GridGraphicsView(QGraphicsView):
         if scene:
             for rect in self.selection_rects.values():
                 scene.removeItem(rect)
+            for label in self.order_labels.values():
+                scene.removeItem(label)
         if self.selection_rects:
             self.selection_rects.clear()
+        if self.order_labels:
+            self.order_labels.clear()
 
-    def highlight_arranged_tiles(self, tiles: list[TilePosition], color: QColor | None = None):
-        """Highlight arranged tiles"""
+    def highlight_arranged_tiles(
+        self,
+        tiles: list[TilePosition],
+        color: QColor | None = None,
+        manager: GridArrangementManager | None = None,
+    ):
+        """Highlight arranged tiles and show order indices"""
         if color is None:
             color = self.arranged_color
 
         scene = self.scene()
-        if scene:
-            for tile_pos in tiles:
-                if tile_pos not in self.selection_rects:
-                    rect = self._create_tile_rect(tile_pos, color)
-                    scene.addItem(rect)
-                    self.selection_rects[tile_pos] = rect
+        if not scene:
+            return
+
+        # Track which tiles we've already processed to avoid duplicates
+        processed_tiles = set()
+
+        for i, tile_pos in enumerate(tiles):
+            if tile_pos in processed_tiles:
+                continue
+            processed_tiles.add(tile_pos)
+
+            if tile_pos not in self.selection_rects:
+                rect = self._create_tile_rect(tile_pos, color)
+                scene.addItem(rect)
+                self.selection_rects[tile_pos] = rect
+
+            # Show index if manager is provided
+            if manager:
+                # Find the logical index in arrangement_order
+                logical_index = -1
+                for idx, (arr_type, key) in enumerate(manager.get_arrangement_order()):
+                    if (arr_type == ArrangementType.TILE and key == f"{tile_pos.row},{tile_pos.col}") or (arr_type == ArrangementType.ROW and int(key) == tile_pos.row):
+                        logical_index = idx
+                        break
+                    if arr_type == ArrangementType.COLUMN and int(key) == tile_pos.col:
+                        logical_index = idx
+                        break
+                    if arr_type == ArrangementType.GROUP:
+                        group = manager.get_groups().get(key)
+                        if group and tile_pos in group.tiles:
+                            logical_index = idx
+                            break
+
+                if logical_index != -1:
+                    self._update_tile_index_label(tile_pos, logical_index + 1)
+
+    def _update_tile_index_label(self, tile_pos: TilePosition, index: int):
+        """Update or create the index label for a tile"""
+        scene = self.scene()
+        if not scene:
+            return
+
+        if tile_pos in self.order_labels:
+            label = self.order_labels[tile_pos]
+            label.setText(str(index))
+        else:
+            label = QGraphicsSimpleTextItem(str(index))
+            font = QFont("Arial", 6)
+            font.setBold(True)
+            label.setFont(font)
+            label.setBrush(QBrush(self.index_text_color))
+            label.setZValue(20)  # High Z-value
+
+            # Center text in tile
+            x = tile_pos.col * self.tile_width + 1
+            y = tile_pos.row * self.tile_height + 1
+            label.setPos(x, y)
+
+            scene.addItem(label)
+            self.order_labels[tile_pos] = label
 
     @override
     def mousePressEvent(self, event: QMouseEvent | None):
         """Handle mouse press"""
-        if event and event.button() == Qt.MouseButton.LeftButton:
+        if not event:
+            return
+
+        if event.button() == Qt.MouseButton.LeftButton:
             pos = self.mapToScene(event.pos())
             tile_pos = self._pos_to_tile(pos)
+
+            # Start drag if clicking an arranged tile
+            if tile_pos and self._is_valid_tile(tile_pos) and tile_pos in self.selection_rects:
+                self._drag_start_pos = event.pos()
+                self._drag_tile = tile_pos
+                # Don't return yet, we might want to toggle selection too if it's just a click
 
             # Ctrl+click: Toggle tile in selection (add/remove)
             if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
@@ -218,19 +299,21 @@ class GridGraphicsView(QGraphicsView):
             self._start_marquee_selection(pos)
             return
 
-        elif event and event.button() == Qt.MouseButton.MiddleButton:
+        elif event.button() == Qt.MouseButton.MiddleButton:
             # Middle mouse button for panning
             self.is_panning = True
             self.last_pan_point = event.pos()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
-        if event:
-            super().mousePressEvent(event)
+        super().mousePressEvent(event)
 
     @override
     def mouseMoveEvent(self, event: QMouseEvent | None):
         """Handle mouse move"""
-        if event and self.is_panning and self.last_pan_point is not None:
+        if not event:
+            return
+
+        if self.is_panning and self.last_pan_point is not None:
             # Pan the view
             delta = event.pos() - self.last_pan_point
             h_bar = self.horizontalScrollBar()
@@ -242,22 +325,95 @@ class GridGraphicsView(QGraphicsView):
             self.last_pan_point = event.pos()
             return
 
-        if event and self._marquee_active:
+        if self._marquee_active:
             # Update marquee selection during drag
             pos = self.mapToScene(event.pos())
             self._update_marquee_selection(pos)
             return
 
-        if event:
+        # Check for drag start
+        if (
+            event.buttons() & Qt.MouseButton.LeftButton
+            and hasattr(self, "_drag_start_pos")
+            and (event.pos() - self._drag_start_pos).manhattanLength() > QApplication.startDragDistance()
+        ):
+            self._execute_drag()
+            return
+
+        pos = self.mapToScene(event.pos())
+        tile_pos = self._pos_to_tile(pos)
+
+        # Update hover
+        if tile_pos and self._is_valid_tile(tile_pos):
+            self._update_hover(tile_pos)
+
+        super().mouseMoveEvent(event)
+
+    def _execute_drag(self):
+        """Execute a drag operation for tile reordering"""
+        if not hasattr(self, "_drag_tile") or self._drag_tile is None:
+            return
+
+        drag = QDrag(self)
+        mime_data = QMimeData()
+
+        # Store tile position and its index in the arrangement
+        tile_str = f"{self._drag_tile.row},{self._drag_tile.col}"
+        mime_data.setText(tile_str)
+        mime_data.setData("application/x-spritepal-tile", tile_str.encode())
+
+        drag.setMimeData(mime_data)
+
+        # Create a ghost pixmap of the tile for the drag cursor
+        rect = QRectF(
+            self._drag_tile.col * self.tile_width,
+            self._drag_tile.row * self.tile_height,
+            self.tile_width,
+            self.tile_height,
+        )
+        pixmap = self.grab(self.mapFromScene(rect).boundingRect())
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(QPoint(pixmap.width() // 2, pixmap.height() // 2))
+
+        # Reset drag state
+        self._marquee_active = False  # Cancel marquee if dragging tile
+        self._drag_tile = None
+
+        drag.exec(Qt.DropAction.MoveAction)
+
+    @override
+    def dragEnterEvent(self, event):
+        """Handle drag enter"""
+        if event.mimeData().hasFormat("application/x-spritepal-tile"):
+            event.acceptProposedAction()
+
+    @override
+    def dragMoveEvent(self, event):
+        """Handle drag move"""
+        if event.mimeData().hasFormat("application/x-spritepal-tile"):
+            event.acceptProposedAction()
+
+    @override
+    def dropEvent(self, event):
+        """Handle drop for reordering"""
+        if event.mimeData().hasFormat("application/x-spritepal-tile"):
             pos = self.mapToScene(event.pos())
-            tile_pos = self._pos_to_tile(pos)
+            target_tile = self._pos_to_tile(pos)
 
-            # Update hover
-            if tile_pos and self._is_valid_tile(tile_pos):
-                self._update_hover(tile_pos)
+            if target_tile and self._is_valid_tile(target_tile):
+                # Signal that we want to move the tile to this target position
+                source_tile_str = event.mimeData().data("application/x-spritepal-tile").data().decode()
+                r, c = map(int, source_tile_str.split(","))
+                source_tile = TilePosition(r, c)
 
-        if event:
-            super().mouseMoveEvent(event)
+                # Find the target index
+                # We emit a signal for the dialog to handle the actual manager update
+                self.tile_reordered.emit(source_tile, target_tile)
+                event.acceptProposedAction()
+
+    # Signals (add to GridGraphicsView class)
+    tile_reordered = Signal(TilePosition, TilePosition)
+
 
     @override
     def wheelEvent(self, event: QWheelEvent | None):
@@ -1062,6 +1218,7 @@ class GridArrangementDialog(SplitterDialog):
         self.grid_view.tile_clicked.connect(self._on_tile_clicked)
         self.grid_view.tiles_selected.connect(self._on_tiles_selected)
         self.grid_view.zoom_changed.connect(self._on_zoom_changed)
+        self.grid_view.tile_reordered.connect(self._on_tile_reordered)
         self._update_zoom_level_display()
 
     def _create_actions_group(self, parent: QWidget) -> QGroupBox:
@@ -1145,7 +1302,7 @@ class GridArrangementDialog(SplitterDialog):
         layout.addWidget(self.zoom_reset_btn)
 
     def _create_arrangement_list_group(self, parent: QWidget) -> QGroupBox:
-        """Create the arrangement list group.
+        """Create the arrangement list group with reordering support.
 
         Args:
             parent: Parent widget for the group
@@ -1157,6 +1314,8 @@ class GridArrangementDialog(SplitterDialog):
         list_layout = QVBoxLayout()
 
         self.arrangement_list: QListWidget = QListWidget(self)
+        self.arrangement_list.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        self.arrangement_list.model().rowsMoved.connect(self._on_list_rows_moved)
         list_layout.addWidget(self.arrangement_list)
 
         list_group.setLayout(list_layout)
@@ -1178,6 +1337,82 @@ class GridArrangementDialog(SplitterDialog):
         )
         self.preview_label = preview_group.preview_label
         return preview_group
+
+    def _on_list_rows_moved(self, parent, start, end, destination, row):
+        """Handle reordering via list drag-and-drop"""
+        # Note: Qt rowsMoved parameters:
+        # row is the destination row index BEFORE the move
+        old_index = start
+        new_index = row
+        if old_index < new_index:
+            new_index -= 1  # Adjust because item was removed from its old position
+
+        if old_index != new_index:
+            # Wrap in command for undo support
+            old_order = self.arrangement_manager.get_arrangement_order()
+            self.arrangement_manager.move_item(old_index, new_index)
+            new_order = self.arrangement_manager.get_arrangement_order()
+
+            from .row_arrangement.undo_redo import ReorderGridCommand
+
+            command = ReorderGridCommand(
+                manager=self.arrangement_manager,
+                old_order=old_order,
+                new_order=new_order,
+            )
+            # Push without executing because it's already done
+            self.undo_stack._undo_stack.append(command)
+            self.undo_stack._redo_stack.clear()
+            self.undo_stack.can_undo_changed.emit(True)
+            self.undo_stack.can_redo_changed.emit(False)
+            self.undo_stack.stack_changed.emit()
+
+    def _on_tile_reordered(self, source_tile: TilePosition, target_tile: TilePosition):
+        """Handle tile reordering via grid drag-and-drop"""
+        # Find indices of source and target in arrangement_order
+        source_idx = -1
+        target_idx = -1
+
+        order = self.arrangement_manager.get_arrangement_order()
+
+        # Helper to check if a tile is part of an arrangement item
+        def tile_in_item(tile: TilePosition, arr_type: ArrangementType, key: str) -> bool:
+            if arr_type == ArrangementType.TILE:
+                return key == f"{tile.row},{tile.col}"
+            elif arr_type == ArrangementType.ROW:
+                return int(key) == tile.row
+            elif arr_type == ArrangementType.COLUMN:
+                return int(key) == tile.col
+            elif arr_type == ArrangementType.GROUP:
+                group = self.arrangement_manager.get_groups().get(key)
+                return group is not None and tile in group.tiles
+            return False
+
+        for i, (arr_type, key) in enumerate(order):
+            if tile_in_item(source_tile, arr_type, key):
+                source_idx = i
+            if tile_in_item(target_tile, arr_type, key):
+                target_idx = i
+
+        if -1 not in (source_idx, target_idx) and source_idx != target_idx:
+            # Move source item to target item's position
+            old_order = self.arrangement_manager.get_arrangement_order()
+            self.arrangement_manager.move_item(source_idx, target_idx)
+            new_order = self.arrangement_manager.get_arrangement_order()
+
+            from .row_arrangement.undo_redo import ReorderGridCommand
+
+            command = ReorderGridCommand(
+                manager=self.arrangement_manager,
+                old_order=old_order,
+                new_order=new_order,
+            )
+            # Push WITHOUT executing (as it's already done)
+            self.undo_stack._undo_stack.append(command)
+            self.undo_stack._redo_stack.clear()
+            self.undo_stack.can_undo_changed.emit(True)
+            self.undo_stack.can_redo_changed.emit(False)
+            self.undo_stack.stack_changed.emit()
 
     def _on_undo(self) -> None:
         """Handle undo shortcut."""
@@ -1389,9 +1624,9 @@ class GridArrangementDialog(SplitterDialog):
 
     def _update_displays(self):
         """Update all display elements"""
-        # Update grid view highlights
+        # Update grid view highlights with manager for index visualization
         arranged_tiles = self.arrangement_manager.get_arranged_tiles()
-        self.grid_view.highlight_arranged_tiles(arranged_tiles)
+        self.grid_view.highlight_arranged_tiles(arranged_tiles, manager=self.arrangement_manager)
 
         # Update arrangement list
         self._update_arrangement_list()
@@ -1401,25 +1636,32 @@ class GridArrangementDialog(SplitterDialog):
 
     def _update_arrangement_list(self):
         """Update the arrangement list widget"""
-        if self.arrangement_list:
+        if not self.arrangement_list:
+            return
+
+        # Block signals to prevent _on_list_rows_moved from being triggered
+        self.arrangement_list.blockSignals(True)
+        try:
             self.arrangement_list.clear()
 
-        for arr_type, key in self.arrangement_manager.get_arrangement_order():
-            if arr_type == ArrangementType.ROW:
-                item_text = f"Row {key}"
-            elif arr_type == ArrangementType.COLUMN:
-                item_text = f"Column {key}"
-            elif arr_type == ArrangementType.TILE:
-                row, col = key.split(",")
-                item_text = f"Tile ({row}, {col})"
-            elif arr_type == ArrangementType.GROUP:
-                group = self.arrangement_manager.get_groups().get(key)
-                item_text = group.name if group else f"Group {key}"
-            else:
-                item_text = str(key)
+            for arr_type, key in self.arrangement_manager.get_arrangement_order():
+                if arr_type == ArrangementType.ROW:
+                    item_text = f"Row {key}"
+                elif arr_type == ArrangementType.COLUMN:
+                    item_text = f"Column {key}"
+                elif arr_type == ArrangementType.TILE:
+                    row, col = key.split(",")
+                    item_text = f"Tile ({row}, {col})"
+                elif arr_type == ArrangementType.GROUP:
+                    group = self.arrangement_manager.get_groups().get(key)
+                    item_text = group.name if group else f"Group {key}"
+                else:
+                    item_text = str(key)
 
-            if self.arrangement_list and item_text:
-                self.arrangement_list.addItem(item_text)
+                if item_text:
+                    self.arrangement_list.addItem(item_text)
+        finally:
+            self.arrangement_list.blockSignals(False)
 
     def _update_preview(self):
         """Update the arrangement preview"""

@@ -291,6 +291,59 @@ class GridArrangementManager(QObject):
         self._arrangement_order = new_order.copy()
         self.arrangement_changed.emit()
 
+    def move_item(self, old_index: int, new_index: int) -> bool:
+        """Move an item from one position to another in the arrangement order.
+
+        Args:
+            old_index: Current index of the item
+            new_index: New index for the item
+
+        Returns:
+            True if item was moved, False otherwise
+        """
+        if not (0 <= old_index < len(self._arrangement_order)):
+            return False
+        if not (0 <= new_index < len(self._arrangement_order)):
+            return False
+
+        if old_index == new_index:
+            return True
+
+        item = self._arrangement_order.pop(old_index)
+        self._arrangement_order.insert(new_index, item)
+
+        # Also update the _arranged_tiles list to match the new order
+        # This is more complex because one order item (like a ROW) can expand to multiple tiles
+        self._rebuild_arranged_tiles()
+
+        self.arrangement_changed.emit()
+        return True
+
+    def _rebuild_arranged_tiles(self) -> None:
+        """Rebuild the _arranged_tiles list from the _arrangement_order.
+
+        This ensures the flat tile list matches the logical arrangement order.
+        """
+        new_tiles: list[TilePosition] = []
+
+        for arr_type, key in self._arrangement_order:
+            if arr_type == ArrangementType.TILE:
+                row, col = map(int, key.split(","))
+                new_tiles.append(TilePosition(row, col))
+            elif arr_type == ArrangementType.ROW:
+                row_index = int(key)
+                new_tiles.extend([TilePosition(row_index, col) for col in range(self.total_cols)])
+            elif arr_type == ArrangementType.COLUMN:
+                col_index = int(key)
+                new_tiles.extend([TilePosition(row, col_index) for row in range(self.total_rows)])
+            elif arr_type == ArrangementType.GROUP:
+                group = self._groups.get(key)
+                if group:
+                    new_tiles.extend(group.tiles)
+
+        # Update flat list (set lookup remains valid as tiles didn't change)
+        self._arranged_tiles = new_tiles
+
     def clear(self) -> None:
         """Clear all arrangements"""
         if self._arranged_tiles:
