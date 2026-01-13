@@ -1278,3 +1278,60 @@ def get_danger_action_button_style() -> str:
         include_disabled=True,
         min_height=None,  # No min-height for danger buttons
     )
+
+
+def get_segmented_button_style(position: str = "middle", checked: bool = False) -> str:
+    """
+    Get styling for segmented control buttons.
+
+    Args:
+        position: Button position - "first", "middle", "last", "only"
+        checked: Whether the button is currently selected
+
+    Returns:
+        CSS string for segmented button styling
+    """
+    radius = DIMENSIONS["border_radius"]
+    
+    # Border radius logic
+    radius_css = "border-radius: 0px;"
+    if position == "first":
+        radius_css = f"border-top-left-radius: {radius}px; border-bottom-left-radius: {radius}px;"
+    elif position == "last":
+        radius_css = f"border-top-right-radius: {radius}px; border-bottom-right-radius: {radius}px;"
+    elif position == "only":
+        radius_css = f"border-radius: {radius}px;"
+
+    # Colors based on state
+    if checked:
+        bg_color = COLORS["primary"]
+        text_color = COLORS["white"]
+        border_color = COLORS["primary_pressed"]
+        hover_bg = COLORS["primary_hover"]
+    else:
+        bg_color = COLORS["input_background"]
+        text_color = COLORS["text_secondary"]
+        border_color = COLORS["border"]
+        hover_bg = COLORS["panel_background"]
+
+    return f"""
+    QPushButton {{
+        background-color: {bg_color};
+        color: {text_color};
+        border: 1px solid {border_color};
+        padding: 4px 12px;
+        font-weight: {FONTS["bold_weight"] if checked else "normal"};
+        {radius_css}
+        min-height: 24px;
+    }}
+    QPushButton:hover {{
+        background-color: {hover_bg};
+        border-color: {COLORS["border_focus"]};
+        z-index: 1;
+    }}
+    QPushButton:checked {{
+        background-color: {COLORS["primary"]};
+        color: {COLORS["white"]};
+        border-color: {COLORS["primary_pressed"]};
+    }}
+    """

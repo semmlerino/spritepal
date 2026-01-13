@@ -1,7 +1,7 @@
 """Integration tests for startup state consistency.
 
 Verifies that UI state is correctly synchronized at startup:
-- Mode combo matches stack widget
+- Mode toggle matches stack widget
 - Tab selections are consistent
 - Session restore maintains state consistency
 """
@@ -88,6 +88,8 @@ class MockEditWorkspace(QWidget):
         self.saveToRomRequested.connect = Mock()
         self.exportPngRequested = Mock()
         self.exportPngRequested.connect = Mock()
+        self.importImageRequested = Mock()
+        self.importImageRequested.connect = Mock()
         self.saveProjectRequested = Mock()
         self.saveProjectRequested.connect = Mock()
         self.loadProjectRequested = Mock()
@@ -214,19 +216,18 @@ class TestStartupState:
             qtbot.addWidget(workspace)
             return workspace
 
-    def test_mode_combo_matches_stack_at_startup(self, sprite_editor_workspace):
-        """Verify mode combo and stack widget are in sync at startup.
+    def test_mode_toggle_matches_stack_at_startup(self, sprite_editor_workspace):
+        """Verify mode toggle and stack widget are in sync at startup.
 
         This tests the sync-after-wiring pattern:
-        - Combo is set to ROM mode (index 1) during __init__
-        - Signal is connected after combo state is set
-        - Explicit sync call ensures stack matches combo
+        - Toggle is set to ROM mode during __init__
+        - Signal is connected after toggle state is set
+        - Explicit sync call ensures stack matches toggle
         """
         workspace = sprite_editor_workspace
 
-        # Mode combo should default to ROM mode (index 1)
-        assert workspace._mode_combo.currentIndex() == 1
-        assert workspace._mode_combo.currentData() == "rom"
+        # Mode toggle should default to ROM mode
+        assert workspace._mode_toggle.current_data() == "rom"
 
         # Stack should show ROM page (index 1)
         assert workspace._mode_stack.currentIndex() == 1
@@ -239,35 +240,35 @@ class TestStartupState:
         workspace = sprite_editor_workspace
 
         # Switch to VRAM mode
-        workspace._mode_combo.setCurrentIndex(0)
+        workspace._mode_toggle.set_current_data("vram")
 
         # Stack should now show VRAM page
         assert workspace._mode_stack.currentIndex() == 0
         assert workspace._mode_stack.currentWidget() == workspace._vram_page
-        assert workspace._mode_combo.currentData() == "vram"
+        assert workspace._mode_toggle.current_data() == "vram"
 
         # Switch back to ROM mode
-        workspace._mode_combo.setCurrentIndex(1)
+        workspace._mode_toggle.set_current_data("rom")
 
         # Stack should show ROM page again
         assert workspace._mode_stack.currentIndex() == 1
         assert workspace._mode_stack.currentWidget() == workspace._rom_page
-        assert workspace._mode_combo.currentData() == "rom"
+        assert workspace._mode_toggle.current_data() == "rom"
 
-    def test_set_mode_programmatic_updates_combo_and_stack(self, sprite_editor_workspace):
-        """Verify programmatic set_mode() updates both combo and stack."""
+    def test_set_mode_programmatic_updates_toggle_and_stack(self, sprite_editor_workspace):
+        """Verify programmatic set_mode() updates both toggle and stack."""
         workspace = sprite_editor_workspace
 
         # Use the public API to switch modes
         workspace.set_mode("vram")
 
-        # Both combo and stack should update
-        assert workspace._mode_combo.currentData() == "vram"
+        # Both toggle and stack should update
+        assert workspace._mode_toggle.current_data() == "vram"
         assert workspace._mode_stack.currentWidget() == workspace._vram_page
 
         workspace.set_mode("rom")
 
-        assert workspace._mode_combo.currentData() == "rom"
+        assert workspace._mode_toggle.current_data() == "rom"
         assert workspace._mode_stack.currentWidget() == workspace._rom_page
 
     def test_controllers_receive_mode_at_startup(self, sprite_editor_workspace):
@@ -300,8 +301,8 @@ class TestStartupState:
         assert workspace._injection_controller._mode == "rom"
 
 
-class TestModeComboDataConsistency:
-    """Tests for combo box data consistency."""
+class TestModeToggleDataConsistency:
+    """Tests for toggle data consistency."""
 
     @pytest.fixture
     def mock_deps(self):
@@ -331,29 +332,21 @@ class TestModeComboDataConsistency:
             qtbot.addWidget(workspace)
             return workspace
 
-    def test_combo_data_values_are_strings(self, sprite_editor_workspace):
-        """Verify combo items have string data values for mode identification."""
-        combo = sprite_editor_workspace._mode_combo
-
-        # Check each item has the expected data
-        assert combo.itemData(0) == "vram"
-        assert combo.itemData(1) == "rom"
-
-    def test_combo_count_matches_stack_count(self, sprite_editor_workspace):
-        """Verify combo items match stack pages."""
+    def test_toggle_count_matches_stack_count(self, sprite_editor_workspace):
+        """Verify toggle options match stack pages."""
         workspace = sprite_editor_workspace
 
-        assert workspace._mode_combo.count() == workspace._mode_stack.count()
-        assert workspace._mode_combo.count() == 2  # VRAM and ROM
+        assert len(workspace._mode_toggle._buttons) == workspace._mode_stack.count()
+        assert len(workspace._mode_toggle._buttons) == 2  # VRAM and ROM
 
-    def test_index_mapping_is_consistent(self, sprite_editor_workspace):
-        """Verify combo index maps to correct stack page."""
+    def test_data_mapping_is_consistent(self, sprite_editor_workspace):
+        """Verify toggle data maps to correct stack page."""
         workspace = sprite_editor_workspace
 
-        # Index 0 should be VRAM
-        workspace._mode_combo.setCurrentIndex(0)
+        # "vram" should map to VRAM page
+        workspace._mode_toggle.set_current_data("vram")
         assert workspace._mode_stack.currentWidget() == workspace._vram_page
 
-        # Index 1 should be ROM
-        workspace._mode_combo.setCurrentIndex(1)
+        # "rom" should map to ROM page
+        workspace._mode_toggle.set_current_data("rom")
         assert workspace._mode_stack.currentWidget() == workspace._rom_page

@@ -15,14 +15,12 @@ from __future__ import annotations
 import logging
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PIL import Image
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
-    QComboBox,
     QHBoxLayout,
-    QLabel,
     QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
@@ -36,6 +34,7 @@ from ui.sprite_editor.controllers import (
 )
 from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
 from ui.sprite_editor.views.workspaces import ROMWorkflowPage, VRAMEditorPage
+from ui.widgets.segmented_toggle import SegmentedToggle
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
@@ -155,18 +154,12 @@ class SpriteEditorWorkspace(QWidget):
         layout.setContentsMargins(0, 0, 0, 4)
         layout.setSpacing(8)
 
-        # Label
-        label = QLabel("Sprite Editor")
-        label.setStyleSheet("font-weight: bold;")
-        layout.addWidget(label)
-
-        # Mode Switcher
-        self._mode_combo = QComboBox()
-        self._mode_combo.addItem("VRAM Mode", "vram")
-        self._mode_combo.addItem("ROM Mode", "rom")
-        self._mode_combo.setCurrentIndex(1)  # Default to ROM mode (Mesen2 workflow)
-        self._mode_combo.currentIndexChanged.connect(self._on_mode_changed)
-        layout.addWidget(self._mode_combo)
+        # Mode Switcher (Segmented Toggle)
+        self._mode_toggle = SegmentedToggle()
+        self._mode_toggle.add_option("VRAM Mode", "vram")
+        self._mode_toggle.add_option("ROM Mode", "rom", checked=True)  # Default to ROM mode
+        self._mode_toggle.selection_changed.connect(self._on_mode_changed)
+        layout.addWidget(self._mode_toggle)
 
         layout.addStretch()
 
@@ -202,9 +195,8 @@ class SpriteEditorWorkspace(QWidget):
         self.mode_changed.connect(self._on_mode_changed_internal)
         self.mode_changed.connect(self._on_mode_switched)
 
-        # Sync stack AND controllers to match initial combo state
-        # (combo was set to ROM mode before signals were wired)
-        initial_mode = self._mode_combo.currentData()
+        # Sync stack AND controllers to match initial toggle state
+        initial_mode = cast(str, self._mode_toggle.current_data())
         self._on_mode_switched(initial_mode)
         self._on_mode_changed_internal(initial_mode)  # Also sync controllers
 
@@ -223,10 +215,10 @@ class SpriteEditorWorkspace(QWidget):
         """Trigger redo action."""
         self._editing_controller.redo()
 
-    def _on_mode_changed(self, index: int) -> None:
-        """Handle mode combo box change."""
-        mode = self._mode_combo.currentData()
-        logger.info("Mode combo changed to index %s, mode=%s", index, mode)
+    def _on_mode_changed(self, mode_data: object) -> None:
+        """Handle mode toggle change."""
+        mode = cast(str, mode_data)
+        logger.info("Mode toggle changed to mode=%s", mode)
         self.mode_changed.emit(mode)
 
     def _on_mode_switched(self, mode: str) -> None:
@@ -335,19 +327,18 @@ class SpriteEditorWorkspace(QWidget):
         return self._rom_page
 
     @property
-    def mode_combo(self) -> QComboBox:
-        """Access the mode combo box."""
-        return self._mode_combo
+    def mode_toggle(self) -> SegmentedToggle:
+        """Access the mode toggle widget."""
+        return self._mode_toggle
 
     @property
     def current_mode(self) -> str:
         """Get the current workflow mode ('vram' or 'rom')."""
-        return self._mode_combo.currentData()
+        return cast(str, self._mode_toggle.current_data())
 
     def set_mode(self, mode: str) -> None:
         """Programmatically set the mode."""
-        index = 0 if mode == "vram" else 1
-        self._mode_combo.setCurrentIndex(index)
+        self._mode_toggle.set_current_data(mode)
 
     def jump_to_offset(self, offset: int, *, auto_open: bool = True, capture_name: str | None = None) -> None:
         """Jump to a specific ROM offset.
@@ -362,7 +353,7 @@ class SpriteEditorWorkspace(QWidget):
                           If provided, ensures the capture appears in asset browser.
         """
         # Switch to ROM mode
-        self._mode_combo.setCurrentIndex(1)
+        self.set_mode("rom")
 
         # Ensure capture is in asset browser and selected (for cross-component sync)
         self._rom_workflow_controller.ensure_and_select_capture(offset, capture_name)

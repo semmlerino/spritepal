@@ -46,9 +46,9 @@ from .data_repository import DataRepository, get_test_data_repository
 
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
+    from core.services.rom_cache import ROMCache
     from core.tile_renderer import TileRenderer
     from core.workers import ROMExtractionWorker, VRAMExtractionWorker
-    from core.services.rom_cache import ROMCache
     from ui.main_window import MainWindow
 
 

@@ -41,8 +41,8 @@ if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.services.rom_cache import ROMCache
-    from ui.main_window import MainWindow
     from tests.infrastructure.real_component_factory import RealComponentFactory
+    from ui.main_window import MainWindow
 
 # Import Qt fixtures for is_headless helper
 from tests.fixtures.qt_fixtures import is_headless

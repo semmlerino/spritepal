@@ -32,6 +32,7 @@ import pytest
 
 if TYPE_CHECKING:
     from pytest import FixtureRequest
+
     from tests.infrastructure.mock_hal import (
         MockHALCompressor,
         MockHALProcessPool,
