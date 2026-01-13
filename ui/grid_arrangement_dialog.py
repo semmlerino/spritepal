@@ -5,9 +5,13 @@ Flexible sprite arrangement supporting rows, columns, and custom tile groups
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, override
+from typing import TYPE_CHECKING, Any, override
+
+if TYPE_CHECKING:
+    from ui.sprite_editor.services.arrangement_bridge import ArrangementBridge
 
 from PIL import Image
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
@@ -67,6 +71,18 @@ from .row_arrangement.undo_redo import (
 from .utils.accessibility import AccessibilityHelper
 
 
+@dataclass
+class ArrangementResult:
+    """Result from GridArrangementDialog when accepted with arrangement.
+
+    Contains everything needed to use the arrangement in the editing workflow.
+    """
+
+    bridge: ArrangementBridge
+    metadata: dict[str, object]
+    logical_width: int  # Tiles per row in arranged view
+
+
 class SelectionMode(Enum):
     """Selection modes for grid interaction"""
 
@@ -109,6 +125,13 @@ class GridGraphicsView(QGraphicsView):
         self.is_panning = False
         self.last_pan_point = None
 
+        # Marquee selection state
+        self._marquee_start: QPointF | None = None
+        self._marquee_rect: QGraphicsRectItem | None = None
+        self._marquee_active = False
+        self._drag_distance = 0
+        self._last_mouse_pos: QPointF | None = None
+
         # Visual elements
         self.grid_lines: list[QGraphicsLineItem] = []
         self.selection_rects: dict[TilePosition, QGraphicsRectItem] = {}
@@ -120,6 +143,8 @@ class GridGraphicsView(QGraphicsView):
         self.hover_color = QColor(0, 255, 255, 64)
         self.arranged_color = QColor(0, 255, 0, 64)
         self.keyboard_focus_color = QColor(0, 0, 255, 128)  # Blue border for keyboard focus
+        self.marquee_color = QColor(0, 120, 215, 40)  # Windows-style blue
+        self.marquee_border_color = QColor(0, 120, 215)
         self.group_colors = [
             QColor(255, 0, 0, 64),
             QColor(0, 0, 255, 64),
@@ -174,30 +199,25 @@ class GridGraphicsView(QGraphicsView):
     def mousePressEvent(self, event: QMouseEvent | None):
         """Handle mouse press"""
         if event and event.button() == Qt.MouseButton.LeftButton:
-            # Check if we should pan instead of select
+            pos = self.mapToScene(event.pos())
+            tile_pos = self._pos_to_tile(pos)
+
+            # Ctrl+click: Toggle tile in selection (add/remove)
             if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                self.is_panning = True
-                self.last_pan_point = event.pos()
-                self.setCursor(Qt.CursorShape.ClosedHandCursor)
-            else:
-                pos = self.mapToScene(event.pos())
-                tile_pos = self._pos_to_tile(pos)
-
                 if tile_pos and self._is_valid_tile(tile_pos):
-                    self.selecting = True
-                    self.selection_start = tile_pos
-
-                    if self.selection_mode == SelectionMode.TILE:
-                        self.current_selection = {tile_pos}
-                        self.tile_clicked.emit(tile_pos)
-                    elif self.selection_mode == SelectionMode.ROW:
-                        self._select_row(tile_pos.row)
-                    elif self.selection_mode == SelectionMode.COLUMN:
-                        self._select_column(tile_pos.col)
-                    elif self.selection_mode == SelectionMode.RECTANGLE:
-                        self.current_selection = {tile_pos}
-
+                    if tile_pos in self.current_selection:
+                        self.current_selection.discard(tile_pos)
+                    else:
+                        self.current_selection.add(tile_pos)
                     self._update_selection_display()
+                    self.tiles_selected.emit(list(self.current_selection))
+                    self.tile_clicked.emit(tile_pos)
+                return
+
+            # Default: Start marquee selection (drag-to-select)
+            self._start_marquee_selection(pos)
+            return
+
         elif event and event.button() == Qt.MouseButton.MiddleButton:
             # Middle mouse button for panning
             self.is_panning = True
@@ -220,7 +240,15 @@ class GridGraphicsView(QGraphicsView):
             if v_bar:
                 v_bar.setValue(v_bar.value() - delta.y())
             self.last_pan_point = event.pos()
-        elif event:
+            return
+
+        if event and self._marquee_active:
+            # Update marquee selection during drag
+            pos = self.mapToScene(event.pos())
+            self._update_marquee_selection(pos)
+            return
+
+        if event:
             pos = self.mapToScene(event.pos())
             tile_pos = self._pos_to_tile(pos)
 
@@ -228,29 +256,20 @@ class GridGraphicsView(QGraphicsView):
             if tile_pos and self._is_valid_tile(tile_pos):
                 self._update_hover(tile_pos)
 
-            # Update rectangle selection
-            if (
-                self.selecting
-                and self.selection_mode == SelectionMode.RECTANGLE
-                and tile_pos
-                and self._is_valid_tile(tile_pos)
-                and self.selection_start
-            ):
-                self._update_rectangle_selection(self.selection_start, tile_pos)
-
         if event:
             super().mouseMoveEvent(event)
 
     @override
     def wheelEvent(self, event: QWheelEvent | None):
-        """Handle mouse wheel for zooming"""
-        if event and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            # Zoom with Ctrl+Wheel
-            zoom_factor = 1.15 if event.angleDelta().y() > 0 else 1.0 / 1.15
+        """Handle mouse wheel for zooming (no modifier required)"""
+        if event:
+            delta = event.angleDelta().y()
+            if delta == 0:
+                return
+            # Always zoom on wheel - standard graphics editor behavior
+            zoom_factor = 1.15 if delta > 0 else 1.0 / 1.15
             self._zoom_at_point(event.position().toPoint(), zoom_factor)
-        elif event:
-            # Default scroll behavior
-            super().wheelEvent(event)
+            event.accept()
 
     @override
     def keyPressEvent(self, a0: QKeyEvent | None) -> None:
@@ -387,22 +406,148 @@ class GridGraphicsView(QGraphicsView):
     def mouseReleaseEvent(self, event: QMouseEvent | None):
         """Handle mouse release"""
         if event and event.button() == Qt.MouseButton.LeftButton:
-            if self.is_panning:
-                self.is_panning = False
-                self.last_pan_point = None
-                self.setCursor(Qt.CursorShape.CrossCursor)
-            elif self.selecting:
-                self.selecting = False
-                if self.current_selection:
-                    self.tiles_selected.emit(list(self.current_selection))
-                    self.selection_completed.emit()
-        elif event and event.button() == Qt.MouseButton.MiddleButton and self.is_panning:
+            if self._marquee_active:
+                # Finish marquee selection
+                # Shift held = add to existing selection
+                add_to = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+                pos = self.mapToScene(event.pos())
+                self._finish_marquee_selection(pos, add_to)
+                return
+
+        if event and event.button() == Qt.MouseButton.MiddleButton and self.is_panning:
             self.is_panning = False
             self.last_pan_point = None
             self.setCursor(Qt.CursorShape.CrossCursor)
 
         if event:
             super().mouseReleaseEvent(event)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Marquee selection methods
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _start_marquee_selection(self, pos: QPointF) -> None:
+        """Begin marquee selection at scene position."""
+        self._marquee_start = pos
+        self._marquee_active = True
+        self._drag_distance = 0
+        self._last_mouse_pos = pos
+        # Don't create visual rect yet - wait for drag threshold
+
+    def _update_marquee_selection(self, current_pos: QPointF) -> None:
+        """Update marquee rect during drag."""
+        if self._marquee_start is None or self._last_mouse_pos is None:
+            return
+
+        # Track drag distance
+        delta = current_pos - self._last_mouse_pos
+        self._drag_distance += abs(delta.x()) + abs(delta.y())
+        self._last_mouse_pos = current_pos
+
+        # Only show marquee after threshold (5 scene units)
+        if self._drag_distance < 5:
+            return
+
+        scene = self.scene()
+        if not scene:
+            return
+
+        # Create marquee rect if not exists
+        if self._marquee_rect is None:
+            self._marquee_rect = scene.addRect(
+                self._marquee_start.x(),
+                self._marquee_start.y(),
+                0,
+                0,
+                QPen(self.marquee_border_color, 1, Qt.PenStyle.DashLine),
+                QBrush(self.marquee_color),
+            )
+            self._marquee_rect.setZValue(1000)  # Above tiles
+
+        # Update rect geometry
+        x = min(self._marquee_start.x(), current_pos.x())
+        y = min(self._marquee_start.y(), current_pos.y())
+        w = abs(current_pos.x() - self._marquee_start.x())
+        h = abs(current_pos.y() - self._marquee_start.y())
+        self._marquee_rect.setRect(x, y, w, h)
+
+        # Preview selection (highlight tiles in marquee)
+        self._preview_marquee_selection(QRectF(x, y, w, h))
+
+    def _preview_marquee_selection(self, rect: QRectF) -> None:
+        """Preview tiles that would be selected by current marquee."""
+        # Calculate tiles in rect
+        tiles = self._get_tiles_in_rect(rect)
+        # Update visual selection preview
+        self.current_selection = tiles
+        self._update_selection_display()
+
+    def _finish_marquee_selection(self, end_pos: QPointF, add_to_existing: bool = False) -> None:
+        """Complete marquee selection."""
+        if self._marquee_start is None:
+            self._cleanup_marquee()
+            return
+
+        # If no significant drag, treat as single click
+        if self._drag_distance < 5:
+            tile_pos = self._pos_to_tile(end_pos)
+            if tile_pos and self._is_valid_tile(tile_pos):
+                if not add_to_existing:
+                    self.current_selection.clear()
+                self.current_selection.add(tile_pos)
+                self._update_selection_display()
+                self.tiles_selected.emit(list(self.current_selection))
+                self.tile_clicked.emit(tile_pos)
+            self._cleanup_marquee()
+            return
+
+        # Calculate selected tiles from marquee rect
+        x = min(self._marquee_start.x(), end_pos.x())
+        y = min(self._marquee_start.y(), end_pos.y())
+        w = abs(end_pos.x() - self._marquee_start.x())
+        h = abs(end_pos.y() - self._marquee_start.y())
+        selected = self._get_tiles_in_rect(QRectF(x, y, w, h))
+
+        # Update selection
+        if add_to_existing:
+            self.current_selection.update(selected)
+        else:
+            self.current_selection = selected
+
+        self._update_selection_display()
+        self.tiles_selected.emit(list(self.current_selection))
+        if self.current_selection:
+            self.selection_completed.emit()
+
+        self._cleanup_marquee()
+
+    def _get_tiles_in_rect(self, rect: QRectF) -> set[TilePosition]:
+        """Get all tiles intersecting the given scene rect."""
+        tiles: set[TilePosition] = set()
+
+        # Convert scene coords to tile coords
+        start_col = max(0, int(rect.x() / self.tile_width))
+        start_row = max(0, int(rect.y() / self.tile_height))
+        end_col = min(self.grid_cols - 1, int((rect.x() + rect.width()) / self.tile_width))
+        end_row = min(self.grid_rows - 1, int((rect.y() + rect.height()) / self.tile_height))
+
+        for row in range(start_row, end_row + 1):
+            for col in range(start_col, end_col + 1):
+                tiles.add(TilePosition(row, col))
+
+        return tiles
+
+    def _cleanup_marquee(self) -> None:
+        """Clean up marquee visual and state."""
+        if self._marquee_rect is not None:
+            scene = self.scene()
+            if scene and self._marquee_rect.scene():
+                scene.removeItem(self._marquee_rect)
+            self._marquee_rect = None
+        self._marquee_start = None
+        self._marquee_active = False
+        self._drag_distance = 0
+        self._last_mouse_pos = None
 
     def _pos_to_tile(self, pos: QPointF) -> TilePosition | None:
         """Convert scene position to tile position"""
@@ -1304,8 +1449,8 @@ class GridArrangementDialog(SplitterDialog):
         qimage = pil_to_qimage(image)
         return QPixmap.fromImage(qimage)
 
-    def _export_arrangement(self):
-        """Export the current arrangement"""
+    def _export_arrangement(self) -> None:
+        """Export the current arrangement."""
         if self.arrangement_manager.get_arranged_count() == 0:
             self._update_status("No tiles arranged for export")
             return
@@ -1324,8 +1469,8 @@ class GridArrangementDialog(SplitterDialog):
                     self.sprite_path, arranged_image, "grid"
                 )
 
-                # Save arrangement data
-                self.preview_generator.create_arrangement_preview_data(self.arrangement_manager, self.processor)
+                # Store arrangement result before accepting
+                self._arrangement_result = self.get_arrangement_result()
 
                 self._update_status(f"Exported to {Path(self.output_path).name}")
                 self.accept()
@@ -1401,8 +1546,34 @@ class GridArrangementDialog(SplitterDialog):
         self._update_displays()
 
     def get_arranged_path(self) -> str | None:
-        """Get the path to the exported arrangement"""
+        """Get the path to the exported arrangement."""
         return self.output_path
+
+    def get_arrangement_result(self) -> ArrangementResult | None:
+        """Get the arrangement result for workflow integration.
+
+        Returns:
+            ArrangementResult containing bridge and metadata, or None if no arrangement.
+        """
+        if self.arrangement_manager.get_arranged_count() == 0:
+            return None
+
+        # Import here to avoid circular dependency
+        from ui.sprite_editor.services.arrangement_bridge import ArrangementBridge
+
+        bridge = ArrangementBridge(self.arrangement_manager, self.processor)
+        metadata = self.preview_generator.create_arrangement_preview_data(self.arrangement_manager, self.processor)
+
+        return ArrangementResult(
+            bridge=bridge,
+            metadata=metadata,
+            logical_width=min(16, self.processor.grid_cols),
+        )
+
+    @property
+    def arrangement_result(self) -> ArrangementResult | None:
+        """Access stored arrangement result after dialog closes."""
+        return getattr(self, "_arrangement_result", None)
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:
