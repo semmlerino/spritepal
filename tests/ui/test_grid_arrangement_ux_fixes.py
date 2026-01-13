@@ -13,8 +13,8 @@ from PIL import Image
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialogButtonBox
 
-from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.components.visualization import SelectionMode
+from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.row_arrangement.grid_arrangement_manager import TilePosition
 
 if TYPE_CHECKING:

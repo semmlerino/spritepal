@@ -21,6 +21,7 @@ from PySide6.QtGui import (
     QPixmap,
 )
 from PySide6.QtWidgets import (
+    QDialogButtonBox,
     QFrame,
     QGraphicsPixmapItem,
     QGraphicsRectItem,
@@ -33,7 +34,6 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
     QWidget,
-    QDialogButtonBox,
 )
 
 from core.apply_operation import ApplyOperation, ApplyResult, ApplyWarning, WarningType
