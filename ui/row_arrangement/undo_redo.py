@@ -546,6 +546,7 @@ class ClearGridCommand:
     previous_groups: dict[str, TileGroup] = field(default_factory=dict)
     previous_tile_to_group: dict[TilePosition, str] = field(default_factory=dict)
     previous_order: list[tuple[ArrangementType, str]] = field(default_factory=list)
+    previous_grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = field(default_factory=dict)
 
     @property
     def description(self) -> str:
@@ -561,6 +562,7 @@ class ClearGridCommand:
             self.previous_groups,
             self.previous_tile_to_group,
             self.previous_order,
+            self.previous_grid_mapping,
         )
 
 
@@ -573,7 +575,7 @@ class CanvasMoveItemsCommand:
     target_pos: tuple[int, int]
     # We might overwrite something at target, so we need to store it
     overwritten_item: tuple[ArrangementType, str] | None = None
-    
+
     @property
     def description(self) -> str:
         return f"Move item to ({self.target_pos[0]}, {self.target_pos[1]})"
@@ -584,13 +586,13 @@ class CanvasMoveItemsCommand:
         # Here we assume the caller provides it or we check it now.
         if self.overwritten_item is None:
             self.overwritten_item = self.manager.get_item_at(*self.target_pos)
-            
+
         self.manager.move_grid_item(self.source_pos, self.target_pos)
 
     def undo(self) -> None:
         # Move back
         self.manager.move_grid_item(self.target_pos, self.source_pos)
-        
+
         # Restore overwritten item at target if any
         if self.overwritten_item:
             arr_type, key = self.overwritten_item
@@ -614,13 +616,13 @@ class CanvasPlaceItemsCommand:
     def execute(self) -> None:
         if self.overwritten_item is None:
             self.overwritten_item = self.manager.get_item_at(*self.target_pos)
-            
+
         self.manager.set_item_at(self.target_pos[0], self.target_pos[1], self.item_type, self.item_key)
 
     def undo(self) -> None:
         # Remove placed item
         self.manager.remove_item_at(self.target_pos[0], self.target_pos[1])
-        
+
         # Restore overwritten item if any
         if self.overwritten_item:
             arr_type, key = self.overwritten_item
@@ -642,11 +644,10 @@ class CanvasRemoveItemCommand:
     def execute(self) -> None:
         if self.removed_item is None:
             self.removed_item = self.manager.get_item_at(*self.target_pos)
-            
+
         self.manager.remove_item_at(self.target_pos[0], self.target_pos[1])
 
     def undo(self) -> None:
         if self.removed_item:
             arr_type, key = self.removed_item
             self.manager.set_item_at(self.target_pos[0], self.target_pos[1], arr_type, key)
-

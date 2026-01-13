@@ -659,7 +659,7 @@ class GridArrangementDialog(SplitterDialog):
             return
 
         # Capture current state for undo
-        tiles, groups, tile_to_group, order = self.arrangement_manager.get_state_snapshot()
+        tiles, groups, tile_to_group, order, grid_mapping = self.arrangement_manager.get_state_snapshot()
 
         command = ClearGridCommand(
             manager=self.arrangement_manager,
@@ -667,6 +667,7 @@ class GridArrangementDialog(SplitterDialog):
             previous_groups=groups,
             previous_tile_to_group=tile_to_group,
             previous_order=order,
+            previous_grid_mapping=grid_mapping,
         )
         self.undo_stack.push(command)
 

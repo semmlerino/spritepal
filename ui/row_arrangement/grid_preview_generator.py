@@ -102,7 +102,7 @@ class GridPreviewGenerator(ArrangementPreviewGenerator):
         # Calculate output dimensions
         if width is None:
             width = min(16, processor.grid_cols)  # Max 16 tiles wide
-            
+
         return self._create_arranged_image_with_spacing(
             arranged_tiles,
             processor.tile_width,

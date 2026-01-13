@@ -141,8 +141,8 @@ class GridArrangementManager(QObject):
             return
 
         # Find bounds of the grid mapping
-        rows = [p[0] for p in self._grid_mapping.keys()]
-        cols = [p[1] for p in self._grid_mapping.keys()]
+        rows = [p[0] for p in self._grid_mapping]
+        cols = [p[1] for p in self._grid_mapping]
         min_r, max_r = min(rows), max(rows)
         min_c, max_c = min(cols), max(cols)
 
@@ -175,19 +175,20 @@ class GridArrangementManager(QObject):
             # Let's just find the first empty slot in row-major order.
             found = False
             # Assume a reasonable search width, or just append to end
-            max_r = max(p[0] for p in self._grid_mapping.keys()) if self._grid_mapping else 0
+            max_r = max(p[0] for p in self._grid_mapping) if self._grid_mapping else 0
             # We don't know the preferred width here, so let's just use the current grid_cols
             # from the source as a hint, or just 16.
             width_hint = 16
-            
+
             for r in range(max_r + 2):
                 for c in range(width_hint):
                     if (r, c) not in self._grid_mapping:
                         target_row, target_col = r, c
                         found = True
                         break
-                if found: break
-        
+                if found:
+                    break
+
         item = (ArrangementType.TILE, f"{position.row},{position.col}")
         self._grid_mapping[(target_row, target_col)] = item
         self._derive_order_from_grid()
@@ -750,6 +751,7 @@ class GridArrangementManager(QObject):
         self._groups.clear()
         self._tile_to_group.clear()
         self._arrangement_order.clear()
+        self._grid_mapping.clear()
 
         self.arrangement_cleared.emit()
         self.arrangement_changed.emit()
@@ -760,6 +762,7 @@ class GridArrangementManager(QObject):
         groups: dict[str, TileGroup],
         tile_to_group: dict[TilePosition, str],
         order: list[tuple[ArrangementType, str]],
+        grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]],
     ) -> None:
         """Restore full state without triggering undo history.
 
@@ -770,12 +773,14 @@ class GridArrangementManager(QObject):
             groups: Dict of groups to restore
             tile_to_group: Tile-to-group mapping to restore
             order: Arrangement order to restore
+            grid_mapping: Grid position mapping to restore
         """
         self._arranged_tiles = list(tiles)
         self._tile_set = set(tiles)
         self._groups = dict(groups)
         self._tile_to_group = dict(tile_to_group)
         self._arrangement_order = list(order)
+        self._grid_mapping = dict(grid_mapping)
 
         self.arrangement_changed.emit()
 
@@ -814,15 +819,17 @@ class GridArrangementManager(QObject):
         dict[str, TileGroup],
         dict[TilePosition, str],
         list[tuple[ArrangementType, str]],
+        dict[tuple[int, int], tuple[ArrangementType, str]],
     ]:
         """Get a snapshot of the current state for undo/redo.
 
         Returns:
-            Tuple of (tiles, groups, tile_to_group, arrangement_order) copies
+            Tuple of (tiles, groups, tile_to_group, arrangement_order, grid_mapping) copies
         """
         return (
             list(self._arranged_tiles),
             dict(self._groups),
             dict(self._tile_to_group),
             list(self._arrangement_order),
+            dict(self._grid_mapping),
         )

@@ -403,3 +403,101 @@ class TestArrangementPreviewGenerator:
         assert generator.generate_output_filename("/path/to/sprite.png") == "sprite_arranged.png"
 
         assert generator.generate_output_filename("sprite.png", "_modified") == "sprite_modified.png"
+
+
+class TestGridArrangementManagerStateSnapshot:
+    """Test GridArrangementManager state snapshot and restore behavior.
+
+    Regression test for the bug where grid_mapping was not included in
+    state snapshots, causing undo to break grid positions.
+    """
+
+    def test_state_snapshot_includes_grid_mapping(self):
+        """Test that get_state_snapshot includes grid_mapping."""
+        from ui.row_arrangement.grid_arrangement_manager import (
+            ArrangementType,
+            GridArrangementManager,
+            TilePosition,
+        )
+
+        manager = GridArrangementManager(10, 10)
+
+        # Add a tile to the arrangement
+        tile = TilePosition(0, 0)
+        manager.add_tile(tile)
+
+        # Place it on the canvas at position (2, 3)
+        manager.set_item_at(2, 3, ArrangementType.TILE, "0,0")
+
+        # Get state snapshot
+        snapshot = manager.get_state_snapshot()
+
+        # Should return 5 items now (including grid_mapping)
+        assert len(snapshot) == 5
+        tiles, groups, tile_to_group, order, grid_mapping = snapshot
+
+        # Verify grid_mapping is present and correct
+        assert (2, 3) in grid_mapping
+        assert grid_mapping[(2, 3)] == (ArrangementType.TILE, "0,0")
+
+    def test_restore_state_restores_grid_mapping(self):
+        """Test that _restore_state_no_history restores grid_mapping."""
+        from ui.row_arrangement.grid_arrangement_manager import (
+            ArrangementType,
+            GridArrangementManager,
+            TilePosition,
+        )
+
+        manager = GridArrangementManager(10, 10)
+
+        # Add tiles and place them on canvas
+        tile1 = TilePosition(0, 0)
+        tile2 = TilePosition(0, 1)
+        manager.add_tile(tile1)
+        manager.add_tile(tile2)
+        manager.set_item_at(1, 1, ArrangementType.TILE, "0,0")
+        manager.set_item_at(1, 2, ArrangementType.TILE, "0,1")
+
+        # Capture snapshot
+        snapshot = manager.get_state_snapshot()
+        tiles, groups, tile_to_group, order, grid_mapping = snapshot
+
+        # Clear everything
+        manager._clear_no_history()
+
+        # Verify grid_mapping is cleared
+        assert manager.get_grid_mapping() == {}
+
+        # Restore state
+        manager._restore_state_no_history(tiles, groups, tile_to_group, order, grid_mapping)
+
+        # Verify grid_mapping is restored
+        restored_mapping = manager.get_grid_mapping()
+        assert (1, 1) in restored_mapping
+        assert (1, 2) in restored_mapping
+        assert restored_mapping[(1, 1)] == (ArrangementType.TILE, "0,0")
+        assert restored_mapping[(1, 2)] == (ArrangementType.TILE, "0,1")
+
+    def test_clear_no_history_clears_grid_mapping(self):
+        """Test that _clear_no_history clears grid_mapping."""
+        from ui.row_arrangement.grid_arrangement_manager import (
+            ArrangementType,
+            GridArrangementManager,
+            TilePosition,
+        )
+
+        manager = GridArrangementManager(10, 10)
+
+        # Add and place tiles
+        tile = TilePosition(0, 0)
+        manager.add_tile(tile)
+        manager.set_item_at(5, 5, ArrangementType.TILE, "0,0")
+
+        # Verify grid_mapping has content
+        assert manager.get_grid_mapping() != {}
+
+        # Clear
+        manager._clear_no_history()
+
+        # Verify grid_mapping is cleared
+        assert manager.get_grid_mapping() == {}
