@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 from PIL import Image
 
 from core.color_quantization import ColorQuantizer, QuantizationResult
@@ -128,7 +127,7 @@ class TestColorQuantizer:
         assert unique_indices[0] >= 1
 
     def test_scaling_to_target_size(self) -> None:
-        """Image is scaled to target size before quantization."""
+        """Image is scaled to fit target size before quantization."""
         image = Image.new("RGBA", (16, 16), color=(255, 0, 0, 255))
 
         quantizer = ColorQuantizer(dither=False)
@@ -136,15 +135,28 @@ class TestColorQuantizer:
 
         assert result.indexed_data.shape == (8, 8)
 
-    def test_scaling_preserves_aspect_ratio_not_enforced(self) -> None:
-        """Scaling uses exact target size (may distort)."""
+    def test_scaling_preserves_aspect_ratio(self) -> None:
+        """Scaling preserves aspect ratio and centers image on transparent canvas."""
+        # Create a wide image (16x8) to scale into 8x8 target
         image = Image.new("RGBA", (16, 8), color=(255, 0, 0, 255))
 
         quantizer = ColorQuantizer(dither=False)
         result = quantizer.quantize(image, target_size=(8, 8))
 
-        # Result matches target exactly
+        # Result should be 8x8 (target size)
         assert result.indexed_data.shape == (8, 8)
+
+        # Image should be scaled to 8x4 (preserving 2:1 aspect ratio)
+        # and centered vertically, so rows 0-1 and 6-7 should be transparent
+        assert result.transparency_mask is not None
+        # Top padding should be transparent (rows 0-1)
+        assert result.transparency_mask[0, :].all()
+        assert result.transparency_mask[1, :].all()
+        # Bottom padding should be transparent (rows 6-7)
+        assert result.transparency_mask[6, :].all()
+        assert result.transparency_mask[7, :].all()
+        # Middle rows should have content (not fully transparent)
+        assert not result.transparency_mask[2, :].all()
 
     def test_no_scaling_when_already_correct_size(self) -> None:
         """No scaling if image already matches target."""
@@ -155,12 +167,30 @@ class TestColorQuantizer:
 
         assert result.indexed_data.shape == (8, 8)
 
+    def test_no_upscaling_for_smaller_images(self) -> None:
+        """Images smaller than target are not upscaled, just centered."""
+        # Create a small 4x4 image
+        image = Image.new("RGBA", (4, 4), color=(255, 0, 0, 255))
 
-class TestMedianCut:
-    """Tests for median-cut quantization algorithm."""
+        quantizer = ColorQuantizer(dither=False)
+        result = quantizer.quantize(image, target_size=(8, 8))
+
+        # Result should be 8x8 with centered 4x4 content
+        assert result.indexed_data.shape == (8, 8)
+        assert result.transparency_mask is not None
+
+        # Edges should be transparent (2 pixel border)
+        assert result.transparency_mask[0, :].all()  # Top row
+        assert result.transparency_mask[1, :].all()  # Second row
+        assert result.transparency_mask[6, :].all()  # Seventh row
+        assert result.transparency_mask[7, :].all()  # Bottom row
+
+
+class TestFastOctreeQuantization:
+    """Tests for FASTOCTREE quantization algorithm."""
 
     def test_single_color_image(self) -> None:
-        """Single color image produces palette with that color."""
+        """Single color image preserves color in palette."""
         image = Image.new("RGBA", (8, 8), color=(128, 64, 32, 255))
 
         quantizer = ColorQuantizer(dither=False)
@@ -170,8 +200,10 @@ class TestMedianCut:
         pixel_index = result.indexed_data[0, 0]
         color = result.palette[pixel_index]
 
-        # Should be close to original (exact match for single color)
-        assert color == (128, 64, 32)
+        # Should be close to original (allow small tolerance for FASTOCTREE)
+        assert abs(color[0] - 128) <= 5
+        assert abs(color[1] - 64) <= 5
+        assert abs(color[2] - 32) <= 5
 
     def test_two_distinct_colors(self) -> None:
         """Two distinct colors are preserved in palette."""
@@ -255,8 +287,8 @@ class TestFloydSteinbergDithering:
 class TestAllTransparentImage:
     """Tests for edge case: fully transparent image."""
 
-    def test_all_transparent_uses_grayscale_palette(self) -> None:
-        """Fully transparent image uses grayscale fallback palette."""
+    def test_all_transparent_uses_fallback_palette(self) -> None:
+        """Fully transparent image uses fallback palette."""
         image = Image.new("RGBA", (4, 4), color=(0, 0, 0, 0))
 
         quantizer = ColorQuantizer(dither=False)

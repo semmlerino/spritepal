@@ -7,7 +7,6 @@ palette format used by SNES sprites (4bpp).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -32,7 +31,7 @@ class QuantizationResult:
 class ColorQuantizer:
     """Quantizes RGB/RGBA images to 16-color indexed format.
 
-    Supports median-cut quantization with optional Floyd-Steinberg dithering.
+    Uses PIL's FASTOCTREE quantization for better color preservation in pixel art.
     Transparency is handled by reserving index 0 for transparent pixels.
     """
 
@@ -40,18 +39,15 @@ class ColorQuantizer:
         self,
         dither: bool = True,
         transparency_threshold: int = 127,
-        algorithm: Literal["median_cut"] = "median_cut",
     ) -> None:
         """Initialize the quantizer.
 
         Args:
             dither: Whether to apply Floyd-Steinberg dithering
             transparency_threshold: Alpha values below this are transparent
-            algorithm: Quantization algorithm to use
         """
         self._dither = dither
         self._transparency_threshold = transparency_threshold
-        self._algorithm = algorithm
 
     def quantize(
         self,
@@ -71,9 +67,27 @@ class ColorQuantizer:
         if image.mode != "RGBA":
             image = image.convert("RGBA")
 
-        # Scale if target size provided
-        if target_size is not None and (image.width, image.height) != target_size:
-            image = image.resize(target_size, Image.Resampling.LANCZOS)
+        # Scale uniformly to fit within target size, preserving aspect ratio
+        if target_size is not None:
+            target_w, target_h = target_size
+            scale = min(target_w / image.width, target_h / image.height)
+
+            if scale < 1.0:  # Only scale down, not up
+                new_w = int(image.width * scale)
+                new_h = int(image.height * scale)
+                scaled = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            else:
+                scaled = image
+
+            # Create transparent canvas at target size
+            canvas = Image.new("RGBA", target_size, (0, 0, 0, 0))
+
+            # Center the scaled image
+            paste_x = (target_w - scaled.width) // 2
+            paste_y = (target_h - scaled.height) // 2
+            canvas.paste(scaled, (paste_x, paste_y))
+
+            image = canvas
 
         # Convert to numpy array
         pixels = np.array(image)
@@ -82,205 +96,50 @@ class ColorQuantizer:
         alpha = pixels[:, :, 3]
         transparency_mask = alpha < self._transparency_threshold
 
-        # Extract RGB channels
-        rgb = pixels[:, :, :3].astype(np.float32)
+        # Check if there are any opaque pixels
+        has_opaque = not transparency_mask.all()
 
-        # Get opaque pixels for palette computation
-        opaque_mask = ~transparency_mask
-        opaque_pixels = rgb[opaque_mask]
+        if has_opaque:
+            # Create RGB image for quantization (transparent pixels get black)
+            rgb_image = Image.new("RGB", image.size, (0, 0, 0))
+            rgb_image.paste(image, mask=image.split()[3])
 
-        # Generate palette (15 colors for opaque, index 0 reserved for transparent)
-        if len(opaque_pixels) > 0:
-            palette_colors = self._median_cut(opaque_pixels, 15)
+            # Use PIL's FASTOCTREE for better color preservation in pixel art
+            dither_mode = Image.Dither.FLOYDSTEINBERG if self._dither else Image.Dither.NONE
+            quantized = rgb_image.quantize(
+                colors=15,  # Reserve index 0 for transparency
+                method=Image.Quantize.FASTOCTREE,
+                dither=dither_mode,
+            )
+
+            # Extract palette from quantized image
+            pil_palette = quantized.getpalette()
+            if pil_palette is None:
+                palette_colors: list[tuple[int, int, int]] = [(0, 0, 0)] * 15
+            else:
+                palette_colors = [
+                    (pil_palette[i * 3], pil_palette[i * 3 + 1], pil_palette[i * 3 + 2])
+                    for i in range(15)
+                ]
+
+            # Convert indexed image to numpy, offset indices by 1 for transparency
+            indexed = np.array(quantized, dtype=np.uint8)
+            indexed = indexed + 1  # Shift all indices up by 1
+            indexed[transparency_mask] = 0  # Set transparent pixels to index 0
         else:
-            # All transparent - use grayscale palette
-            palette_colors = [(i * 17, i * 17, i * 17) for i in range(15)]
+            # All transparent - create empty indexed image
+            indexed = np.zeros((image.height, image.width), dtype=np.uint8)
+            palette_colors = [(0, 0, 0)] * 15
 
-        # Index 0 is transparent (black)
+        # Build full palette with index 0 = transparent (black)
         full_palette: list[tuple[int, int, int]] = [(0, 0, 0), *palette_colors]
 
         # Pad to exactly 16 colors if needed
         while len(full_palette) < 16:
             full_palette.append((0, 0, 0))
 
-        # Apply dithering or direct mapping
-        if self._dither and len(opaque_pixels) > 0:
-            indexed = self._floyd_steinberg_dither(rgb, full_palette, transparency_mask)
-        else:
-            indexed = self._map_to_nearest(rgb, full_palette, transparency_mask)
-
         return QuantizationResult(
             indexed_data=indexed,
             palette=full_palette,
             transparency_mask=transparency_mask,
         )
-
-    def _median_cut(
-        self,
-        pixels: NDArray[np.float32],
-        n_colors: int,
-    ) -> list[tuple[int, int, int]]:
-        """Generate palette using median-cut algorithm.
-
-        Args:
-            pixels: Array of RGB pixels, shape (N, 3)
-            n_colors: Number of colors to generate
-
-        Returns:
-            List of RGB tuples
-        """
-        if len(pixels) == 0:
-            return []
-
-        # Start with all pixels in one box
-        boxes: list[NDArray[np.float32]] = [pixels]
-
-        # Split boxes until we have enough colors
-        while len(boxes) < n_colors:
-            # Find box with largest range to split
-            best_idx = 0
-            best_range = 0.0
-
-            for i, box in enumerate(boxes):
-                if len(box) < 2:
-                    continue
-                # Find channel with largest range
-                ranges = box.max(axis=0) - box.min(axis=0)
-                max_range = float(ranges.max())
-                if max_range > best_range:
-                    best_range = max_range
-                    best_idx = i
-
-            if best_range == 0:
-                break  # Can't split further
-
-            # Split the best box
-            box = boxes.pop(best_idx)
-            ranges = box.max(axis=0) - box.min(axis=0)
-            split_channel = int(np.argmax(ranges))
-
-            # Sort by the split channel and divide at median
-            sorted_pixels = box[box[:, split_channel].argsort()]
-            mid = len(sorted_pixels) // 2
-
-            boxes.append(sorted_pixels[:mid])
-            boxes.append(sorted_pixels[mid:])
-
-        # Compute average color for each box
-        palette: list[tuple[int, int, int]] = []
-        for box in boxes:
-            if len(box) > 0:
-                avg = box.mean(axis=0)
-                palette.append(
-                    (
-                        int(np.clip(avg[0], 0, 255)),
-                        int(np.clip(avg[1], 0, 255)),
-                        int(np.clip(avg[2], 0, 255)),
-                    )
-                )
-
-        return palette
-
-    def _floyd_steinberg_dither(
-        self,
-        rgb: NDArray[np.float32],
-        palette: list[tuple[int, int, int]],
-        transparency_mask: NDArray[np.bool_],
-    ) -> NDArray[np.uint8]:
-        """Apply Floyd-Steinberg dithering.
-
-        Args:
-            rgb: RGB pixel array, shape (H, W, 3)
-            palette: List of 16 RGB tuples
-            transparency_mask: Boolean mask where True = transparent
-
-        Returns:
-            Indexed array, shape (H, W)
-        """
-        height, width = rgb.shape[:2]
-        indexed = np.zeros((height, width), dtype=np.uint8)
-
-        # Work on a copy to accumulate errors
-        working = rgb.copy()
-
-        # Convert palette to array for vectorized operations
-        palette_array = np.array(palette[1:], dtype=np.float32)  # Skip index 0
-
-        for y in range(height):
-            for x in range(width):
-                if transparency_mask[y, x]:
-                    indexed[y, x] = 0
-                    continue
-
-                old_pixel = working[y, x]
-
-                # Find nearest color (excluding index 0)
-                idx = self._find_nearest_color(old_pixel, palette_array)
-                indexed[y, x] = idx + 1  # +1 because we skipped index 0
-
-                new_pixel = np.array(palette[idx + 1], dtype=np.float32)
-                error = old_pixel - new_pixel
-
-                # Distribute error to neighbors (Floyd-Steinberg pattern)
-                if x + 1 < width and not transparency_mask[y, x + 1]:
-                    working[y, x + 1] += error * (7 / 16)
-                if y + 1 < height:
-                    if x > 0 and not transparency_mask[y + 1, x - 1]:
-                        working[y + 1, x - 1] += error * (3 / 16)
-                    if not transparency_mask[y + 1, x]:
-                        working[y + 1, x] += error * (5 / 16)
-                    if x + 1 < width and not transparency_mask[y + 1, x + 1]:
-                        working[y + 1, x + 1] += error * (1 / 16)
-
-        return indexed
-
-    def _map_to_nearest(
-        self,
-        rgb: NDArray[np.float32],
-        palette: list[tuple[int, int, int]],
-        transparency_mask: NDArray[np.bool_],
-    ) -> NDArray[np.uint8]:
-        """Map pixels to nearest palette color without dithering.
-
-        Args:
-            rgb: RGB pixel array, shape (H, W, 3)
-            palette: List of 16 RGB tuples
-            transparency_mask: Boolean mask where True = transparent
-
-        Returns:
-            Indexed array, shape (H, W)
-        """
-        height, width = rgb.shape[:2]
-        indexed = np.zeros((height, width), dtype=np.uint8)
-
-        # Convert palette to array (excluding index 0)
-        palette_array = np.array(palette[1:], dtype=np.float32)
-
-        for y in range(height):
-            for x in range(width):
-                if transparency_mask[y, x]:
-                    indexed[y, x] = 0
-                else:
-                    idx = self._find_nearest_color(rgb[y, x], palette_array)
-                    indexed[y, x] = idx + 1
-
-        return indexed
-
-    def _find_nearest_color(
-        self,
-        pixel: NDArray[np.float32],
-        palette: NDArray[np.float32],
-    ) -> int:
-        """Find index of nearest palette color.
-
-        Args:
-            pixel: RGB values, shape (3,)
-            palette: Palette colors, shape (N, 3)
-
-        Returns:
-            Index into palette
-        """
-        if len(palette) == 0:
-            return 0
-        distances = np.sum((palette - pixel) ** 2, axis=1)
-        return int(np.argmin(distances))
