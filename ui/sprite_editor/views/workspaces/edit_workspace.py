@@ -57,6 +57,8 @@ class EditWorkspace(QWidget):
     ready_for_inject = Signal()
     saveToRomRequested = Signal()
     exportPngRequested = Signal()
+    saveProjectRequested = Signal()
+    loadProjectRequested = Signal()
 
     def __init__(self, embed_mode: str = "standalone", parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -80,6 +82,8 @@ class EditWorkspace(QWidget):
         # Connect SaveExportPanel signals
         self._save_export_panel.saveToRomClicked.connect(self.saveToRomRequested.emit)
         self._save_export_panel.exportPngClicked.connect(self.exportPngRequested.emit)
+        self._save_export_panel.saveProjectClicked.connect(self.saveProjectRequested.emit)
+        self._save_export_panel.loadProjectClicked.connect(self.loadProjectRequested.emit)
 
         if self._embed_mode == "standalone":
             # Standalone mode: Create full layout with internal splitter
@@ -574,3 +578,11 @@ class EditWorkspace(QWidget):
             enabled: Whether the save button should be enabled
         """
         self._save_export_panel.set_save_enabled(enabled)
+
+    def set_save_project_enabled(self, enabled: bool) -> None:
+        """Enable or disable the save project button.
+
+        Args:
+            enabled: Whether the save project button should be enabled
+        """
+        self._save_export_panel.set_save_project_enabled(enabled)

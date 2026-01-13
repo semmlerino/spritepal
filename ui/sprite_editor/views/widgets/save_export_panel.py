@@ -31,6 +31,8 @@ class SaveExportPanel(QWidget):
     # Signals
     saveToRomClicked = Signal()
     exportPngClicked = Signal()
+    saveProjectClicked = Signal()
+    loadProjectClicked = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         """
@@ -74,6 +76,19 @@ class SaveExportPanel(QWidget):
         self.export_png_btn.clicked.connect(self.exportPngClicked.emit)
         self.export_png_btn.setEnabled(False)
         group_layout.addWidget(self.export_png_btn)
+
+        # Save Project button
+        self.save_project_btn = QPushButton("Save Project...")
+        self.save_project_btn.setStyleSheet(get_button_style("secondary"))
+        self.save_project_btn.clicked.connect(self.saveProjectClicked.emit)
+        self.save_project_btn.setEnabled(False)
+        group_layout.addWidget(self.save_project_btn)
+
+        # Load Project button
+        self.load_project_btn = QPushButton("Load Project...")
+        self.load_project_btn.setStyleSheet(get_button_style("secondary"))
+        self.load_project_btn.clicked.connect(self.loadProjectClicked.emit)
+        group_layout.addWidget(self.load_project_btn)
 
         # Size info container (initially hidden)
         self.size_info_widget = QWidget()
@@ -132,6 +147,24 @@ class SaveExportPanel(QWidget):
             visible: Whether the button should be visible
         """
         self.export_png_btn.setVisible(visible)
+
+    def set_save_project_enabled(self, enabled: bool) -> None:
+        """
+        Enable or disable the "Save Project" button.
+
+        Args:
+            enabled: Whether the button should be enabled
+        """
+        self.save_project_btn.setEnabled(enabled)
+
+    def set_load_project_enabled(self, enabled: bool) -> None:
+        """
+        Enable or disable the "Load Project" button.
+
+        Args:
+            enabled: Whether the button should be enabled
+        """
+        self.load_project_btn.setEnabled(enabled)
 
     def set_size_info(self, original_bytes: int, modified_bytes: int) -> None:
         """

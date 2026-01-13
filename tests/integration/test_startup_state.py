@@ -88,6 +88,10 @@ class MockEditWorkspace(QWidget):
         self.saveToRomRequested.connect = Mock()
         self.exportPngRequested = Mock()
         self.exportPngRequested.connect = Mock()
+        self.saveProjectRequested = Mock()
+        self.saveProjectRequested.connect = Mock()
+        self.loadProjectRequested = Mock()
+        self.loadProjectRequested.connect = Mock()
 
         # Mock icon toolbar
         self.icon_toolbar = Mock()
@@ -98,6 +102,9 @@ class MockEditWorkspace(QWidget):
         self.palette_panel = None
 
     def set_controller(self, ctrl):
+        pass
+
+    def set_save_project_enabled(self, enabled: bool) -> None:
         pass
 
 

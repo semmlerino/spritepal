@@ -22,6 +22,8 @@ class MockPanel(QWidget):
     # SaveExportPanel signals
     saveToRomClicked = Signal()
     exportPngClicked = Signal()
+    saveProjectClicked = Signal()
+    loadProjectClicked = Signal()
     # IconToolbar signals
     zoomInClicked = Signal()
     zoomOutClicked = Signal()

@@ -297,6 +297,8 @@ class ROMWorkflowController(QObject):
         # EditWorkspace signals (save/export)
         self._view.workspace.saveToRomRequested.connect(self.prepare_injection)
         self._view.workspace.exportPngRequested.connect(self.export_png)
+        self._view.workspace.saveProjectRequested.connect(self.save_sprite_project)
+        self._view.workspace.loadProjectRequested.connect(self.load_sprite_project)
 
         # Palette panel signals
         if self._view.workspace and self._view.workspace.palette_panel:
@@ -985,6 +987,9 @@ class ROMWorkflowController(QObject):
         if self._view:
             self._view.set_action_text("Save to ROM")
             self._view.set_workflow_state("edit")
+            # Enable save project button when sprite is loaded for editing
+            if self._view.workspace:
+                self._view.workspace.set_save_project_enabled(True)
         self.workflow_state_changed.emit("edit")
 
         # Emit sprite_extracted for external listeners (e.g. history, status)
@@ -1352,6 +1357,202 @@ class ROMWorkflowController(QObject):
             from PySide6.QtWidgets import QMessageBox
 
             QMessageBox.critical(self._view, "Export Failed", f"Failed to export PNG: {e}")
+
+    def save_sprite_project(self) -> None:
+        """Save current sprite as a .spritepal project file."""
+        from pathlib import Path
+
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+        from core.sprite_project import SpriteProject, SpriteProjectError
+
+        # Check if we have sprite data to save
+        tile_data = self.current_tile_data
+        if tile_data is None:
+            if self._message_service:
+                self._message_service.show_message("No sprite loaded to save")
+            return
+
+        # Get palette from editing controller
+        palette_model = self._editing_controller.palette_model
+        if not palette_model.colors:
+            if self._message_service:
+                self._message_service.show_message("No palette available")
+            return
+
+        # Get ROM info for metadata
+        rom_title = ""
+        rom_checksum = ""
+        if self.rom_path and self.rom_extractor:
+            try:
+                header = self.rom_extractor.read_rom_header(self.rom_path)
+                rom_title = header.title
+                rom_checksum = f"0x{header.checksum:04X}"
+            except Exception:
+                rom_title = Path(self.rom_path).stem
+
+        # Create the project
+        project = SpriteProject(
+            name=self.current_sprite_name or f"sprite_0x{self.current_offset:06X}",
+            width=self.current_width,
+            height=self.current_height,
+            tile_data=tile_data,
+            tile_count=len(tile_data) // 32,
+            palette_colors=list(palette_model.colors),
+            palette_name=palette_model.name,
+            palette_index=palette_model.index,
+            original_rom_offset=self.current_offset,
+            original_compressed_size=self.original_compressed_size,
+            header_bytes=self.current_header_bytes,
+            compression_type=self.current_compression_type.value,
+            rom_title=rom_title,
+            rom_checksum=rom_checksum,
+        )
+
+        # Generate preview
+        project.update_preview()
+
+        # Show save dialog
+        default_name = f"{project.name}.spritepal"
+        file_path, _ = QFileDialog.getSaveFileName(
+            self._view,
+            "Save Sprite Project",
+            default_name,
+            "SpritePal Projects (*.spritepal);;All Files (*)",
+        )
+
+        if not file_path:
+            return
+
+        try:
+            project.save(Path(file_path))
+            if self._message_service:
+                self._message_service.show_message(f"Project saved: {file_path}")
+            QMessageBox.information(self._view, "Project Saved", f"Sprite project saved to:\n{file_path}")
+        except SpriteProjectError as e:
+            logger.exception("Failed to save sprite project")
+            if self._message_service:
+                self._message_service.show_message(f"Save failed: {e}")
+            QMessageBox.critical(self._view, "Save Failed", f"Failed to save project:\n{e}")
+
+    def load_sprite_project(self) -> None:
+        """Load a .spritepal project file for editing/injection."""
+        from pathlib import Path
+
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+        from core.sprite_project import SpriteProject, SpriteProjectError
+
+        # Check for unsaved changes
+        if self._editing_controller.has_unsaved_changes():
+            result = QMessageBox.question(
+                self._view,
+                "Unsaved Changes",
+                "You have unsaved changes. Load a new project anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if result != QMessageBox.StandardButton.Yes:
+                return
+
+        # Show open dialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self._view,
+            "Load Sprite Project",
+            "",
+            "SpritePal Projects (*.spritepal);;All Files (*)",
+        )
+
+        if not file_path:
+            return
+
+        try:
+            project = SpriteProject.load(Path(file_path))
+        except SpriteProjectError as e:
+            logger.exception("Failed to load sprite project")
+            if self._message_service:
+                self._message_service.show_message(f"Load failed: {e}")
+            QMessageBox.critical(self._view, "Load Failed", f"Failed to load project:\n{e}")
+            return
+
+        # Check ROM checksum mismatch
+        if self.rom_path and project.rom_checksum and self.rom_extractor:
+            try:
+                current_header = self.rom_extractor.read_rom_header(self.rom_path)
+                current_checksum = f"0x{current_header.checksum:04X}"
+                if current_checksum != project.rom_checksum:
+                    QMessageBox.warning(
+                        self._view,
+                        "ROM Mismatch",
+                        f"This project was created from a different ROM.\n\n"
+                        f"Project ROM: {project.rom_title}\n"
+                        f"Project checksum: {project.rom_checksum}\n\n"
+                        f"Current ROM checksum: {current_checksum}\n\n"
+                        "Injection may not work correctly.",
+                    )
+            except Exception:
+                pass  # Ignore header read errors
+
+        # Apply project data to controller state
+        self.current_tile_data = project.tile_data
+        self.current_width = project.width
+        self.current_height = project.height
+        self.current_sprite_name = project.name
+        self.original_compressed_size = project.original_compressed_size
+        self.current_header_bytes = project.header_bytes
+        self.current_offset = project.original_rom_offset
+
+        # Set compression type
+        try:
+            self.current_compression_type = CompressionType(project.compression_type)
+        except ValueError:
+            self.current_compression_type = CompressionType.HAL
+
+        # Load into editing controller
+        self._load_tile_data_into_editor(project.tile_data, project.width, project.height)
+
+        # Apply palette
+        self._editing_controller.set_palette(project.palette_colors, project.palette_name)
+        self._editing_controller.palette_model.index = project.palette_index
+
+        # Update state
+        self.state = "edit"
+        self.workflow_state_changed.emit("edit")
+
+        # Enable save project button
+        if self._view and self._view.workspace:
+            self._view.workspace.set_save_project_enabled(True)
+
+        if self._message_service:
+            self._message_service.show_message(f"Loaded project: {project.name}")
+
+    def _load_tile_data_into_editor(self, tile_data: bytes, width: int, height: int) -> None:
+        """Load raw tile data into the editing controller."""
+        from core.tile_utils import decode_4bpp_tile
+
+        # Decode tiles to pixel indices
+        num_tiles = len(tile_data) // 32
+        tiles_per_row = width // 8 if width >= 8 else 1
+
+        # Create numpy array for pixel data
+        pixels = np.zeros((height, width), dtype=np.uint8)
+
+        for tile_idx in range(num_tiles):
+            tile_x = (tile_idx % tiles_per_row) * 8
+            tile_y = (tile_idx // tiles_per_row) * 8
+
+            tile_bytes = tile_data[tile_idx * 32 : (tile_idx + 1) * 32]
+            tile_pixels = decode_4bpp_tile(tile_bytes)
+
+            for py in range(8):
+                for px in range(8):
+                    x = tile_x + px
+                    y = tile_y + py
+                    if x < width and y < height:
+                        pixels[y, x] = tile_pixels[py][px]
+
+        # Load into editing controller
+        self._editing_controller.load_image(pixels)
 
     def _get_rom_data_for_preview(self) -> tuple[str, object] | None:
         """Provide ROM data for smart preview coordinator."""

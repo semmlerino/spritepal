@@ -17,7 +17,8 @@ def test_preview_cache_invalidation(tmp_path: Path) -> None:
 
     offset = 0x1234
     cache_key = coordinator._cache.make_key(str(rom_path), offset)
-    preview_data = (b"\x01" * 32, 8, 8, "sprite", 16, 0, offset, True)
+    # Cache format: (tile_data, width, height, sprite_name, compressed_size, slack_size, actual_offset, hal_succeeded, header_bytes)
+    preview_data = (b"\x01" * 32, 8, 8, "sprite", 16, 0, offset, True, b"")
     coordinator._cache.put(cache_key, preview_data)
 
     assert len(coordinator._cache) == 1

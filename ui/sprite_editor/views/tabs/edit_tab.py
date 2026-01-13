@@ -36,6 +36,8 @@ class EditTab(QWidget):
     detach_requested = Signal()
     image_modified = Signal()
     ready_for_inject = Signal()
+    saveProjectRequested = Signal()
+    loadProjectRequested = Signal()
 
     def __init__(
         self,
@@ -62,6 +64,8 @@ class EditTab(QWidget):
         self._workspace.detach_requested.connect(self.detach_requested.emit)
         self._workspace.image_modified.connect(self.image_modified.emit)
         self._workspace.ready_for_inject.connect(self.ready_for_inject.emit)
+        self._workspace.saveProjectRequested.connect(self.saveProjectRequested.emit)
+        self._workspace.loadProjectRequested.connect(self.loadProjectRequested.emit)
 
     @property
     def workspace(self) -> EditWorkspace:
