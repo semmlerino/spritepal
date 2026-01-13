@@ -46,11 +46,11 @@ class TestGridArrangementUXFixes:
 
         assert dialog.export_btn is not None
         assert not dialog.export_btn.isEnabled()
-        
+
         # Verify it's in the button box if possible (checking parent or layout)
         # QDialogButtonBox layout is internal, but we can check if button is visible/parented
         assert dialog.export_btn.isVisible()
-        
+
         # Check if it's in the button box list of buttons
         # (This depends on how it was added. We added it manually via addButton)
         if dialog.button_box:
@@ -61,25 +61,25 @@ class TestGridArrangementUXFixes:
         """Verify T, R, C, M shortcuts switch selection modes."""
         dialog.show()
         qtbot.waitForWindowShown(dialog)
-        
+
         # Default is TILE
         assert dialog.mode_toggle.current_data() == SelectionMode.TILE
-        
+
         # Press R for Row
         qtbot.keyClick(dialog, Qt.Key.Key_R)
         assert dialog.mode_toggle.current_data() == SelectionMode.ROW
         assert dialog.grid_view.selection_mode == SelectionMode.ROW
-        
+
         # Press C for Column
         qtbot.keyClick(dialog, Qt.Key.Key_C)
         assert dialog.mode_toggle.current_data() == SelectionMode.COLUMN
         assert dialog.grid_view.selection_mode == SelectionMode.COLUMN
-        
+
         # Press M for Marquee (Rectangle)
         qtbot.keyClick(dialog, Qt.Key.Key_M)
         assert dialog.mode_toggle.current_data() == SelectionMode.RECTANGLE
         assert dialog.grid_view.selection_mode == SelectionMode.RECTANGLE
-        
+
         # Press T for Tile
         qtbot.keyClick(dialog, Qt.Key.Key_T)
         assert dialog.mode_toggle.current_data() == SelectionMode.TILE
@@ -89,28 +89,28 @@ class TestGridArrangementUXFixes:
         """Verify clicking a tile adds it, and undo/redo works."""
         dialog.show()
         qtbot.waitForWindowShown(dialog)
-        
+
         # Ensure we are in TILE mode
         dialog.mode_toggle.set_current_data(SelectionMode.TILE)
-        
+
         # Simulate clicking tile at (0, 0)
         tile_pos = TilePosition(0, 0)
-        
+
         # Initial state: not arranged
         assert not dialog.arrangement_manager.is_tile_arranged(tile_pos)
-        
+
         # Trigger click manually (simulating signal from grid view)
         dialog._on_tile_clicked(tile_pos)
-        
+
         # Should be arranged now
         assert dialog.arrangement_manager.is_tile_arranged(tile_pos)
         assert dialog.undo_stack.can_undo()
-        
+
         # Undo
         dialog._on_undo()
         assert not dialog.arrangement_manager.is_tile_arranged(tile_pos)
         assert dialog.undo_stack.can_redo()
-        
+
         # Redo
         dialog._on_redo()
         assert dialog.arrangement_manager.is_tile_arranged(tile_pos)
@@ -254,3 +254,38 @@ class TestGridArrangementUXFixes:
         # Verify all tiles in row 0 are now removed
         for tile in row_tiles:
             assert not dialog.arrangement_manager.is_tile_arranged(tile)
+
+    def test_legend_shows_mouse_shortcuts(self, dialog: GridArrangementDialog, qtbot: QtBot):
+        """Verify legend contains mouse interaction shortcuts."""
+        dialog.show()
+        qtbot.waitForWindowShown(dialog)
+
+        # Check that legend content widget exists and is visible
+        assert hasattr(dialog, "_legend_content")
+        assert dialog._legend_content.isVisible()
+
+        # Check legend text contains key mouse shortcuts
+        legend_text = dialog._legend_content.text()
+        assert "Ctrl+Click" in legend_text
+        assert "Wheel zoom" in legend_text
+        assert "Middle-drag pan" in legend_text
+        assert "Ctrl+E" in legend_text  # Export shortcut
+
+    def test_legend_collapsible(self, dialog: GridArrangementDialog, qtbot: QtBot):
+        """Verify legend can be collapsed and expanded."""
+        dialog.show()
+        qtbot.waitForWindowShown(dialog)
+
+        # Initially expanded
+        assert dialog._legend_content.isVisible()
+        assert dialog._legend_toggle_btn.isChecked()
+
+        # Click toggle to collapse
+        qtbot.mouseClick(dialog._legend_toggle_btn, Qt.MouseButton.LeftButton)
+        assert not dialog._legend_content.isVisible()
+        assert not dialog._legend_toggle_btn.isChecked()
+
+        # Click toggle to expand again
+        qtbot.mouseClick(dialog._legend_toggle_btn, Qt.MouseButton.LeftButton)
+        assert dialog._legend_content.isVisible()
+        assert dialog._legend_toggle_btn.isChecked()

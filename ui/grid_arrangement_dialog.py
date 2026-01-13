@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -156,7 +157,7 @@ class GridArrangementDialog(SplitterDialog):
         # Initial update (only if we have valid data)
         if self.original_image is not None:
             self._update_displays()
-            self.update_status("Select tiles, rows, or columns to arrange. Ctrl+Wheel or F to zoom.")
+            self.update_status("Select tiles, rows, or columns to arrange. Wheel to zoom, F to fit.")
         else:
             self.update_status("Error: Unable to load sprite file")
 
@@ -467,14 +468,47 @@ class GridArrangementDialog(SplitterDialog):
 
         layout.addStretch()
 
-        # Add shortcut legend
-        legend = QLabel(
+        # Add collapsible shortcut legend
+        self._add_shortcut_legend(layout)
+
+    def _add_shortcut_legend(self, layout: QHBoxLayout):
+        """Add a collapsible shortcut legend to the given layout."""
+        # Container for the toggle button and legend content
+        legend_container = QFrame()
+        legend_layout = QVBoxLayout(legend_container)
+        legend_layout.setContentsMargins(0, 0, 0, 0)
+        legend_layout.setSpacing(2)
+
+        # Toggle button with arrow indicator
+        self._legend_toggle_btn = QToolButton()
+        self._legend_toggle_btn.setCheckable(True)
+        self._legend_toggle_btn.setChecked(True)  # Start expanded
+        self._legend_toggle_btn.setArrowType(Qt.ArrowType.DownArrow)
+        self._legend_toggle_btn.setText(" Shortcuts")
+        self._legend_toggle_btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._legend_toggle_btn.setStyleSheet("QToolButton { border: none; color: #888888; }")
+        self._legend_toggle_btn.toggled.connect(self._on_legend_toggled)
+        legend_layout.addWidget(self._legend_toggle_btn)
+
+        # Legend content (multi-line, comprehensive)
+        self._legend_content = QLabel(
             "<font color='#888888'>"
-            "<b>Shortcuts:</b> [T] Tile, [R] Row, [C] Column, [M] Marquee | "
-            "[Enter] Add, [Del] Remove, [Esc] Clear | [Ctrl+Z/Y] Undo/Redo"
+            "<b>Modes:</b> [T] Tile [R] Row [C] Column [M] Marquee<br>"
+            "<b>Actions:</b> [Enter] Add [Del] Remove [Esc] Clear [Ctrl+E] Export<br>"
+            "<b>Mouse:</b> Ctrl+Click select | Drag to arrange | Wheel zoom | Middle-drag pan<br>"
+            "<b>Undo:</b> [Ctrl+Z] Undo [Ctrl+Y] Redo"
             "</font>"
         )
-        layout.addWidget(legend)
+        self._legend_content.setWordWrap(True)
+        legend_layout.addWidget(self._legend_content)
+
+        layout.addWidget(legend_container)
+
+    def _on_legend_toggled(self, expanded: bool):
+        """Handle legend toggle button state change."""
+        self._legend_content.setVisible(expanded)
+        arrow = Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow
+        self._legend_toggle_btn.setArrowType(arrow)
 
     def _add_zoom_controls(self, layout: QHBoxLayout):
         """Add zoom control buttons to the given layout.
@@ -551,7 +585,9 @@ class GridArrangementDialog(SplitterDialog):
             self.arrangement_manager.set_target_width(value)
         if hasattr(self, "arrangement_grid"):
             try:
-                self.arrangement_grid.set_grid_dimensions(value, 32, self.processor.tile_width, self.processor.tile_height)
+                self.arrangement_grid.set_grid_dimensions(
+                    value, 32, self.processor.tile_width, self.processor.tile_height
+                )
             except RuntimeError:
                 # Grid items may be deleted during shutdown/test teardown
                 pass
@@ -619,7 +655,7 @@ class GridArrangementDialog(SplitterDialog):
     def _on_mode_changed(self, mode: SelectionMode) -> None:
         """Handle selection mode change"""
         self.grid_view.set_selection_mode(mode)
-        
+
         guidance = {
             SelectionMode.TILE: "Click tiles to select. Drag from Source to Canvas to place.",
             SelectionMode.ROW: "Click a tile to select its entire row.",
@@ -720,13 +756,13 @@ class GridArrangementDialog(SplitterDialog):
         # Sort selection to add in a sensible order
         selection.sort(key=lambda t: (t.row, t.col))
 
-        # Filter out already arranged if desired? 
+        # Filter out already arranged if desired?
         # Usually adding selection adds duplicates if allowed, or skips.
         # GridArrangementManager.add_tile usually allows duplicates if not checked.
         # But _add_tile_no_history checks is_tile_arranged? No, it just finds a slot.
         # Let's filter to avoid duplicates if that's the desired behavior.
         # The original code did: `if not self.arrangement_manager.is_tile_arranged(tile): self.arrangement_manager.add_tile(tile)`
-        
+
         tiles_to_add = [t for t in selection if not self.arrangement_manager.is_tile_arranged(t)]
 
         if tiles_to_add:
@@ -747,13 +783,13 @@ class GridArrangementDialog(SplitterDialog):
             canvas_selection = list(self.arrangement_grid.current_selection)
             if canvas_selection:
                 items_to_remove = [(t.row, t.col) for t in canvas_selection]
-                
+
                 command = CanvasRemoveMultipleItemsCommand(
                     manager=self.arrangement_manager,
                     items_to_remove=items_to_remove,
                 )
                 self.undo_stack.push(command)
-                
+
                 self.arrangement_grid.clear_selection()
                 self._update_displays()
                 self._update_status(f"Removed {len(items_to_remove)} items from canvas")
