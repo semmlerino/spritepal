@@ -78,12 +78,12 @@ class OverlayControls(QGroupBox):
         scale_row = QHBoxLayout()
         scale_row.addWidget(QLabel("Scale:"))
         self.scale_slider = QSlider(Qt.Orientation.Horizontal)
-        self.scale_slider.setRange(10, 1000)  # 10% to 1000%
+        self.scale_slider.setRange(1, 1000)  # 1% to 1000%
         self.scale_slider.setValue(100)
-        self.scale_slider.setToolTip("Overlay scale (10-1000%)")
+        self.scale_slider.setToolTip("Overlay scale (1-1000%)")
         scale_row.addWidget(self.scale_slider)
         self.scale_spin = QSpinBox()
-        self.scale_spin.setRange(10, 1000)
+        self.scale_spin.setRange(1, 1000)
         self.scale_spin.setValue(100)
         self.scale_spin.setSuffix("%")
         scale_row.addWidget(self.scale_spin)
@@ -141,7 +141,22 @@ class OverlayControls(QGroupBox):
             "Images (*.png *.jpg *.jpeg *.bmp *.gif);;All Files (*)",
         )
         if file_path:
-            self._overlay.import_image(file_path)
+            # Try to get target dimensions from parent dialog for auto-scaling
+            target_w, target_h = None, None
+            # Look for GridArrangementDialog in the parent chain without circular import
+            parent = self.parentWidget()
+            while parent:
+                if parent.__class__.__name__ == "GridArrangementDialog":
+                    # Accessing attributes via duck typing to avoid import
+                    grid = getattr(parent, "arrangement_grid", None)
+                    processor = getattr(parent, "processor", None)
+                    if grid and processor:
+                        target_w = grid.grid_cols * processor.tile_width
+                        target_h = grid.grid_rows * processor.tile_height
+                    break
+                parent = parent.parentWidget()
+                
+            self._overlay.import_image(file_path, target_w, target_h)
 
     def _on_clear_clicked(self) -> None:
         """Handle clear button click."""

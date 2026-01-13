@@ -82,11 +82,13 @@ class OverlayLayer(QObject):
         """Whether the overlay is visible."""
         return self._visible
 
-    def import_image(self, path: str) -> bool:
+    def import_image(self, path: str, target_width: int | None = None, target_height: int | None = None) -> bool:
         """Import an image from the given path.
 
         Args:
             path: Path to image file.
+            target_width: Optional target width to auto-scale to.
+            target_height: Optional target height to auto-scale to.
 
         Returns:
             True if import succeeded, False otherwise.
@@ -98,7 +100,27 @@ class OverlayLayer(QObject):
                 image = image.convert("RGBA")
             self._image = image
             self._image_path = str(Path(path).resolve())
+            
+            # Auto-scale if target dimensions provided
+            if target_width and target_height:
+                # Calculate scale to fit within target (preserving aspect ratio)
+                scale_w = target_width / image.width
+                scale_h = target_height / image.height
+                # We use the larger scale to ensure it's a good reference, or smaller to fit?
+                # Usually users want it to roughly match the size of the sprite.
+                # Let's use the average or min to ensure it's not overwhelming.
+                initial_scale = min(scale_w, scale_h)
+                # Ensure it's not too tiny or too huge initially
+                self._scale = max(0.01, min(2.0, initial_scale))
+                
+                # Center it at (0,0) or near the target?
+                # Usually (0,0) is the top-left of the grid.
+                self._x = 0
+                self._y = 0
+
             self.image_changed.emit()
+            self.scale_changed.emit(self._scale)
+            self.position_changed.emit(self._x, self._y)
             return True
         except (OSError, ValueError) as e:
             # Log error but don't crash
@@ -149,9 +171,9 @@ class OverlayLayer(QObject):
         """Set the overlay scale, keeping the center fixed.
 
         Args:
-            scale: Scale factor (0.1 to 10.0).
+            scale: Scale factor (0.01 to 10.0).
         """
-        scale = max(0.1, min(10.0, scale))
+        scale = max(0.01, min(10.0, scale))
         if self._scale != scale and self._image is not None:
             # Calculate current visual center relative to canvas
             # Visual width/height = original * scale
