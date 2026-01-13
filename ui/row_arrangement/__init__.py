@@ -14,6 +14,8 @@ from .grid_arrangement_manager import (
 from .grid_image_processor import GridImageProcessor
 from .grid_preview_generator import GridPreviewGenerator
 from .image_processor import RowImageProcessor
+from .overlay_controls import OverlayControls
+from .overlay_layer import OverlayLayer
 from .palette_colorizer import PaletteColorizer
 from .preview_generator import ArrangementPreviewGenerator
 
@@ -24,6 +26,8 @@ __all__ = [
     "GridArrangementManager",
     "GridImageProcessor",
     "GridPreviewGenerator",
+    "OverlayControls",
+    "OverlayLayer",
     "PaletteColorizer",
     "RowImageProcessor",
     "TileGroup",

@@ -42,7 +42,7 @@ from ui.components.visualization import GridGraphicsView, ScrollablePreviewGroup
 from ui.widgets.segmented_toggle import SegmentedToggle
 
 from .components import SplitterDialog
-from .row_arrangement import PaletteColorizer
+from .row_arrangement import OverlayControls, OverlayLayer, PaletteColorizer
 from .row_arrangement.grid_arrangement_manager import (
     ArrangementType,
     GridArrangementManager,
@@ -117,6 +117,9 @@ class GridArrangementDialog(SplitterDialog):
         # Create undo/redo stack
         self.undo_stack = UndoRedoStack()
 
+        # Create overlay layer for reference images
+        self.overlay_layer = OverlayLayer()
+
         # Step 2: Call parent init (this will call _setup_ui)
         super().__init__(
             parent=parent,
@@ -132,6 +135,12 @@ class GridArrangementDialog(SplitterDialog):
         # Connect signals after UI is created
         self.arrangement_manager.arrangement_changed.connect(self._on_arrangement_changed)
         self.colorizer.palette_mode_changed.connect(self._on_palette_mode_changed)
+
+        # Connect overlay signals to update canvas when overlay changes
+        self.overlay_layer.position_changed.connect(self._on_overlay_changed)
+        self.overlay_layer.opacity_changed.connect(self._on_overlay_changed)
+        self.overlay_layer.visibility_changed.connect(self._on_overlay_changed)
+        self.overlay_layer.image_changed.connect(self._on_overlay_changed)
 
         # Initial update (only if we have valid data)
         if self.original_image is not None:
@@ -196,7 +205,7 @@ class GridArrangementDialog(SplitterDialog):
         return left_widget
 
     def _create_right_panel(self) -> QWidget:
-        """Create the right panel containing arrangement grid and preview.
+        """Create the right panel containing arrangement grid, overlay controls, and preview.
 
         Returns:
             QWidget: The configured right panel widget
@@ -209,6 +218,10 @@ class GridArrangementDialog(SplitterDialog):
         # Add arrangement grid
         grid_group = self._create_arrangement_grid_group(right_widget)
         right_layout.addWidget(grid_group, 1)
+
+        # Add overlay controls
+        self.overlay_controls = OverlayControls(self.overlay_layer, right_widget)
+        right_layout.addWidget(self.overlay_controls)
 
         # Add preview
         preview_group = self._create_preview_group(right_widget)
@@ -680,6 +693,10 @@ class GridArrangementDialog(SplitterDialog):
         if self.export_btn:
             self.export_btn.setEnabled(self.arrangement_manager.get_arranged_count() > 0)
 
+    def _on_overlay_changed(self, *_: object) -> None:
+        """Handle overlay property changes (position, opacity, visibility, image)."""
+        self._update_arrangement_canvas()
+
     def _on_palette_mode_changed(self, enabled: bool):
         """Handle palette mode change"""
         self._update_displays()
@@ -908,6 +925,18 @@ class GridArrangementDialog(SplitterDialog):
                 rect.setPen(QPen(self.grid_view.arranged_color, 1))
                 scene.addItem(rect)
 
+        # Render overlay if visible and has image
+        if self.overlay_layer.visible and self.overlay_layer.has_image():
+            overlay_image = self.overlay_layer.image
+            if overlay_image is not None:
+                # Convert PIL Image to QPixmap
+                overlay_pixmap = self._create_pixmap_from_image(overlay_image)
+                if overlay_pixmap:
+                    overlay_item = QGraphicsPixmapItem(overlay_pixmap)
+                    overlay_item.setPos(self.overlay_layer.x, self.overlay_layer.y)
+                    overlay_item.setOpacity(self.overlay_layer.opacity)
+                    scene.addItem(overlay_item)
+
     def _get_item_preview_full(self, arr_type: ArrangementType, key: str) -> QPixmap | None:
         """Get the full-size preview pixmap for an arrangement item"""
         img = None
@@ -1034,6 +1063,24 @@ class GridArrangementDialog(SplitterDialog):
         elif modifiers == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
             if key == Qt.Key.Key_Z:
                 self._on_redo()
+                return
+
+        # Overlay nudging with arrow keys (only if overlay has image)
+        if self.overlay_layer.has_image():
+            # Determine nudge amount: 10px with Shift, 1px without
+            nudge_amount = 10 if modifiers & Qt.KeyboardModifier.ShiftModifier else 1
+
+            if key == Qt.Key.Key_Left:
+                self.overlay_layer.nudge(-nudge_amount, 0)
+                return
+            elif key == Qt.Key.Key_Right:
+                self.overlay_layer.nudge(nudge_amount, 0)
+                return
+            elif key == Qt.Key.Key_Up:
+                self.overlay_layer.nudge(0, -nudge_amount)
+                return
+            elif key == Qt.Key.Key_Down:
+                self.overlay_layer.nudge(0, nudge_amount)
                 return
 
         # Other shortcuts
