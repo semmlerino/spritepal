@@ -10,7 +10,11 @@ from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QPointF, Qt
 
+from PySide6.QtGui import QPixmap
+
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem, QGraphicsSceneMouseEvent
+
+
 
 
 

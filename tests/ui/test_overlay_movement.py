@@ -94,7 +94,7 @@ def test_overlay_keyboard_nudge(qtbot, dummy_sprite, dummy_overlay):
     assert dialog.overlay_layer.position == (1, 10)
     
 def test_overlay_scaling(qtbot, dummy_sprite, dummy_overlay):
-    """Test that changing overlay scale updates the graphics item."""
+    """Test that changing overlay scale updates the graphics item and keeps center fixed."""
     dialog = GridArrangementDialog(dummy_sprite)
     qtbot.addWidget(dialog)
     dialog.show()
@@ -103,17 +103,26 @@ def test_overlay_scaling(qtbot, dummy_sprite, dummy_overlay):
     dialog.overlay_layer.import_image(dummy_overlay)
     dialog._update_arrangement_canvas()
     
+    # Initial state (32x32 at 0,0)
     assert dialog.overlay_layer.scale == 1.0
-    assert dialog.overlay_item.scale() == 1.0
+    assert dialog.overlay_layer.position == (0, 0)
+    initial_center = (16, 16)
     
-    # Change scale via spinbox
+    # Change scale to 50% (should become 16x16)
+    # New top-left should be (8, 8) to keep center at (16, 16)
     dialog.overlay_controls.scale_spin.setValue(50)
     assert dialog.overlay_layer.scale == 0.5
-    assert dialog.overlay_item.scale() == 0.5
+    assert dialog.overlay_layer.position == (8, 8)
     
-    # Change scale via slider
+    # Check visual center
+    new_width = 32 * 0.5
+    new_center_x = dialog.overlay_layer.x + new_width / 2
+    assert new_center_x == initial_center[0]
+    
+    # Change scale to 200% (should become 64x64)
+    # To keep center at (16, 16), top-left must be at 16 - 32 = -16
     dialog.overlay_controls.scale_slider.setValue(200)
     assert dialog.overlay_layer.scale == 2.0
-    assert dialog.overlay_item.scale() == 2.0
+    assert dialog.overlay_layer.position == (-16, -16)
 
     dialog.close()

@@ -146,15 +146,34 @@ class OverlayLayer(QObject):
             self.opacity_changed.emit(opacity)
 
     def set_scale(self, scale: float) -> None:
-        """Set the overlay scale.
+        """Set the overlay scale, keeping the center fixed.
 
         Args:
             scale: Scale factor (0.1 to 10.0).
         """
         scale = max(0.1, min(10.0, scale))
-        if self._scale != scale:
+        if self._scale != scale and self._image is not None:
+            # Calculate current visual center relative to canvas
+            # Visual width/height = original * scale
+            old_width = self._image.width * self._scale
+            old_height = self._image.height * self._scale
+            center_x = self._x + old_width / 2
+            center_y = self._y + old_height / 2
+            
+            # Update scale
             self._scale = scale
-            self.scale_changed.emit(scale)
+            
+            # Calculate new top-left to maintain visual center
+            new_width = self._image.width * self._scale
+            new_height = self._image.height * self._scale
+            self._x = int(center_x - new_width / 2)
+            self._y = int(center_y - new_height / 2)
+            
+            self.scale_changed.emit(self._scale)
+            self.position_changed.emit(self._x, self._y)
+        elif self._scale != scale:
+            self._scale = scale
+            self.scale_changed.emit(self._scale)
 
     def toggle_visibility(self) -> bool:
         """Toggle overlay visibility.
