@@ -105,3 +105,10 @@ class SegmentedToggle(QWidget):
                 # QButtonGroup doesn't emit buttonClicked on programmatic change
                 self.selection_changed.emit(data)
                 return
+
+    def set_tooltip(self, data: object, tooltip: str) -> None:
+        """Set the tooltip for an option by its data."""
+        for btn, btn_data in self._data.items():
+            if btn_data == data:
+                btn.setToolTip(tooltip)
+                return

@@ -57,8 +57,8 @@ from .row_arrangement.undo_redo import (
     AddMultipleTilesCommand,
     CanvasMoveItemsCommand,
     CanvasPlaceItemsCommand,
-    CanvasRemoveItemCommand,
     ClearGridCommand,
+    RestoreGridStateCommand,
     UndoRedoStack,
 )
 from .utils.accessibility import AccessibilityHelper
@@ -221,11 +221,26 @@ class GridArrangementDialog(SplitterDialog):
 
         # Add arrangement grid
         grid_group = self._create_arrangement_grid_group(right_widget)
-        right_layout.addWidget(grid_group, 1)
+        right_layout.addWidget(grid_group, 2)  # Give more stretch to canvas
 
-        # Add overlay controls
-        self.overlay_controls = OverlayControls(self.overlay_layer, right_widget)
-        right_layout.addWidget(self.overlay_controls)
+        # Add overlay controls and Apply button
+        overlay_group = QGroupBox("Overlay Reference", right_widget)
+        overlay_layout = QVBoxLayout(overlay_group)
+
+        self.overlay_controls = OverlayControls(self.overlay_layer, overlay_group)
+        self.overlay_controls.setContentsMargins(0, 0, 0, 0)
+        self.overlay_controls.setTitle("")  # Hide redundant title
+        overlay_layout.addWidget(self.overlay_controls)
+
+        self.apply_overlay_btn = QPushButton("Apply Overlay to Arranged Tiles", overlay_group)
+        self.apply_overlay_btn.setToolTip(
+            "Sample overlay image and write pixels to tiles currently placed on the canvas"
+        )
+        self.apply_overlay_btn.setStyleSheet("font-weight: bold; padding: 5px;")
+        _ = self.apply_overlay_btn.clicked.connect(self._apply_overlay)
+        overlay_layout.addWidget(self.apply_overlay_btn)
+
+        right_layout.addWidget(overlay_group)
 
         # Add preview
         preview_group = self._create_preview_group(right_widget)
@@ -301,16 +316,15 @@ class GridArrangementDialog(SplitterDialog):
 
         # Create buttons with mnemonics and accessibility
         mode_options = [
-            (SelectionMode.TILE, "Tile", "T", "Select individual tiles"),
-            (SelectionMode.ROW, "Row", "R", "Select entire rows"),
-            (SelectionMode.COLUMN, "Column", "C", "Select entire columns"),
-            (SelectionMode.RECTANGLE, "Rectangle", "G", "Select rectangular regions"),
+            (SelectionMode.TILE, "Tile", "T", "Select individual tiles [T]"),
+            (SelectionMode.ROW, "Row", "R", "Select entire rows [R]"),
+            (SelectionMode.COLUMN, "Column", "C", "Select entire columns [C]"),
+            (SelectionMode.RECTANGLE, "Marquee", "M", "Select rectangular regions [M]"),
         ]
 
-        for mode, label, _, _ in mode_options:
+        for mode, label, _, tooltip in mode_options:
             self.mode_toggle.add_option(label, mode, checked=(mode == SelectionMode.TILE))
-
-        self.mode_toggle.selection_changed.connect(self._on_mode_changed)
+            self.mode_toggle.set_tooltip(mode, tooltip)
         mode_layout.addWidget(self.mode_toggle)
         mode_layout.addStretch()
 
@@ -402,6 +416,7 @@ class GridArrangementDialog(SplitterDialog):
             layout: Layout to add buttons to
         """
         self.add_btn = QPushButton("Add Selection", self)
+        self.add_btn.setToolTip("Add selected tiles to canvas [Enter]")
         _ = self.add_btn.clicked.connect(self._add_selection)
         layout.addWidget(self.add_btn)
 
@@ -415,6 +430,7 @@ class GridArrangementDialog(SplitterDialog):
         layout.addWidget(self.magic_wand_btn)
 
         self.remove_btn = QPushButton("Remove Selection", self)
+        self.remove_btn.setToolTip("Remove selection from source or canvas [Delete]")
         _ = self.remove_btn.clicked.connect(self._remove_selection)
         layout.addWidget(self.remove_btn)
 
@@ -423,24 +439,20 @@ class GridArrangementDialog(SplitterDialog):
         layout.addWidget(self.create_group_btn)
 
         self.clear_btn = QPushButton("Clear All", self)
+        self.clear_btn.setToolTip("Clear the entire arrangement [Esc]")
         _ = self.clear_btn.clicked.connect(self._clear_arrangement)
         layout.addWidget(self.clear_btn)
 
-        # Add separator before Apply
+        # Add separator before Reset
         sep2 = QFrame()
         sep2.setFrameShape(QFrame.Shape.VLine)
         sep2.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(sep2)
 
-        self.reset_layout_btn = QPushButton("Reset Layout", self)
-        self.reset_layout_btn.setToolTip("Reset tiles to original extracted positions")
+        self.reset_layout_btn = QPushButton("Reset to 1:1", self)
+        self.reset_layout_btn.setToolTip("Reset all tiles to their original positions (1:1 mapping)")
         _ = self.reset_layout_btn.clicked.connect(self._reset_layout)
         layout.addWidget(self.reset_layout_btn)
-
-        self.apply_overlay_btn = QPushButton("Apply Overlay", self)
-        self.apply_overlay_btn.setToolTip("Sample overlay image and write pixels to tiles")
-        _ = self.apply_overlay_btn.clicked.connect(self._apply_overlay)
-        layout.addWidget(self.apply_overlay_btn)
 
     def _add_zoom_controls(self, layout: QHBoxLayout):
         """Add zoom control buttons to the given layout.
@@ -448,12 +460,12 @@ class GridArrangementDialog(SplitterDialog):
         Args:
             layout: Layout to add zoom controls to
         """
-        # Arrangement Width
-        layout.addWidget(QLabel("Arrangement Width:"))
+        # Target Sheet Width
+        layout.addWidget(QLabel("Target Sheet Width:"))
         self.width_spin = QSpinBox(self)
         self.width_spin.setRange(1, 64)
         self.width_spin.setValue(min(16, self.processor.grid_cols))
-        self.width_spin.setToolTip("Number of tiles per row in the arranged view")
+        self.width_spin.setToolTip("Number of tiles per row in the final exported sprite sheet")
         self.width_spin.valueChanged.connect(self._on_arrangement_width_changed)
         layout.addWidget(self.width_spin)
 
@@ -466,6 +478,7 @@ class GridArrangementDialog(SplitterDialog):
         self.zoom_out_btn = QPushButton("-", self)
         _ = self.zoom_out_btn.clicked.connect(self.grid_view.zoom_out)
         self.zoom_out_btn.setMaximumWidth(30)
+        self.zoom_out_btn.setToolTip("Zoom out [Ctrl+-]")
         layout.addWidget(self.zoom_out_btn)
 
         self.zoom_level_label = QLabel("100%", self)
@@ -476,16 +489,19 @@ class GridArrangementDialog(SplitterDialog):
         self.zoom_in_btn = QPushButton("+", self)
         _ = self.zoom_in_btn.clicked.connect(self.grid_view.zoom_in)
         self.zoom_in_btn.setMaximumWidth(30)
+        self.zoom_in_btn.setToolTip("Zoom in [Ctrl++]")
         layout.addWidget(self.zoom_in_btn)
 
         self.zoom_fit_btn = QPushButton("Fit", self)
         _ = self.zoom_fit_btn.clicked.connect(self.grid_view.zoom_to_fit)
         self.zoom_fit_btn.setMaximumWidth(40)
+        self.zoom_fit_btn.setToolTip("Zoom to fit [F]")
         layout.addWidget(self.zoom_fit_btn)
 
         self.zoom_reset_btn = QPushButton("1:1", self)
         _ = self.zoom_reset_btn.clicked.connect(self.grid_view.reset_zoom)
         self.zoom_reset_btn.setMaximumWidth(40)
+        self.zoom_reset_btn.setToolTip("Reset zoom to 1:1 [Ctrl+0]")
         layout.addWidget(self.zoom_reset_btn)
 
     def _create_preview_group(self, parent: QWidget) -> ScrollablePreviewGroup:
@@ -573,7 +589,14 @@ class GridArrangementDialog(SplitterDialog):
     def _on_mode_changed(self, mode: SelectionMode) -> None:
         """Handle selection mode change"""
         self.grid_view.set_selection_mode(mode)
-        self._update_status(f"Selection mode: {mode.value}")
+        
+        guidance = {
+            SelectionMode.TILE: "Click tiles to select. Drag from Source to Canvas to place.",
+            SelectionMode.ROW: "Click a tile to select its entire row.",
+            SelectionMode.COLUMN: "Click a tile to select its entire column.",
+            SelectionMode.RECTANGLE: "Click and drag on Source to select a rectangular region [M].",
+        }
+        self._update_status(f"Selection mode: {mode.value.title()}. {guidance.get(mode, '')}")
 
     def _on_tile_clicked(self, tile_pos: TilePosition) -> None:
         """Handle single tile click in source grid"""
@@ -615,6 +638,18 @@ class GridArrangementDialog(SplitterDialog):
 
     def _remove_selection(self):
         """Remove current selection from arrangement grid mapping"""
+        # 1. Check arrangement grid selection first (direct canvas deletion)
+        if hasattr(self, "arrangement_grid"):
+            canvas_selection = list(self.arrangement_grid.current_selection)
+            if canvas_selection:
+                for tile in canvas_selection:
+                    self.arrangement_manager.remove_item_at(tile.row, tile.col)
+                self.arrangement_grid.clear_selection()
+                self._update_displays()
+                self._update_status(f"Removed {len(canvas_selection)} items from canvas")
+                return
+
+        # 2. Check source grid selection (remove instances of these source tiles from canvas)
         selection = list(self.grid_view.current_selection)
 
         if not selection:
@@ -625,13 +660,17 @@ class GridArrangementDialog(SplitterDialog):
         to_remove = []
         for (tr, tc), (arr_type, key) in mapping.items():
             if arr_type == ArrangementType.TILE:
-                row, col = map(int, key.split(","))
-                if TilePosition(row, col) in selection:
-                    to_remove.append((tr, tc))
-            # Support for other types could go here
+                try:
+                    row, col = map(int, key.split(","))
+                    if TilePosition(row, col) in selection:
+                        to_remove.append((tr, tc))
+                except ValueError:
+                    continue
 
-        for tr, tc in to_remove:
-            self.arrangement_manager.remove_item_at(tr, tc)
+        if to_remove:
+            for tr, tc in to_remove:
+                self.arrangement_manager.remove_item_at(tr, tc)
+            self._update_status(f"Removed {len(to_remove)} instances of selected source tiles")
 
         self.grid_view.clear_selection()
         self._update_displays()
@@ -708,30 +747,47 @@ class GridArrangementDialog(SplitterDialog):
         self._update_status("Cleared all arrangements")
 
     def _reset_layout(self) -> None:
-        """Reset tiles to original extracted positions (clear all arrangement)."""
+        """Reset tiles to original extracted positions (1:1 mapping)."""
         if not self.arrangement_manager:
-            return
-
-        # Check if there's anything to reset
-        if not self.arrangement_manager.get_arranged_tiles():
-            self._update_status("Layout already at original position")
             return
 
         # Ask for confirmation
         result = QMessageBox.question(
             self,
-            "Reset Layout",
+            "Reset to 1:1",
             "Reset all tiles to their original extracted positions?\n\n"
-            "This will clear the current arrangement but can be undone.",
+            "This will create a 1:1 mapping from the source grid to the canvas and can be undone.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if result != QMessageBox.StandardButton.Yes:
             return
 
-        # Use the existing clear mechanism with undo support
-        self._clear_arrangement()
-        self._update_status("Layout reset to original positions")
+        # Generate 1:1 state
+        new_tiles = []
+        new_grid_mapping = {}
+        new_order = []
+
+        for r in range(self.grid_view.grid_rows):
+            for c in range(self.grid_view.grid_cols):
+                pos = TilePosition(r, c)
+                new_tiles.append(pos)
+                item = (ArrangementType.TILE, f"{r},{c}")
+                new_grid_mapping[(r, c)] = item
+                new_order.append(item)
+
+        command = RestoreGridStateCommand(
+            manager=self.arrangement_manager,
+            new_tiles=new_tiles,
+            new_groups={},
+            new_tile_to_group={},
+            new_order=new_order,
+            new_grid_mapping=new_grid_mapping,
+        )
+        self.undo_stack.push(command)
+
+        self.grid_view.clear_selection()
+        self._update_status("Reset layout to 1:1 mapping")
 
     def _apply_overlay(self) -> None:
         """Apply overlay image to tiles, sampling and quantizing pixels."""
@@ -1032,11 +1088,19 @@ class GridArrangementDialog(SplitterDialog):
         self._update_displays()
 
     def _on_arrangement_tile_clicked(self, tile_pos: TilePosition) -> None:
-        """Handle click in arrangement canvas (e.g. to remove)"""
+        """Handle click in arrangement canvas (selection/focus)"""
+        # Instead of removing, we just ensure it's selected if not already
         if self.arrangement_manager.get_item_at(tile_pos.row, tile_pos.col):
-            command = CanvasRemoveItemCommand(manager=self.arrangement_manager, target_pos=(tile_pos.row, tile_pos.col))
-            self.undo_stack.push(command)
-            self._update_displays()
+            # In TILE mode, clicking can select the tile on canvas
+            if tile_pos not in self.arrangement_grid.current_selection:
+                # Use shift to add to selection if desired, or just select single
+                # For now, let's just make it select single tile to avoid confusion
+                self.arrangement_grid.current_selection.add(tile_pos)
+                self.arrangement_grid._update_selection_display()
+
+            self._update_status(f"Canvas item selected at ({tile_pos.row}, {tile_pos.col})")
+        else:
+            self.arrangement_grid.clear_selection()
 
     def _update_displays(self):
         """Update all display elements"""

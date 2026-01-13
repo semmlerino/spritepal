@@ -567,6 +567,52 @@ class ClearGridCommand:
 
 
 @dataclass
+class RestoreGridStateCommand:
+    """Command to set full grid state (useful for Reset or Batch operations)."""
+
+    manager: GridArrangementManager
+    new_tiles: list[TilePosition]
+    new_groups: dict[str, TileGroup]
+    new_tile_to_group: dict[TilePosition, str]
+    new_order: list[tuple[ArrangementType, str]]
+    new_grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]]
+    
+    # Store previous state for undo
+    previous_tiles: list[TilePosition] = field(default_factory=list)
+    previous_groups: dict[str, TileGroup] = field(default_factory=dict)
+    previous_tile_to_group: dict[TilePosition, str] = field(default_factory=dict)
+    previous_order: list[tuple[ArrangementType, str]] = field(default_factory=list)
+    previous_grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = field(default_factory=dict)
+
+    @property
+    def description(self) -> str:
+        return "Reset arrangement to 1:1"
+
+    def execute(self) -> None:
+        # Capture current state if not already done
+        if not self.previous_tiles and not self.previous_grid_mapping:
+             self.previous_tiles, self.previous_groups, self.previous_tile_to_group, \
+             self.previous_order, self.previous_grid_mapping = self.manager.get_state_snapshot()
+             
+        self.manager._restore_state_no_history(
+            self.new_tiles,
+            self.new_groups,
+            self.new_tile_to_group,
+            self.new_order,
+            self.new_grid_mapping,
+        )
+
+    def undo(self) -> None:
+        self.manager._restore_state_no_history(
+            self.previous_tiles,
+            self.previous_groups,
+            self.previous_tile_to_group,
+            self.previous_order,
+            self.previous_grid_mapping,
+        )
+
+
+@dataclass
 class CanvasMoveItemsCommand:
     """Command to move an item within the arrangement canvas."""
 
