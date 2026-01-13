@@ -9,14 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QPointF, Qt
-
-from PySide6.QtGui import QPixmap
-
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem, QGraphicsSceneMouseEvent
-
-
-
-
 
 if TYPE_CHECKING:
 
