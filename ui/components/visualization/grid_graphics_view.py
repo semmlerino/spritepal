@@ -979,14 +979,22 @@ class GridGraphicsView(QGraphicsView):
         # Keep focus indicator visible but maybe dim it
         # This allows users to see where they were when returning focus
 
+    def update_grid(self):
+        """Public method to refresh the grid line display"""
+        self._update_grid_lines()
+
     def _update_grid_lines(self):
         """Update grid line display"""
         # Clear existing grid lines
         scene = self.scene()
         if scene:
             for line in self.grid_lines:
-                if line.scene():
-                    scene.removeItem(line)
+                try:
+                    if line.scene():
+                        scene.removeItem(line)
+                except RuntimeError:
+                    # Item already deleted (e.g. by scene clear)
+                    pass
         if self.grid_lines:
             self.grid_lines.clear()
 

@@ -1197,9 +1197,6 @@ class GridArrangementDialog(SplitterDialog):
         scene = self.arrangement_scene
         scene.clear()
 
-        # Re-add background grid or placeholder if needed
-        # (GridGraphicsView handles its own grid lines)
-
         mapping = self.arrangement_manager.get_grid_mapping()
 
         for (r, c), (arr_type, key) in mapping.items():
@@ -1209,16 +1206,6 @@ class GridArrangementDialog(SplitterDialog):
                 item = QGraphicsPixmapItem(pixmap)
                 item.setPos(c * self.processor.tile_width, r * self.processor.tile_height)
                 scene.addItem(item)
-
-                # Add a border or highlight
-                rect = QGraphicsRectItem(
-                    c * self.processor.tile_width,
-                    r * self.processor.tile_height,
-                    self.processor.tile_width,
-                    self.processor.tile_height,
-                )
-                rect.setPen(QPen(self.grid_view.arranged_color, 1))
-                scene.addItem(rect)
 
         # Render overlay if visible and has image
         if self.overlay_layer.visible and self.overlay_layer.has_image():
@@ -1231,6 +1218,10 @@ class GridArrangementDialog(SplitterDialog):
                     overlay_item.setPos(self.overlay_layer.x, self.overlay_layer.y)
                     overlay_item.setOpacity(self.overlay_layer.opacity)
                     scene.addItem(overlay_item)
+
+        # Restore background grid lines ON TOP of the items
+        # (matching the appearance of the source grid)
+        self.arrangement_grid.update_grid()
 
     def _get_item_preview_full(self, arr_type: ArrangementType, key: str) -> QPixmap | None:
         """Get the full-size preview pixmap for an arrangement item"""
