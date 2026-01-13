@@ -171,9 +171,9 @@ class OverlayLayer(QObject):
         """Set the overlay scale, keeping the center fixed.
 
         Args:
-            scale: Scale factor (0.01 to 10.0).
+            scale: Scale factor (0.01 to 3.0).
         """
-        scale = max(0.01, min(10.0, scale))
+        scale = max(0.01, min(3.0, scale))
         if self._scale != scale and self._image is not None:
             # Calculate current visual center relative to canvas
             # Visual width/height = original * scale

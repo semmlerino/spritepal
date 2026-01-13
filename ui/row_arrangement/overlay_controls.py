@@ -78,12 +78,12 @@ class OverlayControls(QGroupBox):
         scale_row = QHBoxLayout()
         scale_row.addWidget(QLabel("Scale:"))
         self.scale_slider = QSlider(Qt.Orientation.Horizontal)
-        self.scale_slider.setRange(1, 1000)  # 1% to 1000%
+        self.scale_slider.setRange(1, 300)  # 1% to 300%
         self.scale_slider.setValue(100)
-        self.scale_slider.setToolTip("Overlay scale (1-1000%)")
+        self.scale_slider.setToolTip("Overlay scale (1-300%)")
         scale_row.addWidget(self.scale_slider)
         self.scale_spin = QSpinBox()
-        self.scale_spin.setRange(1, 1000)
+        self.scale_spin.setRange(1, 300)
         self.scale_spin.setValue(100)
         self.scale_spin.setSuffix("%")
         scale_row.addWidget(self.scale_spin)
