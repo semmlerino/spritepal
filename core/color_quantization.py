@@ -118,8 +118,7 @@ class ColorQuantizer:
                 palette_colors: list[tuple[int, int, int]] = [(0, 0, 0)] * 15
             else:
                 palette_colors = [
-                    (pil_palette[i * 3], pil_palette[i * 3 + 1], pil_palette[i * 3 + 2])
-                    for i in range(15)
+                    (pil_palette[i * 3], pil_palette[i * 3 + 1], pil_palette[i * 3 + 2]) for i in range(15)
                 ]
 
             # Convert indexed image to numpy, offset indices by 1 for transparency

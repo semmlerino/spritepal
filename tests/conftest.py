@@ -103,7 +103,9 @@ def pytest_configure(config):
     try:
         import PySide6  # noqa: F401
     except ImportError as e:
-        pytest.exit(f"FATAL: PySide6 is required for tests but not installed.\nRun: uv sync --extra dev\nImport error: {e}")
+        pytest.exit(
+            f"FATAL: PySide6 is required for tests but not installed.\nRun: uv sync --extra dev\nImport error: {e}"
+        )
 
     # Install QPixmap guard via import hook - guarantees guard is installed even for late Qt imports
     _install_qpixmap_guard_unconditional()
@@ -248,7 +250,7 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     """
     # Initialize tracking
     real_hal_nodeids = []
-    
+
     # Check xdist status once
     xdist_active = config.pluginmanager.has_plugin("xdist")
     worker_count = None
@@ -257,7 +259,7 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
             worker_count = config.getoption("-n", default=None)
         except ValueError:
             xdist_active = False
-            
+
     serial_group = pytest.mark.xdist_group("serial") if xdist_active and worker_count and worker_count != "0" else None
 
     for item in items:
@@ -268,16 +270,12 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
         # 2. Validate skip_thread_cleanup markers
         skip_marker = item.get_closest_marker("skip_thread_cleanup")
         if skip_marker is not None and not skip_marker.kwargs.get("reason"):
-            raise pytest.UsageError(
-                f"Test {item.nodeid} uses @pytest.mark.skip_thread_cleanup without a reason."
-            )
+            raise pytest.UsageError(f"Test {item.nodeid} uses @pytest.mark.skip_thread_cleanup without a reason.")
 
         # 3. Validate allows_registry_state markers
         allow_marker = item.get_closest_marker("allows_registry_state")
         if allow_marker is not None and not allow_marker.kwargs.get("reason"):
-            raise pytest.UsageError(
-                f"Test {item.nodeid} uses @pytest.mark.allows_registry_state without a reason."
-            )
+            raise pytest.UsageError(f"Test {item.nodeid} uses @pytest.mark.allows_registry_state without a reason.")
 
         # 4. Apply xdist serialization
         if serial_group and not item.get_closest_marker("xdist_group"):

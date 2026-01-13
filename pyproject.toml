@@ -21,6 +21,7 @@ dependencies = [
     "Pillow>=10.1.0",
     "numpy>=1.26.0",
     "psutil>=6.0.0",
+    "scikit-image>=0.22.0",
 ]
 
 [project.optional-dependencies]

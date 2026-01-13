@@ -33,23 +33,29 @@ if TYPE_CHECKING:
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
+
 # Get environment info lazily
 def _get_env_info():
     from tests.infrastructure.environment_detection import get_environment_info
+
     return get_environment_info()
+
 
 def is_headless() -> bool:
     return _get_env_info().is_headless
 
+
 # Thread baseline captured lazily
 _SESSION_THREAD_BASELINE: int | None = None
 _SESSION_THREAD_IDENTITIES: dict[int, str] | None = None
+
 
 def _capture_baseline_if_needed():
     global _SESSION_THREAD_BASELINE, _SESSION_THREAD_IDENTITIES
     if _SESSION_THREAD_BASELINE is None:
         _SESSION_THREAD_BASELINE = threading.active_count()
         _SESSION_THREAD_IDENTITIES = {t.ident: t.name for t in threading.enumerate() if t.ident is not None}
+
 
 # Module logger for fixture diagnostics
 _logger = logging.getLogger(__name__)
@@ -80,7 +86,7 @@ def _get_session_thread_baseline(request: pytest.FixtureRequest | None = None) -
                 return baseline
         except AttributeError:
             pass
-    
+
     _capture_baseline_if_needed()
     assert _SESSION_THREAD_BASELINE is not None
 
@@ -117,7 +123,7 @@ def _get_session_thread_identities(request: pytest.FixtureRequest | None = None)
                 return identities.copy()
         except AttributeError:
             pass
-    
+
     _capture_baseline_if_needed()
     assert _SESSION_THREAD_IDENTITIES is not None
 

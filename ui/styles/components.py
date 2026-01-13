@@ -1292,7 +1292,7 @@ def get_segmented_button_style(position: str = "middle", checked: bool = False) 
         CSS string for segmented button styling
     """
     radius = DIMENSIONS["border_radius"]
-    
+
     # Border radius logic
     radius_css = "border-radius: 0px;"
     if position == "first":
