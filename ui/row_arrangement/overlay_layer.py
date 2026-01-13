@@ -26,7 +26,7 @@ class OverlayLayer(QObject):
         image_changed: Emitted when overlay image is loaded or cleared.
     """
 
-    position_changed = Signal(int, int)
+    position_changed = Signal(float, float)
     opacity_changed = Signal(float)
     scale_changed = Signal(float)
     visibility_changed = Signal(bool)
@@ -36,8 +36,8 @@ class OverlayLayer(QObject):
         super().__init__(parent)
         self._image: Image.Image | None = None
         self._image_path: str | None = None
-        self._x: int = 0
-        self._y: int = 0
+        self._x: float = 0.0
+        self._y: float = 0.0
         self._opacity: float = 0.5
         self._scale: float = 1.0
         self._visible: bool = True
@@ -53,17 +53,17 @@ class OverlayLayer(QObject):
         return self._image_path
 
     @property
-    def x(self) -> int:
+    def x(self) -> float:
         """X position of overlay (pixels from left)."""
         return self._x
 
     @property
-    def y(self) -> int:
+    def y(self) -> float:
         """Y position of overlay (pixels from top)."""
         return self._y
 
     @property
-    def position(self) -> tuple[int, int]:
+    def position(self) -> tuple[float, float]:
         """Current overlay position as (x, y)."""
         return (self._x, self._y)
 
@@ -112,8 +112,8 @@ class OverlayLayer(QObject):
                 self._scale = max(0.001, min(0.3, initial_scale))
                 
                 # Center it at (0,0)
-                self._x = 0
-                self._y = 0
+                self._x = 0.0
+                self._y = 0.0
 
             self.image_changed.emit()
             self.scale_changed.emit(self._scale)
@@ -132,7 +132,7 @@ class OverlayLayer(QObject):
         self._image_path = None
         self.image_changed.emit()
 
-    def set_position(self, x: int, y: int) -> None:
+    def set_position(self, x: float, y: float) -> None:
         """Set the overlay position.
 
         Args:
@@ -144,7 +144,7 @@ class OverlayLayer(QObject):
             self._y = y
             self.position_changed.emit(x, y)
 
-    def nudge(self, dx: int, dy: int) -> None:
+    def nudge(self, dx: float, dy: float) -> None:
         """Nudge the overlay position by delta.
 
         Args:
@@ -185,8 +185,8 @@ class OverlayLayer(QObject):
             # Calculate new top-left to maintain visual center
             new_width = self._image.width * self._scale
             new_height = self._image.height * self._scale
-            self._x = int(center_x - new_width / 2)
-            self._y = int(center_y - new_height / 2)
+            self._x = center_x - new_width / 2
+            self._y = center_y - new_height / 2
             
             self.scale_changed.emit(self._scale)
             self.position_changed.emit(self._x, self._y)
@@ -250,10 +250,10 @@ class OverlayLayer(QObject):
                     return False
 
             # Restore position
-            x = state.get("x", 0)
-            y = state.get("y", 0)
-            if isinstance(x, int) and isinstance(y, int):
-                self.set_position(x, y)
+            x = state.get("x", 0.0)
+            y = state.get("y", 0.0)
+            if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+                self.set_position(float(x), float(y))
 
             # Restore opacity
             opacity = state.get("opacity", 0.5)

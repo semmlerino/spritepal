@@ -104,25 +104,32 @@ def test_overlay_scaling(qtbot, dummy_sprite, dummy_overlay):
     dialog._update_arrangement_canvas()
     
     # Initial state (32x32 at 0,0)
-    assert dialog.overlay_layer.scale == 1.0
-    assert dialog.overlay_layer.position == (0, 0)
-    initial_center = (16, 16)
+    # The scale depends on the auto-scaling logic in import_image.
+    # dummy_sprite is usually small, so target_w/target_h will be small.
+    # Let's force a known scale for the test.
+    dialog.overlay_layer.set_scale(0.1)  # 10%
+    dialog.overlay_layer.set_position(0.0, 0.0)
     
-    # Change scale to 50% (should become 16x16)
-    # New top-left should be (8, 8) to keep center at (16, 16)
-    dialog.overlay_controls.scale_spin.setValue(50)
-    assert dialog.overlay_layer.scale == 0.5
-    assert dialog.overlay_layer.position == (8, 8)
+    assert dialog.overlay_layer.scale == 0.1
+    assert dialog.overlay_layer.position == (0.0, 0.0)
+    # Visual size is 3.2x3.2. Center is at 1.6, 1.6
+    initial_center = (1.6, 1.6)
+    
+    # Change scale to 5% (0.05) (should become 1.6x1.6)
+    # New top-left should be 1.6 - (1.6/2) = 0.8
+    dialog.overlay_controls.scale_spin.setValue(5.0)
+    assert dialog.overlay_layer.scale == 0.05
+    assert dialog.overlay_layer.x == pytest.approx(0.8)
     
     # Check visual center
-    new_width = 32 * 0.5
+    new_width = 32 * 0.05
     new_center_x = dialog.overlay_layer.x + new_width / 2
-    assert new_center_x == initial_center[0]
+    assert new_center_x == pytest.approx(initial_center[0])
     
-    # Change scale to 200% (should become 64x64)
-    # To keep center at (16, 16), top-left must be at 16 - 32 = -16
-    dialog.overlay_controls.scale_slider.setValue(200)
-    assert dialog.overlay_layer.scale == 2.0
-    assert dialog.overlay_layer.position == (-16, -16)
+    # Change scale to 20% (0.2) (should become 6.4x6.4)
+    # To keep center at 1.6, 1.6, top-left must be 1.6 - (6.4/2) = -1.6
+    dialog.overlay_controls.scale_slider.setValue(200) # 200 * 0.1% = 20%
+    assert dialog.overlay_layer.scale == 0.2
+    assert dialog.overlay_layer.x == pytest.approx(-1.6)
 
     dialog.close()
