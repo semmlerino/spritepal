@@ -1027,8 +1027,12 @@ class GridGraphicsView(QGraphicsView):
         scene = self.scene()
         if scene:
             for rect in self.selection_rects.values():
-                if rect.scene():
-                    scene.removeItem(rect)
+                try:
+                    if rect.scene():
+                        scene.removeItem(rect)
+                except RuntimeError:
+                    # Item already deleted (e.g. by scene clear)
+                    pass
         if self.selection_rects:
             self.selection_rects.clear()
 
@@ -1043,14 +1047,22 @@ class GridGraphicsView(QGraphicsView):
         """Update hover display"""
         scene = self.scene()
         if self.hover_rect is not None:
-            if self.hover_rect.scene() and scene:
-                scene.removeItem(self.hover_rect)
+            try:
+                if self.hover_rect.scene() and scene:
+                    scene.removeItem(self.hover_rect)
+            except RuntimeError:
+                # Item already deleted (e.g. by scene clear)
+                pass
             self.hover_rect = None
 
         if tile_pos not in self.current_selection and scene:
-            self.hover_rect = self._create_tile_rect(tile_pos, self.hover_color)
-            self.hover_rect.setZValue(0.5)  # Below selection
-            scene.addItem(self.hover_rect)
+            try:
+                self.hover_rect = self._create_tile_rect(tile_pos, self.hover_color)
+                self.hover_rect.setZValue(0.5)  # Below selection
+                scene.addItem(self.hover_rect)
+            except RuntimeError:
+                # Scene might be in an inconsistent state during clear
+                self.hover_rect = None
 
 
 __all__ = ["GridGraphicsView"]

@@ -178,8 +178,8 @@ class GridArrangementDialog(SplitterDialog):
         # Apply accessibility enhancements
         self._apply_accessibility_enhancements()
 
-        # Create horizontal splitter for left and right panels
-        self.main_splitter = self.add_horizontal_splitter(handle_width=8)
+        # The super()._setup_ui() (from SplitterDialog) already created self.main_splitter
+        # We just need to add our panels to it.
 
         # Create left and right panels
         left_widget = self._create_left_panel()
@@ -187,9 +187,15 @@ class GridArrangementDialog(SplitterDialog):
 
         # Add panels to main horizontal splitter
         self.main_splitter.addWidget(left_widget)
-        self.main_splitter.setStretchFactor(0, 2)  # 67% for left panel
         self.main_splitter.addWidget(right_widget)
-        self.main_splitter.setStretchFactor(1, 1)  # 33% for right panel
+
+        # Set equal stretch factors (1:1) so they start at the same size
+        self.main_splitter.setStretchFactor(0, 1)
+        self.main_splitter.setStretchFactor(1, 1)
+
+        # Force equal distribution and prevent collapsing
+        self.main_splitter.setSizes([800, 800])
+        self.main_splitter.setChildrenCollapsible(False)
 
         # Add custom buttons using SplitterDialog's button system
         self.export_btn = self.add_button("Export Arrangement", callback=self._export_arrangement)
@@ -270,6 +276,7 @@ class GridArrangementDialog(SplitterDialog):
             QGroupBox: The configured arrangement grid group
         """
         grid_group = QGroupBox("Arrangement Grid", parent)
+        grid_group.setMinimumWidth(200)
         grid_layout = QVBoxLayout()
 
         # Create arrangement scene and view
@@ -321,6 +328,7 @@ class GridArrangementDialog(SplitterDialog):
             QGroupBox: The configured grid view group
         """
         grid_group = QGroupBox("Sprite Grid", parent)
+        grid_group.setMinimumWidth(200)
         grid_layout = QVBoxLayout()
 
         # Create graphics scene and view
@@ -1181,6 +1189,11 @@ class GridArrangementDialog(SplitterDialog):
         if not hasattr(self, "arrangement_grid"):
             return
 
+        # BEFORE clearing the scene, clear view's references to items that will be deleted
+        self.arrangement_grid.clear_selection()
+        # Trigger hover update at invalid position to clear hover rect safely
+        self.arrangement_grid._update_hover(TilePosition(-1, -1))
+
         scene = self.arrangement_scene
         scene.clear()
 
@@ -1227,8 +1240,47 @@ class GridArrangementDialog(SplitterDialog):
             pos = TilePosition(row, col)
             img = self.tiles.get(pos)
             if img and self.colorizer.is_palette_mode():
-                img = self.colorizer.get_display_image(row, img)
-        # Support for ROW/COLUMN could be added here if needed for canvas placement
+                # Use a unique index for this tile to avoid cache collisions in PaletteColorizer
+                # (which uses row_index as part of the cache key)
+                tile_index = row * self.processor.grid_cols + col + 1000
+                img = self.colorizer.get_display_image(tile_index, img)
+
+        elif arr_type == ArrangementType.ROW:
+            row_idx = int(key)
+            if self.original_image:
+                th = self.processor.tile_height
+                crop_rect = (0, row_idx * th, self.original_image.width, (row_idx + 1) * th)
+                img = self.original_image.crop(crop_rect)
+                if self.colorizer.is_palette_mode():
+                    img = self.colorizer.get_display_image(row_idx, img)
+
+        elif arr_type == ArrangementType.COLUMN:
+            col_idx = int(key)
+            if self.original_image:
+                tw = self.processor.tile_width
+                crop_rect = (col_idx * tw, 0, (col_idx + 1) * tw, self.original_image.height)
+                img = self.original_image.crop(crop_rect)
+                if self.colorizer.is_palette_mode():
+                    # For columns, use a unique high index to avoid row collisions
+                    col_key = col_idx + 5000
+                    img = self.colorizer.get_display_image(col_key, img)
+
+        elif arr_type == ArrangementType.GROUP:
+            group = self.arrangement_manager.get_groups().get(key)
+            if group:
+                img = self.preview_generator._create_arranged_image_with_spacing(
+                    [(t, self.tiles[t]) for t in group.tiles],
+                    self.processor.tile_width,
+                    self.processor.tile_height,
+                    group.width,
+                    0,
+                )
+                if img and self.colorizer.is_palette_mode():
+                    # Colorize the group image (index 0 for the whole combined image)
+                    palette_idx = self.colorizer.get_selected_palette_index()
+                    palettes = self.colorizer.get_palettes()
+                    if palette_idx in palettes:
+                        img = self.colorizer.apply_palette_to_image(img, palettes[palette_idx]) or img
 
         if img:
             return self._create_pixmap_from_image(img)
@@ -1468,6 +1520,19 @@ class GridArrangementDialog(SplitterDialog):
         """Set available palettes for colorization"""
         self.colorizer.set_palettes(palettes_dict)
         self._update_displays()
+
+    def set_initial_palette_state(self, index: int, enabled: bool):
+        """Set the initial palette selection and mode.
+
+        Args:
+            index: Palette index to select
+            enabled: Whether palette mode should be enabled
+        """
+        self.colorizer.set_selected_palette(index)
+        if self.colorizer.is_palette_mode() != enabled:
+            self.toggle_palette_application()
+        else:
+            self._update_displays()
 
     def get_arranged_path(self) -> str | None:
         """Get the path to the exported arrangement."""

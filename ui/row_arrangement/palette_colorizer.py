@@ -70,7 +70,7 @@ class PaletteColorizer(QObject):
         return self._palette_applied
 
     def cycle_palette(self) -> int:
-        """Cycle through available palettes (8-15)
+        """Cycle through available palettes
 
         Returns:
             The newly selected palette index
@@ -78,8 +78,8 @@ class PaletteColorizer(QObject):
         if not self._current_palettes:
             return self._selected_palette_index
 
-        # Find next available palette index
-        available_indices = [i for i in range(8, 16) if i in self._current_palettes]
+        # Find all available palette indices
+        available_indices = sorted(self._current_palettes.keys())
         if not available_indices:
             return self._selected_palette_index
 

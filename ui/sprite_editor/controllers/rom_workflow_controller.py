@@ -1139,6 +1139,19 @@ class ROMWorkflowController(QObject):
             )
             dialog.setWindowTitle(f"Arrange Tiles - {self.current_sprite_name}")
 
+            # Pass available palettes and initial state from editor
+            palettes = self._get_palettes_for_dialog()
+            if palettes:
+                dialog.set_palettes(palettes)
+
+            # Sync initial palette selection and mode
+            current_palette_idx = self._editing_controller.palette_model.index
+            palette_enabled = True
+            if self._view and self._view.workspace and self._view.workspace.icon_toolbar:
+                palette_enabled = self._view.workspace.icon_toolbar.is_palette_preview_enabled()
+
+            dialog.set_initial_palette_state(current_palette_idx, palette_enabled)
+
             if dialog.exec():
                 result = dialog.arrangement_result
                 if result and result.bridge.has_arrangement:
@@ -1206,6 +1219,30 @@ class ROMWorkflowController(QObject):
 
         # Update current_tile_data
         self.current_tile_data = bytes(data_mutable)
+
+    def _get_palettes_for_dialog(self) -> dict[int, list[tuple[int, int, int]]]:
+        """Get palettes registered in editing controller for use in dialogs.
+
+        Includes all ROM palettes plus the currently active palette if it's
+        from another source (e.g., file or mesen).
+
+        Returns:
+            Dictionary mapping palette index to list of RGB colors.
+        """
+        palettes = {}
+        sources = self._editing_controller.get_palette_sources()
+        for (source_type, index), (colors, _name) in sources.items():
+            if source_type == "rom":
+                palettes[index] = colors
+
+        # Also include the currently active palette if not already present
+        # (This handles 'file', 'mesen', or 'default' sources)
+        current_colors = self._editing_controller.get_current_colors()
+        current_idx = self._editing_controller.palette_model.index
+        if current_idx not in palettes:
+            palettes[current_idx] = current_colors
+
+        return palettes
 
     def _load_existing_arrangement(self) -> None:
         """Check for saved arrangement and notify user.
