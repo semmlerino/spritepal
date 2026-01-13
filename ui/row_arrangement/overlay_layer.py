@@ -106,15 +106,12 @@ class OverlayLayer(QObject):
                 # Calculate scale to fit within target (preserving aspect ratio)
                 scale_w = target_width / image.width
                 scale_h = target_height / image.height
-                # We use the larger scale to ensure it's a good reference, or smaller to fit?
                 # Usually users want it to roughly match the size of the sprite.
-                # Let's use the average or min to ensure it's not overwhelming.
                 initial_scale = min(scale_w, scale_h)
-                # Ensure it's not too tiny or too huge initially
-                self._scale = max(0.01, min(2.0, initial_scale))
+                # Ensure it's not too tiny or too huge initially (0.1% to 30%)
+                self._scale = max(0.001, min(0.3, initial_scale))
                 
-                # Center it at (0,0) or near the target?
-                # Usually (0,0) is the top-left of the grid.
+                # Center it at (0,0)
                 self._x = 0
                 self._y = 0
 
@@ -171,9 +168,9 @@ class OverlayLayer(QObject):
         """Set the overlay scale, keeping the center fixed.
 
         Args:
-            scale: Scale factor (0.01 to 1.0).
+            scale: Scale factor (0.001 to 0.3).
         """
-        scale = max(0.01, min(1.0, scale))
+        scale = max(0.001, min(0.3, scale))
         if self._scale != scale and self._image is not None:
             # Calculate current visual center relative to canvas
             # Visual width/height = original * scale

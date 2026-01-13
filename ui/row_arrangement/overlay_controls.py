@@ -8,16 +8,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
+    QDoubleSpinBox,
     QFileDialog,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QSlider,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -78,14 +77,17 @@ class OverlayControls(QGroupBox):
         scale_row = QHBoxLayout()
         scale_row.addWidget(QLabel("Scale:"))
         self.scale_slider = QSlider(Qt.Orientation.Horizontal)
-        self.scale_slider.setRange(1, 100)  # 1% to 100%
+        self.scale_slider.setRange(1, 300)  # 0.1% to 30.0%
         self.scale_slider.setValue(100)
-        self.scale_slider.setToolTip("Overlay scale (1-100%)")
+        self.scale_slider.setToolTip("Overlay scale (0.1-30.0%)")
         scale_row.addWidget(self.scale_slider)
-        self.scale_spin = QSpinBox()
-        self.scale_spin.setRange(1, 100)
-        self.scale_spin.setValue(100)
+        
+        self.scale_spin = QDoubleSpinBox()
+        self.scale_spin.setRange(0.1, 30.0)
+        self.scale_spin.setSingleStep(0.1)
+        self.scale_spin.setValue(10.0)
         self.scale_spin.setSuffix("%")
+        self.scale_spin.setDecimals(1)
         scale_row.addWidget(self.scale_spin)
         layout.addLayout(scale_row)
 
@@ -174,16 +176,18 @@ class OverlayControls(QGroupBox):
         self._overlay.position_changed.emit(x, y)
 
     def _on_scale_slider_changed(self, value: int) -> None:
-        """Handle scale slider changes."""
+        """Handle scale slider changes (1-300 = 0.1%-30.0%)."""
+        scale_percent = value / 10.0
         self.scale_spin.blockSignals(True)
-        self.scale_spin.setValue(value)
+        self.scale_spin.setValue(scale_percent)
         self.scale_spin.blockSignals(False)
-        self._overlay.set_scale(value / 100.0)
+        self._overlay.set_scale(scale_percent / 100.0)
 
-    def _on_scale_spin_changed(self, value: int) -> None:
-        """Handle scale spinbox changes."""
+    def _on_scale_spin_changed(self, value: float) -> None:
+        """Handle scale spinbox changes (0.1-30.0)."""
+        slider_value = int(value * 10)
         self.scale_slider.blockSignals(True)
-        self.scale_slider.setValue(value)
+        self.scale_slider.setValue(slider_value)
         self.scale_slider.blockSignals(False)
         self._overlay.set_scale(value / 100.0)
 
@@ -216,12 +220,15 @@ class OverlayControls(QGroupBox):
 
     def _update_scale_controls(self, scale: float) -> None:
         """Update scale controls from overlay state."""
-        value = int(scale * 100)
+        percent = scale * 100.0
+        slider_value = int(percent * 10)
+        
         self.scale_slider.blockSignals(True)
-        self.scale_slider.setValue(value)
+        self.scale_slider.setValue(slider_value)
         self.scale_slider.blockSignals(False)
+        
         self.scale_spin.blockSignals(True)
-        self.scale_spin.setValue(value)
+        self.scale_spin.setValue(percent)
         self.scale_spin.blockSignals(False)
 
     def _update_visibility_checkbox(self, visible: bool) -> None:
