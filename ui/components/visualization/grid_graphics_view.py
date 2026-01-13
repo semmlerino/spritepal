@@ -7,7 +7,6 @@ marquee selection, and drag-and-drop support.
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import TYPE_CHECKING, Any, override
 
 if TYPE_CHECKING:
@@ -46,15 +45,6 @@ from PySide6.QtWidgets import (
 )
 
 
-class SelectionMode(Enum):
-    """Selection modes for grid interaction"""
-
-    TILE = "tile"
-    ROW = "row"
-    COLUMN = "column"
-    RECTANGLE = "rectangle"
-
-
 # Import TilePosition at runtime to avoid circular imports
 def _make_tile_position(row: int, col: int) -> TilePosition:
     """Create a TilePosition-compatible object."""
@@ -80,7 +70,6 @@ class GridGraphicsView(QGraphicsView):
         self.grid_cols = 0
         self.grid_rows = 0
 
-        self.selection_mode = SelectionMode.TILE
         self.selecting = False
         self.selection_start: TilePosition | None = None
         self.current_selection: set[TilePosition] = set()
@@ -148,11 +137,6 @@ class GridGraphicsView(QGraphicsView):
         self.tile_width = tile_width
         self.tile_height = tile_height
         self._update_grid_lines()
-
-    def set_selection_mode(self, mode: SelectionMode):
-        """Set the selection mode"""
-        self.selection_mode = mode
-        self.clear_selection()
 
     def clear_selection(self):
         """Clear current selection"""
@@ -249,9 +233,20 @@ class GridGraphicsView(QGraphicsView):
             pos = self.mapToScene(event.pos())
             tile_pos = self._pos_to_tile(pos)
 
-            # Ctrl+click: Toggle tile in selection (add/remove)
-            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                if tile_pos and self._is_valid_tile(tile_pos):
+            # Check modifiers
+            modifiers = event.modifiers()
+            ctrl_pressed = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+            shift_pressed = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+
+            # Ctrl + Shift + Drag: Marquee selection
+            if ctrl_pressed and shift_pressed:
+                self._start_marquee_selection(pos)
+                return
+
+            # Handle tile interactions
+            if tile_pos and self._is_valid_tile(tile_pos):
+                if ctrl_pressed:
+                    # Ctrl+click: Toggle tile in selection (add/remove)
                     if tile_pos in self.current_selection:
                         self.current_selection.discard(tile_pos)
                     else:
@@ -259,16 +254,29 @@ class GridGraphicsView(QGraphicsView):
                     self._update_selection_display()
                     self.tiles_selected.emit(list(self.current_selection))
                     self.tile_clicked.emit(tile_pos)
-                return
+                    # Don't start drag on toggle
+                    return
 
-            # Start drag if clicking on a valid tile
-            if tile_pos and self._is_valid_tile(tile_pos):
-                self._drag_start_pos = event.pos()
-                self._drag_tile = tile_pos
-                return  # Don't start marquee - let mouseMoveEvent decide based on drag distance
+                else:
+                    # Normal click: Select single tile (if not already selected)
+                    # If clicking on an already selected tile, keep selection to allow dragging multiple
+                    if tile_pos not in self.current_selection:
+                        self.current_selection.clear()
+                        self.current_selection.add(tile_pos)
+                        self._update_selection_display()
+                        self.tiles_selected.emit(list(self.current_selection))
+                    
+                    self.tile_clicked.emit(tile_pos)
 
-            # Default: Start marquee selection on empty space (drag-to-select rectangle)
-            self._start_marquee_selection(pos)
+                    # Prepare for drag
+                    self._drag_start_pos = event.pos()
+                    self._drag_tile = tile_pos
+                    return
+
+            # Click on empty space
+            if not ctrl_pressed and not shift_pressed:
+                self.clear_selection()
+            
             return
 
         elif event.button() == Qt.MouseButton.MiddleButton:
@@ -854,29 +862,26 @@ class GridGraphicsView(QGraphicsView):
         new_pos = _make_tile_position(row, col)
 
         # Handle selection extension with Shift
-        if shift_pressed and self.selection_mode != SelectionMode.TILE:
+        if shift_pressed:
             # Extend selection from start position to new position
             if not self.selection_start:
                 self.selection_start = self.keyboard_focus_pos
 
-            # Calculate selection based on mode
-            if self.selection_mode == SelectionMode.ROW:
-                self.current_selection = {_make_tile_position(new_pos.row, c) for c in range(self.grid_cols)}
-            elif self.selection_mode == SelectionMode.COLUMN:
-                self.current_selection = {_make_tile_position(r, new_pos.col) for r in range(self.grid_rows)}
-            elif self.selection_mode == SelectionMode.RECTANGLE:
-                # Select rectangle from start to new position
-                min_row = min(self.selection_start.row, new_pos.row)
-                max_row = max(self.selection_start.row, new_pos.row)
-                min_col = min(self.selection_start.col, new_pos.col)
-                max_col = max(self.selection_start.col, new_pos.col)
+            # Select rectangle from start to new position
+            min_row = min(self.selection_start.row, new_pos.row)
+            max_row = max(self.selection_start.row, new_pos.row)
+            min_col = min(self.selection_start.col, new_pos.col)
+            max_col = max(self.selection_start.col, new_pos.col)
 
-                self.current_selection = {
-                    _make_tile_position(r, c) for r in range(min_row, max_row + 1) for c in range(min_col, max_col + 1)
-                }
+            self.current_selection = {
+                _make_tile_position(r, c) for r in range(min_row, max_row + 1) for c in range(min_col, max_col + 1)
+            }
 
             self._update_selection_display()
             self.tiles_selected.emit(list(self.current_selection))
+        else:
+            # Reset selection start if shift not pressed
+            self.selection_start = None
 
         # Move focus to new position
         self._set_keyboard_focus(new_pos)
@@ -889,15 +894,14 @@ class GridGraphicsView(QGraphicsView):
         # Emit tile clicked signal
         self.tile_clicked.emit(self.keyboard_focus_pos)
 
-        # In tile mode, toggle selection
-        if self.selection_mode == SelectionMode.TILE:
-            if self.keyboard_focus_pos in self.current_selection:
-                self.current_selection.remove(self.keyboard_focus_pos)
-            else:
-                self.current_selection.add(self.keyboard_focus_pos)
+        # Toggle selection
+        if self.keyboard_focus_pos in self.current_selection:
+            self.current_selection.remove(self.keyboard_focus_pos)
+        else:
+            self.current_selection.add(self.keyboard_focus_pos)
 
-            self._update_selection_display()
-            self.tiles_selected.emit(list(self.current_selection))
+        self._update_selection_display()
+        self.tiles_selected.emit(list(self.current_selection))
 
     def _set_keyboard_focus(self, tile_pos: TilePosition):
         """Set keyboard focus to a specific tile"""
@@ -1005,14 +1009,6 @@ class GridGraphicsView(QGraphicsView):
             if line:
                 self.grid_lines.append(line)
 
-    def _select_row(self, row: int):
-        """Select an entire row"""
-        self.current_selection = {_make_tile_position(row, col) for col in range(self.grid_cols)}
-
-    def _select_column(self, col: int):
-        """Select an entire column"""
-        self.current_selection = {_make_tile_position(row, col) for row in range(self.grid_rows)}
-
     def _update_rectangle_selection(self, start: TilePosition, end: TilePosition):
         """Update rectangle selection"""
         min_row = min(start.row, end.row)
@@ -1057,4 +1053,4 @@ class GridGraphicsView(QGraphicsView):
             scene.addItem(self.hover_rect)
 
 
-__all__ = ["GridGraphicsView", "SelectionMode"]
+__all__ = ["GridGraphicsView"]

@@ -104,9 +104,9 @@ class TestQtSignalArchitecture:
         return SignalCapture()
 
     @pytest.fixture
-    def mock_factory(self, session_app_context):
+    def mock_factory(self, session_app_context, isolated_data_repository):
         """Get mock factory instance"""
-        return RealComponentFactory()
+        return RealComponentFactory(data_repository=isolated_data_repository)
 
     def test_signal_connection_with_managers(self, app, signal_capture):
         """Test that signal connections work correctly with CoreOperationsManager."""

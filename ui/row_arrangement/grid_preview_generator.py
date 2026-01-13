@@ -342,4 +342,8 @@ class GridPreviewGenerator(ArrangementPreviewGenerator):
                 for group in manager.get_groups().values()
             ],
             "total_tiles": manager.get_arranged_count(),
+            "grid_mapping": {
+                f"{r},{c}": {"type": arr_type.value, "key": key}
+                for (r, c), (arr_type, key) in manager.get_grid_mapping().items()
+            },
         }

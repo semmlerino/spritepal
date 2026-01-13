@@ -1131,7 +1131,12 @@ class ROMWorkflowController(QObject):
             # Calculate grid dimensions from tile data
             tiles_per_row = min(16, self.current_width // 8) if self.current_width > 0 else 16
 
-            dialog = GridArrangementDialog(temp_png, tiles_per_row, self._view)
+            dialog = GridArrangementDialog(
+                temp_png,
+                tiles_per_row,
+                self._view,
+                arrangement_config=self._arrangement_config,
+            )
             dialog.setWindowTitle(f"Arrange Tiles - {self.current_sprite_name}")
 
             if dialog.exec():

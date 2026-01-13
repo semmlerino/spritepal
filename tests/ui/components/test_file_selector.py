@@ -150,7 +150,7 @@ class TestFileSelectorSignals:
         with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = "/selected/file.rom"
 
-            widget._browse_file()
+            qtbot.mouseClick(widget.browse_button, Qt.MouseButton.LeftButton)
 
         assert len(received_files) == 1
         assert received_files[0] == "/selected/file.rom"
@@ -193,41 +193,41 @@ class TestFileSelectorValidation:
 class TestFileSelectorBrowse:
     """Tests for browse functionality."""
 
-    def test_browse_open_mode_calls_helper(self, widget: FileSelector) -> None:
+    def test_browse_open_mode_calls_helper(self, qtbot: QtBot, widget: FileSelector) -> None:
         """Browse in open mode calls browse_open_file."""
         with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = None
 
-            widget._browse_file()
+            qtbot.mouseClick(widget.browse_button, Qt.MouseButton.LeftButton)
 
             mock_helper.browse_open_file.assert_called_once()
 
-    def test_browse_save_mode_calls_helper(self, widget_save_mode: FileSelector) -> None:
+    def test_browse_save_mode_calls_helper(self, qtbot: QtBot, widget_save_mode: FileSelector) -> None:
         """Browse in save mode calls browse_save_file."""
         with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_save_file.return_value = None
 
-            widget_save_mode._browse_file()
+            qtbot.mouseClick(widget_save_mode.browse_button, Qt.MouseButton.LeftButton)
 
             mock_helper.browse_save_file.assert_called_once()
 
-    def test_browse_updates_path(self, widget: FileSelector) -> None:
+    def test_browse_updates_path(self, qtbot: QtBot, widget: FileSelector) -> None:
         """Browse updates path on selection."""
         with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = "/selected/file.rom"
 
-            widget._browse_file()
+            qtbot.mouseClick(widget.browse_button, Qt.MouseButton.LeftButton)
 
             assert widget.get_path() == "/selected/file.rom"
 
-    def test_browse_no_selection_keeps_path(self, widget: FileSelector) -> None:
+    def test_browse_no_selection_keeps_path(self, qtbot: QtBot, widget: FileSelector) -> None:
         """Browse with no selection keeps current path."""
         widget.set_path("/original/path.rom")
 
         with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = None  # No selection
 
-            widget._browse_file()
+            qtbot.mouseClick(widget.browse_button, Qt.MouseButton.LeftButton)
 
             assert widget.get_path() == "/original/path.rom"
 
@@ -240,7 +240,7 @@ class TestFileSelectorBrowse:
         with patch("ui.components.inputs.file_selector.FileDialogHelper") as mock_helper:
             mock_helper.browse_open_file.return_value = "/selected/file.rom"
 
-            w._browse_file()
+            qtbot.mouseClick(w.browse_button, Qt.MouseButton.LeftButton)
 
             callback.assert_called_once_with("/selected/file.rom")
 
@@ -254,7 +254,7 @@ class TestFileSelectorBrowse:
             mock_helper.browse_open_file.return_value = "/selected/file.rom"
 
             # Should not raise
-            w._browse_file()
+            qtbot.mouseClick(w.browse_button, Qt.MouseButton.LeftButton)
 
             callback.assert_called_once()
 

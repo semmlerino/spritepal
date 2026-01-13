@@ -87,13 +87,13 @@ class TestRealDialogIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure for each test."""
         # Initialize Qt application (fixture ensures it exists)
         self.qt_app = QApplication.instance()
 
         # Initialize real manager factory with isolated managers for test isolation
-        self.manager_factory = RealComponentFactory()
+        self.manager_factory = RealComponentFactory(data_repository=isolated_data_repository)
 
         # Managers already initialized by isolated_managers fixture
 
@@ -221,10 +221,10 @@ class TestRealDialogManagerIntegration:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers):
+    def setup_test_infrastructure(self, isolated_managers, isolated_data_repository):
         """Set up real testing infrastructure."""
         self.qt_app = QApplication.instance()
-        self.manager_factory = RealComponentFactory()
+        self.manager_factory = RealComponentFactory(data_repository=isolated_data_repository)
 
         # Managers already initialized by isolated_managers fixture
 
@@ -306,10 +306,10 @@ class TestBugDiscoveryRealVsMockedDialogs:
     """
 
     @pytest.fixture(autouse=True)
-    def setup_test_infrastructure(self, isolated_managers, session_data_repository):
+    def setup_test_infrastructure(self, isolated_managers, session_data_repository, isolated_data_repository):
         """Set up real testing infrastructure."""
         self.qt_app = QApplication.instance()
-        self.manager_factory = RealComponentFactory()
+        self.manager_factory = RealComponentFactory(data_repository=isolated_data_repository)
         self.test_data = session_data_repository
 
         # Managers already initialized by isolated_managers fixture

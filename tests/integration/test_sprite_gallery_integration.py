@@ -29,10 +29,10 @@ pytestmark = [
 
 
 @pytest.fixture
-def real_factory(tmp_path, app_context):
+def real_factory(tmp_path, app_context, isolated_data_repository):
     """Create RealComponentFactory for integration tests."""
     # context_guaranteed=True because app_context fixture guarantees context exists
-    with RealComponentFactory(context_guaranteed=True) as factory:
+    with RealComponentFactory(context_guaranteed=True, data_repository=isolated_data_repository) as factory:
         yield factory
 
 

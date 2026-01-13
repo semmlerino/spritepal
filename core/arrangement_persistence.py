@@ -16,7 +16,7 @@ from typing import cast
 
 logger = logging.getLogger(__name__)
 
-FORMAT_VERSION = "1.1"  # Added overlay state fields
+FORMAT_VERSION = "1.2"  # Added grid_mapping
 
 
 @dataclass
@@ -35,6 +35,9 @@ class ArrangementConfig:
     groups: list[dict[str, object]]
     total_tiles: int
     logical_width: int
+    # Grid mapping (added in v1.2) - stores visual layout
+    # Key: "row,col", Value: {"type": str, "key": str}
+    grid_mapping: dict[str, dict[str, str]] = field(default_factory=dict)
     # Overlay state (added in v1.1)
     overlay_path: str | None = None
     overlay_x: int = 0
@@ -109,6 +112,8 @@ class ArrangementConfig:
             "groups": self.groups,
             "total_tiles": self.total_tiles,
             "logical_width": self.logical_width,
+            # Grid mapping
+            "grid_mapping": self.grid_mapping,
             # Overlay state
             "overlay_path": self.overlay_path,
             "overlay_x": self.overlay_x,
@@ -163,6 +168,8 @@ class ArrangementConfig:
             groups=data.get("groups", []),
             total_tiles=data["total_tiles"],
             logical_width=data["logical_width"],
+            # Grid mapping (v1.2+, defaults to empty for older files)
+            grid_mapping=data.get("grid_mapping", {}),
             # Overlay state (v1.1+, defaults for older files)
             overlay_path=data.get("overlay_path"),
             overlay_x=data.get("overlay_x", 0),
@@ -202,6 +209,7 @@ class ArrangementConfig:
             groups=cast(list[dict[str, object]], metadata.get("groups", [])),
             total_tiles=cast(int, metadata["total_tiles"]),
             logical_width=cast(int, metadata.get("logical_width", 16)),
+            grid_mapping=cast(dict[str, dict[str, str]], metadata.get("grid_mapping", {})),
         )
 
     def validate_rom_hash(self, rom_path: str) -> bool:

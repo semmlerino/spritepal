@@ -260,6 +260,7 @@ def session_data_repository(
 def real_factory(
     request: pytest.FixtureRequest,
     app_context: AppContext,
+    isolated_data_repository: Any,
 ) -> Generator[RealComponentFactory, None, None]:
     """Provide a RealComponentFactory for creating test components.
 
@@ -272,6 +273,7 @@ def real_factory(
     fail_on_leaks = _should_fail_on_leaks(request.config)
     factory = RealComponentFactory(
         fail_on_leaks=fail_on_leaks,
+        data_repository=isolated_data_repository,
     )
     yield factory
     # Cleanup will be handled by factory's cleanup method if needed
@@ -325,6 +327,7 @@ def rom_cache(
     request: FixtureRequest,
     tmp_path: Path,
     app_context: AppContext,
+    isolated_data_repository: Any,
 ) -> ROMCache:
     """Function-scoped ROM cache fixture with automatic cleanup.
 
@@ -338,6 +341,7 @@ def rom_cache(
     _ = app_context  # Ensures fixture runs first
     factory = RealComponentFactory(
         fail_on_leaks=_should_fail_on_leaks(request.config),
+        data_repository=isolated_data_repository,
     )
     cache_dir = tmp_path / "rom_cache"
     cache_dir.mkdir(exist_ok=True)
