@@ -370,7 +370,9 @@ class TestPreviewGenerator:
             assert result is not None
             assert result.sprite_name == "test_sprite"
             assert result.tile_count == 16
-            assert result.pixmap is mock_pixmap
+            assert result.pixmap is not None
+            # PreviewGenerator now scales the pixmap, so it returns a scaled version
+            mock_pixmap.scaled.assert_called_once()
             assert result.generation_time > 0
 
             # Verify extraction manager was called

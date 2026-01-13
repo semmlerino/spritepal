@@ -194,8 +194,8 @@ class TestSmartPreviewCoordinatorPerformance:
                     cache_operations["hits"] += 1
                 else:
                     cache_operations["misses"] += 1
-                    # Simulate adding to cache - needs 8-tuple for SpritePreviewCache
-                    self.coordinator._cache.put(cache_key, (b"mock_data", 0, 0, "mock", 0, 0, -1, True))
+                    # Simulate adding to cache - needs 9-tuple for SpritePreviewCache
+                    self.coordinator._cache.put(cache_key, (b"mock_data", 0, 0, "mock", 0, 0, -1, True, b""))
 
             # Request preview
             self.coordinator.request_preview(offset)
