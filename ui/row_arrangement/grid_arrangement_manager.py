@@ -473,8 +473,10 @@ class GridArrangementManager(QObject):
                 if group:
                     new_tiles.extend(group.tiles)
 
-        # Update flat list (set lookup remains valid as tiles didn't change)
+        # Update flat list
         self._arranged_tiles = new_tiles
+        # Update set
+        self._tile_set = set(new_tiles)
 
     def clear(self) -> None:
         """Clear all arrangements"""

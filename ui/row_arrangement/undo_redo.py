@@ -703,6 +703,35 @@ class CanvasRemoveItemCommand:
 
 
 @dataclass
+class CanvasRemoveMultipleItemsCommand:
+    """Command to remove multiple items from the arrangement canvas."""
+
+    manager: GridArrangementManager
+    items_to_remove: list[tuple[int, int]]  # List of (row, col) coordinates
+    # Store removed items for undo: map (row, col) -> (type, key)
+    removed_items: dict[tuple[int, int], tuple[ArrangementType, str]] = field(default_factory=dict)
+
+    @property
+    def description(self) -> str:
+        return f"Remove {len(self.items_to_remove)} items from canvas"
+
+    def execute(self) -> None:
+        # Capture items before removing if not already done
+        if not self.removed_items:
+            for r, c in self.items_to_remove:
+                item = self.manager.get_item_at(r, c)
+                if item:
+                    self.removed_items[(r, c)] = item
+
+        for r, c in self.items_to_remove:
+            self.manager.remove_item_at(r, c)
+
+    def undo(self) -> None:
+        for (r, c), (arr_type, key) in self.removed_items.items():
+            self.manager.set_item_at(r, c, arr_type, key)
+
+
+@dataclass
 class ApplyOverlayCommand:
     """Command to apply overlay pixels to tiles.
 

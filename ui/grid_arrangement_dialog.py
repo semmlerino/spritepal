@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
     QSpinBox,
     QVBoxLayout,
     QWidget,
+    QDialogButtonBox,
 )
 
 from core.apply_operation import ApplyOperation, ApplyResult, ApplyWarning, WarningType
@@ -58,6 +59,7 @@ from .row_arrangement.undo_redo import (
     ApplyOverlayCommand,
     CanvasMoveItemsCommand,
     CanvasPlaceItemsCommand,
+    CanvasRemoveMultipleItemsCommand,
     ClearGridCommand,
     RestoreGridStateCommand,
     UndoRedoStack,
@@ -142,6 +144,9 @@ class GridArrangementDialog(SplitterDialog):
         self.arrangement_manager.arrangement_changed.connect(self._on_arrangement_changed)
         self.colorizer.palette_mode_changed.connect(self._on_palette_mode_changed)
 
+        # Connect selection mode toggle
+        self.mode_toggle.selection_changed.connect(self._on_mode_changed)
+
         # Connect overlay signals to update canvas when overlay changes
         self.overlay_layer.position_changed.connect(self._on_overlay_changed)
         self.overlay_layer.opacity_changed.connect(self._on_overlay_changed)
@@ -178,9 +183,13 @@ class GridArrangementDialog(SplitterDialog):
         self.main_splitter.setStretchFactor(1, 1)  # 33% for right panel
 
         # Add custom buttons using SplitterDialog's button system
-        self.export_btn = self.add_button("&Export Arrangement", callback=self._export_arrangement)
+        self.export_btn = self.add_button("Export Arrangement", callback=self._export_arrangement)
         if self.export_btn:
             self.export_btn.setEnabled(False)
+            # Add to button box with ActionRole so it appears on the left or appropriate spot
+            if self.button_box:
+                self.button_box.addButton(self.export_btn, QDialogButtonBox.ButtonRole.ActionRole)
+
         AccessibilityHelper.make_accessible(
             self.export_btn, "Export Arrangement", "Export the arranged sprites to a new file", "Ctrl+E"
         )
@@ -618,12 +627,30 @@ class GridArrangementDialog(SplitterDialog):
             if self.arrangement_manager.is_tile_arranged(tile_pos):
                 # Find where it is and remove it
                 mapping = self.arrangement_manager.get_grid_mapping()
+                items_to_remove = []
                 for (tr, tc), (arr_type, key) in mapping.items():
                     if arr_type == ArrangementType.TILE and key == f"{tile_pos.row},{tile_pos.col}":
-                        self.arrangement_manager.remove_item_at(tr, tc)
-                        break
+                        items_to_remove.append((tr, tc))
+                
+                if items_to_remove:
+                    command = CanvasRemoveMultipleItemsCommand(
+                        manager=self.arrangement_manager,
+                        items_to_remove=items_to_remove,
+                    )
+                    self.undo_stack.push(command)
             else:
-                self.arrangement_manager.add_tile(tile_pos)
+                # Add to next available slot using command
+                # We need to find the target position first to use CanvasPlaceItemsCommand
+                # BUT AddMultipleTilesCommand (which wraps _add_tile_no_history) handles finding the slot.
+                # However, AddTileCommand is for single tile. Let's use AddMultipleTilesCommand for consistency
+                # or just AddTileCommand if we have it (we don't import it, but we can).
+                # Wait, we import AddMultipleTilesCommand. Let's use that.
+                
+                command = AddMultipleTilesCommand(
+                    manager=self.arrangement_manager,
+                    tiles=[tile_pos],
+                )
+                self.undo_stack.push(command)
 
         # Highlight in canvas if already arranged
         # (Implementation of canvas highlighting could go here)
@@ -642,12 +669,25 @@ class GridArrangementDialog(SplitterDialog):
         # Sort selection to add in a sensible order
         selection.sort(key=lambda t: (t.row, t.col))
 
-        for tile in selection:
-            if not self.arrangement_manager.is_tile_arranged(tile):
-                self.arrangement_manager.add_tile(tile)
+        # Filter out already arranged if desired? 
+        # Usually adding selection adds duplicates if allowed, or skips.
+        # GridArrangementManager.add_tile usually allows duplicates if not checked.
+        # But _add_tile_no_history checks is_tile_arranged? No, it just finds a slot.
+        # Let's filter to avoid duplicates if that's the desired behavior.
+        # The original code did: `if not self.arrangement_manager.is_tile_arranged(tile): self.arrangement_manager.add_tile(tile)`
+        
+        tiles_to_add = [t for t in selection if not self.arrangement_manager.is_tile_arranged(t)]
 
-        self.grid_view.clear_selection()
-        self._update_displays()
+        if tiles_to_add:
+            command = AddMultipleTilesCommand(
+                manager=self.arrangement_manager,
+                tiles=tiles_to_add,
+            )
+            self.undo_stack.push(command)
+            self.grid_view.clear_selection()
+            self._update_displays()
+        else:
+            self._update_status("Selected tiles are already arranged")
 
     def _remove_selection(self):
         """Remove current selection from arrangement grid mapping"""
@@ -655,11 +695,17 @@ class GridArrangementDialog(SplitterDialog):
         if hasattr(self, "arrangement_grid"):
             canvas_selection = list(self.arrangement_grid.current_selection)
             if canvas_selection:
-                for tile in canvas_selection:
-                    self.arrangement_manager.remove_item_at(tile.row, tile.col)
+                items_to_remove = [(t.row, t.col) for t in canvas_selection]
+                
+                command = CanvasRemoveMultipleItemsCommand(
+                    manager=self.arrangement_manager,
+                    items_to_remove=items_to_remove,
+                )
+                self.undo_stack.push(command)
+                
                 self.arrangement_grid.clear_selection()
                 self._update_displays()
-                self._update_status(f"Removed {len(canvas_selection)} items from canvas")
+                self._update_status(f"Removed {len(items_to_remove)} items from canvas")
                 return
 
         # 2. Check source grid selection (remove instances of these source tiles from canvas)
@@ -681,8 +727,11 @@ class GridArrangementDialog(SplitterDialog):
                     continue
 
         if to_remove:
-            for tr, tc in to_remove:
-                self.arrangement_manager.remove_item_at(tr, tc)
+            command = CanvasRemoveMultipleItemsCommand(
+                manager=self.arrangement_manager,
+                items_to_remove=to_remove,
+            )
+            self.undo_stack.push(command)
             self._update_status(f"Removed {len(to_remove)} instances of selected source tiles")
 
         self.grid_view.clear_selection()
@@ -1324,8 +1373,18 @@ class GridArrangementDialog(SplitterDialog):
                 self.overlay_layer.nudge(0, nudge_amount)
                 return
 
+        # Selection Mode Shortcuts
+        if key == Qt.Key.Key_T:
+            self.mode_toggle.set_current_data(SelectionMode.TILE)
+        elif key == Qt.Key.Key_R:
+            self.mode_toggle.set_current_data(SelectionMode.ROW)
+        elif key == Qt.Key.Key_C:
+            self.mode_toggle.set_current_data(SelectionMode.COLUMN)
+        elif key == Qt.Key.Key_M:
+            self.mode_toggle.set_current_data(SelectionMode.RECTANGLE)
+
         # Other shortcuts
-        if key == Qt.Key.Key_G:
+        elif key == Qt.Key.Key_G:
             # Toggle grid (already handled by view)
             pass
         elif key == Qt.Key.Key_C:
@@ -1440,13 +1499,13 @@ class GridArrangementDialog(SplitterDialog):
         # Clear colorizer cache
         self.colorizer.clear_cache()
 
+        # Clear grid view selections BEFORE clearing scene (to avoid double deletion)
+        self.grid_view.clear_selection()
+        self.grid_view.selection_rects.clear()
+
         # Clear graphics scene items
         if self.scene:
             self.scene.clear()
-
-        # Clear grid view selections
-        self.grid_view.clear_selection()
-        self.grid_view.selection_rects.clear()
 
         # Clear processor data
         self.processor.tiles.clear()
