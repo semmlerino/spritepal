@@ -18,6 +18,7 @@ from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from core.color_quantization import QuantizationResult
     from core.mesen_integration.log_watcher import LogWatcher
     from core.rom_extractor import ROMExtractor
     from core.services.rom_cache import ROMCache
@@ -299,6 +300,7 @@ class ROMWorkflowController(QObject):
         self._view.workspace.exportPngRequested.connect(self.export_png)
         self._view.workspace.saveProjectRequested.connect(self.save_sprite_project)
         self._view.workspace.loadProjectRequested.connect(self.load_sprite_project)
+        self._view.workspace.importImageRequested.connect(self.show_import_dialog)
 
         # Palette panel signals
         if self._view.workspace and self._view.workspace.palette_panel:
@@ -1062,6 +1064,46 @@ class ROMWorkflowController(QObject):
 
         if self._message_service:
             self._message_service.show_message("Sprite reverted to original ROM data")
+
+    def show_import_dialog(self) -> None:
+        """Open the image import dialog to import an external image.
+
+        Only available when in edit state with a sprite loaded.
+        Shows the ImageImportDialog which handles color quantization.
+        """
+        if self.state != "edit":
+            if self._message_service:
+                self._message_service.show_message("Open a sprite in editor first")
+            return
+
+        # Get current image size for target dimensions
+        data = self._editing_controller.get_image_data()
+        if data is None:
+            if self._message_service:
+                self._message_service.show_message("No sprite loaded")
+            return
+
+        target_size = (data.shape[1], data.shape[0])  # (width, height)
+
+        from ui.dialogs.image_import_dialog import ImageImportDialog
+
+        dialog = ImageImportDialog(self._view, target_size=target_size)
+        dialog.import_requested.connect(self._on_import_accepted)
+        dialog.exec()
+
+    def _on_import_accepted(self, result: "QuantizationResult") -> None:
+        """Handle accepted import from the image import dialog.
+
+        Args:
+            result: The quantization result containing indexed data and palette.
+        """
+        success = self._editing_controller.import_image(
+            result.indexed_data,
+            result.palette,
+            source_path="",
+        )
+        if success and self._message_service:
+            self._message_service.show_message("Image imported successfully")
 
     def prepare_injection(self) -> None:
         """Transition from editing to save confirmation with size comparison."""

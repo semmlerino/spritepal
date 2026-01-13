@@ -59,6 +59,7 @@ class EditWorkspace(QWidget):
     exportPngRequested = Signal()
     saveProjectRequested = Signal()
     loadProjectRequested = Signal()
+    importImageRequested = Signal()
 
     def __init__(self, embed_mode: str = "standalone", parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -84,6 +85,9 @@ class EditWorkspace(QWidget):
         self._save_export_panel.exportPngClicked.connect(self.exportPngRequested.emit)
         self._save_export_panel.saveProjectClicked.connect(self.saveProjectRequested.emit)
         self._save_export_panel.loadProjectClicked.connect(self.loadProjectRequested.emit)
+
+        # Connect IconToolbar action signals
+        self._icon_toolbar.importClicked.connect(self.importImageRequested.emit)
 
         if self._embed_mode == "standalone":
             # Standalone mode: Create full layout with internal splitter

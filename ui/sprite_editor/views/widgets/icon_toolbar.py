@@ -43,6 +43,7 @@ class IconToolbar(QWidget):
 
     # Signals - Actions
     revertClicked = Signal()  # Revert to original ROM data
+    importClicked = Signal()  # Import external image
 
     # Icon configuration: (theme_name, fallback_icon_text, display_label)
     # Theme names follow freedesktop.org icon naming spec
@@ -60,6 +61,7 @@ class IconToolbar(QWidget):
         "palette": ("preferences-desktop-color", "C", "Toggle Palette Preview"),
         "background": ("format-fill-color", "B", "Background"),
         "revert": ("view-refresh", "↺", "Revert"),
+        "import": ("document-import", "↓", "Import"),
     }
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -84,6 +86,7 @@ class IconToolbar(QWidget):
         self.palette_preview_btn: QToolButton | None = None
         self.background_btn: QToolButton | None = None
         self.revert_btn: QToolButton | None = None
+        self.import_btn: QToolButton | None = None
 
         # Track toggle states
         self._grid_visible = False
@@ -204,6 +207,14 @@ class IconToolbar(QWidget):
         self.revert_btn.setIconSize(self._get_icon_size())
         self.revert_btn.clicked.connect(self.revertClicked.emit)
         layout.addWidget(self.revert_btn)
+
+        # Import external image button
+        self.import_btn = QToolButton()
+        self._apply_icon(self.import_btn, "import")
+        self.import_btn.setToolTip("Import External Image (I)")
+        self.import_btn.setIconSize(self._get_icon_size())
+        self.import_btn.clicked.connect(self.importClicked.emit)
+        layout.addWidget(self.import_btn)
 
         # Add stretch to push everything to the left
         layout.addStretch()

@@ -190,6 +190,56 @@ class EditingController(QObject):
 
         self.imageChanged.emit()
 
+    def import_image(
+        self,
+        indexed_data: np.ndarray,
+        palette: list[tuple[int, int, int]],
+        source_path: str = "",
+    ) -> bool:
+        """Import an external image with undo support.
+
+        Unlike load_image() which clears undo history, this method supports
+        undo/redo for the import operation.
+
+        Args:
+            indexed_data: 2D numpy array of palette indices (0-15)
+            palette: List of 16 RGB tuples for the palette
+            source_path: Optional source file path for reference
+
+        Returns:
+            True if import succeeded, False otherwise
+        """
+        if not self.has_image():
+            # No existing image - treat as initial load
+            self.load_image(indexed_data, palette)
+            return True
+
+        # Get current state for undo
+        previous_data = self.image_model.data.copy()
+        previous_palette = self.palette_model.colors.copy()
+
+        # Create and execute import command
+        from ..commands.import_command import ImportImageCommand
+
+        cmd = ImportImageCommand(
+            previous_data=previous_data,
+            previous_palette=previous_palette,
+            new_data=indexed_data,
+            new_palette=palette,
+            source_path=source_path,
+        )
+
+        self.undo_manager.execute_command(cmd, self.image_model)
+
+        # Update palette
+        self.set_palette(palette)
+
+        # Emit signals
+        self.imageChanged.emit()
+        self._emit_undo_state()
+
+        return True
+
     def _on_tool_changed(self, tool_type: ToolType) -> None:
         """Handle tool change from manager."""
         tool_name = {
