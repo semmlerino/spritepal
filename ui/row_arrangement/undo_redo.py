@@ -316,6 +316,25 @@ class AddTileCommand:
 
 
 @dataclass
+class InsertTileCommand:
+    """Command to insert a single tile at a specific position."""
+
+    manager: GridArrangementManager
+    tile: TilePosition
+    index: int
+
+    @property
+    def description(self) -> str:
+        return f"Insert tile ({self.tile.row}, {self.tile.col}) at index {self.index + 1}"
+
+    def execute(self) -> None:
+        self.manager.insert_tile(self.tile, self.index)
+
+    def undo(self) -> None:
+        self.manager.remove_tile(self.tile)
+
+
+@dataclass
 class RemoveTileCommand:
     """Command to remove a single tile from the grid arrangement."""
 

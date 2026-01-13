@@ -95,6 +95,36 @@ class GridArrangementManager(QObject):
         self.arrangement_changed.emit()
         return True
 
+    def insert_tile(self, position: TilePosition, index: int) -> bool:
+        """Insert a single tile at a specific position in the arrangement.
+
+        Args:
+            position: The tile position to insert
+            index: The index in the arrangement order to insert at
+
+        Returns:
+            True if tile was inserted, False if invalid or already arranged
+        """
+        if not self._is_valid_position(position):
+            return False
+
+        if position in self._tile_set or position in self._tile_to_group:
+            return False
+
+        self._tile_set.add(position)
+
+        # Insert in arrangement order
+        tile_key = f"{position.row},{position.col}"
+        index = max(0, min(index, len(self._arrangement_order)))
+        self._arrangement_order.insert(index, (ArrangementType.TILE, tile_key))
+
+        # Rebuild flat list to match order
+        self._rebuild_arranged_tiles()
+
+        self.tile_added.emit(position)
+        self.arrangement_changed.emit()
+        return True
+
     def remove_tile(self, position: TilePosition) -> bool:
         """Remove a single tile from the arrangement"""
         # Check if tile is part of a group
