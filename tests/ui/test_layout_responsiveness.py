@@ -129,13 +129,6 @@ class TestLayoutResponsiveness:
             "actions_handler": actions_handler,
         }
 
-    def test_layout_collapse_restore(self, mock_dependencies):
-        """Test layout collapse functionality.
-
-        Obsolete: Splitter logic replaced by Dock switching.
-        """
-        pytest.skip("Obsolete test: Splitter logic replaced by Dock switching")
-
     def test_canvas_responsiveness(self, qt_app):
         # Patch the panels/widgets that EditWorkspace creates
         with (

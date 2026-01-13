@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from core.services.rom_cache import ROMCache
     from core.sprite_library import SpriteLibrary
     from ui.managers.status_bar_manager import StatusBarManager
+    from ui.row_arrangement.grid_arrangement_manager import TilePosition
 
     from ..services.arrangement_bridge import ArrangementBridge
     from ..views.workspaces.rom_workflow_page import ROMWorkflowPage
@@ -1136,6 +1137,11 @@ class ROMWorkflowController(QObject):
             if dialog.exec():
                 result = dialog.arrangement_result
                 if result and result.bridge.has_arrangement:
+                    # Update tile data if overlay was applied
+                    if result.modified_tiles:
+                        self._update_tile_data_from_modified_tiles(result.modified_tiles)
+                        logger.info("Updated current_tile_data with modified pixels from overlay")
+
                     self._current_arrangement = result.bridge
                     self._save_arrangement_config(result.metadata)
 
@@ -1153,6 +1159,48 @@ class ROMWorkflowController(QObject):
                 Path(temp_png).unlink()
             except OSError:
                 pass
+
+    def _update_tile_data_from_modified_tiles(self, modified_tiles: dict["TilePosition", Image.Image]) -> None:
+        """Update current_tile_data (bytes) from modified PIL images.
+
+        Converts each modified tile back to 4bpp SNES format and patches
+        it into the current_tile_data bytearray.
+
+        Args:
+            modified_tiles: Dict mapping TilePosition to modified PIL image
+        """
+        if not self.current_tile_data:
+            return
+
+        from core.tile_utils import encode_4bpp_tile
+
+        # Convert to bytearray for modification
+        data_mutable = bytearray(self.current_tile_data)
+        tiles_per_row = self.current_width // 8 if self.current_width >= 8 else 1
+
+        for pos, img in modified_tiles.items():
+            # Calculate byte offset for this tile
+            tile_idx = pos.row * tiles_per_row + pos.col
+            offset = tile_idx * 32
+
+            if offset + 32 > len(data_mutable):
+                logger.warning(f"Tile {pos} (index {tile_idx}) out of bounds for data of size {len(data_mutable)}")
+                continue
+
+            # Convert PIL image (assumed L mode with values 0-15 * 16) to indices
+            # ApplyOperation._quantize_to_palette writes indices * 16
+            img_l = img.convert("L")
+            pixels = np.array(img_l, dtype=np.uint8)
+            indices = (pixels // 16).flatten()
+
+            # Encode back to 4bpp
+            tile_bytes = encode_4bpp_tile(indices)
+
+            # Patch into data
+            data_mutable[offset : offset + 32] = tile_bytes
+
+        # Update current_tile_data
+        self.current_tile_data = bytes(data_mutable)
 
     def _load_existing_arrangement(self) -> None:
         """Check for saved arrangement and notify user.

@@ -6,12 +6,15 @@ RowArrangementDialog and GridArrangementDialog.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
 from PySide6.QtCore import QObject, Signal
 
 if TYPE_CHECKING:
+    from PIL import Image
+
     from ui.row_arrangement.arrangement_manager import ArrangementManager
     from ui.row_arrangement.grid_arrangement_manager import (
         ArrangementType,
@@ -697,3 +700,38 @@ class CanvasRemoveItemCommand:
         if self.removed_item:
             arr_type, key = self.removed_item
             self.manager.set_item_at(self.target_pos[0], self.target_pos[1], arr_type, key)
+
+
+@dataclass
+class ApplyOverlayCommand:
+    """Command to apply overlay pixels to tiles.
+
+    Stores previous tile images to support undo/redo of the destructive
+    pixel-sampling operation.
+    """
+
+    tiles: dict[TilePosition, Image.Image]
+    modified_tiles: dict[TilePosition, Image.Image]
+    callback: Callable[[], None]  # Callback to refresh displays (e.g., dialog._update_displays)
+    _previous_tiles: dict[TilePosition, Image.Image] = field(default_factory=dict)
+
+    @property
+    def description(self) -> str:
+        return f"Apply overlay to {len(self.modified_tiles)} tile(s)"
+
+    def execute(self) -> None:
+        # Store previous tiles on first execution
+        if not self._previous_tiles:
+            for pos in self.modified_tiles:
+                if pos in self.tiles:
+                    self._previous_tiles[pos] = self.tiles[pos]
+
+        # Apply modified tiles
+        self.tiles.update(self.modified_tiles)
+        self.callback()
+
+    def undo(self) -> None:
+        # Restore previous tiles
+        for pos, img in self._previous_tiles.items():
+            self.tiles[pos] = img
+        self.callback()

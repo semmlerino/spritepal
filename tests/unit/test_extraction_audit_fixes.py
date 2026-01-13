@@ -216,8 +216,9 @@ class TestCompressionRatioValidation:
 
     def test_low_ratio_warning_logged(self, caplog):
         """HAL-3.1a: Check that unusually low compression ratios trigger rejection."""
-        # Use DEBUG level to see rejection messages
-        caplog.set_level("DEBUG")
+        # Explicitly set level for spritepal logger to ensure DEBUG messages are captured
+        # even if setup_logging was called earlier in the same worker process.
+        caplog.set_level("DEBUG", logger="spritepal")
 
         injector = ROMInjector()
 

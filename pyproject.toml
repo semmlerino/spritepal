@@ -451,6 +451,7 @@ filterwarnings = [
 # Markers used in the test suite (consolidated from 65 to 16 based on actual usage)
 markers = [
     # Categorization markers
+    "unit: Unit tests",
     "gui: GUI tests requiring Qt (run with QT_QPA_PLATFORM=offscreen)",
     "headless: Tests that can run without display",
     "integration: Integration tests (cross-component)",

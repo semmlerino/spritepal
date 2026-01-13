@@ -55,6 +55,7 @@ from .row_arrangement.grid_preview_generator import GridPreviewGenerator
 from .row_arrangement.undo_redo import (
     AddGroupCommand,
     AddMultipleTilesCommand,
+    ApplyOverlayCommand,
     CanvasMoveItemsCommand,
     CanvasPlaceItemsCommand,
     ClearGridCommand,
@@ -74,6 +75,7 @@ class ArrangementResult:
     bridge: ArrangementBridge
     metadata: dict[str, object]
     logical_width: int  # Tiles per row in arranged view
+    modified_tiles: dict[TilePosition, Image.Image] | None = None
 
 
 # GridGraphicsView and SelectionMode are now imported from ui.components.visualization
@@ -234,7 +236,7 @@ class GridArrangementDialog(SplitterDialog):
 
         self.apply_overlay_btn = QPushButton("Apply Overlay to Arranged Tiles", overlay_group)
         self.apply_overlay_btn.setToolTip(
-            "Sample overlay image and write pixels to tiles currently placed on the canvas"
+            "Sample overlay image and write pixels to tiles currently placed on the canvas (Undoable)"
         )
         self.apply_overlay_btn.setStyleSheet("font-weight: bold; padding: 5px;")
         _ = self.apply_overlay_btn.clicked.connect(self._apply_overlay)
@@ -453,6 +455,17 @@ class GridArrangementDialog(SplitterDialog):
         self.reset_layout_btn.setToolTip("Reset all tiles to their original positions (1:1 mapping)")
         _ = self.reset_layout_btn.clicked.connect(self._reset_layout)
         layout.addWidget(self.reset_layout_btn)
+
+        layout.addStretch()
+
+        # Add shortcut legend
+        legend = QLabel(
+            "<font color='#888888'>"
+            "<b>Shortcuts:</b> [T] Tile, [R] Row, [C] Column, [M] Marquee | "
+            "[Enter] Add, [Del] Remove, [Esc] Clear | [Ctrl+Z/Y] Undo/Redo"
+            "</font>"
+        )
+        layout.addWidget(legend)
 
     def _add_zoom_controls(self, layout: QHBoxLayout):
         """Add zoom control buttons to the given layout.
@@ -849,6 +862,14 @@ class GridArrangementDialog(SplitterDialog):
 
         # Store the result for retrieval
         self._apply_result = result
+
+        # Use undoable command to update tiles
+        command = ApplyOverlayCommand(
+            tiles=self.tiles,
+            modified_tiles=result.modified_tiles,
+            callback=self._update_displays,
+        )
+        self.undo_stack.push(command)
 
         # Update status with result summary
         num_modified = len(result.modified_tiles)
@@ -1349,10 +1370,15 @@ class GridArrangementDialog(SplitterDialog):
         bridge = ArrangementBridge(self.arrangement_manager, self.processor)
         metadata = self.preview_generator.create_arrangement_preview_data(self.arrangement_manager, self.processor)
 
+        # Include modified tiles if any Apply operation was performed
+        # self.tiles contains the current pixel state (potentially modified by ApplyOverlayCommand)
+        modified_tiles = self.tiles.copy() if self._apply_result else None
+
         return ArrangementResult(
             bridge=bridge,
             metadata=metadata,
             logical_width=self.width_spin.value() if hasattr(self, "width_spin") else min(16, self.processor.grid_cols),
+            modified_tiles=modified_tiles,
         )
 
     @property

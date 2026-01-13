@@ -566,8 +566,20 @@ class TestRealHALComparison:
         Returns compressed data or None if inhal not available.
         """
         import shutil
+        from pathlib import Path
 
         inhal_path = shutil.which("inhal")
+        if not inhal_path:
+            # Try tools directory relative to project root
+            # tests/unit/test_hal_parsing.py -> tests/unit -> tests -> root
+            project_root = Path(__file__).parent.parent.parent
+            tools_inhal = project_root / "tools" / "inhal"
+            if not tools_inhal.exists():
+                tools_inhal = project_root / "tools" / "inhal.exe"
+
+            if tools_inhal.exists():
+                inhal_path = str(tools_inhal)
+
         if not inhal_path:
             pytest.skip("inhal binary not found")
             return None
@@ -577,7 +589,7 @@ class TestRealHALComparison:
 
         # Run inhal
         result = subprocess.run(
-            [inhal_path, str(input_file), str(compressed_file)],
+            [inhal_path, "-n", str(input_file), str(compressed_file)],
             capture_output=True,
             timeout=10,
         )
