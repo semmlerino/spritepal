@@ -18,6 +18,9 @@ from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from PySide6.QtCore import QPoint
+
+    from core.arrangement_persistence import ArrangementConfig
     from core.color_quantization import QuantizationResult
     from core.mesen_integration.log_watcher import LogWatcher
     from core.rom_extractor import ROMExtractor
@@ -25,6 +28,7 @@ if TYPE_CHECKING:
     from core.sprite_library import SpriteLibrary
     from ui.managers.status_bar_manager import StatusBarManager
 
+    from ..services.arrangement_bridge import ArrangementBridge
     from ..views.workspaces.rom_workflow_page import ROMWorkflowPage
     from .editing_controller import EditingController
 
@@ -103,6 +107,10 @@ class ROMWorkflowController(QObject):
         self.current_compression_type: CompressionType = CompressionType.UNKNOWN
         # Header bytes stripped during alignment (prepended back during injection to prevent color shift)
         self.current_header_bytes: bytes = b""
+
+        # Tile arrangement state (for scattered tile layouts)
+        self._current_arrangement: ArrangementBridge | None = None
+        self._arrangement_config: ArrangementConfig | None = None
 
         # Flag for auto-opening in editor after preview completes (double-click)
         self._pending_open_in_editor: bool = False
@@ -301,10 +309,20 @@ class ROMWorkflowController(QObject):
         self._view.workspace.saveProjectRequested.connect(self.save_sprite_project)
         self._view.workspace.loadProjectRequested.connect(self.load_sprite_project)
         self._view.workspace.importImageRequested.connect(self.show_import_dialog)
+        self._view.workspace.arrangeClicked.connect(self.show_arrangement_dialog)
 
         # Palette panel signals
         if self._view.workspace and self._view.workspace.palette_panel:
             self._view.workspace.palette_panel.manualPaletteRequested.connect(self._on_manual_palette_requested)
+
+        # Overlay panel signals
+        if self._view.workspace and self._view.workspace.overlay_panel:
+            self._view.workspace.overlay_panel.importRequested.connect(self._on_overlay_import_requested)
+            self._view.workspace.overlay_panel.applyRequested.connect(self._on_apply_overlay)
+            self._view.workspace.overlay_panel.cancelRequested.connect(self._on_cancel_overlay)
+            self._view.workspace.overlay_panel.baseOpacityChanged.connect(self._on_base_opacity_changed)
+            self._view.workspace.overlay_panel.overlayOpacityChanged.connect(self._on_overlay_opacity_changed)
+            self._view.workspace.overlay_panel.positionChanged.connect(self._on_overlay_position_changed)
 
     def _on_sprite_selected(self, offset: int, source_type: str) -> None:
         """Handle sprite selection from asset browser."""
@@ -819,6 +837,7 @@ class ROMWorkflowController(QObject):
             self.workflow_state_changed.emit("preview")
 
         self.current_offset = offset
+        self._clear_arrangement()  # Clear arrangement when changing offset
         if self._view:
             self._view.set_offset(offset)
 
@@ -869,6 +888,10 @@ class ROMWorkflowController(QObject):
             self._view.clear_rom_palette_sources()
             self._view.hide_palette_warning()
 
+        # Check for saved arrangement if none currently loaded
+        if self._current_arrangement is None:
+            self._load_existing_arrangement()
+
         # Use SpriteRenderer to create PIL image from 4bpp
         from ..core.palette_utils import get_default_snes_palette
         from ..services import SpriteRenderer
@@ -897,6 +920,15 @@ class ROMWorkflowController(QObject):
 
         # Convert to numpy and load into editor
         image_array = np.array(image, dtype=np.uint8)
+
+        # Apply arrangement transformation (physical → logical) if active
+        if self._current_arrangement and self._current_arrangement.has_arrangement:
+            try:
+                image_array = self._current_arrangement.physical_to_logical(image_array)
+                logger.info("[OPEN] Applied arrangement: physical → logical transformation")
+            except Exception as e:
+                logger.warning("Failed to apply arrangement transformation: %s", e)
+                self._clear_arrangement()
 
         # Try to extract all ROM palettes if possible
         palette: list[tuple[int, int, int]] | None = None
@@ -989,9 +1021,10 @@ class ROMWorkflowController(QObject):
         if self._view:
             self._view.set_action_text("Save to ROM")
             self._view.set_workflow_state("edit")
-            # Enable save project button when sprite is loaded for editing
+            # Enable save project button and arrange tiles when sprite is loaded for editing
             if self._view.workspace:
                 self._view.workspace.set_save_project_enabled(True)
+                self._view.workspace.set_arrange_enabled(True)
         self.workflow_state_changed.emit("edit")
 
         # Emit sprite_extracted for external listeners (e.g. history, status)
@@ -1065,6 +1098,137 @@ class ROMWorkflowController(QObject):
         if self._message_service:
             self._message_service.show_message("Sprite reverted to original ROM data")
 
+    def show_arrangement_dialog(self) -> None:
+        """Open the tile arrangement dialog.
+
+        Allows users to rearrange scattered tiles into a contiguous layout
+        for easier editing. The arrangement is persisted to a sidecar file
+        so it can be reloaded across sessions.
+        """
+        if not self.current_tile_data:
+            if self._message_service:
+                self._message_service.show_message("No sprite data to arrange")
+            return
+
+        # Create a temporary PNG from the current tile data for the dialog
+        import tempfile
+        from pathlib import Path
+
+        from ..services import SpriteRenderer
+
+        renderer = SpriteRenderer()
+        image = renderer.render_4bpp(self.current_tile_data, self.current_width, self.current_height)
+
+        # Save to temp file for dialog
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            image.save(f.name, "PNG")
+            temp_png = f.name
+
+        try:
+            from ui.grid_arrangement_dialog import GridArrangementDialog
+
+            # Calculate grid dimensions from tile data
+            tiles_per_row = min(16, self.current_width // 8) if self.current_width > 0 else 16
+
+            dialog = GridArrangementDialog(temp_png, tiles_per_row, self._view)
+            dialog.setWindowTitle(f"Arrange Tiles - {self.current_sprite_name}")
+
+            if dialog.exec():
+                result = dialog.arrangement_result
+                if result and result.bridge.has_arrangement:
+                    self._current_arrangement = result.bridge
+                    self._save_arrangement_config(result.metadata)
+
+                    if self._message_service:
+                        self._message_service.show_message("Arrangement applied. Editing in logical view.")
+
+                    # Reload in editor with arrangement applied
+                    self.open_in_editor()
+                elif self._message_service:
+                    self._message_service.show_message("No arrangement created")
+
+        finally:
+            # Cleanup temp file
+            try:
+                Path(temp_png).unlink()
+            except OSError:
+                pass
+
+    def _load_existing_arrangement(self) -> None:
+        """Check for saved arrangement and notify user.
+
+        Called when opening a sprite in editor. If a saved arrangement exists,
+        notifies the user they can re-apply it via the Arrange Tiles button.
+
+        Note: Full auto-reconstruction would require rebuilding the manager/processor
+        state from the tile image, which is complex. For now we just detect that
+        an arrangement was saved and prompt the user to re-create it.
+        """
+        from core.arrangement_persistence import ArrangementConfig
+
+        if not self.rom_path or not self.current_offset:
+            return
+
+        if not ArrangementConfig.exists_for(self.rom_path, self.current_offset):
+            return
+
+        try:
+            sidecar_path = ArrangementConfig.get_sidecar_path(self.rom_path, self.current_offset)
+            config = ArrangementConfig.load(sidecar_path)
+            self._arrangement_config = config
+
+            # Just store config for reference; user can re-apply via dialog
+            logger.info(
+                "Found saved arrangement for 0x%06X (%d tiles)",
+                self.current_offset,
+                len(config.arrangement_order),
+            )
+
+            if self._message_service:
+                self._message_service.show_message(
+                    f"Saved arrangement found ({len(config.arrangement_order)} tiles). "
+                    "Click 'Arrange Tiles' to re-apply."
+                )
+
+        except Exception as e:
+            logger.warning("Failed to read arrangement config: %s", e)
+            self._arrangement_config = None
+
+    def _save_arrangement_config(self, metadata: dict[str, object]) -> None:
+        """Save arrangement configuration to sidecar file.
+
+        Args:
+            metadata: Arrangement metadata from GridArrangementManager
+        """
+        from core.arrangement_persistence import ArrangementConfig
+
+        if not self.rom_path or not self.current_offset:
+            return
+
+        try:
+            config = ArrangementConfig.from_metadata(
+                metadata,
+                self.rom_path,
+                self.current_offset,
+                self.current_sprite_name,
+            )
+
+            sidecar_path = ArrangementConfig.get_sidecar_path(self.rom_path, self.current_offset)
+            config.save(sidecar_path)
+            self._arrangement_config = config
+
+            logger.info("Saved arrangement to %s", sidecar_path)
+
+        except Exception as e:
+            logger.warning("Failed to save arrangement: %s", e)
+            if self._message_service:
+                self._message_service.show_message(f"Warning: Failed to save arrangement: {e}")
+
+    def _clear_arrangement(self) -> None:
+        """Clear current arrangement state."""
+        self._current_arrangement = None
+        self._arrangement_config = None
+
     def show_import_dialog(self) -> None:
         """Open the image import dialog to import an external image.
 
@@ -1104,6 +1268,195 @@ class ROMWorkflowController(QObject):
         )
         if success and self._message_service:
             self._message_service.show_message("Image imported successfully")
+
+    # --- Overlay handlers ---
+
+    def _on_overlay_import_requested(self) -> None:
+        """Open file dialog to select overlay image."""
+        if self.state != "edit":
+            if self._message_service:
+                self._message_service.show_message("Open a sprite in editor first")
+            return
+
+        from PySide6.QtWidgets import QFileDialog
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self._view,
+            "Import Overlay Image",
+            "",
+            "Images (*.png *.jpg *.jpeg *.bmp);;All Files (*)",
+        )
+        if not file_path:
+            return
+
+        # Load image preserving alpha
+        overlay = QImage(file_path)
+        if overlay.isNull():
+            logger.warning("Failed to load overlay: %s", file_path)
+            if self._message_service:
+                self._message_service.show_message("Failed to load overlay image")
+            return
+
+        # Convert to ARGB32 for consistent handling
+        overlay = overlay.convertToFormat(QImage.Format.Format_ARGB32)
+
+        if not self._view or not self._view.workspace:
+            return
+
+        # Set on canvas
+        canvas = self._view.workspace.get_canvas()
+        if canvas:
+            canvas.set_overlay_image(overlay)
+            self._view.workspace.overlay_panel.set_overlay_active(True)
+            # Connect overlay moved signal to update panel position
+            canvas.overlayMoved.connect(self._on_overlay_moved_from_canvas)
+            if self._message_service:
+                self._message_service.show_message("Overlay loaded - drag or use arrow keys to position")
+
+    def _on_overlay_moved_from_canvas(self, x: int, y: int) -> None:
+        """Update overlay panel position display when canvas reports movement."""
+        if self._view and self._view.workspace:
+            self._view.workspace.overlay_panel.update_position(x, y)
+
+    def _on_apply_overlay(self) -> None:
+        """Merge overlay onto sprite image."""
+        if not self._view:
+            return
+
+        canvas = self._view.workspace.get_canvas()
+        if not canvas or not canvas.has_overlay():
+            return
+
+        # Get current sprite data
+        current_data = self._editing_controller.get_image_data()
+        if current_data is None:
+            return
+        current_data = current_data.copy()
+        current_palette = self._editing_controller.get_current_colors()
+
+        # Get overlay data from canvas
+        overlay_image = canvas._overlay_image
+        overlay_position = canvas.get_overlay_position()
+
+        if overlay_image is None:
+            return
+
+        # Merge overlay onto sprite
+        merged = self._merge_overlay_to_indexed(
+            current_data,
+            current_palette,
+            overlay_image,
+            overlay_position,
+        )
+
+        # Apply via import command (supports undo)
+        success = self._editing_controller.import_image(
+            merged,
+            current_palette,
+            source_path="overlay",
+        )
+
+        if success:
+            # Clear overlay
+            canvas.clear_overlay()
+            self._view.workspace.overlay_panel.set_overlay_active(False)
+            self._view.workspace.overlay_panel.reset()
+            if self._message_service:
+                self._message_service.show_message("Overlay applied successfully")
+
+    def _merge_overlay_to_indexed(
+        self,
+        sprite_data: np.ndarray,
+        palette: list[tuple[int, int, int]],
+        overlay: QImage,
+        position: "QPoint",
+    ) -> np.ndarray:
+        """Merge RGBA overlay onto indexed sprite data.
+
+        For each non-transparent overlay pixel:
+        - Find closest palette color
+        - Write that index to sprite data
+
+        Args:
+            sprite_data: 2D numpy array of palette indices
+            palette: List of RGB tuples
+            overlay: QImage in ARGB32 format
+            position: Overlay offset from top-left
+
+        Returns:
+            Modified sprite data array
+        """
+        result = sprite_data.copy()
+        height, width = result.shape
+
+        for y in range(overlay.height()):
+            for x in range(overlay.width()):
+                # Target position in sprite
+                sx = position.x() + x
+                sy = position.y() + y
+
+                # Skip if outside sprite bounds
+                if sx < 0 or sx >= width or sy < 0 or sy >= height:
+                    continue
+
+                # Get overlay pixel
+                pixel = overlay.pixelColor(x, y)
+
+                # Skip transparent pixels
+                if pixel.alpha() < 128:
+                    continue
+
+                # Find closest palette color (excluding index 0 = transparent)
+                best_idx = 1
+                best_dist = float("inf")
+                for i, (r, g, b) in enumerate(palette[1:], start=1):
+                    dist = (pixel.red() - r) ** 2 + (pixel.green() - g) ** 2 + (pixel.blue() - b) ** 2
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_idx = i
+
+                result[sy, sx] = best_idx
+
+        return result
+
+    def _on_cancel_overlay(self) -> None:
+        """Cancel overlay import."""
+        if not self._view:
+            return
+
+        canvas = self._view.workspace.get_canvas()
+        if canvas:
+            canvas.clear_overlay()
+        self._view.workspace.overlay_panel.set_overlay_active(False)
+        self._view.workspace.overlay_panel.reset()
+        if self._message_service:
+            self._message_service.show_message("Overlay cancelled")
+
+    def _on_base_opacity_changed(self, value: int) -> None:
+        """Handle base sprite opacity change from panel."""
+        if not self._view:
+            return
+        canvas = self._view.workspace.get_canvas()
+        if canvas:
+            canvas.set_base_opacity(value)
+
+    def _on_overlay_opacity_changed(self, value: int) -> None:
+        """Handle overlay opacity change from panel."""
+        if not self._view:
+            return
+        canvas = self._view.workspace.get_canvas()
+        if canvas:
+            canvas.set_overlay_opacity(value)
+
+    def _on_overlay_position_changed(self, x: int, y: int) -> None:
+        """Handle overlay position change from panel spinboxes."""
+        if not self._view:
+            return
+        canvas = self._view.workspace.get_canvas()
+        if canvas:
+            from PySide6.QtCore import QPoint
+
+            canvas.set_overlay_position(QPoint(x, y))
 
     def prepare_injection(self) -> None:
         """Transition from editing to save confirmation with size comparison."""
@@ -1214,6 +1567,17 @@ class ROMWorkflowController(QObject):
             if self._message_service:
                 self._message_service.show_message(f"Cannot save: {'; '.join(errors)}")
             return
+
+        # Reverse arrangement transformation (logical → physical) if active
+        if self._current_arrangement and self._current_arrangement.has_arrangement:
+            try:
+                data = self._current_arrangement.logical_to_physical(data)
+                logger.info("[SAVE] Applied reverse arrangement: logical → physical transformation")
+            except Exception as e:
+                logger.error("Failed to reverse arrangement transformation: %s", e)
+                if self._message_service:
+                    self._message_service.show_message(f"Error: Failed to restore tile positions: {e}")
+                return
 
         try:
             if self._message_service:

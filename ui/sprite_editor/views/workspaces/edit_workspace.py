@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from ui.common.signal_utils import safe_disconnect
 from ui.common.spacing_constants import PANEL_PADDING, SPACING_MEDIUM, SPACING_SMALL
 
-from ..panels import PalettePanel, PreviewPanel
+from ..panels import OverlayPanel, PalettePanel, PreviewPanel
 from ..widgets import EditorStatusBar, IconToolbar, PixelCanvas, SaveExportPanel
 
 if TYPE_CHECKING:
@@ -60,6 +60,7 @@ class EditWorkspace(QWidget):
     saveProjectRequested = Signal()
     loadProjectRequested = Signal()
     importImageRequested = Signal()
+    arrangeClicked = Signal()
 
     def __init__(self, embed_mode: str = "standalone", parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -168,6 +169,17 @@ class EditWorkspace(QWidget):
         self._save_export_panel = SaveExportPanel()
         right_layout.addWidget(self._save_export_panel)
 
+        # Overlay panel (for image import alignment)
+        self._overlay_panel = OverlayPanel()
+        right_layout.addWidget(self._overlay_panel)
+
+        # Arrange Tiles button (for ROM workflow with scattered tiles)
+        self._arrange_tiles_btn = QPushButton("Arrange Tiles...")
+        self._arrange_tiles_btn.setToolTip("Rearrange scattered tiles into contiguous layout for editing")
+        self._arrange_tiles_btn.setEnabled(False)
+        self._arrange_tiles_btn.clicked.connect(self.arrangeClicked.emit)
+        right_layout.addWidget(self._arrange_tiles_btn)
+
         # Action buttons (detach and ready for inject)
         self._detach_btn = QPushButton("Pop Out Editor")
         self._detach_btn.setToolTip("Open editor in a separate window")
@@ -244,6 +256,11 @@ class EditWorkspace(QWidget):
     def save_export_panel(self) -> SaveExportPanel:
         """Access the save/export panel."""
         return self._save_export_panel
+
+    @property
+    def overlay_panel(self) -> OverlayPanel:
+        """Access the overlay panel."""
+        return self._overlay_panel
 
     @property
     def status_bar(self) -> EditorStatusBar:
@@ -590,3 +607,11 @@ class EditWorkspace(QWidget):
             enabled: Whether the save project button should be enabled
         """
         self._save_export_panel.set_save_project_enabled(enabled)
+
+    def set_arrange_enabled(self, enabled: bool) -> None:
+        """Enable or disable the Arrange Tiles button.
+
+        Args:
+            enabled: Whether the arrange tiles button should be enabled
+        """
+        self._arrange_tiles_btn.setEnabled(enabled)

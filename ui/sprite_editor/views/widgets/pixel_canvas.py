@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, override
 
 import numpy as np
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QEnterEvent, QImage, QMouseEvent, QPainter, QPaintEvent, QPen, QWheelEvent
+from PySide6.QtGui import QColor, QEnterEvent, QImage, QKeyEvent, QMouseEvent, QPainter, QPaintEvent, QPen, QWheelEvent
 from PySide6.QtWidgets import QSizePolicy, QWidget
 
 if TYPE_CHECKING:
@@ -24,6 +24,7 @@ class PixelCanvas(QWidget):
     pixelReleased = Signal(int, int)  # x, y in image space
     zoomRequested = Signal(int)  # new zoom level
     hoverPositionChanged = Signal(int, int)  # x, y in image space (-1, -1 when no position)
+    overlayMoved = Signal(int, int)  # x, y overlay position changed
 
     def __init__(self, controller: "EditingController", parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -45,6 +46,15 @@ class PixelCanvas(QWidget):
         self.temporary_picker = False  # Track if we're temporarily using picker with right-click
         self.previous_tool: str | None = None  # Store previous tool when using temporary picker
         self.last_draw_pos: QPoint | None = None  # Track last known position during drawing
+
+        # Overlay state (for image alignment)
+        self._overlay_image: QImage | None = None
+        self._overlay_position = QPoint(0, 0)  # Offset from top-left in image pixels
+        self._overlay_opacity = 80  # 0-100%
+        self._base_opacity = 100  # 0-100% for existing sprite
+        self._overlay_visible = False
+        self._overlay_dragging = False
+        self._drag_start_pos: QPoint | None = None
 
         # Performance caches
         self._qcolor_cache: dict[int, QColor] = {}
@@ -68,6 +78,7 @@ class PixelCanvas(QWidget):
         self.setMouseTracking(True)
         self.setMinimumSize(200, 200)
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # Accept keyboard focus for overlay nudging
 
         # Connect to controller signals
         self.controller.imageChanged.connect(self._on_image_changed)
@@ -447,8 +458,10 @@ class PixelCanvas(QWidget):
         # Enable composition mode for proper transparency
         painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceOver)
 
-        # Draw only the visible portion of the image
+        # Draw only the visible portion of the image (with base opacity)
+        painter.setOpacity(self._base_opacity / 100.0)
         painter.drawImage(image_rect, scaled_qimage, image_rect)
+        painter.setOpacity(1.0)
 
         # Reset clipping to allow drawing grid lines on the exact edge of the image
         painter.setClipping(False)
@@ -460,6 +473,10 @@ class PixelCanvas(QWidget):
         # Draw tile grid if visible (8x8 tiles)
         if self.tile_grid_visible and self.zoom >= 1:
             self._draw_tile_grid_viewport(painter, image_rect)
+
+        # Draw overlay if visible
+        if self._overlay_visible and self._overlay_image is not None:
+            self._draw_overlay(painter)
 
         # Draw hover highlight without clipping restrictions
         if self.hover_pos and not self.drawing:
@@ -595,6 +612,34 @@ class PixelCanvas(QWidget):
         if lines:
             painter.drawLines(lines)
 
+    def _draw_overlay(self, painter: QPainter) -> None:
+        """Draw overlay image with current opacity and position."""
+        if not self._overlay_image:
+            return
+
+        # Scale overlay to match zoom
+        scaled_width = self._overlay_image.width() * self.zoom
+        scaled_height = self._overlay_image.height() * self.zoom
+        scaled = self._overlay_image.scaled(
+            scaled_width,
+            scaled_height,
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.FastTransformation,
+        )
+
+        # Draw at offset position with opacity
+        painter.setOpacity(self._overlay_opacity / 100.0)
+        painter.drawImage(
+            self._overlay_position.x() * self.zoom,
+            self._overlay_position.y() * self.zoom,
+            scaled,
+        )
+        painter.setOpacity(1.0)
+
+        # Draw position indicator border (orange)
+        painter.setPen(QPen(QColor(255, 165, 0), 2))
+        painter.drawRect(self.get_overlay_bounds())
+
     def _draw_hover_highlight(self, painter: QPainter) -> None:
         """Draw hover highlight with brush size preview."""
         if not self.hover_pos:
@@ -622,6 +667,15 @@ class PixelCanvas(QWidget):
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse press."""
         if event.button() == Qt.MouseButton.LeftButton:
+            # Check if clicking on overlay (takes priority over drawing)
+            if self._overlay_visible and self._overlay_image is not None:
+                overlay_bounds = self.get_overlay_bounds()
+                mouse_pos = QPoint(int(event.position().x()), int(event.position().y()))
+                if overlay_bounds.contains(mouse_pos):
+                    self._overlay_dragging = True
+                    self._drag_start_pos = mouse_pos
+                    return
+
             pos = self._get_pixel_pos(event.position())
             if pos is not None:
                 self.drawing = True
@@ -641,6 +695,24 @@ class PixelCanvas(QWidget):
     @override
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Handle mouse move with optimized hover updates."""
+        # Handle overlay dragging
+        if self._overlay_dragging and self._drag_start_pos is not None:
+            current_pos = QPoint(int(event.position().x()), int(event.position().y()))
+            delta = current_pos - self._drag_start_pos
+            # Convert screen delta to image pixels
+            dx = delta.x() // self.zoom
+            dy = delta.y() // self.zoom
+            if dx != 0 or dy != 0:
+                self._overlay_position += QPoint(dx, dy)
+                # Adjust drag start to account for consumed movement
+                self._drag_start_pos = QPoint(
+                    self._drag_start_pos.x() + dx * self.zoom,
+                    self._drag_start_pos.y() + dy * self.zoom,
+                )
+                self.overlayMoved.emit(self._overlay_position.x(), self._overlay_position.y())
+                self.update()
+            return
+
         # Update hover position with optimized partial repaints
         pos = self._get_pixel_pos(event.position())
         if pos != self.hover_pos:
@@ -663,6 +735,12 @@ class PixelCanvas(QWidget):
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         """Handle mouse release."""
         if event.button() == Qt.MouseButton.LeftButton:
+            # End overlay dragging
+            if self._overlay_dragging:
+                self._overlay_dragging = False
+                self._drag_start_pos = None
+                return
+
             if self.drawing:
                 self.drawing = False
                 pos = self._get_pixel_pos(event.position())
@@ -715,6 +793,37 @@ class PixelCanvas(QWidget):
         event.accept()
 
     @override
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """Handle key press for overlay nudging."""
+        if self._overlay_visible and self._overlay_image is not None:
+            # Determine nudge amount (1px normal, 8px with Shift)
+            nudge = 8 if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else 1
+
+            key = event.key()
+            if key == Qt.Key.Key_Left:
+                self.nudge_overlay(-nudge, 0)
+                self.overlayMoved.emit(self._overlay_position.x(), self._overlay_position.y())
+                event.accept()
+                return
+            elif key == Qt.Key.Key_Right:
+                self.nudge_overlay(nudge, 0)
+                self.overlayMoved.emit(self._overlay_position.x(), self._overlay_position.y())
+                event.accept()
+                return
+            elif key == Qt.Key.Key_Up:
+                self.nudge_overlay(0, -nudge)
+                self.overlayMoved.emit(self._overlay_position.x(), self._overlay_position.y())
+                event.accept()
+                return
+            elif key == Qt.Key.Key_Down:
+                self.nudge_overlay(0, nudge)
+                self.overlayMoved.emit(self._overlay_position.x(), self._overlay_position.y())
+                event.accept()
+                return
+
+        super().keyPressEvent(event)
+
+    @override
     def leaveEvent(self, event: QEvent) -> None:
         """Handle mouse leave event."""
         old_hover_pos = self.hover_pos
@@ -760,3 +869,94 @@ class PixelCanvas(QWidget):
                         self.pixelReleased.emit(self.last_draw_pos.x(), self.last_draw_pos.y())
                     self.last_draw_pos = None
         return super().eventFilter(obj, event)
+
+    # --- Overlay methods ---
+
+    def set_overlay_image(self, image: QImage | None) -> None:
+        """Set the overlay image for alignment.
+
+        Args:
+            image: QImage to overlay, or None to clear
+        """
+        self._overlay_image = image
+        self._overlay_visible = image is not None
+        if image is None:
+            self._overlay_position = QPoint(0, 0)
+        self.update()
+
+    def set_overlay_position(self, pos: QPoint) -> None:
+        """Set overlay position in image pixels.
+
+        Args:
+            pos: Position offset from top-left
+        """
+        self._overlay_position = pos
+        self.update()
+
+    def nudge_overlay(self, dx: int, dy: int) -> None:
+        """Nudge overlay position by delta.
+
+        Args:
+            dx: Horizontal offset in pixels
+            dy: Vertical offset in pixels
+        """
+        self._overlay_position += QPoint(dx, dy)
+        self.update()
+
+    def set_overlay_opacity(self, opacity: int) -> None:
+        """Set overlay opacity.
+
+        Args:
+            opacity: 0-100 percentage
+        """
+        self._overlay_opacity = max(0, min(100, opacity))
+        self.update()
+
+    def set_base_opacity(self, opacity: int) -> None:
+        """Set base sprite opacity.
+
+        Args:
+            opacity: 0-100 percentage
+        """
+        self._base_opacity = max(0, min(100, opacity))
+        self.update()
+
+    def clear_overlay(self) -> None:
+        """Remove overlay and reset state."""
+        self._overlay_image = None
+        self._overlay_visible = False
+        self._overlay_position = QPoint(0, 0)
+        self._overlay_opacity = 80
+        self._base_opacity = 100
+        self.update()
+
+    def get_overlay_bounds(self) -> QRect:
+        """Get overlay bounding rect in canvas (screen) coordinates.
+
+        Returns:
+            QRect of overlay bounds, or empty rect if no overlay
+        """
+        if not self._overlay_image:
+            return QRect()
+        return QRect(
+            self._overlay_position.x() * self.zoom,
+            self._overlay_position.y() * self.zoom,
+            self._overlay_image.width() * self.zoom,
+            self._overlay_image.height() * self.zoom,
+        )
+
+    def get_overlay_position(self) -> QPoint:
+        """Get current overlay position in image pixels.
+
+        Returns:
+            QPoint of overlay position
+        """
+        return QPoint(self._overlay_position)
+
+    def has_overlay(self) -> bool:
+        """Check if overlay is active.
+
+        Returns:
+            True if overlay image is set and visible
+        """
+        return self._overlay_visible and self._overlay_image is not None

@@ -94,6 +94,8 @@ class MockEditWorkspace(QWidget):
         self.saveProjectRequested.connect = Mock()
         self.loadProjectRequested = Mock()
         self.loadProjectRequested.connect = Mock()
+        self.arrangeClicked = Mock()
+        self.arrangeClicked.connect = Mock()
 
         # Mock icon toolbar
         self.icon_toolbar = Mock()
@@ -103,10 +105,28 @@ class MockEditWorkspace(QWidget):
         # Added to satisfy ROMWorkflowController
         self.palette_panel = None
 
+        # Overlay panel (for image import alignment)
+        self.overlay_panel = Mock()
+        self.overlay_panel.importRequested = Mock()
+        self.overlay_panel.importRequested.connect = Mock()
+        self.overlay_panel.applyRequested = Mock()
+        self.overlay_panel.applyRequested.connect = Mock()
+        self.overlay_panel.cancelRequested = Mock()
+        self.overlay_panel.cancelRequested.connect = Mock()
+        self.overlay_panel.baseOpacityChanged = Mock()
+        self.overlay_panel.baseOpacityChanged.connect = Mock()
+        self.overlay_panel.overlayOpacityChanged = Mock()
+        self.overlay_panel.overlayOpacityChanged.connect = Mock()
+        self.overlay_panel.positionChanged = Mock()
+        self.overlay_panel.positionChanged.connect = Mock()
+
     def set_controller(self, ctrl):
         pass
 
     def set_save_project_enabled(self, enabled: bool) -> None:
+        pass
+
+    def set_arrange_enabled(self, enabled: bool) -> None:
         pass
 
 

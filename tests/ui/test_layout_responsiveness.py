@@ -30,6 +30,16 @@ class MockPanel(QWidget):
     tileGridToggled = Signal(bool)
     palettePreviewToggled = Signal(bool)
     backgroundChanged = Signal(str)  # background name
+    importClicked = Signal()
+    revertClicked = Signal()
+    arrangeClicked = Signal()
+    # OverlayPanel signals
+    importRequested = Signal()
+    applyRequested = Signal()
+    cancelRequested = Signal()
+    baseOpacityChanged = Signal(int)
+    overlayOpacityChanged = Signal(int)
+    positionChanged = Signal(int, int)
     # PalettePanel signals
     sourceChanged = Signal(str)
     loadPaletteClicked = Signal()
@@ -62,6 +72,10 @@ class MockPanel(QWidget):
         self.set_export_visible = Mock()
         # PalettePanel methods
         self.add_palette_source = Mock()
+        # OverlayPanel methods
+        self.set_overlay_active = Mock()
+        self.update_position = Mock()
+        self.reset = Mock()
 
     @property
     def controller(self):
@@ -129,6 +143,7 @@ class TestLayoutResponsiveness:
             patch("ui.sprite_editor.views.workspaces.edit_workspace.PalettePanel", MockPanel),
             patch("ui.sprite_editor.views.workspaces.edit_workspace.PreviewPanel", MockPanel),
             patch("ui.sprite_editor.views.workspaces.edit_workspace.SaveExportPanel", MockPanel),
+            patch("ui.sprite_editor.views.workspaces.edit_workspace.OverlayPanel", MockPanel),
         ):
             edit_tab = EditTab()
 
