@@ -545,8 +545,16 @@ class GridArrangementDialog(SplitterDialog):
 
     def _on_arrangement_width_changed(self, value: int):
         """Handle arrangement width change"""
+        # Update the arrangement manager's target width for auto-placement FIRST
+        # (before UI updates that may fail in test environments)
+        if self.arrangement_manager:
+            self.arrangement_manager.set_target_width(value)
         if hasattr(self, "arrangement_grid"):
-            self.arrangement_grid.set_grid_dimensions(value, 32, self.processor.tile_width, self.processor.tile_height)
+            try:
+                self.arrangement_grid.set_grid_dimensions(value, 32, self.processor.tile_width, self.processor.tile_height)
+            except RuntimeError:
+                # Grid items may be deleted during shutdown/test teardown
+                pass
         self._update_preview()
 
     def _add_all_tiles(self):
@@ -622,8 +630,10 @@ class GridArrangementDialog(SplitterDialog):
 
     def _on_tile_clicked(self, tile_pos: TilePosition) -> None:
         """Handle single tile click in source grid"""
+        mode = self.grid_view.selection_mode
+
         # In tile mode, immediately add/remove the tile
-        if self.grid_view.selection_mode == SelectionMode.TILE:
+        if mode == SelectionMode.TILE:
             if self.arrangement_manager.is_tile_arranged(tile_pos):
                 # Find where it is and remove it
                 mapping = self.arrangement_manager.get_grid_mapping()
@@ -631,7 +641,7 @@ class GridArrangementDialog(SplitterDialog):
                 for (tr, tc), (arr_type, key) in mapping.items():
                     if arr_type == ArrangementType.TILE and key == f"{tile_pos.row},{tile_pos.col}":
                         items_to_remove.append((tr, tc))
-                
+
                 if items_to_remove:
                     command = CanvasRemoveMultipleItemsCommand(
                         manager=self.arrangement_manager,
@@ -640,20 +650,61 @@ class GridArrangementDialog(SplitterDialog):
                     self.undo_stack.push(command)
             else:
                 # Add to next available slot using command
-                # We need to find the target position first to use CanvasPlaceItemsCommand
-                # BUT AddMultipleTilesCommand (which wraps _add_tile_no_history) handles finding the slot.
-                # However, AddTileCommand is for single tile. Let's use AddMultipleTilesCommand for consistency
-                # or just AddTileCommand if we have it (we don't import it, but we can).
-                # Wait, we import AddMultipleTilesCommand. Let's use that.
-                
                 command = AddMultipleTilesCommand(
                     manager=self.arrangement_manager,
                     tiles=[tile_pos],
                 )
                 self.undo_stack.push(command)
 
-        # Highlight in canvas if already arranged
-        # (Implementation of canvas highlighting could go here)
+        # In ROW mode, add/remove the entire row
+        elif mode == SelectionMode.ROW:
+            row_tiles = self.arrangement_manager.get_row_tiles(tile_pos.row)
+            self._toggle_tiles_arrangement(row_tiles, f"row {tile_pos.row}")
+
+        # In COLUMN mode, add/remove the entire column
+        elif mode == SelectionMode.COLUMN:
+            col_tiles = self.arrangement_manager.get_column_tiles(tile_pos.col)
+            self._toggle_tiles_arrangement(col_tiles, f"column {tile_pos.col}")
+
+        # RECTANGLE mode: no click-to-add, only marquee selection
+
+    def _toggle_tiles_arrangement(self, tiles: list[TilePosition], description: str) -> None:
+        """Toggle a group of tiles between arranged/unarranged state.
+
+        Args:
+            tiles: List of tile positions to toggle
+            description: Human-readable description for status message (e.g., "row 0", "column 3")
+        """
+        # Check if ALL tiles are already arranged
+        all_arranged = all(self.arrangement_manager.is_tile_arranged(t) for t in tiles)
+
+        if all_arranged:
+            # Remove all - find their canvas positions
+            mapping = self.arrangement_manager.get_grid_mapping()
+            items_to_remove = []
+            for tile in tiles:
+                key = f"{tile.row},{tile.col}"
+                for (tr, tc), (arr_type, k) in mapping.items():
+                    if arr_type == ArrangementType.TILE and k == key:
+                        items_to_remove.append((tr, tc))
+
+            if items_to_remove:
+                command = CanvasRemoveMultipleItemsCommand(
+                    manager=self.arrangement_manager,
+                    items_to_remove=items_to_remove,
+                )
+                self.undo_stack.push(command)
+                self._update_status(f"Removed {description}")
+        else:
+            # Add unarranged tiles
+            tiles_to_add = [t for t in tiles if not self.arrangement_manager.is_tile_arranged(t)]
+            if tiles_to_add:
+                command = AddMultipleTilesCommand(
+                    manager=self.arrangement_manager,
+                    tiles=tiles_to_add,
+                )
+                self.undo_stack.push(command)
+                self._update_status(f"Added {description}")
 
     def _on_tiles_selected(self, tiles: list[TilePosition]) -> None:
         """Handle tile selection"""
@@ -847,6 +898,10 @@ class GridArrangementDialog(SplitterDialog):
             new_grid_mapping=new_grid_mapping,
         )
         self.undo_stack.push(command)
+
+        # Sync width_spin to source grid columns for consistent 1:1 mapping
+        source_cols = self.grid_view.grid_cols
+        self.width_spin.setValue(source_cols)
 
         self.grid_view.clear_selection()
         self._update_status("Reset layout to 1:1 mapping")
@@ -1387,12 +1442,15 @@ class GridArrangementDialog(SplitterDialog):
         elif key == Qt.Key.Key_G:
             # Toggle grid (already handled by view)
             pass
-        elif key == Qt.Key.Key_C:
-            # Toggle palette
+        elif key == Qt.Key.Key_O:
+            # Toggle palette (O for colorize On/Off)
             self.toggle_palette_application()
         elif key == Qt.Key.Key_P and self.colorizer.is_palette_mode():
             # Cycle palette
             self._cycle_palette()
+        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            # Add selection (advertised in legend/tooltip)
+            self._add_selection()
         elif key == Qt.Key.Key_Delete:
             # Remove selection
             self._remove_selection()

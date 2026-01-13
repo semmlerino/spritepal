@@ -82,6 +82,33 @@ class GridArrangementManager(QObject):
         # This allows free placement and dragging in the arrangement grid
         self._grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = {}
 
+        # Target width for auto-placement (used by add_tile and _add_tile_no_history)
+        self._target_width: int = 16
+
+    def set_target_width(self, width: int) -> None:
+        """Set the target sheet width for auto-placement.
+
+        Args:
+            width: Target width in tiles (clamped to 1-64)
+        """
+        self._target_width = max(1, min(64, width))
+
+    def _find_next_empty_slot(self) -> tuple[int, int]:
+        """Find the next empty slot in the grid mapping using target_width.
+
+        Returns:
+            Tuple of (row, col) for the next empty slot
+        """
+        if not self._grid_mapping:
+            return (0, 0)
+
+        max_row = max(p[0] for p in self._grid_mapping)
+        for r in range(max_row + 2):
+            for c in range(self._target_width):
+                if (r, c) not in self._grid_mapping:
+                    return (r, c)
+        return (max_row + 1, 0)
+
     def set_item_at(self, target_row: int, target_col: int, arr_type: ArrangementType, key: str) -> bool:
         """Place an arrangement item at a specific grid position on the canvas.
 
@@ -165,29 +192,8 @@ class GridArrangementManager(QObject):
         if position in self._tile_set or position in self._tile_to_group:
             return False
 
-        # Find next available slot in grid mapping (simple append logic for non-drag adds)
-        target_row = 0
-        target_col = 0
-        if self._grid_mapping:
-            # For simplicity, we can't easily know "arrangement width" here,
-            # so we just find the highest row/col and increment.
-            # But usually add_tile is called by double-click.
-            # Let's just find the first empty slot in row-major order.
-            found = False
-            # Assume a reasonable search width, or just append to end
-            max_r = max(p[0] for p in self._grid_mapping) if self._grid_mapping else 0
-            # We don't know the preferred width here, so let's just use the current grid_cols
-            # from the source as a hint, or just 16.
-            width_hint = 16
-
-            for r in range(max_r + 2):
-                for c in range(width_hint):
-                    if (r, c) not in self._grid_mapping:
-                        target_row, target_col = r, c
-                        found = True
-                        break
-                if found:
-                    break
+        # Find next available slot using the configured target width
+        target_row, target_col = self._find_next_empty_slot()
 
         item = (ArrangementType.TILE, f"{position.row},{position.col}")
         self._grid_mapping[(target_row, target_col)] = item
@@ -553,6 +559,7 @@ class GridArrangementManager(QObject):
         """Add a tile without triggering undo history.
 
         Called by command execution, not directly by user actions.
+        Also updates _grid_mapping for unified arrangement models.
 
         Args:
             tile: The tile position to add
@@ -566,9 +573,14 @@ class GridArrangementManager(QObject):
         if tile in self._tile_set or tile in self._tile_to_group:
             return False
 
+        # Find next available slot and update grid mapping
+        target_row, target_col = self._find_next_empty_slot()
+        item = (ArrangementType.TILE, f"{tile.row},{tile.col}")
+        self._grid_mapping[(target_row, target_col)] = item
+
         self._arranged_tiles.append(tile)
         self._tile_set.add(tile)
-        self._arrangement_order.append((ArrangementType.TILE, f"{tile.row},{tile.col}"))
+        self._arrangement_order.append(item)
 
         self.tile_added.emit(tile)
         self.arrangement_changed.emit()
@@ -579,6 +591,7 @@ class GridArrangementManager(QObject):
 
         Called by command execution, not directly by user actions.
         Note: Does NOT handle group membership - caller must handle that.
+        Also removes from _grid_mapping for unified arrangement models.
 
         Args:
             tile: The tile position to remove
@@ -592,11 +605,19 @@ class GridArrangementManager(QObject):
         self._arranged_tiles.remove(tile)
         self._tile_set.remove(tile)
 
-        # Remove from arrangement order
+        # Remove from arrangement order and grid mapping
         tile_key = f"{tile.row},{tile.col}"
         self._arrangement_order = [
             (t, k) for t, k in self._arrangement_order if not (t == ArrangementType.TILE and k == tile_key)
         ]
+
+        # Remove from grid mapping
+        positions_to_remove = [
+            pos for pos, (arr_type, key) in self._grid_mapping.items()
+            if arr_type == ArrangementType.TILE and key == tile_key
+        ]
+        for pos in positions_to_remove:
+            del self._grid_mapping[pos]
 
         self.tile_removed.emit(tile)
         self.arrangement_changed.emit()
