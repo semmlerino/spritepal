@@ -16,7 +16,7 @@ from typing import cast
 
 logger = logging.getLogger(__name__)
 
-FORMAT_VERSION = "1.0"
+FORMAT_VERSION = "1.1"  # Added overlay state fields
 
 
 @dataclass
@@ -35,6 +35,13 @@ class ArrangementConfig:
     groups: list[dict[str, object]]
     total_tiles: int
     logical_width: int
+    # Overlay state (added in v1.1)
+    overlay_path: str | None = None
+    overlay_x: int = 0
+    overlay_y: int = 0
+    overlay_opacity: float = 0.5
+    overlay_visible: bool = True
+    # Timestamps
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_modified: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -102,6 +109,13 @@ class ArrangementConfig:
             "groups": self.groups,
             "total_tiles": self.total_tiles,
             "logical_width": self.logical_width,
+            # Overlay state
+            "overlay_path": self.overlay_path,
+            "overlay_x": self.overlay_x,
+            "overlay_y": self.overlay_y,
+            "overlay_opacity": self.overlay_opacity,
+            "overlay_visible": self.overlay_visible,
+            # Timestamps
             "created_at": self.created_at.isoformat(),
             "last_modified": self.last_modified.isoformat(),
         }
@@ -131,7 +145,7 @@ class ArrangementConfig:
         """
         data = json.loads(path.read_text(encoding="utf-8"))
 
-        # Validate format version
+        # Validate format version (warn but allow older versions)
         version = data.get("format_version", "0.0")
         if version != FORMAT_VERSION:
             logger.warning(
@@ -149,6 +163,13 @@ class ArrangementConfig:
             groups=data.get("groups", []),
             total_tiles=data["total_tiles"],
             logical_width=data["logical_width"],
+            # Overlay state (v1.1+, defaults for older files)
+            overlay_path=data.get("overlay_path"),
+            overlay_x=data.get("overlay_x", 0),
+            overlay_y=data.get("overlay_y", 0),
+            overlay_opacity=data.get("overlay_opacity", 0.5),
+            overlay_visible=data.get("overlay_visible", True),
+            # Timestamps
             created_at=datetime.fromisoformat(data["created_at"]),
             last_modified=datetime.fromisoformat(data["last_modified"]),
         )
