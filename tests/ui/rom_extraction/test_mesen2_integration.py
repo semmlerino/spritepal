@@ -141,6 +141,7 @@ class TestMesen2Integration:
     ) -> None:
         """Widget signals still work after module connection."""
         from PySide6.QtWidgets import QListWidget
+
         mesen2_module.connect_to_widget(captures_widget)
 
         # Add a capture manually

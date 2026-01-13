@@ -280,7 +280,9 @@ class RecentCapturesWidget(QWidget):
         time_str = capture.timestamp.strftime("%H:%M:%S")
         frame_str = f" (f{capture.frame})" if capture.frame else ""
         item.setText(f"{capture.offset_hex}  {time_str}{frame_str}")
-        item.setToolTip(f"ROM Offset: 0x{rom_offset:06X}\nMesen FILE: {capture.offset_hex}\nFrame: {capture.frame or 'N/A'}\n{capture.raw_line}")
+        item.setToolTip(
+            f"ROM Offset: 0x{rom_offset:06X}\nMesen FILE: {capture.offset_hex}\nFrame: {capture.frame or 'N/A'}\n{capture.raw_line}"
+        )
 
         self._list_widget.insertItem(0, item)
 

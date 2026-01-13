@@ -240,6 +240,7 @@ class TestPreviewPanel:
     def test_pil_to_pixmap_conversion(self, panel, test_grayscale_image):
         """Test PIL image to QPixmap conversion"""
         from core.services.image_utils import pil_to_qpixmap
+
         pixmap = pil_to_qpixmap(test_grayscale_image)
         assert pixmap is not None
         assert not pixmap.isNull()

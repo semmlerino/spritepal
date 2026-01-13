@@ -24,9 +24,9 @@ def dump_tile_bytes(rom_path: str, file_offset: int, tile_indices: list[int] | N
     if tile_indices is None:
         tile_indices = [0, 1, 2, 3]
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"TILE BYTE DUMP - FILE offset 0x{file_offset:06X}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     # Get header info
     header, smc_offset = ROMValidator.validate_rom_header(rom_path)
@@ -52,22 +52,23 @@ def dump_tile_bytes(rom_path: str, file_offset: int, tile_indices: list[int] | N
             continue
 
         start = tile_idx * 32
-        tile_bytes = decompressed[start:start + 32]
+        tile_bytes = decompressed[start : start + 32]
 
-        print(f"Tile {tile_idx} (bytes {start}-{start+31}):")
-        print(f"  Bitplanes 0-1 (bytes 0-15):")
+        print(f"Tile {tile_idx} (bytes {start}-{start + 31}):")
+        print("  Bitplanes 0-1 (bytes 0-15):")
         print(f"    {tile_bytes[0:8].hex(' ').upper()}")
         print(f"    {tile_bytes[8:16].hex(' ').upper()}")
-        print(f"  Bitplanes 2-3 (bytes 16-31):")
+        print("  Bitplanes 2-3 (bytes 16-31):")
         print(f"    {tile_bytes[16:24].hex(' ').upper()}")
         print(f"    {tile_bytes[24:32].hex(' ').upper()}")
-        print(f"  All 32 bytes (one line):")
+        print("  All 32 bytes (one line):")
         print(f"    {tile_bytes.hex(' ').upper()}")
         print()
 
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(description="Dump tile bytes for Mesen comparison")
     parser.add_argument("rom_path", help="Path to ROM file")
     parser.add_argument("file_offset", help="FILE offset (hex, e.g., 0x25AD84)")
