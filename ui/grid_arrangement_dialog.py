@@ -17,14 +17,12 @@ from PySide6.QtCore import QObject, QSignalBlocker, Qt
 from PySide6.QtGui import (
     QCloseEvent,
     QKeyEvent,
-    QPen,
     QPixmap,
 )
 from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFrame,
     QGraphicsPixmapItem,
-    QGraphicsRectItem,
     QGraphicsScene,
     QGroupBox,
     QHBoxLayout,
