@@ -249,11 +249,6 @@ class GridGraphicsView(QGraphicsView):
             pos = self.mapToScene(event.pos())
             tile_pos = self._pos_to_tile(pos)
 
-            # Start drag if clicking any valid tile
-            if tile_pos and self._is_valid_tile(tile_pos):
-                self._drag_start_pos = event.pos()
-                self._drag_tile = tile_pos
-
             # Ctrl+click: Toggle tile in selection (add/remove)
             if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
                 if tile_pos and self._is_valid_tile(tile_pos):
@@ -266,7 +261,13 @@ class GridGraphicsView(QGraphicsView):
                     self.tile_clicked.emit(tile_pos)
                 return
 
-            # Default: Start marquee selection (drag-to-select)
+            # Start drag if clicking on a valid tile
+            if tile_pos and self._is_valid_tile(tile_pos):
+                self._drag_start_pos = event.pos()
+                self._drag_tile = tile_pos
+                return  # Don't start marquee - let mouseMoveEvent decide based on drag distance
+
+            # Default: Start marquee selection on empty space (drag-to-select rectangle)
             self._start_marquee_selection(pos)
             return
 
@@ -666,6 +667,10 @@ class GridGraphicsView(QGraphicsView):
                 pos = self.mapToScene(event.pos())
                 self._finish_marquee_selection(pos, add_to)
                 return
+
+            # Clear drag state if drag didn't trigger
+            self._drag_tile = None
+            self._drag_start_pos = None
 
         if event and event.button() == Qt.MouseButton.MiddleButton and self.is_panning:
             self.is_panning = False
