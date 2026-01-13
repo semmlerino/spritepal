@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFileDialog,
     QFrame,
     QGridLayout,
@@ -138,6 +139,17 @@ class ImageImportDialog(DialogBase):
         self._transparency_checkbox.setToolTip("Map transparent pixels to color index 0")
         self._transparency_checkbox.stateChanged.connect(self._on_option_changed)
         options_layout.addWidget(self._transparency_checkbox)
+
+        # Background type selector for preview
+        bg_layout = QHBoxLayout()
+        bg_layout.addWidget(QLabel("Preview background:"))
+        self._bg_combo = QComboBox()
+        self._bg_combo.addItems(["Checkerboard", "Black", "White"])
+        self._bg_combo.setToolTip("Background color for transparent pixels in preview")
+        self._bg_combo.currentIndexChanged.connect(self._on_option_changed)
+        bg_layout.addWidget(self._bg_combo)
+        bg_layout.addStretch()
+        options_layout.addLayout(bg_layout)
 
         # Target size info
         if self._target_size:
@@ -312,23 +324,65 @@ class ImageImportDialog(DialogBase):
         # QImage doesn't keep the data, so we need to copy
         return QPixmap.fromImage(qimage.copy())
 
+    def _create_checkerboard(self, w: int, h: int, cell_size: int = 8) -> NDArray[np.uint8]:
+        """Create checkerboard pattern for transparency display.
+
+        Args:
+            w: Width in pixels
+            h: Height in pixels
+            cell_size: Size of each checker cell (default 8)
+
+        Returns:
+            RGBA numpy array with checkerboard pattern
+        """
+        import numpy as np
+
+        rgba = np.zeros((h, w, 4), dtype=np.uint8)
+        light = (220, 220, 220, 255)  # Match PixelCanvas colors
+        dark = (180, 180, 180, 255)
+
+        for y in range(h):
+            for x in range(w):
+                is_light = ((x // cell_size) + (y // cell_size)) % 2 == 0
+                rgba[y, x] = light if is_light else dark
+
+        return rgba
+
     def _indexed_to_pil(
         self,
         indexed: NDArray[np.uint8],
         palette: list[tuple[int, int, int]],
     ) -> Image.Image:
-        """Convert indexed array back to PIL Image for preview."""
+        """Convert indexed array to PIL Image with transparency background.
+
+        Uses the selected background type for transparent pixels (index 0).
+        """
         import numpy as np
         from PIL import Image
 
         h, w = indexed.shape
-        rgb = np.zeros((h, w, 3), dtype=np.uint8)
+        bg_type = self._bg_combo.currentText().lower()
 
+        # Create background based on selection
+        if bg_type == "checkerboard":
+            rgba = self._create_checkerboard(w, h)
+        elif bg_type == "white":
+            rgba = np.full((h, w, 4), 255, dtype=np.uint8)
+        else:  # black
+            rgba = np.zeros((h, w, 4), dtype=np.uint8)
+            rgba[:, :, 3] = 255  # Opaque black
+
+        # Apply palette colors for non-transparent pixels
         for i, color in enumerate(palette):
+            if i == 0:  # Index 0 = transparent, keep background
+                continue
             mask = indexed == i
-            rgb[mask] = color
+            rgba[mask, 0] = color[0]
+            rgba[mask, 1] = color[1]
+            rgba[mask, 2] = color[2]
+            rgba[mask, 3] = 255
 
-        return Image.fromarray(rgb, mode="RGB")
+        return Image.fromarray(rgba, mode="RGBA")
 
     @override
     def accept(self) -> None:
