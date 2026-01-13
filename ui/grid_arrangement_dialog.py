@@ -1148,12 +1148,28 @@ class GridArrangementDialog(SplitterDialog):
 
     def _update_displays(self):
         """Update all display elements"""
+        # Update source grid image (palette application)
+        self._update_source_grid_image()
+
         # Update source grid view (highlights/dimming)
         arranged_tiles = self.arrangement_manager.get_arranged_tiles()
         self.grid_view.highlight_arranged_tiles(arranged_tiles, manager=self.arrangement_manager)
 
         # Update arrangement canvas
         self._update_arrangement_canvas()
+
+    def _update_source_grid_image(self):
+        """Update the source grid image based on palette mode."""
+        if self.original_image is None or self.pixmap_item is None:
+            return
+
+        # Use -1 as row index for full image to leverage existing caching in PaletteColorizer
+        # This will return the colorized version if palette mode is on, or original if off
+        display_image = self.colorizer.get_display_image(-1, self.original_image)
+
+        # Update the pixmap item
+        pixmap = self._create_pixmap_from_image(display_image)
+        self.pixmap_item.setPixmap(pixmap)
 
     def _on_palette_toggle_clicked(self, checked: bool):
         """Handle palette toggle button click."""
