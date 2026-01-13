@@ -162,3 +162,25 @@ class TestGridArrangementUXFixes:
         qtbot.mouseClick(dialog._legend_toggle_btn, Qt.MouseButton.LeftButton)
         assert dialog._legend_content.isVisible()
         assert dialog._legend_toggle_btn.isChecked()
+
+    def test_palette_toggle_button(self, dialog: GridArrangementDialog, qtbot: QtBot):
+        """Verify palette toggle button works and syncs with C key."""
+        dialog.show()
+        qtbot.waitForWindowShown(dialog)
+
+        # Verify button exists
+        assert hasattr(dialog, "palette_toggle_btn")
+        btn = dialog.palette_toggle_btn
+
+        # Initial state (should match colorizer, usually False)
+        assert btn.isChecked() == dialog.colorizer.is_palette_mode()
+
+        # Click button to toggle ON
+        qtbot.mouseClick(btn, Qt.MouseButton.LeftButton)
+        assert btn.isChecked()
+        assert dialog.colorizer.is_palette_mode()
+
+        # Press C to toggle OFF
+        qtbot.keyClick(dialog, Qt.Key.Key_C)
+        assert not dialog.colorizer.is_palette_mode()
+        assert not btn.isChecked()  # Should sync back

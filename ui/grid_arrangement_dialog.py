@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ui.sprite_editor.services.arrangement_bridge import ArrangementBridge
 
 from PIL import Image
-from PySide6.QtCore import QObject, Qt
+from PySide6.QtCore import QObject, QSignalBlocker, Qt
 from PySide6.QtGui import (
     QCloseEvent,
     QKeyEvent,
@@ -42,7 +42,7 @@ from core.arrangement_persistence import ArrangementConfig
 from core.services.image_utils import pil_to_qimage
 from ui.common.signal_utils import safe_disconnect
 from ui.common.spacing_constants import SPACING_COMPACT_SMALL
-from ui.components.visualization import GridGraphicsView, ScrollablePreviewGroup
+from ui.components.visualization import GridGraphicsView
 
 from .components import SplitterDialog
 from .row_arrangement import OverlayControls, OverlayLayer, PaletteColorizer
@@ -237,7 +237,7 @@ class GridArrangementDialog(SplitterDialog):
 
         # Add arrangement grid
         grid_group = self._create_arrangement_grid_group(right_widget)
-        right_layout.addWidget(grid_group, 2)  # Give more stretch to canvas
+        right_layout.addWidget(grid_group, 1)  # Give all stretch to canvas
 
         # Add overlay controls and Apply button
         overlay_group = QGroupBox("Overlay Reference", right_widget)
@@ -258,10 +258,6 @@ class GridArrangementDialog(SplitterDialog):
 
         right_layout.addWidget(overlay_group)
 
-        # Add preview
-        preview_group = self._create_preview_group(right_widget)
-        right_layout.addWidget(preview_group, 1)
-
         return right_widget
 
     def _create_arrangement_grid_group(self, parent: QWidget) -> QGroupBox:
@@ -273,7 +269,7 @@ class GridArrangementDialog(SplitterDialog):
         Returns:
             QGroupBox: The configured arrangement grid group
         """
-        grid_group = QGroupBox("Current Arrangement", parent)
+        grid_group = QGroupBox("Arrangement Grid", parent)
         grid_layout = QVBoxLayout()
 
         # Create arrangement scene and view
@@ -438,6 +434,18 @@ class GridArrangementDialog(SplitterDialog):
         _ = self.reset_layout_btn.clicked.connect(self._reset_layout)
         layout.addWidget(self.reset_layout_btn)
 
+        # Separator
+        sep3 = QFrame()
+        sep3.setFrameShape(QFrame.Shape.VLine)
+        sep3.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(sep3)
+
+        self.palette_toggle_btn = QPushButton("Palette Preview", self)
+        self.palette_toggle_btn.setCheckable(True)
+        self.palette_toggle_btn.setToolTip("Toggle palette preview on/off [C]")
+        _ = self.palette_toggle_btn.toggled.connect(self._on_palette_toggle_clicked)
+        layout.addWidget(self.palette_toggle_btn)
+
         layout.addStretch()
 
         # Add collapsible shortcut legend
@@ -532,23 +540,6 @@ class GridArrangementDialog(SplitterDialog):
         self.zoom_reset_btn.setToolTip("Reset zoom to 1:1 [Ctrl+0]")
         layout.addWidget(self.zoom_reset_btn)
 
-    def _create_preview_group(self, parent: QWidget) -> ScrollablePreviewGroup:
-        """Create the preview group with scrollable area.
-
-        Args:
-            parent: Parent widget for the group
-
-        Returns:
-            ScrollablePreviewGroup: The configured preview group
-        """
-        preview_group = ScrollablePreviewGroup(
-            title="Arrangement Preview",
-            with_styling=True,
-            parent=parent,
-        )
-        self.preview_label = preview_group.preview_label
-        return preview_group
-
     def _on_arrangement_width_changed(self, value: int):
         """Handle arrangement width change"""
         # Update the arrangement manager's target width for auto-placement FIRST
@@ -563,7 +554,7 @@ class GridArrangementDialog(SplitterDialog):
             except RuntimeError:
                 # Grid items may be deleted during shutdown/test teardown
                 pass
-        self._update_preview()
+        # self._update_preview()  # Preview removed
 
     def _add_all_tiles(self):
         """Add all tiles from the grid to the arrangement"""
@@ -960,6 +951,10 @@ class GridArrangementDialog(SplitterDialog):
 
     def _on_palette_mode_changed(self, enabled: bool):
         """Handle palette mode change"""
+        if hasattr(self, "palette_toggle_btn") and self.palette_toggle_btn.isChecked() != enabled:
+            # Block signals to avoid feedback loop if setChecked triggers toggled
+            with QSignalBlocker(self.palette_toggle_btn):
+                self.palette_toggle_btn.setChecked(enabled)
         self._update_displays()
 
     def toggle_palette_application(self) -> None:
@@ -1160,8 +1155,10 @@ class GridArrangementDialog(SplitterDialog):
         # Update arrangement canvas
         self._update_arrangement_canvas()
 
-        # Update preview
-        self._update_preview()
+    def _on_palette_toggle_clicked(self, checked: bool):
+        """Handle palette toggle button click."""
+        if checked != self.colorizer.is_palette_mode():
+            self.toggle_palette_application()
 
     def _update_arrangement_canvas(self):
         """Update the arrangement canvas view"""
@@ -1220,42 +1217,6 @@ class GridArrangementDialog(SplitterDialog):
         if img:
             return self._create_pixmap_from_image(img)
         return None
-
-    def _update_preview(self):
-        """Update the arrangement preview"""
-        width = self.width_spin.value() if hasattr(self, "width_spin") else min(16, self.processor.grid_cols)
-
-        # Get all arranged tiles with their images
-        arranged_tiles = self.arrangement_manager.get_arranged_tiles()
-        tiles_with_images = []
-        for t in arranged_tiles:
-            if t in self.tiles:
-                tiles_with_images.append((t, self.tiles[t]))
-
-        arranged_image = self.preview_generator._create_arranged_image_with_spacing(
-            tiles_with_images,
-            self.processor.tile_width,
-            self.processor.tile_height,
-            width,
-            spacing=2,
-        )
-
-        if arranged_image:
-            pixmap = self._create_pixmap_from_image(arranged_image)
-            # Scale for preview
-            scaled = pixmap.scaled(
-                pixmap.width() * 2,
-                pixmap.height() * 2,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            )
-            if self.preview_label:
-                self.preview_label.setPixmap(scaled)
-        else:
-            if self.preview_label:
-                self.preview_label.clear()
-            if self.preview_label:
-                self.preview_label.setText("No arrangement")
 
     def _create_pixmap_from_image(self, image: Image.Image) -> QPixmap:
         """Convert PIL Image to QPixmap using centralized utility."""
