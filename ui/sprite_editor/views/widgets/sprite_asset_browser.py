@@ -454,6 +454,9 @@ class SpriteAssetBrowser(QWidget):
         # Connect to capture new name
         def on_item_changed(changed_item: QTreeWidgetItem, column: int) -> None:
             if changed_item == item:
+                # Disconnect FIRST to prevent recursion from setFlags triggering itemChanged
+                self.tree.itemChanged.disconnect(on_item_changed)
+
                 data = item.data(0, Qt.ItemDataRole.UserRole)
                 if isinstance(data, dict) and "offset" in data:
                     new_name = item.text(0)
@@ -466,9 +469,8 @@ class SpriteAssetBrowser(QWidget):
 
                     self.rename_requested.emit(offset, new_name)
 
-                # Disable editing after rename
+                # Disable editing after rename (safe now that handler is disconnected)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                self.tree.itemChanged.disconnect(on_item_changed)
 
         self.tree.itemChanged.connect(on_item_changed)
 
