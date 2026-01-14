@@ -854,6 +854,7 @@ class ROMWorkflowController(QObject):
         self._clear_arrangement()  # Clear arrangement when changing offset
         if self._view:
             self._view.set_offset(offset)
+            self._view.hide_palette_warning()
 
         # Emit change for external listeners (e.g. MainWindow toolbar)
         self.offset_changed.emit(offset)
@@ -1854,6 +1855,8 @@ class ROMWorkflowController(QObject):
                 if self._view:
                     self._view.set_action_text("Save to ROM")
                     self._view.set_workflow_state("edit")
+                    # Clear undo history so set_offset doesn't prompt again
+                    self._editing_controller.undo_manager.clear()
                     # Trigger a re-preview to verify
                     self.set_offset(self.current_offset)
             else:

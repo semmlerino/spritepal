@@ -38,7 +38,7 @@ class EditingController(QObject):
     paletteSourceAdded = Signal(str, str, int, object, bool)  # name, type, index, colors, is_active
     paletteSourceSelected = Signal(str, int)  # source_type, palette_index
     # Signal to clear all palettes of a specific type from views
-    clearRomSources = Signal()
+    paletteSourcesCleared = Signal(str)  # source_type ("rom", "mesen", or "all")
     # Emitted when ROM validation state changes: (is_valid, list of error messages)
     validationChanged = Signal(bool, list)
 
@@ -179,6 +179,9 @@ class EditingController(QObject):
         self.palette_model.from_rgb_list(colors)
         if name:
             self.palette_model.name = name
+
+        # Default to custom source when palette is set directly
+        self._current_palette_source = None
         self.paletteChanged.emit()
 
     def load_image(self, data: np.ndarray, palette: list[tuple[int, int, int]] | None = None) -> None:
@@ -243,6 +246,7 @@ class EditingController(QObject):
 
         # Emit signals
         self.imageChanged.emit()
+        self.paletteSourceSelected.emit("", -1)
         self._emit_undo_state()
 
         return True
@@ -400,16 +404,14 @@ class EditingController(QObject):
         """
         if source_type is None:
             self._palette_sources.clear()
-            self.clearRomSources.emit()
-            # Also need signals for other types if they are handled separately
+            self.paletteSourcesCleared.emit("all")
         else:
             # Create list of keys to remove to avoid mutation during iteration
             to_remove = [k for k in self._palette_sources if k[0] == source_type]
             for k in to_remove:
                 del self._palette_sources[k]
 
-            if source_type == "rom":
-                self.clearRomSources.emit()
+            self.paletteSourcesCleared.emit(source_type)
 
     def register_palette_source(
         self,
@@ -434,7 +436,7 @@ class EditingController(QObject):
 
     def handle_palette_source_changed(self, source_type: str, index: int) -> None:
         """Handle palette source selection change."""
-        self._current_palette_source = (source_type, index)
+        key = (source_type, index)
         try:
             if source_type == "default":
                 from ui.sprite_editor import get_default_snes_palette
@@ -442,12 +444,14 @@ class EditingController(QObject):
                 colors = get_default_snes_palette()
                 self.set_palette(colors, "Default SNES")
             elif source_type in ("mesen", "rom", "preset", "file"):
-                key = (source_type, index)
                 if key in self._palette_sources:
                     colors, name = self._palette_sources[key]
                     self.set_palette(colors, name)
             else:
                 logger.warning(f"Unknown palette source type: {source_type}")
+            
+            # Restore source tracker (cleared by set_palette)
+            self._current_palette_source = key
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
 
@@ -608,7 +612,9 @@ class EditingController(QObject):
             if color.isValid():
                 new_rgb = (color.red(), color.green(), color.blue())
                 self.palette_model.set_color(self._selected_color, new_rgb)
+                self._current_palette_source = None
                 self.paletteChanged.emit()
+                self.paletteSourceSelected.emit("", -1)
         except Exception as e:
             QMessageBox.critical(parent, "Error", f"Failed to edit color: {e}")
 

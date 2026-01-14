@@ -191,9 +191,15 @@ class PaletteSourceSelector(QWidget):
         """Set the selected palette source.
 
         Args:
-            source_type: Type of source ("default" or "mesen")
-            palette_index: Palette index (0-7)
+            source_type: Type of source ("default", "mesen", "rom", or "" for custom)
+            palette_index: Palette index
         """
+        if not source_type:
+            # Handle custom/modified state
+            index = self._ensure_custom_item()
+            self._combo_box.setCurrentIndex(index)
+            return
+
         for i in range(self._combo_box.count()):
             if (
                 self._combo_box.itemData(i, self._SOURCE_TYPE_ROLE) == source_type
@@ -201,6 +207,30 @@ class PaletteSourceSelector(QWidget):
             ):
                 self._combo_box.setCurrentIndex(i)
                 return
+
+    def _ensure_custom_item(self) -> int:
+        """Ensure a '[Modified]' entry exists in the combo box.
+
+        Returns the index of the custom item.
+        """
+        # Check if already exists
+        for i in range(self._combo_box.count()):
+            if self._combo_box.itemData(i, self._SOURCE_TYPE_ROLE) == "":
+                return i
+
+        # Insert before the separator (keeping Manual at the end)
+        if self._separator_index >= 0:
+            self._combo_box.insertItem(self._separator_index, "[Modified]")
+            index = self._separator_index
+            # Update separator index since we inserted before it
+            self._separator_index += 1
+        else:
+            self._combo_box.addItem("[Modified]")
+            index = self._combo_box.count() - 1
+
+        self._combo_box.setItemData(index, "", self._SOURCE_TYPE_ROLE)
+        self._combo_box.setItemData(index, -1, self._PALETTE_INDEX_ROLE)
+        return index
 
     def add_palette_source(
         self,

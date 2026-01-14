@@ -251,6 +251,20 @@ class PalettePanel(QWidget):
         self._palette_descriptions.clear()
         self._view_all_btn.setEnabled(False)
 
+    def clear_palette_sources(self, source_type: str) -> None:
+        """Clear palette sources of a specific type.
+
+        Args:
+            source_type: "rom", "mesen", or "all"
+        """
+        if source_type == "rom":
+            self.clear_rom_sources()
+        elif source_type == "mesen":
+            self.clear_mesen_sources()
+        elif source_type == "all":
+            self.clear_rom_sources()
+            self.clear_mesen_sources()
+
     def _show_palette_gallery(self) -> None:
         """Show the palette gallery popup."""
         from ..dialogs import PaletteGalleryPopup

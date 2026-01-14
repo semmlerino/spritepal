@@ -36,7 +36,7 @@ def test_ready_for_inject_hidden_in_rom_mode(qtbot):
         colorChanged = Signal(int)
         paletteSourceAdded = Signal(str, str, int, object, bool)
         paletteSourceSelected = Signal(str, int)
-        clearRomSources = Signal()
+        paletteSourcesCleared = Signal(str)
 
         def __init__(self):
             super().__init__()
