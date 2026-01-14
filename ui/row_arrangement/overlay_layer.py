@@ -249,7 +249,13 @@ class OverlayLayer(QObject):
                 if not self.import_image(image_path):
                     return False
 
-            # Restore position
+            # Restore scale BEFORE position - set_scale adjusts position to maintain
+            # visual center, so position must be set after scale
+            scale = state.get("scale", 1.0)
+            if isinstance(scale, (int, float)):
+                self.set_scale(float(scale))
+
+            # Restore position AFTER scale to avoid it being overwritten
             x = state.get("x", 0.0)
             y = state.get("y", 0.0)
             if isinstance(x, (int, float)) and isinstance(y, (int, float)):
@@ -259,11 +265,6 @@ class OverlayLayer(QObject):
             opacity = state.get("opacity", 0.5)
             if isinstance(opacity, (int, float)):
                 self.set_opacity(float(opacity))
-
-            # Restore scale
-            scale = state.get("scale", 1.0)
-            if isinstance(scale, (int, float)):
-                self.set_scale(float(scale))
 
             # Restore visibility
             visible = state.get("visible", True)
