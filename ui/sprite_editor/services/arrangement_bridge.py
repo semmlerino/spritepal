@@ -235,19 +235,31 @@ class ArrangementBridge:
     def physical_to_logical(self, physical_data: NDArray[np.uint8]) -> NDArray[np.uint8]:
         """Transform physical layout image to logical (arranged) layout.
 
+        Non-arranged tiles are preserved at their original positions (identity mapping)
+        to ensure the full canvas is maintained when only a subset of tiles is arranged.
+
         Args:
             physical_data: Image data in original physical layout (H, W)
 
         Returns:
-            Image data rearranged into logical layout
+            Image data rearranged into logical layout, preserving non-arranged tiles
         """
         if not self.has_arrangement:
             return physical_data.copy()
 
         logical_h = self._logical_height * self._tile_height
         logical_w = self._logical_width * self._tile_width
-        logical_data = np.zeros((logical_h, logical_w), dtype=np.uint8)
 
+        # Start with zeros but copy original data as baseline (identity mapping).
+        # This preserves non-arranged tiles at their original positions.
+        logical_data = np.zeros((logical_h, logical_w), dtype=np.uint8)
+        physical_h, physical_w = physical_data.shape
+        copy_h = min(physical_h, logical_h)
+        copy_w = min(physical_w, logical_w)
+        logical_data[:copy_h, :copy_w] = physical_data[:copy_h, :copy_w]
+
+        # Now apply arrangement transformations for arranged tiles.
+        # This overwrites identity-mapped tiles at their new positions.
         for mapping in self._mappings:
             # Source tile coordinates in physical image
             phys_y = mapping.physical_pos.row * self._tile_height
