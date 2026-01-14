@@ -404,7 +404,7 @@ class EditingController(QObject):
             # Also need signals for other types if they are handled separately
         else:
             # Create list of keys to remove to avoid mutation during iteration
-            to_remove = [k for k in self._palette_sources.keys() if k[0] == source_type]
+            to_remove = [k for k in self._palette_sources if k[0] == source_type]
             for k in to_remove:
                 del self._palette_sources[k]
 

@@ -72,6 +72,7 @@ class MockPanel(QWidget):
         self.set_export_visible = Mock()
         # PalettePanel methods
         self.add_palette_source = Mock()
+        self.clear_rom_sources = Mock()
         # OverlayPanel methods
         self.set_overlay_active = Mock()
         self.update_position = Mock()
