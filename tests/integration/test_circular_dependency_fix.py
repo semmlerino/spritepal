@@ -13,6 +13,7 @@ Note: ExtractionController was removed in Phase 4e refactoring. The original cir
 dependency issue no longer exists since MainWindow now handles extraction directly.
 """
 
+
 def test_mainwindow_initialization(qtbot, isolated_managers, app_context):
     """Verify MainWindow can be initialized without infinite recursion/deadlock."""
     from ui.main_window import MainWindow

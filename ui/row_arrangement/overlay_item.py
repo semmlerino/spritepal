@@ -12,10 +12,7 @@ from PySide6.QtCore import QPointF, Qt
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsPixmapItem, QGraphicsSceneMouseEvent
 
 if TYPE_CHECKING:
-
     from ui.row_arrangement.overlay_layer import OverlayLayer
-
-
 
 
 class OverlayGraphicsItem(QGraphicsPixmapItem):
@@ -38,7 +35,7 @@ class OverlayGraphicsItem(QGraphicsPixmapItem):
 
         # Ensure it's on top of tiles
         self.setZValue(1000)
-        
+
         # Cross-hair cursor for moving
         self.setCursor(Qt.CursorShape.SizeAllCursor)
 

@@ -100,7 +100,7 @@ class OverlayLayer(QObject):
                 image = image.convert("RGBA")
             self._image = image
             self._image_path = str(Path(path).resolve())
-            
+
             # Auto-scale if target dimensions provided
             if target_width and target_height:
                 # Calculate scale to fit within target (preserving aspect ratio)
@@ -110,7 +110,7 @@ class OverlayLayer(QObject):
                 initial_scale = min(scale_w, scale_h)
                 # Ensure it's not too tiny or too huge initially (0.1% to 30%)
                 self._scale = max(0.001, min(0.3, initial_scale))
-                
+
                 # Center it at (0,0)
                 self._x = 0.0
                 self._y = 0.0
@@ -178,16 +178,16 @@ class OverlayLayer(QObject):
             old_height = self._image.height * self._scale
             center_x = self._x + old_width / 2
             center_y = self._y + old_height / 2
-            
+
             # Update scale
             self._scale = scale
-            
+
             # Calculate new top-left to maintain visual center
             new_width = self._image.width * self._scale
             new_height = self._image.height * self._scale
             self._x = center_x - new_width / 2
             self._y = center_y - new_height / 2
-            
+
             self.scale_changed.emit(self._scale)
             self.position_changed.emit(self._x, self._y)
         elif self._scale != scale:
@@ -292,18 +292,18 @@ class OverlayLayer(QObject):
         if self._image is None:
             return None
 
-        # When the overlay is scaled, we need to find the corresponding region 
+        # When the overlay is scaled, we need to find the corresponding region
         # in the original full-resolution overlay image.
-        
+
         # Coordinates relative to overlay top-left on canvas
         rel_x = tile_x - self._x
         rel_y = tile_y - self._y
-        
+
         # Scale these relative coordinates to original image space
         # If scale=0.5, then rel_x=10 means sample_x=20 in the original image
         sample_x = rel_x / self._scale
         sample_y = rel_y / self._scale
-        
+
         # Also scale the tile dimensions to original image space
         sample_w = tile_width / self._scale
         sample_h = tile_height / self._scale
@@ -320,7 +320,7 @@ class OverlayLayer(QObject):
         # Crop the region from the original overlay
         crop_box = (int(sample_x), int(sample_y), int(sample_x + sample_w), int(sample_y + sample_h))
         region = self._image.crop(crop_box)
-        
+
         # Resize the cropped region back to the tile size (8x8)
         # using Lanczos (high quality) or nearest if indices matter
         # Since this is an overlay (RGB/RGBA), we use high quality scaling.
@@ -344,7 +344,7 @@ class OverlayLayer(QObject):
         # Same logic as sample_region: check if the mapped region is within bounds
         rel_x = tile_x - self._x
         rel_y = tile_y - self._y
-        
+
         sample_x = rel_x / self._scale
         sample_y = rel_y / self._scale
         sample_w = tile_width / self._scale

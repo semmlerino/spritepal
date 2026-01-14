@@ -37,6 +37,7 @@ pytestmark = [
 class TestVRAMExtractionWorker:
     """Test the VRAMExtractionWorker class with real components."""
 
+
 @pytest.fixture
 def factory(app_context, isolated_data_repository):
     """Create RealComponentFactory for integration tests."""

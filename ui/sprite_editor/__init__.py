@@ -21,8 +21,10 @@ from utils.image_utils import bgr555_to_rgb888, rgb888_to_bgr555
 def get_grayscale_palette():
     return PaletteManager.get_grayscale_palette()
 
+
 def get_default_snes_palette():
     return PaletteManager.get_default_snes_palette()
+
 
 def read_cgram_palette(cgram_file: str, palette_num: int) -> list[int] | None:
     pm = PaletteManager()

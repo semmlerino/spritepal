@@ -613,7 +613,8 @@ class GridArrangementManager(QObject):
 
         # Remove from grid mapping
         positions_to_remove = [
-            pos for pos, (arr_type, key) in self._grid_mapping.items()
+            pos
+            for pos, (arr_type, key) in self._grid_mapping.items()
             if arr_type == ArrangementType.TILE and key == tile_key
         ]
         for pos in positions_to_remove:

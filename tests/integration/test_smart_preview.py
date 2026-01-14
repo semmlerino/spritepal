@@ -16,6 +16,7 @@ Tests that the smart preview coordinator properly stores and retrieves preview d
 using the memory LRU cache.
 """
 
+
 def test_smart_preview_initialization():
     """Verify PreviewGenerator can be initialized."""
     # This replaces more complex tests that were removed or redundant

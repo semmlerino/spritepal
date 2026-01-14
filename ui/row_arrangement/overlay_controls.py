@@ -83,7 +83,7 @@ class OverlayControls(QGroupBox):
         self.scale_slider.setValue(100)
         self.scale_slider.setToolTip("Overlay scale (0.1-30.0%)")
         scale_row.addWidget(self.scale_slider)
-        
+
         self.scale_spin = QDoubleSpinBox()
         self.scale_spin.setRange(0.1, 30.0)
         self.scale_spin.setSingleStep(0.1)
@@ -159,7 +159,7 @@ class OverlayControls(QGroupBox):
                         target_h = grid.grid_rows * processor.tile_height
                     break
                 parent = parent.parentWidget()
-                
+
             self._overlay.import_image(file_path, target_w, target_h)
 
     def _on_clear_clicked(self) -> None:
@@ -224,11 +224,11 @@ class OverlayControls(QGroupBox):
         """Update scale controls from overlay state."""
         percent = scale * 100.0
         slider_value = int(percent * 10)
-        
+
         self.scale_slider.blockSignals(True)
         self.scale_slider.setValue(slider_value)
         self.scale_slider.blockSignals(False)
-        
+
         self.scale_spin.blockSignals(True)
         self.scale_spin.setValue(percent)
         self.scale_spin.blockSignals(False)

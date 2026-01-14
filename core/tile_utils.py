@@ -105,6 +105,7 @@ def encode_4bpp_tile(tile_pixels: list[int] | list[list[int]] | np.ndarray) -> b
         # Flatten
         from collections.abc import Iterable
         from typing import cast
+
         flat_pixels: list[int] = []
         for row in tile_pixels:
             flat_pixels.extend(cast(Iterable[int], row))

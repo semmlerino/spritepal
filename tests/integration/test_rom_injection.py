@@ -92,7 +92,7 @@ class TestROMInjector:
     def test_sprite_location_finding_synthetic_rom(self, injector, test_rom_data, tmp_path):
         """Test finding sprite locations with synthetic ROM."""
         from core.sprite_config_loader import SpriteConfig
-        
+
         rom_path = tmp_path / "test.sfc"
         rom_path.write_bytes(test_rom_data)
 
@@ -116,7 +116,7 @@ class TestRegressionFixes:
         """Issue #1: Verify temp files are cleaned up even when compression fails."""
         # Setup similar to original regression test but cleaned up
         rom_path = tmp_path / "test.smc"
-        rom_path.write_bytes(b"\x00" * (512 * 1024)) # Minimal size
+        rom_path.write_bytes(b"\x00" * (512 * 1024))  # Minimal size
         sprite_path = tmp_path / "sprite.png"
         Image.new("P", (16, 16)).save(sprite_path)
 
@@ -127,7 +127,7 @@ class TestRegressionFixes:
             mock_comp = mock_comp_cls.return_value
             mock_comp.compress_to_file.side_effect = HALCompressionError("Test failure")
             mock_val.validate_rom_for_injection.return_value = ({"title": "TEST"}, 0x7FC0)
-            
+
             injector = ROMInjector()
             injector.read_rom_header = MagicMock(return_value=MagicMock(header_offset=0x7FC0))
 
@@ -142,33 +142,34 @@ class TestRegressionFixes:
     def test_rom_data_unchanged_on_write_failure(self, tmp_path):
         """Issue #4: Verify ROM state is not corrupted when write fails."""
         rom_path = tmp_path / "test.smc"
-        original_data = b"\xAA" * 1024
+        original_data = b"\xaa" * 1024
         rom_path.write_bytes(original_data)
-        
+
         sprite_path = tmp_path / "sprite.png"
         Image.new("P", (8, 8)).save(sprite_path)
 
         with patch("core.rom_injector.atomic_write", side_effect=OSError("Disk full")):
             injector = ROMInjector()
             injector.rom_data = bytearray(original_data)
-            
+
             injector.inject_sprite_to_rom(str(sprite_path), str(rom_path), str(tmp_path / "out.sfc"), 0)
-            
+
             # Internal rom_data should not have been updated with "new" data if write failed
-            # (In reality it might be complex to verify without deep mocking, 
+            # (In reality it might be complex to verify without deep mocking,
             # but we verify it doesn't crash and preserves original data if reload fails)
             assert injector.rom_data == bytearray(original_data)
 
     def test_vram_cleared_on_injection_error(self, tmp_path):
         """Issue #5: Verify VRAM buffer is cleared on injection error."""
         from core.injector import SpriteInjector
+
         vram_path = tmp_path / "input.vram"
         vram_path.write_bytes(b"\x00" * 65536)
         sprite_path = tmp_path / "sprite.png"
         Image.new("P", (8, 8)).save(sprite_path)
 
         injector = SpriteInjector()
-        injector.vram_data = bytearray(b"\xAA" * 65536)
+        injector.vram_data = bytearray(b"\xaa" * 65536)
 
         with patch("core.injector.atomic_write", side_effect=OSError("Disk full")):
             injector.inject_sprite(str(sprite_path), str(vram_path), str(tmp_path / "out.vram"), 0)
@@ -182,13 +183,13 @@ class TestInjectionDimensionValidation:
     @pytest.mark.parametrize("width,height", [(7, 8), (8, 7), (15, 16), (9, 9)])
     def test_injection_rejects_invalid_dimensions(self, tmp_path, width, height, app_context):
         from core.managers.core_operations_manager import ValidationError
-        
+
         invalid_png = tmp_path / "invalid.png"
         Image.new("P", (width, height)).save(invalid_png)
-        
+
         # The real manager validation logic:
         real_manager = app_context.core_operations_manager
-        
+
         params = {"mode": "rom", "sprite_path": str(invalid_png), "offset": 0}
         with pytest.raises(ValidationError, match="multiples of 8"):
             real_manager.validate_injection_params(params)

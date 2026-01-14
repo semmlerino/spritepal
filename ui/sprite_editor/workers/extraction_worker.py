@@ -75,7 +75,7 @@ class ExtractWorker(BaseWorker):
                 # OAM palette numbers (0-7) map to CGRAM sprite palettes (8-15)
                 cgram_palette_num = self.palette_num + 8 if self.palette_num < 8 else self.palette_num
                 self.emit_progress(70, f"Applying palette {self.palette_num} (CGRAM {cgram_palette_num})...")
-                
+
                 pm = PaletteManager()
                 try:
                     pm.load_cgram(str(cgram_path))

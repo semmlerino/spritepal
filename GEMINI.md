@@ -82,3 +82,9 @@ Commands should be executed from the `spritepal/` root directory.
 - `AGENTS.md`: High-level guidelines for AI agents.
 - `donso/AUDIT_REPORT.md`: Architectural audit identifying public contracts.
 - `SPRITE_LEARNINGS_DO_NOT_DELETE.md`: Domain-specific knowledge about SNES formats.
+
+## Search & Tooling Guidelines
+- **Prefer Internal Tools:** Always use `search_file_content` or `search_for_pattern` instead of `run_shell_command("grep ...")`. These tools are optimized and automatically respect `.gitignore` and `.geminiignore`.
+- **Exclude Noisy Folders:** When forced to use shell commands (`grep`, `find`, `ls`), always exclude metadata and environment folders: `.git`, `.serena`, `.venv`, `.ruff_cache`, `.pytest_cache`, and `__pycache__`.
+- **Shell Example:** Use `rg` (ripgrep) which respects ignores by default, or `grep -r --exclude-dir={.git,.serena,.venv,__pycache__} "pattern" .`.
+- **ripgrep:** `rg` is available in this environment.

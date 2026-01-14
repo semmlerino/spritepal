@@ -18,10 +18,12 @@ from utils.constants import BYTES_PER_TILE
 def mock_rom_cache():
     return Mock()
 
+
 @pytest.fixture
 def extractor(mock_rom_cache):
     """Create ROM extractor with mocked dependencies for unit testing."""
     return ROMExtractor(rom_cache=mock_rom_cache)
+
 
 class TestROMExtractorValidationMethods:
     """Test tile and data validation methods (structural check only)."""

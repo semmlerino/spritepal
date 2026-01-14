@@ -262,7 +262,7 @@ class TestROMValidator:
 
         header, _ = ROMValidator.validate_rom_header(str(rom_path))
 
-        # Should handle odd length and detect mismatch (since create_test_rom doesn't 
+        # Should handle odd length and detect mismatch (since create_test_rom doesn't
         # perfectly calculate checksum for non-power-of-2 sizes in its simple implementation)
         # The key is that it doesn't crash with IndexError
         result = ROMValidator.verify_rom_checksum(str(rom_path), header, lenient=True)

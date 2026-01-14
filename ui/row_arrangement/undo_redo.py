@@ -453,7 +453,7 @@ class RestoreGridStateCommand:
     new_tile_to_group: dict[TilePosition, str]
     new_order: list[tuple[ArrangementType, str]]
     new_grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]]
-    
+
     # Store previous state for undo
     previous_tiles: list[TilePosition] = field(default_factory=list)
     previous_groups: dict[str, TileGroup] = field(default_factory=dict)
@@ -468,9 +468,14 @@ class RestoreGridStateCommand:
     def execute(self) -> None:
         # Capture current state if not already done
         if not self.previous_tiles and not self.previous_grid_mapping:
-             self.previous_tiles, self.previous_groups, self.previous_tile_to_group, \
-             self.previous_order, self.previous_grid_mapping = self.manager.get_state_snapshot()
-             
+            (
+                self.previous_tiles,
+                self.previous_groups,
+                self.previous_tile_to_group,
+                self.previous_order,
+                self.previous_grid_mapping,
+            ) = self.manager.get_state_snapshot()
+
         self.manager._restore_state_no_history(
             self.new_tiles,
             self.new_groups,

@@ -254,6 +254,7 @@ class TestStartupState:
 
         # The visible page should be the ROM page
         from PySide6.QtWidgets import QStackedWidget
+
         stack = workspace.findChild(QStackedWidget)
         assert stack.currentWidget() == workspace.rom_page
 
@@ -266,6 +267,7 @@ class TestStartupState:
 
         # Stack should now show VRAM page
         from PySide6.QtWidgets import QStackedWidget
+
         stack = workspace.findChild(QStackedWidget)
         assert stack.currentWidget() == workspace.vram_page
         assert workspace.current_mode == "vram"
@@ -287,6 +289,7 @@ class TestStartupState:
         # Both toggle and stack should update
         assert workspace.current_mode == "vram"
         from PySide6.QtWidgets import QStackedWidget
+
         stack = workspace.findChild(QStackedWidget)
         assert stack.currentWidget() == workspace.vram_page
 
@@ -360,6 +363,7 @@ class TestModeToggleDataConsistency:
         """Verify toggle options match stack pages."""
         workspace = sprite_editor_workspace
         from PySide6.QtWidgets import QStackedWidget
+
         stack = workspace.findChild(QStackedWidget)
 
         # SegmentedToggle doesn't have a public count() but we can check if it has the 2 expected options
@@ -370,6 +374,7 @@ class TestModeToggleDataConsistency:
         """Verify toggle data maps to correct stack page."""
         workspace = sprite_editor_workspace
         from PySide6.QtWidgets import QStackedWidget
+
         stack = workspace.findChild(QStackedWidget)
 
         # "vram" should map to VRAM page

@@ -233,15 +233,16 @@ class GridGraphicsView(QGraphicsView):
         # We want to prioritize items that have the ItemIsMovable flag
         scene_pos = self.mapToScene(event.pos())
         items = self.scene().items(scene_pos) if self.scene() else []
-        
+
         # Filter for items that should handle events instead of the grid
         interactive_items = [
-            i for i in items 
-            if i.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable 
+            i
+            for i in items
+            if i.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable
             and i != self.pixmap_item
             and not isinstance(i, (QGraphicsLineItem, QGraphicsRectItem))
         ]
-        
+
         if interactive_items and event.button() == Qt.MouseButton.LeftButton:
             super().mousePressEvent(event)
             return
@@ -282,7 +283,7 @@ class GridGraphicsView(QGraphicsView):
                         self.current_selection.add(tile_pos)
                         self._update_selection_display()
                         self.tiles_selected.emit(list(self.current_selection))
-                    
+
                     self.tile_clicked.emit(tile_pos)
 
                     # Prepare for drag
@@ -293,7 +294,7 @@ class GridGraphicsView(QGraphicsView):
             # Click on empty space
             if not ctrl_pressed and not shift_pressed:
                 self.clear_selection()
-            
+
             return
 
         elif event.button() == Qt.MouseButton.MiddleButton:

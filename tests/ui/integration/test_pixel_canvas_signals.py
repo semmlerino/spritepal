@@ -269,7 +269,7 @@ class TestPixelCanvasRegression:
         """Verify canvas updates its color cache when controller palette changes."""
         canvas, controller = canvas_with_image
         canvas.greyscale_mode = False
-        
+
         # Set some data with index 7
         data = np.zeros((8, 8), dtype=np.uint8)
         data[0, 0] = 7
