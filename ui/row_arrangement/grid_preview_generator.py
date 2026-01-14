@@ -82,7 +82,10 @@ class GridPreviewGenerator:
         spacing: int = 0,
         width: int | None = None,
     ) -> Image.Image | None:
-        """Create image from grid arrangement
+        """Create image from grid arrangement.
+
+        If grid_mapping is available, creates a spatial layout preserving gaps.
+        Otherwise falls back to linear layout based on arrangement_order.
 
         Args:
             processor: Grid image processor with extracted tiles
@@ -93,36 +96,41 @@ class GridPreviewGenerator:
         Returns:
             Arranged image or None if no arrangement
         """
+        grid_mapping = manager.get_grid_mapping()
+        if grid_mapping:
+            return self._create_spatial_arranged_image(processor, manager, grid_mapping, spacing, width)
+
         arrangement_order = manager.get_arrangement_order()
         if not arrangement_order:
             return None
 
         # Collect all tiles in arrangement order
         arranged_tiles = []
-
         for arr_type, key in arrangement_order:
             if arr_type == ArrangementType.TILE:
-                # Single tile
-                row, col = map(int, key.split(","))
-                position = TilePosition(row, col)
-                tile_img = processor.get_tile(position)
-                if tile_img:
-                    arranged_tiles.append((position, tile_img))
-
+                try:
+                    row, col = map(int, key.split(","))
+                    position = TilePosition(row, col)
+                    tile_img = processor.get_tile(position)
+                    if tile_img:
+                        arranged_tiles.append((position, tile_img))
+                except (ValueError, IndexError):
+                    continue
             elif arr_type == ArrangementType.ROW:
-                # Entire row
-                row_index = int(key)
-                row_tiles = processor.get_row_tiles(row_index)
-                arranged_tiles.extend(row_tiles)
-
+                try:
+                    row_index = int(key)
+                    row_tiles = processor.get_row_tiles(row_index)
+                    arranged_tiles.extend(row_tiles)
+                except (ValueError, IndexError):
+                    continue
             elif arr_type == ArrangementType.COLUMN:
-                # Entire column
-                col_index = int(key)
-                col_tiles = processor.get_column(col_index)
-                arranged_tiles.extend(col_tiles)
-
+                try:
+                    col_index = int(key)
+                    col_tiles = processor.get_column(col_index)
+                    arranged_tiles.extend(col_tiles)
+                except (ValueError, IndexError):
+                    continue
             elif arr_type == ArrangementType.GROUP:
-                # Custom group
                 group = manager.get_groups().get(key)
                 if group:
                     group_tiles = processor.get_tile_group(group)
@@ -131,9 +139,8 @@ class GridPreviewGenerator:
         if not arranged_tiles:
             return None
 
-        # Calculate output dimensions
         if width is None:
-            width = min(16, processor.grid_cols)  # Max 16 tiles wide
+            width = min(16, processor.grid_cols)
 
         return self._create_arranged_image_with_spacing(
             arranged_tiles,
@@ -142,6 +149,94 @@ class GridPreviewGenerator:
             width,
             spacing,
         )
+
+    def _create_spatial_arranged_image(
+        self,
+        processor: GridImageProcessor,
+        manager: GridArrangementManager,
+        grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]],
+        spacing: int = 0,
+        width: int | None = None,
+    ) -> Image.Image | None:
+        """Create image that preserves spatial layout including gaps."""
+        # Find bounds
+        rows = [p[0] for p in grid_mapping]
+        cols = [p[1] for p in grid_mapping]
+        max_r = max(rows) if rows else 0
+        max_c = max(cols) if cols else 0
+
+        # Set output dimensions in tiles
+        if width is not None and width > 0:
+            out_tiles_w = max(width, max_c + 1)
+        else:
+            out_tiles_w = max_c + 1
+        out_tiles_h = max_r + 1
+
+        # Calculate pixel dimensions
+        img_w = out_tiles_w * processor.tile_width + (out_tiles_w - 1) * spacing
+        img_h = out_tiles_h * processor.tile_height + (out_tiles_h - 1) * spacing
+
+        # Determine output mode
+        if self.colorizer and self.colorizer.is_palette_mode():
+            output = Image.new("RGBA", (img_w, img_h), (0, 0, 0, 0))
+        else:
+            output = Image.new("L", (img_w, img_h), 0)
+
+        # Place items from grid mapping
+        for (r, c), (arr_type, key) in grid_mapping.items():
+            items_to_draw = []
+            if arr_type == ArrangementType.TILE:
+                try:
+                    row_p, col_p = map(int, key.split(","))
+                    pos = TilePosition(row_p, col_p)
+                    img = processor.get_tile(pos)
+                    if img:
+                        items_to_draw.append((r, c, pos, img))
+                except (ValueError, IndexError):
+                    continue
+            elif arr_type == ArrangementType.ROW:
+                try:
+                    row_idx = int(key)
+                    row_tiles = processor.get_row_tiles(row_idx)
+                    for i, (pos, img) in enumerate(row_tiles):
+                        items_to_draw.append((r, c + i, pos, img))
+                except (ValueError, IndexError):
+                    continue
+            elif arr_type == ArrangementType.COLUMN:
+                try:
+                    col_idx = int(key)
+                    col_tiles = processor.get_column(col_idx)
+                    for i, (pos, img) in enumerate(col_tiles):
+                        items_to_draw.append((r + i, c, pos, img))
+                except (ValueError, IndexError):
+                    continue
+            elif arr_type == ArrangementType.GROUP:
+                group = manager.get_groups().get(key)
+                if group and group.tiles:
+                    min_row = min(p.row for p in group.tiles)
+                    min_col = min(p.col for p in group.tiles)
+                    for p in group.tiles:
+                        img = processor.get_tile(p)
+                        if img:
+                            dr = p.row - min_row
+                            dc = p.col - min_col
+                            items_to_draw.append((r + dr, c + dc, p, img))
+
+            # Draw the collected tiles for this item
+            for tr, tc, t_pos, t_img in items_to_draw:
+                x = tc * (processor.tile_width + spacing)
+                y = tr * (processor.tile_height + spacing)
+                
+                # Apply colorization if enabled
+                if self.colorizer:
+                    display_img = self.colorizer.get_display_image(t_pos.row, t_img)
+                else:
+                    display_img = t_img
+
+                if display_img:
+                    paste_with_mode_handling(output, display_img, (x, y))
+
+        return output
 
     def create_grid_preview_with_overlay(
         self,

@@ -1,8 +1,8 @@
 """
 Tests for overlay sampling coordinate system.
 
-Verifies that overlay sampling uses source tile positions, not canvas positions,
-to correctly apply overlays that match the source sprite layout.
+Verifies that overlay sampling uses canvas positions, to correctly
+apply overlays that are positioned on the arrangement canvas.
 """
 
 import pytest
@@ -56,35 +56,30 @@ def source_layout_overlay(tmp_path) -> str:
     return str(path)
 
 
-class TestOverlaySourceSampling:
-    """Tests for overlay sampling coordinate system."""
+class TestOverlayCanvasSampling:
+    """Tests for overlay sampling coordinate system (Canvas-based)."""
 
-    def test_all_tiles_modified_when_using_source_positions(
+    def test_only_tiles_covered_on_canvas_are_modified(
         self, overlay_layer: OverlayLayer, source_layout_overlay: str
     ):
-        """All tiles should be modified when overlay covers source area.
+        """Only tiles covered by the overlay on the canvas should be modified.
 
-        Bug: When tiles are rearranged on canvas (e.g., 4x2 → 1x8),
-        tiles beyond the overlay's canvas coverage are skipped because
-        sampling uses canvas positions instead of source positions.
-
-        This test verifies that:
-        - With canvas sampling (bug): Only tiles in first 4 canvas columns get modified
-        - With source sampling (fix): All 8 tiles get modified
+        If tiles are rearranged into a wide row (8x1), and the overlay only
+        covers the first 4 columns (32px), then only tiles in those 4 columns
+        should be modified.
         """
-        # 128x64 overlay at 25% scale = 32x16 visual (matches 4x2 source)
+        # 128x64 overlay at 25% scale = 32x16 visual (covers 4x2 area)
         overlay_layer.import_image(source_layout_overlay, 32, 16)
         overlay_layer.set_scale(0.25)
         overlay_layer.set_position(0, 0)
 
-        # Source: 4 columns x 2 rows
+        # Source: 4 columns x 2 rows (8 tiles total)
         source_tiles: dict[TilePosition, Image.Image] = {}
         for row in range(2):
             for col in range(4):
                 source_tiles[TilePosition(row, col)] = Image.new("L", (8, 8), 128)
 
         # Canvas: tiles rearranged into single row (8 columns x 1 row)
-        # This mimics _find_next_empty_slot behavior with wide target_width
         grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = {}
         canvas_col = 0
         for src_row in range(2):
@@ -104,62 +99,45 @@ class TestOverlaySourceSampling:
         )
 
         result = operation.execute(force=True)
-        assert result.success, f"Apply failed: {result.error_message}"
-        assert result.modified_tiles is not None
+        assert result.success
+        
+        # Tiles at canvas columns 0, 1, 2, 3 should be modified (covered by 32px overlay)
+        # Tiles at canvas columns 4, 5, 6, 7 should NOT be modified
+        
+        modified_keys = set(result.modified_tiles.keys())
+        
+        # (0,0) -> (src 0,0) is at canvas (0,0) -> SHOULD BE MODIFIED
+        assert TilePosition(0, 0) in modified_keys
+        # (1,0) -> (src 1,0) is at canvas (0,4) -> SHOULD NOT BE MODIFIED
+        assert TilePosition(1, 0) not in modified_keys
 
-        # ALL 8 tiles should be modified
-        # With the bug (canvas sampling): only tiles 0-3 get modified
-        # (canvas positions 0-3 → pixels 0-24 which are within 32px overlay)
-        # Tiles 4-7 are at canvas positions 32-56, outside the overlay
-        #
-        # With the fix (source sampling): all 8 tiles get modified
-        # because source positions (row 0: 0-24, row 1: 0-24 in Y) are all within overlay
-        expected_tiles = [
-            TilePosition(0, 0),
-            TilePosition(0, 1),
-            TilePosition(0, 2),
-            TilePosition(0, 3),
-            TilePosition(1, 0),
-            TilePosition(1, 1),
-            TilePosition(1, 2),
-            TilePosition(1, 3),
-        ]
-
-        missing_tiles = [t for t in expected_tiles if t not in result.modified_tiles]
-        assert not missing_tiles, (
-            f"Tiles {missing_tiles} not modified. "
-            f"This happens because overlay sampling uses CANVAS positions "
-            f"instead of SOURCE positions. "
-            f"Modified tiles: {list(result.modified_tiles.keys())}"
-        )
-
-    def test_tile_content_matches_source_position_in_overlay(
+    def test_tile_content_matches_canvas_position_in_overlay(
         self, overlay_layer: OverlayLayer, source_layout_overlay: str
     ):
-        """Tile content should come from source position in overlay.
-
-        Tile (1,0) should get DARK content from overlay row 1,
-        NOT bright content from where it's placed on canvas.
+        """Tile content should come from its canvas position in the overlay.
         """
+        # 128x64 overlay at 25% scale = 32x16 visual
         overlay_layer.import_image(source_layout_overlay, 32, 16)
+        
+        # Set scale FIRST
         overlay_layer.set_scale(0.25)
+        # Then set position to ensure it's exactly where we want it
+        # Move overlay so it covers canvas columns 2-5 (pixels 16-48)
+        # Visual top-left of overlay will be at (-16, 0) on canvas
         overlay_layer.set_position(0, 0)
 
         source_tiles: dict[TilePosition, Image.Image] = {}
-        for row in range(2):
-            for col in range(4):
-                source_tiles[TilePosition(row, col)] = Image.new("L", (8, 8), 128)
+        source_tiles[TilePosition(0, 0)] = Image.new("L", (8, 8), 128)
 
-        # Single row canvas arrangement
-        grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = {}
-        canvas_col = 0
-        for src_row in range(2):
-            for src_col in range(4):
-                grid_mapping[(0, canvas_col)] = (
-                    ArrangementType.TILE,
-                    f"{src_row},{src_col}",
-                )
-                canvas_col += 1
+        # Place Tile (0,0) at canvas (0, 2) -> pixel 16 on canvas.
+        # Overlay is at 0, so relative X = 16 - 0 = 16.
+        # Original overlay width is 128. Scale is 0.25.
+        # Sample X = 16 / 0.25 = 64.
+        # Pixel 64 in overlay is the start of Column 2 (if 128px wide / 4 = 32px per col).
+        # Column 2 in Row 0 of overlay has brightness 232.
+        grid_mapping = {
+            (0, 2): (ArrangementType.TILE, "0,0"),
+        }
 
         operation = ApplyOperation(
             overlay=overlay_layer,
@@ -171,88 +149,8 @@ class TestOverlaySourceSampling:
 
         result = operation.execute(force=True)
         assert result.success
-
-        # Skip this test if tile not modified (separate test handles that)
-        tile_1_0 = result.modified_tiles.get(TilePosition(1, 0))
-        if tile_1_0 is None:
-            pytest.skip(
-                "Tile (1,0) not modified - bug where canvas positions are used. "
-                "See test_all_tiles_modified_when_using_source_positions."
-            )
-
-        # Get brightness value
-        pixels = tile_1_0.load()
-        brightness = pixels[4, 4]
-
-        # Tile (1,0) should have DARK content (~40-88 range from row 1)
-        # NOT bright content (~200-248 from row 0)
-        #
-        # With bug: tile (1,0) at canvas (0,4) samples from canvas position
-        # which would sample from a completely different area
-        #
-        # With fix: tile (1,0) samples from source position (row=1, col=0)
-        # which is the dark bottom-left area of the overlay
-        assert brightness < 100, (
-            f"Tile (1,0) has brightness {brightness}, expected < 100 (dark). "
-            f"Source position (1,0) should sample from overlay row 1 (dark area), "
-            f"but it appears to be sampling from the wrong position."
-        )
-
-    def test_row_0_tiles_are_bright_row_1_tiles_are_dark(self, overlay_layer: OverlayLayer, source_layout_overlay: str):
-        """Row 0 tiles should be bright, row 1 tiles should be dark.
-
-        This verifies the full structure is preserved when tiles are rearranged.
-        """
-        overlay_layer.import_image(source_layout_overlay, 32, 16)
-        overlay_layer.set_scale(0.25)
-        overlay_layer.set_position(0, 0)
-
-        source_tiles: dict[TilePosition, Image.Image] = {}
-        for row in range(2):
-            for col in range(4):
-                source_tiles[TilePosition(row, col)] = Image.new("L", (8, 8), 128)
-
-        # Single row canvas
-        grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = {}
-        canvas_col = 0
-        for src_row in range(2):
-            for src_col in range(4):
-                grid_mapping[(0, canvas_col)] = (
-                    ArrangementType.TILE,
-                    f"{src_row},{src_col}",
-                )
-                canvas_col += 1
-
-        operation = ApplyOperation(
-            overlay=overlay_layer,
-            grid_mapping=grid_mapping,
-            tiles=source_tiles,
-            tile_width=8,
-            tile_height=8,
-        )
-
-        result = operation.execute(force=True)
-        assert result.success
-        assert result.modified_tiles is not None
-
-        # Verify row 0 tiles are bright (>150)
-        for col in range(4):
-            tile = result.modified_tiles.get(TilePosition(0, col))
-            if tile is None:
-                pytest.skip(f"Tile (0,{col}) not modified")
-            brightness = tile.load()[4, 4]
-            assert brightness > 150, (
-                f"Tile (0,{col}) has brightness {brightness}, expected > 150. "
-                f"Row 0 tiles should be bright (from overlay top half)."
-            )
-
-        # Verify row 1 tiles are dark (<100)
-        for col in range(4):
-            tile = result.modified_tiles.get(TilePosition(1, col))
-            if tile is None:
-                pytest.skip(f"Tile (1,{col}) not modified")
-            brightness = tile.load()[4, 4]
-            assert brightness < 100, (
-                f"Tile (1,{col}) has brightness {brightness}, expected < 100. "
-                f"Row 1 tiles should be dark (from overlay bottom half)."
-            )
+        assert TilePosition(0, 0) in result.modified_tiles
+        
+        pixels = result.modified_tiles[TilePosition(0, 0)].load()
+        brightness = pixels[0, 0]
+        assert brightness == 232 # Column 2 brightness

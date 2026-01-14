@@ -108,8 +108,9 @@ class OverlayLayer(QObject):
                 scale_h = target_height / image.height
                 # Usually users want it to roughly match the size of the sprite.
                 initial_scale = min(scale_w, scale_h)
-                # Ensure it's not too tiny or too huge initially (0.1% to 30%)
-                self._scale = max(0.001, min(0.3, initial_scale))
+                # Ensure it's not too tiny or too huge initially (0.1% to 100%)
+                # Removed the 30% cap which was causing unexpected tiny overlays.
+                self._scale = max(0.001, min(1.0, initial_scale))
 
                 # Center it at (0,0)
                 self._x = 0.0
@@ -168,9 +169,10 @@ class OverlayLayer(QObject):
         """Set the overlay scale, keeping the center fixed.
 
         Args:
-            scale: Scale factor (0.001 to 0.3).
+            scale: Scale factor (0.001 to 5.0).
         """
-        scale = max(0.001, min(0.3, scale))
+        # Increased max scale to 5.0 to allow zooming in on overlays
+        scale = max(0.001, min(5.0, scale))
         if self._scale != scale and self._image is not None:
             # Calculate current visual center relative to canvas
             # Visual width/height = original * scale
@@ -278,7 +280,7 @@ class OverlayLayer(QObject):
     def sample_region(self, tile_x: int, tile_y: int, tile_width: int, tile_height: int) -> Image.Image | None:
         """Sample a tile-sized region from the overlay at the given canvas position.
 
-        Accounts for overlay scale.
+        Accounts for overlay scale using precise sub-pixel sampling.
 
         Args:
             tile_x: X position of tile on canvas (pixels).
@@ -292,12 +294,9 @@ class OverlayLayer(QObject):
         if self._image is None:
             return None
 
-        # When the overlay is scaled, we need to find the corresponding region
-        # in the original full-resolution overlay image.
-
         # Coordinates relative to overlay top-left on canvas
-        rel_x = tile_x - self._x
-        rel_y = tile_y - self._y
+        rel_x = float(tile_x) - self._x
+        rel_y = float(tile_y) - self._y
 
         # Scale these relative coordinates to original image space
         # If scale=0.5, then rel_x=10 means sample_x=20 in the original image
@@ -317,14 +316,12 @@ class OverlayLayer(QObject):
         if sample_y + sample_h > self._image.height + eps:
             return None
 
-        # Crop the region from the original overlay
-        crop_box = (int(sample_x), int(sample_y), int(sample_x + sample_w), int(sample_y + sample_h))
-        region = self._image.crop(crop_box)
+        # Precise sub-pixel sampling using PIL's box parameter.
+        # This prevents 1-pixel shifts caused by integer truncation.
+        sampling_box = (sample_x, sample_y, sample_x + sample_w, sample_y + sample_h)
 
-        # Resize the cropped region back to the tile size (8x8)
-        # using Lanczos (high quality) or nearest if indices matter
-        # Since this is an overlay (RGB/RGBA), we use high quality scaling.
-        return region.resize((tile_width, tile_height), Image.Resampling.LANCZOS)
+        # resize(..., box=...) performs the crop and scale in one precise step.
+        return self._image.resize((tile_width, tile_height), Image.Resampling.LANCZOS, box=sampling_box)
 
     def covers_tile(self, tile_x: int, tile_y: int, tile_width: int, tile_height: int) -> bool:
         """Check if the overlay fully covers a tile region.

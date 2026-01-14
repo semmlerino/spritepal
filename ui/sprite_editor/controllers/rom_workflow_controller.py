@@ -1212,7 +1212,8 @@ class ROMWorkflowController(QObject):
                 if result and result.bridge.has_arrangement:
                     # Update tile data if overlay was applied
                     if result.modified_tiles:
-                        self._update_tile_data_from_modified_tiles(result.modified_tiles)
+                        # Use the SAME tiles_per_row that was used to initialize the dialog
+                        self._update_tile_data_from_modified_tiles(result.modified_tiles, tiles_per_row)
                         logger.info("Updated current_tile_data with modified pixels from overlay")
 
                     self._current_arrangement = result.bridge
@@ -1233,7 +1234,9 @@ class ROMWorkflowController(QObject):
             except OSError:
                 pass
 
-    def _update_tile_data_from_modified_tiles(self, modified_tiles: dict["TilePosition", Image.Image]) -> None:
+    def _update_tile_data_from_modified_tiles(
+        self, modified_tiles: dict["TilePosition", Image.Image], tiles_per_row: int
+    ) -> None:
         """Update current_tile_data (bytes) from modified PIL images.
 
         Converts each modified tile back to 4bpp SNES format and patches
@@ -1241,6 +1244,7 @@ class ROMWorkflowController(QObject):
 
         Args:
             modified_tiles: Dict mapping TilePosition to modified PIL image
+            tiles_per_row: Number of tiles per row in the source grid (physical layout)
         """
         if not self.current_tile_data:
             return
@@ -1249,7 +1253,6 @@ class ROMWorkflowController(QObject):
 
         # Convert to bytearray for modification
         data_mutable = bytearray(self.current_tile_data)
-        tiles_per_row = self.current_width // 8 if self.current_width >= 8 else 1
 
         for pos, img in modified_tiles.items():
             # Calculate byte offset for this tile

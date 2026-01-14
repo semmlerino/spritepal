@@ -71,7 +71,6 @@ class ApplyOperation:
         tile_width: int,
         tile_height: int,
         palette: list[tuple[int, int, int]] | None = None,
-        use_source_positions: bool = True,
     ) -> None:
         """Initialize the Apply operation.
 
@@ -82,10 +81,6 @@ class ApplyOperation:
             tile_width: Width of each tile in pixels.
             tile_height: Height of each tile in pixels.
             palette: Optional palette for quantization (16 RGB colors).
-            use_source_positions: If True (default), sample overlay at source tile
-                positions instead of canvas positions. This ensures overlays that
-                match the source sprite layout are sampled correctly even when tiles
-                are rearranged on the canvas.
         """
         self._overlay = overlay
         self._grid_mapping = grid_mapping
@@ -93,7 +88,6 @@ class ApplyOperation:
         self._tile_width = tile_width
         self._tile_height = tile_height
         self._palette = palette
-        self._use_source_positions = use_source_positions
 
     def validate(self) -> list[ApplyWarning]:
         """Validate the Apply operation and return warnings.
@@ -185,10 +179,8 @@ class ApplyOperation:
             row, col = map(int, key.split(","))
             tile_pos = TilePosition(row, col)
 
-            # Calculate sampling position - always use CANVAS coordinates (r, c)
-            # The overlay is positioned relative to the canvas grid, not the source grid.
-            # Note: use_source_positions is deprecated and ignored - it was fundamentally
-            # broken because the overlay can only be positioned in canvas space.
+            # Calculate sampling position - use CANVAS coordinates (r, c)
+            # The overlay is positioned relative to the canvas grid.
             tile_x = c * self._tile_width
             tile_y = r * self._tile_height
 

@@ -40,8 +40,8 @@ class ArrangementConfig:
     grid_mapping: dict[str, dict[str, str]] = field(default_factory=dict)
     # Overlay state (added in v1.1)
     overlay_path: str | None = None
-    overlay_x: int = 0
-    overlay_y: int = 0
+    overlay_x: float = 0.0
+    overlay_y: float = 0.0
     overlay_opacity: float = 0.5
     overlay_visible: bool = True
     # Timestamps

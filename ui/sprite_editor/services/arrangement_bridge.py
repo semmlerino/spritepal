@@ -37,8 +37,6 @@ class ArrangementBridge:
     for ROM injection.
     """
 
-    TILE_SIZE = 8  # SNES tiles are 8x8 pixels
-
     def __init__(
         self,
         manager: GridArrangementManager,
@@ -63,11 +61,91 @@ class ArrangementBridge:
         self._physical_width: int = processor.grid_cols
         self._physical_height: int = processor.grid_rows
 
+        # Use tile dimensions from processor for dynamic layout support
+        self._tile_width: int = processor.tile_width if processor.tile_width > 0 else 8
+        self._tile_height: int = processor.tile_height if processor.tile_height > 0 else 8
+
         # Build mapping from current arrangement
         self._build_mapping()
 
     def _build_mapping(self) -> None:
-        """Build logical→physical tile position mapping from arrangement."""
+        """Build logical→physical tile position mapping from arrangement.
+
+        Prefers spatial mapping (respecting canvas gaps) if grid_mapping is available,
+        otherwise falls back to linear mapping (compact layout).
+        """
+        grid_mapping = self._manager.get_grid_mapping()
+        if grid_mapping:
+            self._build_spatial_mapping(grid_mapping)
+        else:
+            self._build_linear_mapping()
+
+    def _build_spatial_mapping(self, grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]]) -> None:
+        """Build mapping that preserves spatial layout including gaps."""
+        expanded_tiles: list[tuple[int, int, TilePosition]] = []
+
+        for (r, c), (arr_type, key) in grid_mapping.items():
+            if arr_type == ArrangementType.TILE:
+                try:
+                    row_phys, col_phys = map(int, key.split(","))
+                    expanded_tiles.append((r, c, TilePosition(row_phys, col_phys)))
+                except (ValueError, IndexError):
+                    continue
+            elif arr_type == ArrangementType.ROW:
+                try:
+                    row_idx = int(key)
+                    for col_phys in range(self._processor.grid_cols):
+                        expanded_tiles.append((r, c + col_phys, TilePosition(row_idx, col_phys)))
+                except (ValueError, IndexError):
+                    continue
+            elif arr_type == ArrangementType.COLUMN:
+                try:
+                    col_idx = int(key)
+                    for row_phys in range(self._processor.grid_rows):
+                        expanded_tiles.append((r + row_phys, c, TilePosition(row_phys, col_idx)))
+                except (ValueError, IndexError):
+                    continue
+            elif arr_type == ArrangementType.GROUP:
+                group = self._manager.get_groups().get(key)
+                if group and group.tiles:
+                    # Find relative bounding box for group tiles
+                    min_row = min(p.row for p in group.tiles)
+                    min_col = min(p.col for p in group.tiles)
+                    for p in group.tiles:
+                        dr = p.row - min_row
+                        dc = p.col - min_col
+                        expanded_tiles.append((r + dr, c + dc, p))
+
+        if not expanded_tiles:
+            return
+
+        # Find bounds of expanded tiles
+        max_r = max(t[0] for t in expanded_tiles)
+        max_c = max(t[1] for t in expanded_tiles)
+
+        # Set logical dimensions
+        if self._provided_logical_width is not None and self._provided_logical_width > 0:
+            self._logical_width = max(self._provided_logical_width, max_c + 1)
+        else:
+            self._logical_width = max_c + 1
+        self._logical_height = max_r + 1
+
+        # Create mappings
+        for lr, lc, physical_pos in expanded_tiles:
+            logical_pos = TilePosition(lr, lc)
+            # Calculate linear tile index in physical ROM layout
+            tile_index = physical_pos.row * self._physical_width + physical_pos.col
+
+            self._mappings.append(
+                TileMapping(
+                    logical_pos=logical_pos,
+                    physical_pos=physical_pos,
+                    tile_index=tile_index,
+                )
+            )
+
+    def _build_linear_mapping(self) -> None:
+        """Fallback for older versions: Build compact mapping from arrangement order."""
         arrangement_order = self._manager.get_arrangement_order()
         if not arrangement_order:
             return
@@ -77,18 +155,27 @@ class ArrangementBridge:
 
         for arr_type, key in arrangement_order:
             if arr_type == ArrangementType.TILE:
-                row, col = map(int, key.split(","))
-                physical_positions.append(TilePosition(row, col))
+                try:
+                    row, col = map(int, key.split(","))
+                    physical_positions.append(TilePosition(row, col))
+                except (ValueError, IndexError):
+                    continue
 
             elif arr_type == ArrangementType.ROW:
-                row_index = int(key)
-                for col in range(self._processor.grid_cols):
-                    physical_positions.append(TilePosition(row_index, col))
+                try:
+                    row_index = int(key)
+                    for col in range(self._processor.grid_cols):
+                        physical_positions.append(TilePosition(row_index, col))
+                except (ValueError, IndexError):
+                    continue
 
             elif arr_type == ArrangementType.COLUMN:
-                col_index = int(key)
-                for row in range(self._processor.grid_rows):
-                    physical_positions.append(TilePosition(row, col_index))
+                try:
+                    col_index = int(key)
+                    for row in range(self._processor.grid_rows):
+                        physical_positions.append(TilePosition(row, col_index))
+                except (ValueError, IndexError):
+                    continue
 
             elif arr_type == ArrangementType.GROUP:
                 group = self._manager.get_groups().get(key)
@@ -133,16 +220,16 @@ class ArrangementBridge:
     def logical_size(self) -> tuple[int, int]:
         """Get logical image size in pixels (width, height)."""
         return (
-            self._logical_width * self.TILE_SIZE,
-            self._logical_height * self.TILE_SIZE,
+            self._logical_width * self._tile_width,
+            self._logical_height * self._tile_height,
         )
 
     @property
     def physical_size(self) -> tuple[int, int]:
         """Get physical image size in pixels (width, height)."""
         return (
-            self._physical_width * self.TILE_SIZE,
-            self._physical_height * self.TILE_SIZE,
+            self._physical_width * self._tile_width,
+            self._physical_height * self._tile_height,
         )
 
     def physical_to_logical(self, physical_data: NDArray[np.uint8]) -> NDArray[np.uint8]:
@@ -157,22 +244,22 @@ class ArrangementBridge:
         if not self.has_arrangement:
             return physical_data.copy()
 
-        logical_h = self._logical_height * self.TILE_SIZE
-        logical_w = self._logical_width * self.TILE_SIZE
+        logical_h = self._logical_height * self._tile_height
+        logical_w = self._logical_width * self._tile_width
         logical_data = np.zeros((logical_h, logical_w), dtype=np.uint8)
 
         for mapping in self._mappings:
             # Source tile coordinates in physical image
-            phys_y = mapping.physical_pos.row * self.TILE_SIZE
-            phys_x = mapping.physical_pos.col * self.TILE_SIZE
+            phys_y = mapping.physical_pos.row * self._tile_height
+            phys_x = mapping.physical_pos.col * self._tile_width
 
             # Destination tile coordinates in logical image
-            log_y = mapping.logical_pos.row * self.TILE_SIZE
-            log_x = mapping.logical_pos.col * self.TILE_SIZE
+            log_y = mapping.logical_pos.row * self._tile_height
+            log_x = mapping.logical_pos.col * self._tile_width
 
             # Copy tile
-            logical_data[log_y : log_y + self.TILE_SIZE, log_x : log_x + self.TILE_SIZE] = physical_data[
-                phys_y : phys_y + self.TILE_SIZE, phys_x : phys_x + self.TILE_SIZE
+            logical_data[log_y : log_y + self._tile_height, log_x : log_x + self._tile_width] = physical_data[
+                phys_y : phys_y + self._tile_height, phys_x : phys_x + self._tile_width
             ]
 
         return logical_data
@@ -189,22 +276,22 @@ class ArrangementBridge:
         if not self.has_arrangement:
             return logical_data.copy()
 
-        phys_h = self._physical_height * self.TILE_SIZE
-        phys_w = self._physical_width * self.TILE_SIZE
+        phys_h = self._physical_height * self._tile_height
+        phys_w = self._physical_width * self._tile_width
         physical_data = np.zeros((phys_h, phys_w), dtype=np.uint8)
 
         for mapping in self._mappings:
             # Source tile coordinates in logical image
-            log_y = mapping.logical_pos.row * self.TILE_SIZE
-            log_x = mapping.logical_pos.col * self.TILE_SIZE
+            log_y = mapping.logical_pos.row * self._tile_height
+            log_x = mapping.logical_pos.col * self._tile_width
 
             # Destination tile coordinates in physical image
-            phys_y = mapping.physical_pos.row * self.TILE_SIZE
-            phys_x = mapping.physical_pos.col * self.TILE_SIZE
+            phys_y = mapping.physical_pos.row * self._tile_height
+            phys_x = mapping.physical_pos.col * self._tile_width
 
             # Copy tile
-            physical_data[phys_y : phys_y + self.TILE_SIZE, phys_x : phys_x + self.TILE_SIZE] = logical_data[
-                log_y : log_y + self.TILE_SIZE, log_x : log_x + self.TILE_SIZE
+            physical_data[phys_y : phys_y + self._tile_height, phys_x : phys_x + self._tile_width] = logical_data[
+                log_y : log_y + self._tile_height, log_x : log_x + self._tile_width
             ]
 
         return physical_data

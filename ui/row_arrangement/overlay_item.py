@@ -61,7 +61,7 @@ class OverlayGraphicsItem(QGraphicsPixmapItem):
             new_pos = value
             if isinstance(new_pos, QPointF):
                 # Update layer position
-                self._overlay_layer.set_position(int(new_pos.x()), int(new_pos.y()))
+                self._overlay_layer.set_position(new_pos.x(), new_pos.y())
 
         return super().itemChange(change, value)
 
