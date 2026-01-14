@@ -144,9 +144,9 @@ class SourceBar(QWidget):
         if loading:
             self.action_btn.setText("Loading...")
             self.action_btn.setEnabled(False)
-        else:
-            # Caller should call set_action_text() after this to restore proper text
-            self.action_btn.setEnabled(True)
+        # Note: If loading is False, we DON'T automatically re-enable here.
+        # The controller should call set_action_enabled() or set_action_text()
+        # to restore the proper state based on current validation/ROM state.
 
     def set_rom_available(self, available: bool, rom_size: int = 0) -> None:
         """Enable or disable offset-related controls based on ROM availability.

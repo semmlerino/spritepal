@@ -68,6 +68,8 @@ class EditWorkspace(QWidget):
         self._controller: EditingController | None = None
         self._canvas: PixelCanvas | None = None
         self._splitter: QSplitter | None = None
+        self._last_validation_state = True
+        self._image_loaded = False
         self._setup_ui()
         self._setup_shortcuts()
         # Ensure workspace expands to fill parent container
@@ -349,6 +351,7 @@ class EditWorkspace(QWidget):
             safe_disconnect(self._controller.paletteSourceSelected)
             safe_disconnect(self._controller.paletteSourcesCleared)
             safe_disconnect(self._controller.imageChanged)
+            safe_disconnect(self._controller.validationChanged)
 
     def set_controller(self, controller: "EditingController") -> None:
         """Set the editing controller, create canvas, and connect signals."""
@@ -401,6 +404,7 @@ class EditWorkspace(QWidget):
         controller.paletteSourceAdded.connect(self._palette_panel.add_palette_source)
         controller.paletteSourceSelected.connect(self._on_palette_source_selected)
         controller.paletteSourcesCleared.connect(self._palette_panel.clear_palette_sources)
+        controller.validationChanged.connect(self._on_validation_changed)
 
         # Populate existing palette sources from controller
         existing_sources = controller.get_palette_sources()
@@ -459,10 +463,23 @@ class EditWorkspace(QWidget):
 
     def set_image_loaded(self, loaded: bool) -> None:
         """Enable/disable editing controls based on image state."""
+        self._image_loaded = loaded
         self._icon_toolbar.setEnabled(loaded)
-        self._inject_btn.setEnabled(loaded)
-        self._save_export_panel.set_save_enabled(loaded)
         self._save_export_panel.set_export_enabled(loaded)
+        self._update_button_states()
+
+    def _on_validation_changed(self, is_valid: bool, _errors: list[str]) -> None:
+        """Handle validation state change from controller."""
+        self._last_validation_state = is_valid
+        self._update_button_states()
+
+    def _update_button_states(self) -> None:
+        """Update button enabled states based on image loaded and validation."""
+        # Only enable save/inject if image is loaded AND valid
+        can_save = self._image_loaded and self._last_validation_state
+
+        self._inject_btn.setEnabled(can_save)
+        self._save_export_panel.set_save_enabled(can_save)
 
     def set_workflow_mode(self, mode: str) -> None:
         """Configure workspace for specific workflow mode.
@@ -600,7 +617,8 @@ class EditWorkspace(QWidget):
         Args:
             enabled: Whether the save button should be enabled
         """
-        self._save_export_panel.set_save_enabled(enabled)
+        self._last_validation_state = enabled
+        self._update_button_states()
 
     def set_save_project_enabled(self, enabled: bool) -> None:
         """Enable or disable the save project button.

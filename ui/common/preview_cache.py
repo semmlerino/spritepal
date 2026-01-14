@@ -76,19 +76,23 @@ class SpritePreviewCache(BaseLRUCache[PreviewData]):
         Returns:
             str: Cache key
         """
-        # Use filename and size for ROM identity (faster than full path hash)
+        # Use filename, size and mtime for ROM identity (faster than full path hash)
         try:
-            rom_name = Path(rom_path).name
-            # Single stat() call avoids TOCTOU race with exists()
-            rom_size = Path(rom_path).stat().st_size
+            path_obj = Path(rom_path)
+            stat = path_obj.stat()
+            rom_name = path_obj.name
+            rom_size = stat.st_size
+            rom_mtime = stat.st_mtime
         except OSError:
             rom_name = Path(rom_path).name if rom_path else "unknown"
             rom_size = 0
+            rom_mtime = 0
 
         # Create key components
         key_parts = [
             rom_name,
             str(rom_size),
+            str(rom_mtime),
             f"{offset:06X}",
         ]
 

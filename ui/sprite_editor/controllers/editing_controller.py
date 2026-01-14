@@ -174,15 +174,34 @@ class EditingController(QObject):
             self.tool_manager.set_color(index)
             self.colorChanged.emit(index)
 
-    def set_palette(self, colors: list[tuple[int, int, int]], name: str = "") -> None:
-        """Set the palette colors."""
+    def set_palette(
+        self,
+        colors: list[tuple[int, int, int]],
+        name: str = "",
+        *,
+        source_type: str = "",
+        source_index: int = -1,
+    ) -> None:
+        """Set the palette colors.
+
+        Args:
+            colors: List of RGB colors
+            name: Optional name for the palette
+            source_type: Optional source type (e.g. 'rom', 'mesen', 'file')
+            source_index: Optional source index
+        """
         self.palette_model.from_rgb_list(colors)
         if name:
             self.palette_model.name = name
 
-        # Default to custom source when palette is set directly
-        self._current_palette_source = None
+        # Update source tracking
+        if source_type:
+            self._current_palette_source = (source_type, source_index)
+        else:
+            self._current_palette_source = None
+
         self.paletteChanged.emit()
+        self.paletteSourceSelected.emit(source_type, source_index)
 
     def load_image(self, data: np.ndarray, palette: list[tuple[int, int, int]] | None = None) -> None:
         """Load an image into the editor.
@@ -442,16 +461,15 @@ class EditingController(QObject):
                 from ui.sprite_editor import get_default_snes_palette
 
                 colors = get_default_snes_palette()
-                self.set_palette(colors, "Default SNES")
+                self.set_palette(colors, "Default SNES", source_type="default", source_index=0)
             elif source_type in ("mesen", "rom", "preset", "file"):
                 if key in self._palette_sources:
                     colors, name = self._palette_sources[key]
-                    self.set_palette(colors, name)
+                    self.set_palette(colors, name, source_type=source_type, source_index=index)
+                else:
+                    logger.warning(f"Unknown palette source: {source_type} #{index}")
             else:
                 logger.warning(f"Unknown palette source type: {source_type}")
-            
-            # Restore source tracker (cleared by set_palette)
-            self._current_palette_source = key
         except Exception as e:
             from PySide6.QtWidgets import QMessageBox
 

@@ -587,12 +587,26 @@ class MainWindow(QMainWindow):
         self._sprite_editor_workspace.redo()
 
     def _update_undo_redo_state(self, can_undo: bool, can_redo: bool) -> None:
-        """Update undo/redo action state."""
-        self._last_undo_state = (can_undo, can_redo)
-        # Only update buttons if sprite editor is active (Index 1)
-        if hasattr(self, "center_stack") and self.center_stack.currentIndex() == 1:
+        """Update undo/redo action state.
+
+        Args:
+            can_undo: Whether undo is available
+            can_redo: Whether redo is available
+        """
+        # Determine if this call is coming from the editor (via signal)
+        # or if it's a manual override (e.g. when switching workspaces)
+        is_editor_active = hasattr(self, "center_stack") and self.center_stack.currentIndex() == 1
+
+        # If called while editor is active, it's a state update from the editor
+        if is_editor_active:
+            self._last_undo_state = (can_undo, can_redo)
             self.undo_action.setEnabled(can_undo)
             self.redo_action.setEnabled(can_redo)
+        else:
+            # If editor is NOT active, we just disable the actions regardless of can_undo/redo
+            # but we DO NOT overwrite _last_undo_state so we can restore it later
+            self.undo_action.setEnabled(False)
+            self.redo_action.setEnabled(False)
 
     def _on_tab_changed(self, index: int) -> None:
         """Handle legacy tab changes (now unused with workspace architecture).

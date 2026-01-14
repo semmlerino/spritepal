@@ -249,8 +249,10 @@ class ROMWorkflowController(QObject):
         if not self._view:
             return
 
-        # Validate ROM identity (warn if mismatch but still add)
-        self._validate_capture_rom_match(capture)
+        # Validate ROM identity
+        if not self._validate_capture_rom_match(capture):
+            # Mismatched ROM - don't add to browser to avoid confusion/corruption
+            return
 
         rom_offset = self.normalize_mesen_offset(capture.offset)
         name = self._get_capture_name(capture)
