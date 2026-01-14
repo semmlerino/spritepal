@@ -170,12 +170,8 @@ class OverlayControls(QGroupBox):
         """Handle position spinbox changes."""
         x = self.x_spin.value()
         y = self.y_spin.value()
-        # Block signals to prevent feedback loop
-        self._overlay.blockSignals(True)
+        # No need to block overlay signals; _update_position_spinboxes handles re-entrancy
         self._overlay.set_position(x, y)
-        self._overlay.blockSignals(False)
-        # Emit position_changed manually since we blocked it
-        self._overlay.position_changed.emit(x, y)
 
     def _on_scale_slider_changed(self, value: int) -> None:
         """Handle scale slider changes (1-300 = 0.1%-30.0%)."""

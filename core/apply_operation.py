@@ -191,6 +191,8 @@ class ApplyOperation:
                 # Tile not covered - skip (warning already generated)
                 continue
 
+
+
             # Convert RGBA to grayscale for SNES sprite format
             # (SNES sprites use 4bpp indexed color)
             if region.mode == "RGBA":

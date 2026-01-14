@@ -46,6 +46,7 @@ class PixelCanvas(QWidget):
         self.temporary_picker = False  # Track if we're temporarily using picker with right-click
         self.previous_tool: str | None = None  # Store previous tool when using temporary picker
         self.last_draw_pos: QPoint | None = None  # Track last known position during drawing
+        self._last_hover_rect: QRect | None = None  # Track last hover highlight rect for cleanup
 
         # Overlay state (for image alignment)
         self._overlay_image: QImage | None = None
@@ -156,6 +157,8 @@ class PixelCanvas(QWidget):
         new_zoom = max(1, min(64, zoom))
         if new_zoom != self.zoom:
             self.zoom = new_zoom
+            # Reset hover rect as coordinates are now invalid
+            self._last_hover_rect = None
             self._update_size()
             # Invalidate scaled image cache since zoom changed
             self._invalidate_scaled_cache()
@@ -403,9 +406,13 @@ class PixelCanvas(QWidget):
         # Account for pen width in highlight drawing (1 pixel)
         pen_width = 1
 
-        # Add old hover position to update list
-        if old_pos is not None:
-            # Calculate the full brush area that needs updating
+        # INVALIDATE OLD REGION
+        # Use the stored rect from the PREVIOUS draw to ensure we clear exactly what was drawn.
+        # This prevents artifacts if the brush size changed between the last draw and now.
+        if self._last_hover_rect is not None:
+            regions_to_update.append(self._last_hover_rect)
+        elif old_pos is not None:
+            # Fallback if no stored rect (shouldn't happen if logic is tight, but safe)
             update_rect = QRect(
                 old_pos.x() * self.zoom - pen_width,
                 old_pos.y() * self.zoom - pen_width,
@@ -414,16 +421,19 @@ class PixelCanvas(QWidget):
             )
             regions_to_update.append(update_rect)
 
-        # Add new hover position to update list
+        # CALCULATE AND INVALIDATE NEW REGION
         if new_pos is not None:
             # Calculate the full brush area that needs updating
-            update_rect = QRect(
+            new_rect = QRect(
                 new_pos.x() * self.zoom - pen_width,
                 new_pos.y() * self.zoom - pen_width,
                 brush_size * self.zoom + pen_width * 2,
                 brush_size * self.zoom + pen_width * 2,
             )
-            regions_to_update.append(update_rect)
+            regions_to_update.append(new_rect)
+            self._last_hover_rect = new_rect
+        else:
+            self._last_hover_rect = None
 
         # Update the regions
         for rect in regions_to_update:
@@ -475,16 +485,16 @@ class PixelCanvas(QWidget):
         if self.tile_grid_visible and self.zoom >= 1:
             self._draw_tile_grid_viewport(painter, image_rect)
 
+        # Reset clipping to draw overlay and hover highlight outside image bounds
+        painter.setClipping(False)
+
         # Draw overlay if visible
         if self._overlay_visible and self._overlay_image is not None:
             self._draw_overlay(painter)
 
-        # Draw hover highlight without clipping restrictions
+        # Draw hover highlight
         if self.hover_pos and not self.drawing:
-            painter.save()  # Save current painter state
-            painter.setClipping(False)  # Remove clipping for hover highlight
             self._draw_hover_highlight(painter)
-            painter.restore()  # Restore painter state
 
     def _calculate_visible_image_region(self, widget_rect: QRect) -> QRect:
         """Calculate the visible region in image coordinates."""

@@ -264,6 +264,8 @@ class GridArrangementDialog(SplitterDialog):
             "Sample overlay image and write pixels to tiles currently placed on the canvas (Undoable)"
         )
         self.apply_overlay_btn.setStyleSheet("font-weight: bold; padding: 5px;")
+        # Set initial enabled state
+        self.apply_overlay_btn.setEnabled(self.overlay_layer.has_image() and self.overlay_layer.visible)
         _ = self.apply_overlay_btn.clicked.connect(self._apply_overlay)
         overlay_layout.addWidget(self.apply_overlay_btn)
 
@@ -512,7 +514,8 @@ class GridArrangementDialog(SplitterDialog):
         layout.addWidget(QLabel("Target Sheet Width:"))
         self.width_spin = QSpinBox(self)
         self.width_spin.setRange(1, 64)
-        self.width_spin.setValue(min(16, self.processor.grid_cols))
+        # Default to full width to preserve layout shape by default (avoid wrapping)
+        self.width_spin.setValue(self.processor.grid_cols)
         self.width_spin.setToolTip("Number of tiles per row in the final exported sprite sheet")
         self.width_spin.valueChanged.connect(self._on_arrangement_width_changed)
         layout.addWidget(self.width_spin)
@@ -845,6 +848,15 @@ class GridArrangementDialog(SplitterDialog):
             )
             return
 
+        if not self.overlay_layer.visible:
+            _ = QMessageBox.warning(
+                self,
+                "Overlay Hidden",
+                "The overlay is currently hidden.\n\n"
+                "Please check 'Show overlay' to make it visible before applying.",
+            )
+            return
+
         if not self.arrangement_manager.get_arranged_tiles():
             _ = QMessageBox.warning(
                 self,
@@ -913,12 +925,16 @@ class GridArrangementDialog(SplitterDialog):
             status += f" ({warning_count} warning(s))"
         self._update_status(status)
 
+        # Auto-hide overlay to show the result and prevent accidental double-application
+        self.overlay_layer.set_visible(False)
+
         # Show success message
         _ = QMessageBox.information(
             self,
             "Apply Complete",
             f"Successfully applied overlay to {num_modified} tile(s).\n\n"
-            "The modified tile data is available for export.",
+            "The overlay has been hidden to reveal the modified tiles.\n"
+            "Check 'Show overlay' to apply again.",
         )
 
     def _show_apply_warnings_dialog(self, warnings: list[ApplyWarning]) -> bool:
@@ -962,6 +978,11 @@ class GridArrangementDialog(SplitterDialog):
 
     def _on_overlay_changed(self, *_: object) -> None:
         """Handle overlay property changes (position, opacity, visibility, image)."""
+        # Update Apply button state based on visibility and image presence
+        if hasattr(self, "apply_overlay_btn"):
+            can_apply = self.overlay_layer.has_image() and self.overlay_layer.visible
+            self.apply_overlay_btn.setEnabled(can_apply)
+
         # If the overlay item is being moved by the mouse, we don't want to
         # trigger a full scene clear/redraw as it can be expensive and
         # potentially interrupt the drag operation.
@@ -1416,6 +1437,11 @@ class GridArrangementDialog(SplitterDialog):
                 # We need to load it into overlay_layer
                 try:
                     self.overlay_layer.import_image(config.overlay_path)
+                    # Set scale BEFORE position to ensure visual center logic doesn't override desired pos
+                    # Actually OverlayLayer.set_scale adjusts pos to keep center fixed.
+                    # If we set pos then scale, pos moves.
+                    # So we should set scale first (to arbitrary pos), then set explicit pos.
+                    self.overlay_layer.set_scale(config.overlay_scale)
                     self.overlay_layer.set_position(config.overlay_x, config.overlay_y)
                     self.overlay_layer.set_opacity(config.overlay_opacity)
                     self.overlay_layer.set_visible(config.overlay_visible)
@@ -1579,6 +1605,16 @@ class GridArrangementDialog(SplitterDialog):
         logical_width = self.width_spin.value() if hasattr(self, "width_spin") else min(16, self.processor.grid_cols)
         bridge = ArrangementBridge(self.arrangement_manager, self.processor, logical_width=logical_width)
         metadata = self.preview_generator.create_arrangement_preview_data(self.arrangement_manager, self.processor)
+
+        # Inject overlay state into metadata for persistence
+        if self.overlay_layer.has_image():
+            state = self.overlay_layer.get_state()
+            metadata["overlay_path"] = state.get("image_path")
+            metadata["overlay_x"] = state.get("x", 0.0)
+            metadata["overlay_y"] = state.get("y", 0.0)
+            metadata["overlay_scale"] = state.get("scale", 1.0)
+            metadata["overlay_opacity"] = state.get("opacity", 0.5)
+            metadata["overlay_visible"] = state.get("visible", True)
 
         # Include modified tiles if any Apply operation was performed
         # self.tiles contains the current pixel state (potentially modified by ApplyOverlayCommand)

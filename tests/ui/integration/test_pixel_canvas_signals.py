@@ -294,3 +294,50 @@ class TestPixelCanvasRegression:
         assert canvas._qcolor_cache[7].red() == 255
         assert canvas._qcolor_cache[7].green() == 165
         assert canvas._qcolor_cache[7].blue() == 0
+
+    def test_hover_artifacts_fix(self, qtbot, canvas_with_image):
+        """Verify proper invalidation of previous hover rect when brush size changes.
+
+        This ensures that if the brush size decreases, we still clear the full
+        area of the PREVIOUS large brush, preventing visual artifacts (trails).
+        """
+        from unittest.mock import Mock
+
+        from PySide6.QtCore import QPoint, QRect
+
+        canvas, controller = canvas_with_image
+        
+        # Mock canvas.update to track calls and prevent actual painting
+        canvas.update = Mock()
+
+        # 1. Start with Large Brush (Size 3)
+        controller.get_brush_size = Mock(return_value=3)
+
+        # Move to (0,0) - Establishes the "Previous" state
+        # Manually call _update_hover_regions to isolate logic
+        canvas._update_hover_regions(None, QPoint(0, 0))
+
+        # Verify initial rect is stored and is "Large"
+        # Size 3 * Zoom 8 = 24px. Plus 2px pen padding = 26px.
+        assert canvas._last_hover_rect is not None
+        large_rect = canvas._last_hover_rect
+        assert large_rect.width() == 26
+        assert large_rect.height() == 26
+
+        # 2. Decrease Brush Size to 1 (Small)
+        controller.get_brush_size = Mock(return_value=1)
+
+        # 3. Move to (2,2)
+        # This acts as the "cleanup" of the old position (0,0)
+        canvas._update_hover_regions(QPoint(0, 0), QPoint(2, 2))
+
+        # 4. Verify Correct Invalidation
+        # We expect canvas.update() to be called with the OLD Large rect.
+        # If the fix is working, it uses the stored large_rect.
+        # If the fix is missing, it would calculate a new rect at (0,0) using size 1 (width 10),
+        # leaving the outer pixels of the large rect un-cleared.
+        
+        canvas.update.assert_any_call(large_rect)
+        
+        # Also verify the new stored rect is Small
+        assert canvas._last_hover_rect.width() == 10  # 1*8 + 2

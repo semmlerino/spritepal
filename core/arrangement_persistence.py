@@ -42,6 +42,7 @@ class ArrangementConfig:
     overlay_path: str | None = None
     overlay_x: float = 0.0
     overlay_y: float = 0.0
+    overlay_scale: float = 1.0  # Added in v1.2 fix
     overlay_opacity: float = 0.5
     overlay_visible: bool = True
     # Timestamps
@@ -118,6 +119,7 @@ class ArrangementConfig:
             "overlay_path": self.overlay_path,
             "overlay_x": self.overlay_x,
             "overlay_y": self.overlay_y,
+            "overlay_scale": self.overlay_scale,
             "overlay_opacity": self.overlay_opacity,
             "overlay_visible": self.overlay_visible,
             # Timestamps
@@ -174,6 +176,7 @@ class ArrangementConfig:
             overlay_path=data.get("overlay_path"),
             overlay_x=data.get("overlay_x", 0),
             overlay_y=data.get("overlay_y", 0),
+            overlay_scale=data.get("overlay_scale", 1.0),
             overlay_opacity=data.get("overlay_opacity", 0.5),
             overlay_visible=data.get("overlay_visible", True),
             # Timestamps
@@ -209,7 +212,15 @@ class ArrangementConfig:
             groups=cast(list[dict[str, object]], metadata.get("groups", [])),
             total_tiles=cast(int, metadata["total_tiles"]),
             logical_width=cast(int, metadata.get("logical_width", 16)),
+            # Grid mapping (v1.2+, defaults to empty for older files)
             grid_mapping=cast(dict[str, dict[str, str]], metadata.get("grid_mapping", {})),
+            # Overlay state (injected by dialog)
+            overlay_path=cast(str | None, metadata.get("overlay_path")),
+            overlay_x=cast(float, metadata.get("overlay_x", 0.0)),
+            overlay_y=cast(float, metadata.get("overlay_y", 0.0)),
+            overlay_scale=cast(float, metadata.get("overlay_scale", 1.0)),
+            overlay_opacity=cast(float, metadata.get("overlay_opacity", 0.5)),
+            overlay_visible=cast(bool, metadata.get("overlay_visible", True)),
         )
 
     def validate_rom_hash(self, rom_path: str) -> bool:

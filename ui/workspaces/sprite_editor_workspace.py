@@ -182,6 +182,16 @@ class SpriteEditorWorkspace(QWidget):
         # Wire ROM workflow controller to ROM page
         self._rom_workflow_controller.set_view(self._rom_page)
 
+        # Wire VRAM page overlay signals (reusing ROM workflow logic for now)
+        vram_edit_ws = self._vram_page.edit_tab.workspace
+        vram_edit_ws.overlay_panel.importRequested.connect(self._rom_workflow_controller._on_overlay_import_requested)
+        vram_edit_ws.overlay_panel.applyRequested.connect(self._rom_workflow_controller._on_apply_overlay)
+        vram_edit_ws.overlay_panel.cancelRequested.connect(self._rom_workflow_controller._on_cancel_overlay)
+        vram_edit_ws.overlay_panel.baseOpacityChanged.connect(self._rom_workflow_controller._on_base_opacity_changed)
+        vram_edit_ws.overlay_panel.overlayOpacityChanged.connect(self._rom_workflow_controller._on_overlay_opacity_changed)
+        vram_edit_ws.overlay_panel.overlayScaleChanged.connect(self._rom_workflow_controller._on_overlay_scale_changed)
+        vram_edit_ws.overlay_panel.positionChanged.connect(self._rom_workflow_controller._on_overlay_position_changed)
+
         # Connect revert button to ROM workflow controller
         self._rom_page.workspace.icon_toolbar.revertClicked.connect(self._rom_workflow_controller.revert_to_original)
 

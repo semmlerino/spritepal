@@ -1184,7 +1184,8 @@ class ROMWorkflowController(QObject):
             from ui.grid_arrangement_dialog import GridArrangementDialog
 
             # Calculate grid dimensions from tile data
-            tiles_per_row = min(16, self.current_width // 8) if self.current_width > 0 else 16
+            # Use exact tile count to ensure 8x8 tile size calculation in processor
+            tiles_per_row = self.current_width // 8 if self.current_width > 0 else 16
 
             dialog = GridArrangementDialog(
                 temp_png,
