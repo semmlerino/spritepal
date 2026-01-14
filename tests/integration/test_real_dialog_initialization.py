@@ -151,27 +151,6 @@ class TestRealDialogInitialization:
 
         dialog.close()
 
-    def test_row_arrangement_dialog_real(self, qtbot: QtBot, tmp_path) -> None:
-        """Test RowArrangementDialog can be created with real Qt widgets."""
-        from PIL import Image
-
-        from ui.row_arrangement_dialog import RowArrangementDialog
-
-        # Create a minimal test image
-        test_image_path = tmp_path / "test_sprite.png"
-        test_image = Image.new("RGB", (16, 16), color="white")
-        test_image.save(test_image_path)
-
-        dialog = RowArrangementDialog(str(test_image_path), tiles_per_row=16)
-        qtbot.addWidget(dialog)
-
-        # Verify dialog was created
-        assert dialog is not None
-        assert dialog.sprite_path == str(test_image_path)
-        assert dialog.tiles_per_row == 16
-
-        dialog.close()
-
     def test_grid_arrangement_dialog_real(self, qtbot: QtBot, tmp_path) -> None:
         """Test GridArrangementDialog can be created with real Qt widgets."""
         from PIL import Image

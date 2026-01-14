@@ -19,14 +19,18 @@ from .grid_arrangement_manager import (
 )
 from .grid_image_processor import GridImageProcessor
 from .palette_colorizer import PaletteColorizer
-from .preview_generator import ArrangementPreviewGenerator
 
 
-class GridPreviewGenerator(ArrangementPreviewGenerator):
+class GridPreviewGenerator:
     """Extended preview generator with grid-based arrangement support"""
 
     def __init__(self, colorizer: PaletteColorizer | None = None):
-        super().__init__(colorizer)
+        """Initialize preview generator
+
+        Args:
+            colorizer: palette colorizer for colorized previews
+        """
+        self.colorizer = colorizer
         self.grid_color = (128, 128, 128, 128)  # Semi-transparent gray for grid lines
         self.selection_color = (
             255,
@@ -42,6 +46,34 @@ class GridPreviewGenerator(ArrangementPreviewGenerator):
             (128, 0, 255, 64),  # Purple
             (0, 255, 255, 64),  # Cyan
         ]
+
+    def apply_palette_to_full_image(self, image: Image.Image) -> Image.Image | None:
+        """Apply current palette to a full image (for original preview)
+
+        Args:
+            image: The image to colorize
+
+        Returns:
+            Colorized image or None if no colorizer/palettes
+        """
+        if not self.colorizer or not self.colorizer.is_palette_mode():
+            return None
+
+        # Use a special index (-1) to indicate full image colorization
+        return self.colorizer.get_display_image(-1, image)
+
+    def generate_output_filename(self, sprite_path: str, suffix: str = "_arranged") -> str:
+        """Generate output filename based on input path
+
+        Args:
+            sprite_path: Original sprite file path
+            suffix: Suffix to add before extension
+
+        Returns:
+            Generated output filename
+        """
+        base_name = Path(sprite_path).stem
+        return f"{base_name}{suffix}.png"
 
     def create_grid_arranged_image(
         self,

@@ -24,7 +24,6 @@ from ui.components import DialogBase, SplitterDialog, TabbedDialog
 from ui.dialogs.user_error_dialog import UserErrorDialog
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
-from ui.row_arrangement_dialog import RowArrangementDialog
 
 
 def _create_injection_dialog(**kwargs) -> InjectionDialog:
@@ -78,12 +77,6 @@ class TestComprehensiveDialogMigrations:
         assert isinstance(injection_dialog, TabbedDialog)
         assert isinstance(injection_dialog, DialogBase)  # TabbedDialog inherits from DialogBase
 
-        # Test RowArrangementDialog inherits from SplitterDialog
-        row_dialog = RowArrangementDialog(test_sprite_image)
-        qtbot.addWidget(row_dialog)
-        assert isinstance(row_dialog, SplitterDialog)
-        assert isinstance(row_dialog, DialogBase)  # SplitterDialog inherits from DialogBase
-
         # Test GridArrangementDialog inherits from SplitterDialog
         with patch("ui.grid_arrangement_dialog.QMessageBox.critical"):
             grid_dialog = GridArrangementDialog(test_sprite_image)
@@ -92,7 +85,7 @@ class TestComprehensiveDialogMigrations:
         assert isinstance(grid_dialog, DialogBase)  # SplitterDialog inherits from DialogBase
 
         # Clean up
-        for dialog in [error_dialog, injection_dialog, row_dialog, grid_dialog]:
+        for dialog in [error_dialog, injection_dialog, grid_dialog]:
             try:
                 dialog.close()
             except Exception:
@@ -105,7 +98,6 @@ class TestComprehensiveDialogMigrations:
         dialogs = [
             UserErrorDialog("Test error"),
             _create_injection_dialog(),
-            RowArrangementDialog(test_sprite_image),
         ]
 
         # Handle grid dialog with error patching
@@ -146,12 +138,6 @@ class TestComprehensiveDialogMigrations:
         qtbot.addWidget(injection_dialog)
         assert injection_dialog.button_box is not None
 
-        # RowArrangementDialog has Export button
-        row_dialog = RowArrangementDialog(test_sprite_image)
-        qtbot.addWidget(row_dialog)
-        assert row_dialog.button_box is not None
-        assert hasattr(row_dialog, "export_btn")
-
         # GridArrangementDialog has Export button
         with patch("ui.grid_arrangement_dialog.QMessageBox.critical"):
             grid_dialog = GridArrangementDialog(test_sprite_image)
@@ -160,7 +146,7 @@ class TestComprehensiveDialogMigrations:
         assert hasattr(grid_dialog, "export_btn")
 
         # Clean up
-        for dialog in [error_dialog, injection_dialog, row_dialog, grid_dialog]:
+        for dialog in [error_dialog, injection_dialog, grid_dialog]:
             try:
                 dialog.close()
             except Exception:
@@ -169,9 +155,7 @@ class TestComprehensiveDialogMigrations:
     def test_dialog_status_bar_integration_consistency(self, qtbot, test_sprite_image, app_context):
         """Test that status bar integration is consistent across dialogs"""
         # Dialogs with status bars
-        status_dialogs = [
-            RowArrangementDialog(test_sprite_image),
-        ]
+        status_dialogs = []
 
         # Handle grid dialog with error patching
         with patch("ui.grid_arrangement_dialog.QMessageBox.critical"):
@@ -224,12 +208,6 @@ class TestComprehensiveDialogMigrations:
         assert hasattr(injection_dialog, "tab_widget")
         assert injection_dialog.tab_widget.count() == 2  # VRAM and ROM tabs
 
-        # Test SplitterDialog structure
-        row_dialog = RowArrangementDialog(test_sprite_image)
-        qtbot.addWidget(row_dialog)
-        assert hasattr(row_dialog, "main_splitter")
-        assert row_dialog.main_splitter.count() == 2  # Content and preview panels
-
         # Patch QMessageBox to prevent blocking dialogs during GridArrangementDialog initialization
         with patch("ui.grid_arrangement_dialog.QMessageBox.critical"):
             grid_dialog = GridArrangementDialog(test_sprite_image)
@@ -238,7 +216,7 @@ class TestComprehensiveDialogMigrations:
         assert grid_dialog.main_splitter.count() == 2  # Left and right panels
 
         # Clean up
-        for dialog in [injection_dialog, row_dialog, grid_dialog]:
+        for dialog in [injection_dialog, grid_dialog]:
             try:
                 dialog.close()
             except Exception:
@@ -246,14 +224,6 @@ class TestComprehensiveDialogMigrations:
 
     def test_dialog_signal_integration_preservation(self, qtbot, test_sprite_image, app_context):
         """Test that signal integration is preserved after migrations"""
-        # Test RowArrangementDialog signals
-        row_dialog = RowArrangementDialog(test_sprite_image)
-        qtbot.addWidget(row_dialog)
-
-        # Should have arrangement manager with signals
-        assert hasattr(row_dialog, "arrangement_manager")
-        assert hasattr(row_dialog.arrangement_manager, "arrangement_changed")
-
         # Test GridArrangementDialog signals
         with patch("ui.grid_arrangement_dialog.QMessageBox.critical"):
             grid_dialog = GridArrangementDialog(test_sprite_image)
@@ -265,7 +235,7 @@ class TestComprehensiveDialogMigrations:
         assert hasattr(grid_dialog.grid_view, "tile_clicked")
 
         # Clean up
-        for dialog in [row_dialog, grid_dialog]:
+        for dialog in [grid_dialog]:
             try:
                 dialog.close()
             except Exception:
@@ -315,48 +285,8 @@ class TestComprehensiveDialogMigrations:
         except Exception as e:
             pytest.fail(f"Cleanup failed for GridArrangementDialog: {e}")
 
-        # RowArrangementDialog doesn't have explicit cleanup method
-        row_dialog = RowArrangementDialog(test_sprite_image)
-        qtbot.addWidget(row_dialog)
-
-        # Should still close properly without explicit cleanup
-        assert row_dialog.isVisible() or True  # Should not crash
-
         # Clean up
-        for dialog in [grid_dialog, row_dialog]:
-            try:
-                dialog.close()
-            except Exception:
-                pass
-
-    def test_cross_dialog_workflow_integration(self, qtbot, test_sprite_image, app_context):
-        """Test that dialogs can work together in typical workflows"""
-        # Simulate workflow: Extract -> Arrange -> Inject
-
-        # 1. Start with arrangement dialog (simulating extraction output)
-        arrangement_dialog = RowArrangementDialog(test_sprite_image)
-        qtbot.addWidget(arrangement_dialog)
-
-        # Should be able to access arrangement functionality
-        assert hasattr(arrangement_dialog, "arrangement_manager")
-        assert hasattr(arrangement_dialog, "export_btn")
-
-        # 2. Simulate injection workflow
-        injection_dialog = _create_injection_dialog(sprite_path=test_sprite_image)
-        qtbot.addWidget(injection_dialog)
-
-        # Should receive sprite path correctly
-        assert injection_dialog.sprite_file_selector.get_path() == test_sprite_image
-
-        # Should be able to switch between tabs
-        injection_dialog.set_current_tab(0)  # VRAM tab
-        assert injection_dialog.get_current_tab_index() == 0
-
-        injection_dialog.set_current_tab(1)  # ROM tab
-        assert injection_dialog.get_current_tab_index() == 1
-
-        # Clean up
-        for dialog in [arrangement_dialog, injection_dialog]:
+        for dialog in [grid_dialog]:
             try:
                 dialog.close()
             except Exception:
@@ -366,17 +296,15 @@ class TestComprehensiveDialogMigrations:
         """Test that component changes don't affect other dialogs"""
         # Create multiple dialogs
         injection_dialog = _create_injection_dialog()
-        row_dialog = RowArrangementDialog(test_sprite_image)
 
         with patch("ui.grid_arrangement_dialog.QMessageBox.critical"):
             grid_dialog = GridArrangementDialog(test_sprite_image)
 
-        for dialog in [injection_dialog, row_dialog, grid_dialog]:
+        for dialog in [injection_dialog, grid_dialog]:
             qtbot.addWidget(dialog)
 
         # Modify one dialog's settings
         injection_dialog.vram_offset_input.set_text("0x8000")
-        row_dialog.update_status("Test message")
 
         # Other dialogs should be unaffected
         assert grid_dialog.status_bar.currentMessage() != "Test message"
@@ -385,7 +313,7 @@ class TestComprehensiveDialogMigrations:
         assert injection_dialog.vram_offset_input.get_value() == 0x8000
 
         # Clean up
-        for dialog in [injection_dialog, row_dialog, grid_dialog]:
+        for dialog in [injection_dialog, grid_dialog]:
             try:
                 dialog.close()
             except Exception:

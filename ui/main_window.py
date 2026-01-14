@@ -828,29 +828,6 @@ class MainWindow(QMainWindow):
             # Keep signal for backwards compatibility during transition
             self.open_in_editor_requested.emit(sprite_file)
 
-    def on_arrange_rows_clicked(self) -> None:
-        """Handle arrange rows button click."""
-        if self._output_path:
-            sprite_file = f"{self._output_path}.png"
-            # Get palettes from sprite preview if available
-            palettes = self._get_palettes_for_dialog()
-            # Get tiles per row from sprite preview if available
-            tiles_per_row = self._get_tiles_per_row_for_dialog()
-
-            # Use DialogCoordinator directly (Phase 4b: controller removal)
-            def _open_arranged_rows(path: str) -> None:
-                self.dialog_coordinator.open_in_editor(path, status_callback=self.status_bar.showMessage)
-
-            self.dialog_coordinator.open_row_arrangement(
-                sprite_file,
-                palettes=palettes,
-                tiles_per_row=tiles_per_row,
-                status_callback=self.status_bar.showMessage,
-                on_success=_open_arranged_rows,
-            )
-            # Keep signal for backwards compatibility during transition
-            self.arrange_rows_requested.emit(sprite_file)
-
     def on_arrange_grid_clicked(self) -> None:
         """Handle arrange grid button click."""
         if self._output_path:

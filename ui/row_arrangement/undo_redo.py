@@ -15,7 +15,6 @@ from PySide6.QtCore import QObject, Signal
 if TYPE_CHECKING:
     from PIL import Image
 
-    from ui.row_arrangement.arrangement_manager import ArrangementManager
     from ui.row_arrangement.grid_arrangement_manager import (
         ArrangementType,
         GridArrangementManager,
@@ -168,131 +167,6 @@ class UndoRedoStack(QObject):
     def redo_description(self) -> str | None:
         """Get description of next redo command."""
         return self._redo_stack[-1].description if self._redo_stack else None
-
-
-# =============================================================================
-# Row Arrangement Commands
-# =============================================================================
-
-
-@dataclass
-class AddRowCommand:
-    """Command to add a single row to the arrangement."""
-
-    manager: ArrangementManager
-    row_index: int
-
-    @property
-    def description(self) -> str:
-        return f"Add row {self.row_index}"
-
-    def execute(self) -> None:
-        self.manager._add_row_no_history(self.row_index)
-
-    def undo(self) -> None:
-        self.manager._remove_row_no_history(self.row_index)
-
-
-@dataclass
-class RemoveRowCommand:
-    """Command to remove a single row from the arrangement."""
-
-    manager: ArrangementManager
-    row_index: int
-    position: int = -1  # Position in arrangement, captured at creation
-
-    @property
-    def description(self) -> str:
-        return f"Remove row {self.row_index}"
-
-    def execute(self) -> None:
-        self.manager._remove_row_no_history(self.row_index)
-
-    def undo(self) -> None:
-        self.manager._insert_row_no_history(self.row_index, self.position)
-
-
-@dataclass
-class AddMultipleRowsCommand:
-    """Command to add multiple rows to the arrangement."""
-
-    manager: ArrangementManager
-    row_indices: list[int]
-
-    @property
-    def description(self) -> str:
-        count = len(self.row_indices)
-        return f"Add {count} row{'s' if count != 1 else ''}"
-
-    def execute(self) -> None:
-        for row_index in self.row_indices:
-            self.manager._add_row_no_history(row_index)
-
-    def undo(self) -> None:
-        # Remove in reverse order to maintain correct positions
-        for row_index in reversed(self.row_indices):
-            self.manager._remove_row_no_history(row_index)
-
-
-@dataclass
-class RemoveMultipleRowsCommand:
-    """Command to remove multiple rows from the arrangement."""
-
-    manager: ArrangementManager
-    # List of (row_index, original_position) tuples
-    rows_with_positions: list[tuple[int, int]]
-
-    @property
-    def description(self) -> str:
-        count = len(self.rows_with_positions)
-        return f"Remove {count} row{'s' if count != 1 else ''}"
-
-    def execute(self) -> None:
-        for row_index, _ in self.rows_with_positions:
-            self.manager._remove_row_no_history(row_index)
-
-    def undo(self) -> None:
-        # Restore in reverse order of removal, by original position
-        for row_index, position in reversed(self.rows_with_positions):
-            self.manager._insert_row_no_history(row_index, position)
-
-
-@dataclass
-class ReorderRowsCommand:
-    """Command to reorder rows (e.g., via drag-drop)."""
-
-    manager: ArrangementManager
-    old_order: list[int]
-    new_order: list[int]
-
-    @property
-    def description(self) -> str:
-        return "Reorder rows"
-
-    def execute(self) -> None:
-        self.manager._set_arrangement_no_history(self.new_order)
-
-    def undo(self) -> None:
-        self.manager._set_arrangement_no_history(self.old_order)
-
-
-@dataclass
-class ClearRowsCommand:
-    """Command to clear all rows (memento-style, stores full state)."""
-
-    manager: ArrangementManager
-    previous_state: list[int] = field(default_factory=list)
-
-    @property
-    def description(self) -> str:
-        count = len(self.previous_state)
-        return f"Clear {count} row{'s' if count != 1 else ''}"
-
-    def execute(self) -> None:
-        self.manager._clear_no_history()
-
-    def undo(self) -> None:
-        self.manager._set_arrangement_no_history(self.previous_state)
 
 
 # =============================================================================

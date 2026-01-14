@@ -31,8 +31,6 @@ class ToolbarManager(QObject):
     # Signals - forward button clicks to main window
     extract_clicked = Signal()
     open_editor_clicked = Signal()
-    arrange_rows_clicked = Signal()
-    arrange_grid_clicked = Signal()
     inject_clicked = Signal()
 
     def __init__(self, parent: QWidget, actions_handler: MainWindow) -> None:
@@ -116,24 +114,13 @@ class ToolbarManager(QObject):
         layout.addWidget(self.open_editor_button, 3, 0)  # Row 3, first column
 
     def _create_arrange_button(self, layout: QGridLayout) -> None:
-        """Create consolidated arrange button with dropdown menu - secondary action"""
-        self.arrange_button = QPushButton("Arrange...")
+        """Create arrange button - secondary action"""
+        self.arrange_button = QPushButton("Arrange")
         self.arrange_button.setMinimumHeight(BUTTON_HEIGHT)
         self.arrange_button.setEnabled(False)
-        self.arrange_button.setToolTip("Arrange sprites (Ctrl+R for rows, Ctrl+G for grid)")
+        self.arrange_button.setToolTip("Arrange sprites in flexible grid layout (Ctrl+G)")
+        self.arrange_button.setShortcut(QKeySequence("Ctrl+G"))
         self.arrange_button.setStyleSheet(get_button_style("secondary_outline"))
-
-        # Create dropdown menu for arrange options
-        self.arrange_menu = QMenu(self.parent_widget)
-        self.arrange_rows_action = self.arrange_menu.addAction("By Rows (Ctrl+R)")
-        self.arrange_rows_action.setShortcut(QKeySequence("Ctrl+R"))
-        self.arrange_rows_action.setToolTip("Arrange sprite rows for easier editing")
-
-        self.arrange_grid_action = self.arrange_menu.addAction("By Grid (Ctrl+G)")
-        self.arrange_grid_action.setShortcut(QKeySequence("Ctrl+G"))
-        self.arrange_grid_action.setToolTip("Arrange sprites in flexible grid layout")
-
-        self.arrange_button.setMenu(self.arrange_menu)
 
         layout.addWidget(self.arrange_button, 3, 1)  # Row 3, second column
 
@@ -153,8 +140,7 @@ class ToolbarManager(QObject):
         """Connect button signals to action handlers"""
         self.extract_button.clicked.connect(self.actions_handler.on_extract_clicked)
         self.open_editor_button.clicked.connect(self.actions_handler.on_open_editor_clicked)
-        self.arrange_rows_action.triggered.connect(self.actions_handler.on_arrange_rows_clicked)
-        self.arrange_grid_action.triggered.connect(self.actions_handler.on_arrange_grid_clicked)
+        self.arrange_button.clicked.connect(self.actions_handler.on_arrange_grid_clicked)
         self.inject_button.clicked.connect(self.actions_handler.on_inject_clicked)
 
     def set_extract_enabled(self, enabled: bool, reason: str = "") -> None:

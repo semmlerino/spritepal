@@ -8,21 +8,77 @@ from pathlib import Path
 
 from PIL import Image
 
-from core.exceptions import TileError
+from core.exceptions import FileFormatError, TileError
 
 from .grid_arrangement_manager import TileGroup, TilePosition
-from .image_processor import RowImageProcessor
 
 
-class GridImageProcessor(RowImageProcessor):
+class GridImageProcessor:
     """Extended image processor with grid-based tile extraction capabilities"""
 
     def __init__(self) -> None:
-        super().__init__()
+        self.tile_width: int = 0
+        self.tile_height: int = 0
         self.tiles: dict[TilePosition, Image.Image] = {}
         self.grid_rows = 0
         self.grid_cols = 0
         self.original_image: Image.Image | None = None
+
+    def load_sprite(self, sprite_path: str) -> Image.Image:
+        """Load sprite image and convert to appropriate mode
+
+        Args:
+            sprite_path: Path to the sprite image file
+
+        Returns:
+            Loaded image in grayscale mode
+
+        Raises:
+            Exception: If image cannot be loaded
+        """
+        try:
+            # Load the sprite sheet
+            image = Image.open(sprite_path)
+
+            # Convert palette mode images to grayscale for proper display
+            if image.mode == "P":
+                # Convert palette indices to actual grayscale values
+                image = image.convert("L")
+            elif image.mode not in ["L", "1"]:
+                # Convert any other mode (RGB, RGBA, etc.) to grayscale
+                image = image.convert("L")
+
+        except Exception as e:
+            raise FileFormatError(f"Error loading sprite: {e}") from e
+        else:
+            return image
+
+    def calculate_tile_dimensions(self, image: Image.Image, tiles_per_row: int) -> tuple[int, int]:
+        """Calculate tile dimensions based on image width and tiles per row
+
+        Args:
+            image: The sprite sheet image
+            tiles_per_row: Number of tiles in each row
+
+        Returns:
+            Tuple of (tile_width, tile_height)
+
+        Raises:
+            ValueError: If tiles_per_row is not positive
+        """
+        if tiles_per_row <= 0:
+            raise ValueError(f"tiles_per_row must be positive, got {tiles_per_row}")
+
+        # Calculate tile width based on tiles_per_row
+        tile_width = image.width // tiles_per_row
+        # Assume square tiles (most common case)
+        tile_height = tile_width
+
+        # Store for later use
+        self.tile_width = tile_width
+        self.tile_height = tile_height
+
+        return tile_width, tile_height
 
     def extract_tiles_as_grid(self, image: Image.Image, tiles_per_row: int) -> dict[TilePosition, Image.Image]:
         """Extract individual tiles from sprite sheet into a grid structure

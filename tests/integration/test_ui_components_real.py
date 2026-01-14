@@ -17,7 +17,6 @@ from PIL import Image
 from PySide6.QtGui import QPixmap
 
 from core.services.image_utils import pil_to_qpixmap
-from ui.row_arrangement_dialog import RowArrangementDialog
 
 # Serial execution required: Real Qt components
 pytestmark = [
@@ -60,55 +59,3 @@ class TestImageUtils:
             assert result.width() == 32
             assert result.height() == 32
             assert not result.isNull()
-
-
-@pytest.mark.gui
-class TestRowArrangementDialog:
-    """Test RowArrangementDialog with real Qt components"""
-
-    @pytest.fixture
-    def temp_sprite_path(self):
-        """Create a temporary sprite file for testing"""
-        # Create a test sprite image
-        test_image = Image.new("RGBA", (64, 32), (255, 0, 0, 255))
-        temp_file = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-        test_image.save(temp_file.name)
-        return temp_file.name
-
-    @pytest.fixture
-    def dialog(self, temp_sprite_path, qtbot):
-        """Create a real RowArrangementDialog for testing"""
-        dialog = RowArrangementDialog(temp_sprite_path, tiles_per_row=8)
-        qtbot.addWidget(dialog)
-        return dialog
-
-    def test_scroll_position_preserved_on_palette_toggle(self, dialog, qtbot):
-        """Test that scroll position is preserved when toggling palette application"""
-        # Skip if dialog doesn't have the method (not all versions may have it)
-        if not hasattr(dialog, "toggle_palette_application"):
-            pytest.skip("Dialog does not have toggle_palette_application method")
-
-        # Get initial window title for comparison
-        dialog.windowTitle()
-
-        # Toggle palette application
-        dialog.toggle_palette_application()
-
-    def test_dialog_initialization(self, temp_sprite_path, qtbot):
-        """Test that dialog initializes properly with real components"""
-        dialog = RowArrangementDialog(temp_sprite_path, tiles_per_row=8)
-        qtbot.addWidget(dialog)
-
-        # Verify basic initialization
-        assert dialog.sprite_path == temp_sprite_path
-        assert dialog.tiles_per_row == 8
-        assert dialog.image_processor is not None
-        assert dialog.arrangement_manager is not None
-
-    def test_dialog_cleanup(self, dialog, qtbot):
-        """Test that dialog cleans up properly"""
-        # Dialog should be able to close without errors
-        dialog.close()
-
-        # Verify cleanup
-        assert not dialog.isVisible()

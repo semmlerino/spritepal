@@ -515,8 +515,7 @@ class TestExtractionParameterValidation:
     @pytest.mark.parametrize(
         "offset,should_pass",
         [
-            # Note: offset=0 is treated as "missing" due to falsy check in validate_required_params
-            # This is arguably a bug but documenting current behavior
+            (0, True),  # Zero offset is valid (start of ROM)
             (0x1, True),  # Near start of ROM (valid)
             (0x1000, True),  # Typical sprite offset
             (0x200000, True),  # Standard sprite bank
@@ -550,7 +549,7 @@ class TestExtractionParameterValidation:
         [
             ("not_an_int", "Invalid type for 'offset'"),
             (3.14, "Invalid type for 'offset'"),
-            # Note: None is caught as "missing" before type check due to falsy handling
+            # Note: None is caught as "missing" before type check (explicit None check)
             ([0x1000], "Invalid type for 'offset'"),
             ({"value": 0x1000}, "Invalid type for 'offset'"),
         ],

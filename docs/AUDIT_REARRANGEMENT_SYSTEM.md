@@ -18,8 +18,10 @@ This audit reveals that the current implementation is heavily overloaded, blendi
 
 ## 1. Responsibilities & Ownership
 
-### Current State
-- **GridArrangementDialog (Monolithic Orchestrator):** A 2,100+ line file that serves as the "God Object." It handles UI construction, mouse/keyboard events, palette cycling, and even raw image slicing via the `GridImageProcessor`.
+### Jan 14, 2026 Update: Legacy Consolidation
+As of Jan 14, the legacy `RowArrangementDialog` and its dedicated row-based image processing/preview paths have been removed. The system now exclusively uses the more flexible `GridArrangementDialog`. The `GridImageProcessor` and `GridPreviewGenerator` have been refactored to be standalone (removing inheritance from the now-deleted row counterparts).
+
+- **GridArrangementDialog (Consolidated Orchestrator):** Handles UI construction, mouse/keyboard events, palette cycling, and tile management. that serves as the "God Object." It handles UI construction, mouse/keyboard events, palette cycling, and even raw image slicing via the `GridImageProcessor`.
 - **GridArrangementManager (State Machine):** Tracks the logical mapping of tiles. However, it is "passive"—it relies on the Dialog to decide when to record history or how to calculate target slots.
 - **GridGraphicsView (The Interactive Canvas):** This component is responsible for both *rendering* (drawing grid lines, dimming unselected tiles) and *complex logic* (panning, zooming, and the "marquee" drag-selection algorithm).
 - **ROMWorkflowController (Persistence & Integration):** Triggers the dialog and manages the "Sidecar" files (JSON files saved next to the ROM that store the arrangement).

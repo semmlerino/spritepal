@@ -75,7 +75,6 @@ from ui.dialogs import (
 )
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
-from ui.row_arrangement_dialog import RowArrangementDialog
 
 
 class TestRealDialogIntegration:
@@ -102,63 +101,6 @@ class TestRealDialogIntegration:
         # Cleanup
         self.manager_factory.cleanup()
         # Manager cleanup handled by fixtures
-
-    def test_real_row_arrangement_dialog_vs_mocked_image_processing(self):
-        """
-        Test real RowArrangementDialog with image processing vs mocked image data.
-
-        EXPOSED BUGS MOCKS WOULD MISS:
-        - Real image file processing dependencies
-        - UI component initialization with real file data
-        - Image processor integration bugs
-        - Widget layout and arrangement logic errors
-        """
-        # Create real test image file (vs mocked file paths)
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
-            test_file = f.name
-            # Create proper minimal 16x16 PNG file for real file testing
-            from PIL import Image
-
-            test_image = Image.new("RGB", (16, 16), color="white")
-            test_image.save(f.name)
-
-        try:
-            # Test dialog creation with real file (could expose file validation bugs)
-            # DISCOVERED BUG #21: Dialog crashes on invalid image files instead of graceful error handling
-            dialog = RowArrangementDialog(test_file, tiles_per_row=16)
-
-            # Test UI components exist (vs mocked UI components)
-            # DISCOVERED BUG #22: Real attributes are 'available_list' and 'arranged_list', not *_rows_widget
-            # Dialog created successfully - no need to check internal widgets
-
-            # Test real file path handling (vs mocked file paths)
-            # DISCOVERED BUG #22: Real attribute is 'sprite_path', not 'sprite_file'
-            assert dialog.sprite_path == test_file, "Dialog should store real file path"
-            assert dialog.tiles_per_row == 16, "Dialog should store tiles per row"
-
-            # Test that dialog can handle real file operations
-            # This would expose file I/O bugs that mocks hide
-            try:
-                # The dialog should be able to process the real image file
-                # If image processing fails, it's a real bug vs mocked success
-
-                # Test dialog methods that work with real file data
-                if hasattr(dialog, "get_arranged_path"):
-                    # This method works with real file operations
-                    dialog.get_arranged_path()
-                    # Could be None if no arrangement done yet, but shouldn't crash
-
-            except Exception as e:
-                # If dialog fails with real file, it's potentially a real bug
-                print(f"POTENTIAL BUG in row arrangement with real file: {e}")
-                # Don't fail the test - this is discovery, not validation
-
-        finally:
-            dialog.close()
-            # Clean up test file
-            test_file_path = Path(test_file)
-            if test_file_path.exists():
-                test_file_path.unlink()
 
     def test_real_grid_arrangement_dialog_vs_mocked_tile_extraction(self):
         """

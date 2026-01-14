@@ -109,69 +109,6 @@ class DialogCoordinator(QObject):
                 status_callback(f"Failed to open pixel editor: {e}")
             return False
 
-    def open_row_arrangement(
-        self,
-        sprite_file: str,
-        palettes: dict[int, list[tuple[int, int, int]]] | None,
-        tiles_per_row: int | None,
-        status_callback: Callable[[str], None] | None = None,
-        on_success: Callable[[str], None] | None = None,
-    ) -> bool:
-        """Open the row arrangement dialog.
-
-        Args:
-            sprite_file: Path to the sprite file
-            palettes: Optional palette data to pass to dialog
-            tiles_per_row: Tiles per row (None to auto-calculate)
-            status_callback: Optional callback for status messages
-            on_success: Optional callback with arranged file path on success
-
-        Returns:
-            True if dialog was accepted, False otherwise
-        """
-        # Validate sprite file exists
-        sprite_result = FileValidator.validate_file_existence(sprite_file, "Sprite file")
-        if not sprite_result.is_valid:
-            if status_callback:
-                status_callback(sprite_result.error_message or "Sprite file not found")
-            return False
-
-        try:
-            # Calculate tiles per row if not provided
-            if tiles_per_row is None:
-                tiles_per_row = self._get_tiles_per_row_from_sprite(sprite_file)
-
-            # Direct import and instantiation
-            from ui.row_arrangement_dialog import RowArrangementDialog
-
-            dialog = RowArrangementDialog(sprite_file, tiles_per_row, self._parent)
-
-            # Pass palette data if available
-            if palettes:
-                try:
-                    dialog.set_palettes(palettes)
-                except Exception as e:
-                    logger.warning(f"Failed to load palette data for dialog: {e}")
-
-            if dialog.exec():
-                arranged_path = dialog.get_arranged_path()
-
-                if arranged_path and Path(arranged_path).exists():
-                    if on_success:
-                        on_success(arranged_path)
-                    if status_callback:
-                        status_callback("Opened arranged sprites in pixel editor")
-                    return True
-                else:
-                    if status_callback:
-                        status_callback("Row arrangement cancelled")
-                    return False
-            return False
-
-        except Exception as e:
-            self._error_handler.handle_exception(e, "Failed to open row arrangement dialog")
-            return False
-
     def open_grid_arrangement(
         self,
         sprite_file: str,
