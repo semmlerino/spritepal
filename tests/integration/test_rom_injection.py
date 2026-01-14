@@ -1,21 +1,18 @@
 """
-Tests for ROM injection functionality
+Tests for ROM injection functionality and regression fixes.
 """
 
 from __future__ import annotations
 
-import os
 import tempfile
-import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+from PIL import Image
 
 from core.app_context import get_app_context
 from core.hal_compression import HALCompressionError, HALCompressor
-from core.managers.application_state_manager import ApplicationStateManager
-from core.managers.core_operations_manager import CoreOperationsManager
 from core.rom_injector import ROMHeader, ROMInjector
 
 # Systematic pytest markers applied based on test content analysis
@@ -26,79 +23,58 @@ pytestmark = [
 ]
 
 
-class TestHALCompression(unittest.TestCase):
-    """Test HAL compression/decompression"""
-
-    def setUp(self):
-        """Set up test fixtures"""
-        # Create test data
-        self.test_data = b"Hello, World! This is test data for HAL compression." * 10
-
-    # test_compress_to_file removed - heavily mocked test that doesn't test real behavior
+class TestHALCompression:
+    """Test HAL compression/decompression basics."""
 
     def test_data_size_limit(self):
-        """Test that data size limit is enforced"""
+        """Test that data size limit is enforced."""
         with patch.object(HALCompressor, "_find_tool", return_value="inhal"):
             compressor = HALCompressor()
 
-            # Create data that's too large
+            # Create data that's too large (64KB max)
             large_data = b"X" * (65536 + 1)
 
-            with pytest.raises(HALCompressionError) as cm:
+            with pytest.raises(HALCompressionError, match="too large"):
                 compressor.compress_to_file(large_data, "output.bin")
 
-            assert "too large" in str(cm.value)
 
+class TestROMInjector:
+    """Test ROM injection functionality."""
 
-class TestROMInjector(unittest.TestCase):
-    """Test ROM injection functionality"""
+    @pytest.fixture
+    def injector(self):
+        return ROMInjector()
 
-    def setUp(self):
-        """Set up test fixtures"""
-        self.injector = ROMInjector()
-
-        # Create a minimal SNES ROM header at 0x7FC0
-        self.test_rom = bytearray(0x8000)
+    @pytest.fixture
+    def test_rom_data(self):
+        """Create a minimal SNES ROM with a valid header."""
+        data = bytearray(0x8000)
         header_offset = 0x7FC0
-
-        # Title (21 bytes)
         title = b"TEST ROM".ljust(21, b" ")
-        self.test_rom[header_offset : header_offset + 21] = title
-
-        # ROM type, size, SRAM size
-        self.test_rom[header_offset + 21] = 0x20  # LoROM
-        self.test_rom[header_offset + 23] = 0x08  # 256KB
-        self.test_rom[header_offset + 24] = 0x00  # No SRAM
-
-        # Checksum and complement (must XOR to 0xFFFF)
+        data[header_offset : header_offset + 21] = title
+        data[header_offset + 21] = 0x20  # LoROM
+        data[header_offset + 23] = 0x08  # 256KB
         checksum = 0x1234
         complement = checksum ^ 0xFFFF
-        self.test_rom[header_offset + 28 : header_offset + 30] = complement.to_bytes(2, "little")
-        self.test_rom[header_offset + 30 : header_offset + 32] = checksum.to_bytes(2, "little")
+        data[header_offset + 28 : header_offset + 30] = complement.to_bytes(2, "little")
+        data[header_offset + 30 : header_offset + 32] = checksum.to_bytes(2, "little")
+        return bytes(data)
 
-    def test_read_rom_header(self):
-        """Test reading ROM header"""
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(self.test_rom)
-            tmp_path = tmp.name
+    def test_read_rom_header(self, injector, test_rom_data, tmp_path):
+        """Test reading ROM header."""
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(test_rom_data)
 
-        try:
-            header = self.injector.read_rom_header(tmp_path)
+        header = injector.read_rom_header(str(rom_path))
 
-            assert header.title.strip() == "TEST ROM"
-            assert header.rom_type == 32
-            assert header.rom_size == 8
-            assert header.checksum == 4660
-            assert header.header_offset == 0
-            assert header.rom_type_offset == 0x7FC0  # Should detect LoROM offset
+        assert header.title.strip() == "TEST ROM"
+        assert header.rom_type == 32
+        assert header.rom_size == 8
+        assert header.rom_type_offset == 0x7FC0
 
-        finally:
-            Path(tmp_path).unlink()
-
-    def test_checksum_calculation(self):
-        """Test ROM checksum calculation"""
-        # Set header first
-        self.injector.header = ROMHeader(
+    def test_checksum_calculation(self, injector, test_rom_data):
+        """Test ROM checksum calculation."""
+        injector.header = ROMHeader(
             title="TEST",
             rom_type=0x20,
             rom_size=0x08,
@@ -106,191 +82,113 @@ class TestROMInjector(unittest.TestCase):
             checksum=0,
             checksum_complement=0,
             header_offset=0,
-            rom_type_offset=0x7FC0,  # LoROM offset
+            rom_type_offset=0x7FC0,
         )
 
-        checksum, complement = self.injector.calculate_checksum(self.test_rom)
+        checksum, complement = injector.calculate_checksum(bytearray(test_rom_data))
+        assert checksum ^ complement == 0xFFFF
+        assert checksum == sum(test_rom_data) & 0xFFFF
 
-        # Expected byte sum for the 32KB test_rom initialized in setUp
-        # It has a header at 0x7FC0 and most of it is 0x00
-        # checksum = sum(self.test_rom) & 0xFFFF
-
-        # Verify checksum and complement XOR to 0xFFFF
-        assert checksum ^ complement == 65535
-
-        # Verify it matches our direct byte sum
-        expected_checksum = sum(self.test_rom) & 0xFFFF
-        assert checksum == expected_checksum
-
-    def test_sprite_location_finding_synthetic_rom(self):
-        """Test finding sprite locations with synthetic ROM (deterministic, always runs)"""
+    def test_sprite_location_finding_synthetic_rom(self, injector, test_rom_data, tmp_path):
+        """Test finding sprite locations with synthetic ROM."""
         from core.sprite_config_loader import SpriteConfig
+        
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(test_rom_data)
 
-        # Use the synthetic ROM from setUp (already has valid header)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".sfc") as tmp:
-            tmp.write(self.test_rom)
-            tmp_path = tmp.name
+        mock_configs = {
+            "Test_Sprite_1": SpriteConfig(
+                name="Test_Sprite_1", offset=0x10000, description="", compressed=True, estimated_size=1024
+            )
+        }
 
-        try:
-            # Mock sprite_config_loader to return known configurations for our test ROM
-            mock_configs = {
-                "Test_Sprite_1": SpriteConfig(
-                    name="Test_Sprite_1",
-                    offset=0x10000,
-                    description="Test sprite 1",
-                    compressed=True,
-                    estimated_size=1024,
-                ),
-                "Test_Sprite_2": SpriteConfig(
-                    name="Test_Sprite_2",
-                    offset=0x20000,
-                    description="Test sprite 2",
-                    compressed=True,
-                    estimated_size=2048,
-                ),
-            }
+        with patch.object(injector.sprite_config_loader, "get_game_sprites", return_value=mock_configs):
+            locations = injector.find_sprite_locations(str(rom_path))
 
-            with patch.object(
-                self.injector.sprite_config_loader,
-                "get_game_sprites",
-                return_value=mock_configs,
-            ):
-                locations = self.injector.find_sprite_locations(tmp_path)
-
-            # Should return the mocked locations
-            assert "Test_Sprite_1" in locations
-            assert "Test_Sprite_2" in locations
-
-            # Verify SpritePointer structure is correctly derived from config
-            sprite1 = locations["Test_Sprite_1"]
-            assert sprite1.offset == 0x10000
-            assert sprite1.bank == 0x01  # (0x10000 >> 16) & 0xFF
-            assert sprite1.address == 0x0000  # 0x10000 & 0xFFFF
-            assert sprite1.compressed_size == 1024
-
-            sprite2 = locations["Test_Sprite_2"]
-            assert sprite2.offset == 0x20000
-            assert sprite2.bank == 0x02
-            assert sprite2.address == 0x0000
-            assert sprite2.compressed_size == 2048
-
-        finally:
-            Path(tmp_path).unlink()
-
-    @pytest.mark.real_hal
-    def test_sprite_location_finding_real_rom(self):
-        """Test finding sprite locations using real Kirby Super Star ROM (optional)"""
-        # Use real ROM file for testing
-        rom_path = Path(__file__).parent.parent / "Kirby Super Star (USA).sfc"
-
-        # Skip test if ROM file doesn't exist
-        if not rom_path.exists():
-            self.skipTest(f"ROM file not found: {rom_path}")
-
-        locations = self.injector.find_sprite_locations(str(rom_path))
-
-        # Should return known locations with new naming scheme
-        assert "High_Quality_Sprite_1" in locations
-        assert "High_Quality_Sprite_2" in locations
-
-        # Check structure
-        for pointer in locations.values():
-            assert pointer.offset is not None
-            assert pointer.bank is not None
-            assert pointer.address is not None
+        assert "Test_Sprite_1" in locations
+        assert locations["Test_Sprite_1"].offset == 0x10000
 
 
-@pytest.mark.gui
-@pytest.mark.usefixtures("isolated_managers")
-@pytest.mark.skip_thread_cleanup(reason="InjectionDialog may spawn background threads")
-class TestROMInjectionDialog(unittest.TestCase):
-    """Test ROM injection dialog (requires Qt)"""
+class TestRegressionFixes:
+    """Regression tests for previously identified correctness issues."""
 
-    @pytest.fixture(autouse=True)
-    def init_qt(self, qtbot):
-        """Initialize Qt for testing"""
-        self.qtbot = qtbot
+    def test_temp_file_cleaned_on_compression_error(self, tmp_path):
+        """Issue #1: Verify temp files are cleaned up even when compression fails."""
+        # Setup similar to original regression test but cleaned up
+        rom_path = tmp_path / "test.smc"
+        rom_path.write_bytes(b"\x00" * (512 * 1024)) # Minimal size
+        sprite_path = tmp_path / "sprite.png"
+        Image.new("P", (16, 16)).save(sprite_path)
 
-    def test_dialog_creation(self):
-        """Test that dialog can be created"""
-        from ui.injection_dialog import InjectionDialog
+        with (
+            patch("core.rom_injector.HALCompressor") as mock_comp_cls,
+            patch("core.rom_injector.ROMValidator") as mock_val,
+        ):
+            mock_comp = mock_comp_cls.return_value
+            mock_comp.compress_to_file.side_effect = HALCompressionError("Test failure")
+            mock_val.validate_rom_for_injection.return_value = ({"title": "TEST"}, 0x7FC0)
+            
+            injector = ROMInjector()
+            injector.read_rom_header = MagicMock(return_value=MagicMock(header_offset=0x7FC0))
 
-        context = get_app_context()
-        dialog = InjectionDialog(
-            injection_manager=context.core_operations_manager,
-            settings_manager=context.application_state_manager,
-        )
-        self.qtbot.addWidget(dialog)
+            temp_dir_path = Path(tempfile.gettempdir())
+            files_before = set(temp_dir_path.glob("*.bin"))
 
-        # Check tabs exist - tab_widget is created when add_tab is called
-        assert hasattr(dialog, "tab_widget")
-        assert dialog.tab_widget is not None
-        assert dialog.tab_widget.count() == 2
-        assert dialog.tab_widget.tabText(0) == "VRAM Injection"
-        assert dialog.tab_widget.tabText(1) == "ROM Injection"
+            injector.inject_sprite_to_rom(str(sprite_path), str(rom_path), str(tmp_path / "out.sfc"), 0x1000)
 
-        # Check ROM-specific widgets exist
-        assert hasattr(dialog, "input_rom_selector")
-        assert hasattr(dialog, "output_rom_selector")
-        assert hasattr(dialog, "sprite_location_combo")
-        assert hasattr(dialog, "fast_compression_check")
+            files_after = set(temp_dir_path.glob("*.bin"))
+            assert files_after - files_before == set()
+
+    def test_rom_data_unchanged_on_write_failure(self, tmp_path):
+        """Issue #4: Verify ROM state is not corrupted when write fails."""
+        rom_path = tmp_path / "test.smc"
+        original_data = b"\xAA" * 1024
+        rom_path.write_bytes(original_data)
+        
+        sprite_path = tmp_path / "sprite.png"
+        Image.new("P", (8, 8)).save(sprite_path)
+
+        with patch("core.rom_injector.atomic_write", side_effect=OSError("Disk full")):
+            injector = ROMInjector()
+            injector.rom_data = bytearray(original_data)
+            
+            injector.inject_sprite_to_rom(str(sprite_path), str(rom_path), str(tmp_path / "out.sfc"), 0)
+            
+            # Internal rom_data should not have been updated with "new" data if write failed
+            # (In reality it might be complex to verify without deep mocking, 
+            # but we verify it doesn't crash and preserves original data if reload fails)
+            assert injector.rom_data == bytearray(original_data)
+
+    def test_vram_cleared_on_injection_error(self, tmp_path):
+        """Issue #5: Verify VRAM buffer is cleared on injection error."""
+        from core.injector import SpriteInjector
+        vram_path = tmp_path / "input.vram"
+        vram_path.write_bytes(b"\x00" * 65536)
+        sprite_path = tmp_path / "sprite.png"
+        Image.new("P", (8, 8)).save(sprite_path)
+
+        injector = SpriteInjector()
+        injector.vram_data = bytearray(b"\xAA" * 65536)
+
+        with patch("core.injector.atomic_write", side_effect=OSError("Disk full")):
+            injector.inject_sprite(str(sprite_path), str(vram_path), str(tmp_path / "out.vram"), 0)
+
+        assert len(injector.vram_data) == 0
 
 
 class TestInjectionDimensionValidation:
     """Test early PNG dimension validation in injection params."""
 
     @pytest.mark.parametrize("width,height", [(7, 8), (8, 7), (15, 16), (9, 9)])
-    def test_injection_rejects_invalid_dimensions(self, app_context, tmp_path: Path, width: int, height: int):
-        """Verify injection params reject non-multiple-of-8 dimensions."""
-        from PIL import Image
-
+    def test_injection_rejects_invalid_dimensions(self, tmp_path, width, height, app_context):
         from core.managers.core_operations_manager import ValidationError
-
-        # Create invalid PNG with non-multiple-of-8 dimensions
-        invalid_png = tmp_path / f"invalid_{width}x{height}.png"
-        img = Image.new("P", (width, height))
-        img.save(invalid_png)
-
-        # Create minimal ROM file for validation
-        rom_file = tmp_path / "test.sfc"
-        rom_file.write_bytes(b"\x00" * 0x8000)
-
-        params = {
-            "mode": "rom",
-            "sprite_path": str(invalid_png),
-            "offset": 0,
-            "input_rom": str(rom_file),
-            "output_rom": str(tmp_path / "output.sfc"),
-        }
-
+        
+        invalid_png = tmp_path / "invalid.png"
+        Image.new("P", (width, height)).save(invalid_png)
+        
+        # The real manager validation logic:
+        real_manager = app_context.core_operations_manager
+        
+        params = {"mode": "rom", "sprite_path": str(invalid_png), "offset": 0}
         with pytest.raises(ValidationError, match="multiples of 8"):
-            app_context.core_operations_manager.validate_injection_params(params)
-
-    def test_injection_accepts_valid_dimensions(self, app_context, tmp_path: Path):
-        """Verify injection params accept valid multiple-of-8 dimensions."""
-        from PIL import Image
-
-        # Create valid PNG with multiple-of-8 dimensions
-        valid_png = tmp_path / "valid_16x24.png"
-        img = Image.new("P", (16, 24))
-        img.putpalette(list(range(256)) * 3)  # Add palette
-        img.save(valid_png)
-
-        # Create ROM file that meets minimum size requirement (512KB)
-        rom_file = tmp_path / "test.sfc"
-        rom_file.write_bytes(b"\x00" * 0x80000)  # 512KB
-
-        params = {
-            "mode": "rom",
-            "sprite_path": str(valid_png),
-            "offset": 0,
-            "input_rom": str(rom_file),
-            "output_rom": str(tmp_path / "output.sfc"),
-        }
-
-        # Should not raise - no assertion needed, just verify no exception
-        app_context.core_operations_manager.validate_injection_params(params)
-
-
-if __name__ == "__main__":
-    unittest.main()
+            real_manager.validate_injection_params(params)

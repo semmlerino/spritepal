@@ -80,3 +80,47 @@ def create_output_image(
     else:
         # Default to grayscale
         return Image.new("L", (width, height), 0)
+
+
+def bgr555_to_rgb888(bgr555: int) -> tuple[int, int, int]:
+    """
+    Convert BGR555 color to RGB888.
+
+    Args:
+        bgr555: 16-bit BGR555 color value
+
+    Returns:
+        Tuple of (r, g, b) values in 0-255 range
+    """
+    # Extract 5-bit components (SNES format: xBBBBBGGGGGRRRRR)
+    r = bgr555 & 0x1F
+    g = (bgr555 >> 5) & 0x1F
+    b = (bgr555 >> 10) & 0x1F
+
+    # Convert to 8-bit values using (val << 3) | (val >> 2) for accurate scaling
+    r8 = (r << 3) | (r >> 2)
+    g8 = (g << 3) | (g >> 2)
+    b8 = (b << 3) | (b >> 2)
+
+    return r8, g8, b8
+
+
+def rgb888_to_bgr555(r: int, g: int, b: int) -> int:
+    """
+    Convert RGB888 color to BGR555.
+
+    Args:
+        r: Red component (0-255)
+        g: Green component (0-255)
+        b: Blue component (0-255)
+
+    Returns:
+        16-bit BGR555 color value
+    """
+    # Convert to 5-bit values
+    r5 = r >> 3
+    g5 = g >> 3
+    b5 = b >> 3
+
+    # Pack into BGR555
+    return (b5 << 10) | (g5 << 5) | r5

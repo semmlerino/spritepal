@@ -907,7 +907,8 @@ class ROMWorkflowController(QObject):
             self._load_existing_arrangement()
 
         # Use SpriteRenderer to create PIL image from 4bpp
-        from ..core.palette_utils import get_default_snes_palette
+        from ui.sprite_editor import get_default_snes_palette
+
         from ..services import SpriteRenderer
 
         renderer = SpriteRenderer()
@@ -949,6 +950,9 @@ class ROMWorkflowController(QObject):
         all_palettes: dict[int, list[tuple[int, int, int]]] = {}
         detected_palette_index: int | None = None
         palette_offset: int | None = None
+
+        # Clear existing ROM palettes before registering new ones to prevent accumulation
+        self._editing_controller.clear_palette_sources("rom")
 
         # Check library for associated palette choice
         library_palette_colors = None
@@ -1810,12 +1814,25 @@ class ROMWorkflowController(QObject):
                 # Update our knowledge of checksum validity after successful injection
                 self._checksum_valid = True
 
+                # Update ROM path to the modified version so subsequent previews use it
+                self.rom_path = str(output_path)
+                try:
+                    self._rom_mtime = Path(self.rom_path).stat().st_mtime
+                except OSError:
+                    self._rom_mtime = None
+
                 if self._view:
                     self._view.set_checksum_valid(True)
+                    self._view.set_rom_path(self.rom_path)
                     # Invalidate thumbnail cache so it regenerates with updated sprite
                     self._view.asset_browser.clear_thumbnail(self.current_offset)
+
                 if self.preview_coordinator:
                     self.preview_coordinator.invalidate_preview_cache(self.current_offset)
+
+                # Re-queue thumbnail generation for the modified sprite
+                if self._thumbnail_controller:
+                    self._thumbnail_controller.queue_thumbnail(self.current_offset)
 
                 if self._message_service:
                     self._message_service.show_message(f"Successfully saved to: {output_path}")
@@ -2256,18 +2273,19 @@ class ROMWorkflowController(QObject):
     def _on_palette_source_changed(self, source_type: str, palette_index: int) -> None:
         """Handle palette source change from editing controller.
 
-        When user loads a custom palette file, hide the 'Using default palette' warning
-        since the user has explicitly chosen their palette.
+        When user selects a specific palette source (ROM, Mesen, File, or Preset),
+        hide the 'Using default palette' warning since the user has explicitly
+        chosen their palette.
         Also updates the library entry if the sprite is already in the library.
 
         Args:
             source_type: Type of palette source ('file', 'rom', 'mesen', 'default', 'preset')
             palette_index: Index of the palette within the source
         """
-        # Hide palette warning when user explicitly loads a palette file
-        if source_type == "file" and self._view:
+        # Hide palette warning when user explicitly selects a non-default palette
+        if source_type != "default" and self._view:
             self._view.hide_palette_warning()
-            if self._message_service:
+            if self._message_service and source_type == "file":
                 self._message_service.show_message("Custom palette loaded")
 
         # Update library association if sprite is in library

@@ -7,9 +7,9 @@ Extracts sprite-to-palette assignments from OAM dumps.
 import logging
 from typing import TypedDict
 
-from ..constants import (
+from utils.constants import (
     BYTES_PER_OAM_ENTRY,
-    BYTES_PER_TILE_4BPP,
+    BYTES_PER_TILE as BYTES_PER_TILE_4BPP,
     KIRBY_TILE_END,
     KIRBY_TILE_START,
     KIRBY_VRAM_BASE,

@@ -17,6 +17,7 @@ from ui.components.visualization.rom_map_widget import ROMMapWidget
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.skip_thread_cleanup(reason="UI tests may involve managers that spawn threads"),
     pytest.mark.headless,
 ]

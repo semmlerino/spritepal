@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.headless,
     pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,

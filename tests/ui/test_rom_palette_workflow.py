@@ -52,7 +52,7 @@ def test_open_in_editor_uses_extracted_palette(qtbot):
     mock_rom_extractor.extract_palette_range.return_value = all_palettes
 
     # Execute
-    with patch("ui.sprite_editor.core.palette_utils.get_default_snes_palette") as mock_default:
+    with patch("ui.sprite_editor.get_default_snes_palette") as mock_default:
         controller.open_in_editor()
 
         # Verify extract_palette_range was called for all sprite palettes (8-15)
@@ -117,7 +117,7 @@ def test_open_in_editor_fallback_to_default(qtbot):
     # which simulates "no palette config found for this sprite".
 
     # Execute
-    with patch("ui.sprite_editor.core.palette_utils.get_default_snes_palette") as mock_default:
+    with patch("ui.sprite_editor.get_default_snes_palette") as mock_default:
         mock_default_palette = [(1, 1, 1)] * 16
         mock_default.return_value = mock_default_palette
 
@@ -163,7 +163,7 @@ def test_open_in_editor_clears_previous_rom_sources(qtbot):
     mock_rom_extractor.get_palette_config_from_sprite_config.return_value = (None, None)
 
     # Execute
-    with patch("ui.sprite_editor.core.palette_utils.get_default_snes_palette") as mock_default:
+    with patch("ui.sprite_editor.get_default_snes_palette") as mock_default:
         mock_default.return_value = [(0, 0, 0)] * 16
         controller.open_in_editor()
 

@@ -23,6 +23,7 @@ from core.managers.application_state_manager import ApplicationStateManager
 from tests.fixtures.timeouts import signal_timeout
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.headless,
 ]
 

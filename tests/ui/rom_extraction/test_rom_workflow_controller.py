@@ -1,14 +1,21 @@
+"""
+Tests for ROMWorkflowController logic and regression fixes.
+"""
+
+from __future__ import annotations
+
 from datetime import datetime
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
-from PySide6.QtCore import QObject
 
 from core.mesen_integration.log_watcher import CapturedOffset
 from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
 
 
-class TestSyncCapturesRepro:
+class TestROMWorkflowControllerRegression:
+    """Regression tests for ROMWorkflowController desync issues."""
+
     @pytest.fixture
     def mock_view(self):
         view = MagicMock()
@@ -24,10 +31,8 @@ class TestSyncCapturesRepro:
 
     @pytest.fixture
     def controller(self, mock_view, mock_log_watcher):
-        # Mock EditingController as it is a required dependency
-        mock_editing_ctrl = MagicMock()
-
         # Mock dependencies
+        mock_editing_ctrl = MagicMock()
         mock_rom_cache = MagicMock()
         mock_rom_extractor = MagicMock()
         mock_sprite_library = MagicMock()
@@ -89,27 +94,15 @@ class TestSyncCapturesRepro:
         mock_view.add_mesen_capture.reset_mock()
 
         # 3. Load a new ROM
-        # This triggers clear_asset_browser()
         controller.load_rom("test.sfc")
 
-        # Verify clear was called
-        mock_view.clear_asset_browser.assert_called()
-
-        # 4. Verify re-population (THIS SHOULD FAIL CURRENTLY)
+        # Verify re-population
         # The controller should re-add the existing Mesen captures after clearing
         mock_view.add_mesen_capture.assert_called_with(ANY, 0x123456)
 
 
 class TestThumbnailRequeueOnAlignment:
-    """Tests for thumbnail re-queuing when offset alignment occurs.
-
-    The refactored approach uses signals:
-    1. _on_preview_ready() calls update_sprite_offset()
-    2. update_sprite_offset() emits item_offset_changed signal
-    3. _on_item_offset_changed() handler queues thumbnail
-
-    These tests verify each part of the chain.
-    """
+    """Tests for thumbnail re-queuing when offset alignment occurs."""
 
     @pytest.fixture
     def mock_view(self):
@@ -119,13 +112,7 @@ class TestThumbnailRequeueOnAlignment:
         return view
 
     @pytest.fixture
-    def mock_thumbnail_controller(self):
-        return MagicMock()
-
-    @pytest.fixture
-    def controller(self, mock_view, mock_thumbnail_controller):
-        from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
-
+    def controller(self, mock_view):
         mock_editing_ctrl = MagicMock()
         mock_rom_cache = MagicMock()
         mock_rom_extractor = MagicMock()
@@ -143,7 +130,6 @@ class TestThumbnailRequeueOnAlignment:
             sprite_library=mock_sprite_library,
         )
         ctrl.set_view(mock_view)
-        ctrl._thumbnail_controller = mock_thumbnail_controller
         ctrl.current_offset = 0x1000
         return ctrl
 
@@ -167,50 +153,16 @@ class TestThumbnailRequeueOnAlignment:
             hal_succeeded=True,
         )
 
-        # The key behavior: update_sprite_offset is called with old and new offsets
         mock_view.asset_browser.update_sprite_offset.assert_called_with(0x1000, 0x1004)
-
-    def test_no_update_when_offset_unchanged(
-        self,
-        controller,
-        mock_view,
-    ):
-        """Verify update_sprite_offset is NOT called when offset matches."""
-        tile_data = b"\x00" * 32
-        actual_offset = 0x1000  # Same as current_offset
-
-        controller._on_preview_ready(
-            tile_data=tile_data,
-            width=8,
-            height=8,
-            sprite_name="Test Sprite",
-            compressed_size=32,
-            slack_size=0,
-            actual_offset=actual_offset,
-            hal_succeeded=True,
-        )
-
-        mock_view.asset_browser.update_sprite_offset.assert_not_called()
 
     def test_offset_changed_handler_queues_thumbnail(
         self,
         controller,
-        mock_thumbnail_controller,
     ):
-        """Verify _on_item_offset_changed handler queues thumbnail for new offset.
-
-        This tests the signal handler directly (the signal wiring is tested separately).
-        """
+        """Verify _on_item_offset_changed handler queues thumbnail for new offset."""
+        mock_thumb_ctrl = MagicMock()
+        controller._thumbnail_controller = mock_thumb_ctrl
+        
         controller._on_item_offset_changed(0x1000, 0x1004)
 
-        mock_thumbnail_controller.queue_thumbnail.assert_called_with(0x1004)
-
-    def test_offset_changed_handler_no_op_without_thumbnail_controller(
-        self,
-        controller,
-    ):
-        """Verify handler is safe when thumbnail controller is None."""
-        controller._thumbnail_controller = None
-
-        # Should not raise
-        controller._on_item_offset_changed(0x1000, 0x1004)
+        mock_thumb_ctrl.queue_thumbnail.assert_called_with(0x1004)

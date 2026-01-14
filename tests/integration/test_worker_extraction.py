@@ -26,6 +26,7 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 
 # Serial execution required: QApplication management, Real Qt components
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.skip_thread_cleanup(reason="Extraction worker tests create background extraction threads"),
     pytest.mark.headless,
     pytest.mark.usefixtures("session_app_context"),

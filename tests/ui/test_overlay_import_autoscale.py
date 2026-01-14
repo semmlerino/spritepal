@@ -2,8 +2,11 @@
 Tests for overlay import auto-scaling in GridArrangementDialog.
 """
 
+import os
+
 import pytest
 from PIL import Image
+from PySide6.QtWidgets import QGraphicsPixmapItem
 
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.row_arrangement.overlay_layer import OverlayLayer
@@ -137,18 +140,6 @@ class TestOverlayImportAutoScale:
         # If it WORKS, scale should be << 1.0
         assert dialog.overlay_layer.has_image()
 
-        # Print debug info
-        print(f"\n[DEBUG] Overlay scale after import: {dialog.overlay_layer.scale}")
-        print(f"[DEBUG] Grid cols: {dialog.arrangement_grid.grid_cols}")
-        print(f"[DEBUG] Grid rows: {dialog.arrangement_grid.grid_rows}")
-        print(f"[DEBUG] Tile width: {dialog.processor.tile_width}")
-        print(f"[DEBUG] Tile height: {dialog.processor.tile_height}")
-        target_w = dialog.arrangement_grid.grid_cols * dialog.processor.tile_width
-        target_h = dialog.arrangement_grid.grid_rows * dialog.processor.tile_height
-        print(f"[DEBUG] Expected target: {target_w}x{target_h}")
-        expected_scale = min(target_w / 1000, target_h / 1000)
-        print(f"[DEBUG] Expected scale: {expected_scale}")
-
         # THIS ASSERTION SHOULD FAIL before the fix (scale = 1.0 due to failed lookup)
         # After the fix, scale should be properly calculated
         assert dialog.overlay_layer.scale < 0.5, (
@@ -175,32 +166,54 @@ class TestOverlayImportAutoScale:
         qtbot.addWidget(dialog)
         dialog.show()
 
-        print("\n[M.PNG TEST]")
-        print("Sprite: 128x128, tiles_per_row=16")
-        print(f"processor.tile_width={dialog.processor.tile_width}")
-        print(f"processor.tile_height={dialog.processor.tile_height}")
-        print(f"processor.grid_cols={dialog.processor.grid_cols}")
-        print(f"processor.grid_rows={dialog.processor.grid_rows}")
-        print(f"arrangement_grid.grid_cols={dialog.arrangement_grid.grid_cols}")
-        print(f"arrangement_grid.grid_rows={dialog.arrangement_grid.grid_rows}")
-
         # Calculate what the target dimensions SHOULD be
         target_w = dialog.arrangement_grid.grid_cols * dialog.processor.tile_width
         target_h = dialog.arrangement_grid.grid_rows * dialog.processor.tile_height
-        print(f"Target dimensions: {target_w}x{target_h}")
 
         # Import overlay
         dialog.overlay_layer.import_image(str(overlay_path), target_w, target_h)
 
         expected_scale = min(target_w / 1696, target_h / 2528)
-        print(f"Expected scale: {expected_scale}")
-        print(f"Actual scale: {dialog.overlay_layer.scale}")
-
-        # With scale, overlay visual size would be:
-        visual_w = 1696 * dialog.overlay_layer.scale
-        visual_h = 2528 * dialog.overlay_layer.scale
-        print(f"Visual overlay size: {visual_w}x{visual_h}")
-
         assert dialog.overlay_layer.scale == pytest.approx(expected_scale, rel=0.01)
 
+        dialog.close()
+
+
+class TestOverlayRegression:
+    """Regression tests for overlay rendering and visibility."""
+
+    @pytest.mark.skipif(os.environ.get("QT_QPA_PLATFORM") == "offscreen", reason="Requires GUI")
+    def test_overlay_import_renders_on_scene(self, qtbot, small_sprite, tmp_path, isolated_managers):
+        """Verify overlay image is actually rendered as a pixmap item in the scene."""
+        overlay_img_path = tmp_path / "repro_overlay.png"
+        Image.new("RGBA", (32, 32), color=(255, 0, 0, 128)).save(overlay_img_path)
+        
+        dialog = GridArrangementDialog(small_sprite)
+        qtbot.addWidget(dialog)
+        dialog.show()
+        
+        # Initially no overlay
+        assert not dialog.overlay_layer.has_image()
+        
+        # Import overlay
+        success = dialog.overlay_layer.import_image(str(overlay_img_path))
+        assert success
+        
+        # Process events to let signals and render happen
+        qtbot.wait_until(lambda: any(isinstance(item, QGraphicsPixmapItem) for item in dialog.arrangement_scene.items()), timeout=1000)
+        
+        # Check if we have pixmap items in the scene
+        items = dialog.arrangement_scene.items()
+        pixmap_items = [item for item in items if isinstance(item, QGraphicsPixmapItem)]
+        assert len(pixmap_items) >= 1
+        
+        # Find the overlay item (it should be 32x32)
+        overlay_items = [item for item in pixmap_items if item.pixmap().width() == 32 and item.pixmap().height() == 32]
+        assert len(overlay_items) == 1
+        
+        # Toggle visibility
+        dialog.overlay_layer.set_visible(False)
+        # Re-render should happen via signal, item should be removed or hidden
+        qtbot.wait_until(lambda: len([item for item in dialog.arrangement_scene.items() if isinstance(item, QGraphicsPixmapItem) and item.pixmap().width() == 32]) == 0, timeout=1000)
+        
         dialog.close()

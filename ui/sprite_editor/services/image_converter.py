@@ -10,12 +10,12 @@ from typing import cast
 
 from PIL import Image
 
-from ..constants import (
-    PIXEL_4BPP_MASK,
+from core.tile_utils import calculate_tile_grid_padded, encode_4bpp_tile
+from utils.constants import (
+    PIXEL_MASK_4BIT as PIXEL_4BPP_MASK,
     TILE_HEIGHT,
     TILE_WIDTH,
 )
-from ..core.tile_utils import calculate_tile_grid_padded, encode_4bpp_tile
 
 logger = logging.getLogger(__name__)
 

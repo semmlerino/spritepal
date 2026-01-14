@@ -27,6 +27,7 @@ from core.managers.core_operations_manager import CoreOperationsManager
 from tests.infrastructure.real_component_factory import RealComponentFactory
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),

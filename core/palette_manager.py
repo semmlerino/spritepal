@@ -19,6 +19,7 @@ from utils.constants import (
     COLORS_PER_PALETTE,
     OAM_Y_VISIBLE_THRESHOLD,
     PALETTE_ATTR_MASK,
+    PALETTE_ENTRIES,
     PALETTE_INFO,
     SPRITE_PALETTE_END,
     SPRITE_PALETTE_START,
@@ -83,6 +84,64 @@ class PaletteManager:
     def get_palette(self, palette_index: int) -> list[list[int]]:
         """Get a specific palette"""
         return self.palettes.get(palette_index, [[0, 0, 0]] * COLORS_PER_PALETTE)
+
+    def get_flat_palette(self, palette_index: int) -> list[int]:
+        """Get a specific palette as a flat list of 768 RGB values (for PIL)."""
+        colors = self.get_palette(palette_index)
+        flat = []
+        for r, g, b in colors:
+            flat.extend([r, g, b])
+
+        # Pad to 256 colors (768 values)
+        while len(flat) < 768:
+            flat.extend([0, 0, 0])
+
+        return flat
+
+    @staticmethod
+    def get_grayscale_palette() -> list[int]:
+        """
+        Get default grayscale palette for preview.
+
+        Returns:
+            List of 768 RGB values forming a grayscale palette
+        """
+        palette = []
+        for i in range(PALETTE_ENTRIES):
+            # For 4bpp sprites, map 0-15 to 0-255
+            gray = (i * 255) // 15 if i < COLORS_PER_PALETTE else 0
+            palette.extend([gray, gray, gray])
+        return palette
+
+    @staticmethod
+    def get_default_snes_palette() -> list[tuple[int, int, int]]:
+        """
+        Get a default SNES-style color palette for initial sprite display.
+
+        Returns a visually distinct 16-color palette similar to what SNES games
+        commonly use. Color 0 is typically transparent (black in display).
+
+        Returns:
+            List of 16 (R, G, B) tuples in 0-255 range.
+        """
+        return [
+            (0, 0, 0),  # 0: Transparent (black)
+            (255, 255, 255),  # 1: White
+            (248, 216, 176),  # 2: Skin tone light
+            (232, 168, 120),  # 3: Skin tone medium
+            (200, 120, 88),  # 4: Skin tone dark
+            (255, 200, 120),  # 5: Yellow/blonde
+            (248, 88, 88),  # 6: Red
+            (88, 144, 248),  # 7: Blue
+            (120, 216, 88),  # 8: Green
+            (248, 168, 200),  # 9: Pink
+            (168, 88, 200),  # 10: Purple
+            (88, 88, 88),  # 11: Dark gray
+            (168, 168, 168),  # 12: Light gray
+            (200, 160, 88),  # 13: Brown/orange
+            (48, 48, 48),  # 14: Near black
+            (255, 216, 88),  # 15: Gold/highlight
+        ]
 
     def get_sprite_palettes(self) -> dict[int, list[list[int]]]:
         """Get only the sprite palettes (8-15)"""

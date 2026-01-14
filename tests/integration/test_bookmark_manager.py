@@ -16,6 +16,7 @@ import pytest
 from PySide6.QtWidgets import QWidget
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.headless,
     pytest.mark.no_manager_setup,
     pytest.mark.allows_registry_state(reason="BookmarkManager tests are stateless"),

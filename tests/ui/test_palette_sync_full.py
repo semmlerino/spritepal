@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
+from ui.sprite_editor import get_default_snes_palette
 from ui.sprite_editor.controllers.editing_controller import EditingController
-from ui.sprite_editor.core.palette_utils import get_default_snes_palette
 from ui.sprite_editor.views.workspaces.edit_workspace import EditWorkspace
 
 

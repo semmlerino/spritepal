@@ -20,7 +20,10 @@ from core.services.image_utils import pil_to_qpixmap
 from ui.row_arrangement_dialog import RowArrangementDialog
 
 # Serial execution required: Real Qt components
-pytestmark = [pytest.mark.skip_thread_cleanup(reason="Real Qt component tests may create background threads")]
+pytestmark = [
+    pytest.mark.skip_thread_cleanup(reason="Real Qt component tests may create background threads"),
+    pytest.mark.integration,
+]
 
 
 @pytest.mark.gui

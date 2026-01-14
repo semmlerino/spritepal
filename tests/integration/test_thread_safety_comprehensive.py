@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),
     pytest.mark.headless,
     pytest.mark.slow,

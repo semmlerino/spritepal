@@ -9,15 +9,29 @@ and pixel-level editing capabilities.
 __version__ = "0.1.0"
 
 # Core utilities
-from .core import (
-    bgr555_to_rgb888,
+from core.palette_manager import PaletteManager
+from core.tile_utils import (
     calculate_tile_grid_padded,
     decode_4bpp_tile,
     encode_4bpp_tile,
-    get_grayscale_palette,
-    read_cgram_palette,
-    rgb888_to_bgr555,
 )
+from utils.image_utils import bgr555_to_rgb888, rgb888_to_bgr555
+
+
+def get_grayscale_palette():
+    return PaletteManager.get_grayscale_palette()
+
+def get_default_snes_palette():
+    return PaletteManager.get_default_snes_palette()
+
+def read_cgram_palette(cgram_file: str, palette_num: int) -> list[int] | None:
+    pm = PaletteManager()
+    try:
+        pm.load_cgram(cgram_file)
+        return pm.get_flat_palette(palette_num)
+    except Exception:
+        return None
+
 
 # Managers
 from .managers import ToolManager, ToolType, UndoManager
@@ -39,9 +53,6 @@ from .services import (
 
 # Workers (import only when Qt is available)
 try:
-    # Application
-    from .application import SpriteEditorApplication, main
-
     # Controllers
     from .controllers import (
         EditingController,
@@ -61,7 +72,6 @@ try:
         PalettePanel,
         PixelCanvas,
         PreviewPanel,
-        SpriteEditorMainWindow,
         ToolPanel,
     )
     from .workers import (
@@ -102,10 +112,6 @@ __all__ = [
     "PalettePanel",
     "PixelCanvas",
     "PreviewPanel",
-    # Application
-    "SpriteEditorApplication",
-    # Views - Main Window
-    "SpriteEditorMainWindow",
     "SpriteRenderer",
     "ToolManager",
     "ToolPanel",
@@ -120,8 +126,8 @@ __all__ = [
     "create_tile_palette_map",
     "decode_4bpp_tile",
     "encode_4bpp_tile",
+    "get_default_snes_palette",
     "get_grayscale_palette",
-    "main",
     "read_cgram_palette",
     "rgb888_to_bgr555",
 ]

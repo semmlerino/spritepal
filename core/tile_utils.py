@@ -23,14 +23,9 @@ if TYPE_CHECKING:
 
 def decode_4bpp_tile(tile_bytes: bytes) -> list[list[int]]:
     """
-    Decode a single 4bpp SNES tile to pixel indices.
+    Decode a single 4bpp SNES tile to 8x8 pixel indices.
 
-    SNES 4bpp format uses 32 bytes per 8x8 tile:
-    - Bytes 0-15: Bitplanes 0 and 1 for rows 0-7
-    - Bytes 16-31: Bitplanes 2 and 3 for rows 0-7
-
-    For each row, 2 bytes encode bitplanes 0-1, another 2 bytes (offset by 16)
-    encode bitplanes 2-3. Each pixel combines 4 bits to get a color index 0-15.
+    SNES 4bpp format uses 32 bytes per 8x8 tile.
 
     Args:
         tile_bytes: 32 bytes of tile data (padded if shorter)
@@ -44,12 +39,14 @@ def decode_4bpp_tile(tile_bytes: bytes) -> list[list[int]]:
 
     pixels: list[list[int]] = []
 
+    from utils.constants import TILE_PLANE_SIZE
+
     for row in range(8):
         row_pixels: list[int] = []
 
         # Get the 4 plane bytes for this row
         plane_01_offset = row * 2
-        plane_23_offset = 16 + row * 2
+        plane_23_offset = TILE_PLANE_SIZE + row * 2
 
         plane0 = tile_bytes[plane_01_offset]
         plane1 = tile_bytes[plane_01_offset + 1]
@@ -78,19 +75,44 @@ def decode_4bpp_tile(tile_bytes: bytes) -> list[list[int]]:
     return pixels
 
 
-def encode_4bpp_tile(tile_pixels: list[int] | np.ndarray) -> bytes:
+def decode_4bpp_tile_flat(tile_bytes: bytes) -> list[int]:
+    """
+    Decode a single 4bpp SNES tile to a flat list of 64 pixels.
+
+    Args:
+        tile_bytes: 32 bytes of tile data
+
+    Returns:
+        Flat list of 64 color indices (0-15)
+    """
+    decoded_2d = decode_4bpp_tile(tile_bytes)
+    # Flatten the 8x8 list
+    return [pixel for row in decoded_2d for pixel in row]
+
+
+def encode_4bpp_tile(tile_pixels: list[int] | list[list[int]] | np.ndarray) -> bytes:
     """
     Encode an 8x8 tile to SNES 4bpp format using NumPy vectorization.
 
     Args:
-        tile_pixels: 64 pixel values (either list or numpy array)
+        tile_pixels: 64 pixel values (flat list, 8x8 list, or numpy array)
 
     Returns:
         32 bytes of SNES 4bpp tile data
     """
-    # Convert to numpy array if needed
-    if isinstance(tile_pixels, list):
+    # Handle list of lists (8x8)
+    if isinstance(tile_pixels, list) and len(tile_pixels) > 0 and isinstance(tile_pixels[0], list):
+        # Flatten
+        from collections.abc import Iterable
+        from typing import cast
+        flat_pixels: list[int] = []
+        for row in tile_pixels:
+            flat_pixels.extend(cast(Iterable[int], row))
+        pixels = np.array(flat_pixels, dtype=np.uint8)
+    # Handle flat list
+    elif isinstance(tile_pixels, list):
         pixels = np.array(tile_pixels, dtype=np.uint8)
+    # Handle numpy array
     else:
         pixels = tile_pixels.astype(np.uint8)
 
@@ -269,3 +291,137 @@ def get_tile_alignment_info(tile_data: bytes, bytes_per_tile: int = BYTES_PER_TI
         "is_aligned": remainder == 0,
         "header_bytes": max(0, remainder),
     }
+
+
+def calculate_tile_grid_padded(width: int, height: int) -> tuple[int, int, int]:
+    """
+    Calculate tile grid dimensions using ceiling division (round up).
+
+    Use this for extraction: includes partial tiles at edges.
+    Ensures all pixels are covered even if image isn't tile-aligned.
+
+    Args:
+        width: Image width in pixels
+        height: Image height in pixels
+
+    Returns:
+        Tuple of (tiles_x, tiles_y, total_tiles)
+    """
+    from utils.constants import TILE_HEIGHT, TILE_WIDTH
+
+    tiles_x = (width + TILE_WIDTH - 1) // TILE_WIDTH
+    tiles_y = (height + TILE_HEIGHT - 1) // TILE_HEIGHT
+    return tiles_x, tiles_y, tiles_x * tiles_y
+
+
+def calculate_dimensions_from_tile_data(data_size: int, tiles_per_row: int) -> tuple[int, int, int, int, int]:
+    """
+    Calculate sprite layout dimensions from tile data size.
+
+    Args:
+        data_size: Size of tile data in bytes
+        tiles_per_row: Number of tiles per row in output image
+
+    Returns:
+        Tuple of (total_tiles, tiles_x, tiles_y, width_pixels, height_pixels)
+
+    Raises:
+        ValueError: If tiles_per_row is less than or equal to 0
+    """
+    if tiles_per_row <= 0:
+        raise ValueError(f"tiles_per_row must be positive, got {tiles_per_row}")
+
+    # Check for partial tiles and warn
+    remainder = data_size % BYTES_PER_TILE
+    if remainder != 0:
+        bytes_truncated = remainder
+        next_aligned_size = data_size + (BYTES_PER_TILE - remainder)
+        logger.warning(
+            f"Data size ({data_size} bytes) is not tile-aligned. "
+            f"{bytes_truncated} bytes will be truncated. "
+            f"Consider using {next_aligned_size} bytes ({next_aligned_size // BYTES_PER_TILE} tiles) instead."
+        )
+
+    total_tiles = data_size // BYTES_PER_TILE
+    tiles_x = tiles_per_row
+    tiles_y = (total_tiles + tiles_x - 1) // tiles_x  # Round up
+
+    from utils.constants import TILE_HEIGHT, TILE_WIDTH
+
+    width = tiles_x * TILE_WIDTH
+    height = tiles_y * TILE_HEIGHT
+    return total_tiles, tiles_x, tiles_y, width, height
+
+
+def validate_4bpp_tile_structure(tile_data: bytes) -> bool:
+    """
+    Validate if a single tile has valid 4bpp sprite characteristics.
+    Strict version: empty/full tiles ARE technically valid SNES tiles.
+
+    Args:
+        tile_data: 32 bytes of tile data (BYTES_PER_TILE)
+
+    Returns:
+        True if tile is a valid 4bpp tile structure
+    """
+    if len(tile_data) != BYTES_PER_TILE:
+        return False
+
+    # Check for completely empty or full tile - these ARE valid 4bpp tiles
+    if tile_data in (b"\x00" * BYTES_PER_TILE, b"\xff" * BYTES_PER_TILE):
+        return True
+
+    # Check bitplane structure
+    # SNES 4bpp: Plane 0/1 are bytes 0-15, Plane 2/3 are bytes 16-31
+    plane_validity = 0
+
+    # TILE_PLANE_SIZE is 16
+    from utils.constants import TILE_PLANE_SIZE
+
+    # Check first two bitplanes (bytes 0-15)
+    plane01_zeros = sum(1 for b in tile_data[0:TILE_PLANE_SIZE] if b == 0)
+    plane01_ones = sum(1 for b in tile_data[0:TILE_PLANE_SIZE] if b == 0xFF)
+    if plane01_zeros < (TILE_PLANE_SIZE - 1) and plane01_ones < (TILE_PLANE_SIZE - 1):  # Not all blank/full
+        plane_validity += 1
+
+    # Check second two bitplanes (bytes 16-31)
+    plane23_zeros = sum(1 for b in tile_data[16:32] if b == 0)
+    plane23_ones = sum(1 for b in tile_data[16:32] if b == 0xFF)
+    if plane23_zeros < (TILE_PLANE_SIZE - 1) and plane23_ones < (TILE_PLANE_SIZE - 1):  # Not all blank/full
+        plane_validity += 1
+
+    # Check for bitplane patterns that indicate graphics (correlation between planes)
+    correlation = 0
+    for i in range(8):  # Check each row
+        p0 = tile_data[i * 2]
+        p1 = tile_data[i * 2 + 1]
+        p2 = tile_data[16 + i * 2]
+        p3 = tile_data[16 + i * 2 + 1]
+        # Real graphics often have bits set in both low and high plane groups for same pixel
+        if (p0 & p2) != 0 or (p1 & p3) != 0:
+            correlation += 1
+
+    # Valid if at least one plane group has data AND we see some correlation
+    return plane_validity >= 1 and correlation >= 2
+
+
+def is_heuristic_graphics_tile(tile_data: bytes) -> bool:
+    """
+    Heuristic check if a tile looks like valid graphics data.
+    Filters out empty/full tiles as they are unlikely to be part of a sprite.
+
+    Args:
+        tile_data: 32 bytes of tile data
+
+    Returns:
+        True if tile looks like actual graphics data (not blank/noise)
+    """
+    if len(tile_data) != BYTES_PER_TILE:
+        return False
+
+    # Exclude solid tiles (all same byte)
+    if len(set(tile_data)) <= 1:
+        return False
+
+    # Check for 4bpp structure
+    return validate_4bpp_tile_structure(tile_data)

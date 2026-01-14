@@ -7,7 +7,7 @@ Handles reading, writing, and injecting data into VRAM dump files.
 import logging
 from pathlib import Path
 
-from ..constants import (
+from utils.constants import (
     TILE_DATA_MAX_SIZE,
     VRAM_SIZE_ABSOLUTE_MAX,
 )

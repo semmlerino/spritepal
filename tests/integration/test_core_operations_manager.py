@@ -23,6 +23,7 @@ from core.managers.core_operations_manager import CoreOperationsManager
 from tests.fixtures.timeouts import signal_timeout
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.usefixtures("isolated_managers"),
     pytest.mark.skip_thread_cleanup(reason="Uses isolated_managers which owns cleanup"),
     pytest.mark.headless,
@@ -673,3 +674,55 @@ class TestROMInjectionSettings:
         assert "sprite_location_name" in result
         assert "sprite_location_index" in result
         assert "custom_offset" in result
+
+
+class TestRegressionFixes:
+    """Regression tests for CoreOperationsManager correctness fixes."""
+
+    def test_worker_cleared_on_exception(self, manager, tmp_path):
+        """Issue #2: _current_worker should be None after exception in start_injection."""
+        # Try to inject with invalid params that will cause an exception
+        # after worker assignment but before completion
+        params = {
+            "mode": "rom",
+            "sprite_path": "/nonexistent/sprite.png",
+            "input_rom": "/nonexistent/rom.smc",
+            "output_rom": str(tmp_path / "output.smc"),
+            "offset": 0x1000,
+        }
+
+        try:
+            manager.start_injection(params)
+        except Exception:
+            pass  # Expected to fail
+
+        # Key assertion: worker should be cleaned up (private access okay in regression test)
+        assert manager._current_worker is None
+
+    def test_invalid_offset_logged_and_indicated(self, manager, tmp_path, caplog):
+        """Issue #3: Parse failure should log warning and set offset_parse_error."""
+        import logging
+
+        # Create a metadata file with invalid offset
+        sprite_path = tmp_path / "sprite.png"
+        rom_path = tmp_path / "test.smc"
+
+        # Create minimal files
+        sprite_path.write_bytes(b"fake")
+        rom_path.write_bytes(b"\x00" * 100)
+
+        metadata = {
+            "rom_extraction_info": {
+                "rom_source": rom_path.name,
+                "rom_offset": "not_a_valid_offset",  # Invalid!
+            }
+        }
+
+        with caplog.at_level(logging.WARNING):
+            result = manager.load_rom_injection_defaults(str(sprite_path), metadata)
+
+        # Should have logged a warning
+        assert any("Failed to parse ROM offset" in record.message for record in caplog.records)
+
+        # Should indicate error in result
+        assert "offset_parse_error" in result

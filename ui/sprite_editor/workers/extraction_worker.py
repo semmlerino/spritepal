@@ -4,14 +4,18 @@ Worker thread for sprite extraction operations.
 Handles background extraction of sprites from VRAM dumps.
 """
 
+import logging
 from pathlib import Path
 from typing import override
 
 from PySide6.QtCore import QObject, Signal
 
-from ..core.palette_utils import read_cgram_palette
+from core.palette_manager import PaletteManager
+
 from ..services.sprite_renderer import SpriteRenderer
 from .base_worker import BaseWorker
+
+logger = logging.getLogger(__name__)
 
 
 class ExtractWorker(BaseWorker):
@@ -71,9 +75,15 @@ class ExtractWorker(BaseWorker):
                 # OAM palette numbers (0-7) map to CGRAM sprite palettes (8-15)
                 cgram_palette_num = self.palette_num + 8 if self.palette_num < 8 else self.palette_num
                 self.emit_progress(70, f"Applying palette {self.palette_num} (CGRAM {cgram_palette_num})...")
-                palette = read_cgram_palette(str(cgram_path), cgram_palette_num)
-                if palette:
-                    image.putpalette(palette)
+                
+                pm = PaletteManager()
+                try:
+                    pm.load_cgram(str(cgram_path))
+                    palette = pm.get_flat_palette(cgram_palette_num)
+                    if palette:
+                        image.putpalette(palette)
+                except Exception as e:
+                    logger.warning(f"Failed to apply palette: {e}")
 
             if self.is_cancelled():
                 return

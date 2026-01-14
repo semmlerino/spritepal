@@ -15,14 +15,19 @@ from PIL import Image
 if TYPE_CHECKING:
     import numpy as np
 
-from ..constants import (
-    BYTES_PER_TILE_4BPP,
+from core.palette_manager import PaletteManager
+from core.tile_utils import (
+    calculate_dimensions_from_tile_data,
+    decode_4bpp_tile_flat,
+)
+from ui.sprite_editor import read_cgram_palette
+from utils.constants import (
+    BYTES_PER_TILE,
     PIXELS_PER_TILE,
     TILE_HEIGHT,
     TILE_WIDTH,
 )
-from ..core.palette_utils import get_grayscale_palette, read_cgram_palette
-from ..core.tile_utils import calculate_dimensions_from_tile_data, decode_4bpp_tile
+
 from .oam_palette_mapper import OAMPaletteMapper
 
 logger = logging.getLogger(__name__)
@@ -41,10 +46,11 @@ class SpriteRenderer:
     def _decode_all_tiles(self, data: bytes) -> list[int]:
         """Decode all tiles from VRAM data into a flat pixel array."""
         pixels: list[int] = []
-        total_tiles = len(data) // BYTES_PER_TILE_4BPP
+        total_tiles = len(data) // BYTES_PER_TILE
         for tile_idx in range(total_tiles):
-            if tile_idx * BYTES_PER_TILE_4BPP + BYTES_PER_TILE_4BPP <= len(data):
-                tile = decode_4bpp_tile(data, tile_idx * BYTES_PER_TILE_4BPP)
+            offset = tile_idx * BYTES_PER_TILE
+            if offset + BYTES_PER_TILE <= len(data):
+                tile = decode_4bpp_tile_flat(data[offset : offset + BYTES_PER_TILE])
                 pixels.extend(tile)
         return pixels
 
@@ -110,7 +116,7 @@ class SpriteRenderer:
             total_tiles, tiles_x, tiles_y, width, height = calculate_dimensions_from_tile_data(len(data), tiles_per_row)
 
             img = Image.new("P", (width, height))
-            img.putpalette(get_grayscale_palette())
+            img.putpalette(PaletteManager.get_grayscale_palette())
 
             pixels = self._decode_all_tiles(data)
             img_pixels = self._arrange_tiles_in_indexed_image(pixels, total_tiles, tiles_x, tiles_y, width, height)
@@ -130,10 +136,10 @@ class SpriteRenderer:
 
         tiles_x = max(1, width // TILE_WIDTH)
         tiles_y = max(1, height // TILE_HEIGHT)
-        total_tiles = len(tile_data) // BYTES_PER_TILE_4BPP
+        total_tiles = len(tile_data) // BYTES_PER_TILE
 
         img = Image.new("P", (width, height))
-        img.putpalette(get_grayscale_palette())
+        img.putpalette(PaletteManager.get_grayscale_palette())
 
         pixels = self._decode_all_tiles(tile_data)
         img_pixels = self._arrange_tiles_in_indexed_image(pixels, total_tiles, tiles_x, tiles_y, width, height)
@@ -150,20 +156,18 @@ class SpriteRenderer:
             cgram_file = ""
 
         if cgram_file:
-            for i in range(16):
-                try:
-                    pal = read_cgram_palette(cgram_file, i)
-                    if pal and len(pal) >= 48:
-                        palettes.append(pal)
-                    else:
-                        logger.warning(f"Invalid palette {i} in CGRAM, using grayscale")
-                        palettes.append(get_grayscale_palette())
-                except Exception as e:
-                    logger.warning(f"Error reading palette {i}: {e}, using grayscale")
-                    palettes.append(get_grayscale_palette())
+            pm = PaletteManager()
+            try:
+                pm.load_cgram(cgram_file)
+                for i in range(16):
+                    palettes.append(pm.get_flat_palette(i))
+            except Exception as e:
+                logger.warning(f"Error loading CGRAM: {e}, using grayscale")
+                for _ in range(16):
+                    palettes.append(PaletteManager.get_grayscale_palette())
         else:
             for _ in range(16):
-                palettes.append(get_grayscale_palette())
+                palettes.append(PaletteManager.get_grayscale_palette())
 
         return palettes
 
@@ -264,11 +268,12 @@ class SpriteRenderer:
             clamped_pixels: list[int] = []
 
             for tile_idx in range(total_tiles):
-                if tile_idx * BYTES_PER_TILE_4BPP + BYTES_PER_TILE_4BPP <= len(data):
-                    tile_data = decode_4bpp_tile(data, tile_idx * BYTES_PER_TILE_4BPP)
+                offset_in_data = tile_idx * BYTES_PER_TILE
+                if offset_in_data + BYTES_PER_TILE <= len(data):
+                    tile_data = decode_4bpp_tile_flat(data[offset_in_data : offset_in_data + BYTES_PER_TILE])
 
-                    tile_offset = offset + (tile_idx * BYTES_PER_TILE_4BPP)
-                    assigned_palette = self._get_tile_palette_assignment(tile_offset)
+                    tile_vram_offset = offset + offset_in_data
+                    assigned_palette = self._get_tile_palette_assignment(tile_vram_offset)
 
                     palette = palettes[assigned_palette] if assigned_palette < len(palettes) else palettes[0]
 
@@ -338,7 +343,7 @@ class SpriteRenderer:
                     if palette:
                         img.putpalette(palette)
                 else:
-                    img.putpalette(get_grayscale_palette())
+                    img.putpalette(PaletteManager.get_grayscale_palette())
 
                 # Use original OAM palette number in dict key for consistency
                 palette_images[f"palette_{pal_num}"] = img

@@ -99,13 +99,16 @@ EMPTY_REGION_SIZE = 4096  # Size of regions to analyze (4KB)
 # This is why BYTES_PER_TILE = 32 appears throughout the codebase.
 # =============================================================================
 
+TILE_WIDTH = 8
+TILE_HEIGHT = 8
+PIXELS_PER_TILE = TILE_WIDTH * TILE_HEIGHT  # 64 pixels per 8x8 tile
 BYTES_PER_TILE = 32  # 4bpp format: 8x8 pixels x 4 bits = 32 bytes per tile
-TILE_WIDTH = 8  # Pixels per tile row
-TILE_HEIGHT = 8  # Pixels per tile column
 DEFAULT_TILES_PER_ROW = 16  # Default layout for sprite sheets
 
 # Palette information
-COLORS_PER_PALETTE = 16
+PALETTE_SIZE_BYTES = 768  # 256 colors * 3 bytes
+PALETTE_ENTRIES = 256  # Total palette entries for PIL
+COLORS_PER_PALETTE = 16  # SNES 4bpp palettes have 16 colors
 SPRITE_PALETTE_START = 8  # Sprite palettes start at index 8
 SPRITE_PALETTE_END = 16  # Up to palette 15
 CGRAM_PALETTE_SIZE = 32  # Bytes per palette in CGRAM (16 colors * 2 bytes)
@@ -172,6 +175,22 @@ BUFFER_SIZE_2KB = 2048  # 2KB buffer size
 BUFFER_SIZE_1KB = 1024  # 1KB buffer size and sample size
 BUFFER_SIZE_512B = 512  # 512 byte test offset and SMC header size
 BUFFER_SIZE_256B = 256  # 256 byte step size and sample size
+
+# OAM SPECIFICATIONS
+OAM_ENTRIES = 128  # Number of sprite entries
+BYTES_PER_OAM_ENTRY = 4
+OAM_HIGH_TABLE_OFFSET = 512  # Offset to high table
+OAM_HIGH_TABLE_SIZE = 32
+OAM_SIZE = 544  # Object Attribute Memory size (512 + 32 bytes)
+
+# Kirby-specific tile ranges
+KIRBY_TILE_START = 0x180  # Tile 384
+KIRBY_TILE_END = 0x200  # Tile 512
+KIRBY_VRAM_BASE = 0x6000  # VRAM word address
+
+# VRAM Address Type Aliases
+VRAM_SIZE_ABSOLUTE_MAX = 0x20000  # 128KB absolute maximum
+TILE_DATA_MAX_SIZE = 0x10000  # 64KB max for tile data
 
 # ROM format constants
 SMC_HEADER_SIZE = 512  # SMC ROM header size

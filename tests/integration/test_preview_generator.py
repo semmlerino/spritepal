@@ -30,6 +30,7 @@ from tests.fixtures.timeouts import signal_timeout
 from tests.infrastructure.thread_safe_test_image import ThreadSafeTestImage
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.skip_thread_cleanup(reason="Preview workers may not clean up within fixture timeout"),
     pytest.mark.benchmark,
     pytest.mark.headless,

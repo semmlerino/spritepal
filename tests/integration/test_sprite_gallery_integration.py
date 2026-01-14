@@ -24,6 +24,7 @@ from ui.windows.detached_gallery_window import DetachedGalleryWindow
 # Use function-scoped app_context for proper test isolation
 # (migrated from session_app_context to fix shared state and thread cleanup issues)
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.usefixtures("app_context"),
 ]
 

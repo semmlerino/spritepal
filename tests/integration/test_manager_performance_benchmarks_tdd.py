@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from core.app_context import AppContext
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.headless,
     pytest.mark.performance,
     pytest.mark.slow,

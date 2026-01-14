@@ -260,3 +260,37 @@ class TestPixelCanvasSignalContract:
         """Verify all expected public signals exist on PixelCanvas."""
         canvas, _ = canvas_with_image
         assert hasattr(canvas, signal_name), f"SIGNAL CONTRACT: PixelCanvas must expose '{signal_name}' signal"
+
+
+class TestPixelCanvasRegression:
+    """Regression tests for PixelCanvas correctness fixes."""
+
+    def test_canvas_palette_sync(self, qtbot, canvas_with_image):
+        """Verify canvas updates its color cache when controller palette changes."""
+        canvas, controller = canvas_with_image
+        canvas.greyscale_mode = False
+        
+        # Set some data with index 7
+        data = np.zeros((8, 8), dtype=np.uint8)
+        data[0, 0] = 7
+        controller.load_image(data)
+
+        # Force update the cache
+        canvas._update_color_lut()
+
+        # Check initial colors (should be grayscale 7*17=119 by default in PaletteModel)
+        assert canvas._qcolor_cache[7].red() == 119
+
+        # Change palette to something else (e.g. Orange for index 7)
+        new_palette = [(0, 0, 0)] * 16
+        new_palette[7] = (255, 165, 0)  # Orange
+
+        # This should trigger paletteChanged signal
+        controller.set_palette(new_palette)
+
+        # Canvas invalidates cache on signal, rebuild on next access
+        canvas._update_color_lut()
+
+        assert canvas._qcolor_cache[7].red() == 255
+        assert canvas._qcolor_cache[7].green() == 165
+        assert canvas._qcolor_cache[7].blue() == 0

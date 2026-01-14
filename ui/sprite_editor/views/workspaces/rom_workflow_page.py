@@ -187,8 +187,10 @@ class ROMWorkflowPage(QWidget):
         self._source_bar.set_checksum_valid(valid)
 
     def set_offset(self, offset: int) -> None:
-        """Update displayed ROM offset in source bar."""
+        """Update displayed ROM offset in source bar and asset browser selection."""
         self._source_bar.set_offset(offset)
+        # Synchronize asset browser selection
+        self._asset_browser.select_sprite_by_offset(offset)
 
     def set_mapping_type(self, mapping_type: RomMappingType) -> None:
         """Set ROM mapping type for SNES address conversion in source bar."""

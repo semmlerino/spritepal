@@ -347,6 +347,7 @@ class EditWorkspace(QWidget):
             safe_disconnect(self._controller.paletteChanged)
             safe_disconnect(self._controller.paletteSourceAdded)
             safe_disconnect(self._controller.paletteSourceSelected)
+            safe_disconnect(self._controller.clearRomSources)
             safe_disconnect(self._controller.imageChanged)
 
     def set_controller(self, controller: "EditingController") -> None:
@@ -399,6 +400,7 @@ class EditWorkspace(QWidget):
         controller.paletteChanged.connect(self._update_palette)
         controller.paletteSourceAdded.connect(self._palette_panel.add_palette_source)
         controller.paletteSourceSelected.connect(self._on_palette_source_selected)
+        controller.clearRomSources.connect(self._palette_panel.clear_rom_sources)
 
         # Populate existing palette sources from controller
         existing_sources = controller.get_palette_sources()

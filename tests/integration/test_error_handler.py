@@ -12,6 +12,7 @@ from ui.common import ErrorHandler
 
 # Test characteristics: Real GUI components requiring display
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.gui,
     pytest.mark.slow,
     pytest.mark.allows_registry_state(reason="Pure error handling tests, no managers"),

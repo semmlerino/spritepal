@@ -37,6 +37,8 @@ class EditingController(QObject):
     undoStateChanged = Signal(bool, bool)  # can_undo, can_redo
     paletteSourceAdded = Signal(str, str, int, object, bool)  # name, type, index, colors, is_active
     paletteSourceSelected = Signal(str, int)  # source_type, palette_index
+    # Signal to clear all palettes of a specific type from views
+    clearRomSources = Signal()
     # Emitted when ROM validation state changes: (is_valid, list of error messages)
     validationChanged = Signal(bool, list)
 
@@ -389,6 +391,26 @@ class EditingController(QObject):
         """Get the currently selected palette source (source_type, index)."""
         return self._current_palette_source
 
+    def clear_palette_sources(self, source_type: str | None = None) -> None:
+        """Clear registered palette sources.
+
+        Args:
+            source_type: If provided, only clear sources of this type.
+                         If None, clear all sources.
+        """
+        if source_type is None:
+            self._palette_sources.clear()
+            self.clearRomSources.emit()
+            # Also need signals for other types if they are handled separately
+        else:
+            # Create list of keys to remove to avoid mutation during iteration
+            to_remove = [k for k in self._palette_sources.keys() if k[0] == source_type]
+            for k in to_remove:
+                del self._palette_sources[k]
+
+            if source_type == "rom":
+                self.clearRomSources.emit()
+
     def register_palette_source(
         self,
         source_type: str,
@@ -415,7 +437,7 @@ class EditingController(QObject):
         self._current_palette_source = (source_type, index)
         try:
             if source_type == "default":
-                from ..core.palette_utils import get_default_snes_palette
+                from ui.sprite_editor import get_default_snes_palette
 
                 colors = get_default_snes_palette()
                 self.set_palette(colors, "Default SNES")

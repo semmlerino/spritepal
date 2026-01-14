@@ -15,7 +15,7 @@ from tests.fixtures.timeouts import signal_timeout
 from ui.common import ErrorHandler
 
 # Serial execution required: Thread safety concerns
-pytestmark = [pytest.mark.headless]
+pytestmark = [pytest.mark.headless, pytest.mark.integration]
 
 
 class TestErrorHandlerThreadSafety:

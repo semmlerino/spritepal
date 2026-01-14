@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
     from core.app_context import AppContext
 
-pytestmark = [pytest.mark.gui]
+pytestmark = [pytest.mark.gui, pytest.mark.integration]
 
 
 class TestRealDialogInitialization:

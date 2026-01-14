@@ -25,6 +25,7 @@ from core.workers.base import BaseWorker, ManagedWorker
 
 # Serial execution required: QApplication management
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.skip_thread_cleanup(reason="Worker tests create background worker threads"),
     pytest.mark.headless,
 ]

@@ -27,6 +27,7 @@ from ui.common.timing_constants import (
 )
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.gui,
     pytest.mark.slow,
     pytest.mark.headless,

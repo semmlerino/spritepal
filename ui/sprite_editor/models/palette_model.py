@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ..core.palette_utils import read_cgram_palette
+from ui.sprite_editor import read_cgram_palette
 
 
 @dataclass

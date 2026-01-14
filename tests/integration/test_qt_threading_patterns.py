@@ -34,6 +34,7 @@ from core.workers.base import BaseWorker, handle_worker_errors
 from ui.common import WorkerManager
 
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
     pytest.mark.skip_thread_cleanup(reason="Thread tests may intentionally leave threads running"),

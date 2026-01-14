@@ -1,24 +1,20 @@
-"""
-Integration tests for Qt signal/slot connections in SpritePal.
-
-This module tests the critical signal/slot connections between UnifiedManualOffsetDialog
-and ROMExtractionPanel, ensuring proper:
-- Signal emission and reception
-- Parameter types and values
-- Connection timing and order
-- Thread safety
-- Connection lifecycle management
-"""
-
 from __future__ import annotations
 
 import tempfile
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-from PySide6.QtCore import QObject, Qt, QThread, Signal, Slot
+from PySide6.QtCore import QObject, Signal
+
+from core.app_context import get_app_context
+
+pytestmark = [pytest.mark.integration]
+from unittest.mock import patch
+
+import pytest
+from PySide6.QtCore import Qt, QThread, Slot
 
 from tests.fixtures.timeouts import SHORT, signal_timeout
 from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
@@ -33,7 +29,6 @@ def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
 
     Used by tests that have managers_initialized fixture.
     """
-    from core.app_context import get_app_context
 
     context = get_app_context()
     return UnifiedManualOffsetDialog(

@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 # Serial execution required: QApplication management, HAL process pool
 pytestmark = [
+    pytest.mark.integration,
     pytest.mark.performance,
     pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
