@@ -953,11 +953,6 @@ class ROMWorkflowController(QObject):
 
         # Clear existing ROM palettes before registering new ones to prevent accumulation
         self._editing_controller.clear_palette_sources("rom")
-        detected_palette_index: int | None = None
-        palette_offset: int | None = None
-
-        # Clear existing ROM palettes before registering new ones to prevent accumulation
-        self._editing_controller.clear_palette_sources("rom")
 
         # Check library for associated palette choice
         library_palette_colors = None

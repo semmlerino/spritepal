@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
+
 
 def test_save_button_follows_validation_state(qtbot):
     """

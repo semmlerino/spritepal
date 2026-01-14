@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from ui.rom_extraction_panel import ROMExtractionPanel
+
 
 def test_set_manual_offset_updates_display_label(qtbot):
     """

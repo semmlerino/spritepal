@@ -1,7 +1,10 @@
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
+
 
 def test_revert_to_original_forces_rom_reload():
     """

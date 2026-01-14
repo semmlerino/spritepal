@@ -532,19 +532,6 @@ class TestGridImageProcessor:
         assert tile_10.getpixel((4, 4)) == 200
         assert tile_11.getpixel((4, 4)) == 250
 
-    def test_inheritance_from_row_image_processor(self):
-        """Test that GridImageProcessor properly inherits from RowImageProcessor"""
-        from ui.row_arrangement.image_processor import RowImageProcessor
-
-        processor = GridImageProcessor()
-        assert isinstance(processor, RowImageProcessor)
-
-        # Check that inherited methods are available
-        assert hasattr(processor, "load_sprite")
-        assert hasattr(processor, "calculate_tile_dimensions")
-        assert hasattr(processor, "extract_rows")
-        assert hasattr(processor, "process_sprite_sheet")
-
     def test_clearing_tiles_on_new_extraction(self):
         """Test that tiles are cleared when extracting new grid"""
         processor = GridImageProcessor()

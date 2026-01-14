@@ -1,9 +1,12 @@
 
-import pytest
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
-from datetime import datetime, UTC
-from ui.main_window import MainWindow, WorkspaceMode
+
+import pytest
+
 from core.mesen_integration.log_watcher import CapturedOffset
+from ui.main_window import MainWindow, WorkspaceMode
+
 
 def test_mesen_captures_synced_on_workspace_switch(qtbot):
     """

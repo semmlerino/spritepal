@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock
-from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
+
+import pytest
+
 from ui.sprite_editor.controllers.editing_controller import EditingController
+from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
+
 
 def test_palette_sources_not_duplicated_on_reopen(qtbot):
     """
