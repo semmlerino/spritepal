@@ -43,6 +43,12 @@ class OverlayControls(QGroupBox):
         self._overlay = overlay
         self._setup_ui()
         self._connect_signals()
+        
+        # Sync with current overlay state
+        self._update_position_spinboxes(int(self._overlay.x), int(self._overlay.y))
+        self._update_opacity_slider(self._overlay.opacity)
+        self._update_scale_controls(self._overlay.scale)
+        self._update_visibility_checkbox(self._overlay.visible)
         self._update_enabled_state()
 
     def _setup_ui(self) -> None:
@@ -79,15 +85,15 @@ class OverlayControls(QGroupBox):
         scale_row = QHBoxLayout()
         scale_row.addWidget(QLabel("Scale:"))
         self.scale_slider = QSlider(Qt.Orientation.Horizontal)
-        self.scale_slider.setRange(1, 300)  # 0.1% to 30.0%
-        self.scale_slider.setValue(100)
-        self.scale_slider.setToolTip("Overlay scale (0.1-30.0%)")
+        self.scale_slider.setRange(1, 10000)  # 0.1% to 1000.0%
+        self.scale_slider.setValue(1000)
+        self.scale_slider.setToolTip("Overlay scale (0.1-1000.0%)")
         scale_row.addWidget(self.scale_slider)
 
         self.scale_spin = QDoubleSpinBox()
-        self.scale_spin.setRange(0.1, 30.0)
-        self.scale_spin.setSingleStep(0.1)
-        self.scale_spin.setValue(10.0)
+        self.scale_spin.setRange(0.1, 1000.0)
+        self.scale_spin.setSingleStep(1.0)
+        self.scale_spin.setValue(100.0)
         self.scale_spin.setSuffix("%")
         self.scale_spin.setDecimals(1)
         scale_row.addWidget(self.scale_spin)
@@ -174,7 +180,7 @@ class OverlayControls(QGroupBox):
         self._overlay.set_position(x, y)
 
     def _on_scale_slider_changed(self, value: int) -> None:
-        """Handle scale slider changes (1-300 = 0.1%-30.0%)."""
+        """Handle scale slider changes (1-10000 = 0.1%-1000.0%)."""
         scale_percent = value / 10.0
         self.scale_spin.blockSignals(True)
         self.scale_spin.setValue(scale_percent)
@@ -182,7 +188,7 @@ class OverlayControls(QGroupBox):
         self._overlay.set_scale(scale_percent / 100.0)
 
     def _on_scale_spin_changed(self, value: float) -> None:
-        """Handle scale spinbox changes (0.1-30.0)."""
+        """Handle scale spinbox changes (0.1-1000.0)."""
         slider_value = int(value * 10)
         self.scale_slider.blockSignals(True)
         self.scale_slider.setValue(slider_value)

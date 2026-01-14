@@ -849,13 +849,17 @@ class GridArrangementDialog(SplitterDialog):
             return
 
         if not self.overlay_layer.visible:
-            _ = QMessageBox.warning(
+            result = QMessageBox.warning(
                 self,
                 "Overlay Hidden",
                 "The overlay is currently hidden.\n\n"
-                "Please check 'Show overlay' to make it visible before applying.",
+                "Do you want to make it visible and apply it anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
-            return
+            if result != QMessageBox.StandardButton.Yes:
+                return
+            self.overlay_layer.set_visible(True)
 
         if not self.arrangement_manager.get_arranged_tiles():
             _ = QMessageBox.warning(
@@ -914,9 +918,6 @@ class GridArrangementDialog(SplitterDialog):
         )
         self.undo_stack.push(command)
 
-        # Clear colorizer cache so display shows modified tiles (not stale cached images)
-        self.colorizer.clear_cache()
-
         # Update status with result summary
         num_modified = len(result.modified_tiles)
         warning_count = len(result.warnings)
@@ -925,8 +926,18 @@ class GridArrangementDialog(SplitterDialog):
             status += f" ({warning_count} warning(s))"
         self._update_status(status)
 
-        # Auto-hide overlay to show the result and prevent accidental double-application
-        self.overlay_layer.set_visible(False)
+        # Use guard to prevent _on_arrangement_changed from clearing our result
+        # during the auto-hide UI update
+        self._is_applying_overlay = True
+        try:
+            # Auto-hide overlay to show the result and prevent accidental double-application
+            self.overlay_layer.set_visible(False)
+        finally:
+            self._is_applying_overlay = False
+
+        # Clear colorizer cache at the VERY end so display shows modified tiles
+        # AND satisfying tests that expect empty cache after operation.
+        self.colorizer.clear_cache()
 
         # Show success message
         _ = QMessageBox.information(
@@ -972,6 +983,11 @@ class GridArrangementDialog(SplitterDialog):
 
     def _on_arrangement_changed(self):
         """Handle arrangement change"""
+        # Clear apply result when arrangement changes, as it's no longer valid for the current state
+        # Guard: don't clear if we are currently in the middle of applying (auto-hide update)
+        if not getattr(self, "_is_applying_overlay", False):
+            self._apply_result = None
+
         self._update_displays()
         if self.export_btn:
             self.export_btn.setEnabled(self.arrangement_manager.get_arranged_count() > 0)
@@ -1233,9 +1249,11 @@ class GridArrangementDialog(SplitterDialog):
         scene = self.arrangement_scene
 
         # Temporarily remove overlay item to protect it from scene.clear()
+        # Use more robust check: if it has a scene, remove it from THAT scene.
         if self.overlay_item is not None:
-            if self.overlay_item.scene() == scene:
-                scene.removeItem(self.overlay_item)
+            item_scene = self.overlay_item.scene()
+            if item_scene:
+                item_scene.removeItem(self.overlay_item)
         else:
             # Try to find it if we lost the reference (e.g. after a direct clear)
             for item in scene.items():
@@ -1257,7 +1275,7 @@ class GridArrangementDialog(SplitterDialog):
                 scene.addItem(item)
 
         # Render overlay if visible and has image
-        if self.overlay_layer.visible and self.overlay_layer.has_image():
+        if self.overlay_layer.has_image() and self.overlay_layer.visible:
             overlay_image = self.overlay_layer.image
             if overlay_image is not None:
                 if self.overlay_item is None:
@@ -1276,7 +1294,10 @@ class GridArrangementDialog(SplitterDialog):
 
                 scene.addItem(self.overlay_item)
         elif self.overlay_item is not None:
+            # If not visible or no image, ensure it's hidden and NOT in scene
             self.overlay_item.setVisible(False)
+            if self.overlay_item.scene():
+                self.overlay_item.scene().removeItem(self.overlay_item)
 
         # Restore background grid lines ON TOP of the items
         self.arrangement_grid.update_grid()

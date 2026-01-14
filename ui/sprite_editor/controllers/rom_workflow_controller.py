@@ -929,7 +929,9 @@ class ROMWorkflowController(QObject):
 
             # Force re-initialization if dimensions are 0 or clearly too small for the data
             if self.current_width <= 0 or current_tile_capacity < num_tiles:
-                TILES_PER_ROW = 16
+                # Prefer current tiles_per_row if valid (>0), otherwise fallback to 16.
+                # This preserves physical tile (row, col) coordinates for existing arrangements.
+                TILES_PER_ROW = current_tiles_per_row if current_tiles_per_row > 0 else 16
                 tile_rows = (num_tiles + TILES_PER_ROW - 1) // TILES_PER_ROW
                 calculated_width = TILES_PER_ROW * 8
                 calculated_height = tile_rows * 8

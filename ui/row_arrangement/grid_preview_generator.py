@@ -182,6 +182,9 @@ class GridPreviewGenerator:
         else:
             output = Image.new("L", (img_w, img_h), 0)
 
+        # Tracking if we actually drew any tiles
+        tiles_drawn = 0
+
         # Place items from grid mapping
         for (r, c), (arr_type, key) in grid_mapping.items():
             items_to_draw = []
@@ -235,8 +238,9 @@ class GridPreviewGenerator:
 
                 if display_img:
                     paste_with_mode_handling(output, display_img, (x, y))
+                    tiles_drawn += 1
 
-        return output
+        return output if tiles_drawn > 0 else None
 
     def create_grid_preview_with_overlay(
         self,

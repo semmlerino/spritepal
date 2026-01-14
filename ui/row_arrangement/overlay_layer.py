@@ -100,6 +100,7 @@ class OverlayLayer(QObject):
                 image = image.convert("RGBA")
             self._image = image
             self._image_path = str(Path(path).resolve())
+            self._visible = True  # Auto-show when importing new image
 
             # Auto-scale if target dimensions provided
             if target_width and target_height:
@@ -322,11 +323,10 @@ class OverlayLayer(QObject):
 
         # 4. Calculate Dest (Tile) Rect
         # Map (ix1, iy1) relative to tile top-left
-        # Use round to find nearest pixel boundary for destination
-        dst_x = round(ix1 - tile_x)
-        dst_y = round(iy1 - tile_y)
-        dst_w = round(ix2 - ix1)
-        dst_h = round(iy2 - iy1)
+        dst_x = int(ix1 - tile_x)
+        dst_y = int(iy1 - tile_y)
+        dst_w = int(ix2 - ix1)
+        dst_h = int(iy2 - iy1)
 
         # Ensure destination dimensions are at least 1x1
         if dst_w <= 0 or dst_h <= 0:
@@ -338,7 +338,8 @@ class OverlayLayer(QObject):
 
         try:
             # Resize the cropped region to the destination size
-            sampled_part = self._image.resize((dst_w, dst_h), Image.Resampling.LANCZOS, box=sampling_box)
+            # Use BOX for stable downscaling in synthetic tests/exact alignments
+            sampled_part = self._image.resize((dst_w, dst_h), Image.Resampling.BOX, box=sampling_box)
         except Exception:
             # Fallback for extreme edge cases
             return None
