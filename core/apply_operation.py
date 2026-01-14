@@ -71,6 +71,7 @@ class ApplyOperation:
         tile_width: int,
         tile_height: int,
         palette: list[tuple[int, int, int]] | None = None,
+        use_source_positions: bool = True,
     ) -> None:
         """Initialize the Apply operation.
 
@@ -81,6 +82,10 @@ class ApplyOperation:
             tile_width: Width of each tile in pixels.
             tile_height: Height of each tile in pixels.
             palette: Optional palette for quantization (16 RGB colors).
+            use_source_positions: If True (default), sample overlay at source tile
+                positions instead of canvas positions. This ensures overlays that
+                match the source sprite layout are sampled correctly even when tiles
+                are rearranged on the canvas.
         """
         self._overlay = overlay
         self._grid_mapping = grid_mapping
@@ -88,6 +93,7 @@ class ApplyOperation:
         self._tile_width = tile_width
         self._tile_height = tile_height
         self._palette = palette
+        self._use_source_positions = use_source_positions
 
     def validate(self) -> list[ApplyWarning]:
         """Validate the Apply operation and return warnings.
@@ -103,11 +109,17 @@ class ApplyOperation:
         uncovered_tiles: list[TilePosition] = []
         for (r, c), (arr_type, key) in self._grid_mapping.items():
             if arr_type == ArrangementType.TILE:
-                tile_x = c * self._tile_width
-                tile_y = r * self._tile_height
+                row, col = map(int, key.split(","))
+
+                # Use same coordinate system as execute()
+                if self._use_source_positions:
+                    tile_x = col * self._tile_width
+                    tile_y = row * self._tile_height
+                else:
+                    tile_x = c * self._tile_width
+                    tile_y = r * self._tile_height
 
                 if not self._overlay.covers_tile(tile_x, tile_y, self._tile_width, self._tile_height):
-                    row, col = map(int, key.split(","))
                     uncovered_tiles.append(TilePosition(row, col))
 
         if uncovered_tiles:
@@ -176,9 +188,15 @@ class ApplyOperation:
             row, col = map(int, key.split(","))
             tile_pos = TilePosition(row, col)
 
-            # Calculate canvas position
-            tile_x = c * self._tile_width
-            tile_y = r * self._tile_height
+            # Calculate sampling position
+            if self._use_source_positions:
+                # Sample at source tile position (for overlays matching source layout)
+                tile_x = col * self._tile_width
+                tile_y = row * self._tile_height
+            else:
+                # Sample at canvas position (for custom arrangements)
+                tile_x = c * self._tile_width
+                tile_y = r * self._tile_height
 
             # Sample from overlay
             region = self._overlay.sample_region(tile_x, tile_y, self._tile_width, self._tile_height)
