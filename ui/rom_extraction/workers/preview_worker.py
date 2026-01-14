@@ -253,11 +253,17 @@ class SpritePreviewWorker(BaseWorker):
             num_tiles = len(tile_data) // 32  # 32 bytes per tile
             _validate_tile_count(num_tiles, len(tile_data))
 
-            tiles_per_row = 16
-            tile_rows = (num_tiles + tiles_per_row - 1) // tiles_per_row
+            # Calculate dimensions based on actual tile data size and default tiles_per_row
+            # Use a default tiles_per_row for calculation, mirroring general discovery behavior
+            tiles_per_row_for_calc = 16
+            from core.tile_utils import calculate_dimensions_from_tile_data
+            _, _, _, width, height = calculate_dimensions_from_tile_data(
+                len(tile_data), tiles_per_row_for_calc
+            )
 
-            width = min(tiles_per_row * 8, 384)
-            height = min(tile_rows * 8, 384)
+            # Cap dimensions to prevent excessively large previews
+            width = min(width, 384)
+            height = min(height, 384)
 
             self.preview_ready.emit(tile_data, width, height, self.sprite_name, compressed_size, slack_size)
             self.operation_finished.emit(True, f"Preview loaded for {self.sprite_name}")

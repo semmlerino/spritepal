@@ -30,6 +30,7 @@ class OverlayPanel(QGroupBox):
     cancelRequested = Signal()
     baseOpacityChanged = Signal(int)
     overlayOpacityChanged = Signal(int)
+    overlayScaleChanged = Signal(float)
     positionChanged = Signal(int, int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -76,6 +77,20 @@ class OverlayPanel(QGroupBox):
         overlay_layout.addWidget(self._overlay_label)
         layout.addLayout(overlay_layout)
 
+        # Overlay scale
+        scale_layout = QHBoxLayout()
+        scale_layout.addWidget(QLabel("Scale:"))
+        self._scale_slider = QSlider(Qt.Orientation.Horizontal)
+        self._scale_slider.setRange(1, 300)  # 1% to 300%
+        self._scale_slider.setValue(100)
+        self._scale_slider.setToolTip("Overlay image scale")
+        self._scale_slider.valueChanged.connect(self._on_overlay_scale_changed)
+        scale_layout.addWidget(self._scale_slider)
+        self._scale_label = QLabel("100%")
+        self._scale_label.setFixedWidth(40)
+        scale_layout.addWidget(self._scale_label)
+        layout.addLayout(scale_layout)
+
         # Position display
         pos_layout = QHBoxLayout()
         pos_layout.addWidget(QLabel("Position:"))
@@ -118,6 +133,11 @@ class OverlayPanel(QGroupBox):
         self._overlay_label.setText(f"{value}%")
         self.overlayOpacityChanged.emit(value)
 
+    def _on_overlay_scale_changed(self, value: int) -> None:
+        scale = value / 100.0
+        self._scale_label.setText(f"{value}%")
+        self.overlayScaleChanged.emit(scale)
+
     def _on_position_changed(self) -> None:
         self.positionChanged.emit(self._pos_x.value(), self._pos_y.value())
 
@@ -125,6 +145,7 @@ class OverlayPanel(QGroupBox):
         """Enable or disable controls that require an overlay."""
         self._base_slider.setEnabled(enabled)
         self._overlay_slider.setEnabled(enabled)
+        self._scale_slider.setEnabled(enabled)
         self._pos_x.setEnabled(enabled)
         self._pos_y.setEnabled(enabled)
         self._apply_btn.setEnabled(enabled)
@@ -147,6 +168,7 @@ class OverlayPanel(QGroupBox):
         """Reset panel to initial state."""
         self._base_slider.setValue(100)
         self._overlay_slider.setValue(80)
+        self._scale_slider.setValue(100)
         self._pos_x.setValue(0)
         self._pos_y.setValue(0)
         self._set_controls_enabled(False)

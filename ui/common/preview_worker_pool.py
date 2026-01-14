@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, override
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QTimer, Signal
 
 from core.services.worker_lifecycle import WorkerManager
-from core.tile_utils import align_tile_data
+from core.tile_utils import align_tile_data, calculate_dimensions_from_tile_data
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
 from utils.logging_config import get_logger
 from utils.rom_utils import detect_smc_offset
@@ -345,10 +345,17 @@ class PooledPreviewWorker(SpritePreviewWorker):
         if num_tiles == 0:
             raise ValueError("No complete tiles found in sprite data")
 
-        tiles_per_row = 16
-        tile_rows = (num_tiles + tiles_per_row - 1) // tiles_per_row
-        width = min(tiles_per_row * 8, 384)
-        height = min(tile_rows * 8, 384)
+        # Calculate dimensions based on actual tile data size and default tiles_per_row
+        # Use a default tiles_per_row for calculation, mirroring general discovery behavior
+        # The actual output image dimensions are then derived from this grid
+        tiles_per_row_for_calc = 16
+        _, _, _, width, height = calculate_dimensions_from_tile_data(
+            len(tile_data), tiles_per_row_for_calc
+        )
+
+        # Cap dimensions to prevent excessively large previews
+        width = min(width, 384)
+        height = min(height, 384)
 
         # Final cancellation check before emitting
         if self._cancel_requested.is_set():

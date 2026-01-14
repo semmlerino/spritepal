@@ -51,6 +51,7 @@ class PixelCanvas(QWidget):
         self._overlay_image: QImage | None = None
         self._overlay_position = QPoint(0, 0)  # Offset from top-left in image pixels
         self._overlay_opacity = 80  # 0-100%
+        self._overlay_scale = 1.0  # 1.0 = 100%
         self._base_opacity = 100  # 0-100% for existing sprite
         self._overlay_visible = False
         self._overlay_dragging = False
@@ -617,9 +618,15 @@ class PixelCanvas(QWidget):
         if not self._overlay_image:
             return
 
-        # Scale overlay to match zoom
-        scaled_width = self._overlay_image.width() * self.zoom
-        scaled_height = self._overlay_image.height() * self.zoom
+        # Scale overlay to match zoom AND overlay scale factor
+        # Use floor to ensure we don't sample outside image bounds
+        visual_scale = self.zoom * self._overlay_scale
+        scaled_width = int(self._overlay_image.width() * visual_scale)
+        scaled_height = int(self._overlay_image.height() * visual_scale)
+
+        if scaled_width <= 0 or scaled_height <= 0:
+            return
+
         scaled = self._overlay_image.scaled(
             scaled_width,
             scaled_height,
@@ -912,6 +919,19 @@ class PixelCanvas(QWidget):
         self._overlay_opacity = max(0, min(100, opacity))
         self.update()
 
+    def set_overlay_scale(self, scale: float) -> None:
+        """Set overlay scale factor.
+
+        Args:
+            scale: Scale factor (1.0 = original size)
+        """
+        self._overlay_scale = max(0.01, min(10.0, scale))
+        self.update()
+
+    def get_overlay_scale(self) -> float:
+        """Get current overlay scale factor."""
+        return self._overlay_scale
+
     def set_base_opacity(self, opacity: int) -> None:
         """Set base sprite opacity.
 
@@ -938,11 +958,13 @@ class PixelCanvas(QWidget):
         """
         if not self._overlay_image:
             return QRect()
+
+        visual_scale = self.zoom * self._overlay_scale
         return QRect(
             self._overlay_position.x() * self.zoom,
             self._overlay_position.y() * self.zoom,
-            self._overlay_image.width() * self.zoom,
-            self._overlay_image.height() * self.zoom,
+            int(self._overlay_image.width() * visual_scale),
+            int(self._overlay_image.height() * visual_scale),
         )
 
     def get_overlay_position(self) -> QPoint:

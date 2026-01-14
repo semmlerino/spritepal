@@ -326,6 +326,7 @@ class ROMWorkflowController(QObject):
             self._view.workspace.overlay_panel.cancelRequested.connect(self._on_cancel_overlay)
             self._view.workspace.overlay_panel.baseOpacityChanged.connect(self._on_base_opacity_changed)
             self._view.workspace.overlay_panel.overlayOpacityChanged.connect(self._on_overlay_opacity_changed)
+            self._view.workspace.overlay_panel.overlayScaleChanged.connect(self._on_overlay_scale_changed)
             self._view.workspace.overlay_panel.positionChanged.connect(self._on_overlay_position_changed)
 
     def _on_sprite_selected(self, offset: int, source_type: str) -> None:
@@ -916,20 +917,26 @@ class ROMWorkflowController(QObject):
 
         renderer = SpriteRenderer()
 
-        # Recalculate dimensions from actual tile_data to ensure correctness
-        # This handles edge cases where cached dimensions came from truncated preview data
+        # Recalculate dimensions ONLY if current dimensions are invalid or appear truncated.
+        # Normal previews are limited to 4KB (128 tiles), so we must allow expansion
+        # for the full decompressed data, while preserving valid physical widths.
         num_tiles = len(self.current_tile_data) // 32
         if num_tiles > 0:
-            TILES_PER_ROW = 16
-            tile_rows = (num_tiles + TILES_PER_ROW - 1) // TILES_PER_ROW
-            calculated_width = min(TILES_PER_ROW * 8, 384)
-            calculated_height = min(tile_rows * 8, 384)
+            # Check if current dimensions can accommodate the tiles
+            # (current_width // 8) is tiles_per_row
+            current_tiles_per_row = self.current_width // 8 if self.current_width >= 8 else 0
+            current_tile_capacity = current_tiles_per_row * (self.current_height // 8) if self.current_height >= 8 else 0
 
-            # Update stored dimensions if they differ (indicates truncation issue)
-            if calculated_width != self.current_width or calculated_height != self.current_height:
+            # Force re-initialization if dimensions are 0 or clearly too small for the data
+            if self.current_width <= 0 or current_tile_capacity < num_tiles:
+                TILES_PER_ROW = 16
+                tile_rows = (num_tiles + TILES_PER_ROW - 1) // TILES_PER_ROW
+                calculated_width = TILES_PER_ROW * 8
+                calculated_height = tile_rows * 8
+
                 logger.info(
-                    f"[OPEN] Correcting dimensions from {self.current_width}x{self.current_height} "
-                    f"to {calculated_width}x{calculated_height} ({num_tiles} tiles)"
+                    f"[OPEN] Initializing dimensions to {calculated_width}x{calculated_height} "
+                    f"({num_tiles} tiles, was {self.current_width}x{self.current_height})"
                 )
                 self.current_width = calculated_width
                 self.current_height = calculated_height
@@ -1444,8 +1451,29 @@ class ROMWorkflowController(QObject):
         # Set on canvas
         canvas = self._view.workspace.get_canvas()
         if canvas:
+            # Auto-scale if image is much larger than sprite
+            sprite_w = self.current_width
+            sprite_h = self.current_height
+            if sprite_w > 0 and sprite_h > 0:
+                scale_w = sprite_w / overlay.width()
+                scale_h = sprite_h / overlay.height()
+                initial_scale = min(scale_w, scale_h)
+                
+                # If overlay is at least 2x larger, auto-scale down
+                if initial_scale < 0.5:
+                    # Round to nearest percent
+                    initial_scale = round(initial_scale, 2)
+                    canvas.set_overlay_scale(initial_scale)
+                    self._view.workspace.overlay_panel._scale_slider.setValue(int(initial_scale * 100))
+                    self._view.workspace.overlay_panel._scale_label.setText(f"{int(initial_scale * 100)}%")
+                else:
+                    canvas.set_overlay_scale(1.0)
+                    self._view.workspace.overlay_panel._scale_slider.setValue(100)
+                    self._view.workspace.overlay_panel._scale_label.setText("100%")
+
             canvas.set_overlay_image(overlay)
             self._view.workspace.overlay_panel.set_overlay_active(True)
+            
             # Connect overlay moved signal to update panel position
             canvas.overlayMoved.connect(self._on_overlay_moved_from_canvas)
             if self._message_service:
@@ -1475,6 +1503,7 @@ class ROMWorkflowController(QObject):
         # Get overlay data from canvas
         overlay_image = canvas._overlay_image
         overlay_position = canvas.get_overlay_position()
+        overlay_scale = canvas.get_overlay_scale()
 
         if overlay_image is None:
             return
@@ -1485,6 +1514,7 @@ class ROMWorkflowController(QObject):
             current_palette,
             overlay_image,
             overlay_position,
+            overlay_scale,
         )
 
         # Apply via import command (supports undo)
@@ -1508,6 +1538,7 @@ class ROMWorkflowController(QObject):
         palette: list[tuple[int, int, int]],
         overlay: QImage,
         position: "QPoint",
+        scale: float = 1.0,
     ) -> np.ndarray:
         """Merge RGBA overlay onto indexed sprite data.
 
@@ -1517,9 +1548,10 @@ class ROMWorkflowController(QObject):
 
         Args:
             sprite_data: 2D numpy array of palette indices
-            palette: List of RGB tuples
+            palette: List of 16 RGB tuples
             overlay: QImage in ARGB32 format
             position: Overlay offset from top-left
+            scale: Scale factor applied to the overlay
 
         Returns:
             Modified sprite data array
@@ -1527,8 +1559,16 @@ class ROMWorkflowController(QObject):
         result = sprite_data.copy()
         height, width = result.shape
 
-        for y in range(overlay.height()):
-            for x in range(overlay.width()):
+        # Calculate visual dimensions of the overlay after scaling
+        visual_w = int(overlay.width() * scale)
+        visual_h = int(overlay.height() * scale)
+
+        if visual_w <= 0 or visual_h <= 0:
+            return result
+
+        # Iterate over the visual (scaled) dimensions
+        for y in range(visual_h):
+            for x in range(visual_w):
                 # Target position in sprite
                 sx = position.x() + x
                 sy = position.y() + y
@@ -1537,8 +1577,17 @@ class ROMWorkflowController(QObject):
                 if sx < 0 or sx >= width or sy < 0 or sy >= height:
                     continue
 
+                # Map visual coordinates back to original overlay pixels
+                # Use floor to ensure we stay within bounds
+                ox = int(x / scale)
+                oy = int(y / scale)
+
+                # Safety bounds check for original overlay
+                if ox < 0 or ox >= overlay.width() or oy < 0 or oy >= overlay.height():
+                    continue
+
                 # Get overlay pixel
-                pixel = overlay.pixelColor(x, y)
+                pixel = overlay.pixelColor(ox, oy)
 
                 # Skip transparent pixels
                 if pixel.alpha() < 128:
@@ -1585,6 +1634,14 @@ class ROMWorkflowController(QObject):
         canvas = self._view.workspace.get_canvas()
         if canvas:
             canvas.set_overlay_opacity(value)
+
+    def _on_overlay_scale_changed(self, value: float) -> None:
+        """Handle overlay scale change from panel."""
+        if not self._view:
+            return
+        canvas = self._view.workspace.get_canvas()
+        if canvas:
+            canvas.set_overlay_scale(value)
 
     def _on_overlay_position_changed(self, x: int, y: int) -> None:
         """Handle overlay position change from panel spinboxes."""
