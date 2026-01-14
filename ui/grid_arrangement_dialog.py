@@ -1575,7 +1575,9 @@ class GridArrangementDialog(SplitterDialog):
         # Import here to avoid circular dependency
         from ui.sprite_editor.services.arrangement_bridge import ArrangementBridge
 
-        bridge = ArrangementBridge(self.arrangement_manager, self.processor)
+        # Pass logical_width to preserve user's intended layout width
+        logical_width = self.width_spin.value() if hasattr(self, "width_spin") else min(16, self.processor.grid_cols)
+        bridge = ArrangementBridge(self.arrangement_manager, self.processor, logical_width=logical_width)
         metadata = self.preview_generator.create_arrangement_preview_data(self.arrangement_manager, self.processor)
 
         # Include modified tiles if any Apply operation was performed
@@ -1585,7 +1587,7 @@ class GridArrangementDialog(SplitterDialog):
         return ArrangementResult(
             bridge=bridge,
             metadata=metadata,
-            logical_width=self.width_spin.value() if hasattr(self, "width_spin") else min(16, self.processor.grid_cols),
+            logical_width=logical_width,
             modified_tiles=modified_tiles,
         )
 

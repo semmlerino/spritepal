@@ -43,16 +43,21 @@ class ArrangementBridge:
         self,
         manager: GridArrangementManager,
         processor: GridImageProcessor,
+        logical_width: int | None = None,
     ) -> None:
         """Initialize bridge with arrangement state.
 
         Args:
             manager: Grid arrangement manager with arrangement defined
             processor: Grid image processor with tile data
+            logical_width: Desired tiles per row in logical view. If None, calculated
+                from arranged tile count (max 16). Pass the dialog's width_spin value
+                to preserve the user's intended layout width.
         """
         self._manager = manager
         self._processor = processor
         self._mappings: list[TileMapping] = []
+        self._provided_logical_width = logical_width  # User-specified width
         self._logical_width: int = 0  # Tiles per row in logical view
         self._logical_height: int = 0  # Rows in logical view
         self._physical_width: int = processor.grid_cols
@@ -93,8 +98,13 @@ class ArrangementBridge:
         if not physical_positions:
             return
 
-        # Calculate logical dimensions (default width: 16 tiles or less)
-        self._logical_width = min(16, len(physical_positions))
+        # Calculate logical dimensions
+        # Use provided width if available, otherwise calculate from tile count
+        if self._provided_logical_width is not None and self._provided_logical_width > 0:
+            self._logical_width = self._provided_logical_width
+        else:
+            # Fallback: use min of 16 or arranged tile count
+            self._logical_width = min(16, len(physical_positions))
         self._logical_height = (len(physical_positions) + self._logical_width - 1) // self._logical_width
 
         # Create mappings

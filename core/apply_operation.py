@@ -111,13 +111,10 @@ class ApplyOperation:
             if arr_type == ArrangementType.TILE:
                 row, col = map(int, key.split(","))
 
-                # Use same coordinate system as execute()
-                if self._use_source_positions:
-                    tile_x = col * self._tile_width
-                    tile_y = row * self._tile_height
-                else:
-                    tile_x = c * self._tile_width
-                    tile_y = r * self._tile_height
+                # Always use CANVAS coordinates (r, c) for overlay coverage check.
+                # The overlay is positioned relative to the canvas grid.
+                tile_x = c * self._tile_width
+                tile_y = r * self._tile_height
 
                 if not self._overlay.covers_tile(tile_x, tile_y, self._tile_width, self._tile_height):
                     uncovered_tiles.append(TilePosition(row, col))
@@ -188,15 +185,12 @@ class ApplyOperation:
             row, col = map(int, key.split(","))
             tile_pos = TilePosition(row, col)
 
-            # Calculate sampling position
-            if self._use_source_positions:
-                # Sample at source tile position (for overlays matching source layout)
-                tile_x = col * self._tile_width
-                tile_y = row * self._tile_height
-            else:
-                # Sample at canvas position (for custom arrangements)
-                tile_x = c * self._tile_width
-                tile_y = r * self._tile_height
+            # Calculate sampling position - always use CANVAS coordinates (r, c)
+            # The overlay is positioned relative to the canvas grid, not the source grid.
+            # Note: use_source_positions is deprecated and ignored - it was fundamentally
+            # broken because the overlay can only be positioned in canvas space.
+            tile_x = c * self._tile_width
+            tile_y = r * self._tile_height
 
             # Sample from overlay
             region = self._overlay.sample_region(tile_x, tile_y, self._tile_width, self._tile_height)
