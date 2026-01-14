@@ -131,6 +131,7 @@ class ROMWorkflowController(QObject):
 
         # Connect palette source changes to hide warning when user loads custom palette
         self._editing_controller.paletteSourceSelected.connect(self._on_palette_source_changed)
+        self._editing_controller.paletteChanged.connect(self._on_palette_changed)
 
         # Connect LogWatcher
         self._connect_log_watcher()
@@ -380,6 +381,15 @@ class ROMWorkflowController(QObject):
         # Get display name from browser
         name = self._get_display_name_for_offset(offset) or f"Sprite 0x{offset:06X}"
 
+        # Get current palette if saving the currently active sprite
+        palette_colors = None
+        palette_name = ""
+        palette_source = None
+        if self.current_offset == offset:
+            palette_colors = self._editing_controller.get_current_colors()
+            palette_name = self._editing_controller.palette_model.name
+            palette_source = self._editing_controller.get_current_palette_source()
+
         # Generate thumbnail (PIL Image for library storage)
         pil_thumbnail = self._generate_library_thumbnail(offset)
 
@@ -390,6 +400,9 @@ class ROMWorkflowController(QObject):
             rom_path=self.rom_path,
             name=name,
             thumbnail=pil_thumbnail,
+            palette_colors=palette_colors,
+            palette_name=palette_name,
+            palette_source=palette_source,
         )
 
         if sprite is None:
@@ -937,6 +950,20 @@ class ROMWorkflowController(QObject):
         detected_palette_index: int | None = None
         palette_offset: int | None = None
 
+        # Check library for associated palette choice
+        library_palette_colors = None
+        library_palette_name = ""
+        library_palette_source = None
+        if self._sprite_library and self.rom_path:
+            rom_hash = self._sprite_library.compute_rom_hash(self.rom_path)
+            existing_sprites = self._sprite_library.get_by_offset(self.current_offset, rom_hash)
+            if existing_sprites and existing_sprites[0].palette_colors:
+                lib_sprite = existing_sprites[0]
+                library_palette_colors = lib_sprite.palette_colors
+                library_palette_name = lib_sprite.palette_name
+                library_palette_source = lib_sprite.palette_source
+                logger.info(f"[OPEN] Found library palette association for 0x{self.current_offset:06X}")
+
         if self.rom_extractor and self.rom_path:
             try:
                 # 1. Get header to identify game
@@ -1008,8 +1035,20 @@ class ROMWorkflowController(QObject):
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self._editing_controller.load_image(image_array, palette)
 
-        # Auto-select the palette source in dropdown if we detected one
-        if detected_palette_index and all_palettes:
+        # Apply library palette override if available
+        if library_palette_colors:
+            self._editing_controller.set_palette(library_palette_colors, library_palette_name)
+            if library_palette_source:
+                source_type, source_idx = library_palette_source
+                # Ensure custom file palettes are re-registered so they appear in dropdown
+                if source_type == "file":
+                    self._editing_controller.register_palette_source(
+                        "file", source_idx, library_palette_colors, library_palette_name or "Loaded Palette"
+                    )
+                self._editing_controller.set_palette_source(source_type, source_idx)
+                logger.info(f"[OPEN] Applied library palette: {source_type} {source_idx}")
+        # Auto-select the palette source in dropdown if we detected one and no library override
+        elif detected_palette_index and all_palettes:
             self._editing_controller.set_palette_source("rom", detected_palette_index)
             if self._message_service:
                 palette_count = len(all_palettes)
@@ -2219,6 +2258,7 @@ class ROMWorkflowController(QObject):
 
         When user loads a custom palette file, hide the 'Using default palette' warning
         since the user has explicitly chosen their palette.
+        Also updates the library entry if the sprite is already in the library.
 
         Args:
             source_type: Type of palette source ('file', 'rom', 'mesen', 'default', 'preset')
@@ -2229,6 +2269,50 @@ class ROMWorkflowController(QObject):
             self._view.hide_palette_warning()
             if self._message_service:
                 self._message_service.show_message("Custom palette loaded")
+
+        # Update library association if sprite is in library
+        self._update_library_palette_association(source_type, palette_index)
+
+    def _on_palette_changed(self) -> None:
+        """Handle palette color changes from editing controller."""
+        # Update library association if sprite is in library
+        self._update_library_palette_association()
+
+    def _update_library_palette_association(
+        self, source_type: str | None = None, palette_index: int | None = None
+    ) -> None:
+        """Update the palette association in the sprite library for the current offset.
+
+        Args:
+            source_type: Optional source type override
+            palette_index: Optional palette index override
+        """
+        if not (self._sprite_library and self.rom_path and self.current_offset >= 0):
+            return
+
+        rom_hash = self._sprite_library.compute_rom_hash(self.rom_path)
+        existing = self._sprite_library.get_by_offset(self.current_offset, rom_hash)
+        if not existing:
+            return
+
+        palette_colors = self._editing_controller.get_current_colors()
+        palette_name = self._editing_controller.palette_model.name
+
+        # Use provided source info or fallback to controller's current source
+        if source_type is None or palette_index is None:
+            source = self._editing_controller.get_current_palette_source()
+            if source:
+                source_type, palette_index = source
+
+        palette_source = (source_type, palette_index) if source_type is not None and palette_index is not None else None
+
+        self._sprite_library.update_sprite(
+            existing[0].unique_id,
+            palette_colors=palette_colors,
+            palette_name=palette_name,
+            palette_source=palette_source,
+        )
+        logger.debug(f"Updated library palette association for 0x{self.current_offset:06X}")
 
     def _on_manual_palette_requested(self) -> None:
         """Handle request to manually specify a palette offset.

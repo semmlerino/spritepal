@@ -46,7 +46,12 @@ class EditingController(QObject):
         # Create models and managers
         self.image_model = ImageModel()
         self.palette_model = PaletteModel()  # Use model instead of inline list
+        self._current_palette_source: tuple[str, int] | None = None
+
+        # Tool manager
         self.tool_manager = ToolManager()
+
+        # Undo/Redo manager
         self.undo_manager = UndoManager()
 
         # Selected color index
@@ -380,6 +385,10 @@ class EditingController(QObject):
         """Get all registered palette sources."""
         return self._palette_sources.copy()
 
+    def get_current_palette_source(self) -> tuple[str, int] | None:
+        """Get the currently selected palette source (source_type, index)."""
+        return self._current_palette_source
+
     def register_palette_source(
         self,
         source_type: str,
@@ -403,6 +412,7 @@ class EditingController(QObject):
 
     def handle_palette_source_changed(self, source_type: str, index: int) -> None:
         """Handle palette source selection change."""
+        self._current_palette_source = (source_type, index)
         try:
             if source_type == "default":
                 from ..core.palette_utils import get_default_snes_palette
@@ -456,6 +466,9 @@ class EditingController(QObject):
             source_type: Type of source ("default", "mesen", or "rom")
             palette_index: Palette index
         """
+        # Update current source tracker
+        self._current_palette_source = (source_type, palette_index)
+
         # Apply the palette
         self.handle_palette_source_changed(source_type, palette_index)
 

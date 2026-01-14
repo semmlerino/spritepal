@@ -45,6 +45,9 @@ class LibrarySprite:
         created_at: When the sprite was added to library
         last_edited: When the sprite was last modified (None if never edited)
         tags: Optional list of tags for categorization
+        palette_colors: Optional list of 16 RGB colors
+        palette_name: Optional name of the palette
+        palette_source: Optional tuple of (source_type, index)
     """
 
     rom_offset: int
@@ -55,6 +58,9 @@ class LibrarySprite:
     created_at: datetime = field(default_factory=datetime.now)
     last_edited: datetime | None = None
     tags: list[str] = field(default_factory=list)
+    palette_colors: list[tuple[int, int, int]] | None = None
+    palette_name: str = ""
+    palette_source: tuple[str, int] | None = None
 
     @property
     def offset_hex(self) -> str:
@@ -82,6 +88,18 @@ class LibrarySprite:
         tags_obj = d.get("tags", [])
         tags = [str(t) for t in tags_obj] if isinstance(tags_obj, list) else []
 
+        palette_colors = None
+        if "palette_colors" in d and d["palette_colors"] is not None:
+            colors_list = d["palette_colors"]
+            if isinstance(colors_list, list):
+                palette_colors = [tuple(c) for c in colors_list if len(c) >= 3]
+
+        palette_source = None
+        if "palette_source" in d and d["palette_source"] is not None:
+            source = d["palette_source"]
+            if isinstance(source, list) and len(source) == 2:
+                palette_source = (str(source[0]), int(source[1]))
+
         return cls(
             rom_offset=int(str(d["rom_offset"])),
             rom_hash=str(d["rom_hash"]),
@@ -91,6 +109,9 @@ class LibrarySprite:
             created_at=created_at,
             last_edited=last_edited,
             tags=tags,
+            palette_colors=palette_colors,
+            palette_name=str(d.get("palette_name", "")),
+            palette_source=palette_source,
         )
 
 
@@ -221,6 +242,9 @@ class SpriteLibrary(QObject):
         thumbnail: Image.Image | None = None,
         notes: str = "",
         tags: list[str] | None = None,
+        palette_colors: list[tuple[int, int, int]] | None = None,
+        palette_name: str = "",
+        palette_source: tuple[str, int] | None = None,
     ) -> LibrarySprite | None:
         """
         Add a sprite to the library.
@@ -232,6 +256,9 @@ class SpriteLibrary(QObject):
             thumbnail: Optional PIL Image for thumbnail
             notes: Optional notes about the sprite
             tags: Optional list of tags
+            palette_colors: Optional list of 16 RGB colors
+            palette_name: Optional name of the palette
+            palette_source: Optional tuple of (source_type, index)
 
         Returns:
             The created LibrarySprite, or None if persistence failed.
@@ -244,6 +271,9 @@ class SpriteLibrary(QObject):
             name=name,
             notes=notes,
             tags=tags or [],
+            palette_colors=palette_colors,
+            palette_name=palette_name,
+            palette_source=palette_source,
         )
 
         # Save thumbnail if provided
@@ -300,6 +330,9 @@ class SpriteLibrary(QObject):
         notes: str | None = None,
         tags: list[str] | None = None,
         thumbnail: Image.Image | None = None,
+        palette_colors: list[tuple[int, int, int]] | None = None,
+        palette_name: str | None = None,
+        palette_source: tuple[str, int] | None = None,
     ) -> LibrarySprite | None:
         """
         Update a sprite's metadata.
@@ -310,6 +343,9 @@ class SpriteLibrary(QObject):
             notes: New notes (None to keep current)
             tags: New tags (None to keep current)
             thumbnail: New thumbnail (None to keep current)
+            palette_colors: New palette colors (None to keep current)
+            palette_name: New palette name (None to keep current)
+            palette_source: New palette source (None to keep current)
 
         Returns:
             Updated sprite, or None if not found
@@ -327,6 +363,12 @@ class SpriteLibrary(QObject):
             sprite.tags = tags
         if thumbnail is not None:
             sprite.thumbnail_path = self._save_thumbnail(unique_id, thumbnail)
+        if palette_colors is not None:
+            sprite.palette_colors = palette_colors
+        if palette_name is not None:
+            sprite.palette_name = palette_name
+        if palette_source is not None:
+            sprite.palette_source = palette_source
 
         sprite.last_edited = datetime.now()
         self.save()
