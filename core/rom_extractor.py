@@ -1269,7 +1269,8 @@ class ROMExtractor:
         for i in range(tiles_checked):
             tile_offset = i * BYTES_PER_TILE
             tile_data = sprite_data[tile_offset : tile_offset + BYTES_PER_TILE]
-            if len(tile_data) == BYTES_PER_TILE and self._validate_4bpp_tile(tile_data):
+            # Use heuristic for scoring - empty/full tiles don't contribute to 'graphics' quality
+            if len(tile_data) == BYTES_PER_TILE and self._is_heuristic_graphics_tile(tile_data):
                 valid_tile_count += 1
 
         return valid_tile_count / tiles_checked
@@ -1373,21 +1374,23 @@ class ROMExtractor:
     def _validate_4bpp_tile(self, tile_data: bytes) -> bool:
         """
         Validate if a single tile has valid 4bpp sprite characteristics.
+        Strict version: empty/full tiles ARE technically valid SNES tiles.
 
         Args:
             tile_data: {BYTES_PER_TILE} bytes of tile data
 
         Returns:
-            True if tile appears valid
+            True if tile is a valid 4bpp tile structure
         """
         if len(tile_data) != BYTES_PER_TILE:
             return False
 
-        # Check for completely empty or full tile (common in non-sprite data)
+        # Check for completely empty or full tile - these ARE valid 4bpp tiles
         if tile_data in (b"\x00" * BYTES_PER_TILE, b"\xff" * BYTES_PER_TILE):
-            return False
+            return True
 
         # Check bitplane structure
+        # ... rest of the logic remains same for more complex tiles
         plane_validity = 0
 
         # Check first two bitplanes (bytes 0-15)
@@ -1403,20 +1406,25 @@ class ROMExtractor:
             plane_validity += 1
 
         # Check for bitplane patterns that indicate graphics
-        # In sprites, bitplanes often have correlated patterns
         correlation = 0
         for i in range(8):  # Check each row
-            # Get bytes from each bitplane pair
             p0 = tile_data[i * 2]
             p1 = tile_data[i * 2 + 1]
             p2 = tile_data[16 + i * 2]
             p3 = tile_data[16 + i * 2 + 1]
-
-            # Check if there's some correlation between planes
             if (p0 & p2) != 0 or (p1 & p3) != 0:
                 correlation += 1
 
         return plane_validity >= 1 and correlation >= 2
+
+    def _is_heuristic_graphics_tile(self, tile_data: bytes) -> bool:
+        """
+        Heuristic version of tile validation for ROM scanning.
+        Filters out empty/full tiles as they are unlikely to be part of a sprite.
+        """
+        if tile_data in (b"\x00" * BYTES_PER_TILE, b"\xff" * BYTES_PER_TILE):
+            return False
+        return self._validate_4bpp_tile(tile_data)
 
     def _has_graphics_patterns(self, data: bytes) -> bool:
         """

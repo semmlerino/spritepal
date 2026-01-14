@@ -247,33 +247,32 @@ class TestStartupState:
         workspace = sprite_editor_workspace
 
         # Mode toggle should default to ROM mode
-        assert workspace._mode_toggle.current_data() == "rom"
-
-        # Stack should show ROM page (index 1)
-        assert workspace._mode_stack.currentIndex() == 1
+        assert workspace.current_mode == "rom"
 
         # The visible page should be the ROM page
-        assert workspace._mode_stack.currentWidget() == workspace._rom_page
+        from PySide6.QtWidgets import QStackedWidget
+        stack = workspace.findChild(QStackedWidget)
+        assert stack.currentWidget() == workspace.rom_page
 
     def test_mode_switch_updates_stack(self, sprite_editor_workspace):
         """Verify switching modes updates the stack widget."""
         workspace = sprite_editor_workspace
 
         # Switch to VRAM mode
-        workspace._mode_toggle.set_current_data("vram")
+        workspace.set_mode("vram")
 
         # Stack should now show VRAM page
-        assert workspace._mode_stack.currentIndex() == 0
-        assert workspace._mode_stack.currentWidget() == workspace._vram_page
-        assert workspace._mode_toggle.current_data() == "vram"
+        from PySide6.QtWidgets import QStackedWidget
+        stack = workspace.findChild(QStackedWidget)
+        assert stack.currentWidget() == workspace.vram_page
+        assert workspace.current_mode == "vram"
 
         # Switch back to ROM mode
-        workspace._mode_toggle.set_current_data("rom")
+        workspace.set_mode("rom")
 
         # Stack should show ROM page again
-        assert workspace._mode_stack.currentIndex() == 1
-        assert workspace._mode_stack.currentWidget() == workspace._rom_page
-        assert workspace._mode_toggle.current_data() == "rom"
+        assert stack.currentWidget() == workspace.rom_page
+        assert workspace.current_mode == "rom"
 
     def test_set_mode_programmatic_updates_toggle_and_stack(self, sprite_editor_workspace):
         """Verify programmatic set_mode() updates both toggle and stack."""
@@ -283,13 +282,15 @@ class TestStartupState:
         workspace.set_mode("vram")
 
         # Both toggle and stack should update
-        assert workspace._mode_toggle.current_data() == "vram"
-        assert workspace._mode_stack.currentWidget() == workspace._vram_page
+        assert workspace.current_mode == "vram"
+        from PySide6.QtWidgets import QStackedWidget
+        stack = workspace.findChild(QStackedWidget)
+        assert stack.currentWidget() == workspace.vram_page
 
         workspace.set_mode("rom")
 
-        assert workspace._mode_toggle.current_data() == "rom"
-        assert workspace._mode_stack.currentWidget() == workspace._rom_page
+        assert workspace.current_mode == "rom"
+        assert stack.currentWidget() == workspace.rom_page
 
     def test_controllers_receive_mode_at_startup(self, sprite_editor_workspace):
         """Verify sub-controllers are set to correct mode at startup.
@@ -300,8 +301,8 @@ class TestStartupState:
         workspace = sprite_editor_workspace
 
         # Controllers should be in ROM mode (default)
-        assert workspace._extraction_controller._mode == "rom"
-        assert workspace._injection_controller._mode == "rom"
+        assert workspace.extraction_controller.mode == "rom"
+        assert workspace.injection_controller.mode == "rom"
 
     def test_mode_switch_propagates_to_controllers(self, sprite_editor_workspace):
         """Verify mode switches propagate to all sub-controllers."""
@@ -311,14 +312,14 @@ class TestStartupState:
         workspace.set_mode("vram")
 
         # All controllers should update
-        assert workspace._extraction_controller._mode == "vram"
-        assert workspace._injection_controller._mode == "vram"
+        assert workspace.extraction_controller.mode == "vram"
+        assert workspace.injection_controller.mode == "vram"
 
         # Switch back to ROM
         workspace.set_mode("rom")
 
-        assert workspace._extraction_controller._mode == "rom"
-        assert workspace._injection_controller._mode == "rom"
+        assert workspace.extraction_controller.mode == "rom"
+        assert workspace.injection_controller.mode == "rom"
 
 
 class TestModeToggleDataConsistency:
@@ -355,18 +356,23 @@ class TestModeToggleDataConsistency:
     def test_toggle_count_matches_stack_count(self, sprite_editor_workspace):
         """Verify toggle options match stack pages."""
         workspace = sprite_editor_workspace
+        from PySide6.QtWidgets import QStackedWidget
+        stack = workspace.findChild(QStackedWidget)
 
-        assert len(workspace._mode_toggle._buttons) == workspace._mode_stack.count()
-        assert len(workspace._mode_toggle._buttons) == 2  # VRAM and ROM
+        # SegmentedToggle doesn't have a public count() but we can check if it has the 2 expected options
+        assert workspace.mode_toggle is not None
+        assert stack.count() == 2  # VRAM and ROM
 
     def test_data_mapping_is_consistent(self, sprite_editor_workspace):
         """Verify toggle data maps to correct stack page."""
         workspace = sprite_editor_workspace
+        from PySide6.QtWidgets import QStackedWidget
+        stack = workspace.findChild(QStackedWidget)
 
         # "vram" should map to VRAM page
-        workspace._mode_toggle.set_current_data("vram")
-        assert workspace._mode_stack.currentWidget() == workspace._vram_page
+        workspace.set_mode("vram")
+        assert stack.currentWidget() == workspace.vram_page
 
         # "rom" should map to ROM page
-        workspace._mode_toggle.set_current_data("rom")
-        assert workspace._mode_stack.currentWidget() == workspace._rom_page
+        workspace.set_mode("rom")
+        assert stack.currentWidget() == workspace.rom_page

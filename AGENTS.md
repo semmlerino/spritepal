@@ -23,8 +23,10 @@ Run from `spritepal/`:
 - Python 3.12+, 4-space indents, 120-char lines (Ruff config in `pyproject.toml`).
 - Prefer type hints everywhere; use `| None` for optionals and annotate Qt signals.
 - Naming: modules/functions in `snake_case`, classes in `PascalCase`, tests as `test_*.py`, `Test*` classes, `test_*` functions.
+- **Law of Demeter (LoD)**: Strictly follow the Law of Demeter. Use facade methods on parent components rather than reaching through to children. Never access `parent.child.grandchild`.
 
 ## Testing Guidelines
+- **Bug-First TDD (Mandatory)**: Always write a failing reproduction test before fixing a bug.
 - Frameworks: `pytest`, `pytest-qt`, `pytest-xdist` (default `-n auto`).
 - Use `isolated_managers` unless `session_managers` is required with `@pytest.mark.shared_state_safe`.
 - Avoid `time.sleep()`; use `qtbot.wait()`/`waitSignal()` context managers.

@@ -7,11 +7,13 @@ A PySide6-based sprite extraction and editing tool for SNES ROM hacking.
 - **Extract sprites** from SNES ROMs with HAL compression support
 - **Edit sprites** directly in embedded editor with full Extract→Edit→Inject workflow
 - **Inject modified sprites** back into ROMs with compression
+- **Modern IDE-like UI**: Dock-based layout (QDockWidget) for flexible workspace management
 - **Mesen 2 integration**: Click on sprites in emulator to find ROM offset automatically
 - **Multi-threaded thumbnail** generation for fast browsing
 - **Keyboard shortcuts** for tab navigation (Ctrl+1/2/3) and quick capture access (F6)
 - **WCAG 2.1 compliant** keyboard navigation
 - **Session persistence** saves window state, file paths, and recent captures
+- **Segmented UI controls**: Improved mode switching using `SegmentedToggle` widgets
 - **Toggleable backgrounds** in sprite editor for better visibility during editing
 - **Revert to Original** button to restore a sprite from ROM if edits go wrong
 - **Per-category logging** control via Settings → Logging tab for detailed debugging

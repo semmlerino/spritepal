@@ -244,26 +244,29 @@ class TestROMValidator:
 
         header, _ = ROMValidator.validate_rom_header(str(rom_path))
 
+        # Strict mode (default) should raise
         with pytest.raises(ROMChecksumError) as exc_info:
             ROMValidator.verify_rom_checksum(str(rom_path), header)
-
         assert "ROM checksum mismatch" in str(exc_info.value)
+
+        # Lenient mode should return False and not raise
+        result = ROMValidator.verify_rom_checksum(str(rom_path), header, lenient=True)
+        assert result is False
 
     def test_verify_rom_checksum_odd_length(self, tmp_path):
         """Test checksum with odd-length ROM data"""
         rom_path = tmp_path / "odd_length.sfc"
-        # Create ROM with odd size
-        rom_data = create_test_rom(size=0x200001)  # One extra byte
+        # Create ROM with odd size (0x200000 is 2MB, +1 byte)
+        rom_data = create_test_rom(size=0x200001)
         rom_path.write_bytes(rom_data)
 
         header, _ = ROMValidator.validate_rom_header(str(rom_path))
 
-        # Should handle odd length gracefully
-        try:
-            ROMValidator.verify_rom_checksum(str(rom_path), header)
-        except Exception:
-            # If it fails, it should be with checksum error, not index error
-            pass
+        # Should handle odd length and detect mismatch (since create_test_rom doesn't 
+        # perfectly calculate checksum for non-power-of-2 sizes in its simple implementation)
+        # The key is that it doesn't crash with IndexError
+        result = ROMValidator.verify_rom_checksum(str(rom_path), header, lenient=True)
+        assert isinstance(result, bool)
 
     def test_identify_rom_version_known_game(self):
         """Test ROM version identification for known game"""

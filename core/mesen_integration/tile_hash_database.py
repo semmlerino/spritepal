@@ -270,6 +270,28 @@ class TileHashDatabase:
 
         return dict(sorted(offset_counts.items(), key=lambda x: -x[1]))
 
+    @property
+    def rom_size(self) -> int:
+        """Get the ROM size in bytes."""
+        return self._rom_size
+
+    @property
+    def blocks(self) -> list[ROMSpriteBlock]:
+        """Get a copy of the indexed blocks."""
+        return list(self._blocks)
+
+    def __len__(self) -> int:
+        """Return the number of indexed blocks."""
+        return len(self._blocks)
+
+    def has_tile_hash(self, tile_hash: str) -> bool:
+        """Check if a tile hash is indexed in the database."""
+        return tile_hash in self._hash_to_match
+
+    def get_matches_for_hash(self, tile_hash: str) -> list[TileMatch]:
+        """Get all matches for a given tile hash."""
+        return list(self._hash_to_match.get(tile_hash, []))
+
     def get_statistics(self) -> dict[str, object]:
         """Get database statistics."""
         return {

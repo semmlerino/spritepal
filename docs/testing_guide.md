@@ -1084,6 +1084,8 @@ def qtbot(): ...           # Qt test interface
 @pytest.fixture
 def tmp_path(): ...         # Temp directory
 @pytest.fixture
+def isolated_data_repository(): ... # Isolated ROM/sprite data repository
+@pytest.fixture
 def monkeypatch(): ...      # Mock attributes
 @pytest.fixture
 def caplog(): ...           # Capture logs
@@ -1203,6 +1205,6 @@ QT_QPA_PLATFORM=offscreen pytest tests/
 - Cache consistency
 
 ---
-*Last Updated: December 25, 2025 | SpritePal Testing Reference - DO NOT DELETE*
+*Last Updated: January 14, 2026 | SpritePal Testing Reference - DO NOT DELETE*
 
 **Critical**: ThreadSafeTestImage implementation required to prevent Qt threading violations that cause "Fatal Python error: Aborted" crashes in worker tests.

@@ -831,12 +831,18 @@ class TestROMExtractorValidationMethods:
     def test_validate_4bpp_tile_empty(self, extractor):
         """Test tile validation with empty tile"""
         empty_tile = b"\x00" * 32
-        assert extractor._validate_4bpp_tile(empty_tile) is False
+        # Strict validation allows it
+        assert extractor._validate_4bpp_tile(empty_tile) is True
+        # Heuristic (for scanning) rejects it
+        assert extractor._is_heuristic_graphics_tile(empty_tile) is False
 
     def test_validate_4bpp_tile_full(self, extractor):
         """Test tile validation with full tile"""
         full_tile = b"\xff" * 32
-        assert extractor._validate_4bpp_tile(full_tile) is False
+        # Strict validation allows it
+        assert extractor._validate_4bpp_tile(full_tile) is True
+        # Heuristic (for scanning) rejects it
+        assert extractor._is_heuristic_graphics_tile(full_tile) is False
 
     def test_validate_4bpp_tile_no_correlation(self, extractor):
         """Test tile validation with no bitplane correlation"""

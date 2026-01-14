@@ -55,10 +55,23 @@ SpritePal follows a layered architecture to maintain clean dependencies and prev
 4. **Core Layer (`core/`)**
    - ✅ CAN import from: `utils/`, `PySide6` (for Qt event infrastructure)
    - ❌ CANNOT import from: `ui/`, `core/managers/` (except via protocols)
-   - Purpose: Domain logic, data structures, algorithms
+   - Purpose: Domain logic, data structures, algorithms.
+   - **Utility Modules**: Recently extracted logic for improved testability:
+     - `hal_parser.py`: HAL compression format parsing and validation.
+     - `tile_utils.py`: SNES tile bitplane decoding/encoding and manipulation.
+     - `analysis_utils.py`: ROM space analysis, slack detection, and empty region detection.
    - Note: Core uses PySide6 for QObject-based managers/workers (signals, threading).
      This is intentional architecture for event-driven patterns, not a layer violation.
      Core services may reference manager protocols for DI but should not import managers directly.
+
+### Law of Demeter (LoD) and Facades
+
+SpritePal strictly enforces the Law of Demeter to prevent tight coupling. Components should only talk to their immediate neighbors and use **facade methods** to interact with deeper child components.
+
+- **Bad**: `workspace.editing_controller.image_model.set_pixel(...)`
+- **Good**: `workspace.set_pixel(...)` (where `workspace` delegates to `editing_controller`)
+
+All major controllers and views should expose high-level facade methods (`get_*`, `set_*`, `clear_*`, `perform_*`) rather than exposing internal children.
 
 5. **Utils Layer (`utils/`)**
    - ✅ CAN import from: Python standard library only

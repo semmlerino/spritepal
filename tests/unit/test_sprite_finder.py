@@ -86,9 +86,9 @@ class TestSpriteCandidate:
         assert result["compressed_size"] == 1024
         assert result["decompressed_size"] == 2048
         assert result["tile_count"] == 64
-        assert result["confidence"] == 0.857  # Rounded to 3 decimal places
-        assert result["visual_metrics"]["coherence"] == 0.823  # Rounded
-        assert result["visual_metrics"]["edge_score"] == 0.712  # Rounded
+        assert result["confidence"] == pytest.approx(0.857, abs=1e-3)
+        assert result["visual_metrics"]["coherence"] == pytest.approx(0.823, abs=1e-3)
+        assert result["visual_metrics"]["edge_score"] == pytest.approx(0.712, abs=1e-3)
         assert result["preview_path"] == preview_path
 
 

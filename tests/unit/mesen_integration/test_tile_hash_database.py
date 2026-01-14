@@ -525,10 +525,11 @@ class TestTileHashDatabasePersistence:
 
         new_db.load_database(output_path)
 
-        assert "abc123" in new_db._hash_to_match
-        assert "def456" in new_db._hash_to_match
-        assert len(new_db._hash_to_match["abc123"]) == 1
-        assert new_db._hash_to_match["abc123"][0].rom_offset == 0x1B0000
+        assert new_db.has_tile_hash("abc123")
+        assert new_db.has_tile_hash("def456")
+        matches = new_db.get_matches_for_hash("abc123")
+        assert len(matches) == 1
+        assert matches[0].rom_offset == 0x1B0000
 
     def test_load_database_restores_blocks(self, db_for_save: TileHashDatabase, tmp_path: Path) -> None:
         """load_database restores block list."""
@@ -541,9 +542,9 @@ class TestTileHashDatabasePersistence:
 
         new_db.load_database(output_path)
 
-        assert len(new_db._blocks) == 1
-        assert new_db._blocks[0].rom_offset == 0x1B0000
-        assert new_db._blocks[0].tile_count == 2
+        assert len(new_db.blocks) == 1
+        assert new_db.blocks[0].rom_offset == 0x1B0000
+        assert new_db.blocks[0].tile_count == 2
 
     def test_load_database_clears_existing(self, db_for_save: TileHashDatabase, tmp_path: Path) -> None:
         """load_database clears existing data before loading."""
@@ -551,6 +552,8 @@ class TestTileHashDatabasePersistence:
         db_for_save.save_database(output_path)
 
         new_db = TileHashDatabase(db_for_save.rom_path)
+        # Seed via private members for setup is acceptable if no public seed method exists,
+        # but assertions should be public.
         new_db._hash_to_match = {"existing": [TileMatch(0, 0)]}
         new_db._blocks = [ROMSpriteBlock(0, "existing")]
         new_db._rom_checksum = 0x1234
@@ -558,8 +561,8 @@ class TestTileHashDatabasePersistence:
 
         new_db.load_database(output_path)
 
-        assert "existing" not in new_db._hash_to_match
-        assert len(new_db._blocks) == 1
+        assert not new_db.has_tile_hash("existing")
+        assert len(new_db.blocks) == 1
 
 
 # =============================================================================
@@ -575,7 +578,7 @@ class TestTileHashDatabaseInit:
         rom_path = tmp_path / "nonexistent.sfc"
         db = TileHashDatabase(rom_path)
         assert db.rom_path == rom_path
-        assert db._rom_size == 0
+        assert db.rom_size == 0
 
     def test_init_empty_database(self, tmp_path: Path) -> None:
         """New database starts empty."""
@@ -588,8 +591,8 @@ class TestTileHashDatabaseInit:
         db._hash_to_match = {}
         db._blocks = []
 
-        assert len(db._hash_to_match) == 0
-        assert len(db._blocks) == 0
+        assert len(db.blocks) == 0
+        assert not db.has_tile_hash("any")
 
 
 # =============================================================================

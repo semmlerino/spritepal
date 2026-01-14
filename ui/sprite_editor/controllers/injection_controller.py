@@ -53,6 +53,11 @@ class InjectionController(QObject):
         self._png_validation_passed: bool = False
 
     @property
+    def mode(self) -> str:
+        """Get the current injection mode ('vram' or 'rom')."""
+        return self._mode
+
+    @property
     def rom_injector(self) -> ROMInjector:
         """Lazy access to ROMInjector via AppContext when available.
 

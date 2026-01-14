@@ -66,6 +66,11 @@ class ExtractionController(QObject):
         self.oam_file: str = ""
         self.rom_file: str = ""
 
+    @property
+    def mode(self) -> str:
+        """Get the current extraction mode ('vram' or 'rom')."""
+        return self._mode
+
     def _cleanup_worker(self) -> None:
         """Clean up existing workers before creating new ones."""
         if self._worker is not None:
