@@ -1,11 +1,13 @@
-import pytest
-from PySide6.QtCore import QObject, Signal
-
 from ui.sprite_editor.controllers.editing_controller import EditingController
 from ui.sprite_editor.views.workspaces.edit_workspace import EditWorkspace
 
 
 def test_shared_controller_disconnection(qtbot):
+    """Regression test: connecting workspace2 must not disconnect workspace1.
+
+    This verifies that when multiple workspaces share a controller,
+    connecting a second workspace doesn't break signal delivery to the first.
+    """
     # Shared controller
     controller = EditingController()
 
@@ -13,20 +15,31 @@ def test_shared_controller_disconnection(qtbot):
     workspace1 = EditWorkspace()
     workspace2 = EditWorkspace()
 
-    # Wire them to the same controller
+    # Wire workspace1 to controller
     workspace1.set_controller(controller)
 
-    canvas1 = workspace1.get_canvas()
-    initial_version = canvas1._palette_version
+    # Set a known palette state on workspace1
+    initial_palette = [(0, 0, 0)] * 16
+    initial_palette[5] = (100, 100, 100)  # Gray
+    controller.set_palette(initial_palette, "Initial")
 
-    # Now wire the second workspace to the same controller
-    # This should NOT disconnect the first one
+    # Verify workspace1 has the initial palette
+    assert workspace1.palette_panel.get_color_at(5) == (100, 100, 100)
+
+    # Now wire workspace2 to the same controller
+    # This is the critical moment - workspace1 should NOT be disconnected
     workspace2.set_controller(controller)
 
-    # Change palette
-    controller.paletteChanged.emit()
+    # Change the palette via controller
+    new_palette = [(0, 0, 0)] * 16
+    new_palette[5] = (255, 0, 0)  # Red
+    controller.set_palette(new_palette, "Changed")
 
-    # If bug exists, canvas1 won't receive the signal and _palette_version stays at initial_version
-    assert canvas1._palette_version > initial_version, (
-        "Workspace 1 was disconnected by Workspace 2's set_controller call!"
+    # If workspace1 was disconnected, it won't see the new palette
+    assert workspace1.palette_panel.get_color_at(5) == (255, 0, 0), (
+        "Workspace 1 was disconnected by Workspace 2's set_controller call! "
+        "Expected (255, 0, 0) but palette wasn't updated."
     )
+
+    # Verify workspace2 also received the update
+    assert workspace2.palette_panel.get_color_at(5) == (255, 0, 0)

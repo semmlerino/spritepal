@@ -656,18 +656,21 @@ class TestExtractionErrorPaths:
         with pytest.raises(ValidationError, match="does not exist|not found|No such file"):
             mgr.validate_extraction_params(params)
 
-    def test_validate_vram_extraction_nonexistent_file_raises(self, mgr, tmp_path):
-        """VRAM extraction params with nonexistent file should raise ValidationError."""
+    def test_validate_vram_extraction_defers_file_existence_check(self, mgr, tmp_path):
+        """VRAM validation defers file existence check to extraction time.
+
+        Unlike ROM validation which checks file existence early,
+        VRAM validation only checks param structure. File existence
+        is verified when extract_from_vram is called.
+        """
         params = {
             "vram_path": "/nonexistent/path/file.vram",
             "output_base": str(tmp_path / "output"),
             "grayscale_mode": True,
         }
-        # Note: validate_extraction_params doesn't check file existence for VRAM
-        # The actual extract_from_vram call validates file existence
-        # This test documents that validation is deferred
+        # Validation passes - file existence is checked at extraction time, not validation time
         result = mgr.validate_extraction_params(params)
-        assert result is True  # Params are valid, file check is deferred
+        assert result is True
 
     def test_validate_params_missing_extraction_type_raises(self, mgr, tmp_path):
         """Params without rom_path or vram_path should raise ValidationError."""

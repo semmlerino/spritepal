@@ -4,8 +4,7 @@ Tests for PalettePanel public signal behavior.
 These tests verify ONLY observable signal behavior:
 - Signal emission count
 - Signal argument values
-
-They do NOT inspect internal state or private attributes.
+- Signal forwarding from child widgets
 """
 
 from __future__ import annotations
@@ -83,55 +82,54 @@ class TestPalettePanelColorSignals:
 
 
 class TestPalettePanelButtonSignals:
-    """Test PalettePanel emits button click signals."""
+    """Test PalettePanel forwards button signals from PaletteSourceSelector."""
 
-    def test_load_button_emits_loadPaletteClicked(self, qtbot: QtBot, palette_panel) -> None:
-        """Verify clicking Load Palette button emits loadPaletteClicked."""
+    def test_load_signal_forwarded_to_panel(self, palette_panel) -> None:
+        """Verify PalettePanel forwards loadPaletteClicked from child selector."""
         spy = QSignalSpy(palette_panel.loadPaletteClicked)
 
-        # Access the button through the palette_source_selector
-        load_btn = palette_panel.palette_source_selector._load_palette_btn
-        qtbot.mouseClick(load_btn, Qt.MouseButton.LeftButton)
+        # Emit on child widget - panel should forward
+        palette_panel.palette_source_selector.loadPaletteClicked.emit()
 
         assert spy.count() == 1, (
-            "SIGNAL CONTRACT VIOLATION: loadPaletteClicked must be emitted when Load Palette button is clicked."
+            "SIGNAL CONTRACT VIOLATION: loadPaletteClicked must be forwarded from PaletteSourceSelector."
         )
 
-    def test_save_button_emits_savePaletteClicked(self, qtbot: QtBot, palette_panel) -> None:
-        """Verify clicking Save Palette button emits savePaletteClicked."""
+    def test_save_signal_forwarded_to_panel(self, palette_panel) -> None:
+        """Verify PalettePanel forwards savePaletteClicked from child selector."""
         spy = QSignalSpy(palette_panel.savePaletteClicked)
 
-        save_btn = palette_panel.palette_source_selector._save_palette_btn
-        qtbot.mouseClick(save_btn, Qt.MouseButton.LeftButton)
+        # Emit on child widget - panel should forward
+        palette_panel.palette_source_selector.savePaletteClicked.emit()
 
         assert spy.count() == 1, (
-            "SIGNAL CONTRACT VIOLATION: savePaletteClicked must be emitted when Save Palette button is clicked."
+            "SIGNAL CONTRACT VIOLATION: savePaletteClicked must be forwarded from PaletteSourceSelector."
         )
 
-    def test_edit_button_emits_editColorClicked(self, qtbot: QtBot, palette_panel) -> None:
-        """Verify clicking Edit Color button emits editColorClicked."""
+    def test_edit_signal_forwarded_to_panel(self, palette_panel) -> None:
+        """Verify PalettePanel forwards editColorClicked from child selector."""
         spy = QSignalSpy(palette_panel.editColorClicked)
 
-        edit_btn = palette_panel.palette_source_selector._edit_color_btn
-        qtbot.mouseClick(edit_btn, Qt.MouseButton.LeftButton)
+        # Emit on child widget - panel should forward
+        palette_panel.palette_source_selector.editColorClicked.emit()
 
         assert spy.count() == 1, (
-            "SIGNAL CONTRACT VIOLATION: editColorClicked must be emitted when Edit Color button is clicked."
+            "SIGNAL CONTRACT VIOLATION: editColorClicked must be forwarded from PaletteSourceSelector."
         )
 
 
 class TestPalettePanelSourceSignals:
     """Test PalettePanel emits sourceChanged signal on source selection."""
 
-    def test_add_and_select_source_emits_sourceChanged(self, qtbot: QtBot, palette_panel) -> None:
+    def test_add_and_select_source_emits_sourceChanged(self, palette_panel) -> None:
         """Verify selecting a different source emits sourceChanged."""
         # Add a new palette source
         palette_panel.add_palette_source("Mesen2 #1", "mesen", 1)
 
         spy = QSignalSpy(palette_panel.sourceChanged)
 
-        # Select the new source (index 1)
-        palette_panel.palette_source_selector._combo_box.setCurrentIndex(1)
+        # Use public API to select the source
+        palette_panel.set_selected_palette_source("mesen", 1)
 
         assert spy.count() == 1, (
             "SIGNAL CONTRACT VIOLATION: sourceChanged must be emitted when palette source is changed."
@@ -140,7 +138,7 @@ class TestPalettePanelSourceSignals:
         assert args[0] == "mesen"
         assert args[1] == 1
 
-    def test_select_same_source_twice_emits_once(self, qtbot: QtBot, palette_panel) -> None:
+    def test_select_different_sources_emits_each_time(self, palette_panel) -> None:
         """Verify selecting different sources emits each time."""
         # Add some sources
         palette_panel.add_palette_source("Mesen2 #1", "mesen", 1)
@@ -148,10 +146,9 @@ class TestPalettePanelSourceSignals:
 
         spy = QSignalSpy(palette_panel.sourceChanged)
 
-        # Select source 1
-        palette_panel.palette_source_selector._combo_box.setCurrentIndex(1)
-        # Select source 2
-        palette_panel.palette_source_selector._combo_box.setCurrentIndex(2)
+        # Use public API to select sources
+        palette_panel.set_selected_palette_source("mesen", 1)
+        palette_panel.set_selected_palette_source("mesen", 2)
 
         assert spy.count() == 2
         assert list(spy.at(0))[0] == "mesen"
