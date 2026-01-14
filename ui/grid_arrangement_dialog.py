@@ -134,7 +134,7 @@ class GridArrangementDialog(SplitterDialog):
 
         # Apply operation result (set by _apply_overlay())
         self._apply_result: ApplyResult | None = None
-        
+
         # Persistent overlay item
         self.overlay_item: OverlayGraphicsItem | None = None
 
@@ -393,15 +393,15 @@ class GridArrangementDialog(SplitterDialog):
 
         # Row 2: Layout and Zoom controls
         row2_layout = QHBoxLayout()
-        
+
         # Add zoom and target controls
         self._add_zoom_controls(row2_layout)
-        
+
         row2_layout.addStretch()
-        
+
         # Add collapsible shortcut legend to the right of row 2
         self._add_shortcut_legend(row2_layout)
-        
+
         main_actions_layout.addLayout(row2_layout)
 
         return actions_group
@@ -902,6 +902,9 @@ class GridArrangementDialog(SplitterDialog):
         )
         self.undo_stack.push(command)
 
+        # Clear colorizer cache so display shows modified tiles (not stale cached images)
+        self.colorizer.clear_cache()
+
         # Update status with result summary
         num_modified = len(result.modified_tiles)
         warning_count = len(result.warnings)
@@ -959,8 +962,8 @@ class GridArrangementDialog(SplitterDialog):
 
     def _on_overlay_changed(self, *_: object) -> None:
         """Handle overlay property changes (position, opacity, visibility, image)."""
-        # If the overlay item is being moved by the mouse, we don't want to 
-        # trigger a full scene clear/redraw as it can be expensive and 
+        # If the overlay item is being moved by the mouse, we don't want to
+        # trigger a full scene clear/redraw as it can be expensive and
         # potentially interrupt the drag operation.
         if self.overlay_item and self.overlay_item.is_dragging:
             # The item itself is already updating its position on screen.
@@ -1207,7 +1210,7 @@ class GridArrangementDialog(SplitterDialog):
         self.arrangement_grid._update_hover(TilePosition(-1, -1))
 
         scene = self.arrangement_scene
-        
+
         # Temporarily remove overlay item to protect it from scene.clear()
         if self.overlay_item is not None:
             if self.overlay_item.scene() == scene:
@@ -1238,18 +1241,18 @@ class GridArrangementDialog(SplitterDialog):
             if overlay_image is not None:
                 if self.overlay_item is None:
                     self.overlay_item = OverlayGraphicsItem(self.overlay_layer)
-                
+
                 # Update pixmap if it might have changed (or just always for simplicity here)
                 # Ideally OverlayLayer would have a dirty flag for image
                 overlay_pixmap = self._create_pixmap_from_image(overlay_image)
                 self.overlay_item.setPixmap(overlay_pixmap)
-                
+
                 # Sync position and other properties
                 self.overlay_item.setPos(self.overlay_layer.x, self.overlay_layer.y)
                 self.overlay_item.setOpacity(self.overlay_layer.opacity)
                 self.overlay_item.setScale(self.overlay_layer.scale)
                 self.overlay_item.setVisible(True)
-                
+
                 scene.addItem(self.overlay_item)
         elif self.overlay_item is not None:
             self.overlay_item.setVisible(False)
@@ -1327,10 +1330,7 @@ class GridArrangementDialog(SplitterDialog):
         groups = {}
         for g_data in config.groups:
             group_id = str(g_data["id"])
-            tiles = [
-                TilePosition(int(t["row"]), int(t["col"]))
-                for t in cast(list[dict[str, int]], g_data["tiles"])
-            ]
+            tiles = [TilePosition(int(t["row"]), int(t["col"])) for t in cast(list[dict[str, int]], g_data["tiles"])]
             groups[group_id] = TileGroup(
                 id=group_id,
                 tiles=tiles,
@@ -1368,7 +1368,7 @@ class GridArrangementDialog(SplitterDialog):
             # But _derive_order_from_grid is usually what we want.
             # If we just restore the linear order, the canvas will be empty unless we synthesize mapping.
             # Let's try to synthesize mapping from order using target width.
-            pass # TODO: Synthesize mapping if missing? For now rely on v1.2+
+            pass  # TODO: Synthesize mapping if missing? For now rely on v1.2+
 
         # 5. Restore tiles list (all unique tiles in order/groups)
         # This is handled by manager internals usually, but we need to pass the list
@@ -1376,7 +1376,7 @@ class GridArrangementDialog(SplitterDialog):
         # But we use _restore_state_no_history which takes the full list.
         # Let's just collect all tiles from order/groups/mapping.
         # Actually, simpler to just assume grid_mapping is the source of truth if present.
-        
+
         # We need a list of ALL arranged tiles.
         tiles = []
         # Extract from order to be safe
@@ -1394,7 +1394,7 @@ class GridArrangementDialog(SplitterDialog):
                 tiles.extend([TilePosition(r, int(key)) for r in range(self.processor.grid_rows)])
 
         # Remove duplicates
-        unique_tiles = list(dict.fromkeys(tiles)) # Preserve order
+        unique_tiles = list(dict.fromkeys(tiles))  # Preserve order
 
         # Use the manager's restore method
         self.arrangement_manager._restore_state_no_history(
@@ -1410,7 +1410,7 @@ class GridArrangementDialog(SplitterDialog):
             # We assume the path is valid or relative.
             # Ideally load the image.
             # For now, just set properties. Loading image might be async or complex if path changed.
-            pass # Overlay loading requires path handling, maybe skip for now or implement if requested.
+            pass  # Overlay loading requires path handling, maybe skip for now or implement if requested.
             # If we have overlay_path, we can try to load it.
             if Path(config.overlay_path).exists():
                 # We need to load it into overlay_layer
@@ -1594,6 +1594,17 @@ class GridArrangementDialog(SplitterDialog):
         """Access stored arrangement result after dialog closes."""
         return getattr(self, "_arrangement_result", None)
 
+    @override
+    def accept(self) -> None:
+        """Ensure arrangement result is captured before accepting.
+
+        This overrides the base accept() to ensure _arrangement_result is set
+        even when the user clicks OK without using the Export flow.
+        """
+        if getattr(self, "_arrangement_result", None) is None:
+            self._arrangement_result = self.get_arrangement_result()
+        super().accept()
+
     @property
     def apply_result(self) -> ApplyResult | None:
         """Access the Apply operation result (modified tiles) after Apply is executed.
@@ -1652,7 +1663,7 @@ class GridArrangementDialog(SplitterDialog):
         # Clear graphics scene items
         if self.scene:
             self.scene.clear()
-            
+
         self.overlay_item = None
 
         # Clear processor data
