@@ -14,14 +14,12 @@ def mock_sprite_image(tmp_path):
     Image.new("RGBA", (32, 16)).save(path)
     return str(path)
 
+
 @pytest.fixture
 def sample_config():
     # create a mock ArrangementConfig with some data
     config = MagicMock(spec=ArrangementConfig)
-    config.arrangement_order = [
-        {"type": "tile", "key": "0,0"},
-        {"type": "tile", "key": "0,1"}
-    ]
+    config.arrangement_order = [{"type": "tile", "key": "0,0"}, {"type": "tile", "key": "0,1"}]
     config.groups = []
     config.grid_dimensions = {"rows": 2, "cols": 4}
     config.logical_width = 16
@@ -31,11 +29,9 @@ def sample_config():
     config.overlay_x = 0
     config.overlay_y = 0
     # Include grid_mapping for v1.2+ logic
-    config.grid_mapping = {
-        "0,0": {"type": "tile", "key": "0,0"},
-        "0,1": {"type": "tile", "key": "0,1"}
-    }
+    config.grid_mapping = {"0,0": {"type": "tile", "key": "0,0"}, "0,1": {"type": "tile", "key": "0,1"}}
     return config
+
 
 def test_dialog_accepts_config(qtbot, mock_sprite_image, sample_config):
     """Test that GridArrangementDialog accepts an arrangement_config parameter."""
@@ -43,17 +39,18 @@ def test_dialog_accepts_config(qtbot, mock_sprite_image, sample_config):
         dialog = GridArrangementDialog(mock_sprite_image, arrangement_config=sample_config)
     except TypeError:
         pytest.fail("GridArrangementDialog does not accept arrangement_config")
-    
+
     qtbot.addWidget(dialog)
-    
+
     assert hasattr(dialog, "arrangement_config")
     assert dialog.arrangement_config == sample_config
+
 
 def test_dialog_restores_state(qtbot, mock_sprite_image, sample_config):
     """Test that dialog restores manager state from config."""
     dialog = GridArrangementDialog(mock_sprite_image, arrangement_config=sample_config)
     qtbot.addWidget(dialog)
-    
+
     # Check if tiles are arranged
     assert dialog.arrangement_manager.is_tile_arranged(TilePosition(0, 0))
     assert dialog.arrangement_manager.is_tile_arranged(TilePosition(0, 1))

@@ -953,6 +953,11 @@ class ROMWorkflowController(QObject):
 
         # Clear existing ROM palettes before registering new ones to prevent accumulation
         self._editing_controller.clear_palette_sources("rom")
+        detected_palette_index: int | None = None
+        palette_offset: int | None = None
+
+        # Clear existing ROM palettes before registering new ones to prevent accumulation
+        self._editing_controller.clear_palette_sources("rom")
 
         # Check library for associated palette choice
         library_palette_colors = None
@@ -1137,7 +1142,9 @@ class ROMWorkflowController(QObject):
 
         # Reload the original sprite data
         logger.info("Reverting sprite to original ROM data at offset 0x%06X", self.current_offset)
-        self.open_in_editor()
+        # Clear undo history so set_offset doesn't prompt again
+        self._editing_controller.undo_manager.clear()
+        self.set_offset(self.current_offset, auto_open=True)
 
         if self._message_service:
             self._message_service.show_message("Sprite reverted to original ROM data")
@@ -2258,6 +2265,10 @@ class ROMWorkflowController(QObject):
         # Update the workspace's save button state
         if self._view.workspace:
             self._view.workspace.set_save_enabled(is_valid)
+
+        # Update the source bar action button if in edit mode
+        if self.state == "edit":
+            self._view.source_bar.set_action_enabled(is_valid)
 
         # Show/hide validation warning in status bar
         if errors:

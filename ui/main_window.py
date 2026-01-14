@@ -626,6 +626,9 @@ class MainWindow(QMainWindow):
             can_undo, can_redo = self._last_undo_state
             self._update_undo_redo_state(can_undo, can_redo)
 
+            # Sync Mesen captures when entering editor
+            self._sprite_editor_workspace.rom_workflow_controller.sync_captures_from_log_watcher()
+
         if tab_index is not None and workspace_mode == WorkspaceMode.EXTRACTION:
             # Switch tab within extraction panel
             self.extraction_tabs.setCurrentIndex(tab_index)

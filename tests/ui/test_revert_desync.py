@@ -3,40 +3,29 @@ import pytest
 from unittest.mock import MagicMock, patch
 from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
 
-def test_revert_to_original_uses_dirty_data_repro():
+def test_revert_to_original_forces_rom_reload():
     """
-    Reproduction test for UI Desync Bug:
-    revert_to_original() uses self.current_tile_data which might be dirty (e.g. from Arrangement),
-    instead of forcing a fresh reload from the ROM via set_offset/preview_coordinator.
+    Test that revert_to_original() triggers a fresh reload from ROM
+    by calling set_offset(..., auto_open=True) instead of using
+    possibly dirty internal cache.
     """
     # Setup
     mock_editing = MagicMock()
-    # Mock has_unsaved_changes to False so we don't get blocked by dialogs
     mock_editing.has_unsaved_changes.return_value = False
     
     controller = ROMWorkflowController(None, mock_editing)
-    
-    # Simulate loaded state
     controller.rom_path = "dummy.sfc"
     controller.current_offset = 0x1000
     controller.state = "edit"
+    # Must have tile data to revert
+    controller.current_tile_data = b'\x00' * 32
     
-    # Mock the preview coordinator so we can assert if it was called
-    controller.preview_coordinator = MagicMock()
-    
-    # Mock current_tile_data with some "dirty" data (simulating an applied arrangement)
-    controller.current_tile_data = b'\xFF' * 32
-    
-    # Mock open_in_editor to verify it is called (current behavior)
-    with patch.object(controller, 'open_in_editor') as mock_open:
-        # Action: Click "Revert to Original"
+    # Action: Click "Revert to Original"
+    with patch.object(controller, 'set_offset') as mock_set_offset:
         controller.revert_to_original()
         
-        # Current Behavior (Bug): It calls open_in_editor(), which uses the dirty current_tile_data
-        mock_open.assert_called_once()
+        # Verify fix: it calls set_offset with auto_open=True
+        mock_set_offset.assert_called_once_with(0x1000, auto_open=True)
         
-        # Expected Behavior (Fix): It should call set_offset or request_manual_preview to reload from ROM
-        # This assertion FAILS currently because it's not called
-        assert controller.preview_coordinator.request_manual_preview.called, \
-            "revert_to_original did not request fresh data from ROM via preview_coordinator"
-
+    # Verify undo history was cleared to avoid double prompt in set_offset
+    assert mock_editing.undo_manager.clear.called

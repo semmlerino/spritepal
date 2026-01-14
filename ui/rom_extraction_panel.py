@@ -565,6 +565,9 @@ class ROMExtractionPanel(QWidget):
         if self._manual_offset_dialog is not None:
             self._manual_offset_dialog.set_offset(offset)
 
+        # Update the offset display label in the section
+        self.manual_offset_section.set_offset_display(f"Manual offset: 0x{offset:06X}")
+
         self._check_extraction_ready()
 
     def open_manual_offset_dialog(self) -> None:

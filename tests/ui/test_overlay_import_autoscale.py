@@ -66,9 +66,7 @@ class TestOverlayImportAutoScale:
         # Scale should stay at default 1.0
         assert layer.scale == 1.0
 
-    def test_dialog_provides_target_dimensions_for_autoscale(
-        self, qtbot, small_sprite, large_overlay
-    ):
+    def test_dialog_provides_target_dimensions_for_autoscale(self, qtbot, small_sprite, large_overlay):
         """GridArrangementDialog should provide target dimensions for overlay auto-scaling.
 
         This is the key integration test - when importing via the dialog,
@@ -95,9 +93,7 @@ class TestOverlayImportAutoScale:
 
         # Now import a large overlay - it SHOULD auto-scale
         # We'll call import_image directly with the dimensions the dialog SHOULD provide
-        dialog.overlay_layer.import_image(
-            large_overlay, expected_target_w, expected_target_h
-        )
+        dialog.overlay_layer.import_image(large_overlay, expected_target_w, expected_target_h)
 
         # The overlay scale should be much less than 1.0
         # For 1000x1000 image -> target ~128x256, scale = min(128/1000, 256/1000) = 0.128
@@ -105,16 +101,12 @@ class TestOverlayImportAutoScale:
         assert dialog.overlay_layer.scale > 0.001
 
         # The scale should roughly equal the expected ratio
-        expected_scale = min(
-            expected_target_w / 1000, expected_target_h / 1000
-        )
+        expected_scale = min(expected_target_w / 1000, expected_target_h / 1000)
         assert dialog.overlay_layer.scale == pytest.approx(expected_scale, rel=0.01)
 
         dialog.close()
 
-    def test_dialog_overlay_controls_autoscale_on_import(
-        self, qtbot, small_sprite, large_overlay, monkeypatch
-    ):
+    def test_dialog_overlay_controls_autoscale_on_import(self, qtbot, small_sprite, large_overlay, monkeypatch):
         """Test that OverlayControls._on_import_clicked correctly provides target dimensions.
 
         This test verifies the parent chain lookup works correctly.
@@ -187,33 +179,46 @@ class TestOverlayRegression:
         """Verify overlay image is actually rendered as a pixmap item in the scene."""
         overlay_img_path = tmp_path / "repro_overlay.png"
         Image.new("RGBA", (32, 32), color=(255, 0, 0, 128)).save(overlay_img_path)
-        
+
         dialog = GridArrangementDialog(small_sprite)
         qtbot.addWidget(dialog)
         dialog.show()
-        
+
         # Initially no overlay
         assert not dialog.overlay_layer.has_image()
-        
+
         # Import overlay
         success = dialog.overlay_layer.import_image(str(overlay_img_path))
         assert success
-        
+
         # Process events to let signals and render happen
-        qtbot.wait_until(lambda: any(isinstance(item, QGraphicsPixmapItem) for item in dialog.arrangement_scene.items()), timeout=1000)
-        
+        qtbot.wait_until(
+            lambda: any(isinstance(item, QGraphicsPixmapItem) for item in dialog.arrangement_scene.items()),
+            timeout=1000,
+        )
+
         # Check if we have pixmap items in the scene
         items = dialog.arrangement_scene.items()
         pixmap_items = [item for item in items if isinstance(item, QGraphicsPixmapItem)]
         assert len(pixmap_items) >= 1
-        
+
         # Find the overlay item (it should be 32x32)
         overlay_items = [item for item in pixmap_items if item.pixmap().width() == 32 and item.pixmap().height() == 32]
         assert len(overlay_items) == 1
-        
+
         # Toggle visibility
         dialog.overlay_layer.set_visible(False)
         # Re-render should happen via signal, item should be removed or hidden
-        qtbot.wait_until(lambda: len([item for item in dialog.arrangement_scene.items() if isinstance(item, QGraphicsPixmapItem) and item.pixmap().width() == 32]) == 0, timeout=1000)
-        
+        qtbot.wait_until(
+            lambda: len(
+                [
+                    item
+                    for item in dialog.arrangement_scene.items()
+                    if isinstance(item, QGraphicsPixmapItem) and item.pixmap().width() == 32
+                ]
+            )
+            == 0,
+            timeout=1000,
+        )
+
         dialog.close()

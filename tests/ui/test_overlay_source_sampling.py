@@ -198,9 +198,7 @@ class TestOverlaySourceSampling:
             f"but it appears to be sampling from the wrong position."
         )
 
-    def test_row_0_tiles_are_bright_row_1_tiles_are_dark(
-        self, overlay_layer: OverlayLayer, source_layout_overlay: str
-    ):
+    def test_row_0_tiles_are_bright_row_1_tiles_are_dark(self, overlay_layer: OverlayLayer, source_layout_overlay: str):
         """Row 0 tiles should be bright, row 1 tiles should be dark.
 
         This verifies the full structure is preserved when tiles are rearranged.
