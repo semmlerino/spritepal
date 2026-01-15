@@ -848,8 +848,21 @@ class SpriteAssetBrowser(QWidget):
             item = iterator.value()
             data = item.data(0, Qt.ItemDataRole.UserRole)
             if isinstance(data, dict) and data.get("offset") == old_offset:
+                # Update internal data
                 data["offset"] = new_offset
                 item.setData(0, Qt.ItemDataRole.UserRole, data)
+
+                # Update display text if it contains the old offset
+                # This handles Mesen captures like "0x293AEB (F1938)"
+                # ROM sprites like "Test Sprite 1" are left unchanged
+                current_text = item.text(0)
+                old_offset_str = f"0x{old_offset:06X}"
+                if old_offset_str in current_text:
+                    # Replace old offset with new offset in the display text
+                    new_offset_str = f"0x{new_offset:06X}"
+                    new_text = current_text.replace(old_offset_str, new_offset_str)
+                    item.setText(0, new_text)
+
                 logger.debug("update_sprite_offset: 0x%06X -> 0x%06X", old_offset, new_offset)
                 self.item_offset_changed.emit(old_offset, new_offset)
                 return True
