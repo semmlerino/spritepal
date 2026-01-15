@@ -956,16 +956,26 @@ class GridArrangementDialog(SplitterDialog):
             self._is_applying_overlay = False
 
         # Show success message - deferred so UI can repaint first
-        def _show_success_message() -> None:
-            _ = QMessageBox.information(
-                self,
-                "Apply Complete",
-                f"Successfully applied overlay to {num_modified} tile(s).\n\n"
-                "The overlay has been hidden to reveal the modified tiles.\n"
-                "Check 'Show overlay' to apply again.",
-            )
+        # Use lambda with guard to prevent crash if dialog closes before timer fires
+        QTimer.singleShot(0, lambda: self._show_apply_success_message(num_modified))
 
-        QTimer.singleShot(0, _show_success_message)
+    def _show_apply_success_message(self, num_modified: int) -> None:
+        """Show success message after overlay apply (deferred call).
+
+        This is called via QTimer.singleShot to allow the UI to repaint first.
+        Guards against the dialog being closed before the timer fires.
+        """
+        # Guard: Don't show if dialog was closed or destroyed
+        if not self.isVisible():
+            return
+
+        _ = QMessageBox.information(
+            self,
+            "Apply Complete",
+            f"Successfully applied overlay to {num_modified} tile(s).\n\n"
+            "The overlay has been hidden to reveal the modified tiles.\n"
+            "Check 'Show overlay' to apply again.",
+        )
 
     def _show_apply_warnings_dialog(self, warnings: list[ApplyWarning]) -> bool:
         """Show warning dialog for Apply operation.

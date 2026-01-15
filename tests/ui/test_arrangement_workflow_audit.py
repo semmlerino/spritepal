@@ -133,6 +133,7 @@ def test_apply_overlay_samples_canvas_pos(qtbot, test_sprite, gradient_overlay):
     with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes):
         with patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok):
             dialog._apply_overlay()
+            qtbot.wait(10)  # Process deferred QTimer before patch context exits
 
     # If it sampled correctly, it should find that Tile 0 is NOT covered.
     # (Since overlay ends at x=16 and tile starts at x=16)
@@ -147,6 +148,7 @@ def test_apply_overlay_samples_canvas_pos(qtbot, test_sprite, gradient_overlay):
     with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes):
         with patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok):
             dialog._apply_overlay()
+            qtbot.wait(10)  # Process deferred QTimer before patch context exits
 
     assert TilePosition(0, 0) in dialog.apply_result.modified_tiles
 
@@ -164,6 +166,7 @@ def test_apply_overlay_samples_canvas_pos(qtbot, test_sprite, gradient_overlay):
     with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes):
         with patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok):
             dialog._apply_overlay()
+            qtbot.wait(10)  # Process deferred QTimer before patch context exits
 
     assert TilePosition(0, 0) in dialog.apply_result.modified_tiles
     # Sampled pixel at (0,0) of overlay is (0,0,0) -> index 0.

@@ -127,12 +127,14 @@ class TestPaletteCacheBug:
 
     @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
     @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
-    def test_colorizer_cache_cleared_after_apply(
+    def test_colorizer_cache_cleared_during_apply(
         self, mock_info, mock_warning, qtbot, simple_sprite, white_overlay, sample_palette
     ):
         """Colorizer cache should be cleared when overlay is applied.
 
         Otherwise the display shows old tile images even after Apply modifies them.
+        The cache is cleared BEFORE _update_displays() runs, which then repopulates
+        it with the new tile images. This ensures stale cached images aren't used.
         """
         dialog = GridArrangementDialog(simple_sprite, tiles_per_row=2)
         qtbot.addWidget(dialog)
@@ -159,14 +161,25 @@ class TestPaletteCacheBug:
         cache_stats_before = dialog.colorizer.get_cache_stats()
         assert cache_stats_before["size"] > 0, "Cache should be populated after get_display_image"
 
+        # Wrap clear_cache to track calls
+        original_clear_cache = dialog.colorizer.clear_cache
+        clear_cache_called = []
+
+        def tracked_clear_cache() -> None:
+            clear_cache_called.append(True)
+            original_clear_cache()
+
+        dialog.colorizer.clear_cache = tracked_clear_cache  # type: ignore[method-assign]
+
         # Apply overlay (modifies tiles)
         dialog.overlay_layer.import_image(white_overlay, 16, 16)
         dialog._apply_overlay()
+        qtbot.wait(10)  # Process deferred QTimer before mock decorator is torn down
 
-        # Cache should be cleared after Apply
-        cache_stats_after = dialog.colorizer.get_cache_stats()
-        assert cache_stats_after["size"] == 0, (
-            f"Cache should be cleared after Apply, but has {cache_stats_after['size']} entries. "
+        # CRITICAL: clear_cache() must be called during Apply
+        # This ensures stale cached images are invalidated before _update_displays() runs
+        assert len(clear_cache_called) > 0, (
+            "clear_cache() was not called during _apply_overlay()! "
             "This causes the display to show old tiles instead of modified ones."
         )
         # qtbot handles dialog cleanup - don't call dialog.close()
