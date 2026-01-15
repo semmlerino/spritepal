@@ -20,6 +20,7 @@ from PySide6.QtGui import (
     QPixmap,
 )
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialogButtonBox,
     QFrame,
     QGraphicsPixmapItem,
@@ -78,6 +79,7 @@ class ArrangementResult:
     metadata: dict[str, object]
     logical_width: int  # Tiles per row in arranged view
     modified_tiles: dict[TilePosition, Image.Image] | None = None
+    keep_arrangement: bool = True  # Whether to apply this arrangement as the active layout
 
 
 # GridGraphicsView is now imported from ui.components.visualization
@@ -134,6 +136,10 @@ class GridArrangementDialog(SplitterDialog):
 
         # Apply operation result (set by _apply_overlay())
         self._apply_result: ApplyResult | None = None
+        # Flag indicating tiles have been modified by an overlay apply operation.
+        # This persists through arrangement changes (unlike _apply_result which is cleared).
+        # Used by get_arrangement_result() to determine whether to export modified tiles.
+        self._tiles_have_been_modified: bool = False
 
         # Persistent overlay item
         self.overlay_item: OverlayGraphicsItem | None = None
@@ -268,6 +274,14 @@ class GridArrangementDialog(SplitterDialog):
         self.apply_overlay_btn.setEnabled(self.overlay_layer.has_image() and self.overlay_layer.visible)
         _ = self.apply_overlay_btn.clicked.connect(self._apply_overlay)
         overlay_layout.addWidget(self.apply_overlay_btn)
+
+        self.keep_layout_check = QCheckBox("Keep layout in editor after closing", overlay_group)
+        self.keep_layout_check.setToolTip(
+            "If unchecked, the arrangement will be discarded after closing the dialog,\n"
+            "but any modified pixels from the overlay will be preserved."
+        )
+        self.keep_layout_check.setChecked(True)
+        overlay_layout.addWidget(self.keep_layout_check)
 
         right_layout.addWidget(overlay_group)
 
@@ -852,8 +866,7 @@ class GridArrangementDialog(SplitterDialog):
             result = QMessageBox.warning(
                 self,
                 "Overlay Hidden",
-                "The overlay is currently hidden.\n\n"
-                "Do you want to make it visible and apply it anyway?",
+                "The overlay is currently hidden.\n\nDo you want to make it visible and apply it anyway?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -909,6 +922,8 @@ class GridArrangementDialog(SplitterDialog):
 
         # Store the result for retrieval
         self._apply_result = result
+        # Mark that tiles have been modified (this flag persists through arrangement changes)
+        self._tiles_have_been_modified = True
 
         # Use undoable command to update tiles
         command = ApplyOverlayCommand(
@@ -1639,13 +1654,20 @@ class GridArrangementDialog(SplitterDialog):
 
         # Include modified tiles if any Apply operation was performed
         # self.tiles contains the current pixel state (potentially modified by ApplyOverlayCommand)
-        modified_tiles = self.tiles.copy() if self._apply_result else None
+        # Use _tiles_have_been_modified flag which persists through arrangement changes
+        # (unlike _apply_result which is cleared when arrangement changes)
+        modified_tiles = self.tiles.copy() if self._tiles_have_been_modified else None
+
+        keep_arrangement = True
+        if hasattr(self, "keep_layout_check"):
+            keep_arrangement = self.keep_layout_check.isChecked()
 
         return ArrangementResult(
             bridge=bridge,
             metadata=metadata,
             logical_width=logical_width,
             modified_tiles=modified_tiles,
+            keep_arrangement=keep_arrangement,
         )
 
     @property
