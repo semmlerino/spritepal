@@ -1,4 +1,3 @@
-
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
@@ -10,7 +9,7 @@ from ui.main_window import MainWindow, WorkspaceMode
 
 def test_mesen_captures_synced_on_workspace_switch(qtbot):
     """
-    Test that Mesen captures are synchronized from LogWatcher 
+    Test that Mesen captures are synchronized from LogWatcher
     to the Asset Browser when switching to the Sprite Editor workspace.
     """
     # 1. Setup: Create real MainWindow with mocked dependencies
@@ -22,17 +21,14 @@ def test_mesen_captures_synced_on_workspace_switch(qtbot):
     mock_preview = MagicMock()
     mock_rom_ext = MagicMock()
     mock_library = MagicMock()
-    
+
     # Configure log_watcher to have a capture
     capture = CapturedOffset(
-        offset=0x1234, 
-        frame=100, 
-        timestamp=datetime.now(tz=UTC), 
-        raw_line="FILE OFFSET: 0x001234 frame=100"
+        offset=0x1234, frame=100, timestamp=datetime.now(tz=UTC), raw_line="FILE OFFSET: 0x001234 frame=100"
     )
     mock_log_watcher.recent_captures = [capture]
     mock_log_watcher.load_persistent_clicks.return_value = []
-    
+
     window = MainWindow(
         settings_manager=mock_settings,
         rom_cache=mock_rom_cache,
@@ -41,13 +37,13 @@ def test_mesen_captures_synced_on_workspace_switch(qtbot):
         log_watcher=mock_log_watcher,
         preview_generator=mock_preview,
         rom_extractor=mock_rom_ext,
-        sprite_library=mock_library
+        sprite_library=mock_library,
     )
     qtbot.addWidget(window)
-    
+
     # 2. Action: Switch to Sprite Editor workspace (Mode 1)
     window.switch_to_workspace(WorkspaceMode.SPRITE_EDITOR)
-    
+
     # 3. Verify: Asset browser should have been synced
     browser = window._sprite_editor_workspace.rom_page.asset_browser
     assert browser.has_mesen_capture(0x1234)

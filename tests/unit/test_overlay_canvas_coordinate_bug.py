@@ -76,8 +76,7 @@ class TestCanvasPositionSampling:
         assert TilePosition(0, 0) in result.modified_tiles
 
     def test_overlay_at_source_position_but_tile_elsewhere_no_match(self, tmp_path):
-        """Overlay at source position should NOT match tile moved to different canvas position.
-        """
+        """Overlay at source position should NOT match tile moved to different canvas position."""
         tiles = {TilePosition(0, 0): Image.new("L", (8, 8), color=0)}
 
         # Place tile at canvas (0, 4), but overlay covers (0, 0)

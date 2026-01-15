@@ -123,12 +123,12 @@ class ArrangementBridge:
         max_r = max(t[0] for t in expanded_tiles)
         max_c = max(t[1] for t in expanded_tiles)
 
-        # Set logical dimensions
+        # Set logical dimensions (at least physical size to avoid shrinkage)
         if self._provided_logical_width is not None and self._provided_logical_width > 0:
-            self._logical_width = max(self._provided_logical_width, max_c + 1)
+            self._logical_width = max(self._provided_logical_width, max_c + 1, self._physical_width)
         else:
-            self._logical_width = max_c + 1
-        self._logical_height = max_r + 1
+            self._logical_width = max(max_c + 1, self._physical_width)
+        self._logical_height = max(max_r + 1, self._physical_height)
 
         # Create mappings
         for lr, lc, physical_pos in expanded_tiles:
@@ -185,14 +185,18 @@ class ArrangementBridge:
         if not physical_positions:
             return
 
-        # Calculate logical dimensions
+        # Calculate logical dimensions (at least physical size to avoid shrinkage)
         # Use provided width if available, otherwise calculate from tile count
         if self._provided_logical_width is not None and self._provided_logical_width > 0:
-            self._logical_width = self._provided_logical_width
+            self._logical_width = max(self._provided_logical_width, self._physical_width)
         else:
-            # Fallback: use min of 16 or arranged tile count
-            self._logical_width = min(16, len(physical_positions))
-        self._logical_height = (len(physical_positions) + self._logical_width - 1) // self._logical_width
+            # Fallback: use max of 16, arranged tile count, or physical width
+            self._logical_width = max(16, len(physical_positions), self._physical_width)
+
+        self._logical_height = max(
+            (len(physical_positions) + self._logical_width - 1) // self._logical_width,
+            self._physical_height,
+        )
 
         # Create mappings
         for i, physical_pos in enumerate(physical_positions):
@@ -235,31 +239,48 @@ class ArrangementBridge:
     def physical_to_logical(self, physical_data: NDArray[np.uint8]) -> NDArray[np.uint8]:
         """Transform physical layout image to logical (arranged) layout.
 
-        Non-arranged tiles are preserved at their original positions (identity mapping)
-        to ensure the full canvas is maintained when only a subset of tiles is arranged.
+        Arranged tiles are moved to their logical positions.
+        Unarranged tiles are preserved at their original physical positions.
+        The canvas size is determined by the maximum of physical and logical extents.
 
         Args:
             physical_data: Image data in original physical layout (H, W)
 
         Returns:
-            Image data rearranged into logical layout, preserving non-arranged tiles
+            Image data rearranged into logical layout
         """
         if not self.has_arrangement:
             return physical_data.copy()
 
-        logical_h = self._logical_height * self._tile_height
-        logical_w = self._logical_width * self._tile_width
-
-        # Start with zeros but copy original data as baseline (identity mapping).
-        # This preserves non-arranged tiles at their original positions.
-        logical_data = np.zeros((logical_h, logical_w), dtype=np.uint8)
+        # Determine logical dimensions (ensure we can fit both physical and arranged tiles)
+        # This prevents losing unarranged tiles if they are outside the arrangement's bounding box.
         physical_h, physical_w = physical_data.shape
-        copy_h = min(physical_h, logical_h)
-        copy_w = min(physical_w, logical_w)
-        logical_data[:copy_h, :copy_w] = physical_data[:copy_h, :copy_w]
+        logical_h = max(physical_h, self._logical_height * self._tile_height)
+        logical_w = max(physical_w, self._logical_width * self._tile_width)
 
-        # Now apply arrangement transformations for arranged tiles.
-        # This overwrites identity-mapped tiles at their new positions.
+        logical_data = np.zeros((logical_h, logical_w), dtype=np.uint8)
+
+        # Keep track of which tiles are explicitly arranged to avoid duplication
+        arranged_physical_pos = {mapping.physical_pos for mapping in self._mappings}
+
+        # 1. Place unarranged tiles at their original positions (identity mapping)
+        num_phys_rows = physical_h // self._tile_height
+        num_phys_cols = physical_w // self._tile_width
+
+        for r in range(num_phys_rows):
+            for c in range(num_phys_cols):
+                phys_pos = TilePosition(r, c)
+                if phys_pos not in arranged_physical_pos:
+                    y = r * self._tile_height
+                    x = c * self._tile_width
+                    # Safety check: ensure we don't exceed physical_data bounds
+                    if y + self._tile_height <= physical_h and x + self._tile_width <= physical_w:
+                        logical_data[y : y + self._tile_height, x : x + self._tile_width] = physical_data[
+                            y : y + self._tile_height, x : x + self._tile_width
+                        ]
+
+        # 2. Now apply arrangement transformations for arranged tiles.
+        # This moves arranged tiles to their new logical positions.
         for mapping in self._mappings:
             # Source tile coordinates in physical image
             phys_y = mapping.physical_pos.row * self._tile_height
@@ -270,9 +291,15 @@ class ArrangementBridge:
             log_x = mapping.logical_pos.col * self._tile_width
 
             # Copy tile
-            logical_data[log_y : log_y + self._tile_height, log_x : log_x + self._tile_width] = physical_data[
-                phys_y : phys_y + self._tile_height, phys_x : phys_x + self._tile_width
-            ]
+            if (
+                phys_y + self._tile_height <= physical_h
+                and phys_x + self._tile_width <= physical_w
+                and log_y + self._tile_height <= logical_h
+                and log_x + self._tile_width <= logical_w
+            ):
+                logical_data[log_y : log_y + self._tile_height, log_x : log_x + self._tile_width] = physical_data[
+                    phys_y : phys_y + self._tile_height, phys_x : phys_x + self._tile_width
+                ]
 
         return logical_data
 
@@ -292,6 +319,13 @@ class ArrangementBridge:
         phys_w = self._physical_width * self._tile_width
         physical_data = np.zeros((phys_h, phys_w), dtype=np.uint8)
 
+        # 1. Identity mapping baseline for unarranged tiles
+        # This preserves unarranged tiles at their original positions.
+        copy_h = min(phys_h, logical_data.shape[0])
+        copy_w = min(phys_w, logical_data.shape[1])
+        physical_data[:copy_h, :copy_w] = logical_data[:copy_h, :copy_w]
+
+        # 2. Revert arranged tiles to their physical positions
         for mapping in self._mappings:
             # Source tile coordinates in logical image
             log_y = mapping.logical_pos.row * self._tile_height
@@ -302,9 +336,15 @@ class ArrangementBridge:
             phys_x = mapping.physical_pos.col * self._tile_width
 
             # Copy tile
-            physical_data[phys_y : phys_y + self._tile_height, phys_x : phys_x + self._tile_width] = logical_data[
-                log_y : log_y + self._tile_height, log_x : log_x + self._tile_width
-            ]
+            if (
+                log_y + self._tile_height <= logical_data.shape[0]
+                and log_x + self._tile_width <= logical_data.shape[1]
+                and phys_y + self._tile_height <= phys_h
+                and phys_x + self._tile_width <= phys_w
+            ):
+                physical_data[phys_y : phys_y + self._tile_height, phys_x : phys_x + self._tile_width] = logical_data[
+                    log_y : log_y + self._tile_height, log_x : log_x + self._tile_width
+                ]
 
         return physical_data
 

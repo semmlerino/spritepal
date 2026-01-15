@@ -59,9 +59,7 @@ def source_layout_overlay(tmp_path) -> str:
 class TestOverlayCanvasSampling:
     """Tests for overlay sampling coordinate system (Canvas-based)."""
 
-    def test_only_tiles_covered_on_canvas_are_modified(
-        self, overlay_layer: OverlayLayer, source_layout_overlay: str
-    ):
+    def test_only_tiles_covered_on_canvas_are_modified(self, overlay_layer: OverlayLayer, source_layout_overlay: str):
         """Only tiles covered by the overlay on the canvas should be modified.
 
         If tiles are rearranged into a wide row (8x1), and the overlay only
@@ -100,12 +98,12 @@ class TestOverlayCanvasSampling:
 
         result = operation.execute(force=True)
         assert result.success
-        
+
         # Tiles at canvas columns 0, 1, 2, 3 should be modified (covered by 32px overlay)
         # Tiles at canvas columns 4, 5, 6, 7 should NOT be modified
-        
+
         modified_keys = set(result.modified_tiles.keys())
-        
+
         # (0,0) -> (src 0,0) is at canvas (0,0) -> SHOULD BE MODIFIED
         assert TilePosition(0, 0) in modified_keys
         # (1,0) -> (src 1,0) is at canvas (0,4) -> SHOULD NOT BE MODIFIED
@@ -114,11 +112,10 @@ class TestOverlayCanvasSampling:
     def test_tile_content_matches_canvas_position_in_overlay(
         self, overlay_layer: OverlayLayer, source_layout_overlay: str
     ):
-        """Tile content should come from its canvas position in the overlay.
-        """
+        """Tile content should come from its canvas position in the overlay."""
         # 128x64 overlay at 25% scale = 32x16 visual
         overlay_layer.import_image(source_layout_overlay, 32, 16)
-        
+
         # Set scale FIRST
         overlay_layer.set_scale(0.25)
         # Then set position to ensure it's exactly where we want it
@@ -150,7 +147,7 @@ class TestOverlayCanvasSampling:
         result = operation.execute(force=True)
         assert result.success
         assert TilePosition(0, 0) in result.modified_tiles
-        
+
         pixels = result.modified_tiles[TilePosition(0, 0)].load()
         brightness = pixels[0, 0]
-        assert brightness == 232 # Column 2 brightness
+        assert brightness == 232  # Column 2 brightness

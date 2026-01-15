@@ -306,7 +306,7 @@ class TestPixelCanvasRegression:
         from PySide6.QtCore import QPoint, QRect
 
         canvas, controller = canvas_with_image
-        
+
         # Mock canvas.update to track calls and prevent actual painting
         canvas.update = Mock()
 
@@ -336,8 +336,8 @@ class TestPixelCanvasRegression:
         # If the fix is working, it uses the stored large_rect.
         # If the fix is missing, it would calculate a new rect at (0,0) using size 1 (width 10),
         # leaving the outer pixels of the large rect un-cleared.
-        
+
         canvas.update.assert_any_call(large_rect)
-        
+
         # Also verify the new stored rect is Small
         assert canvas._last_hover_rect.width() == 10  # 1*8 + 2

@@ -925,7 +925,9 @@ class ROMWorkflowController(QObject):
             # Check if current dimensions can accommodate the tiles
             # (current_width // 8) is tiles_per_row
             current_tiles_per_row = self.current_width // 8 if self.current_width >= 8 else 0
-            current_tile_capacity = current_tiles_per_row * (self.current_height // 8) if self.current_height >= 8 else 0
+            current_tile_capacity = (
+                current_tiles_per_row * (self.current_height // 8) if self.current_height >= 8 else 0
+            )
 
             # Force re-initialization if dimensions are 0 or clearly too small for the data
             if self.current_width <= 0 or current_tile_capacity < num_tiles:
@@ -1212,20 +1214,26 @@ class ROMWorkflowController(QObject):
 
             if dialog.exec():
                 result = dialog.arrangement_result
-                if result and result.bridge.has_arrangement:
-                    # Update tile data if overlay was applied
+                if result:
+                    # 1. Update tile data if overlay was applied (regardless of arrangement)
                     if result.modified_tiles:
                         # Use the SAME tiles_per_row that was used to initialize the dialog
                         self._update_tile_data_from_modified_tiles(result.modified_tiles, tiles_per_row)
                         logger.info("Updated current_tile_data with modified pixels from overlay")
 
-                    self._current_arrangement = result.bridge
-                    self._save_arrangement_config(result.metadata)
+                    # 2. Handle arrangement persistence
+                    if result.keep_arrangement and result.bridge.has_arrangement:
+                        self._current_arrangement = result.bridge
+                        self._save_arrangement_config(result.metadata)
+                        if self._message_service:
+                            self._message_service.show_message("Arrangement applied. Editing in logical view.")
+                    else:
+                        # Discard arrangement if not requested or not present
+                        self._clear_arrangement()
+                        if result.modified_tiles and self._message_service:
+                            self._message_service.show_message("Overlay applied. Layout preserved.")
 
-                    if self._message_service:
-                        self._message_service.show_message("Arrangement applied. Editing in logical view.")
-
-                    # Reload in editor with arrangement applied
+                    # 3. Reload in editor with updated pixels/layout
                     self.open_in_editor()
                 elif self._message_service:
                     self._message_service.show_message("No arrangement created")
@@ -1464,7 +1472,7 @@ class ROMWorkflowController(QObject):
                 scale_w = sprite_w / overlay.width()
                 scale_h = sprite_h / overlay.height()
                 initial_scale = min(scale_w, scale_h)
-                
+
                 # If overlay is at least 2x larger, auto-scale down
                 if initial_scale < 0.5:
                     # Round to nearest percent
@@ -1479,7 +1487,7 @@ class ROMWorkflowController(QObject):
 
             canvas.set_overlay_image(overlay)
             self._view.workspace.overlay_panel.set_overlay_active(True)
-            
+
             # Connect overlay moved signal to update panel position
             canvas.overlayMoved.connect(self._on_overlay_moved_from_canvas)
             if self._message_service:

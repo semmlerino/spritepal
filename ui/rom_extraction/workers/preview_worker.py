@@ -257,9 +257,8 @@ class SpritePreviewWorker(BaseWorker):
             # Use a default tiles_per_row for calculation, mirroring general discovery behavior
             tiles_per_row_for_calc = 16
             from core.tile_utils import calculate_dimensions_from_tile_data
-            _, _, _, width, height = calculate_dimensions_from_tile_data(
-                len(tile_data), tiles_per_row_for_calc
-            )
+
+            _, _, _, width, height = calculate_dimensions_from_tile_data(len(tile_data), tiles_per_row_for_calc)
 
             # Cap dimensions to prevent excessively large previews
             width = min(width, 384)

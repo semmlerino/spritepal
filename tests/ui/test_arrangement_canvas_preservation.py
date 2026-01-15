@@ -49,9 +49,7 @@ def small_overlay(tmp_path):
 class TestCanvasPreservation:
     """Tests for preserving canvas dimensions after overlay application."""
 
-    def test_canvas_size_preserved_after_overlay_partial_coverage(
-        self, qtbot, wide_sprite, small_overlay
-    ):
+    def test_canvas_size_preserved_after_overlay_partial_coverage(self, qtbot, wide_sprite, small_overlay):
         """
         REGRESSION TEST: When overlay is applied to only some tiles, canvas size
         must remain unchanged in the sprite editor.
@@ -79,9 +77,7 @@ class TestCanvasPreservation:
 
         # Apply overlay (bypass message boxes)
         with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes):
-            with patch.object(
-                QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok
-            ):
+            with patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok):
                 dialog._apply_overlay()
 
         # Get arrangement result
@@ -138,8 +134,7 @@ class TestCanvasPreservation:
             expected_value = min(tile_idx * 10, 240)
             actual_value = output_array[0, x]
             assert actual_value == expected_value, (
-                f"Tile {tile_idx} at x={x} was not preserved. "
-                f"Expected {expected_value}, got {actual_value}"
+                f"Tile {tile_idx} at x={x} was not preserved. Expected {expected_value}, got {actual_value}"
             )
 
     def test_logical_to_physical_preserves_non_arranged_tiles(self, wide_sprite):
@@ -175,8 +170,7 @@ class TestCanvasPreservation:
         # Physical dimensions should match original sprite
         phys_w, phys_h = bridge.physical_size
         assert physical_array.shape == (phys_h, phys_w), (
-            f"logical_to_physical output shape {physical_array.shape} "
-            f"doesn't match physical size ({phys_h}, {phys_w})"
+            f"logical_to_physical output shape {physical_array.shape} doesn't match physical size ({phys_h}, {phys_w})"
         )
 
         # Verify arranged tiles were copied correctly
@@ -184,8 +178,7 @@ class TestCanvasPreservation:
             expected_value = min(col * 10, 240)
             actual_value = physical_array[0, col * 8]
             assert actual_value == expected_value, (
-                f"Arranged tile {col} was not correctly transformed. "
-                f"Expected {expected_value}, got {actual_value}"
+                f"Arranged tile {col} was not correctly transformed. Expected {expected_value}, got {actual_value}"
             )
 
 
@@ -211,9 +204,5 @@ class TestArrangementBridgeDimensions:
         physical_w, physical_h = bridge.physical_size
 
         # Logical size should accommodate all physical tiles
-        assert logical_w >= physical_w, (
-            f"Logical width {logical_w}px is smaller than physical {physical_w}px"
-        )
-        assert logical_h >= physical_h, (
-            f"Logical height {logical_h}px is smaller than physical {physical_h}px"
-        )
+        assert logical_w >= physical_w, f"Logical width {logical_w}px is smaller than physical {physical_w}px"
+        assert logical_h >= physical_h, f"Logical height {logical_h}px is smaller than physical {physical_h}px"

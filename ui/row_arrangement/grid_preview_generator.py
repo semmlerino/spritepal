@@ -229,7 +229,7 @@ class GridPreviewGenerator:
             for tr, tc, t_pos, t_img in items_to_draw:
                 x = tc * (processor.tile_width + spacing)
                 y = tr * (processor.tile_height + spacing)
-                
+
                 # Apply colorization if enabled
                 if self.colorizer:
                     display_img = self.colorizer.get_display_image(t_pos.row, t_img)
