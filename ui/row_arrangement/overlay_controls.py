@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from PIL import Image
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFileDialog,
     QGroupBox,
@@ -49,6 +51,7 @@ class OverlayControls(QGroupBox):
         self._update_opacity_slider(self._overlay.opacity)
         self._update_scale_controls(self._overlay.scale)
         self._update_visibility_checkbox(self._overlay.visible)
+        self._update_resample_combo(self._overlay.resampling_mode.value)
         self._update_enabled_state()
 
     def _setup_ui(self) -> None:
@@ -118,6 +121,22 @@ class OverlayControls(QGroupBox):
         self.visible_check.setToolTip("Toggle overlay visibility")
         layout.addWidget(self.visible_check)
 
+        # Resampling mode combo
+        resample_row = QHBoxLayout()
+        resample_row.addWidget(QLabel("Quality:"))
+        self.resample_combo = QComboBox()
+        self.resample_combo.addItem("Pixel Perfect", Image.Resampling.NEAREST)
+        self.resample_combo.addItem("Smoothed", Image.Resampling.BOX)
+        self.resample_combo.addItem("High Quality", Image.Resampling.LANCZOS)
+        self.resample_combo.setToolTip(
+            "Pixel Perfect: Sharp edges for pixel art (default)\n"
+            "Smoothed: Averaged pixels for softer result\n"
+            "High Quality: Best for photos/gradients"
+        )
+        self.resample_combo.setCurrentIndex(0)  # Default to Pixel Perfect
+        resample_row.addWidget(self.resample_combo)
+        layout.addLayout(resample_row)
+
         # Nudge hint
         hint = QLabel("Arrow keys: ±1px (±10px with Shift)")
         hint.setStyleSheet("color: gray; font-size: 10px;")
@@ -134,12 +153,14 @@ class OverlayControls(QGroupBox):
         self.scale_spin.valueChanged.connect(self._on_scale_spin_changed)
         self.opacity_slider.valueChanged.connect(self._on_opacity_changed)
         self.visible_check.toggled.connect(self._on_visibility_changed)
+        self.resample_combo.currentIndexChanged.connect(self._on_resample_changed)
 
         # Overlay -> UI
         self._overlay.position_changed.connect(self._update_position_spinboxes)
         self._overlay.opacity_changed.connect(self._update_opacity_slider)
         self._overlay.scale_changed.connect(self._update_scale_controls)
         self._overlay.visibility_changed.connect(self._update_visibility_checkbox)
+        self._overlay.resampling_mode_changed.connect(self._update_resample_combo)
         self._overlay.image_changed.connect(self._update_enabled_state)
 
     def _on_import_clicked(self) -> None:
@@ -205,6 +226,12 @@ class OverlayControls(QGroupBox):
         """Handle visibility checkbox changes."""
         self._overlay.set_visible(visible)
 
+    def _on_resample_changed(self, index: int) -> None:
+        """Handle resampling mode combo box changes."""
+        mode = self.resample_combo.itemData(index)
+        if mode is not None:
+            self._overlay.set_resampling_mode(mode)
+
     def _update_position_spinboxes(self, x: int, y: int) -> None:
         """Update spinboxes from overlay state."""
         self.x_spin.blockSignals(True)
@@ -241,6 +268,17 @@ class OverlayControls(QGroupBox):
         self.visible_check.setChecked(visible)
         self.visible_check.blockSignals(False)
 
+    def _update_resample_combo(self, mode_value: int) -> None:
+        """Update combo box from overlay state."""
+        self.resample_combo.blockSignals(True)
+        # Find the index for this mode value
+        for i in range(self.resample_combo.count()):
+            item_data = self.resample_combo.itemData(i)
+            if item_data is not None and item_data.value == mode_value:
+                self.resample_combo.setCurrentIndex(i)
+                break
+        self.resample_combo.blockSignals(False)
+
     def _update_enabled_state(self) -> None:
         """Update enabled state based on whether overlay has image."""
         has_image = self._overlay.has_image()
@@ -251,3 +289,4 @@ class OverlayControls(QGroupBox):
         self.scale_spin.setEnabled(has_image)
         self.opacity_slider.setEnabled(has_image)
         self.visible_check.setEnabled(has_image)
+        self.resample_combo.setEnabled(has_image)

@@ -31,6 +31,7 @@ class OverlayLayer(QObject):
     scale_changed = Signal(float)
     visibility_changed = Signal(bool)
     image_changed = Signal()
+    resampling_mode_changed = Signal(int)  # Image.Resampling enum value
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -41,6 +42,8 @@ class OverlayLayer(QObject):
         self._opacity: float = 0.5
         self._scale: float = 1.0
         self._visible: bool = True
+        # Default to NEAREST for pixel art - preserves sharp edges
+        self._resampling_mode: Image.Resampling = Image.Resampling.NEAREST
 
     @property
     def image(self) -> Image.Image | None:
@@ -81,6 +84,11 @@ class OverlayLayer(QObject):
     def visible(self) -> bool:
         """Whether the overlay is visible."""
         return self._visible
+
+    @property
+    def resampling_mode(self) -> Image.Resampling:
+        """Resampling mode for image scaling (NEAREST, BOX, LANCZOS)."""
+        return self._resampling_mode
 
     def import_image(self, path: str, target_width: int | None = None, target_height: int | None = None) -> bool:
         """Import an image from the given path.
@@ -217,6 +225,16 @@ class OverlayLayer(QObject):
             self._visible = visible
             self.visibility_changed.emit(visible)
 
+    def set_resampling_mode(self, mode: Image.Resampling) -> None:
+        """Set the resampling mode for image scaling.
+
+        Args:
+            mode: Resampling mode (NEAREST for pixel art, BOX for smoothed, LANCZOS for high-quality).
+        """
+        if self._resampling_mode != mode:
+            self._resampling_mode = mode
+            self.resampling_mode_changed.emit(mode.value)
+
     def has_image(self) -> bool:
         """Check if an overlay image is loaded."""
         return self._image is not None
@@ -234,6 +252,7 @@ class OverlayLayer(QObject):
             "opacity": self._opacity,
             "scale": self._scale,
             "visible": self._visible,
+            "resampling_mode": self._resampling_mode.value,
         }
 
     def restore_state(self, state: dict[str, object]) -> bool:
@@ -273,6 +292,11 @@ class OverlayLayer(QObject):
             visible = state.get("visible", True)
             if isinstance(visible, bool):
                 self.set_visible(visible)
+
+            # Restore resampling mode
+            resampling_mode = state.get("resampling_mode")
+            if isinstance(resampling_mode, int):
+                self.set_resampling_mode(Image.Resampling(resampling_mode))
 
             return True
         except (TypeError, ValueError):
@@ -338,8 +362,8 @@ class OverlayLayer(QObject):
 
         try:
             # Resize the cropped region to the destination size
-            # Use BOX for stable downscaling in synthetic tests/exact alignments
-            sampled_part = self._image.resize((dst_w, dst_h), Image.Resampling.BOX, box=sampling_box)
+            # Use configured resampling mode (default NEAREST for pixel art)
+            sampled_part = self._image.resize((dst_w, dst_h), self._resampling_mode, box=sampling_box)
         except Exception:
             # Fallback for extreme edge cases
             return None

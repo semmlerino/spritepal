@@ -243,3 +243,103 @@ class TestApplyOperationPaletteQuantization:
         if pixels is not None:
             # Should be index 1 (red), which maps to grayscale value 16
             assert pixels[0, 0] == 16
+
+    def test_perceptual_color_matching_preserves_vivid_colors(self, tmp_path):
+        """Test that vivid colors are not mapped to pale equivalents.
+
+        Bug: Simple Euclidean RGB distance often maps vivid colors to paler
+        versions because it doesn't account for human perception. Green
+        sensitivity is highest, followed by red, then blue.
+
+        This test verifies that a vivid red (255, 0, 0) is matched to the
+        vivid red in the palette, not to a paler red that might be
+        mathematically closer.
+        """
+        # Create overlay with vivid red
+        img_path = tmp_path / "vivid_red.png"
+        img = Image.new("RGBA", (8, 8), color=(255, 0, 0, 255))  # Pure vivid red
+        img.save(img_path)
+
+        overlay = OverlayLayer()
+        overlay.import_image(str(img_path))
+
+        tiles = {TilePosition(0, 0): Image.new("L", (8, 8))}
+        grid_mapping = {(0, 0): (ArrangementType.TILE, "0,0")}
+
+        # Palette with vivid red at index 2 and a pale red at index 1
+        # Simple Euclidean might incorrectly choose the pale red due to
+        # how it calculates distance
+        palette = [
+            (0, 0, 0),  # Index 0: Black (transparent)
+            (200, 150, 150),  # Index 1: Pale/washed-out red
+            (255, 0, 0),  # Index 2: Vivid red - should be matched
+            (0, 255, 0),  # Index 3: Green
+        ] + [(128, 128, 128)] * 12
+
+        operation = ApplyOperation(
+            overlay=overlay,
+            grid_mapping=grid_mapping,
+            tiles=tiles,
+            tile_width=8,
+            tile_height=8,
+            palette=palette,
+        )
+
+        result = operation.execute()
+        assert result.success is True
+
+        # Check that vivid red (255,0,0) maps to index 2 (vivid red), not index 1 (pale)
+        # Index 2 * 16 = 32
+        modified = result.modified_tiles[TilePosition(0, 0)]
+        pixels = modified.load()
+        assert pixels is not None
+        # Should match index 2 (vivid red), giving grayscale value 32
+        assert pixels[0, 0] == 32, (
+            f"Vivid red should map to palette index 2 (value 32), "
+            f"not {pixels[0, 0] // 16} (value {pixels[0, 0]})"
+        )
+
+    def test_perceptual_color_matching_saturated_blue(self, tmp_path):
+        """Test perceptual matching for saturated blue.
+
+        Human eyes are least sensitive to blue, so a pure saturated blue
+        should strongly prefer other saturated blues over desaturated ones.
+        """
+        img_path = tmp_path / "saturated_blue.png"
+        img = Image.new("RGBA", (8, 8), color=(0, 0, 255, 255))  # Pure blue
+        img.save(img_path)
+
+        overlay = OverlayLayer()
+        overlay.import_image(str(img_path))
+
+        tiles = {TilePosition(0, 0): Image.new("L", (8, 8))}
+        grid_mapping = {(0, 0): (ArrangementType.TILE, "0,0")}
+
+        # Palette with saturated blue at index 3 and a grayish-blue at index 1
+        palette = [
+            (0, 0, 0),  # Index 0: Black (transparent)
+            (100, 100, 180),  # Index 1: Desaturated/grayish blue
+            (128, 128, 128),  # Index 2: Gray
+            (0, 0, 255),  # Index 3: Saturated blue - should be matched
+        ] + [(64, 64, 64)] * 12
+
+        operation = ApplyOperation(
+            overlay=overlay,
+            grid_mapping=grid_mapping,
+            tiles=tiles,
+            tile_width=8,
+            tile_height=8,
+            palette=palette,
+        )
+
+        result = operation.execute()
+        assert result.success is True
+
+        modified = result.modified_tiles[TilePosition(0, 0)]
+        pixels = modified.load()
+        assert pixels is not None
+        # Should match index 3 (saturated blue), giving grayscale value 48
+        assert pixels[0, 0] == 48, (
+            f"Saturated blue should map to palette index 3 (value 48), "
+            f"not {pixels[0, 0] // 16} (value {pixels[0, 0]})"
+        )
