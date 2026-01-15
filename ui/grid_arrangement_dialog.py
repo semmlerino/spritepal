@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ui.sprite_editor.services.arrangement_bridge import ArrangementBridge
 
 from PIL import Image
-from PySide6.QtCore import QObject, QSignalBlocker, Qt
+from PySide6.QtCore import QObject, QSignalBlocker, Qt, QTimer
 from PySide6.QtGui import (
     QCloseEvent,
     QKeyEvent,
@@ -281,7 +281,7 @@ class GridArrangementDialog(SplitterDialog):
             "If unchecked, the arrangement will be discarded after closing the dialog,\n"
             "but any modified pixels from the overlay will be preserved."
         )
-        self.keep_layout_check.setChecked(True)
+        self.keep_layout_check.setChecked(False)
         overlay_layout.addWidget(self.keep_layout_check)
 
         right_layout.addWidget(overlay_group)
@@ -955,14 +955,17 @@ class GridArrangementDialog(SplitterDialog):
         # AND satisfying tests that expect empty cache after operation.
         self.colorizer.clear_cache()
 
-        # Show success message
-        _ = QMessageBox.information(
-            self,
-            "Apply Complete",
-            f"Successfully applied overlay to {num_modified} tile(s).\n\n"
-            "The overlay has been hidden to reveal the modified tiles.\n"
-            "Check 'Show overlay' to apply again.",
-        )
+        # Show success message - deferred so UI can repaint first
+        def _show_success_message() -> None:
+            _ = QMessageBox.information(
+                self,
+                "Apply Complete",
+                f"Successfully applied overlay to {num_modified} tile(s).\n\n"
+                "The overlay has been hidden to reveal the modified tiles.\n"
+                "Check 'Show overlay' to apply again.",
+            )
+
+        QTimer.singleShot(0, _show_success_message)
 
     def _show_apply_warnings_dialog(self, warnings: list[ApplyWarning]) -> bool:
         """Show warning dialog for Apply operation.

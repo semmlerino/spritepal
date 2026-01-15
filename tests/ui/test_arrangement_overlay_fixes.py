@@ -1,8 +1,9 @@
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
+from PySide6.QtWidgets import QMessageBox
 
 from core.apply_operation import ApplyOperation
 from core.arrangement_persistence import ArrangementConfig
@@ -261,16 +262,14 @@ def test_apply_enabled_when_tiles_placed(qapp, tmp_path):
 # --- Risk 2: tiles_per_row Drift Tests ---
 
 
-def test_tiles_per_row_preserved_in_result(qapp, tmp_path):
+@patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
+@patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
+def test_tiles_per_row_preserved_in_result(mock_info, mock_warning, qapp, tmp_path, qtbot):
     """Risk 2: tiles_per_row must be preserved in ArrangementResult for correct byte offset calculation.
 
     The tiles_per_row value used to slice the source image must be the same value
     used for patching byte offsets. This test verifies the value is captured in the result.
     """
-    from unittest.mock import patch
-
-    from PySide6.QtWidgets import QMessageBox
-
     from ui.grid_arrangement_dialog import GridArrangementDialog
 
     # Create a 32x16 sprite (4x2 = 8 tiles, tiles_per_row=4)
@@ -283,29 +282,27 @@ def test_tiles_per_row_preserved_in_result(qapp, tmp_path):
     overlay_path = tmp_path / "overlay.png"
     overlay_img.save(overlay_path)
 
-    with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes):
-        with patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok):
-            # Create dialog with specific tiles_per_row=4
-            dialog = GridArrangementDialog(str(sprite_path), tiles_per_row=4)
-            dialog.show()
+    # Create dialog with specific tiles_per_row=4
+    dialog = GridArrangementDialog(str(sprite_path), tiles_per_row=4)
+    dialog.show()
 
-            # Place a tile and apply overlay
-            dialog.arrangement_manager.set_item_at(0, 0, ArrangementType.TILE, "0,0")
-            dialog.overlay_layer.import_image(str(overlay_path))
-            dialog.overlay_layer.set_position(0, 0)
-            dialog._apply_overlay()
+    # Place a tile and apply overlay
+    dialog.arrangement_manager.set_item_at(0, 0, ArrangementType.TILE, "0,0")
+    dialog.overlay_layer.import_image(str(overlay_path))
+    dialog.overlay_layer.set_position(0, 0)
+    dialog._apply_overlay()
+    # Process events to handle the deferred QMessageBox
+    qtbot.wait(10)
 
-            # Close dialog
-            dialog.accept()
+    # Close dialog
+    dialog.accept()
 
-            result = dialog.arrangement_result
-            assert result is not None, "Result should exist after accept"
+    result = dialog.arrangement_result
+    assert result is not None, "Result should exist after accept"
 
-            # CRITICAL CHECK: tiles_per_row must be preserved in result
-            assert hasattr(result, "tiles_per_row"), (
-                "ArrangementResult must have tiles_per_row field! "
-                "Without it, byte offset calculation may use wrong value if current_width changes."
-            )
-            assert result.tiles_per_row == 4, (
-                f"tiles_per_row should be 4 (from dialog init), got {result.tiles_per_row}"
-            )
+    # CRITICAL CHECK: tiles_per_row must be preserved in result
+    assert hasattr(result, "tiles_per_row"), (
+        "ArrangementResult must have tiles_per_row field! "
+        "Without it, byte offset calculation may use wrong value if current_width changes."
+    )
+    assert result.tiles_per_row == 4, f"tiles_per_row should be 4 (from dialog init), got {result.tiles_per_row}"

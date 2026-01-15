@@ -109,7 +109,7 @@ class TestTileIdentityEndToEnd:
     @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
     @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_tile_identity_preserved_through_overlay_workflow(
-        self, mock_info, mock_warning, qapp, sprite_4x2_tiles, distinctive_overlay
+        self, mock_info, mock_warning, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay
     ):
         """
         Trace TilePosition(1, 2) through the entire workflow:
@@ -152,6 +152,8 @@ class TestTileIdentityEndToEnd:
 
         # STAGE 5: Apply overlay - should sample at canvas (0, 0), store at TilePosition(1, 2)
         dialog._apply_overlay()
+        # Process events to handle the deferred QMessageBox
+        qtbot.wait(10)
 
         # Verify apply succeeded
         assert dialog._apply_result is not None, "Apply should have succeeded"
@@ -201,7 +203,7 @@ class TestTileIdentityEndToEnd:
     @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
     @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_byte_offset_calculation_matches_rom_layout(
-        self, mock_info, mock_warning, qapp, sprite_4x2_tiles, distinctive_overlay, mock_4bpp_tile_data
+        self, mock_info, mock_warning, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay, mock_4bpp_tile_data
     ):
         """
         Verify that _update_tile_data_from_modified_tiles patches the correct byte offset.
@@ -223,6 +225,8 @@ class TestTileIdentityEndToEnd:
         dialog.overlay_layer.import_image(distinctive_overlay)
         dialog.overlay_layer.set_position(0, 0)
         dialog._apply_overlay()
+        # Process events to handle the deferred QMessageBox
+        qtbot.wait(10)
         dialog.accept()
 
         result = dialog.arrangement_result
@@ -273,7 +277,7 @@ class TestApplyThenRearrangeDataLoss:
     @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
     @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_rearrange_after_apply_preserves_modified_tiles(
-        self, mock_info, mock_warning, qapp, sprite_4x2_tiles, distinctive_overlay
+        self, mock_info, mock_warning, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay
     ):
         """
         Verify that rearranging tiles after applying overlay does NOT lose the changes.
@@ -291,6 +295,8 @@ class TestApplyThenRearrangeDataLoss:
         dialog.overlay_layer.import_image(distinctive_overlay)
         dialog.overlay_layer.set_position(0, 0)
         dialog._apply_overlay()
+        # Process events to handle the deferred QMessageBox
+        qtbot.wait(10)
 
         # Verify apply worked
         assert dialog._apply_result is not None, "Apply should have succeeded"
@@ -327,7 +333,7 @@ class TestApplyThenRearrangeDataLoss:
     @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
     @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_add_tile_after_apply_preserves_modified_tiles(
-        self, mock_info, mock_warning, qapp, sprite_4x2_tiles, distinctive_overlay
+        self, mock_info, mock_warning, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay
     ):
         """
         Verify that adding a tile after applying overlay does NOT lose the changes.
@@ -343,6 +349,8 @@ class TestApplyThenRearrangeDataLoss:
         dialog.overlay_layer.import_image(distinctive_overlay)
         dialog.overlay_layer.set_position(0, 0)
         dialog._apply_overlay()
+        # Process events to handle the deferred QMessageBox
+        qtbot.wait(10)
 
         assert dialog._apply_result is not None, "Apply should have succeeded"
 
@@ -361,7 +369,7 @@ class TestApplyThenRearrangeDataLoss:
     @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
     @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_remove_tile_after_apply_preserves_modified_tiles(
-        self, mock_info, mock_warning, qapp, sprite_4x2_tiles, distinctive_overlay
+        self, mock_info, mock_warning, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay
     ):
         """
         Verify that removing a tile after applying overlay does NOT lose the changes.
@@ -380,6 +388,8 @@ class TestApplyThenRearrangeDataLoss:
         dialog.overlay_layer.import_image(distinctive_overlay)
         dialog.overlay_layer.set_position(0, 0)
         dialog._apply_overlay()
+        # Process events to handle the deferred QMessageBox
+        qtbot.wait(10)
 
         assert dialog._apply_result is not None, "Apply should have succeeded"
 
