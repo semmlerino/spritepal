@@ -1620,7 +1620,7 @@ class MainWindow(QMainWindow):
         Called when user double-clicks a Mesen2 capture offset.
 
         Args:
-            offset: ROM offset to open in sprite editor
+            offset: ROM offset (headerless, already normalized from capture widget)
         """
         logger.info("Opening offset 0x%06X in sprite editor", offset)
 
@@ -1632,10 +1632,13 @@ class MainWindow(QMainWindow):
 
         self._sprite_editor_workspace.load_rom(rom_path)
 
-        # Convert Mesen FILE OFFSET (file-based) to ROM offset after loading header info
-        rom_offset = self._sprite_editor_workspace.rom_workflow_controller.normalize_mesen_offset(offset)
+        # offset is already ROM offset (normalized from RecentCapturesWidget)
+        # No normalization needed here - this was causing double-normalization bug
+        rom_offset = offset
 
         # Get capture info from log watcher for display name
+        # Note: get_capture_by_offset searches by FILE offset, so this may not find the
+        # capture when SMC headers are present, but that's OK - we'll just skip the frame number
         capture = self.log_watcher.get_capture_by_offset(offset)
         capture_name: str | None = None
         if capture and capture.frame:

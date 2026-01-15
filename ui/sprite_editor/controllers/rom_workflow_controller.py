@@ -59,7 +59,7 @@ class ROMWorkflowController(QObject):
     workflow_state_changed = Signal(str)  # 'preview'/'edit'/'save' → view state updates
     sprite_extracted = Signal(object, int)  # image, tile_count - for integration (e.g. history)
     offset_changed = Signal(int)  # Emitted when offset changes (for sync with other UI)
-    capture_offset_adjusted = Signal(int, int)  # (old, new) - HAL alignment adjusted offset
+    capture_offset_adjusted = Signal(int, int)  # (old_rom_offset, new_rom_offset) - ROM offsets (headerless) adjusted by HAL alignment
 
     def __init__(
         self,

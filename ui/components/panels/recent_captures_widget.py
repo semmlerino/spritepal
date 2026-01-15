@@ -150,13 +150,68 @@ class RecentCapturesWidget(QWidget):
         self._connect_signals()
 
     def set_smc_offset(self, offset: int) -> None:
-        """Set the SMC header offset for normalizing Mesen FILE offsets to ROM offsets.
+        """Set the SMC header offset and re-normalize existing captures.
+
+        When the SMC offset changes (e.g., loading a new ROM), all existing
+        captures must be re-normalized because their stored ROM offsets are
+        based on the old SMC offset.
 
         Args:
             offset: SMC header size in bytes (typically 0 or 512).
         """
+        if self._smc_offset == offset:
+            return  # No change needed
+        
+        old_smc_offset = self._smc_offset
         self._smc_offset = offset
-        logger.debug("SMC offset set to %d bytes", offset)
+        logger.debug("SMC offset changed from %d to %d bytes", old_smc_offset, offset)
+        
+        # Re-normalize all existing captures with the new SMC offset
+        for i in range(self._list_widget.count()):
+            item = self._list_widget.item(i)
+            item_data = item.data(Qt.ItemDataRole.UserRole)
+            
+            if isinstance(item_data, dict):
+                # Get the original FILE offset (never changes)
+                file_offset = item_data.get("file_offset")
+                
+                # If file_offset is not stored (backward compat), try to get it from "offset"
+                if file_offset is None:
+                    # Old item format - "offset" contains ROM offset from old SMC context
+                    # We can't recover the FILE offset, so we'll use current "offset" as approximation
+                    # This is a fallback for backward compatibility
+                    file_offset = item_data.get("offset")
+                    if file_offset is not None:
+                        # Denormalize to FILE offset using old SMC offset
+                        if old_smc_offset > 0:
+                            file_offset = file_offset + old_smc_offset
+                
+                if file_offset is not None:
+                    # Re-normalize to ROM offset with new SMC offset
+                    rom_offset = self._normalize_offset(file_offset)
+                    
+                    # Update stored offsets
+                    item_data["file_offset"] = file_offset
+                    item_data["rom_offset"] = rom_offset
+                    item_data["offset"] = rom_offset  # Keep backward compat field in sync
+                    item.setData(Qt.ItemDataRole.UserRole, item_data)
+                    
+                    # Update tooltip with new ROM offset
+                    item.setToolTip(
+                        f"ROM Offset: 0x{rom_offset:06X}\n"
+                        f"Mesen FILE: 0x{file_offset:06X}\n"
+                        f"Frame: N/A\n"
+                        f"SMC Offset: {self._smc_offset} bytes"
+                    )
+                    
+                    logger.debug(
+                        "Re-normalized capture: FILE 0x%06X -> ROM 0x%06X (SMC: %d bytes)",
+                        file_offset, rom_offset, self._smc_offset
+                    )
+        
+        # Re-request all thumbnails with corrected offsets
+        # This ensures thumbnails use the new normalized offsets
+        self.request_all_thumbnails()
 
     def _normalize_offset(self, offset: int) -> int:
         """Normalize a Mesen FILE offset to a ROM offset (headerless).
@@ -262,15 +317,18 @@ class RecentCapturesWidget(QWidget):
         # Insert at beginning (most recent first)
         self._captures.insert(0, capture)
 
-        # Normalize offset for internal use (thumbnail matching)
+        # Store both FILE and ROM offsets
         # Mesen reports FILE offsets; we need ROM offsets for decompression
-        rom_offset = self._normalize_offset(capture.offset)
+        file_offset = capture.offset
+        rom_offset = self._normalize_offset(file_offset)
 
         # Create list item with dict data for delegate
         item = QListWidgetItem()
         item_data = {
-            "offset": rom_offset,  # Store normalized ROM offset for thumbnail matching
-            "thumbnail": None,  # Will be set later via set_thumbnail
+            "file_offset": file_offset,  # Original FILE offset from Mesen
+            "rom_offset": rom_offset,    # Normalized ROM offset for decompression
+            "offset": rom_offset,         # Keep for backward compatibility
+            "thumbnail": None,            # Will be set later via set_thumbnail
         }
         item.setData(Qt.ItemDataRole.UserRole, item_data)
 
@@ -389,7 +447,7 @@ class RecentCapturesWidget(QWidget):
         """
         return any(c.offset == offset for c in self._captures)
 
-    def update_capture_offset(self, old_offset: int, new_offset: int) -> bool:
+    def update_capture_offset(self, old_rom_offset: int, new_rom_offset: int) -> bool:
         """Update a capture's offset after HAL alignment adjustment.
 
         When the preview worker discovers a sprite at an adjusted offset
@@ -397,63 +455,71 @@ class RecentCapturesWidget(QWidget):
         the display text and internal data to reflect the corrected offset.
 
         Args:
-            old_offset: The original Mesen FILE offset.
-            new_offset: The adjusted offset where decompression succeeded.
+            old_rom_offset: Original ROM offset (headerless) before alignment
+            new_rom_offset: Adjusted ROM offset (headerless) after alignment
 
         Returns:
             True if an item was found and updated, False otherwise.
         """
-        # Find the capture with matching offset
-        for i, capture in enumerate(self._captures):
-            if capture.offset == old_offset:
-                # Create updated CapturedOffset (frozen dataclass, so must replace)
-                updated_capture = CapturedOffset(
-                    offset=new_offset,
-                    frame=capture.frame,
-                    timestamp=capture.timestamp,
-                    raw_line=capture.raw_line,
-                    rom_checksum=capture.rom_checksum,
-                )
-                self._captures[i] = updated_capture
-
-                # Find and update the corresponding list widget item
-                # Items are in reverse order (most recent first)
-                if i < self._list_widget.count():
-                    item = self._list_widget.item(i)
-                    # Update display text by replacing old offset hex with new
-                    old_hex = f"0x{old_offset:06X}"
-                    new_hex = f"0x{new_offset:06X}"
-                    current_text = item.text()
-                    # Handle both uppercase and lowercase hex
-                    if old_hex in current_text:
-                        new_text = current_text.replace(old_hex, new_hex)
-                    elif old_hex.lower() in current_text.lower():
-                        # Case-insensitive replacement
-                        import re
-
-                        new_text = re.sub(re.escape(old_hex), new_hex, current_text, flags=re.IGNORECASE)
-                    else:
-                        new_text = current_text
-                    item.setText(new_text)
-
-                    # Update item data (normalized ROM offset)
-                    item_data = item.data(Qt.ItemDataRole.UserRole)
-                    if isinstance(item_data, dict):
-                        item_data["offset"] = self._normalize_offset(new_offset)
-                        item.setData(Qt.ItemDataRole.UserRole, item_data)
-
-                    # Update tooltip
-                    rom_offset = self._normalize_offset(new_offset)
-                    item.setToolTip(
-                        f"ROM Offset: 0x{rom_offset:06X}\n"
-                        f"Mesen FILE: {new_hex}\n"
-                        f"Frame: {updated_capture.frame or 'N/A'}\n"
-                        f"{updated_capture.raw_line}"
+        # Find the capture with matching ROM offset in the list widget
+        # Items are in reverse order (most recent first), matching self._captures order
+        for i in range(self._list_widget.count()):
+            item = self._list_widget.item(i)
+            item_data = item.data(Qt.ItemDataRole.UserRole)
+            
+            if isinstance(item_data, dict) and item_data.get("rom_offset") == old_rom_offset:
+                # Found the item to update
+                # Update the stored ROM offset in item data
+                item_data["rom_offset"] = new_rom_offset
+                item_data["offset"] = new_rom_offset  # Keep backward compat field in sync
+                # FILE offset stays unchanged - it's the original capture point
+                item.setData(Qt.ItemDataRole.UserRole, item_data)
+                
+                # Also update the underlying _captures list
+                # Note: _captures is in reverse order (most recent at index 0)
+                captures_index = self._list_widget.count() - 1 - i
+                if captures_index < len(self._captures):
+                    file_offset = self._captures[captures_index].offset
+                    # Create updated CapturedOffset (frozen dataclass, so must replace)
+                    updated_capture = CapturedOffset(
+                        offset=new_rom_offset,  # Update FILE offset to the adjusted value
+                        frame=self._captures[captures_index].frame,
+                        timestamp=self._captures[captures_index].timestamp,
+                        raw_line=self._captures[captures_index].raw_line,
+                        rom_checksum=self._captures[captures_index].rom_checksum,
                     )
-
-                logger.debug("Updated capture offset: 0x%06X -> 0x%06X", old_offset, new_offset)
+                    self._captures[captures_index] = updated_capture
+                
+                # Update display text: replace old ROM offset hex with new
+                old_hex = f"0x{old_rom_offset:06X}"
+                new_hex = f"0x{new_rom_offset:06X}"
+                current_text = item.text()
+                # Try exact replacement first (case-sensitive)
+                if old_hex in current_text:
+                    new_text = current_text.replace(old_hex, new_hex)
+                elif old_hex.lower() in current_text.lower():
+                    # Case-insensitive replacement
+                    import re
+                    new_text = re.sub(re.escape(old_hex), new_hex, current_text, flags=re.IGNORECASE)
+                else:
+                    # Offset not found in display text (display shows FILE offset, not ROM)
+                    # In this case, don't change the display text
+                    new_text = current_text
+                item.setText(new_text)
+                
+                # Update tooltip with new ROM offset
+                item_data_dict = item.data(Qt.ItemDataRole.UserRole)
+                file_offset = item_data_dict.get("file_offset", 0)
+                item.setToolTip(
+                    f"ROM Offset: 0x{new_rom_offset:06X}\n"
+                    f"Mesen FILE: 0x{file_offset:06X}\n"
+                    f"Frame: N/A\n"  # Frame is not tracked through alignment adjustment
+                    f"(Adjusted from 0x{old_rom_offset:06X})"
+                )
+                
+                logger.debug("Updated capture ROM offset: 0x%06X -> 0x%06X", old_rom_offset, new_rom_offset)
                 return True
-
+        
         return False
 
     def _update_status_indicator(self, watching: bool) -> None:

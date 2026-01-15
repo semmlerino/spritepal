@@ -88,7 +88,7 @@ class ROMExtractionPanel(QWidget):
     extraction_ready = Signal(bool, str)  # (ready, reason_if_not_ready)
     rom_extraction_requested = Signal(str, int, str, str)  # rom_path, offset, output_base, sprite_name
     output_name_changed = Signal(str)  # Emit when output name changes in ROM panel
-    open_in_sprite_editor = Signal(int)  # Emitted when user wants to open offset in sprite editor
+    open_in_sprite_editor = Signal(int)  # Emitted when user wants to open offset in sprite editor (ROM offset, headerless)
     mesen2_watching_changed = Signal(bool)  # Emitted when log watcher status changes
     manual_offset_changed = Signal(int)  # Emitted when manual offset changes
 
