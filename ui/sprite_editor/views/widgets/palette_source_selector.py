@@ -63,6 +63,7 @@ class PaletteSourceSelector(QWidget):
         super().__init__(parent)
         self.setObjectName("paletteSourceSelector")
         self._separator_index = -1  # Index of the separator before manual entry
+        self._previous_index = 0  # Track previous selection for restoration
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -158,12 +159,15 @@ class PaletteSourceSelector(QWidget):
         if source_type == self._MANUAL_PALETTE_MARKER:
             # Emit signal for controller to show dialog
             self.manualPaletteRequested.emit()
-            # Revert to previous selection (or default)
+            # Restore previous selection (not Default)
             # The controller will update the selection once a manual palette is loaded
             self._combo_box.blockSignals(True)
-            self._combo_box.setCurrentIndex(0)  # Revert to Default
+            self._combo_box.setCurrentIndex(self._previous_index)
             self._combo_box.blockSignals(False)
             return
+
+        # Track this as the new previous selection (for restoration on manual palette cancel)
+        self._previous_index = index
 
         if source_type is not None and palette_index is not None:
             self.sourceChanged.emit(source_type, palette_index)
