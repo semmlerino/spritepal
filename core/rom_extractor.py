@@ -38,7 +38,6 @@ from utils.constants import (
     ENTROPY_ANALYSIS_SAMPLE,
     LARGE_SPRITE_MAX,
     MAX_ALIGNMENT_ERROR,
-    MAX_BYTE_VALUE,
     MIN_SPRITE_TILES,
     PIXEL_SCALE_FACTOR,
     PROGRESS_LOG_INTERVAL,
@@ -50,7 +49,6 @@ from utils.constants import (
     SPRITE_QUALITY_THRESHOLD,
     TILE_ANALYSIS_SAMPLE,
     TILE_HEIGHT,
-    TILE_PLANE_SIZE,
     TILE_WIDTH,
     TYPICAL_SPRITE_MAX,
     TYPICAL_SPRITE_MIN,
@@ -1316,41 +1314,6 @@ class ROMExtractor:
                 best_score = embedded_score
 
         return best_score
-
-    def _has_4bpp_characteristics(self, data: bytes) -> bool:
-        """
-        Check if data has characteristics of 4bpp sprite data.
-
-        Args:
-            data: Sprite data to check
-
-        Returns:
-            True if data appears to be 4bpp sprite data
-        """
-        if len(data) < BYTES_PER_TILE:
-            return False
-
-        # Check first tile for 4bpp structure
-        tile_data = data[:BYTES_PER_TILE]
-
-        # In 4bpp format, bitplanes are organized in a specific way
-        # Check for reasonable bit patterns (not all 0 or all 1)
-        bitplane_variety = 0
-
-        for i in range(0, TILE_PLANE_SIZE, 2):  # First two bitplanes
-            byte1 = tile_data[i]
-            byte2 = tile_data[i + 1]
-            if 0 < byte1 < MAX_BYTE_VALUE or 0 < byte2 < MAX_BYTE_VALUE:
-                bitplane_variety += 1
-
-        for i in range(TILE_PLANE_SIZE, BYTES_PER_TILE, 2):  # Second two bitplanes
-            byte1 = tile_data[i]
-            byte2 = tile_data[i + 1]
-            if 0 < byte1 < MAX_BYTE_VALUE or 0 < byte2 < MAX_BYTE_VALUE:
-                bitplane_variety += 1
-
-        # Expect some variety in the bitplanes
-        return bitplane_variety >= 4
 
     def _has_graphics_patterns(self, data: bytes) -> bool:
         """

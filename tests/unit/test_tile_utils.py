@@ -1,15 +1,89 @@
-"""Tests for tile data alignment functions in core/tile_utils.py.
+"""
+Unit tests for core/tile_utils.py tile utilities.
 
-These tests verify the alignment functions that handle HAL-decompressed sprite data
-which may contain leading header bytes that cause tile misalignment.
+This module tests:
+- Tile validation functions (validate_4bpp_tile_structure, is_heuristic_graphics_tile)
+- Tile alignment functions (align_tile_data, get_tile_alignment_info)
+- Integration scenarios with real-world patterns
 """
 
 from __future__ import annotations
 
 import pytest
 
-from core.tile_utils import align_tile_data, get_tile_alignment_info
+from core.tile_utils import (
+    align_tile_data,
+    decode_4bpp_tile,
+    get_tile_alignment_info,
+    is_heuristic_graphics_tile,
+    validate_4bpp_tile_structure,
+)
 from utils.constants import BYTES_PER_TILE
+
+# ============================================================================
+# Tile Validation Tests (from test_rom_extractor.py)
+# ============================================================================
+
+
+class TestTileValidation:
+    """Test tile validation functions (structural checks)."""
+
+    def test_4bpp_characteristics_via_public_validation(self):
+        """Test 4bpp characteristics check via public validation function.
+
+        Uses validate_4bpp_tile_structure from tile_utils instead of
+        calling private _has_4bpp_characteristics method.
+        """
+        # Create valid 4bpp tile with bitplane variety
+        tile_data = bytearray(BYTES_PER_TILE)
+        # Add variety to bitplanes (similar pattern to what _has_4bpp_characteristics expects)
+        for i in range(8):
+            tile_data[i * 2] = 0xAA
+            tile_data[i * 2 + 1] = 0x55
+            tile_data[16 + i * 2] = 0xF0
+            tile_data[16 + i * 2 + 1] = 0x0F
+
+        # Validate via public function
+        assert validate_4bpp_tile_structure(bytes(tile_data)) is True
+
+    def test_4bpp_characteristics_too_small(self):
+        """Test 4bpp validation with insufficient data via public function."""
+        small_data = b"\x00" * 16  # Less than one tile
+        assert validate_4bpp_tile_structure(small_data) is False
+
+    def test_validate_4bpp_tile_valid(self):
+        """Test tile validation with valid tile"""
+        # Create a valid tile with good structure
+        tile_data = bytearray(32)
+        # Add variety to bitplanes
+        for i in range(8):
+            tile_data[i * 2] = 0xAA
+            tile_data[i * 2 + 1] = 0x55
+            tile_data[16 + i * 2] = 0xF0
+            tile_data[16 + i * 2 + 1] = 0x0F
+
+        assert validate_4bpp_tile_structure(bytes(tile_data)) is True
+
+    def test_validate_4bpp_tile_wrong_size(self):
+        """Test tile validation with wrong size"""
+        wrong_size = b"\x00" * 16  # Too small
+        assert validate_4bpp_tile_structure(wrong_size) is False
+
+    def test_validate_4bpp_tile_no_correlation(self):
+        """Test tile validation with no bitplane correlation"""
+        tile_data = bytearray(32)
+        # First bitplanes all zero, second all full (no correlation)
+        for i in range(16):
+            tile_data[i] = 0x00
+        for i in range(16, 32):
+            tile_data[i] = 0xFF
+
+        assert validate_4bpp_tile_structure(bytes(tile_data)) is False
+
+
+# ============================================================================
+# Tile Alignment Tests (from test_tile_alignment.py)
+# ============================================================================
 
 
 class TestAlignTileData:
@@ -163,13 +237,16 @@ class TestGetTileAlignmentInfo:
         assert info["header_bytes"] == 2
 
 
+# ============================================================================
+# Alignment Integration Tests (from test_tile_alignment.py)
+# ============================================================================
+
+
 class TestAlignmentIntegration:
     """Integration tests for tile alignment with real-world patterns."""
 
     def test_align_then_decode_produces_valid_tiles(self) -> None:
         """Aligned data should be decodable as valid 4bpp tiles."""
-        from core.tile_utils import decode_4bpp_tile
-
         # Create a recognizable tile pattern (checkerboard)
         # In 4bpp, each pixel is 0-15, encoded in planar format
         tile_bytes = bytes(
