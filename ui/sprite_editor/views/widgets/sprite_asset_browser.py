@@ -648,13 +648,16 @@ class SpriteAssetBrowser(QWidget):
 
     def set_thumbnail(self, offset: int, thumbnail: QPixmap) -> None:
         """
-        Set or update thumbnail for a sprite.
+        Set or update thumbnail for ALL sprites with matching offset.
+
+        Multiple items can share the same offset (e.g., ROM sprite and Mesen
+        capture for the same sprite). All matching items receive the thumbnail.
 
         Args:
             offset: ROM offset
             thumbnail: Thumbnail pixmap
         """
-        # Find item with matching offset
+        updated_count = 0
         iterator = QTreeWidgetItemIterator(self.tree)
         while iterator.value():
             item = iterator.value()
@@ -662,10 +665,12 @@ class SpriteAssetBrowser(QWidget):
             if isinstance(data, dict) and data.get("offset") == offset:
                 data["thumbnail"] = thumbnail
                 item.setData(0, Qt.ItemDataRole.UserRole, data)
-                # Force repaint
-                self.tree.viewport().update()
-                return
+                updated_count += 1
             iterator += 1
+
+        if updated_count > 0:
+            self.tree.viewport().update()
+            logger.debug("Set thumbnail for offset 0x%06X on %d items", offset, updated_count)
 
     def clear_thumbnail(self, offset: int) -> bool:
         """
