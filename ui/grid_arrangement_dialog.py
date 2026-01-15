@@ -926,6 +926,10 @@ class GridArrangementDialog(SplitterDialog):
         # Mark that tiles have been modified (this flag persists through arrangement changes)
         self._tiles_have_been_modified = True
 
+        # Clear colorizer cache BEFORE push so _update_displays() shows modified tiles
+        # (push calls execute() which calls the callback immediately)
+        self.colorizer.clear_cache()
+
         # Use undoable command to update tiles
         command = ApplyOverlayCommand(
             tiles=self.tiles,
@@ -950,10 +954,6 @@ class GridArrangementDialog(SplitterDialog):
             self.overlay_layer.set_visible(False)
         finally:
             self._is_applying_overlay = False
-
-        # Clear colorizer cache at the VERY end so display shows modified tiles
-        # AND satisfying tests that expect empty cache after operation.
-        self.colorizer.clear_cache()
 
         # Show success message - deferred so UI can repaint first
         def _show_success_message() -> None:

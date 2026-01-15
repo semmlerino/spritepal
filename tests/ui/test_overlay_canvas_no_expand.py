@@ -251,3 +251,70 @@ class TestDelayedVisualFeedback:
 
         # Process events to handle the deferred QMessageBox (cleanup)
         qtbot.wait(10)
+
+    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
+    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
+    def test_arrangement_canvas_shows_modified_tiles_after_apply(
+        self, mock_info, mock_warning, qtbot, test_sprite, test_overlay
+    ):
+        """Arrangement canvas should display the modified tiles after overlay apply.
+
+        BUG: When applying overlay with palette mode enabled, the colorizer cache
+        was cleared AFTER _update_displays() ran, causing stale (cached) tile
+        images to be shown in the arrangement grid instead of the modified tiles.
+        """
+        from PySide6.QtWidgets import QGraphicsPixmapItem
+
+        dialog = GridArrangementDialog(test_sprite, tiles_per_row=2)
+        qtbot.addWidget(dialog)
+        dialog.show()
+
+        # Enable palette mode with a simple grayscale palette
+        palette = [(i, i, i) for i in range(0, 256, 16)]  # 16 grayscale colors
+        dialog.colorizer.set_palettes({0: palette})
+        dialog.colorizer.set_selected_palette(0)
+        dialog.colorizer.toggle_palette_mode()  # Actually enable palette mode
+
+        # Place tile (0,0) at position (0,0) on arrangement canvas
+        dialog.arrangement_manager.set_item_at(0, 0, ArrangementType.TILE, "0,0")
+
+        # Apply overlay - this modifies the tile pixel data
+        dialog.overlay_layer.import_image(test_overlay)
+        dialog.overlay_layer.set_position(0, 0)
+        dialog._apply_overlay()
+        qtbot.wait(10)  # Process deferred QMessageBox
+
+        # Get the pixmap items from the arrangement scene
+        scene_items = [item for item in dialog.arrangement_scene.items() if isinstance(item, QGraphicsPixmapItem)]
+
+        # Should have at least one pixmap item (the placed tile)
+        assert len(scene_items) >= 1, "Expected at least one pixmap item in scene"
+
+        # Find the pixmap at position (0, 0) - this is the tile we placed
+        tile_pixmap = None
+        for item in scene_items:
+            if item.pos().x() == 0 and item.pos().y() == 0:
+                tile_pixmap = item.pixmap()
+                break
+
+        assert tile_pixmap is not None, "Could not find tile pixmap at (0,0)"
+
+        # Convert pixmap to image to check pixel values
+        qimage = tile_pixmap.toImage()
+        # Get pixel at (0,0) of the tile
+        pixel_color = qimage.pixelColor(0, 0)
+
+        # After applying red overlay, the tile should NOT have the original value (10)
+        # The overlay is red (255, 0, 0) which when quantized to grayscale palette
+        # should result in a different value than the original grayscale 10
+        # Original tile had value 10 (very dark gray)
+        # Red (255, 0, 0) has luminance ~76, so should quantize to lighter gray
+
+        # The key assertion: the displayed pixel should NOT match the original (dark) value
+        # If the bug exists, we'd see the cached original tile (dark gray)
+        # If fixed, we'd see the modified tile (lighter gray from red overlay)
+        assert pixel_color.red() > 50, (
+            f"Tile in arrangement canvas should show modified pixels. "
+            f"Got color ({pixel_color.red()}, {pixel_color.green()}, {pixel_color.blue()}), "
+            f"expected brighter value after red overlay was applied."
+        )
