@@ -174,7 +174,6 @@ class TestPaletteCacheBug:
         # Apply overlay (modifies tiles)
         dialog.overlay_layer.import_image(white_overlay, 16, 16)
         dialog._apply_overlay()
-        qtbot.wait(10)  # Process deferred QTimer before mock decorator is torn down
 
         # CRITICAL: clear_cache() must be called during Apply
         # This ensures stale cached images are invalidated before _update_displays() runs

@@ -76,12 +76,9 @@ class TestCanvasPreservation:
         dialog.overlay_layer.set_position(0, 0)
 
         # Apply overlay (bypass message boxes)
-        # Note: _apply_overlay() uses QTimer.singleShot(0, ...) to defer the success message,
-        # so we must process events WITHIN the patch context for the mock to intercept it.
         with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes):
             with patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok):
                 dialog._apply_overlay()
-                qtbot.wait(10)  # Process deferred QTimer before patch context exits
 
         # Get arrangement result
         result = dialog.get_arrangement_result()

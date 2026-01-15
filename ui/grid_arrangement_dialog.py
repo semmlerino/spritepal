@@ -13,13 +13,14 @@ if TYPE_CHECKING:
     from ui.sprite_editor.services.arrangement_bridge import ArrangementBridge
 
 from PIL import Image
-from PySide6.QtCore import QObject, QSignalBlocker, Qt, QTimer
+from PySide6.QtCore import QObject, QSignalBlocker, Qt
 from PySide6.QtGui import (
     QCloseEvent,
     QKeyEvent,
     QPixmap,
 )
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QDialogButtonBox,
     QFrame,
@@ -955,20 +956,10 @@ class GridArrangementDialog(SplitterDialog):
         finally:
             self._is_applying_overlay = False
 
-        # Show success message - deferred so UI can repaint first
-        # Use lambda with guard to prevent crash if dialog closes before timer fires
-        QTimer.singleShot(0, lambda: self._show_apply_success_message(num_modified))
+        # Process pending events so UI repaints before showing the blocking dialog
+        QApplication.processEvents()
 
-    def _show_apply_success_message(self, num_modified: int) -> None:
-        """Show success message after overlay apply (deferred call).
-
-        This is called via QTimer.singleShot to allow the UI to repaint first.
-        Guards against the dialog being closed before the timer fires.
-        """
-        # Guard: Don't show if dialog was closed or destroyed
-        if not self.isVisible():
-            return
-
+        # Show success message
         _ = QMessageBox.information(
             self,
             "Apply Complete",
