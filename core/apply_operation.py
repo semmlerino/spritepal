@@ -191,8 +191,6 @@ class ApplyOperation:
                 # Tile not covered - skip (warning already generated)
                 continue
 
-
-
             # Convert RGBA to grayscale for SNES sprite format
             # (SNES sprites use 4bpp indexed color)
             if region.mode == "RGBA":
@@ -260,10 +258,14 @@ class ApplyOperation:
                     pixels_out[x, y] = 0
                     continue
 
-                # Find closest palette color
+                # Find closest palette color, skipping index 0 (reserved for transparency)
+                # SNES sprites use index 0 as the transparent color, so opaque pixels
+                # must never be assigned to index 0, even if it's the closest match.
                 min_dist = float("inf")
-                best_idx = 0
+                best_idx = 1  # Default to index 1 (not 0 which is transparent)
                 for idx, (pr, pg, pb) in enumerate(palette):
+                    if idx == 0:
+                        continue  # Skip index 0 for opaque pixels
                     dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2
                     if dist < min_dist:
                         min_dist = dist

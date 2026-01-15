@@ -262,6 +262,112 @@ def test_apply_enabled_when_tiles_placed(qapp, tmp_path):
 # --- Risk 2: tiles_per_row Drift Tests ---
 
 
+def test_opaque_black_not_quantized_to_transparent_index():
+    """Regression test: Opaque black pixels should NOT become transparent.
+
+    BUG: When an overlay has opaque black pixels (0,0,0,255), they get quantized
+    to palette index 0 (which is typically black in SNES palettes). But index 0
+    is reserved for transparency in SNES sprites, so these pixels appear transparent.
+
+    FIX: When quantizing opaque pixels, skip index 0 entirely. Only transparent
+    pixels (alpha < 128) should be assigned to index 0.
+    """
+    overlay = OverlayLayer()
+    # Create overlay with opaque black pixels
+    img = Image.new("RGBA", (8, 8), (0, 0, 0, 255))  # Opaque black
+    overlay._image = img
+    overlay.set_scale(1.0)
+    overlay.set_position(0.0, 0.0)
+
+    grid_mapping = {(0, 0): (ArrangementType.TILE, "0,0")}
+    tile_pos = TilePosition(0, 0)
+    original_tile = Image.new("L", (8, 8), 128)
+    tiles = {tile_pos: original_tile}
+
+    # Create palette where index 0 is black (typical SNES palette)
+    # Index 0 = transparent (black), Index 1 = dark gray, etc.
+    palette = [
+        (0, 0, 0),  # Index 0: black (transparent color)
+        (16, 16, 16),  # Index 1: very dark gray
+        (32, 32, 32),  # Index 2
+        (48, 48, 48),  # Index 3
+    ] + [(i * 16, i * 16, i * 16) for i in range(4, 16)]  # Fill rest
+
+    op = ApplyOperation(
+        overlay=overlay,
+        grid_mapping=grid_mapping,
+        tiles=tiles,
+        tile_width=8,
+        tile_height=8,
+        palette=palette,
+    )
+
+    result = op.execute(force=True)
+    assert result.success
+    assert tile_pos in result.modified_tiles
+
+    modified = result.modified_tiles[tile_pos]
+
+    # CRITICAL: Opaque black should NOT be index 0 (transparent)
+    # It should be quantized to a non-zero index (closest non-transparent color)
+    pixel_value = modified.getpixel((0, 0))
+    index = pixel_value // 16  # Convert back to palette index
+
+    assert index != 0, (
+        f"Opaque black pixel was quantized to index 0 (transparent)! "
+        f"Got pixel value {pixel_value} (index {index}). "
+        f"Opaque pixels should never be assigned to index 0."
+    )
+
+
+def test_transparent_pixels_remain_transparent():
+    """Regression test: Transparent pixels in overlay should become transparent in output.
+
+    This is the complement to test_opaque_black_not_quantized_to_transparent_index.
+    While opaque black must NOT become transparent, actual transparent pixels
+    (alpha < 128) MUST become transparent (index 0).
+    """
+    overlay = OverlayLayer()
+    # Create overlay with transparent pixels (alpha=0)
+    img = Image.new("RGBA", (8, 8), (255, 0, 0, 0))  # Transparent red
+    overlay._image = img
+    overlay.set_scale(1.0)
+    overlay.set_position(0.0, 0.0)
+
+    grid_mapping = {(0, 0): (ArrangementType.TILE, "0,0")}
+    tile_pos = TilePosition(0, 0)
+    original_tile = Image.new("L", (8, 8), 128)
+    tiles = {tile_pos: original_tile}
+
+    # Standard grayscale palette
+    palette = [(i * 16, i * 16, i * 16) for i in range(16)]
+
+    op = ApplyOperation(
+        overlay=overlay,
+        grid_mapping=grid_mapping,
+        tiles=tiles,
+        tile_width=8,
+        tile_height=8,
+        palette=palette,
+    )
+
+    result = op.execute(force=True)
+    assert result.success
+    assert tile_pos in result.modified_tiles
+
+    modified = result.modified_tiles[tile_pos]
+
+    # CRITICAL: Transparent pixels must become index 0 (transparent)
+    pixel_value = modified.getpixel((0, 0))
+    index = pixel_value // 16
+
+    assert index == 0, (
+        f"Transparent pixel was NOT quantized to index 0! "
+        f"Got pixel value {pixel_value} (index {index}). "
+        f"Transparent pixels (alpha < 128) should always be index 0."
+    )
+
+
 @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
 @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
 def test_tiles_per_row_preserved_in_result(mock_info, mock_warning, qapp, tmp_path, qtbot):
