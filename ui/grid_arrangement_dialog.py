@@ -78,6 +78,7 @@ class ArrangementResult:
     bridge: ArrangementBridge
     metadata: dict[str, object]
     logical_width: int  # Tiles per row in arranged view
+    tiles_per_row: int  # Source grid layout (for byte offset calculation)
     modified_tiles: dict[TilePosition, Image.Image] | None = None
     keep_arrangement: bool = True  # Whether to apply this arrangement as the active layout
 
@@ -1007,11 +1008,20 @@ class GridArrangementDialog(SplitterDialog):
         if self.export_btn:
             self.export_btn.setEnabled(self.arrangement_manager.get_arranged_count() > 0)
 
+        # Update Apply button state (depends on having placed tiles)
+        if hasattr(self, "apply_overlay_btn"):
+            has_overlay = self.overlay_layer.has_image() and self.overlay_layer.visible
+            has_placed_tiles = bool(self.arrangement_manager.get_grid_mapping())
+            can_apply = has_overlay and has_placed_tiles
+            self.apply_overlay_btn.setEnabled(can_apply)
+
     def _on_overlay_changed(self, *_: object) -> None:
         """Handle overlay property changes (position, opacity, visibility, image)."""
-        # Update Apply button state based on visibility and image presence
+        # Update Apply button state based on visibility, image presence, and placed tiles
         if hasattr(self, "apply_overlay_btn"):
-            can_apply = self.overlay_layer.has_image() and self.overlay_layer.visible
+            has_overlay = self.overlay_layer.has_image() and self.overlay_layer.visible
+            has_placed_tiles = bool(self.arrangement_manager.get_grid_mapping())
+            can_apply = has_overlay and has_placed_tiles
             self.apply_overlay_btn.setEnabled(can_apply)
 
         # If the overlay item is being moved by the mouse, we don't want to
@@ -1666,6 +1676,7 @@ class GridArrangementDialog(SplitterDialog):
             bridge=bridge,
             metadata=metadata,
             logical_width=logical_width,
+            tiles_per_row=self.tiles_per_row,
             modified_tiles=modified_tiles,
             keep_arrangement=keep_arrangement,
         )

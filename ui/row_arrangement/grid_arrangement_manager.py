@@ -114,12 +114,23 @@ class GridArrangementManager(QObject):
 
         This handles the "free dragging" in the target grid.
         If another item is there, it will be replaced/moved.
+
+        Returns:
+            True if placement succeeded, False if rejected (e.g., duplicate tile).
         """
-        # We don't strictly validate target bounds here as the canvas can be large,
-        # but we might want to if we have a fixed-width constraint.
         pos = (target_row, target_col)
 
-        # Update mapping
+        # Check for duplicate tile placement at a DIFFERENT position.
+        # Same tile cannot exist at multiple canvas positions - this would cause
+        # ambiguous "last write wins" behavior during overlay apply.
+        if arr_type == ArrangementType.TILE:
+            for existing_pos, (existing_type, existing_key) in self._grid_mapping.items():
+                if existing_type == ArrangementType.TILE and existing_key == key:
+                    if existing_pos != pos:
+                        # Tile already placed elsewhere - reject duplicate
+                        return False
+
+        # Update mapping (this may replace existing item at same position - that's OK)
         self._grid_mapping[pos] = (arr_type, key)
 
         # Re-derive linear arrangement order from grid mapping
