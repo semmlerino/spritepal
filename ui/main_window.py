@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from core.managers.core_operations_manager import CoreOperationsManager
     from core.mesen_integration.log_watcher import LogWatcher
     from core.rom_extractor import ROMExtractor
+    from core.services.extraction_results import ExtractionResult
     from core.services.preview_generator import PreviewGenerator
     from core.services.rom_cache import ROMCache
     from core.sprite_library import SpriteLibrary
@@ -1141,11 +1142,9 @@ class MainWindow(QMainWindow):
         _ = worker.extraction_finished.connect(self._on_vram_extraction_finished)
         _ = worker.error.connect(self._on_vram_extraction_error)
 
-        # Connect directly to manager signals for data (1 hop instead of 3)
+        # Connect to consolidated extraction signal (replaces 3 legacy signals)
         self._manager_connections = [
-            extraction_manager.preview_generated.connect(self._on_vram_preview_ready),
-            extraction_manager.palettes_extracted.connect(self._on_vram_palettes_ready),
-            extraction_manager.active_palettes_found.connect(self._on_vram_active_palettes_ready),
+            extraction_manager.extraction_completed.connect(self._on_extraction_completed),
         ]
 
         worker.start()
@@ -1153,6 +1152,32 @@ class MainWindow(QMainWindow):
     def _on_vram_progress(self, percent: int, message: str) -> None:
         """Handle progress updates from worker."""
         self.status_bar_manager.show_message(message)
+
+    def _on_extraction_completed(self, result: ExtractionResult) -> None:
+        """Handle consolidated extraction_completed signal from CoreOperationsManager.
+
+        This replaces three legacy signal handlers (preview_generated, palettes_extracted,
+        active_palettes_found) with a single handler receiving the full ExtractionResult.
+        """
+        # Handle preview if present
+        if result.preview_image is not None:
+            pixmap = pil_to_qpixmap(result.preview_image)
+            if pixmap is not None:
+                self.sprite_preview.set_preview(pixmap, result.tile_count)
+                self.status_bar_manager.show_message(f"Preview updated: {result.tile_count} tiles")
+            else:
+                logger.error("Failed to convert PIL image to QPixmap for preview")
+
+        # Handle palettes if present
+        if result.palettes:
+            self._extracted_palettes = result.palettes
+            normalized = self._normalize_palettes(result.palettes)
+            if normalized is not None:
+                self.palette_preview.set_all_palettes(normalized)
+
+        # Handle active palettes if present
+        if result.active_palette_indices:
+            self._active_palettes = result.active_palette_indices
 
     def _on_vram_preview_ready(self, pil_image: Image.Image, tile_count: int) -> None:
         """Handle preview ready - convert PIL Image to QPixmap in main thread.
