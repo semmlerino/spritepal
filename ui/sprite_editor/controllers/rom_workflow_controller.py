@@ -59,6 +59,7 @@ class ROMWorkflowController(QObject):
     workflow_state_changed = Signal(str)  # 'preview'/'edit'/'save' → view state updates
     sprite_extracted = Signal(object, int)  # image, tile_count - for integration (e.g. history)
     offset_changed = Signal(int)  # Emitted when offset changes (for sync with other UI)
+    capture_offset_adjusted = Signal(int, int)  # (old, new) - HAL alignment adjusted offset
 
     def __init__(
         self,
@@ -2230,6 +2231,8 @@ class ROMWorkflowController(QObject):
                     self._message_service.show_message(
                         f"Aligned to valid sprite at 0x{actual_offset:06X} (adjusted by {offset_delta:+d} bytes)"
                     )
+            # Notify ROM Extraction panel to update its Mesen captures list
+            self.capture_offset_adjusted.emit(old_offset, actual_offset)
 
         logger.debug(
             f"[PREVIEW] _on_preview_ready called: {len(tile_data)} bytes, {width}x{height}, "

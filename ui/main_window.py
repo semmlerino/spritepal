@@ -1550,6 +1550,11 @@ class MainWindow(QMainWindow):
         # Connect ROM panel's Mesen2 watching status to status bar
         self.rom_extraction_panel.mesen2_watching_changed.connect(self.status_bar_manager.set_mesen2_watching)
 
+        # Sync capture offset adjustments from sprite editor to ROM panel's Mesen captures list
+        self._sprite_editor_workspace.rom_workflow_controller.capture_offset_adjusted.connect(
+            self.rom_extraction_panel.mesen_captures_section.update_capture_offset
+        )
+
         # Connect keyboard shortcut manager signals
         self.keyboard_shortcut_manager.tab_switch_requested.connect(self._on_tab_switch_requested)
         self.keyboard_shortcut_manager.tab_next_requested.connect(self._navigate_to_next_tab)

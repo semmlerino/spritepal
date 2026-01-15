@@ -8,7 +8,7 @@ allowing users to quickly jump to discovered sprites without manual copy-paste.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, override
+from typing import override
 
 from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QPoint, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QPainter, QPen, QPixmap
@@ -26,13 +26,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.mesen_integration.log_watcher import CapturedOffset
 from ui.common.spacing_constants import SPACING_SMALL, SPACING_TINY
 from ui.common.widget_helpers import create_styled_label
 from ui.styles import get_panel_style
 from ui.styles.theme import COLORS
-
-if TYPE_CHECKING:
-    from core.mesen_integration.log_watcher import CapturedOffset
 
 logger = logging.getLogger(__name__)
 
@@ -390,6 +388,73 @@ class RecentCapturesWidget(QWidget):
             True if present, False otherwise.
         """
         return any(c.offset == offset for c in self._captures)
+
+    def update_capture_offset(self, old_offset: int, new_offset: int) -> bool:
+        """Update a capture's offset after HAL alignment adjustment.
+
+        When the preview worker discovers a sprite at an adjusted offset
+        (e.g., due to HAL compression alignment), this method updates both
+        the display text and internal data to reflect the corrected offset.
+
+        Args:
+            old_offset: The original Mesen FILE offset.
+            new_offset: The adjusted offset where decompression succeeded.
+
+        Returns:
+            True if an item was found and updated, False otherwise.
+        """
+        # Find the capture with matching offset
+        for i, capture in enumerate(self._captures):
+            if capture.offset == old_offset:
+                # Create updated CapturedOffset (frozen dataclass, so must replace)
+                updated_capture = CapturedOffset(
+                    offset=new_offset,
+                    frame=capture.frame,
+                    timestamp=capture.timestamp,
+                    raw_line=capture.raw_line,
+                    rom_checksum=capture.rom_checksum,
+                )
+                self._captures[i] = updated_capture
+
+                # Find and update the corresponding list widget item
+                # Items are in reverse order (most recent first)
+                if i < self._list_widget.count():
+                    item = self._list_widget.item(i)
+                    # Update display text by replacing old offset hex with new
+                    old_hex = f"0x{old_offset:06X}"
+                    new_hex = f"0x{new_offset:06X}"
+                    current_text = item.text()
+                    # Handle both uppercase and lowercase hex
+                    if old_hex in current_text:
+                        new_text = current_text.replace(old_hex, new_hex)
+                    elif old_hex.lower() in current_text.lower():
+                        # Case-insensitive replacement
+                        import re
+
+                        new_text = re.sub(re.escape(old_hex), new_hex, current_text, flags=re.IGNORECASE)
+                    else:
+                        new_text = current_text
+                    item.setText(new_text)
+
+                    # Update item data (normalized ROM offset)
+                    item_data = item.data(Qt.ItemDataRole.UserRole)
+                    if isinstance(item_data, dict):
+                        item_data["offset"] = self._normalize_offset(new_offset)
+                        item.setData(Qt.ItemDataRole.UserRole, item_data)
+
+                    # Update tooltip
+                    rom_offset = self._normalize_offset(new_offset)
+                    item.setToolTip(
+                        f"ROM Offset: 0x{rom_offset:06X}\n"
+                        f"Mesen FILE: {new_hex}\n"
+                        f"Frame: {updated_capture.frame or 'N/A'}\n"
+                        f"{updated_capture.raw_line}"
+                    )
+
+                logger.debug("Updated capture offset: 0x%06X -> 0x%06X", old_offset, new_offset)
+                return True
+
+        return False
 
     def _update_status_indicator(self, watching: bool) -> None:
         """Update the status indicator color."""

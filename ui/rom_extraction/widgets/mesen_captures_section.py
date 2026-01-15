@@ -131,6 +131,18 @@ class MesenCapturesSection(QWidget):
         """
         return self._captures_widget.has_capture(offset)
 
+    def update_capture_offset(self, old_offset: int, new_offset: int) -> bool:
+        """Update a capture's offset after HAL alignment adjustment.
+
+        Args:
+            old_offset: The original Mesen FILE offset.
+            new_offset: The adjusted offset where decompression succeeded.
+
+        Returns:
+            True if an item was found and updated, False otherwise.
+        """
+        return self._captures_widget.update_capture_offset(old_offset, new_offset)
+
     def clear(self) -> None:
         """Clear all captured offsets."""
         self._captures_widget.clear()
