@@ -2255,6 +2255,7 @@ class ROMWorkflowController(QObject):
         if self._view:
             self._view.set_action_loading(False)
             self._view.set_action_text("Open in Editor")
+            self._view.source_bar.set_action_enabled(True)
 
         if self._view:
             if hal_succeeded:
@@ -2321,6 +2322,7 @@ class ROMWorkflowController(QObject):
         if self._view:
             self._view.set_action_loading(False)
             self._view.set_action_text("Open in Editor")
+            self._view.source_bar.set_action_enabled(True)
         if self._message_service:
             self._message_service.show_message(f"Preview error: {error_msg}")
 
