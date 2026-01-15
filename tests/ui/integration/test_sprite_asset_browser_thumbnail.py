@@ -146,3 +146,58 @@ class TestSetThumbnailUniqueOffsets:
         item = rom_category.child(0)
         data = item.data(0, Qt.ItemDataRole.UserRole)
         assert data.get("thumbnail") is None, "Unrelated sprite should not get thumbnail"
+
+
+class TestClearThumbnailMultipleMatches:
+    """Tests for clear_thumbnail when multiple items share the same offset."""
+
+    def test_clear_thumbnail_clears_all_items_with_same_offset(self, browser, red_thumbnail, qtbot: QtBot) -> None:
+        """
+        BUG REPRODUCTION: When ROM sprite and Mesen capture share same offset,
+        clear_thumbnail should clear BOTH items, not just the first match.
+
+        This test will FAIL before the fix is applied.
+        """
+        shared_offset = 0x3C6EF1
+
+        # Add ROM sprite and Mesen capture at same offset
+        browser.add_rom_sprite("ROM Sprite", shared_offset)
+        browser.add_mesen_capture("Mesen Capture", shared_offset)
+
+        # Set thumbnails for both
+        browser.set_thumbnail(shared_offset, red_thumbnail)
+
+        # Verify both have thumbnails before clearing
+        rom_category = browser._rom_category
+        mesen_category = browser._mesen_category
+        rom_item = rom_category.child(0)
+        mesen_item = mesen_category.child(0)
+
+        rom_data = rom_item.data(0, Qt.ItemDataRole.UserRole)
+        mesen_data = mesen_item.data(0, Qt.ItemDataRole.UserRole)
+        assert rom_data.get("thumbnail") is not None, "Setup: ROM item should have thumbnail"
+        assert mesen_data.get("thumbnail") is not None, "Setup: Mesen item should have thumbnail"
+
+        # Clear thumbnails
+        result = browser.clear_thumbnail(shared_offset)
+
+        # Refresh data after clear
+        rom_data = rom_item.data(0, Qt.ItemDataRole.UserRole)
+        mesen_data = mesen_item.data(0, Qt.ItemDataRole.UserRole)
+
+        # Both should have thumbnail cleared
+        assert rom_data.get("thumbnail") is None, (
+            "ROM item still has thumbnail - clear_thumbnail stopped at first match"
+        )
+        assert mesen_data.get("thumbnail") is None, (
+            "Mesen item still has thumbnail - clear_thumbnail stopped at first match"
+        )
+        assert result is True, "Should return True when items were cleared"
+
+    def test_clear_thumbnail_returns_false_for_nonexistent_offset(self, browser, qtbot: QtBot) -> None:
+        """clear_thumbnail should return False when offset doesn't exist."""
+        browser.add_rom_sprite("Existing Sprite", 0x1000)
+
+        result = browser.clear_thumbnail(0x9999)
+
+        assert result is False, "Should return False when no items match"

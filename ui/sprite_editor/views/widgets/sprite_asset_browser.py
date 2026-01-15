@@ -674,9 +674,9 @@ class SpriteAssetBrowser(QWidget):
 
     def clear_thumbnail(self, offset: int) -> bool:
         """
-        Clear (invalidate) thumbnail for a sprite.
+        Clear (invalidate) thumbnail for ALL sprites with matching offset.
 
-        After calling this, the item will show a placeholder until a new
+        After calling this, items will show a placeholder until a new
         thumbnail is loaded. This should be called after ROM data changes
         to force a fresh thumbnail generation.
 
@@ -684,9 +684,9 @@ class SpriteAssetBrowser(QWidget):
             offset: ROM offset
 
         Returns:
-            True if thumbnail was cleared, False if offset not found
+            True if any thumbnails were cleared, False if offset not found
         """
-        # Find item with matching offset
+        cleared_count = 0
         iterator = QTreeWidgetItemIterator(self.tree)
         while iterator.value():
             item = iterator.value()
@@ -694,12 +694,14 @@ class SpriteAssetBrowser(QWidget):
             if isinstance(data, dict) and data.get("offset") == offset:
                 data["thumbnail"] = None
                 item.setData(0, Qt.ItemDataRole.UserRole, data)
-                # Force repaint to show placeholder
-                self.tree.viewport().update()
-                logger.debug("Cleared thumbnail for 0x%06X", offset)
-                return True
+                cleared_count += 1
             iterator += 1
-        return False
+
+        if cleared_count > 0:
+            self.tree.viewport().update()
+            logger.debug("Cleared thumbnail for offset 0x%06X on %d items", offset, cleared_count)
+
+        return cleared_count > 0
 
     def filter_items(self, text: str) -> None:
         """
