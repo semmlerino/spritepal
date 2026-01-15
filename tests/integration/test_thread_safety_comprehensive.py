@@ -269,7 +269,7 @@ class TestBatchThumbnailWorkerThreadSafety:
                 thread.join()
 
             assert not errors, f"Errors during concurrent queuing: {errors}"
-            assert worker._pending_count == 500  # 5 threads * 100 thumbnails
+            assert worker.pending_count == 500  # 5 threads * 100 thumbnails
 
     def test_concurrent_cache_access(self, test_rom_data, mock_worker_dependencies, mock_qimage):
         """Test concurrent cache access during processing."""

@@ -529,11 +529,7 @@ class TestHALProcessPoolIntegration:
             # Compressor should handle pool initialization failure
             compressor = HALCompressor(exhal_path, inhal_path, use_pool=True)
 
-            # Should fall back to subprocess mode
-            assert compressor._pool is None
-            assert compressor._pool_failed is True
-
-            # Pool status should indicate fallback
+            # Pool status should indicate fallback to subprocess mode
             status = compressor.pool_status
             assert not status["enabled"]
             assert status["reason"] == "Pool initialization failed"

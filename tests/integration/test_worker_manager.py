@@ -49,6 +49,11 @@ class RealTestWorker(QThread):
         self._work_cycles = 0
         self._interrupted = False
 
+    @property
+    def is_interrupted(self) -> bool:
+        """Check if worker was interrupted during execution."""
+        return self._interrupted
+
     def run(self):
         """Perform real work with interruption checking."""
         try:
@@ -152,7 +157,7 @@ class TestWorkerManagerReal:
         # Worker should be stopped
         assert not worker.isRunning()
         # Worker should have been interrupted
-        assert worker._interrupted or not worker.should_run
+        assert worker.is_interrupted or not worker.should_run
 
     def test_cleanup_with_timeout_real(self, qtbot):
         """Test cleanup respects timeout with real slow worker."""

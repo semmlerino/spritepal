@@ -876,6 +876,24 @@ class ROMExtractionPanel(QWidget):
             cgram_path=self.cgram_selector_widget.get_cgram_path() or None,
         )
 
+    @property
+    def manual_offset_dialog(self) -> UnifiedManualOffsetDialog | None:
+        """Get the manual offset dialog instance if it exists.
+
+        Returns:
+            The dialog instance, or None if not yet created.
+        """
+        return self._manual_offset_dialog
+
+    @property
+    def params_controller(self) -> ExtractionParamsController:
+        """Get the extraction params controller.
+
+        Returns:
+            The ExtractionParamsController managing extraction state.
+        """
+        return self._params_controller
+
     def clear_files(self):
         """Clear all file selections.
 

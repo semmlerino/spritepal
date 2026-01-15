@@ -641,6 +641,26 @@ class BatchThumbnailWorker(QObject):
         """
         return self._rom_mmap is not None
 
+    @property
+    def pending_count(self) -> int:
+        """Get the number of pending thumbnail requests.
+
+        Returns:
+            Number of thumbnails waiting to be processed.
+        """
+        with QMutexLocker(self._counter_mutex):
+            return self._pending_count
+
+    @property
+    def completed_count(self) -> int:
+        """Get the number of completed thumbnail requests.
+
+        Returns:
+            Number of thumbnails that have been processed.
+        """
+        with QMutexLocker(self._counter_mutex):
+            return self._completed_count
+
     def _shutdown_thread_pool(self) -> None:
         """Shutdown thread pool safely with proper wait and error handling."""
         if self._thread_pool:

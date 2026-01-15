@@ -1,5 +1,14 @@
--- sprite_rom_finder.lua v35
+-- sprite_rom_finder.lua v43
 -- Click on any sprite to get its ROM source offset
+-- v43: FIX callback double-registration (all callbacks now registered once at script start)
+-- v43: ADD byte-compare verification (compare VRAM tile bytes vs ROM bytes at reported offset)
+-- v42: ALWAYS clear staging attribution when no session matches (v40 was too permissive)
+-- v41: FIX stale staging attribution during DMA READ (v40 only fixed during WRITE)
+-- v40: FIX stale staging_owner_map attributions - clear old entries when no session matches
+-- v39: FIX tile address calculation - column overflow now carries into row
+-- v38: Prioritize FE52 sessions over DP sessions for staging attribution
+-- v37: Hook FE52 table reads at script start to capture level-load graphics
+-- v36: Shadow SA-1 bank registers ($2220-$2223) for correct multi-level ROM offsets
 -- v35: Output ROM checksum for identity validation in SpritePal
 -- v33: Always-on automatic attribution mode
 --
@@ -37,6 +46,8 @@
 -- v31: optional unmatched sessions + session dedup
 -- v32: reset hotkey + disable lookback for unmatched sessions
 -- v33: always-on automatic attribution (R=labels, X=filter, LEFT/RIGHT=nav, auto-watch)
+-- v37: FE52 table reads trigger sessions (captures actual graphics pointers at load time)
+-- v38: Prioritize FE52 sessions (with valid idx) over DP sessions for staging attribution
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -122,8 +133,62 @@ local function write_offset_file(offset, frame)
         end
         f:write(string.format("frame=%d\n", frame or 0))
         f:write(string.format("timestamp=%d\n", os.time()))
+        f:write(string.format("capture_time=%s\n", os.date("%Y-%m-%d %H:%M:%S")))
         f:close()
     end
+end
+
+-- v43: Byte-compare verification - compare VRAM tile bytes against ROM bytes at reported offset
+-- Returns: match_count, total_bytes, match_pct, first_mismatch_idx (or nil if all match)
+local function verify_tile_bytes(vram_word, file_offset)
+    if not file_offset then return nil, nil, nil, nil end
+
+    -- SNES 4bpp tiles are 32 bytes (16 words) per 8x8 tile
+    local tile_bytes = 32
+
+    -- Read VRAM bytes (vram_word is in word units, multiply by 2 for byte address)
+    local vram_data = {}
+    local vram_byte_addr = vram_word * 2
+    for i = 0, tile_bytes - 1 do
+        local byte = emu.read(vram_byte_addr + i, emu.memType.snesVideoRam)
+        table.insert(vram_data, byte or 0)
+    end
+
+    -- Read ROM bytes at reported file offset (subtract header if needed)
+    -- File offset already includes header, but ROM read uses raw ROM position
+    local rom_data = {}
+    local rom_read_offset = file_offset - ROM_HEADER  -- Remove header for raw ROM access
+    for i = 0, tile_bytes - 1 do
+        local byte = emu.read(rom_read_offset + i, emu.memType.snesPrgRom)
+        table.insert(rom_data, byte or 0)
+    end
+
+    -- Compare bytes
+    local match_count = 0
+    local first_mismatch = nil
+    for i = 1, tile_bytes do
+        if vram_data[i] == rom_data[i] then
+            match_count = match_count + 1
+        elseif not first_mismatch then
+            first_mismatch = i - 1  -- 0-based index
+        end
+    end
+
+    local match_pct = math.floor((match_count / tile_bytes) * 100)
+    return match_count, tile_bytes, match_pct, first_mismatch, vram_data, rom_data
+end
+
+-- Format bytes for display (first N bytes as hex)
+local function fmt_bytes(data, max_bytes)
+    max_bytes = max_bytes or 8
+    local parts = {}
+    for i = 1, math.min(max_bytes, #data) do
+        table.insert(parts, string.format("%02X", data[i]))
+    end
+    if #data > max_bytes then
+        table.insert(parts, "...")
+    end
+    return table.concat(parts, " ")
 end
 
 -- Persistent recent clicks (last 5)
@@ -166,15 +231,16 @@ local function save_recent_clicks()
     local f = io.open(CLICKS_FILE, "w")
     if not f then return end
 
-    -- Write as JSON array (include checksum if present)
+    -- Write as JSON array (include checksum and capture_time if present)
     f:write("[\n")
     for i, click in ipairs(recent_clicks) do
+        local capture_time_str = click.capture_time and string.format(',"capture_time":"%s"', click.capture_time) or ""
         if click.rom_checksum then
-            f:write(string.format('  {"offset":%d,"frame":%d,"timestamp":%d,"rom_checksum":%d}',
-                click.offset, click.frame, click.timestamp, click.rom_checksum))
+            f:write(string.format('  {"offset":%d,"frame":%d,"timestamp":%d%s,"rom_checksum":%d}',
+                click.offset, click.frame, click.timestamp, capture_time_str, click.rom_checksum))
         else
-            f:write(string.format('  {"offset":%d,"frame":%d,"timestamp":%d}',
-                click.offset, click.frame, click.timestamp))
+            f:write(string.format('  {"offset":%d,"frame":%d,"timestamp":%d%s}',
+                click.offset, click.frame, click.timestamp, capture_time_str))
         end
         if i < #recent_clicks then f:write(",") end
         f:write("\n")
@@ -201,6 +267,7 @@ local function add_recent_click(offset, frame)
         offset = offset,
         frame = frame,
         timestamp = os.time(),
+        capture_time = os.date("%Y-%m-%d %H:%M:%S"),
         rom_checksum = checksum  -- may be nil if read failed
     })
 
@@ -253,9 +320,20 @@ local function fmt_addr(addr)
     return string.format("%02X:%04X", bank, offset)
 end
 
+-- v36 FIX: Shadow SA-1 bank registers ($2220-$2223) - write-only, need to track writes
+-- These control ROM bank mapping: C0-CF=CXB, D0-DF=DXB, E0-EF=EXB, F0-FF=FXB
+-- Power-on defaults are 0,1,2,3 but Kirby changes them during level transitions
+-- MUST be declared before cpu_to_file_offset() which uses them
+local sa1_cxb_shadow = 0x00  -- $2220: C0-CF bank mapping (default=0, maps to ROM $000000-$0FFFFF)
+local sa1_dxb_shadow = 0x01  -- $2221: D0-DF bank mapping (default=1, maps to ROM $100000-$1FFFFF)
+local sa1_exb_shadow = 0x02  -- $2222: E0-EF bank mapping (default=2, maps to ROM $200000-$2FFFFF)
+local sa1_fxb_shadow = 0x03  -- $2223: F0-FF bank mapping (default=3, maps to ROM $300000-$3FFFFF)
+
 -- FIX #1: Correct SA-1 full-bank mapping for Kirby Super Star
--- ROM banks C0-FF map full 64KB per bank: file_offset = (bank-0xC0)*0x10000 + addr
--- This handles proven pointers like E9:3AEB, E9:4D0A (addr < 0x8000)
+-- ROM banks C0-FF map full 64KB per bank, but actual ROM offset depends on
+-- SA-1 bank registers ($2220-$2223) which can change during gameplay.
+-- Level 1 uses power-on defaults, but Level 2+ may use different mappings.
+-- v35: Use shadow values since these registers are write-only
 local function cpu_to_file_offset(ptr)
     local bank = (ptr >> 16) & 0xFF
     local addr = ptr & 0xFFFF
@@ -263,7 +341,19 @@ local function cpu_to_file_offset(ptr)
     -- SA-1: ROM window is C0-FF (no addr restriction - full 64KB banks)
     if bank < 0xC0 or bank > 0xFF then return nil end
 
-    local file_off = (bank - 0xC0) * 0x10000 + addr + ROM_HEADER
+    -- Use shadowed bank register values (captured via write callbacks)
+    local bank_base, bank_reg
+    if bank >= 0xC0 and bank <= 0xCF then
+        bank_base, bank_reg = 0xC0, sa1_cxb_shadow
+    elseif bank >= 0xD0 and bank <= 0xDF then
+        bank_base, bank_reg = 0xD0, sa1_dxb_shadow
+    elseif bank >= 0xE0 and bank <= 0xEF then
+        bank_base, bank_reg = 0xE0, sa1_exb_shadow
+    else  -- F0-FF
+        bank_base, bank_reg = 0xF0, sa1_fxb_shadow
+    end
+
+    local file_off = (bank_reg * 0x100000) + ((bank - bank_base) * 0x10000) + addr + ROM_HEADER
     return file_off
 end
 
@@ -445,11 +535,13 @@ end
 -- v19: TUNEABLE PARAMETERS
 -- Adjust these if attribution fails for long-loading sprites or non-Kirby games
 --------------------------------------------------------------------------------
-local RECENT_SESSIONS_MAX = 64   -- Max sessions in queue (increase for busy games)
-local SESSION_MATCH_WINDOW = 45  -- Frames to match DMA to session (increase for slow decode)
+local RECENT_SESSIONS_MAX = 128  -- Max sessions in queue (increase for busy games)
+-- v38: Increased from 45 to 1000 to cover level-load-to-sprite-appear delay
+-- Poppy Bros sprites load at frame ~2356 but appear at frame ~3075 (719 frame gap)
+local SESSION_MATCH_WINDOW = 1000  -- Frames to match DMA to session (increase for slow decode)
 local ALLOW_UNMATCHED_DP_PTR = true  -- Allow sessions for valid DP ptrs not in FE52 table
 local CLICK_PREFER_CLOSEST_SESSION = false   -- v23: Use only direct vram_owner_map attribution
-local CLICK_SESSION_WINDOW = 60              -- Frames around DMA to search for nearest session
+local CLICK_SESSION_WINDOW = 1000            -- v38: Match SESSION_MATCH_WINDOW for consistency
 local PREFER_IDX_KNOWN_SESSIONS = true       -- Prefer idx-known sessions over unmatched
 local CLICK_SESSION_ONLY_BEFORE_DMA = true   -- Do not override with sessions after DMA
 local MAX_DMA_AGE = 0                        -- Max age (frames) for click attribution; 0 disables
@@ -458,12 +550,17 @@ local LOOKBACK_WINDOW = 90       -- Frames to look back at session start (raise 
 local LOOKBACK_REQUIRE_SINCE_LAST_SESSION = true  -- Avoid attributing DMAs from earlier sessions
 local LOOKBACK_ALLOW_UNMATCHED = false  -- If false, unmatched sessions won't claim lookback DMAs
 local SESSION_DEDUP_WINDOW = 4   -- Skip duplicate ptr sessions within N frames (0 disables)
-local ACTIVATE_AT_FRAME = 500    -- Delay tracking/UI until this frame (0 = immediate)
+local ACTIVATE_AT_FRAME = 1500   -- Delay tracking/UI until this frame (0 = immediate)
 
--- Staging WRAM buffer range for Kirby Super Star
--- Adjust for other SA-1 games if they use a different decompression buffer
+-- Staging WRAM buffer ranges for Kirby Super Star
+-- The game uses TWO decompression areas:
+--   $7E2000-$7E2FFF: staging buffer 1 (tiles for VRAM $5xxx/$4xxx)
+--   $7F8000-$7FFFFF: staging buffer 2 (tiles for VRAM $6xxx - includes Poppy Bros!)
+-- Adjust for other SA-1 games if they use different decompression buffers
 local STAGING_START = 0x7E2000
 local STAGING_END = 0x7E2FFF
+local STAGING2_START = 0x7F8000
+local STAGING2_END = 0x7FFFFF
 
 --------------------------------------------------------------------------------
 -- Session/DMA tracking state (forward-declared for Lua scoping)
@@ -474,6 +571,7 @@ local vram_upload_map = {}       -- Key: vram_word, Value: DMA entry (upload inf
 local vram_owner_map = {}        -- Key: vram_word, Value: {idx, ptr, frame, file_offset}
 local vram_watch_set = {}        -- v33: Key: vram_word, Value: {first_seen, count} - for auto-watch
 local recent_staging_dmas = {}   -- Recent staging DMAs for look-back attribution
+local staging_owner_map = {}     -- v36: Maps staging buffer offset -> {idx, ptr, frame, file_offset}
 
 -- v13: Cached counts for draw_debug_info (avoids expensive pairs() every frame)
 local cached_counts = { vram = 0, owner = 0, idx = 0, last_frame = -1 }
@@ -533,6 +631,42 @@ local function write_vram_attribution(entry, idx, ptr, file_off)
     local words = entry.vram_words
     if words then
         for _, w in ipairs(words) do
+            -- v38 FIX: Preserve direct_rom attributions - don't let staging DMAs overwrite them
+            -- Direct ROM data is the actual sprite graphics; staging DMAs may be unrelated
+            local existing = vram_owner_map[w]
+            if existing and existing.attrib_mode == "direct_rom" and entry.attrib_mode ~= "direct_rom" then
+                -- Keep existing direct_rom attribution, skip this write
+            else
+                -- v33: Check if this VRAM word was being watched
+                if vram_watch_set[w] then
+                    local watch = vram_watch_set[w]
+                    log(string.format("WATCH RESOLVED: VRAM $%04X -> idx=%s ptr=%s FILE=0x%06X (watched since f%d, seen %dx)",
+                        w, idx ~= nil and tostring(idx) or "?", fmt_addr(ptr), file_off or 0,
+                        watch.first_seen, watch.count))
+                    vram_watch_set[w] = nil  -- Clear watch
+                end
+
+                vram_owner_map[w] = {
+                    idx = idx,
+                    ptr = ptr,
+                    file_offset = file_off,
+                    owner_frame = frame_count,
+                    dma_frame = entry.frame,
+                    source = entry.source,
+                    attrib_mode = entry.attrib_mode,
+                    session_frame = entry.session_frame,
+                }
+            end
+        end
+        return
+    end
+
+    for w = entry.vram_start, entry.vram_end - 1 do
+        -- v38 FIX: Preserve direct_rom attributions (same as above)
+        local existing = vram_owner_map[w]
+        if existing and existing.attrib_mode == "direct_rom" and entry.attrib_mode ~= "direct_rom" then
+            -- Keep existing direct_rom attribution, skip this write
+        else
             -- v33: Check if this VRAM word was being watched
             if vram_watch_set[w] then
                 local watch = vram_watch_set[w]
@@ -553,29 +687,6 @@ local function write_vram_attribution(entry, idx, ptr, file_off)
                 session_frame = entry.session_frame,
             }
         end
-        return
-    end
-
-    for w = entry.vram_start, entry.vram_end - 1 do
-        -- v33: Check if this VRAM word was being watched
-        if vram_watch_set[w] then
-            local watch = vram_watch_set[w]
-            log(string.format("WATCH RESOLVED: VRAM $%04X -> idx=%s ptr=%s FILE=0x%06X (watched since f%d, seen %dx)",
-                w, idx ~= nil and tostring(idx) or "?", fmt_addr(ptr), file_off or 0,
-                watch.first_seen, watch.count))
-            vram_watch_set[w] = nil  -- Clear watch
-        end
-
-        vram_owner_map[w] = {
-            idx = idx,
-            ptr = ptr,
-            file_offset = file_off,
-            owner_frame = frame_count,
-            dma_frame = entry.frame,
-            source = entry.source,
-            attrib_mode = entry.attrib_mode,
-            session_frame = entry.session_frame,
-        }
     end
 end
 
@@ -649,9 +760,16 @@ end
 
 -- v25: Slot preference for forward attribution (0x0002 = canonical DP cache, beats 0x0005/0x0008)
 -- When multiple pointers complete near each other, prefer the primary slot
+-- v38: FE52 sessions get rank 0 (highest priority) - they have the actual graphics pointers
 local SLOT_RANK = { [0x0002] = 1, [0x0005] = 2, [0x0008] = 3 }
 
--- Pick best session within window (prefer primary slot, then idx_known, then most recent)
+-- v38: Check if session is from FE52 table read (has valid idx from table lookup)
+local function is_fe52_session(s)
+    return s.cpu and string.find(s.cpu, "fe52") ~= nil
+end
+
+-- Pick best session within window (prefer FE52 > primary slot > other slots > unknown)
+-- v38: FE52 sessions with idx_known rank highest (rank 0) - they have the actual graphics pointers
 local function match_recent_session()
     local best = nil
     local best_rank = 999
@@ -663,13 +781,22 @@ local function match_recent_session()
             break
         end
 
-        -- v25: Rank by slot preference (lower = better)
-        local rank = SLOT_RANK[s.slot] or 999
+        -- v38: FE52 sessions with known idx get highest priority (rank 0)
+        -- These come from actual FE52 table reads and have the correct graphics pointer
+        local rank
+        if is_fe52_session(s) and s.idx_known then
+            rank = 0  -- Highest priority - FE52 with valid idx
+        elseif is_fe52_session(s) then
+            rank = 500  -- FE52 but idx not known (shouldn't happen, but handle it)
+        else
+            rank = SLOT_RANK[s.slot] or 999  -- DP sessions ranked by slot
+        end
+
         if s.idx_known and rank < best_rank then
             best = s
             best_rank = rank
-            -- Short-circuit: if we found primary slot with known idx, can't do better
-            if best_rank == 1 then return best end
+            -- Short-circuit: if we found FE52 session with known idx, can't do better
+            if best_rank == 0 then return best end
         elseif not best then
             -- Fallback to any session if none with known idx yet
             best = s
@@ -678,9 +805,11 @@ local function match_recent_session()
     return best
 end
 
+-- v38: Updated to prefer FE52 sessions over DP sessions at click time
 local function find_closest_session(dma_frame)
     local best = nil
     local best_age = nil
+    local best_is_fe52 = false
     local require_idx = PREFER_IDX_KNOWN_SESSIONS
     for pass = 1, (require_idx and 2 or 1) do
         for i = #recent_sessions, 1, -1 do
@@ -691,9 +820,17 @@ local function find_closest_session(dma_frame)
                     age = math.abs(age)
                 end
                 if age >= 0 and age <= CLICK_SESSION_WINDOW then
-                    if not best or age < best_age then
+                    local s_is_fe52 = is_fe52_session(s)
+                    -- v38: Prefer FE52 sessions over DP sessions, then by age
+                    local dominated = (best ~= nil) and
+                        (best_is_fe52 and not s_is_fe52) -- current best is FE52, this one isn't
+                    local dominates = (best == nil) or
+                        (s_is_fe52 and not best_is_fe52) or -- this is FE52, best isn't
+                        (s_is_fe52 == best_is_fe52 and age < best_age) -- same type, closer
+                    if not dominated and dominates then
                         best = s
                         best_age = age
+                        best_is_fe52 = s_is_fe52
                     end
                 end
             end
@@ -709,10 +846,11 @@ end
 
 -- v13 FIX: Factory function to create CPU-specific table_read callbacks
 -- This prevents interleaving if both CPUs read the same idx (keys by cpu:idx)
+-- v37 FIX: Now also calls start_session() to properly track graphics loading
+-- v37 FIX: Runs even before tracking_active to catch level load graphics
 local function make_on_table_read(cpu_name)
     return function(addr, value)
-        if not tracking_active then return nil end
-        -- DEBUG: Count every table read
+        -- v37: Count reads even before activation (no tracking_active guard)
         stats.table_reads = stats.table_reads + 1
         if (stats.table_reads % 2000) == 0 then
             local c = 0
@@ -742,6 +880,11 @@ local function make_on_table_read(cpu_name)
             if is_valid_ptr(ptr) then
                 idx_database[idx] = { ptr = ptr, frame = frame_count }
                 ptr_to_idx[ptr] = idx  -- v24: Keep reverse map in sync
+
+                -- v37 FIX: Start session when FE52 table entry is read
+                -- This captures the ACTUAL graphics pointer at decompression time
+                -- Enable lookback to attribute recent staging DMAs to this session
+                start_session(ptr, idx, true, nil, cpu_name .. "_fe52")
             end
             pending_tbl[key] = nil
         end
@@ -827,6 +970,85 @@ local function on_obsel_write(address, value)
     -- log(string.format("OBSEL write: $%02X -> base=$%04X", obsel_shadow, (obsel_shadow & 7) * 0x2000))
 end
 
+-- v36 FIX: Callback to shadow SA-1 bank register writes ($2220-$2223) - write-only
+-- These determine which 1MB ROM block each 16-bank range maps to
+-- IMPORTANT: Always active (no tracking_active guard) - must capture writes from frame 0
+-- because game may set bank regs before our delayed activation at frame 500
+local function on_sa1_bank_write(address, value)
+    local lo = address & 0xFFFF  -- Mask to handle 24-bit addresses (0x002220, 0x802220, etc.)
+    local reg_value = value & 0x07  -- Only bits 0-2 are meaningful (0-7 = 8 possible 1MB blocks)
+    if lo == 0x2220 then
+        sa1_cxb_shadow = reg_value
+    elseif lo == 0x2221 then
+        sa1_dxb_shadow = reg_value
+    elseif lo == 0x2222 then
+        sa1_exb_shadow = reg_value
+    elseif lo == 0x2223 then
+        sa1_fxb_shadow = reg_value
+    end
+    -- Debug logging (uncomment if needed)
+    -- log(string.format("SA-1 bank write: $%04X = $%02X (CXB=%d DXB=%d EXB=%d FXB=%d)",
+    --     lo, value, sa1_cxb_shadow, sa1_dxb_shadow, sa1_exb_shadow, sa1_fxb_shadow))
+end
+
+-- v36 FIX: Track writes to staging buffer to properly attribute decompressed data
+-- Use 32-byte chunks to reduce overhead (one 8x8 tile = 32 bytes in 4bpp)
+local STAGING_CHUNK_SIZE = 32
+local staging_last_session = nil  -- Cache last matched session to avoid repeated lookups
+
+local function on_staging_write(address, value)
+    -- Calculate unified chunk index across both staging buffers
+    local addr_lo = address & 0xFFFFFF  -- Handle 24-bit addresses
+    local staging_offset = nil
+
+    if addr_lo >= STAGING_START and addr_lo <= STAGING_END then
+        staging_offset = addr_lo - STAGING_START
+    elseif addr_lo >= STAGING2_START and addr_lo <= STAGING2_END then
+        -- For staging buffer 2, offset by size of buffer 1 to get unique chunk indices
+        staging_offset = (STAGING_END - STAGING_START + 1) + (addr_lo - STAGING2_START)
+    else
+        return  -- Not in either staging buffer
+    end
+
+    local chunk_idx = math.floor(staging_offset / STAGING_CHUNK_SIZE)
+
+    -- Only update if this chunk doesn't have an owner yet this frame
+    -- (first write to chunk wins - typically the start of decompression)
+    local existing = staging_owner_map[chunk_idx]
+    if existing and existing.frame == frame_count then
+        return  -- Already attributed this chunk this frame
+    end
+
+    -- Find current active session
+    local sess = match_recent_session()
+    if sess then
+        -- v38 FIX: Preserve FE52 attributions - don't let DP sessions overwrite valid idx
+        -- Initial sprite load (from FE52) happens during level transition, but animation
+        -- updates (from DP) happen later. We want to keep the original graphics source.
+        if existing and existing.idx ~= nil and sess.idx == nil then
+            -- Existing has valid idx (from FE52), new session doesn't - keep existing
+            return
+        end
+
+        staging_owner_map[chunk_idx] = {
+            idx = sess.idx,
+            ptr = sess.ptr,
+            frame = frame_count,
+            file_offset = sess.ptr and cpu_to_file_offset(sess.ptr) or nil
+        }
+    else
+        -- v42 FIX: ALWAYS clear attributions when staging buffer is written without a session
+        -- The v40 fix only cleared entries older than SESSION_MATCH_WINDOW (1000 frames),
+        -- but that was too permissive. If new data is being written to a staging chunk
+        -- and no session matches, the old attribution is invalid regardless of age.
+        -- This was causing idx=43 (Kirby sprites from 470 frames ago) to persist and
+        -- be attributed to Poppy Bros VRAM regions.
+        if existing then
+            staging_owner_map[chunk_idx] = nil
+        end
+    end
+end
+
 -- VMAIN ($2115) controls VRAM increment and address remapping (matches SnesPpu::GetVramAddress)
 local vmain_shadow = 0x00
 local vram_increment_value = 1
@@ -862,14 +1084,14 @@ local function apply_vram_remap(addr)
 end
 
 local function on_vmain_write(address, value)
-    if not tracking_active then return end
+    -- v38: Always active from frame 0 (DMA tracking needs accurate VMAIN)
     update_vmain_shadow(value)
     -- Remap current VMADD after VMAIN changes.
     vram_addr_shadow = apply_vram_remap(vram_addr_logical)
 end
 
 local function on_vram_addr_write(address, value)
-    if not tracking_active then return end
+    -- v38: Always active from frame 0 (DMA tracking needs accurate VMADD)
     -- Capture the WRITTEN value, not a readback
     if address == 0x2116 then
         vmadd_lo = value & 0xFF
@@ -909,7 +1131,7 @@ for ch = 0, 7 do
 end
 
 local function on_dma_reg_write(address, value)
-    if not tracking_active then return end
+    -- v38: Always active from frame 0 (DMA tracking needs accurate channel regs)
     local offset = address - 0x4300
     local ch = math.floor(offset / 16)
     local reg = offset % 16
@@ -931,11 +1153,15 @@ local function map_dma_vram_words(entry, start_logical, word_count, increment)
     entry.vram_logical_start = start_logical
     entry.vram_logical_end = (start_logical + (word_count * inc)) & 0x7FFF
 
+    -- v38 FIX: Always populate entry.vram_words so write_vram_attribution() works
+    -- Previously, the fast path (remap=0, inc=1) skipped this, breaking vram_owner_map writes
     if vram_remap_mode == 0 and inc == 1 then
         entry.vram_start = start_logical
         entry.vram_end = start_logical + word_count
+        entry.vram_words = {}
         for w = entry.vram_start, entry.vram_end - 1 do
             vram_upload_map[w] = entry
+            entry.vram_words[#entry.vram_words + 1] = w
         end
         return entry.vram_logical_end
     end
@@ -958,7 +1184,8 @@ local function map_dma_vram_words(entry, start_logical, word_count, increment)
 end
 
 local function on_dma_enable(addr, value)
-    if not tracking_active then return nil end
+    -- v38: Always active from frame 0 - THIS IS CRITICAL for capturing level-load DMAs
+    -- Without this, sprite uploads during level transition are never recorded in vram_owner_map
     -- FIX #8: Handle nil value (Mesen may pass nil sometimes)
     local enable = value
     if enable == nil then
@@ -1004,8 +1231,9 @@ local function on_dma_enable(addr, value)
 
             -- Only track A→B transfers to VRAM ($2118/$2119)
             if direction == 0 and (bbad == 0x18 or bbad == 0x19) then
-                -- FIX #4: Only attribute staging DMAs
+                -- FIX #4: Only attribute staging DMAs (check both staging ranges)
                 local is_staging = (src_addr >= STAGING_START and src_addr <= STAGING_END)
+                    or (src_addr >= STAGING2_START and src_addr <= STAGING2_END)
 
                 -- DEBUG: Count staging DMAs
                 if is_staging then
@@ -1013,18 +1241,74 @@ local function on_dma_enable(addr, value)
                 end
 
                 -- FIX #9: Use session queue - match most recent session within window
+                -- v36: First check staging_owner_map for proper chunk-based attribution
+                -- v38: Also handle direct ROM→VRAM DMAs (no staging)
                 local session_idx, session_ptr, file_off = nil, nil, nil
                 local session_frame = nil
                 local attrib_mode = nil
                 if is_staging then
-                    local sess = match_recent_session()
-                    if sess then
-                        session_idx = sess.idx
-                        session_ptr = sess.ptr
-                        session_frame = sess.frame
-                        if session_ptr then file_off = cpu_to_file_offset(session_ptr) end
+                    -- v36: Look up chunk owner in staging_owner_map first
+                    -- Calculate unified chunk index across both staging buffers
+                    local staging_offset
+                    if src_addr >= STAGING_START and src_addr <= STAGING_END then
+                        staging_offset = src_addr - STAGING_START
+                    else
+                        -- For staging buffer 2, offset by size of buffer 1 to get unique chunk indices
+                        staging_offset = (STAGING_END - STAGING_START + 1) + (src_addr - STAGING2_START)
+                    end
+                    local chunk_idx = math.floor(staging_offset / STAGING_CHUNK_SIZE)
+                    local owner = staging_owner_map[chunk_idx]
+
+                    -- v41 FIX: Check if staging attribution is stale DURING DMA READ
+                    -- The v40 fix cleared stale entries during staging WRITE, but if no new
+                    -- write happens to that chunk, stale attributions from hundreds of frames
+                    -- ago would still be applied to VRAM. This was causing idx=43 (Kirby) to
+                    -- be wrongly attributed to Poppy Bros sprites.
+                    if owner and (frame_count - owner.frame) > SESSION_MATCH_WINDOW then
+                        owner = nil  -- Treat as no attribution
+                        staging_owner_map[chunk_idx] = nil  -- Also clear the stale entry
+                    end
+
+                    if owner and owner.ptr then
+                        -- Use the session that actually wrote to this staging chunk
+                        session_idx = owner.idx
+                        session_ptr = owner.ptr
+                        session_frame = owner.frame
+                        file_off = owner.file_offset
                         stats.staging_attrib = stats.staging_attrib + 1
-                        attrib_mode = "forward"
+                        attrib_mode = "staging_map"
+                    else
+                        -- Fallback to old behavior: match most recent session
+                        local sess = match_recent_session()
+                        if sess then
+                            session_idx = sess.idx
+                            session_ptr = sess.ptr
+                            session_frame = sess.frame
+                            if session_ptr then file_off = cpu_to_file_offset(session_ptr) end
+                            stats.staging_attrib = stats.staging_attrib + 1
+                            attrib_mode = "forward"
+                        end
+                    end
+                else
+                    -- v38 FIX: Direct ROM→VRAM DMA (no staging buffer)
+                    -- For Poppy Bros and other sprites that bypass staging, the DMA source
+                    -- address IS the ROM location. Convert it directly to file offset.
+                    -- Check if source is in ROM bank range (C0-FF for SA-1)
+                    local src_bank = (src_addr >> 16) & 0xFF
+                    if src_bank >= 0xC0 and src_bank <= 0xFF then
+                        -- Direct ROM source - use DMA source as the pointer
+                        session_ptr = src_addr
+                        file_off = cpu_to_file_offset(src_addr)
+                        -- Try to find idx from ptr_to_idx table
+                        session_idx = ptr_to_idx[src_addr]
+                        attrib_mode = "direct_rom"
+                        session_frame = frame_count
+                        -- DEBUG: Log direct ROM attribution (every 60 frames)
+                        if frame_count % 60 == 0 then
+                            log(string.format("DBG DIRECT_ROM: src=%06X file=%s vram=$%04X",
+                                src_addr, file_off and string.format("0x%06X", file_off) or "nil",
+                                local_vram_logical))
+                        end
                     end
                 end
 
@@ -1052,7 +1336,8 @@ local function on_dma_enable(addr, value)
                 end
 
                 -- v11: If attributed now, also write to persistent owner map
-                if session_idx then
+                -- v38: Also write for direct ROM DMAs (may have file_off without session_idx)
+                if session_idx or file_off then
                     write_vram_attribution(entry, session_idx, session_ptr, file_off)
                 end
 
@@ -1083,18 +1368,28 @@ local function lookup_vram_source(vram_word)
         -- v11: If entry has no attribution, check vram_owner_map
         -- v13 FIX: Only use owner fallback for staging entries - non-staging
         -- DMAs (BG/font) may have overwritten the sprite data
+        -- v38 FIX: Also prefer vram_owner_map if it has direct_rom attribution
+        -- (staging DMAs may have overwritten vram_upload_map but not vram_owner_map)
         local idx, ptr, file_offset = entry.idx, entry.ptr, entry.file_offset
         local attrib_mode = entry.attrib_mode
         local session_frame = entry.session_frame
-        if entry.ptr == nil and entry.is_staging then
-            local owner = vram_owner_map[actual_key]
-            if owner then
-                idx = owner.idx
-                ptr = owner.ptr
-                file_offset = owner.file_offset
-                attrib_mode = owner.attrib_mode
-                session_frame = owner.session_frame
-            end
+
+        -- Check if vram_owner_map has better attribution (direct_rom)
+        local owner = vram_owner_map[actual_key]
+        if owner and owner.attrib_mode == "direct_rom" and attrib_mode ~= "direct_rom" then
+            -- Prefer the preserved direct_rom attribution
+            idx = owner.idx
+            ptr = owner.ptr
+            file_offset = owner.file_offset
+            attrib_mode = owner.attrib_mode
+            session_frame = owner.session_frame
+        elseif entry.ptr == nil and entry.is_staging and owner then
+            -- Original fallback: staging entry with no ptr
+            idx = owner.idx
+            ptr = owner.ptr
+            file_offset = owner.file_offset
+            attrib_mode = owner.attrib_mode
+            session_frame = owner.session_frame
         end
 
         return {
@@ -1207,13 +1502,12 @@ local function get_sprite_vram_word_at_point(spr, mx, my)
         tile_y = rows - 1 - tile_y
     end
 
-    local base_row = (spr.tile_index >> 4) & 0x0F
-    local base_col = spr.tile_index & 0x0F
-    local row = (base_row + tile_y) & 0x0F
-    local col = (base_col + tile_x) & 0x0F
-    local tile_index = row * 16 + col
+    -- v39 FIX: Use linear tile addressing instead of separate row/col wrap
+    -- Old code wrapped col independently, failing to carry overflow into row
+    -- Example: base=0x1F, tile_x=1 → old gave 0x10 (wrong), now gives 0x20 (correct)
+    local tile_index = (spr.tile_index + tile_y * 16 + tile_x) & 0xFF
 
-    local tile_addr = spr.oam_base + (tile_index * 16)
+    local tile_addr = spr.oam_base + (tile_index * 16)  -- 16 words per 4bpp tile
     if spr.use_second_table then
         tile_addr = tile_addr + spr.oam_offset
     end
@@ -1827,6 +2121,26 @@ local function on_left_click(mouse, coord_debug)
             log(string.format("ptr: %s", fmt_addr(display_ptr)))
             if display_file_offset then
                 log(string.format("FILE OFFSET: 0x%06X", display_file_offset))
+
+                -- v43: Byte-compare verification - THE PROOF STEP
+                -- Compare VRAM tile bytes against ROM bytes at reported offset
+                local match_cnt, total, match_pct, first_mismatch, vram_data, rom_data =
+                    verify_tile_bytes(selected_vram_word, display_file_offset)
+                if match_cnt then
+                    if match_pct == 100 then
+                        log(string.format("VERIFY: ✓ MATCH (%d/%d bytes = %d%%)", match_cnt, total, match_pct))
+                        log("        Attribution is CORRECT - VRAM matches ROM")
+                    else
+                        log(string.format("VERIFY: ✗ MISMATCH (%d/%d bytes = %d%%)", match_cnt, total, match_pct))
+                        log(string.format("        First mismatch at byte %d", first_mismatch or -1))
+                        log(string.format("        VRAM: %s", fmt_bytes(vram_data, 16)))
+                        log(string.format("        ROM:  %s", fmt_bytes(rom_data, 16)))
+                        log("        Attribution may be WRONG - investigate offset")
+                    end
+                else
+                    log("VERIFY: (unable to read bytes)")
+                end
+
                 log("")
                 log(string.format(">>> --offset 0x%06X <<<", display_file_offset))
                 -- Write to simple file for SpritePal integration
@@ -1888,71 +2202,11 @@ local function activate_tracking()
         -- v23: Pre-populate FE52 table from ROM (must be after ROM is loaded)
         populate_idx_database_from_rom()
 
-        local snes_cpu = emu.cpuType and emu.cpuType.snes or nil
-        local sa1_cpu = emu.cpuType and emu.cpuType.sa1 or nil
-
-        log(string.format("DEBUG: snes_cpu=%s, sa1_cpu=%s", tostring(snes_cpu), tostring(sa1_cpu)))
-
-        -- v18 FIX: SA-1 CPU uses sa1Memory, not snesMemory (per DebugUtilities.h:16)
-        for _, cpu in ipairs({snes_cpu, sa1_cpu}) do
-            if cpu then
-                local cpu_name = (cpu == snes_cpu) and "snes" or "sa1"
-                local mem_type = (cpu == snes_cpu) and emu.memType.snesMemory or emu.memType.sa1Memory
-
-                local ok1, err1 = pcall(function()
-                    emu.addMemoryCallback(make_safe_callback(make_on_table_read(cpu_name), "table_read:" .. cpu_name),
-                        emu.callbackType.read,
-                        TABLE_CPU_BASE, TABLE_CPU_END, cpu, mem_type)
-                end)
-                log(string.format("DEBUG: table_read callback (%s, mem=%s): %s %s",
-                    cpu_name, (cpu == snes_cpu) and "snesMemory" or "sa1Memory",
-                    ok1 and "OK" or "FAIL", err1 or ""))
-
-                local ok2, err2 = pcall(function()
-                    emu.addMemoryCallback(make_safe_callback(make_on_dp_write(cpu_name), "dp_write:" .. cpu_name),
-                        emu.callbackType.write,
-                        0x000000, 0x0000FF, cpu, mem_type)
-                end)
-                log(string.format("DEBUG: dp_write callback (%s, mem=%s): %s %s",
-                    cpu_name, (cpu == snes_cpu) and "snesMemory" or "sa1Memory",
-                    ok2 and "OK" or "FAIL", err2 or ""))
-            end
-        end
-
-        -- FIX #5: Use snesMemory (not snesRegister) for $420B callback
-        local ok3, err3 = pcall(function()
-            emu.addMemoryCallback(make_safe_callback(on_dma_enable, "dma_enable"), emu.callbackType.write,
-                DMA_ENABLE_REG, DMA_ENABLE_REG, snes_cpu, emu.memType.snesMemory)
-        end)
-        log(string.format("DEBUG: dma_enable callback: %s %s", ok3 and "OK" or "FAIL", err3 or ""))
-
-        -- FIX #6: Shadow VMADD by capturing writes to $2116/$2117
-        local ok4, err4 = pcall(function()
-            emu.addMemoryCallback(make_safe_callback(on_vram_addr_write, "vram_addr"), emu.callbackType.write,
-                0x2116, 0x2117, snes_cpu, emu.memType.snesMemory)
-        end)
-        log(string.format("DEBUG: vram_addr callback: %s %s", ok4 and "OK" or "FAIL", err4 or ""))
-
-        -- v34: Shadow VMAIN ($2115) to track remap/increment behavior
-        local ok5, err5 = pcall(function()
-            emu.addMemoryCallback(make_safe_callback(on_vmain_write, "vmain"), emu.callbackType.write,
-                0x2115, 0x2115, snes_cpu, emu.memType.snesMemory)
-        end)
-        log(string.format("DEBUG: vmain callback: %s %s", ok5 and "OK" or "FAIL", err5 or ""))
-
-        -- FIX #8: Shadow DMA channel registers $4300-$437F
-        local ok6, err6 = pcall(function()
-            emu.addMemoryCallback(make_safe_callback(on_dma_reg_write, "dma_reg"), emu.callbackType.write,
-                0x4300, 0x437F, snes_cpu, emu.memType.snesMemory)
-        end)
-        log(string.format("DEBUG: dma_reg callback: %s %s", ok6 and "OK" or "FAIL", err6 or ""))
-
-        -- v34 FIX: Shadow OBSEL ($2101) writes - register is write-only
-        local ok7, err7 = pcall(function()
-            emu.addMemoryCallback(make_safe_callback(on_obsel_write, "obsel"), emu.callbackType.write,
-                0x2101, 0x2101, snes_cpu, emu.memType.snesMemory)
-        end)
-        log(string.format("DEBUG: obsel callback: %s %s", ok7 and "OK" or "FAIL", err7 or ""))
+        -- v43 FIX: All callbacks are now registered at script start (frame 0) to avoid duplicates
+        -- The following were previously registered here AND at script start, causing double-processing:
+        -- - FE52 table reads, DMA enable, VRAM addr, VMAIN, DMA regs, OBSEL, DP writes
+        -- Now they're only registered once at script start. This block just logs activation.
+        log("DEBUG: All memory callbacks registered at script start (no duplicates)")
     end
 
     local state = emu.getState() or {}
@@ -1966,6 +2220,8 @@ local function activate_tracking()
         oam_source, oam_base_shadow, oam_offset_shadow, obsel_shadow))
     log(string.format("VMAIN: remap=%d inc=%d inc_on_second=%s",
         vram_remap_mode, vram_increment_value, tostring(vram_increment_on_second)))
+    log(string.format("SA-1 bank regs: CXB=%d DXB=%d EXB=%d FXB=%d (captured since frame 0)",
+        sa1_cxb_shadow, sa1_dxb_shadow, sa1_exb_shadow, sa1_fxb_shadow))
 
     log("Ready. Click on sprites! Press R to toggle always-on labels.")
 end
@@ -2099,6 +2355,7 @@ local function on_frame()
         vram_upload_map = {}
         vram_owner_map = {}
         recent_staging_dmas = {}
+        staging_owner_map = {}  -- v36: Clear staging buffer attribution
         recent_sessions = {}
         session_counter = 0
         stats.staging_dmas = 0
@@ -2172,9 +2429,10 @@ local function on_frame()
             -- Log info about selected sprite
             local spr = visible[cur_pos]
             local owner = vram_owner_map[spr.vram_addr]
-            if owner and owner.idx then
-                log(string.format("Selected: OAM#%d (%d,%d) -> idx=%d FILE=0x%06X",
-                    spr.index, spr.x, spr.y, owner.idx, owner.file_offset or 0))
+            -- v38 FIX: Check file_offset too, not just idx (direct ROM DMAs have file_offset but no idx)
+            if owner and (owner.idx or owner.file_offset) then
+                log(string.format("Selected: OAM#%d (%d,%d) -> idx=%s FILE=0x%06X",
+                    spr.index, spr.x, spr.y, owner.idx and tostring(owner.idx) or "?", owner.file_offset or 0))
             else
                 log(string.format("Selected: OAM#%d (%d,%d) -> (unresolved, VRAM=$%04X)",
                     spr.index, spr.x, spr.y, spr.vram_addr))
@@ -2220,8 +2478,16 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v34")
+log("SPRITE ROM FINDER v43")
 log("========================================")
+log("v43: FIX callback double-registration + ADD byte-compare verification")
+log("  - All callbacks now registered ONCE at script start (no duplicates)")
+log("  - Clicks now show VERIFY: MATCH/MISMATCH to prove attribution correctness")
+log("v42: ALWAYS clear staging attribution when no session matches")
+log("v41: Clear stale staging attribution during DMA READ")
+log("v40: Clear stale staging attribution during staging WRITE")
+log("v39: FIX tile address calculation (column overflow carries into row)")
+log("v38: DMA tracking from frame 0, FE52 session priority, direct ROM DMAs")
 log("v34: OAM/VMAIN fixes + velocity clustering + cluster boxes")
 log("  - FIX: Use PPU state/OBSEL shadow for OAM tables (write-only $2101)")
 log("  - FIX: Apply VMAIN remap when tracking VMADD/VRAM DMAs")
@@ -2289,6 +2555,57 @@ log("RIGHT-CLICK = clear panel")
 log("========================================")
 
 emu.addEventCallback(safe_on_frame, emu.eventType.endFrame)
+
+-- v36 FIX: Register SA-1 bank register callbacks IMMEDIATELY at script start
+-- Must capture writes from frame 0 (before delayed activation at frame 500)
+-- v43: Refactored to use helper function to reduce local variable count
+do
+    local snes_cpu = emu.cpuType.snes
+    local sa1_cpu = emu.cpuType.sa1
+
+    -- Helper to register callback and log result (reduces local variable count)
+    local function reg_cb(name, cb, cb_type, start_addr, end_addr, cpu, mem_type)
+        local ok, err = pcall(function()
+            emu.addMemoryCallback(make_safe_callback(cb, name), cb_type, start_addr, end_addr, cpu, mem_type)
+        end)
+        log(string.format("%s: %s %s", name, ok and "OK" or "FAIL", err or ""))
+    end
+
+    -- SA-1 bank registers ($2220-$2223)
+    reg_cb("SA-1 bank (SNES)", on_sa1_bank_write, emu.callbackType.write, 0x2220, 0x2223, snes_cpu, emu.memType.snesMemory)
+    reg_cb("SA-1 bank (SA-1)", on_sa1_bank_write, emu.callbackType.write, 0x2220, 0x2223, sa1_cpu, emu.memType.sa1Memory)
+
+    -- Staging buffer 1: $7E2000-$7E2FFF
+    reg_cb("Staging1 (SA-1)", on_staging_write, emu.callbackType.write, STAGING_START, STAGING_END, sa1_cpu, emu.memType.sa1Memory)
+    reg_cb("Staging1 (SNES)", on_staging_write, emu.callbackType.write, STAGING_START, STAGING_END, snes_cpu, emu.memType.snesMemory)
+
+    -- Staging buffer 2: $7F8000-$7FFFFF
+    reg_cb("Staging2 (SA-1)", on_staging_write, emu.callbackType.write, STAGING2_START, STAGING2_END, sa1_cpu, emu.memType.sa1Memory)
+    reg_cb("Staging2 (SNES)", on_staging_write, emu.callbackType.write, STAGING2_START, STAGING2_END, snes_cpu, emu.memType.snesMemory)
+
+    -- FE52 table reads ($01:FE52-$01:FFFF)
+    reg_cb("FE52 read (SNES)", make_on_table_read("snes"), emu.callbackType.read, TABLE_CPU_BASE, TABLE_CPU_END, snes_cpu, emu.memType.snesMemory)
+    reg_cb("FE52 read (SA-1)", make_on_table_read("sa1"), emu.callbackType.read, TABLE_CPU_BASE, TABLE_CPU_END, sa1_cpu, emu.memType.sa1Memory)
+
+    -- DMA enable ($420B)
+    reg_cb("DMA enable", on_dma_enable, emu.callbackType.write, DMA_ENABLE_REG, DMA_ENABLE_REG, snes_cpu, emu.memType.snesMemory)
+
+    -- VMADD ($2116/$2117)
+    reg_cb("VRAM addr", on_vram_addr_write, emu.callbackType.write, 0x2116, 0x2117, snes_cpu, emu.memType.snesMemory)
+
+    -- VMAIN ($2115)
+    reg_cb("VMAIN", on_vmain_write, emu.callbackType.write, 0x2115, 0x2115, snes_cpu, emu.memType.snesMemory)
+
+    -- DMA channel registers ($4300-$437F)
+    reg_cb("DMA regs", on_dma_reg_write, emu.callbackType.write, 0x4300, 0x437F, snes_cpu, emu.memType.snesMemory)
+
+    -- OBSEL ($2101)
+    reg_cb("OBSEL", on_obsel_write, emu.callbackType.write, 0x2101, 0x2101, snes_cpu, emu.memType.snesMemory)
+
+    -- DP writes ($00-$FF) - both CPUs
+    reg_cb("DP write (snes)", make_on_dp_write("snes"), emu.callbackType.write, 0x000000, 0x0000FF, snes_cpu, emu.memType.snesMemory)
+    reg_cb("DP write (sa1)", make_on_dp_write("sa1"), emu.callbackType.write, 0x000000, 0x0000FF, sa1_cpu, emu.memType.sa1Memory)
+end
 
 log("")
 if ACTIVATE_AT_FRAME > 0 then

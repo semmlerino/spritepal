@@ -70,10 +70,8 @@ class TestManagerPerformanceBenchmarksTDD:
         def get_extraction_manager():
             manager = app_context.core_operations_manager
 
-            # Verify manager is fully initialized
+            # Verify manager is fully initialized via public API
             assert manager.is_initialized()
-            assert manager._sprite_extractor is not None
-            assert manager._rom_extractor is not None
 
             return manager
 

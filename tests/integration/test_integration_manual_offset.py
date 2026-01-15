@@ -374,10 +374,10 @@ class TestDialogIntegrationWithPanel:
 
         # Open manual offset dialog
         panel.open_manual_offset_dialog()
-        qtbot.waitUntil(lambda: panel._manual_offset_dialog is not None, timeout=500)
+        qtbot.waitUntil(lambda: panel.manual_offset_dialog is not None, timeout=500)
 
         # Verify dialog was created
-        dialog = panel._manual_offset_dialog
+        dialog = panel.manual_offset_dialog
         assert dialog is not None
 
         # Verify dialog has ROM data
@@ -390,8 +390,8 @@ class TestDialogIntegrationWithPanel:
 
         # Open dialog
         panel.open_manual_offset_dialog()
-        qtbot.waitUntil(lambda: panel._manual_offset_dialog is not None, timeout=500)
-        dialog = panel._manual_offset_dialog
+        qtbot.waitUntil(lambda: panel.manual_offset_dialog is not None, timeout=500)
+        dialog = panel.manual_offset_dialog
         assert dialog is not None
 
         with qtbot.waitExposed(dialog):
@@ -404,8 +404,8 @@ class TestDialogIntegrationWithPanel:
 
         # Verify panel's extraction params controller tracks the manual offset
         # The offset is now managed by ExtractionParamsController
-        assert panel._params_controller.manual_offset == new_offset
-        assert panel._params_controller.is_manual_mode is True
+        assert panel.params_controller.manual_offset == new_offset
+        assert panel.params_controller.is_manual_mode is True
 
     def test_multiple_dialog_opens_reuse_instance(self, loaded_rom_panel, qtbot, wait_for_signal_processed):
         """Test that opening dialog multiple times reuses instance or creates valid new one.
@@ -416,13 +416,13 @@ class TestDialogIntegrationWithPanel:
 
         # Open dialog first time
         panel.open_manual_offset_dialog()
-        qtbot.waitUntil(lambda: panel._manual_offset_dialog is not None, timeout=500)
-        dialog1 = panel._manual_offset_dialog
+        qtbot.waitUntil(lambda: panel.manual_offset_dialog is not None, timeout=500)
+        dialog1 = panel.manual_offset_dialog
         assert dialog1 is not None
 
         # Opening again without closing should return same instance
         panel.open_manual_offset_dialog()
-        dialog2 = panel._manual_offset_dialog
+        dialog2 = panel.manual_offset_dialog
         # Same instance when not closed
         assert dialog1 is dialog2
 
@@ -432,8 +432,8 @@ class TestDialogIntegrationWithPanel:
 
         # Open again after close - gets new instance (old one was destroyed)
         panel.open_manual_offset_dialog()
-        qtbot.waitUntil(lambda: panel._manual_offset_dialog is not None, timeout=500)
-        dialog3 = panel._manual_offset_dialog
+        qtbot.waitUntil(lambda: panel.manual_offset_dialog is not None, timeout=500)
+        dialog3 = panel.manual_offset_dialog
         # New instance should still be valid and functional
         assert dialog3 is not None
         assert dialog3.rom_path == str(rom_info["path"])

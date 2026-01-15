@@ -696,8 +696,8 @@ class TestRegressionFixes:
         except Exception:
             pass  # Expected to fail
 
-        # Key assertion: worker should be cleaned up (private access okay in regression test)
-        assert manager._current_worker is None
+        # Key assertion: manager should report no active injection after exception cleanup
+        assert manager.is_injection_active() is False
 
     def test_invalid_offset_logged_and_indicated(self, manager, tmp_path, caplog):
         """Issue #3: Parse failure should log warning and set offset_parse_error."""

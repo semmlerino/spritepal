@@ -392,6 +392,7 @@ local function export_capture()
     -- Build final capture data
     local capture = {
         timestamp = os.time(),
+        capture_time = os.date("%Y-%m-%d %H:%M:%S"),
         frame = state.frame_count,
         sprite_count = #oam_entries,
         obsel = state.obsel_config and {

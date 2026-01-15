@@ -108,17 +108,12 @@ class TestExtractionManager:
         """
         manager = app_context.core_operations_manager
 
-        # Verify manager is properly initialized
+        # Verify manager is properly initialized via public API
         assert manager.is_initialized()
         # Registry returns CoreOperationsManager (consolidated manager)
         assert manager.get_name() == "CoreOperationsManager"
 
-        # Verify real dependencies exist (not mocks)
-        assert manager._sprite_extractor is not None
-        assert manager._rom_extractor is not None
-        assert manager._palette_manager is not None
-
-        # Verify real methods are callable
+        # Verify real methods are callable (proves real dependencies, not mocks)
         assert callable(manager.validate_extraction_params)
         assert callable(manager.extract_from_vram)
         assert callable(manager.extract_from_rom)

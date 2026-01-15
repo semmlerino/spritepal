@@ -591,17 +591,17 @@ class TestBugDiscoveryRealVsMocked:
         with self.main_window_test() as main_window:
             # Initial state - button should be disabled
             assert main_window.open_editor_button.isEnabled() is False
-            assert main_window._output_path == ""
+            assert main_window.get_output_path() == ""
 
             # Set up signal spy to catch emissions
             signal_spy = QSignalSpy(main_window.open_in_editor_requested)
 
-            # Call extraction_complete() - this enables button and properly sets _output_path
+            # Call extraction_complete() - this enables button and properly sets output path
             main_window.extraction_complete(["test.png"])
 
-            # FIXED: Button is enabled and _output_path is properly set
+            # FIXED: Button is enabled and output path is properly set
             assert main_window.open_editor_button.isEnabled() is True, "Button should be enabled"
-            assert main_window._output_path == "test", "FIXED: _output_path should be set when button is enabled"
+            assert main_window.get_output_path() == "test", "FIXED: output path should be set when button is enabled"
 
             # Click the enabled button - it should emit signal with correct path
             QTest.mouseClick(main_window.open_editor_button, Qt.MouseButton.LeftButton)

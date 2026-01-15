@@ -301,8 +301,8 @@ class TestParallelSpriteFinder:
         # Shutdown should not raise exceptions
         finder.shutdown()
 
-        # Executor should be shutdown
-        assert finder.executor._shutdown
+        # Finder should report as shutdown
+        assert finder.is_shutdown
 
 
 @pytest.mark.slow

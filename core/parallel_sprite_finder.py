@@ -291,3 +291,12 @@ class ParallelSpriteFinder:
             logger.info("ParallelSpriteFinder shutdown complete")
         except Exception as e:
             logger.warning(f"Error during ParallelSpriteFinder shutdown: {e}")
+
+    @property
+    def is_shutdown(self) -> bool:
+        """Check if the finder has been shutdown.
+
+        Returns:
+            True if shutdown() has been called, False otherwise.
+        """
+        return self._shutdown

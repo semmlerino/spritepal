@@ -75,7 +75,7 @@
 
 3. **Test logic more than widgets** - Put business logic in plain Python classes so tests stay fast and stable. Keep widget tests focused on wiring, signals, and basic interactions.
 
-4. **Parallel by default** - With 1900+ tests, serial runs take 15+ minutes. Tests run parallel via `-n auto`. Mark tests that need isolation with `@pytest.mark.parallel_unsafe` or use `app_context` fixture (which provides clean state per-test).
+4. **Parallel by default** - With 2400+ tests, serial runs take 15+ minutes. Tests run parallel via `-n auto`. Mark tests that need isolation with `@pytest.mark.parallel_unsafe` or use `app_context` fixture (which provides clean state per-test).
 
 5. **Prefer boring determinism** - The fastest dev loop is: small change → run checks → commit.
 

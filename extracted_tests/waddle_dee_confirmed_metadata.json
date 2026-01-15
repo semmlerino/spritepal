@@ -1,0 +1,7 @@
+{
+  "rom_path": "roms/Kirby Super Star (USA).sfc",
+  "rom_offset": "0x25AD84",
+  "sprite_name": "waddle_dee_confirmed",
+  "decompressed_size": 2209,
+  "tile_count": 69
+}

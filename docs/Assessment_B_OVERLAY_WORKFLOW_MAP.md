@@ -1,0 +1,48 @@
+# Tile Arrangement Overlay Workflow Mapping
+
+This document maps the overlay-application workflow for the tile arrangement dialog, focusing on tile identity, data flow, UI consistency, and signal wiring. It is diagnostic only and does not propose changes.
+
+## 1. Tile Lifecycle and Data Flow
+
+- Origin (ROM bytes -> preview): `ROMWorkflowController._on_preview_ready` sets `current_tile_data/current_width/current_height` from ROM preview/decompression. This is the physical tile order used downstream. `ui/sprite_editor/controllers/rom_workflow_controller.py:2190`
+- Arrangement dialog input: `show_arrangement_dialog` renders `current_tile_data` to a temp PNG via `SpriteRenderer.render_4bpp`, then `GridImageProcessor.process_sprite_sheet_as_grid` extracts tiles keyed by `TilePosition(row,col)` (physical grid identity). `ui/sprite_editor/controllers/rom_workflow_controller.py:1158`, `ui/row_arrangement/grid_image_processor.py:15`
+- Arrangement workspace representation: `GridArrangementManager.grid_mapping` maps canvas slots `(r,c)` -> `(ArrangementType, key)` where `key="row,col"` for tiles; dragging/moving only changes canvas positions, not the tile identity. `ui/row_arrangement/grid_arrangement_manager.py:49`, `ui/grid_arrangement_dialog.py:1111`
+- Editor view: `open_in_editor` builds a numpy array from `current_tile_data`, then applies `ArrangementBridge.physical_to_logical` if an arrangement is kept; the editor view is logical only. `ui/sprite_editor/controllers/rom_workflow_controller.py:889`, `ui/sprite_editor/services/arrangement_bridge.py:31`
+- Reinjection path: `save_to_rom` applies `ArrangementBridge.logical_to_physical` before injection, restoring physical order (ROM layout should stay unchanged). `ui/sprite_editor/controllers/rom_workflow_controller.py:1757`, `ui/sprite_editor/services/arrangement_bridge.py:31`
+- Implicit assumption: `tiles_per_row = current_width // 8` is used both to build the dialog grid and to compute byte offsets when patching; if `current_width/current_height` are stale or later recomputed, the `TilePosition -> byte offset` mapping can drift. `ui/sprite_editor/controllers/rom_workflow_controller.py:889`, `ui/sprite_editor/controllers/rom_workflow_controller.py:1245`
+
+## 2. Overlay Application Behavior
+
+- Overlay state + coordinates: `OverlayLayer` stores image, x/y, scale, opacity in canvas pixel coordinates; dragging the overlay item updates `OverlayLayer.position`. `ui/row_arrangement/overlay_layer.py:15`, `ui/row_arrangement/overlay_item.py:17`
+- Apply flow: Apply button -> `_apply_overlay` -> `ApplyOperation.validate` (unplaced/uncovered warnings) -> `ApplyOperation.execute(force=True)` -> `ApplyOverlayCommand` updates `tiles` and triggers UI refresh. `ui/grid_arrangement_dialog.py:848`, `core/apply_operation.py:49`, `ui/row_arrangement/undo_redo.py:612`
+- Arrangement-position dependence (explicit): For each canvas entry `(r,c)`, apply samples overlay at `tile_x=c*tile_width, tile_y=r*tile_height` and writes into the tile identified by `key="row,col"`, so overlay mapping depends on the temporary arrangement positions. `core/apply_operation.py:49`
+- Selection not used: Apply targets all canvas-placed tiles; selection only affects add/remove operations, not overlay application. `ui/grid_arrangement_dialog.py:848`
+- Palette-dependent conversion: With palette preview enabled, overlay pixels are quantized to the selected palette (indices * 16); otherwise RGBA -> L conversion is used, so alpha/index handling differs. `ui/grid_arrangement_dialog.py:848`, `core/apply_operation.py:49`, `ui/row_arrangement/palette_colorizer.py:14`
+- Determinism risk: `grid_mapping` is a dict and duplicates can be created via drag/drop; if the same physical tile appears multiple times, apply overwrites it multiple times in insertion order (last write wins). `core/apply_operation.py:49`, `ui/row_arrangement/undo_redo.py:529`
+
+## 3. Post-Overlay Expectations
+
+- Result capture: `get_arrangement_result` returns `modified_tiles = self.tiles.copy()` whenever `_apply_result` exists; this is a full tile-state snapshot, not just modified tiles. `ui/grid_arrangement_dialog.py:1622`
+- Write-back: `_update_tile_data_from_modified_tiles` re-encodes each tile and patches `current_tile_data` by `tile_idx = row * tiles_per_row + col` (32 bytes per tile), preserving physical order. `ui/sprite_editor/controllers/rom_workflow_controller.py:1245`
+- Editor refresh: After dialog close, `open_in_editor` reloads from `current_tile_data` and reapplies arrangement (if kept), so the editor reflects the updated pixels. `ui/sprite_editor/controllers/rom_workflow_controller.py:1158`, `ui/sprite_editor/controllers/rom_workflow_controller.py:889`
+- ROM order invariant: `save_to_rom` always uses `logical_to_physical` when arrangement is active, keeping ROM tile ordering intact. `ui/sprite_editor/controllers/rom_workflow_controller.py:1757`
+- Potential drop of overlay changes: Any arrangement change after apply clears `_apply_result`, so overlay changes can be visible in the dialog but excluded from the result unless no further rearrangement occurs. `ui/grid_arrangement_dialog.py:993`
+- Implicit UI/data mismatch: The dialog always re-renders from `current_tile_data` (ROM bytes), not the live editor buffer; opening it after edits can overwrite those edits when `open_in_editor` reloads. `ui/sprite_editor/controllers/rom_workflow_controller.py:1158`, `ui/sprite_editor/controllers/rom_workflow_controller.py:889`
+
+## 4. UI Consistency
+
+- Keep layout vs overlay: “Keep layout” only controls whether `ArrangementBridge` is retained; overlay changes still apply even if layout is discarded. `ui/grid_arrangement_dialog.py:274`, `ui/sprite_editor/controllers/rom_workflow_controller.py:1158`
+- Source grid vs canvas: Source grid highlights arranged tiles from `get_arranged_tiles`, but the canvas renders only `grid_mapping`; group/row/column paths update arranged tiles without grid mapping, so the source grid can show arranged tiles while the canvas is empty. `ui/grid_arrangement_dialog.py:1218`, `ui/grid_arrangement_dialog.py:730`, `ui/row_arrangement/grid_arrangement_manager.py:49`
+- Apply label vs behavior: Button text implies “arranged tiles,” but apply uses all canvas-placed tiles regardless of current selection. `ui/grid_arrangement_dialog.py:264`, `ui/grid_arrangement_dialog.py:848`
+- Palette preview coupling: Overlay quantization depends on palette preview being enabled, but the overlay UI does not surface that dependency beyond the palette toggle. `ui/grid_arrangement_dialog.py:1004`, `ui/row_arrangement/palette_colorizer.py:14`
+- Width control behavior: Width spinbox changes grid dimensions and auto-placement target width but does not reflow existing placements; overlay sampling continues to use existing canvas positions. `ui/grid_arrangement_dialog.py:568`, `ui/row_arrangement/grid_arrangement_manager.py:49`
+- Overlay restore ambiguity: `_restore_arrangement_state` attempts to reload overlay only if `overlay_path` exists; failures are silent, so UI can show “no overlay” even when metadata exists. `ui/grid_arrangement_dialog.py:1373`
+
+## 5. Signal and Event Flow
+
+- Tile rearrangement: `GridGraphicsView.tiles_dropped` -> `_on_tiles_dropped_on_canvas` -> `CanvasPlaceItemsCommand/CanvasMoveItemsCommand` -> `GridArrangementManager.set_item_at/move_grid_item` -> `arrangement_changed` -> `_on_arrangement_changed` -> `_update_displays`. `ui/components/visualization/grid_graphics_view.py:55`, `ui/grid_arrangement_dialog.py:1111`, `ui/row_arrangement/undo_redo.py:529`, `ui/row_arrangement/grid_arrangement_manager.py:49`, `ui/grid_arrangement_dialog.py:993`
+- Tile selection clicks: `GridGraphicsView.tile_clicked/tiles_selected` -> `_on_tile_clicked/_on_tiles_selected`; `arrangement_grid.tile_clicked` -> `_on_arrangement_tile_clicked`; selection-only side effects. `ui/components/visualization/grid_graphics_view.py:55`, `ui/grid_arrangement_dialog.py:1203`
+- Overlay property changes: `OverlayControls` + `OverlayGraphicsItem` update `OverlayLayer` -> `position_changed/opacity_changed/scale_changed/visibility_changed/image_changed` -> `_on_overlay_changed` -> `_update_arrangement_canvas`; these signals have multiple listeners (controls + dialog). `ui/row_arrangement/overlay_controls.py:29`, `ui/row_arrangement/overlay_item.py:17`, `ui/row_arrangement/overlay_layer.py:15`, `ui/grid_arrangement_dialog.py:1004`
+- Overlay apply + undo stack: Apply button -> `_apply_overlay` -> `ApplyOperation.execute` -> `ApplyOverlayCommand.execute` via `UndoRedoStack.push`; `UndoRedoStack.can_undo_changed/can_redo_changed/stack_changed` are emitted but no listeners were found in this repo; `GridArrangementManager.tile_added/tile_removed/group_added/group_removed/arrangement_cleared` are also emitted without observed listeners. `ui/grid_arrangement_dialog.py:848`, `core/apply_operation.py:49`, `ui/row_arrangement/undo_redo.py:61`, `ui/row_arrangement/grid_arrangement_manager.py:49`
+- Pixel data update (silent state change): `_update_tile_data_from_modified_tiles` mutates `current_tile_data` without a dedicated signal; the UI refresh relies on the subsequent `open_in_editor` which emits `workflow_state_changed` and `sprite_extracted`. `ui/sprite_editor/controllers/rom_workflow_controller.py:1245`, `ui/sprite_editor/controllers/rom_workflow_controller.py:889`
+- ROM reinjection path: `EditWorkspace.saveToRomRequested` -> `ROMWorkflowController.prepare_injection` -> `save_to_rom` -> `ArrangementBridge.logical_to_physical` -> ROM injector. `ui/sprite_editor/controllers/rom_workflow_controller.py:292`, `ui/sprite_editor/controllers/rom_workflow_controller.py:1757`

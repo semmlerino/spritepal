@@ -235,8 +235,8 @@ class TestBatchThumbnailWorkerIntegration(QtTestCase):
             assert worker.rom_path == test_rom_file
             assert worker.rom_extractor is real_rom_extractor
             assert not worker.isRunning()  # Now works with wrapper
-            assert worker._pending_count == 0
-            assert worker._completed_count == 0
+            assert worker.pending_count == 0
+            assert worker.completed_count == 0
 
             # Cleanup should work without starting
             worker.cleanup()

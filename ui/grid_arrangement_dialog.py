@@ -168,6 +168,7 @@ class GridArrangementDialog(SplitterDialog):
         self.overlay_layer.scale_changed.connect(self._on_overlay_changed)
         self.overlay_layer.visibility_changed.connect(self._on_overlay_changed)
         self.overlay_layer.image_changed.connect(self._on_overlay_changed)
+        self.overlay_layer.resampling_mode_changed.connect(self._on_overlay_changed)
 
         # Restore arrangement if config provided
         if self.arrangement_config:

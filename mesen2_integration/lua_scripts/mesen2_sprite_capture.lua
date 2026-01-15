@@ -313,6 +313,7 @@ local function capture_sprites()
 
     -- Build JSON output
     local timestamp = os.time()
+    local capture_time = os.date("%Y-%m-%d %H:%M:%S")
     local filename = OUTPUT_DIR .. "sprite_capture_" .. timestamp .. ".json"
 
     local f = io.open(filename, "w")
@@ -325,6 +326,7 @@ local function capture_sprites()
     f:write("{\n")
     f:write('  "schema_version": "1.0",\n')
     f:write(string.format('  "timestamp": %d,\n', timestamp))
+    f:write(string.format('  "capture_time": "%s",\n', capture_time))
     f:write(string.format('  "frame": %d,\n', frame))
     f:write('  "obsel": {\n')
     f:write(string.format('    "raw": %d,\n', obsel.raw))

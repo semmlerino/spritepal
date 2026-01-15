@@ -295,8 +295,7 @@ class TestApplyOperationPaletteQuantization:
         assert pixels is not None
         # Should match index 2 (vivid red), giving grayscale value 32
         assert pixels[0, 0] == 32, (
-            f"Vivid red should map to palette index 2 (value 32), "
-            f"not {pixels[0, 0] // 16} (value {pixels[0, 0]})"
+            f"Vivid red should map to palette index 2 (value 32), not {pixels[0, 0] // 16} (value {pixels[0, 0]})"
         )
 
     def test_perceptual_color_matching_saturated_blue(self, tmp_path):
@@ -340,6 +339,5 @@ class TestApplyOperationPaletteQuantization:
         assert pixels is not None
         # Should match index 3 (saturated blue), giving grayscale value 48
         assert pixels[0, 0] == 48, (
-            f"Saturated blue should map to palette index 3 (value 48), "
-            f"not {pixels[0, 0] // 16} (value {pixels[0, 0]})"
+            f"Saturated blue should map to palette index 3 (value 48), not {pixels[0, 0] // 16} (value {pixels[0, 0]})"
         )

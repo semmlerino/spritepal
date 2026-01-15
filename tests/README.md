@@ -63,7 +63,7 @@ tests/
 ```
 
 **Additional Test Location:**
-- `ui/sprite_editor/tests/` - Subsystem-specific tests for the sprite editor (48 tests)
+- `ui/sprite_editor/tests/` - Subsystem-specific tests for the sprite editor (125+ tests)
   - Automatically collected by pytest via `testpaths = ["tests", "ui/sprite_editor/tests"]` in `pyproject.toml`
   - Run with: `uv run pytest ui/sprite_editor/tests/`
 
@@ -420,7 +420,7 @@ uv run pytest -m real_hal --require-real-hal -v
 
 ## UI Integration Tests
 
-UI integration tests validate signal-driven workflows and observable behavior through public APIs rather than mocking internal state. Located in `tests/ui/integration/` with 100+ tests covering:
+UI integration tests validate signal-driven workflows and observable behavior through public APIs rather than mocking internal state. Located in `tests/ui/integration/` with 140+ tests covering:
 
 ### Coverage Areas
 

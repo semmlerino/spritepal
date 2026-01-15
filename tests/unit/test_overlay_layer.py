@@ -398,8 +398,8 @@ class TestOverlayLayerResamplingMode:
         bilinear_pixels = list(region_bilinear.getdata())
 
         # Count unique brightness values (R channel)
-        nearest_unique = set(p[0] for p in nearest_pixels if p[3] > 0)  # Opaque only
-        bilinear_unique = set(p[0] for p in bilinear_pixels if p[3] > 0)
+        nearest_unique = {p[0] for p in nearest_pixels if p[3] > 0}  # Opaque only
+        bilinear_unique = {p[0] for p in bilinear_pixels if p[3] > 0}
 
         # BILINEAR should have more unique values due to interpolation
         # NEAREST should only have 0 (black) and 255 (white)
