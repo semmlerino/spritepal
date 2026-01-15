@@ -98,6 +98,10 @@ class OverlayLayer(QObject):
             # Convert to RGBA for consistent handling
             if image.mode != "RGBA":
                 image = image.convert("RGBA")
+            # Make all pixels fully opaque to prevent black-as-transparent issues
+            # (common in indexed PNGs where black is often the transparent color)
+            r, g, b, _ = image.split()
+            image = Image.merge("RGBA", (r, g, b, Image.new("L", image.size, 255)))
             self._image = image
             self._image_path = str(Path(path).resolve())
             self._visible = True  # Auto-show when importing new image
