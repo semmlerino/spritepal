@@ -155,9 +155,9 @@ class TestTileIdentityEndToEnd:
         # Process events to handle the deferred QMessageBox
         qtbot.wait(10)
 
-        # Verify apply succeeded
-        assert dialog._apply_result is not None, "Apply should have succeeded"
-        assert dialog._apply_result.success, f"Apply failed: {dialog._apply_result.error_message}"
+        # Verify apply succeeded (using public property)
+        assert dialog.apply_result is not None, "Apply should have succeeded"
+        assert dialog.apply_result.success, f"Apply failed: {dialog.apply_result.error_message}"
 
         # STAGE 6: Verify the correct tile was modified
         # The overlay samples at canvas pixel (0, 0), which is (0, 0) to (7, 7)
@@ -298,9 +298,9 @@ class TestApplyThenRearrangeDataLoss:
         # Process events to handle the deferred QMessageBox
         qtbot.wait(10)
 
-        # Verify apply worked
-        assert dialog._apply_result is not None, "Apply should have succeeded"
-        assert dialog._apply_result.success
+        # Verify apply worked (using public property)
+        assert dialog.apply_result is not None, "Apply should have succeeded"
+        assert dialog.apply_result.success
 
         # Save the modified pixel value for verification
         modified_tile = dialog.tiles[TilePosition(0, 0)]
@@ -352,7 +352,7 @@ class TestApplyThenRearrangeDataLoss:
         # Process events to handle the deferred QMessageBox
         qtbot.wait(10)
 
-        assert dialog._apply_result is not None, "Apply should have succeeded"
+        assert dialog.apply_result is not None, "Apply should have succeeded"
 
         # Add another tile - this triggers arrangement_changed
         dialog.arrangement_manager.add_tile(TilePosition(0, 1))
@@ -391,7 +391,7 @@ class TestApplyThenRearrangeDataLoss:
         # Process events to handle the deferred QMessageBox
         qtbot.wait(10)
 
-        assert dialog._apply_result is not None, "Apply should have succeeded"
+        assert dialog.apply_result is not None, "Apply should have succeeded"
 
         # Remove one tile - this triggers arrangement_changed
         dialog.arrangement_manager.remove_item_at(0, 1)

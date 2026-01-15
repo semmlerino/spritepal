@@ -521,6 +521,14 @@ class GridArrangementDialog(SplitterDialog):
         arrow = Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow
         self._legend_toggle_btn.setArrowType(arrow)
 
+    def is_legend_visible(self) -> bool:
+        """Return whether the keyboard shortcut legend is currently visible."""
+        return self._legend_content.isVisible()
+
+    def get_legend_text(self) -> str:
+        """Return the current legend text content."""
+        return self._legend_content.text()
+
     def _add_zoom_controls(self, layout: QHBoxLayout):
         """Add zoom control buttons to the given layout.
 

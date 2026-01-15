@@ -87,17 +87,18 @@ class TestConfigurationServiceInit:
         assert service.app_root == tmp_path.resolve()
 
     def test_init_with_settings_manager(self, tmp_path, clean_env):
-        """Init with settings_manager should accept it."""
+        """Init with settings_manager should use custom cache location."""
+        custom_cache = tmp_path / "custom_cache"
         mock_settings = MagicMock()
-        mock_settings.get_cache_location.return_value = None
+        mock_settings.get_cache_location.return_value = str(custom_cache)
 
         service = ConfigurationService(
             app_root=tmp_path,
             settings_manager=mock_settings,
         )
 
-        # Settings manager is stored and used
-        assert service._settings_manager is mock_settings
+        # Verify observable behavior: cache_directory uses settings override
+        assert service.cache_directory == custom_cache
 
     def test_init_resolves_paths_to_absolute(self, clean_env):
         """All paths should be absolute after initialization."""

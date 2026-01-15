@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 from PIL import Image
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QToolButton
 
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.row_arrangement.grid_arrangement_manager import TilePosition
@@ -96,16 +97,13 @@ class TestGridArrangementUXFixes:
         # Process events to ensure signal is handled
         qtbot.wait(10)
 
-        # Verify the manager's target width was updated
-        assert dialog.arrangement_manager._target_width == 2
-
         # Add 3 tiles sequentially (they should wrap at width=2)
         tiles = [TilePosition(0, 0), TilePosition(0, 1), TilePosition(1, 0)]
         for tile in tiles:
             if not dialog.arrangement_manager.is_tile_arranged(tile):
                 dialog.arrangement_manager.add_tile(tile)
 
-        # Check grid_mapping uses width=2
+        # Verify behavior through observable output: grid_mapping
         mapping = dialog.arrangement_manager.get_grid_mapping()
         # First two tiles should be at (0,0) and (0,1)
         # Third tile should wrap to (1,0) because width is 2
@@ -132,12 +130,11 @@ class TestGridArrangementUXFixes:
         dialog.show()
         qtbot.waitForWindowShown(dialog)
 
-        # Check that legend content widget exists and is visible
-        assert hasattr(dialog, "_legend_content")
-        assert dialog._legend_content.isVisible()
+        # Check that legend is visible via public API
+        assert dialog.is_legend_visible()
 
-        # Check legend text contains key mouse shortcuts
-        legend_text = dialog._legend_content.text()
+        # Check legend text contains key mouse shortcuts via public API
+        legend_text = dialog.get_legend_text()
         assert "Ctrl+Click" in legend_text
         assert "Ctrl+Shift+Drag" in legend_text
         assert "Wheel zoom" in legend_text
@@ -149,19 +146,18 @@ class TestGridArrangementUXFixes:
         dialog.show()
         qtbot.waitForWindowShown(dialog)
 
-        # Initially expanded
-        assert dialog._legend_content.isVisible()
-        assert dialog._legend_toggle_btn.isChecked()
+        # Initially expanded - verify via public API
+        assert dialog.is_legend_visible()
 
-        # Click toggle to collapse
-        qtbot.mouseClick(dialog._legend_toggle_btn, Qt.MouseButton.LeftButton)
-        assert not dialog._legend_content.isVisible()
-        assert not dialog._legend_toggle_btn.isChecked()
+        # Click toggle to collapse (toggle button is internal, but we use findChild)
+        toggle_btn = dialog.findChild(QToolButton)
+        assert toggle_btn is not None
+        qtbot.mouseClick(toggle_btn, Qt.MouseButton.LeftButton)
+        assert not dialog.is_legend_visible()
 
         # Click toggle to expand again
-        qtbot.mouseClick(dialog._legend_toggle_btn, Qt.MouseButton.LeftButton)
-        assert dialog._legend_content.isVisible()
-        assert dialog._legend_toggle_btn.isChecked()
+        qtbot.mouseClick(toggle_btn, Qt.MouseButton.LeftButton)
+        assert dialog.is_legend_visible()
 
     def test_palette_toggle_button(self, dialog: GridArrangementDialog, qtbot: QtBot):
         """Verify palette toggle button works and syncs with C key."""

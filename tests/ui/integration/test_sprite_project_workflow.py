@@ -90,8 +90,8 @@ class TestEditWorkspaceSignalForwarding:
         workspace = EditWorkspace()
 
         with qtbot.waitSignal(workspace.saveProjectRequested, timeout=ui_timeout()):
-            workspace._save_export_panel.save_project_btn.setEnabled(True)
-            workspace._save_export_panel.save_project_btn.click()
+            workspace.save_export_panel.save_project_btn.setEnabled(True)
+            workspace.save_export_panel.save_project_btn.click()
 
     def test_workspace_forwards_load_project_signal(self, qtbot) -> None:
         """EditWorkspace should forward loadProjectRequested signal."""
@@ -100,17 +100,17 @@ class TestEditWorkspaceSignalForwarding:
         workspace = EditWorkspace()
 
         with qtbot.waitSignal(workspace.loadProjectRequested, timeout=ui_timeout()):
-            workspace._save_export_panel.load_project_btn.click()
+            workspace.save_export_panel.load_project_btn.click()
 
     def test_workspace_set_save_project_enabled(self) -> None:
         """set_save_project_enabled should propagate to panel."""
         from ui.sprite_editor.views.workspaces.edit_workspace import EditWorkspace
 
         workspace = EditWorkspace()
-        assert not workspace._save_export_panel.save_project_btn.isEnabled()
+        assert not workspace.save_export_panel.save_project_btn.isEnabled()
 
         workspace.set_save_project_enabled(True)
-        assert workspace._save_export_panel.save_project_btn.isEnabled()
+        assert workspace.save_export_panel.save_project_btn.isEnabled()
 
 
 class TestSpriteProjectRoundTrip:

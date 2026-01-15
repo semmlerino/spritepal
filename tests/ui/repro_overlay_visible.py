@@ -30,9 +30,8 @@ def canvas(qtbot):
 
 def test_overlay_rendering_state(canvas):
     """Verify that overlay state correctly enables rendering logic."""
-    # Initial state
-    assert canvas._overlay_image is None
-    assert not canvas._overlay_visible
+    # Initial state - use public API
+    assert not canvas.has_overlay()
 
     # Set overlay
     overlay_img = QImage(32, 32, QImage.Format.Format_ARGB32)
@@ -40,9 +39,11 @@ def test_overlay_rendering_state(canvas):
 
     canvas.set_overlay_image(overlay_img)
 
-    assert canvas._overlay_image is not None
-    assert canvas._overlay_visible
-    assert canvas._overlay_scale == 1.0
+    # Verify via public API
+    assert canvas.has_overlay()
+    bounds = canvas.get_overlay_bounds()
+    assert bounds.width() > 0 and bounds.height() > 0
+    assert canvas.get_overlay_scale() == 1.0
 
     # Verify bounds
     bounds = canvas.get_overlay_bounds()

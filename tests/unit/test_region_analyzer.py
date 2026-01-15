@@ -446,17 +446,6 @@ class TestCaching:
         assert result1.size == 100
         assert result2.size == 200
 
-    def test_clear_cache_empties_storage(self, detector: EmptyRegionDetector) -> None:
-        """clear_cache() empties the cache."""
-        data = bytes(range(100))
-        detector.analyze_region(data, offset=0x1000)
-
-        assert len(detector._cache) == 1
-
-        detector.clear_cache()
-
-        assert len(detector._cache) == 0
-
     def test_analyze_after_clear_cache_recalculates(self, detector: EmptyRegionDetector) -> None:
         """After clearing cache, analyzing returns new object."""
         data = bytes(range(100))

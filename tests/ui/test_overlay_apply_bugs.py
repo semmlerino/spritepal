@@ -75,9 +75,9 @@ class TestAcceptPathBug:
         dialog.overlay_layer.import_image(white_overlay, 16, 16)
         dialog._apply_overlay()
 
-        # Verify Apply succeeded
-        assert dialog._apply_result is not None
-        assert dialog._apply_result.success
+        # Verify Apply succeeded (using public property)
+        assert dialog.apply_result is not None
+        assert dialog.apply_result.success
 
         # Now simulate clicking OK button (calls accept directly)
         dialog.accept()

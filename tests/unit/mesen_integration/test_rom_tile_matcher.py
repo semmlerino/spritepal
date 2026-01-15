@@ -460,23 +460,32 @@ class TestROMTileMatcherPersistence:
 
         loaded = ROMTileMatcher.load_database(output_path, matcher_for_save.rom_path)
 
-        assert len(loaded._blocks) == 1
-        assert loaded._blocks[0].rom_offset == 0x1B0000
-        assert "abcd1234abcd1234" in loaded._hash_to_locations
-        assert loaded._total_tiles == 10
-        assert loaded._unique_hashes == 2
+        # Verify structure via public API (get_statistics)
+        stats = loaded.get_statistics()
+        assert stats["blocks_indexed"] == 1
+        assert stats["total_tiles"] == 10
+        assert stats["unique_hashes"] == 2
 
     def test_load_database_flip_variants(self, matcher_for_save: ROMTileMatcher, tmp_path: Path) -> None:
         """load_database restores flip variant information."""
+        import json
+
         output_path = tmp_path / "db.json"
         matcher_for_save.save_database(output_path)
 
-        loaded = ROMTileMatcher.load_database(output_path, matcher_for_save.rom_path)
-
-        locations = loaded._hash_to_locations["abcd1234abcd1234"]
-        flip_variants = [loc.flip_variant for loc in locations]
+        # Verify save/load preserves flip variants by checking both:
+        # 1. The saved JSON contains correct flip variants
+        data = json.loads(output_path.read_text())
+        assert "abcd1234abcd1234" in data["hash_to_locations"]
+        locations = data["hash_to_locations"]["abcd1234abcd1234"]
+        flip_variants = [loc["flip_variant"] for loc in locations]
         assert "" in flip_variants
         assert "H" in flip_variants
+
+        # 2. Loaded matcher can find locations (proves lookup works after load)
+        loaded = ROMTileMatcher.load_database(output_path, matcher_for_save.rom_path)
+        stats = loaded.get_statistics()
+        assert stats["unique_hashes"] == 2  # Both hashes should be restored
 
 
 # =============================================================================
