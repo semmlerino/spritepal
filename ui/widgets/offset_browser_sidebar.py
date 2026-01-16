@@ -357,11 +357,19 @@ class OffsetBrowserSidebar(QWidget):
         size_row.setContentsMargins(4, 0, 4, 0)
         size_row.setSpacing(2)
 
+        # Tooltip map for size buttons with shortcut hints
+        tooltip_map = {
+            "small": "Small thumbnails (36px) [1]",
+            "medium": "Medium thumbnails (48px) [2]",
+            "large": "Large thumbnails (64px) [3]",
+        }
+
         for key, label in [("small", "S"), ("medium", "M"), ("large", "L")]:
             btn = QPushButton(label)
             btn.setFixedSize(24, 20)
             btn.setCheckable(True)
             btn.setChecked(key == "medium")  # Default to medium
+            btn.setToolTip(tooltip_map[key])
             btn.setStyleSheet(
                 f"""
                 QPushButton {{
@@ -403,6 +411,7 @@ class OffsetBrowserSidebar(QWidget):
         self._nearby_expand_btn = QPushButton("▼ Show More")
         self._nearby_expand_btn.setFlat(True)
         self._nearby_expand_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self._nearby_expand_btn.setToolTip("Show extended range (±256, ±512, ±1024) [E]")
         self._nearby_expand_btn.setStyleSheet(
             f"""
             QPushButton {{
@@ -467,10 +476,14 @@ class OffsetBrowserSidebar(QWidget):
         """Handle expand/collapse toggle."""
         self._nearby_expanded = not self._nearby_expanded
 
-        # Update button text
+        # Update button text and tooltip
         if self._nearby_expand_btn is not None:
-            text = "▲ Show Less" if self._nearby_expanded else "▼ Show More"
-            self._nearby_expand_btn.setText(text)
+            if self._nearby_expanded:
+                self._nearby_expand_btn.setText("▲ Show Less")
+                self._nearby_expand_btn.setToolTip("Hide extended range [E]")
+            else:
+                self._nearby_expand_btn.setText("▼ Show More")
+                self._nearby_expand_btn.setToolTip("Show extended range (±256, ±512, ±1024) [E]")
 
         # Rebuild grid and regenerate thumbnails
         self._rebuild_nearby_grid()

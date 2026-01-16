@@ -478,3 +478,169 @@ class TestNearbySizeAndExpansionCombination:
         assert len(sidebar._nearby_labels) == 6
         for label in sidebar._nearby_labels:
             assert label.width() == NEARBY_SIZES["large"]
+
+
+class TestNearbyTooltips:
+    """Tests for tooltips on nearby panel controls."""
+
+    def test_size_buttons_have_tooltips(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify S/M/L buttons have descriptive tooltips with keyboard shortcuts."""
+        assert "[1]" in sidebar._nearby_size_buttons["small"].toolTip()
+        assert "36px" in sidebar._nearby_size_buttons["small"].toolTip()
+        assert "[2]" in sidebar._nearby_size_buttons["medium"].toolTip()
+        assert "48px" in sidebar._nearby_size_buttons["medium"].toolTip()
+        assert "[3]" in sidebar._nearby_size_buttons["large"].toolTip()
+        assert "64px" in sidebar._nearby_size_buttons["large"].toolTip()
+
+    def test_expand_button_has_tooltip(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify expand button has tooltip with shortcut hint."""
+        assert sidebar._nearby_expand_btn is not None
+        assert "[E]" in sidebar._nearby_expand_btn.toolTip()
+        # Initial state should mention "Show" and extended range
+        assert "Show" in sidebar._nearby_expand_btn.toolTip()
+        assert "±256" in sidebar._nearby_expand_btn.toolTip()
+
+    def test_expand_button_tooltip_updates_on_expand(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify tooltip changes when expanded."""
+        assert sidebar._nearby_expand_btn is not None
+        sidebar._on_expand_toggled()  # Expand
+        qtbot.wait(50)
+        assert "Hide" in sidebar._nearby_expand_btn.toolTip()
+        assert "[E]" in sidebar._nearby_expand_btn.toolTip()
+
+    def test_expand_button_tooltip_updates_on_collapse(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify tooltip changes when collapsed again."""
+        assert sidebar._nearby_expand_btn is not None
+        sidebar._on_expand_toggled()  # Expand
+        sidebar._on_expand_toggled()  # Collapse
+        qtbot.wait(50)
+        assert "Show" in sidebar._nearby_expand_btn.toolTip()
+        assert "±256" in sidebar._nearby_expand_btn.toolTip()
+        assert "[E]" in sidebar._nearby_expand_btn.toolTip()
+
+
+class TestNearbyKeyboardShortcuts:
+    """Tests for keyboard shortcuts controlling the nearby panel."""
+
+    def test_key_1_sets_small_size(self, qtbot: QtBot, offset_browser) -> None:
+        """Verify pressing 1 sets small thumbnail size."""
+        from PySide6.QtGui import QKeyEvent
+
+        sidebar = offset_browser._sidebar
+        assert sidebar is not None
+
+        # Start with medium (default)
+        assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["medium"]
+
+        # Press key 1
+        event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_1, Qt.KeyboardModifier.NoModifier)
+        offset_browser.keyPressEvent(event)
+        qtbot.wait(50)
+
+        assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["small"]
+        assert sidebar._nearby_size_buttons["small"].isChecked()
+
+    def test_key_2_sets_medium_size(self, qtbot: QtBot, offset_browser) -> None:
+        """Verify pressing 2 sets medium thumbnail size."""
+        from PySide6.QtGui import QKeyEvent
+
+        sidebar = offset_browser._sidebar
+        assert sidebar is not None
+
+        # First change to small
+        sidebar._on_size_changed("small")
+        qtbot.wait(50)
+        assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["small"]
+
+        # Press key 2
+        event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_2, Qt.KeyboardModifier.NoModifier)
+        offset_browser.keyPressEvent(event)
+        qtbot.wait(50)
+
+        assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["medium"]
+        assert sidebar._nearby_size_buttons["medium"].isChecked()
+
+    def test_key_3_sets_large_size(self, qtbot: QtBot, offset_browser) -> None:
+        """Verify pressing 3 sets large thumbnail size."""
+        from PySide6.QtGui import QKeyEvent
+
+        sidebar = offset_browser._sidebar
+        assert sidebar is not None
+
+        # Press key 3
+        event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_3, Qt.KeyboardModifier.NoModifier)
+        offset_browser.keyPressEvent(event)
+        qtbot.wait(50)
+
+        assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["large"]
+        assert sidebar._nearby_size_buttons["large"].isChecked()
+
+    def test_key_e_toggles_expand(self, qtbot: QtBot, offset_browser) -> None:
+        """Verify pressing E toggles expansion."""
+        from PySide6.QtGui import QKeyEvent
+
+        sidebar = offset_browser._sidebar
+        assert sidebar is not None
+
+        # Start collapsed
+        assert not sidebar._nearby_expanded
+
+        # Press key E to expand
+        event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_E, Qt.KeyboardModifier.NoModifier)
+        offset_browser.keyPressEvent(event)
+        qtbot.wait(50)
+
+        assert sidebar._nearby_expanded
+        assert len(sidebar._nearby_labels) == 12
+
+        # Press key E again to collapse
+        event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_E, Qt.KeyboardModifier.NoModifier)
+        offset_browser.keyPressEvent(event)
+        qtbot.wait(50)
+
+        assert not sidebar._nearby_expanded
+        assert len(sidebar._nearby_labels) == 6
+
+    def test_key_1_with_modifier_does_not_change_size(self, qtbot: QtBot, offset_browser) -> None:
+        """Verify pressing Ctrl+1 does not change size (modifiers block shortcut)."""
+        from PySide6.QtGui import QKeyEvent
+
+        sidebar = offset_browser._sidebar
+        assert sidebar is not None
+
+        # Start with medium (default)
+        assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["medium"]
+
+        # Press Ctrl+1
+        event = QKeyEvent(
+            QKeyEvent.Type.KeyPress,
+            Qt.Key.Key_1,
+            Qt.KeyboardModifier.ControlModifier,
+        )
+        offset_browser.keyPressEvent(event)
+        qtbot.wait(50)
+
+        # Size should remain medium (no change from modifier key)
+        assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["medium"]
+
+    def test_key_e_with_modifier_does_not_toggle(self, qtbot: QtBot, offset_browser) -> None:
+        """Verify pressing Ctrl+E does not toggle expand (modifiers block shortcut)."""
+        from PySide6.QtGui import QKeyEvent
+
+        sidebar = offset_browser._sidebar
+        assert sidebar is not None
+
+        # Start collapsed
+        assert not sidebar._nearby_expanded
+
+        # Press Ctrl+E
+        event = QKeyEvent(
+            QKeyEvent.Type.KeyPress,
+            Qt.Key.Key_E,
+            Qt.KeyboardModifier.ControlModifier,
+        )
+        offset_browser.keyPressEvent(event)
+        qtbot.wait(50)
+
+        # Should still be collapsed (no change from modifier key)
+        assert not sidebar._nearby_expanded

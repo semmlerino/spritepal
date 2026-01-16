@@ -1366,6 +1366,24 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             if self.browse_tab is not None:
                 self.browse_tab._paste_from_clipboard()
             event.accept()
+        # Nearby panel size shortcuts (1, 2, 3) - no modifiers
+        elif key == Qt.Key.Key_1 and modifiers == Qt.KeyboardModifier.NoModifier:
+            if self._sidebar is not None:
+                self._sidebar._on_size_changed("small")
+            event.accept()
+        elif key == Qt.Key.Key_2 and modifiers == Qt.KeyboardModifier.NoModifier:
+            if self._sidebar is not None:
+                self._sidebar._on_size_changed("medium")
+            event.accept()
+        elif key == Qt.Key.Key_3 and modifiers == Qt.KeyboardModifier.NoModifier:
+            if self._sidebar is not None:
+                self._sidebar._on_size_changed("large")
+            event.accept()
+        # Nearby panel expand toggle (E) - no modifiers
+        elif key == Qt.Key.Key_E and modifiers == Qt.KeyboardModifier.NoModifier:
+            if self._sidebar is not None:
+                self._sidebar._on_expand_toggled()
+            event.accept()
         else:
             super().keyPressEvent(event)
 
