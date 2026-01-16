@@ -444,6 +444,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Browse tab signals - these are the main navigation controls
         self.browse_tab.offset_changed.connect(self._on_offset_changed)
+        self.browse_tab.navigate_step_requested.connect(self._navigate_by_delta)
         self.browse_tab.find_next_clicked.connect(self._find_next_sprite)
         self.browse_tab.find_prev_clicked.connect(self._find_prev_sprite)
         self.browse_tab.find_sprites_requested.connect(self._scan_for_sprites)
@@ -528,7 +529,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._history_timer = QTimer(self)
         self._history_timer.setSingleShot(True)
         self._history_timer.timeout.connect(self._commit_offset_to_history)
-        self._history_timer.start(500)  # 500ms dwell time
+        self._history_timer.start(200)  # 200ms dwell time (snappier history)
 
     def _commit_offset_to_history(self) -> None:
         """Commit the pending offset to history after dwell time elapsed."""

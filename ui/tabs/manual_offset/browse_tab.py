@@ -66,6 +66,7 @@ class SimpleBrowseTab(QWidget):
     """
 
     offset_changed = Signal(int)
+    navigate_step_requested = Signal(int)  # Request to navigate by step amount
     find_next_clicked = Signal()
     find_prev_clicked = Signal()
     advanced_search_requested = Signal()
@@ -89,6 +90,8 @@ class SimpleBrowseTab(QWidget):
         self._mapping_type: RomMappingType = RomMappingType.LOROM  # ROM mapping type for SNES addresses
         self._advanced_search_dialog: AdvancedSearchDialog | None = None
         self._smart_preview_coordinator: SmartPreviewCoordinator | None = None
+        self._focus_mode_active: bool = False  # Track if slider is in focus mode (zoomed)
+        self._focus_window_size: int = 0x8000  # 32KB window for focus mode (±16KB)
 
         self._setup_ui()
 
@@ -102,6 +105,8 @@ class SimpleBrowseTab(QWidget):
 
     def _setup_ui(self) -> None:
         """Set up the browse tab UI with improved layout and spacing."""
+        from PySide6.QtWidgets import QCheckBox
+
         layout = QVBoxLayout(self)
         layout.setSpacing(SPACING_SMALL)  # Better spacing between sections
         layout.setContentsMargins(
@@ -119,19 +124,235 @@ class SimpleBrowseTab(QWidget):
             }}
         """)
         controls_layout = QVBoxLayout(controls_frame)
-        controls_layout.setSpacing(SPACING_STANDARD)  # Better spacing between controls
+        controls_layout.setSpacing(SPACING_STANDARD)
         controls_layout.setContentsMargins(
             SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM
-        )  # Comfortable padding
+        )
 
-        # Section title with better styling
-        title = create_styled_label("ROM Offset Control", style="title")
-        title.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLORS['highlight']};")
-        controls_layout.addWidget(title)
+        # --- 1. Primary Navigation Bar (Top) ---
+        # Offset Spinbox | Go | Divider | Step Size | Next/Prev Step
+        primary_nav_row = QHBoxLayout()
+        primary_nav_row.setSpacing(SPACING_SMALL)
+
+        # Offset Input Group
+        offset_label = QLabel("Offset:")
+        offset_label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
+        primary_nav_row.addWidget(offset_label)
+
+        self.manual_spinbox = QSpinBox()
+        self.manual_spinbox.setMinimum(0)
+        # QSpinBox has 32-bit signed int limit; clamp like slider does
+        max_spinbox_value = min(self._rom_size, 0x7FFFFFFF)
+        self.manual_spinbox.setMaximum(max_spinbox_value)
+        self.manual_spinbox.setValue(self._current_offset)
+        self.manual_spinbox.setDisplayIntegerBase(16)
+        self.manual_spinbox.setPrefix("0x")
+        self.manual_spinbox.setMinimumWidth(120)
+        self.manual_spinbox.setFixedHeight(28)  # Slightly larger for touch targets
+        if self.manual_spinbox:
+            self.manual_spinbox.setStyleSheet(f"""
+            QSpinBox {{
+                padding: 4px;
+                background-color: {COLORS["panel_background"]};
+                border: 1px solid {COLORS["border"]};
+                border-radius: 4px;
+                font-family: monospace;
+                font-size: 13px;
+                font-weight: bold;
+            }}
+        """)
+        # Defer valueChanged to avoid spamming while typing, rely on returnPressed or Go button
+        # But we also want arrow keys to work immediately.
+        # Let's use returnPressed for navigation, and valueChanged only updates internal state without navigation?
+        # Actually, standard behavior is valueChanged updates immediately. Let's stick to that but ensure debouncing elsewhere if needed.
+        self.manual_spinbox.valueChanged.connect(self._on_manual_changed)
+        primary_nav_row.addWidget(self.manual_spinbox)
+
+        go_button = QPushButton("Go")
+        go_button.setFixedHeight(28)
+        go_button.setStyleSheet(f"""
+            QPushButton {{
+                padding: 4px 12px;
+                background-color: {COLORS["highlight"]};
+                border: 1px solid {COLORS["highlight_hover"]};
+                border-radius: 4px;
+                color: white;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS["highlight_hover"]};
+            }}
+        """)
+        go_button.clicked.connect(self._on_go_button_clicked)
+        primary_nav_row.addWidget(go_button)
+
+        # Spacer / Divider
+        primary_nav_row.addSpacing(SPACING_STANDARD)
+        divider = QFrame()
+        divider.setFrameShape(QFrame.Shape.VLine)
+        divider.setStyleSheet(f"background-color: {COLORS['border']}; max-width: 1px; height: 20px;")
+        primary_nav_row.addWidget(divider)
+        primary_nav_row.addSpacing(SPACING_STANDARD)
+
+        # Step Size Group
+        step_label = QLabel("Step:")
+        step_label.setStyleSheet(f"color: {COLORS['text_muted']};")
+        primary_nav_row.addWidget(step_label)
+
+        self.step_spinbox = QSpinBox()
+        self.step_spinbox.setMinimum(MIN_SPRITE_SIZE)
+        self.step_spinbox.setMaximum(ROM_SIZE_1MB)
+        self.step_spinbox.setValue(self._step_size)
+        self.step_spinbox.setDisplayIntegerBase(16)
+        self.step_spinbox.setPrefix("0x")
+        self.step_spinbox.setMinimumWidth(80)
+        self.step_spinbox.setFixedHeight(28)
+        if self.step_spinbox:
+            self.step_spinbox.setStyleSheet(f"""
+            QSpinBox {{
+                padding: 4px;
+                background-color: {COLORS["panel_background"]};
+                border: 1px solid {COLORS["border"]};
+                border-radius: 4px;
+                font-family: monospace;
+            }}
+        """)
+        primary_nav_row.addWidget(self.step_spinbox)
+
+        # Step Navigation Buttons
+        step_btn_style = f"""
+            QPushButton {{
+                padding: 4px 8px;
+                background-color: {COLORS["panel_background"]};
+                border: 1px solid {COLORS["border"]};
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                border-color: {COLORS["highlight"]};
+                background-color: {COLORS["focus_background_subtle"]};
+            }}
+        """
+
+        step_prev_btn = QPushButton("◀")
+        step_prev_btn.setToolTip("Move backward by step size")
+        step_prev_btn.setFixedWidth(30)
+        step_prev_btn.setFixedHeight(28)
+        step_prev_btn.setStyleSheet(step_btn_style)
+        step_prev_btn.clicked.connect(self._on_prev_step_clicked)
+        primary_nav_row.addWidget(step_prev_btn)
+
+        step_next_btn = QPushButton("▶")
+        step_next_btn.setToolTip("Move forward by step size")
+        step_next_btn.setFixedWidth(30)
+        step_next_btn.setFixedHeight(28)
+        step_next_btn.setStyleSheet(step_btn_style)
+        step_next_btn.clicked.connect(self._on_next_step_clicked)
+        primary_nav_row.addWidget(step_next_btn)
+
+        primary_nav_row.addStretch()
+
+        # Clipboard Paste (moved to top right)
+        self.paste_button = QPushButton("📋")
+        self.paste_button.setToolTip(
+            "Paste offset from clipboard\n\n"
+            "Supports:\n"
+            "• Mesen2 log format: 'FILE OFFSET: 0x3C6EF1'\n"
+            "• SNES addresses: $98:8000 or $988000\n"
+            "• Hex: 0x0C3000\n"
+            "• Mesen2 clipboard file (Key 0 in Lua script)"
+        )
+        self.paste_button.setFixedSize(30, 28)
+        self.paste_button.setStyleSheet(step_btn_style)
+        self.paste_button.clicked.connect(self._paste_from_clipboard)
+        primary_nav_row.addWidget(self.paste_button)
+
+        controls_layout.addLayout(primary_nav_row)
+
+        # Add separator
+        separator1 = QFrame()
+        separator1.setFrameShape(QFrame.Shape.HLine)
+        separator1.setStyleSheet(f"background-color: {COLORS['panel_background']}; max-height: 1px;")
+        controls_layout.addWidget(separator1)
+
+        # --- 2. Seek/Scan Bar (Middle) ---
+        # Seek Prev Sprite | Find All Sprites | Advanced | Seek Next Sprite
+        seek_row = QHBoxLayout()
+        seek_row.setSpacing(SPACING_SMALL)
+
+        action_btn_style = f"""
+            QPushButton {{
+                padding: 6px 12px;
+                background-color: {COLORS["panel_background"]};
+                border: 1px solid {COLORS["border"]};
+                border-radius: 4px;
+                color: {COLORS["text_secondary"]};
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS["focus_background_subtle"]};
+                border-color: {COLORS["highlight"]};
+            }}
+        """
+
+        self.prev_button = QPushButton("⏮ Seek Prev Sprite")
+        self.prev_button.setStyleSheet(action_btn_style)
+        self.prev_button.setToolTip("Scan backward for next valid HAL-compressed sprite")
+        self.prev_button.clicked.connect(self.find_prev_clicked.emit)
+        seek_row.addWidget(self.prev_button)
+
+        # Central Action Group
+        self.find_sprites_button = QPushButton("🔍 Find All Sprites")
+        self.find_sprites_button.setStyleSheet(action_btn_style)
+        self.find_sprites_button.setToolTip("Scan entire ROM for HAL-compressed sprites\n\nKeyboard shortcut: Ctrl+F")
+        self.find_sprites_button.clicked.connect(self._on_find_sprites)
+        seek_row.addWidget(self.find_sprites_button)
+
+        self.advanced_search_button = QPushButton("⚙️ Advanced")
+        self.advanced_search_button.setStyleSheet(action_btn_style)
+        self.advanced_search_button.setToolTip("Open advanced search dialog with filtering and batch operations")
+        self.advanced_search_button.clicked.connect(self._open_advanced_search)
+        seek_row.addWidget(self.advanced_search_button)
+
+        self.next_button = QPushButton("Seek Next Sprite ⏭")
+        self.next_button.setStyleSheet(action_btn_style)
+        self.next_button.setToolTip("Scan forward for next valid HAL-compressed sprite")
+        self.next_button.clicked.connect(self.find_next_clicked.emit)
+        seek_row.addWidget(self.next_button)
+
+        controls_layout.addLayout(seek_row)
+
+        # Add separator
+        separator2 = QFrame()
+        separator2.setFrameShape(QFrame.Shape.HLine)
+        separator2.setStyleSheet(f"background-color: {COLORS['panel_background']}; max-height: 1px;")
+        controls_layout.addWidget(separator2)
+
+        # --- 3. Context & Coarse Nav (Bottom) ---
+        # Slider with Focus Mode | Position Info
+        
+        # Header for slider section
+        slider_header = QHBoxLayout()
+        slider_title = QLabel("ROM Navigation")
+        slider_title.setStyleSheet(f"font-weight: bold; color: {COLORS['text_muted']}; font-size: 11px; text-transform: uppercase;")
+        slider_header.addWidget(slider_title)
+        
+        slider_header.addStretch()
+        
+        # Focus Mode Toggle
+        self.focus_mode_check = QCheckBox("Focus Mode (Zoom)")
+        self.focus_mode_check.setToolTip("Zoom slider to a smaller range around current offset for fine-tuning")
+        self.focus_mode_check.setStyleSheet(f"""
+            QCheckBox {{ color: {COLORS['text_secondary']}; }}
+            QCheckBox::indicator:checked {{ background-color: {COLORS['highlight']}; border-color: {COLORS['highlight']}; }}
+        """)
+        self.focus_mode_check.toggled.connect(self._on_focus_toggled)
+        slider_header.addWidget(self.focus_mode_check)
+        
+        controls_layout.addLayout(slider_header)
 
         # Slider with smart preview support and type-safe range checking
         self.position_slider = QSlider(Qt.Orientation.Horizontal)
-        self.position_slider.setObjectName("manual_offset_rom_slider")  # Unique identifier
+        self.position_slider.setObjectName("manual_offset_rom_slider")
         # Ensure values fit in 32-bit signed int range (QSlider limitation)
         max_slider_value = min(self._rom_size, 0x7FFFFFFF)  # 2^31 - 1
         self.position_slider.setMinimum(0)
@@ -175,190 +396,128 @@ class SimpleBrowseTab(QWidget):
         """)
         controls_layout.addWidget(self.position_slider)
 
-        # Position info row with improved layout
+        # Position info row
         info_row = QHBoxLayout()
-        info_row.setSpacing(SPACING_MEDIUM)  # Better spacing between labels
+        info_row.setSpacing(SPACING_MEDIUM)
 
         self.position_label = QLabel(self._format_position(self._current_offset))
         position_font = QFont()
         position_font.setBold(True)
-        position_font.setPointSize(11)  # More readable size
+        position_font.setPointSize(10)
         self.position_label.setFont(position_font)
+        self.position_label.setStyleSheet(f"color: {COLORS['text_muted']};")
         info_row.addWidget(self.position_label)
 
-        info_row.addStretch()  # Push offset label to the right
+        info_row.addStretch()
 
-        self.offset_label = QLabel(f"0x{self._current_offset:06X}")
-        if self.offset_label:
-            self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS['text_muted']}; font-size: 12px;")
-        info_row.addWidget(self.offset_label)
+        # ROM Range Label (e.g. "0x000000 - 0x400000")
+        self.range_label = QLabel(f"0x0 - 0x{self._rom_size:X}")
+        self.range_label.setStyleSheet(f"font-family: monospace; color: {COLORS['text_muted']}; font-size: 10px;")
+        info_row.addWidget(self.range_label)
 
         controls_layout.addLayout(info_row)
 
-        # Add separator line for visual clarity
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setStyleSheet(f"background-color: {COLORS['panel_background']}; max-height: 1px;")
-        controls_layout.addWidget(separator)
-
-        # Navigation controls section with better grouping
-        nav_row = QHBoxLayout()
-        nav_row.setSpacing(SPACING_SMALL)  # Better button spacing
-
-        # Navigation buttons with improved styling
-        button_style = f"""
-            QPushButton {{
-                padding: 6px 12px;
-                background-color: {COLORS["panel_background"]};
-                border: 1px solid {COLORS["border"]};
-                border-radius: 4px;
-                color: {COLORS["text_secondary"]};
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {COLORS["focus_background_subtle"]};
-                border-color: {COLORS["highlight"]};
-            }}
-            QPushButton:pressed {{
-                background-color: {COLORS["input_background"]};
-            }}
-        """
-
-        self.prev_button = QPushButton("◀ Previous")
-        if self.prev_button:
-            self.prev_button.setStyleSheet(button_style)
-        self.prev_button.setToolTip("Find previous sprite (skip empty areas)")
-        self.prev_button.clicked.connect(self.find_prev_clicked.emit)
-        nav_row.addWidget(self.prev_button)
-
-        self.next_button = QPushButton("Next ▶")
-        if self.next_button:
-            self.next_button.setStyleSheet(button_style)
-        self.next_button.setToolTip("Find next sprite (skip empty areas)")
-        self.next_button.clicked.connect(self.find_next_clicked.emit)
-        nav_row.addWidget(self.next_button)
-
-        # Clipboard paste button - supports system clipboard and Mesen2 file
-        self.paste_button = QPushButton("📋 Paste")
-        if self.paste_button:
-            self.paste_button.setStyleSheet(button_style)
-        self.paste_button.setToolTip(
-            "Paste offset from clipboard\n\n"
-            "Supports:\n"
-            "• Mesen2 log format: 'FILE OFFSET: 0x3C6EF1'\n"
-            "• SNES addresses: $98:8000 or $988000\n"
-            "• Hex: 0x0C3000\n"
-            "• Mesen2 clipboard file (Key 0 in Lua script)"
-        )
-        self.paste_button.clicked.connect(self._paste_from_clipboard)
-        nav_row.addWidget(self.paste_button)
-
-        nav_row.addStretch()  # Add space between navigation and action buttons
-
-        # Find Sprites button - prominent styling for discoverability
-        self.find_sprites_button = QPushButton("🔍 Find Sprites (Ctrl+F)")
-        self.find_sprites_button.setStyleSheet(get_prominent_action_button_style())
-        self.find_sprites_button.setShortcut(QKeySequence("Ctrl+F"))
-        self.find_sprites_button.setToolTip("Scan ROM for HAL-compressed sprites\n\nKeyboard shortcut: Ctrl+F")
-        self.find_sprites_button.clicked.connect(self._on_find_sprites)
-        nav_row.addWidget(self.find_sprites_button)
-
-        # Advanced Search button
-        self.advanced_search_button = QPushButton("⚙️ Advanced")
-        if self.advanced_search_button:
-            self.advanced_search_button.setStyleSheet(button_style)
-        self.advanced_search_button.setToolTip("Open advanced search dialog with filtering and batch operations")
-        self.advanced_search_button.clicked.connect(self._open_advanced_search)
-        nav_row.addWidget(self.advanced_search_button)
-
-        controls_layout.addLayout(nav_row)
-
-        # Add another separator for the manual controls section
-        separator2 = QFrame()
-        separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setStyleSheet(f"background-color: {COLORS['panel_background']}; max-height: 1px;")
-        controls_layout.addWidget(separator2)
-
-        # Manual input section with better organization
-        manual_section = QVBoxLayout()
-        manual_section.setSpacing(SPACING_SMALL)
-
-        # Manual navigation row
-        manual_row = QHBoxLayout()
-        manual_row.setSpacing(SPACING_STANDARD)
-
-        # Go to offset group
-        goto_group = QHBoxLayout()
-        goto_group.setSpacing(SPACING_SMALL)
-
-        goto_label = QLabel("Jump to Offset:")
-        goto_label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_secondary']};")
-        goto_group.addWidget(goto_label)
-
-        self.manual_spinbox = QSpinBox()
-        self.manual_spinbox.setMinimum(0)
-        # QSpinBox has 32-bit signed int limit; clamp like slider does
-        max_spinbox_value = min(self._rom_size, 0x7FFFFFFF)
-        self.manual_spinbox.setMaximum(max_spinbox_value)
-        self.manual_spinbox.setValue(self._current_offset)
-        self.manual_spinbox.setDisplayIntegerBase(16)
-        self.manual_spinbox.setPrefix("0x")
-        self.manual_spinbox.setMinimumWidth(120)
-        if self.manual_spinbox:
-            self.manual_spinbox.setStyleSheet(f"""
-            QSpinBox {{
-                padding: 4px;
-                background-color: {COLORS["panel_background"]};
-                border: 1px solid {COLORS["border"]};
-                border-radius: 4px;
-                font-family: monospace;
-            }}
-        """)
-        self.manual_spinbox.valueChanged.connect(self._on_manual_changed)
-        goto_group.addWidget(self.manual_spinbox)
-
-        go_button = QPushButton("Go")
-        go_button.setStyleSheet(button_style)
-        go_button.clicked.connect(self._on_go_button_clicked)
-        goto_group.addWidget(go_button)
-
-        manual_row.addLayout(goto_group)
-        manual_row.addStretch()
-
-        # Step size control - moved to separate group
-        step_group = QHBoxLayout()
-        step_group.setSpacing(SPACING_SMALL)
-
-        step_label = QLabel("Step Size:")
-        step_label.setStyleSheet(f"font-weight: bold; color: {COLORS['text_muted']};")
-        step_group.addWidget(step_label)
-
-        self.step_spinbox = QSpinBox()
-        self.step_spinbox.setMinimum(MIN_SPRITE_SIZE)
-        self.step_spinbox.setMaximum(ROM_SIZE_1MB)
-        self.step_spinbox.setValue(self._step_size)
-        self.step_spinbox.setDisplayIntegerBase(16)
-        self.step_spinbox.setPrefix("0x")
-        self.step_spinbox.setMinimumWidth(100)
-        if self.step_spinbox:
-            self.step_spinbox.setStyleSheet(f"""
-            QSpinBox {{
-                padding: 4px;
-                background-color: {COLORS["panel_background"]};
-                border: 1px solid {COLORS["border"]};
-                border-radius: 4px;
-                font-family: monospace;
-            }}
-        """)
-        step_group.addWidget(self.step_spinbox)
-
-        manual_row.addLayout(step_group)
-
-        manual_section.addLayout(manual_row)
-        controls_layout.addLayout(manual_section)
-
         layout.addWidget(controls_frame)
         layout.addStretch()  # Push content to top
+
+    def _on_next_step_clicked(self) -> None:
+        """Handle next step button click."""
+        step = self.get_step_size()
+        self.navigate_step_requested.emit(step)
+
+    def _on_prev_step_clicked(self) -> None:
+        """Handle prev step button click."""
+        step = self.get_step_size()
+        self.navigate_step_requested.emit(-step)
+
+    def _on_focus_toggled(self, checked: bool) -> None:
+        """Handle Focus Mode toggle."""
+        self._focus_mode_active = checked
+        self._update_slider_range()
+        
+        # Update styling to indicate focus mode
+        if checked:
+            self.position_slider.setStyleSheet(f"""
+                QSlider::groove:horizontal {{
+                    border: 2px solid {COLORS["highlight"]};
+                    height: 8px;
+                    background: {COLORS["focus_background_subtle"]};
+                    border-radius: 4px;
+                }}
+                QSlider::handle:horizontal {{
+                    background: {COLORS["highlight"]};
+                    border: 2px solid white;
+                    width: 18px;
+                    margin: -5px 0;
+                    border-radius: 9px;
+                }}
+                QSlider::sub-page:horizontal {{
+                    background: {COLORS["highlight_hover"]};
+                    border-radius: 4px;
+                }}
+            """)
+        else:
+            self.position_slider.setStyleSheet(f"""
+                QSlider::groove:horizontal {{
+                    border: 2px solid {COLORS["highlight"]};
+                    height: 8px;
+                    background: {COLORS["input_background"]};
+                    border-radius: 4px;
+                }}
+                QSlider::handle:horizontal {{
+                    background: {COLORS["highlight"]};
+                    border: 2px solid {COLORS["highlight_hover"]};
+                    width: 18px;
+                    margin: -5px 0;
+                    border-radius: 9px;
+                }}
+                QSlider::sub-page:horizontal {{
+                    background: {COLORS["browse_pressed"]};
+                    border-radius: 4px;
+                }}
+            """)
+
+    def _update_slider_range(self) -> None:
+        """Update slider min/max/value based on focus mode."""
+        self.position_slider.blockSignals(True)
+        
+        if self._focus_mode_active:
+            # Focus Mode: Slider represents a window around current offset
+            # We want the slider to be centered if possible
+            # Range: current - window/2 to current + window/2
+            
+            # Note: We can't actually change the range dynamically while dragging without jumping.
+            # Instead, when focus is enabled, we set the range relative to the *current* offset.
+            # As the user moves the slider, the offset changes within that fixed window.
+            # If they want to move the window, they must exit focus mode or use step buttons.
+            
+            # Actually, better behavior: When focus enabled, set range to window around CURRENT.
+            # When slider moves, offset updates.
+            # If offset is updated externally (e.g. step buttons), does the window move?
+            # Yes, if we recenter the window on external updates.
+            
+            center = self._current_offset
+            half_window = self._focus_window_size // 2
+            
+            min_val = max(0, center - half_window)
+            max_val = min(self._rom_size, center + half_window)
+            
+            self.position_slider.setMinimum(min_val)
+            self.position_slider.setMaximum(max_val)
+            self.position_slider.setValue(self._current_offset)
+            
+            self.range_label.setText(f"Focus: 0x{min_val:X} - 0x{max_val:X}")
+            
+        else:
+            # Full ROM Mode
+            max_val = min(self._rom_size, 0x7FFFFFFF)
+            self.position_slider.setMinimum(0)
+            self.position_slider.setMaximum(max_val)
+            self.position_slider.setValue(self._current_offset)
+            
+            self.range_label.setText(f"0x0 - 0x{self._rom_size:X}")
+            
+        self.position_slider.blockSignals(False)
 
     def _format_position(self, offset: int) -> str:
         """
@@ -373,7 +532,7 @@ class SimpleBrowseTab(QWidget):
         if self._rom_size > 0:
             mb_position = offset / (1024 * 1024)
             percentage = (offset / self._rom_size) * 100
-            return f"{mb_position:.1f}MB through ROM ({percentage:.0f}%)"
+            return f"{mb_position:.2f}MB / {percentage:.1f}%"
         return "Unknown position"
 
     def _on_slider_changed(self, value: int) -> None:
@@ -399,11 +558,23 @@ class SimpleBrowseTab(QWidget):
         """Handle manual spinbox changes."""
         self._current_offset = value
         self._update_displays()
-
-        # Update slider without triggering signal
-        self.position_slider.blockSignals(True)
-        self.position_slider.setValue(value)
-        self.position_slider.blockSignals(False)
+        
+        # If in focus mode, we might need to recenter the window if the value went out of bounds,
+        # or just update the slider value.
+        if self._focus_mode_active:
+            # Check if within current slider range
+            if value < self.position_slider.minimum() or value > self.position_slider.maximum():
+                # Re-center window around new value
+                self._update_slider_range()
+            else:
+                self.position_slider.blockSignals(True)
+                self.position_slider.setValue(value)
+                self.position_slider.blockSignals(False)
+        else:
+            # Update slider without triggering signal
+            self.position_slider.blockSignals(True)
+            self.position_slider.setValue(value)
+            self.position_slider.blockSignals(False)
 
         self.offset_changed.emit(value)
         # Preview is requested by dialog's _on_offset_changed handler
@@ -412,8 +583,6 @@ class SimpleBrowseTab(QWidget):
         """Update position displays."""
         if self.position_label:
             self.position_label.setText(self._format_position(self._current_offset))
-        if self.offset_label:
-            self.offset_label.setText(f"0x{self._current_offset:06X}")
 
     def _on_go_button_clicked(self) -> None:
         """Handle go button click without lambda."""
@@ -440,14 +609,18 @@ class SimpleBrowseTab(QWidget):
             self._current_offset = offset
 
             # Update controls without triggering signals
-            self.position_slider.blockSignals(True)
             self.manual_spinbox.blockSignals(True)
-
-            self.position_slider.setValue(offset)
             self.manual_spinbox.setValue(offset)
-
-            self.position_slider.blockSignals(False)
             self.manual_spinbox.blockSignals(False)
+            
+            # Handle slider update (with focus mode logic)
+            if self._focus_mode_active:
+                # Always recenter on external offset set
+                self._update_slider_range()
+            else:
+                self.position_slider.blockSignals(True)
+                self.position_slider.setValue(offset)
+                self.position_slider.blockSignals(False)
 
             self._update_displays()
 
@@ -480,8 +653,10 @@ class SimpleBrowseTab(QWidget):
         self._rom_size = size
         # QSlider and QSpinBox have 32-bit signed int limit
         max_value = min(size, 0x7FFFFFFF)
-        self.position_slider.setMaximum(max_value)
+        # Update manual spinbox max
         self.manual_spinbox.setMaximum(max_value)
+        # Update slider range (respecting focus mode)
+        self._update_slider_range()
         self._update_displays()
 
     def set_navigation_enabled(self, enabled: bool) -> None:
