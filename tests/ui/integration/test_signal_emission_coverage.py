@@ -8,6 +8,24 @@ Tier 1: Critical User-Facing Workflows
 - preview_coordinator.preview_ready -> view update
 - EditingController.imageChanged -> validationChanged
 - undoStateChanged -> UI buttons
+
+Async Safety Notes
+------------------
+These tests use `QCoreApplication.processEvents()` which is safe for:
+- Synchronous signal emissions (EditingController, ToolManager)
+- Mock objects that emit synchronously in the main thread
+
+For tests that simulate what would be async in production (e.g., preview_ready
+from a worker thread), the pattern works because mocks emit synchronously.
+If swapped with real async components, use `qtbot.waitSignal()` instead:
+
+    # ASYNC PATTERN (for real workers):
+    with qtbot.waitSignal(coordinator.preview_ready, timeout=worker_timeout()):
+        coordinator.request_preview(offset)  # Starts async work
+
+    # SYNC PATTERN (current - for mocks):
+    coordinator.preview_ready.emit(...)  # Mock emits synchronously
+    QCoreApplication.processEvents()
 """
 
 from __future__ import annotations

@@ -6,6 +6,18 @@ behavior (emit signal -> verify handler runs) rather than connection counts.
 
 Note: PySide6's QObject.receivers() only counts old-style SIGNAL() connections,
 not new-style signal.connect() connections. These tests verify behavior instead.
+
+Async Safety Notes
+------------------
+Tests that emit signals from mock coordinators (preview_ready, preview_error)
+use synchronous emission + processEvents(). This works because:
+1. MockPreviewCoordinator emits in the main thread
+2. Handler runs immediately (direct connection)
+3. processEvents() ensures any queued side-effects complete
+
+For real async coordinators (worker threads), replace with:
+    with qtbot.waitSignal(coord.preview_ready, timeout=worker_timeout()):
+        coord.request_preview(offset)
 """
 
 from __future__ import annotations
