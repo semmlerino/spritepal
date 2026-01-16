@@ -17,8 +17,9 @@ from PySide6.QtCore import Qt
 
 from tests.fixtures.timeouts import ui_timeout
 from ui.widgets.offset_browser_sidebar import (
-    NEARBY_DELTAS,
-    NEARBY_THUMBNAIL_SIZE,
+    NEARBY_DELTAS_CORE,
+    NEARBY_DELTAS_EXTENDED,
+    NEARBY_SIZES,
     NEARBY_UPDATE_DEBOUNCE_MS,
     OffsetBrowserSidebar,
 )
@@ -95,10 +96,11 @@ class TestNearbyPanelExists:
         assert len(sidebar._nearby_labels) == 6
 
     def test_nearby_labels_have_correct_size(self, sidebar: OffsetBrowserSidebar) -> None:
-        """Verify thumbnail labels have correct size."""
+        """Verify thumbnail labels have correct default size (medium)."""
+        default_size = NEARBY_SIZES["medium"]
         for label in sidebar._nearby_labels:
-            assert label.width() == NEARBY_THUMBNAIL_SIZE
-            assert label.height() == NEARBY_THUMBNAIL_SIZE
+            assert label.width() == default_size
+            assert label.height() == default_size
 
     def test_nearby_timer_created(self, sidebar: OffsetBrowserSidebar) -> None:
         """Verify debounce timer is created."""
@@ -133,7 +135,8 @@ class TestNearbyOffsetCalculations:
 
     def test_nearby_deltas_are_correct(self) -> None:
         """Verify the delta constants are as expected."""
-        assert NEARBY_DELTAS == [-128, -64, -32, 32, 64, 128]
+        assert NEARBY_DELTAS_CORE == [-128, -64, -32, 32, 64, 128]
+        assert NEARBY_DELTAS_EXTENDED == [-1024, -512, -256, 256, 512, 1024]
 
     def test_update_nearby_schedules_timer(self, sidebar: OffsetBrowserSidebar) -> None:
         """Verify update_nearby_offsets starts the debounce timer."""
@@ -152,7 +155,7 @@ class TestNearbyOffsetCalculations:
         qtbot.wait(NEARBY_UPDATE_DEBOUNCE_MS + 100)
 
         # Check calculated offsets
-        expected_offsets = [center_offset + delta for delta in NEARBY_DELTAS]
+        expected_offsets = [center_offset + delta for delta in NEARBY_DELTAS_CORE]
         assert sidebar._nearby_offsets == expected_offsets
 
 
@@ -274,7 +277,7 @@ class TestNearbyDebouncing:
         # Only the last offset should be used
         # Last update was offset 9000
         center = 9000
-        expected_offsets = [center + delta for delta in NEARBY_DELTAS]
+        expected_offsets = [center + delta for delta in NEARBY_DELTAS_CORE]
         assert sidebar._nearby_offsets == expected_offsets
 
     def test_timer_restarts_on_new_update(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
@@ -296,5 +299,182 @@ class TestNearbyDebouncing:
 
         # Should have the second offset's values
         center = 0x20000
-        expected_offsets = [center + delta for delta in NEARBY_DELTAS]
+        expected_offsets = [center + delta for delta in NEARBY_DELTAS_CORE]
         assert sidebar._nearby_offsets == expected_offsets
+
+
+class TestNearbySizeControl:
+    """Tests for thumbnail size control."""
+
+    def test_size_buttons_exist(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify S/M/L buttons are created."""
+        assert len(sidebar._nearby_size_buttons) == 3
+        assert "small" in sidebar._nearby_size_buttons
+        assert "medium" in sidebar._nearby_size_buttons
+        assert "large" in sidebar._nearby_size_buttons
+
+    def test_medium_is_default(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify medium (48px) is default size."""
+        assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["medium"]
+        assert sidebar._nearby_size_buttons["medium"].isChecked()
+        assert not sidebar._nearby_size_buttons["small"].isChecked()
+        assert not sidebar._nearby_size_buttons["large"].isChecked()
+
+    def test_size_change_updates_internal_state(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify changing size updates the internal size variable."""
+        sidebar._on_size_changed("large")
+        qtbot.wait(50)
+        assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["large"]
+
+    def test_size_change_unchecks_other_buttons(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify changing size unchecks the other buttons."""
+        sidebar._on_size_changed("small")
+        qtbot.wait(50)
+        assert sidebar._nearby_size_buttons["small"].isChecked()
+        assert not sidebar._nearby_size_buttons["medium"].isChecked()
+        assert not sidebar._nearby_size_buttons["large"].isChecked()
+
+    def test_size_change_resizes_labels(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify changing size updates label dimensions."""
+        sidebar._on_size_changed("large")
+        qtbot.wait(50)
+        # Check all labels have new size
+        for label in sidebar._nearby_labels:
+            assert label.width() == NEARBY_SIZES["large"]
+            assert label.height() == NEARBY_SIZES["large"]
+
+    def test_size_change_to_small(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify changing to small size works."""
+        sidebar._on_size_changed("small")
+        qtbot.wait(50)
+        assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["small"]
+        for label in sidebar._nearby_labels:
+            assert label.width() == NEARBY_SIZES["small"]
+
+
+class TestNearbyExpansion:
+    """Tests for expand/collapse functionality."""
+
+    def test_expand_button_exists(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify expand button is created."""
+        assert sidebar._nearby_expand_btn is not None
+
+    def test_collapsed_is_default(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify collapsed state is the default."""
+        assert not sidebar._nearby_expanded
+        assert sidebar._nearby_expand_btn is not None
+        assert "Show More" in sidebar._nearby_expand_btn.text()
+
+    def test_expand_shows_more_labels(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify expansion adds 6 more thumbnails (12 total)."""
+        assert len(sidebar._nearby_labels) == 6
+        sidebar._on_expand_toggled()
+        qtbot.wait(50)
+        assert len(sidebar._nearby_labels) == 12
+
+    def test_collapse_returns_to_six(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify collapsing returns to 6 thumbnails."""
+        sidebar._on_expand_toggled()  # Expand
+        qtbot.wait(50)
+        assert len(sidebar._nearby_labels) == 12
+        sidebar._on_expand_toggled()  # Collapse
+        qtbot.wait(50)
+        assert len(sidebar._nearby_labels) == 6
+
+    def test_expand_button_text_changes(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify expand button text changes on toggle."""
+        assert sidebar._nearby_expand_btn is not None
+        assert "Show More" in sidebar._nearby_expand_btn.text()
+        sidebar._on_expand_toggled()
+        qtbot.wait(50)
+        assert "Show Less" in sidebar._nearby_expand_btn.text()
+        sidebar._on_expand_toggled()
+        qtbot.wait(50)
+        assert "Show More" in sidebar._nearby_expand_btn.text()
+
+    def test_expanded_deltas_include_extended_range(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify expanded mode includes ±256, ±512, ±1024."""
+        sidebar._on_expand_toggled()
+        qtbot.wait(50)
+
+        # Get all deltas from labels
+        deltas = [label.property("nearby_delta") for label in sidebar._nearby_labels]
+
+        # Should have both core and extended deltas
+        for delta in NEARBY_DELTAS_CORE:
+            assert delta in deltas
+        for delta in NEARBY_DELTAS_EXTENDED:
+            assert delta in deltas
+
+    def test_collapsed_only_has_core_deltas(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify collapsed mode only has core deltas."""
+        # Get all deltas from labels
+        deltas = [label.property("nearby_delta") for label in sidebar._nearby_labels]
+
+        # Should have only core deltas
+        assert set(deltas) == set(NEARBY_DELTAS_CORE)
+
+    def test_expanded_offsets_calculated_correctly(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify expanded mode calculates correct offsets."""
+        center_offset = 0x10000
+        rom_size = 0x400000
+
+        sidebar._on_expand_toggled()  # Expand
+        sidebar.update_nearby_offsets(center_offset, rom_size)
+        qtbot.wait(NEARBY_UPDATE_DEBOUNCE_MS + 100)
+
+        # Check that we have 12 offsets
+        assert len(sidebar._nearby_offsets) == 12
+
+        # All core deltas should result in valid offsets
+        for delta in NEARBY_DELTAS_CORE:
+            expected_offset = center_offset + delta
+            assert expected_offset in sidebar._nearby_offsets
+
+        # Extended deltas should also be valid for this center
+        for delta in NEARBY_DELTAS_EXTENDED:
+            expected_offset = center_offset + delta
+            assert expected_offset in sidebar._nearby_offsets
+
+
+class TestNearbySizeAndExpansionCombination:
+    """Tests for combining size changes with expansion."""
+
+    def test_size_change_while_expanded(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify size change works correctly when expanded."""
+        sidebar._on_expand_toggled()  # Expand
+        qtbot.wait(50)
+        assert len(sidebar._nearby_labels) == 12
+
+        sidebar._on_size_changed("large")
+        qtbot.wait(50)
+
+        # Should still have 12 labels, all with large size
+        assert len(sidebar._nearby_labels) == 12
+        for label in sidebar._nearby_labels:
+            assert label.width() == NEARBY_SIZES["large"]
+
+    def test_expand_preserves_size(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify expansion preserves the current size setting."""
+        sidebar._on_size_changed("small")
+        qtbot.wait(50)
+
+        sidebar._on_expand_toggled()
+        qtbot.wait(50)
+
+        # All 12 labels should have small size
+        assert len(sidebar._nearby_labels) == 12
+        for label in sidebar._nearby_labels:
+            assert label.width() == NEARBY_SIZES["small"]
+
+    def test_collapse_preserves_size(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify collapse preserves the current size setting."""
+        sidebar._on_size_changed("large")
+        sidebar._on_expand_toggled()  # Expand
+        sidebar._on_expand_toggled()  # Collapse
+        qtbot.wait(50)
+
+        # 6 labels should have large size
+        assert len(sidebar._nearby_labels) == 6
+        for label in sidebar._nearby_labels:
+            assert label.width() == NEARBY_SIZES["large"]

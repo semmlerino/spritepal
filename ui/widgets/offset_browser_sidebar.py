@@ -33,8 +33,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Constants for Nearby panel
-NEARBY_DELTAS = [-128, -64, -32, 32, 64, 128]
-NEARBY_THUMBNAIL_SIZE = 48
+NEARBY_DELTAS_CORE = [-128, -64, -32, 32, 64, 128]
+NEARBY_DELTAS_EXTENDED = [-1024, -512, -256, 256, 512, 1024]
+NEARBY_SIZES: dict[str, int] = {"small": 36, "medium": 48, "large": 64}
 NEARBY_UPDATE_DEBOUNCE_MS = 300
 
 
@@ -94,6 +95,14 @@ class OffsetBrowserSidebar(QWidget):
         self._rom_extractor: ROMExtractor | None = None
         self._rom_path: str = ""
         self._nearby_current_offset_label: QLabel | None = None
+
+        # Configurable nearby panel settings
+        self._nearby_thumbnail_size: int = NEARBY_SIZES["medium"]
+        self._nearby_expanded: bool = False
+        self._nearby_size_buttons: dict[str, QPushButton] = {}
+        self._nearby_expand_btn: QPushButton | None = None
+        self._nearby_grid_container: QWidget | None = None
+        self._nearby_grid_layout: QGridLayout | None = None
 
         self._setup_ui()
 
@@ -342,53 +351,73 @@ class OffsetBrowserSidebar(QWidget):
     # ============= Nearby Panel Management =============
 
     def _setup_nearby_panel(self) -> None:
-        """Set up the Nearby panel with thumbnail grid."""
-        # Container widget for the grid
-        container = QWidget()
-        grid_layout = QGridLayout(container)
-        grid_layout.setSpacing(4)
-        grid_layout.setContentsMargins(4, 4, 4, 4)
+        """Set up the Nearby panel with thumbnail grid and controls."""
+        # Size selector row (S|M|L buttons)
+        size_row = QHBoxLayout()
+        size_row.setContentsMargins(4, 0, 4, 0)
+        size_row.setSpacing(2)
 
-        # Create 6 thumbnail labels (2 rows x 3 cols)
-        # Row 0: -128, -64, -32 (before current)
-        # Row 1: +32, +64, +128 (after current)
-        self._nearby_labels = []
-        for i, delta in enumerate(NEARBY_DELTAS):
-            label = QLabel()
-            label.setFixedSize(NEARBY_THUMBNAIL_SIZE, NEARBY_THUMBNAIL_SIZE)
-            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            label.setStyleSheet(
+        for key, label in [("small", "S"), ("medium", "M"), ("large", "L")]:
+            btn = QPushButton(label)
+            btn.setFixedSize(24, 20)
+            btn.setCheckable(True)
+            btn.setChecked(key == "medium")  # Default to medium
+            btn.setStyleSheet(
                 f"""
-                QLabel {{
+                QPushButton {{
                     background-color: {COLORS["input_background"]};
                     border: 1px solid {COLORS["border"]};
-                    border-radius: 4px;
+                    border-radius: 3px;
+                    font-size: 10px;
+                    padding: 0;
                 }}
-                QLabel:hover {{
+                QPushButton:checked {{
+                    background-color: {COLORS["primary"]};
+                    color: white;
+                }}
+                QPushButton:hover {{
                     border-color: {COLORS["primary"]};
                 }}
                 """
             )
-            label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            btn.clicked.connect(lambda checked, k=key: self._on_size_changed(k))
+            size_row.addWidget(btn)
+            self._nearby_size_buttons[key] = btn
+        size_row.addStretch()
 
-            # Delta label (overlay showing offset delta)
-            delta_text = f"{delta:+d}" if delta != 0 else "0"
-            label.setToolTip(f"Click to navigate to offset {delta_text} bytes")
+        size_widget = QWidget()
+        size_widget.setLayout(size_row)
+        self._nearby_panel.add_widget(size_widget)
 
-            # Store index for click handling
-            label.setProperty("nearby_index", i)
+        # Grid container (will be populated by _rebuild_nearby_grid)
+        self._nearby_grid_container = QWidget()
+        self._nearby_grid_layout = QGridLayout(self._nearby_grid_container)
+        self._nearby_grid_layout.setSpacing(4)
+        self._nearby_grid_layout.setContentsMargins(4, 4, 4, 4)
+        self._nearby_panel.add_widget(self._nearby_grid_container)
 
-            # Connect mouse press
-            label.mousePressEvent = lambda event, idx=i: self._on_nearby_clicked(idx)
+        # Build initial grid
+        self._rebuild_nearby_grid()
 
-            # Position in grid
-            row = 0 if delta < 0 else 1
-            col = i % 3
-
-            grid_layout.addWidget(label, row, col)
-            self._nearby_labels.append(label)
-
-        self._nearby_panel.add_widget(container)
+        # Expand/collapse button
+        self._nearby_expand_btn = QPushButton("▼ Show More")
+        self._nearby_expand_btn.setFlat(True)
+        self._nearby_expand_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self._nearby_expand_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                color: {COLORS["primary"]};
+                font-size: 10px;
+                padding: 4px;
+                text-align: center;
+            }}
+            QPushButton:hover {{
+                color: {COLORS["text_primary"]};
+            }}
+            """
+        )
+        self._nearby_expand_btn.clicked.connect(self._on_expand_toggled)
+        self._nearby_panel.add_widget(self._nearby_expand_btn)
 
         # Current offset label
         self._nearby_current_offset_label = QLabel("No offset")
@@ -403,6 +432,136 @@ class OffsetBrowserSidebar(QWidget):
 
         # Initialize with placeholder state
         self._clear_nearby_thumbnails()
+
+    def _get_active_deltas(self) -> list[int]:
+        """Get the list of deltas based on current expansion state.
+
+        Returns:
+            List of delta values to show in the grid.
+        """
+        if self._nearby_expanded:
+            return NEARBY_DELTAS_CORE + NEARBY_DELTAS_EXTENDED
+        return NEARBY_DELTAS_CORE
+
+    def _on_size_changed(self, size_key: str) -> None:
+        """Handle thumbnail size change.
+
+        Args:
+            size_key: The size key ("small", "medium", or "large").
+        """
+        if size_key not in NEARBY_SIZES:
+            return
+
+        self._nearby_thumbnail_size = NEARBY_SIZES[size_key]
+
+        # Update button states (uncheck others, check selected)
+        for key, btn in self._nearby_size_buttons.items():
+            btn.setChecked(key == size_key)
+
+        # Rebuild grid and regenerate thumbnails
+        self._rebuild_nearby_grid()
+        if self._pending_nearby_center > 0:
+            self._do_nearby_update()
+
+    def _on_expand_toggled(self) -> None:
+        """Handle expand/collapse toggle."""
+        self._nearby_expanded = not self._nearby_expanded
+
+        # Update button text
+        if self._nearby_expand_btn is not None:
+            text = "▲ Show Less" if self._nearby_expanded else "▼ Show More"
+            self._nearby_expand_btn.setText(text)
+
+        # Rebuild grid and regenerate thumbnails
+        self._rebuild_nearby_grid()
+        if self._pending_nearby_center > 0:
+            self._do_nearby_update()
+
+    def _rebuild_nearby_grid(self) -> None:
+        """Rebuild the thumbnail grid with current size and expansion state."""
+        if self._nearby_grid_layout is None:
+            return
+
+        # Clear existing labels
+        for label in self._nearby_labels:
+            label.deleteLater()
+        self._nearby_labels.clear()
+        self._nearby_offsets.clear()
+
+        # Get active deltas
+        deltas = self._get_active_deltas()
+        size = self._nearby_thumbnail_size
+
+        # Create new labels
+        # Layout: negative deltas sorted by absolute value descending in top rows,
+        # positive deltas sorted by absolute value ascending in bottom rows
+        neg_deltas = sorted([d for d in deltas if d < 0], key=lambda x: -abs(x))  # -128, -64, -32, then -1024...
+        pos_deltas = sorted([d for d in deltas if d > 0], key=lambda x: abs(x))  # +32, +64, +128, then +256...
+
+        # Core deltas: row 0 (neg), row 1 (pos)
+        # Extended deltas (when expanded): row 2 (neg), row 3 (pos)
+
+        # Add negative core deltas (row 0)
+        for col, delta in enumerate(neg_deltas[:3]):
+            self._add_nearby_label(delta, size, 0, col)
+
+        # Add positive core deltas (row 1)
+        for col, delta in enumerate(pos_deltas[:3]):
+            self._add_nearby_label(delta, size, 1, col)
+
+        # Add extended deltas if expanded
+        if self._nearby_expanded:
+            # Extended negative deltas (row 2) - sorted by absolute value descending
+            for col, delta in enumerate(neg_deltas[3:]):
+                self._add_nearby_label(delta, size, 2, col)
+
+            # Extended positive deltas (row 3)
+            for col, delta in enumerate(pos_deltas[3:]):
+                self._add_nearby_label(delta, size, 3, col)
+
+    def _add_nearby_label(self, delta: int, size: int, row: int, col: int) -> None:
+        """Add a single nearby label to the grid.
+
+        Args:
+            delta: The offset delta for this label.
+            size: The thumbnail size in pixels.
+            row: Grid row.
+            col: Grid column.
+        """
+        if self._nearby_grid_layout is None:
+            return
+
+        label = QLabel()
+        label.setFixedSize(size, size)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet(
+            f"""
+            QLabel {{
+                background-color: {COLORS["input_background"]};
+                border: 1px solid {COLORS["border"]};
+                border-radius: 4px;
+            }}
+            QLabel:hover {{
+                border-color: {COLORS["primary"]};
+            }}
+            """
+        )
+        label.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+
+        # Delta label (overlay showing offset delta)
+        delta_text = f"{delta:+d}" if delta != 0 else "0"
+        label.setToolTip(f"Click to navigate to offset {delta_text} bytes")
+
+        # Store delta for click handling
+        label.setProperty("nearby_delta", delta)
+        index = len(self._nearby_labels)
+        label.setProperty("nearby_index", index)
+
+        # Connect mouse press
+        label.mousePressEvent = lambda event, idx=index: self._on_nearby_clicked(idx)
+
+        self._nearby_grid_layout.addWidget(label, row, col)
+        self._nearby_labels.append(label)
 
     def set_rom_extractor(self, extractor: ROMExtractor, rom_path: str) -> None:
         """Set the ROM extractor and path for thumbnail generation.
@@ -444,7 +603,12 @@ class OffsetBrowserSidebar(QWidget):
 
         # Calculate actual offsets and update each thumbnail
         self._nearby_offsets = []
-        for i, delta in enumerate(NEARBY_DELTAS):
+        for i, label in enumerate(self._nearby_labels):
+            delta = label.property("nearby_delta")
+            if delta is None:
+                self._nearby_offsets.append(-1)
+                continue
+
             actual_offset = center_offset + delta
 
             # Validate offset bounds
@@ -472,7 +636,9 @@ class OffsetBrowserSidebar(QWidget):
             return
 
         label = self._nearby_labels[index]
-        delta = NEARBY_DELTAS[index]
+        delta = label.property("nearby_delta")
+        if delta is None:
+            return
 
         try:
             from pathlib import Path
@@ -555,10 +721,11 @@ class OffsetBrowserSidebar(QWidget):
             pixmap = QPixmap()
             pixmap.loadFromData(buffer.getvalue())
 
-            # Scale to thumbnail size
+            # Scale to thumbnail size (with margin for border)
+            thumb_size = self._nearby_thumbnail_size - 4
             scaled = pixmap.scaled(
-                NEARBY_THUMBNAIL_SIZE - 4,
-                NEARBY_THUMBNAIL_SIZE - 4,
+                thumb_size,
+                thumb_size,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
@@ -660,8 +827,10 @@ class OffsetBrowserSidebar(QWidget):
 
     def _clear_nearby_thumbnails(self) -> None:
         """Clear all nearby thumbnails to placeholder state."""
-        for i, label in enumerate(self._nearby_labels):
-            delta = NEARBY_DELTAS[i]
+        for label in self._nearby_labels:
+            delta = label.property("nearby_delta")
+            if delta is None:
+                delta = 0
             label.clear()
             label.setText(f"{delta:+d}")
             label.setStyleSheet(
