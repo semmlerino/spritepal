@@ -20,7 +20,6 @@ if TYPE_CHECKING:
     from core.services.preview_generator import PreviewGenerator
     from core.services.rom_cache import ROMCache
     from core.sprite_library import SpriteLibrary
-    from core.workers import ROMExtractionWorker, VRAMExtractionWorker
     from ui.injection_dialog import InjectionDialog
     from ui.services.dialog_coordinator import DialogCoordinator
     from ui.services.extraction_workflow_coordinator import ExtractionWorkflowCoordinator
@@ -75,7 +74,6 @@ from ui.styles import get_muted_text_style
 from ui.styles.components import get_action_zone_style
 from ui.workspaces import SpriteEditorWorkspace
 from ui.zoomable_preview import PreviewPanel
-from utils.constants import VRAM_SPRITE_OFFSET
 from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
 
@@ -162,9 +160,7 @@ class MainWindow(QMainWindow):
         self._dialog_coordinator = None  # Lazy initialization for dialog service
         self._last_undo_state = (False, False)
 
-        # Worker management - retained for cleanup compatibility during transition
-        self._vram_worker: VRAMExtractionWorker | None = None
-        self._rom_worker: ROMExtractionWorker | None = None
+        # Signal connection management (for per-operation manager connections)
         self._manager_connections: list[object] = []
         self._extracted_palettes: dict[int, list[list[int]]] = {}
         self._active_palettes: list[int] = []
@@ -1050,14 +1046,9 @@ class MainWindow(QMainWindow):
 
             self._output_path = params["output_base"]
 
-            # Use coordinator if available, fallback to direct extraction
-            if self._extraction_coordinator is not None:
-                self._extraction_coordinator.start_rom_extraction(params)
-            else:
-                # Fallback: update status and start directly (during tests without coordinator)
-                self.status_bar_manager.show_message("Extracting sprites from ROM...")
-                self.toolbar_manager.set_extract_enabled(False)
-                self._start_rom_extraction(params)
+            # Coordinator is always available in production
+            assert self._extraction_coordinator is not None, "ExtractionWorkflowCoordinator not initialized"
+            self._extraction_coordinator.start_rom_extraction(params)
 
     def _handle_vram_extraction(
         self,
@@ -1092,14 +1083,9 @@ class MainWindow(QMainWindow):
             "grayscale_mode": self.extraction_panel.is_grayscale_mode(),
         }
 
-        # Use coordinator if available, fallback to direct extraction
-        if self._extraction_coordinator is not None:
-            self._extraction_coordinator.start_vram_extraction(params)
-        else:
-            # Fallback: update status and start directly (during tests without coordinator)
-            self.status_bar_manager.show_message("Extracting sprites from VRAM...")
-            self.toolbar_manager.set_extract_enabled(False)
-            self._start_vram_extraction()
+        # Coordinator is always available in production
+        assert self._extraction_coordinator is not None, "ExtractionWorkflowCoordinator not initialized"
+        self._extraction_coordinator.start_vram_extraction(params)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # EXTRACTION COORDINATOR SIGNAL HANDLERS
@@ -1115,91 +1101,8 @@ class MainWindow(QMainWindow):
         self.toolbar_manager.set_extract_enabled(False)
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # VRAM EXTRACTION ORCHESTRATION (Phase 4d: moved from ExtractionController)
-    # LEGACY: This section is being migrated to ExtractionWorkflowCoordinator
+    # VRAM EXTRACTION SIGNAL HANDLERS
     # ═══════════════════════════════════════════════════════════════════════════
-
-    def _start_vram_extraction(self) -> None:
-        """Start the VRAM extraction process.
-
-        Validates parameters, creates worker, and connects signals.
-        Handles PIL→QPixmap conversion in main thread (Bug #26 fix).
-        """
-        from core.workers import VRAMExtractionWorker
-
-        # Get parameters from UI
-        params = self.get_extraction_params()
-
-        # Get extraction manager from instance attribute
-        extraction_manager = self.core_operations_manager
-
-        # PARAMETER VALIDATION: Check requirements first for better UX
-        try:
-            extraction_manager.validate_extraction_params(params)
-        except (ValueError, TypeError) as e:
-            self.extraction_failed(str(e))
-            return
-        except Exception as e:
-            logger.exception("Unexpected error during extraction parameter validation")
-            self.extraction_failed(f"Validation error: {e}")
-            return
-
-        # DEFENSIVE VALIDATION: Validate files that exist
-        vram_path = params.get("vram_path", "")
-        if vram_path:
-            vram_result = FileValidator.validate_vram_file(vram_path)
-            if not vram_result.is_valid:
-                self.extraction_failed(vram_result.error_message or "VRAM file validation failed")
-                return
-            for warning in vram_result.warnings:
-                logger.warning(f"VRAM file warning: {warning}")
-
-        cgram_path = params.get("cgram_path", "")
-        grayscale_mode = params.get("grayscale_mode", False)
-        if cgram_path and not grayscale_mode:
-            cgram_result = FileValidator.validate_cgram_file(cgram_path)
-            if not cgram_result.is_valid:
-                self.extraction_failed(cgram_result.error_message or "CGRAM file validation failed")
-                return
-            for warning in cgram_result.warnings:
-                logger.warning(f"CGRAM file warning: {warning}")
-
-        oam_path = params.get("oam_path", "")
-        if oam_path:
-            oam_result = FileValidator.validate_oam_file(oam_path)
-            if not oam_result.is_valid:
-                self.extraction_failed(oam_result.error_message or "OAM file validation failed")
-                return
-            for warning in oam_result.warnings:
-                logger.warning(f"OAM file warning: {warning}")
-
-        # Create extraction parameters TypedDict
-        extraction_params: VRAMExtractionParams = {
-            "vram_path": params["vram_path"],
-            "cgram_path": params.get("cgram_path") or None,
-            "oam_path": params.get("oam_path") or None,
-            "vram_offset": params.get("vram_offset", VRAM_SPRITE_OFFSET),
-            "output_base": params["output_base"],
-            "create_grayscale": params.get("create_grayscale", True),
-            "create_metadata": params.get("create_metadata", True),
-            "grayscale_mode": params.get("grayscale_mode", False),
-        }
-
-        # Create and start worker
-        worker = VRAMExtractionWorker(extraction_params, extraction_manager=extraction_manager)
-        self._vram_worker = worker
-
-        # Worker-owned signals
-        _ = worker.progress.connect(self._on_vram_progress)
-        _ = worker.extraction_finished.connect(self._on_vram_extraction_finished)
-        _ = worker.error.connect(self._on_vram_extraction_error)
-
-        # Connect to consolidated extraction signal (replaces 3 legacy signals)
-        self._manager_connections = [
-            extraction_manager.extraction_completed.connect(self._on_extraction_completed),
-        ]
-
-        worker.start()
 
     def _on_vram_progress(self, percent: int, message: str) -> None:
         """Handle progress updates from worker."""
@@ -1277,15 +1180,13 @@ class MainWindow(QMainWindow):
         self.extraction_failed(error_message)
 
     def _cleanup_vram_worker(self) -> None:
-        """Safely cleanup VRAM worker thread and manager signal connections."""
-        from core.services.worker_lifecycle import WorkerManager
+        """Cleanup handler for VRAM extraction completion.
 
-        # Disconnect manager signals (connected per-operation)
+        Worker cleanup is now handled by ExtractionWorkflowCoordinator.
+        This method remains for signal handling compatibility.
+        """
+        # Disconnect any manager signals (connected per-operation, if any)
         self._disconnect_manager_signals()
-
-        if self._vram_worker is not None:
-            WorkerManager.cleanup_worker(self._vram_worker, timeout=3000)
-            self._vram_worker = None
 
     def _disconnect_manager_signals(self) -> None:
         """Disconnect manager signal connections."""
@@ -1300,34 +1201,8 @@ class MainWindow(QMainWindow):
         self._manager_connections.clear()
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # ROM EXTRACTION ORCHESTRATION (Phase 4e: moved from ExtractionController)
+    # ROM EXTRACTION SIGNAL HANDLERS
     # ═══════════════════════════════════════════════════════════════════════════
-
-    def _start_rom_extraction(self, params: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - params are dynamic extraction config
-        """Start ROM sprite extraction process."""
-        from core.types import ROMExtractionParams
-        from core.workers import ROMExtractionWorker
-
-        extraction_manager = self.core_operations_manager
-
-        # Convert validated params dict to ROMExtractionParams TypedDict
-        rom_extraction_params: ROMExtractionParams = {
-            "rom_path": params["rom_path"],
-            "sprite_offset": params["sprite_offset"],
-            "sprite_name": params["sprite_name"],
-            "output_base": params["output_base"],
-            "cgram_path": params.get("cgram_path"),
-        }
-
-        # Create and start ROM extraction worker
-        worker = ROMExtractionWorker(rom_extraction_params, extraction_manager=extraction_manager)
-        self._rom_worker = worker
-
-        _ = worker.progress.connect(self._on_rom_progress)
-        _ = worker.extraction_finished.connect(self._on_rom_extraction_finished)
-        _ = worker.error.connect(self._on_rom_extraction_error)
-
-        worker.start()
 
     def _on_rom_progress(self, percent: int, message: str) -> None:
         """Handle ROM extraction progress."""
@@ -1351,12 +1226,12 @@ class MainWindow(QMainWindow):
         self.extraction_failed(error_message)
 
     def _cleanup_rom_worker(self) -> None:
-        """Safely cleanup ROM worker thread."""
-        from core.services.worker_lifecycle import WorkerManager
+        """Cleanup handler for ROM extraction completion.
 
-        if self._rom_worker is not None:
-            WorkerManager.cleanup_worker(self._rom_worker, timeout=3000)
-            self._rom_worker = None
+        Worker cleanup is now handled by ExtractionWorkflowCoordinator.
+        This method remains for signal handling compatibility.
+        """
+        pass  # Coordinator handles worker lifecycle
 
     # ═══════════════════════════════════════════════════════════════════════════
     # INJECTION ORCHESTRATION (Phase 4e: moved from ExtractionController)

@@ -75,7 +75,7 @@ def _apply_vram_output_settings(
     dialog.close()
     qt_app.processEvents()
     # Store settings in MainWindow's internal state without triggering extraction
-    # This simulates what _handle_vram_extraction does before calling _start_vram_extraction
+    # This simulates what _handle_vram_extraction does before delegating to coordinator
     main_window._vram_output_name = settings.output_name
     main_window._vram_export_palettes = settings.export_palette_files
     main_window._vram_include_metadata = settings.include_metadata
