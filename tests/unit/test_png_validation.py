@@ -1,12 +1,12 @@
 """Tests for PNG palette index validation.
 
-Bug: `validate_sprite()` checks unique color count but does NOT validate
-palette indices are 0-15 for 4bpp compatibility.
+`validate_sprite()` checks both unique color count AND validates palette indices
+are 0-15 for 4bpp compatibility.
 
-`convert_png_to_4bpp()` has recovery logic (lines 193-202) that runs AFTER
-validation passes, masking invalid input.
+`convert_png_to_4bpp()` has recovery logic for grayscale PNGs that runs AFTER
+validation passes.
 
-Expected behavior: Validation should reject PNGs with palette indices > 15.
+These tests verify that validation rejects PNGs with palette indices > 15.
 """
 
 import numpy as np

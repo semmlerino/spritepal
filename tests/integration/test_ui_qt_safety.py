@@ -201,36 +201,6 @@ class TestQtSafetyPatterns:
         assert safe_add_widget(None, mock_widget) is False
         mock_layout.addWidget.assert_not_called()
 
-    def test_mock_qt_containers_truthiness(self):
-        """Test with mock Qt containers to simulate the boolean evaluation behavior"""
-        # Create mock containers that behave like empty Qt containers
-        mock_empty_layout = Mock()
-        mock_empty_layout.__bool__ = Mock(return_value=False)  # Simulates empty Qt container
-
-        mock_none_layout = None
-
-        mock_populated_layout = Mock()
-        mock_populated_layout.__bool__ = Mock(return_value=True)  # Simulates non-empty Qt container
-
-        # Test the patterns
-        def check_truthiness(obj):
-            # Unsafe pattern - checking truthiness
-            return bool(obj)
-
-        def check_not_none(obj):
-            # Safe pattern - checking 'is not None'
-            return obj is not None
-
-        # Demonstrate the difference
-        assert check_truthiness(mock_empty_layout) is False  # Bug: empty container fails
-        assert check_not_none(mock_empty_layout) is True  # Fix: empty container passes
-
-        assert check_truthiness(mock_none_layout) is False  # Correct: None fails
-        assert check_not_none(mock_none_layout) is False  # Correct: None fails
-
-        assert check_truthiness(mock_populated_layout) is True  # Correct: populated passes
-        assert check_not_none(mock_populated_layout) is True  # Correct: populated passes
-
 
 class TestSpecificFixedLocations:
     """Test specific locations where Qt boolean evaluation fixes were applied"""
