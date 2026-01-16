@@ -10,6 +10,32 @@ Also tests known issues from Tier 2:
 - Signals not disconnected before reconnect (batch_thumbnail_worker.py:817-819)
 
 These tests focus on signal ordering and lifecycle, not full worker functionality.
+
+Async Safety Notes
+------------------
+These tests use mock workers with synchronous `run_sync()` methods to test signal
+ordering without threading complexity. This is safe because:
+1. MockWorkerWithLifecycle emits signals synchronously in the test thread
+2. processEvents() ensures any queued side-effects complete
+
+For testing REAL threaded workers, use `qtbot.waitSignal()` with context manager:
+
+    # REAL ASYNC WORKER PATTERN:
+    with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
+        worker.start()  # Runs in separate thread
+
+    # Verify order using MultiSignalRecorder connected BEFORE starting
+    recorder = MultiSignalRecorder()
+    recorder.connect_signal(worker.started, "started")
+    recorder.connect_signal(worker.finished, "finished")
+
+    with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
+        worker.start()
+
+    recorder.assert_contains_sequence(["started", "finished"])
+
+IMPORTANT: When testing real threaded workers, connect spies BEFORE starting
+the worker, otherwise signals may be missed.
 """
 
 from __future__ import annotations
@@ -347,3 +373,141 @@ class TestMultipleWorkerInstances:
 
         assert worker1_count == 1
         assert worker2_count == 0, "worker2's slot should not have been called"
+
+
+class ThreadedMockWorker(QObject):
+    """Mock worker that runs in a QThread to demonstrate async patterns."""
+
+    started = Signal()
+    progress = Signal(int, int)
+    finished = Signal()
+
+    def __init__(self, parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._work_steps = 3
+
+    def run(self) -> None:
+        """Simulate work (called in thread context)."""
+        self.started.emit()
+        for i in range(self._work_steps):
+            self.progress.emit(i + 1, self._work_steps)
+        self.finished.emit()
+
+
+class TestAsyncWaitingPatterns:
+    """Examples demonstrating proper qtbot.waitSignal() usage for async workers.
+
+    These tests demonstrate the CORRECT patterns for testing real threaded workers.
+    The key principles are:
+    1. Always use context manager: `with qtbot.waitSignal(...)`
+    2. Connect spies BEFORE starting async operation
+    3. Use timeouts from tests/fixtures/timeouts.py
+    4. Use `raising=True` to fail fast on timeout (default in pytest-qt)
+    """
+
+    def test_wait_signal_context_manager_pattern(self, qtbot: QtBot) -> None:
+        """Demonstrate correct context manager pattern for async signals.
+
+        CORRECT PATTERN:
+            with qtbot.waitSignal(signal, timeout=timeout):
+                start_async_operation()
+
+        WRONG PATTERN (race condition):
+            spy = QSignalSpy(signal)
+            start_async_operation()
+            # Signal may have already emitted before spy was ready!
+        """
+        from PySide6.QtCore import QThread
+
+        worker = ThreadedMockWorker()
+        thread = QThread()
+        worker.moveToThread(thread)
+
+        recorder = MultiSignalRecorder()
+        recorder.connect_signal(worker.started, "started")
+        recorder.connect_signal(worker.finished, "finished")
+
+        # Connect thread started to worker run
+        thread.started.connect(worker.run)
+        # Clean shutdown
+        worker.finished.connect(thread.quit)
+
+        # CORRECT: Context manager ensures we don't miss the signal
+        with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
+            thread.start()
+
+        # Verify signals were captured
+        recorder.assert_emitted("started", times=1)
+        recorder.assert_emitted("finished", times=1)
+        recorder.assert_contains_sequence(["started", "finished"])
+
+        # Cleanup
+        thread.wait()
+
+    def test_multiple_signals_with_recorder_and_wait(self, qtbot: QtBot) -> None:
+        """Demonstrate recording multiple signals from async worker.
+
+        Pattern: Connect MultiSignalRecorder BEFORE starting, then wait
+        for the terminal signal (usually `finished`).
+        """
+        from PySide6.QtCore import QThread
+
+        worker = ThreadedMockWorker()
+        worker._work_steps = 5
+        thread = QThread()
+        worker.moveToThread(thread)
+
+        # Setup recorder BEFORE starting
+        recorder = MultiSignalRecorder()
+        recorder.connect_signal(worker.started, "started")
+        recorder.connect_signal(worker.progress, "progress")
+        recorder.connect_signal(worker.finished, "finished")
+
+        thread.started.connect(worker.run)
+        worker.finished.connect(thread.quit)
+
+        # Wait for terminal signal
+        with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
+            thread.start()
+
+        # Now verify order and counts
+        recorder.assert_emitted("started", times=1)
+        recorder.assert_emitted("progress", times=5)
+        recorder.assert_emitted("finished", times=1)
+
+        order = recorder.emission_order()
+        assert order[0] == "started", "Worker must emit started first"
+        assert order[-1] == "finished", "Worker must emit finished last"
+
+        thread.wait()
+
+    def test_timeout_handling_with_raising(self, qtbot: QtBot) -> None:
+        """Demonstrate timeout handling - test should fail fast on timeout.
+
+        By default pytest-qt uses raising=True, meaning TimeoutError is raised
+        if the signal isn't emitted within the timeout. This is the correct
+        behavior for detecting "signal never emitted" bugs.
+        """
+        from PySide6.QtCore import QThread
+
+        worker = ThreadedMockWorker()
+        thread = QThread()
+        worker.moveToThread(thread)
+
+        thread.started.connect(worker.run)
+        worker.finished.connect(thread.quit)
+
+        # This should NOT timeout since worker emits finished
+        with qtbot.waitSignal(worker.finished, timeout=worker_timeout()):
+            thread.start()
+
+        thread.wait()
+
+        # To demonstrate timeout behavior (commented out - would fail):
+        # from PySide6.QtCore import Signal
+        # class NeverEmits(QObject):
+        #     never = Signal()
+        # obj = NeverEmits()
+        # with pytest.raises(pytestqt.exceptions.TimeoutError):
+        #     with qtbot.waitSignal(obj.never, timeout=100):
+        #         pass  # Signal never emits
