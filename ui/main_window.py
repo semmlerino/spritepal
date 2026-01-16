@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from ui.injection_dialog import InjectionDialog
     from ui.services.dialog_coordinator import DialogCoordinator
     from ui.services.extraction_workflow_coordinator import ExtractionWorkflowCoordinator
+    from ui.services.injection_workflow_coordinator import InjectionWorkflowCoordinator
 
 from typing import override
 
@@ -152,8 +153,9 @@ class MainWindow(QMainWindow):
         self.output_settings_manager: OutputSettingsManager
         self.keyboard_shortcut_manager: KeyboardShortcutManager
 
-        # Extraction workflow coordinator (manages worker lifecycle and signals)
+        # Workflow coordinators (manage worker lifecycle and signals)
         self._extraction_coordinator: ExtractionWorkflowCoordinator | None = None
+        self._injection_coordinator: InjectionWorkflowCoordinator | None = None
 
         self._output_path = ""
         self._extracted_files = []
@@ -687,10 +689,12 @@ class MainWindow(QMainWindow):
         """Set up all UI managers"""
         from core.app_context import get_app_context
         from ui.services.extraction_workflow_coordinator import ExtractionWorkflowCoordinator
+        from ui.services.injection_workflow_coordinator import InjectionWorkflowCoordinator
 
-        # Create extraction workflow coordinator (manages worker lifecycle)
+        # Create workflow coordinators (manage worker lifecycle)
         app_context = get_app_context()
         self._extraction_coordinator = ExtractionWorkflowCoordinator(app_context)
+        self._injection_coordinator = InjectionWorkflowCoordinator(app_context)
 
         # Create managers in dependency order
         self.status_bar_manager = StatusBarManager(
@@ -1283,19 +1287,13 @@ class MainWindow(QMainWindow):
                 self._current_injection_dialog = dialog
                 settings_mgr.set("workflow", "current_injection_params", params)
 
-                # Connect injection manager signals before starting
-                self._injection_progress_connection = injection_manager.injection_progress.connect(
-                    self._on_injection_progress
-                )
-                self._injection_finished_connection = injection_manager.injection_finished.connect(
-                    self._on_injection_finished
-                )
-
-                # Start injection using manager
-                success = injection_manager.start_injection(params)
+                # Start injection via coordinator (handles signal connections)
+                assert self._injection_coordinator is not None, "InjectionWorkflowCoordinator not initialized"
+                success = self._injection_coordinator.start_injection(params)
                 if not success:
                     self.status_bar.showMessage("Failed to start injection")
-                    self._cleanup_injection_connections()
+                    self._current_injection_dialog = None
+                    settings_mgr.set("workflow", "current_injection_params", None)
 
     def _on_injection_progress(self, message: str) -> None:
         """Handle injection progress updates."""
@@ -1327,28 +1325,9 @@ class MainWindow(QMainWindow):
             fail_msg = f"Injection failed: {message}"
             self.status_bar.showMessage(fail_msg)
 
-        # Clean up
+        # Clean up (coordinator handles signal disconnection)
         self._current_injection_dialog = None
         settings_mgr.set("workflow", "current_injection_params", None)
-        self._cleanup_injection_connections()
-
-    def _cleanup_injection_connections(self) -> None:
-        """Cleanup injection signal connections."""
-        from PySide6.QtCore import QObject
-
-        if hasattr(self, "_injection_progress_connection"):
-            try:
-                QObject.disconnect(self._injection_progress_connection)
-            except (RuntimeError, TypeError):
-                pass
-            delattr(self, "_injection_progress_connection")
-
-        if hasattr(self, "_injection_finished_connection"):
-            try:
-                QObject.disconnect(self._injection_finished_connection)
-            except (RuntimeError, TypeError):
-                pass
-            delattr(self, "_injection_finished_connection")
 
     # ═══════════════════════════════════════════════════════════════════════════
 
@@ -1526,6 +1505,11 @@ class MainWindow(QMainWindow):
             self._extraction_coordinator.core_operations_manager.extraction_completed.connect(
                 self._on_extraction_completed
             )
+
+        # Connect injection workflow coordinator signals
+        if self._injection_coordinator is not None:
+            self._injection_coordinator.injection_progress.connect(self._on_injection_progress)
+            self._injection_coordinator.injection_finished.connect(self._on_injection_finished)
 
         # Note: Output settings are now shown in a dialog on Extract click
         # The output_settings_manager just tracks the suggested output name
