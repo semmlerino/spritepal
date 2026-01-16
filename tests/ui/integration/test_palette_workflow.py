@@ -67,6 +67,7 @@ class TestPaletteAssociation:
 
         controller.rom_path = "test.sfc"
         controller.current_offset = 0x123456
+        controller.current_tile_offset = 0x123456  # Must match current_offset
         controller.current_tile_data = b"\x00" * 32
         controller.current_width = 8
         controller.current_height = 8
@@ -172,6 +173,7 @@ class TestPaletteDuplication:
         controller = ROMWorkflowController(None, editing_controller)
         controller.rom_path = "dummy.sfc"
         controller.current_tile_data = b"\x00" * 32
+        controller.current_tile_offset = 0  # Must match current_offset (defaults to 0)
         controller.current_sprite_name = "test_sprite"
 
         mock_extractor = MagicMock()
@@ -417,6 +419,7 @@ class TestROMPaletteWorkflow:
         )
 
         controller.current_tile_data = b"\x00" * 32
+        controller.current_tile_offset = 0  # Must match current_offset (defaults to 0)
         controller.current_width = 8
         controller.current_height = 8
         controller.current_sprite_name = "test_sprite"
@@ -471,6 +474,7 @@ class TestROMPaletteWorkflow:
         )
 
         controller.current_tile_data = b"\x00" * 32
+        controller.current_tile_offset = 0  # Must match current_offset (defaults to 0)
         controller.current_width = 8
         controller.current_height = 8
         controller.current_sprite_name = "test_sprite"
@@ -507,6 +511,7 @@ class TestROMPaletteWorkflow:
         controller.set_view(mock_view)
 
         controller.current_tile_data = b"\x00" * 32
+        controller.current_tile_offset = 0  # Must match current_offset (defaults to 0)
         controller.current_width = 8
         controller.current_height = 8
         controller.current_sprite_name = "test_sprite"

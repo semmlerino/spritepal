@@ -74,6 +74,7 @@ class TestMesen2ModuleInit:
         module = Mesen2Module(log_watcher=mock_log_watcher)
         assert module.log_watcher is mock_log_watcher
 
+
 class TestMesen2ModuleProperties:
     """Test Mesen2Module properties."""
 

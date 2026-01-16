@@ -553,8 +553,14 @@ class ROMWorkflowController(QObject):
 
         This handler is automatically triggered when update_sprite_offset() changes
         a browser item's offset, ensuring the thumbnail matches the new offset.
+
+        The old offset is invalidated first to prevent race conditions where a
+        garbled thumbnail from the misaligned offset could be displayed.
         """
         if self._thumbnail_controller:
+            # Clear stale thumbnail from old offset to prevent flicker
+            self._thumbnail_controller.invalidate_offset(old_offset)
+            # Queue generation at corrected offset
             self._thumbnail_controller.queue_thumbnail(new_offset)
             logger.debug("Re-queued thumbnail for aligned offset 0x%06X (was 0x%06X)", new_offset, old_offset)
 
@@ -892,10 +898,14 @@ class ROMWorkflowController(QObject):
 
     def open_in_editor(self) -> None:
         """Load the current preview into the pixel editor."""
-        logger.debug(f"[OPEN] open_in_editor called, tile_data={self.current_tile_data is not None}, offset=0x{self.current_offset:X}")
-        
+        logger.debug(
+            f"[OPEN] open_in_editor called, tile_data={self.current_tile_data is not None}, offset=0x{self.current_offset:X}"
+        )
+
         if self.current_tile_offset != self.current_offset or not self.current_tile_data:
-            logger.debug(f"[OPEN] Data-offset mismatch or no data: tile_offset=0x{self.current_tile_offset:X}, current_offset=0x{self.current_offset:X}")
+            logger.debug(
+                f"[OPEN] Data-offset mismatch or no data: tile_offset=0x{self.current_tile_offset:X}, current_offset=0x{self.current_offset:X}"
+            )
             if self._message_service:
                 self._message_service.show_message("No sprite data to edit for current offset")
             return
@@ -1904,6 +1914,10 @@ class ROMWorkflowController(QObject):
 
                 if self.preview_coordinator:
                     self.preview_coordinator.invalidate_preview_cache(self.current_offset)
+
+                # Invalidate worker cache to prevent stale thumbnail after save
+                if self._thumbnail_controller:
+                    self._thumbnail_controller.invalidate_offset(self.current_offset)
 
                 # Re-queue thumbnail generation for the modified sprite
                 if self._thumbnail_controller:

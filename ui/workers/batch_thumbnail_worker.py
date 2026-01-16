@@ -30,6 +30,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QImage, QPixmap
 
+from core.offset_hunting import get_offset_candidates, has_nonzero_content
 from core.services.image_utils import pil_to_qimage
 from core.tile_renderer import TileRenderer
 from core.tile_utils import align_tile_data
@@ -515,31 +516,41 @@ class BatchThumbnailWorker(QObject):
             decompressed_data = None
 
             if self.rom_extractor and self._rom_data_for_hal:
-                # Try HAL decompression using cached ROM data (without SMC header) with actual offset
-                # (matches preview_worker_pool approach for consistent decompression)
-                try:
-                    rom_injector = self.rom_extractor.rom_injector
-                    _, decompressed_data, _ = rom_injector.find_compressed_sprite(
-                        self._rom_data_for_hal,  # Pre-cached ROM data without SMC header
-                        request.offset,  # ROM offset (not file offset)
-                        expected_size=None,
-                    )
-                    if decompressed_data:
-                        # Align tile data to 32-byte boundaries (some assets have header bytes)
-                        original_len = len(decompressed_data)
-                        decompressed_data = align_tile_data(decompressed_data)
-                        if len(decompressed_data) != original_len:
-                            logger.debug(
-                                f"Aligned HAL data: {original_len} -> {len(decompressed_data)} bytes "
-                                f"(removed {original_len - len(decompressed_data)} header byte(s)) "
-                                f"from 0x{request.offset:06X}"
-                            )
-                        else:
-                            logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{request.offset:06X}")
-                except Exception as e:
-                    # Log decompression failures for debugging, but continue with fallback to raw data
-                    logger.debug(f"HAL decompression failed for offset 0x{request.offset:06X}: {e}")
-                    decompressed_data = None
+                # Try HAL decompression with offset hunting (matches preview_worker_pool behavior)
+                # Lua-captured offsets may be slightly off due to DMA timing jitter
+                rom_injector = self.rom_extractor.rom_injector
+                rom_size = len(self._rom_data_for_hal)
+
+                for try_offset in get_offset_candidates(request.offset, rom_size):
+                    try:
+                        _, data, _ = rom_injector.find_compressed_sprite(
+                            self._rom_data_for_hal,
+                            try_offset,
+                            expected_size=None,
+                        )
+                        if data and has_nonzero_content(data):
+                            decompressed_data = data
+                            if try_offset != request.offset:
+                                logger.info(
+                                    f"Thumbnail: adjusted offset 0x{request.offset:06X} -> 0x{try_offset:06X} "
+                                    f"(delta: {try_offset - request.offset:+d})"
+                                )
+                            # Align tile data to 32-byte boundaries (some assets have header bytes)
+                            original_len = len(decompressed_data)
+                            decompressed_data = align_tile_data(decompressed_data)
+                            if len(decompressed_data) != original_len:
+                                logger.debug(
+                                    f"Aligned HAL data: {original_len} -> {len(decompressed_data)} bytes "
+                                    f"(removed {original_len - len(decompressed_data)} header byte(s)) "
+                                    f"from 0x{try_offset:06X}"
+                                )
+                            else:
+                                logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{try_offset:06X}")
+                            break
+                    except Exception as e:
+                        if try_offset == request.offset:
+                            logger.debug(f"HAL decompression failed for offset 0x{request.offset:06X}: {e}")
+                        continue
 
             # If no decompressed data, use raw data
             if not decompressed_data:
@@ -632,6 +643,20 @@ class BatchThumbnailWorker(QObject):
         """Clear the thumbnail cache (thread-safe)."""
         if self._cache:
             self._cache.clear()
+
+    def invalidate_offset(self, offset: int, size: int = 384) -> bool:
+        """Remove specific offset from cache (thread-safe).
+
+        Args:
+            offset: ROM offset of the sprite to invalidate
+            size: Thumbnail size (must match the original request size)
+
+        Returns:
+            True if an entry was removed, False if not found
+        """
+        cache_key = ThumbnailCache.make_key(offset, size)
+        with QMutexLocker(self._cache_mutex):
+            return self._cache.remove(cache_key)
 
     def is_rom_loaded(self) -> bool:
         """Check if ROM data is currently loaded.
@@ -808,6 +833,20 @@ class ThumbnailWorkerController(QObject):
         """Queue multiple thumbnails for generation."""
         if self.worker:
             self.worker.queue_batch(offsets, size, priority_start)
+
+    def invalidate_offset(self, offset: int, size: int = 384) -> bool:
+        """Remove specific offset from worker cache.
+
+        Args:
+            offset: ROM offset of the sprite to invalidate
+            size: Thumbnail size (must match the original request size)
+
+        Returns:
+            True if an entry was removed, False if not found or worker not running
+        """
+        if self.worker:
+            return self.worker.invalidate_offset(offset, size)
+        return False
 
     def stop_worker(self) -> None:
         """Safely stop worker and thread."""

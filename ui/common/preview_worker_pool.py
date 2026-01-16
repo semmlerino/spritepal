@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QTimer, Signal
 
+from core.offset_hunting import get_offset_candidates, has_nonzero_content
 from core.services.worker_lifecycle import WorkerManager
 from core.tile_utils import align_tile_data, calculate_dimensions_from_tile_data
 from ui.rom_extraction.workers.preview_worker import SpritePreviewWorker
@@ -202,16 +203,9 @@ class PooledPreviewWorker(SpritePreviewWorker):
         header_bytes = b""  # Stores leading bytes stripped during alignment for injection restoration
 
         # First, try HAL decompression (for Lua-captured offsets and known sprites)
-        # Try the exact offset first, then nearby offsets if it fails
-        offsets_to_try = [self.offset]
+        # Try the exact offset first, then nearby offsets if it fails (DMA timing jitter)
+        offsets_to_try = get_offset_candidates(self.offset, len(rom_data))
         slack_size = 0
-
-        # For Lua-captured offsets, also try nearby offsets in case DMA timing was slightly off
-        # Check offsets within 16 bytes before and after
-        for delta in [2, 4, 6, 8, -2, -4, -6, -8, 10, 12, 14, 16, -10, -12, -14, -16]:
-            adjusted_offset = self.offset + delta
-            if 0 <= adjusted_offset < len(rom_data):
-                offsets_to_try.append(adjusted_offset)
 
         for try_offset in offsets_to_try:
             try:
@@ -241,12 +235,8 @@ class PooledPreviewWorker(SpritePreviewWorker):
                     )
 
                 if tile_data and len(tile_data) > 0:
-                    # Validate that it's reasonable sprite data
-                    # Check if data has some non-zero bytes (not all black)
-                    sample_size = min(100, len(tile_data))
-                    non_zero_count = sum(1 for b in tile_data[:sample_size] if b != 0)
-
-                    if non_zero_count > 10:  # At least 10% non-zero in sample
+                    # Validate that it's reasonable sprite data using shared utility
+                    if has_nonzero_content(tile_data):
                         decompression_succeeded = True
                         if try_offset != self.offset:
                             logger.info(

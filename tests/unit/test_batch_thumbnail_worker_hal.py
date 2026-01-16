@@ -45,7 +45,7 @@ class TestBatchThumbnailWorkerHALAlignment:
 
         # Configure find_compressed_sprite to return valid decompressed data
         # (32 bytes = 1 tile, so rendering will succeed)
-        mock_injector.find_compressed_sprite.return_value = (100, b"\x00" * 32, 0)
+        mock_injector.find_compressed_sprite.return_value = (100, b"\x01" * 32, 0)
 
         # Create worker - patch TileRenderer to avoid actual rendering
         with patch("ui.workers.batch_thumbnail_worker.TileRenderer") as mock_renderer_class:
@@ -128,7 +128,7 @@ class TestBatchThumbnailWorkerHALAlignment:
         mock_extractor.rom_injector = mock_injector
 
         # Configure find_compressed_sprite to return valid decompressed data
-        mock_injector.find_compressed_sprite.return_value = (100, b"\x00" * 32, 0)
+        mock_injector.find_compressed_sprite.return_value = (100, b"\x01" * 32, 0)
 
         # Create worker
         with patch("ui.workers.batch_thumbnail_worker.TileRenderer") as mock_renderer_class:
