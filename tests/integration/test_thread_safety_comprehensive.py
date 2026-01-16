@@ -560,5 +560,63 @@ class TestDeadlockPrevention:
             assert elapsed < 0.5, f"Operations took {elapsed:.2f}s, possible deadlock"
 
 
+class TestCoreOperationsSignalThreadSafety:
+    """Test Qt signal thread safety for CoreOperationsManager.
+
+    Migrated from test_qt_signal_architecture.py during test consolidation.
+    Tests that signals work correctly across thread boundaries using Qt queued connections.
+    """
+
+    def test_thread_safety_signal_emission(self, qapp):
+        """Test that signals work correctly across thread boundaries.
+
+        Verifies that signals emitted from a worker thread are delivered
+        to the main thread via Qt's queued connection mechanism.
+        """
+        from unittest.mock import Mock
+
+        from core.managers.core_operations_manager import CoreOperationsManager
+
+        manager = CoreOperationsManager(session_manager=Mock(), rom_cache=Mock(), rom_extractor=Mock())
+
+        # Thread-safe capture of signal emissions
+        captured_signals = []
+        signal_threads = []
+        lock = threading.Lock()
+
+        def capture(*args):
+            with lock:
+                current_thread = threading.current_thread()
+                captured_signals.append(args)
+                signal_threads.append(
+                    {
+                        "thread_id": current_thread.ident,
+                        "is_main": current_thread == threading.main_thread(),
+                    }
+                )
+
+        manager.injection_progress.connect(capture)
+
+        # Emit signal from worker thread
+        def worker_thread():
+            manager.injection_progress.emit("Progress from worker thread")
+
+        thread = threading.Thread(target=worker_thread)
+        thread.start()
+        thread.join()
+
+        # Wait for signal delivery via Qt event loop
+        start_time = time.time()
+        while len(captured_signals) == 0 and time.time() - start_time < 1.0:
+            qapp.processEvents()
+            time.sleep(0.01)  # sleep-ok: Qt event loop pump
+
+        assert len(captured_signals) == 1
+        assert captured_signals[0] == ("Progress from worker thread",)
+
+        # Verify signal was delivered to main thread (Qt queued connection)
+        assert signal_threads[0]["is_main"]
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
