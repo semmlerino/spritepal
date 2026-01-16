@@ -208,6 +208,14 @@ class ROMWorkflowPage(QWidget):
         """Set action button loading state in source bar."""
         self._source_bar.set_action_loading(loading)
 
+    def set_modified_indicator(self, modified: bool) -> None:
+        """Show or hide the unsaved changes indicator in the source bar.
+
+        Args:
+            modified: True if there are unsaved changes.
+        """
+        self._source_bar.set_modified(modified)
+
     # =========================================================================
     # Delegation methods for SpriteAssetBrowser
     # =========================================================================

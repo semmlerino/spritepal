@@ -4,6 +4,8 @@ Source Bar widget for the ROM workflow.
 Displays ROM path, checksum, offset, and primary action button.
 """
 
+import re
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -165,3 +167,20 @@ class SourceBar(QWidget):
             self.offset_edit.set_rom_bounds(0)
             self.offset_edit.setPlaceholderText("Load ROM first")
             self.action_btn.setToolTip("Load a ROM file to enable")
+
+    def set_modified(self, modified: bool) -> None:
+        """Show or hide the unsaved changes indicator in the info label.
+
+        Args:
+            modified: True if there are unsaved changes.
+        """
+        current_text = self.info_label.text()
+        modified_tag = '<span style="color: #FF9800;">[Modified]</span>'
+        has_indicator = "[Modified]" in current_text
+
+        if modified and not has_indicator:
+            self.info_label.setText(f"{modified_tag} {current_text}")
+        elif not modified and has_indicator:
+            # Remove the modified tag and any leading space
+            cleaned = re.sub(r'<span style="color: #FF9800;">\[Modified\]</span>\s*', "", current_text)
+            self.info_label.setText(cleaned)

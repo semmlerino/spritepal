@@ -135,6 +135,9 @@ class ROMWorkflowController(QObject):
         self._editing_controller.paletteSourceSelected.connect(self._on_palette_source_changed)
         self._editing_controller.paletteChanged.connect(self._on_palette_changed)
 
+        # Connect undo state changes for modified indicator
+        self._editing_controller.undoStateChanged.connect(self._on_undo_state_changed)
+
         # Connect LogWatcher
         self._connect_log_watcher()
 
@@ -1945,8 +1948,8 @@ class ROMWorkflowController(QObject):
                 if self._view:
                     self._view.set_action_text("Save to ROM")
                     self._view.set_workflow_state("edit")
-                    # Clear undo history so set_offset doesn't prompt again
-                    self._editing_controller.undo_manager.clear()
+                    # Clear undo history and emit signal to update UI (clears modified indicator)
+                    self._editing_controller.clear_undo_history()
                     # Trigger a re-preview to verify
                     self.set_offset(self.current_offset)
             else:
@@ -2399,6 +2402,16 @@ class ROMWorkflowController(QObject):
         """Handle palette color changes from editing controller."""
         # Update library association if sprite is in library
         self._update_library_palette_association()
+
+    def _on_undo_state_changed(self, can_undo: bool, can_redo: bool) -> None:
+        """Handle undo state changes to update modified indicator.
+
+        Args:
+            can_undo: True if undo is available (implies unsaved changes).
+            can_redo: True if redo is available.
+        """
+        if self._view and self.state == "edit":
+            self._view.set_modified_indicator(can_undo)
 
     def _update_library_palette_association(
         self, source_type: str | None = None, palette_index: int | None = None

@@ -644,6 +644,11 @@ class MainWindow(QMainWindow):
             # Sync Mesen captures when entering editor
             self._sprite_editor_workspace.rom_workflow_controller.sync_captures_from_log_watcher()
 
+            # Sync toolbar offset with ROM workflow controller's current offset
+            current_offset = self._sprite_editor_workspace.rom_workflow_controller.current_offset
+            if current_offset > 0:
+                self.toolbar_offset_edit.set_offset(current_offset)
+
         if tab_index is not None and workspace_mode == WorkspaceMode.EXTRACTION:
             # Switch tab within extraction panel
             self.extraction_tabs.setCurrentIndex(tab_index)

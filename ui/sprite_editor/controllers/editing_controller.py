@@ -516,16 +516,9 @@ class EditingController(QObject):
         # Apply the palette
         self.handle_palette_source_changed(source_type, palette_index)
 
-        # Emit signal for all connected views (e.g., ROM EditWorkspace)
+        # Emit signal for all connected views (e.g., EditWorkspace)
+        # Views connect to this signal and update their UI accordingly
         self.paletteSourceSelected.emit(source_type, palette_index)
-
-        # Update the primary view's dropdown if available (backward compat for EditTab)
-        if self._view:
-            palette_panel = getattr(self._view, "palette_panel", None)
-            if palette_panel:
-                selector = getattr(palette_panel, "palette_source_selector", None)
-                if selector:
-                    selector.set_selected_source(source_type, palette_index)
 
     def handle_load_palette(self) -> None:
         """Handle load palette button click."""
@@ -662,6 +655,15 @@ class EditingController(QObject):
             self.undo_manager.can_undo(),
             self.undo_manager.can_redo(),
         )
+
+    def clear_undo_history(self) -> None:
+        """Clear undo/redo history and emit state change.
+
+        This is the public API for clearing history. It ensures the
+        undoStateChanged signal is emitted so UI can update accordingly.
+        """
+        self.undo_manager.clear()
+        self._emit_undo_state()
 
     # Image export
 

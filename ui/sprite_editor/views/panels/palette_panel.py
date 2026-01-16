@@ -5,6 +5,8 @@ Displays the color palette and handles color selection.
 Integrates with PaletteSourceSelector for palette source management.
 """
 
+import logging
+
 from PySide6.QtCore import QSignalBlocker, Signal
 from PySide6.QtWidgets import (
     QFrame,
@@ -17,6 +19,8 @@ from PySide6.QtWidgets import (
 )
 
 from ..widgets import ColorPaletteWidget, PaletteSourceSelector
+
+logger = logging.getLogger(__name__)
 
 
 class DismissibleWarningBanner(QFrame):
@@ -264,6 +268,8 @@ class PalettePanel(QWidget):
         elif source_type == "all":
             self.clear_rom_sources()
             self.clear_mesen_sources()
+        else:
+            logger.warning("Unknown palette source type to clear: %r", source_type)
 
     def _show_palette_gallery(self) -> None:
         """Show the palette gallery popup."""
