@@ -89,8 +89,8 @@ class TestROMWorkflowControllerRegression:
         # 2. Connect view -> should populate browser
         controller.set_view(mock_view)
 
-        # Verify initial population
-        mock_view.add_mesen_capture.assert_called_with(ANY, 0x123456)
+        # Verify initial population - now includes frame parameter
+        mock_view.add_mesen_capture.assert_called_with(ANY, 0x123456, frame=123)
         mock_view.add_mesen_capture.reset_mock()
 
         # 3. Load a new ROM
@@ -98,7 +98,7 @@ class TestROMWorkflowControllerRegression:
 
         # Verify re-population
         # The controller should re-add the existing Mesen captures after clearing
-        mock_view.add_mesen_capture.assert_called_with(ANY, 0x123456)
+        mock_view.add_mesen_capture.assert_called_with(ANY, 0x123456, frame=123)
 
 
 class TestThumbnailRequeueOnAlignment:

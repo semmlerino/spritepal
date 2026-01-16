@@ -72,8 +72,15 @@ class TestRecentCapturesWidgetOffsetUpdate:
         assert f"{new_offset:06X}" in updated_text.upper(), f"Expected new offset in display text, got: {updated_text}"
 
         # Verify has_capture reflects new offset
-        assert widget.has_capture(new_offset), "has_capture should find new offset"
-        assert not widget.has_capture(original_offset), "has_capture should NOT find old offset after update"
+        assert widget.has_capture(new_offset), "has_capture should find new (ROM) offset"
+        # FILE offset is immutable and should still be findable
+        assert widget.has_capture_by_file_offset(original_offset), (
+            "FILE offset should still be findable (immutable identity)"
+        )
+        # ROM offset lookup should NOT find old ROM offset after update
+        assert not widget.has_capture_by_rom_offset(original_offset), (
+            "ROM offset should NOT find old offset after update"
+        )
 
     def test_update_capture_offset_preserves_other_info(self, qtbot):
         """Verify that offset update preserves timestamp and frame info."""
@@ -152,5 +159,9 @@ class TestMesenCapturesSectionOffsetUpdate:
         assert success
 
         # Verify internal widget was updated
-        assert widget.has_capture(new_offset)
-        assert not widget.has_capture(original_offset)
+        assert widget.has_capture(new_offset), "Should find new ROM offset"
+        # FILE offset is immutable, ROM offset changes
+        assert widget.has_capture_by_file_offset(original_offset), "FILE offset should still be findable"
+        assert not widget.has_capture_by_rom_offset(original_offset), (
+            "ROM offset should NOT find old offset after update"
+        )

@@ -124,12 +124,34 @@ class MesenCapturesSection(QWidget):
         """Check if a specific offset is already in the list.
 
         Args:
-            offset: The offset to check.
+            offset: The offset to check (FILE or ROM).
 
         Returns:
-            True if present, False otherwise.
+            True if present as either FILE or ROM offset, False otherwise.
         """
         return self._captures_widget.has_capture(offset)
+
+    def has_capture_by_file_offset(self, file_offset: int) -> bool:
+        """Check if a capture with specific FILE offset exists.
+
+        Args:
+            file_offset: The FILE offset to check.
+
+        Returns:
+            True if a capture with this FILE offset exists.
+        """
+        return self._captures_widget.has_capture_by_file_offset(file_offset)
+
+    def has_capture_by_rom_offset(self, rom_offset: int) -> bool:
+        """Check if a capture with specific ROM offset exists.
+
+        Args:
+            rom_offset: The ROM offset to check.
+
+        Returns:
+            True if a capture with this ROM offset exists in item data.
+        """
+        return self._captures_widget.has_capture_by_rom_offset(rom_offset)
 
     def update_capture_offset(self, old_offset: int, new_offset: int) -> bool:
         """Update a capture's offset after HAL alignment adjustment.
@@ -154,6 +176,15 @@ class MesenCapturesSection(QWidget):
             offset: SMC header size in bytes (typically 0 or 512).
         """
         self._captures_widget.set_smc_offset(offset)
+
+    @property
+    def smc_offset(self) -> int:
+        """Get the SMC header offset.
+
+        Returns:
+            SMC header size in bytes (typically 0 or 512).
+        """
+        return self._captures_widget._smc_offset
 
     def set_thumbnail(self, offset: int, thumbnail: QPixmap) -> None:
         """Set thumbnail for a capture.

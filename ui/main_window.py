@@ -1584,9 +1584,9 @@ class MainWindow(QMainWindow):
         rom_offset = offset
 
         # Get capture info from log watcher for display name
-        # Note: get_capture_by_offset searches by FILE offset, so this may not find the
-        # capture when SMC headers are present, but that's OK - we'll just skip the frame number
-        capture = self.log_watcher.get_capture_by_offset(offset)
+        # Use ROM offset lookup with SMC header offset to correctly find the capture
+        smc_offset = self.rom_extraction_panel.mesen_captures_section.smc_offset
+        capture = self.log_watcher.get_capture_by_rom_offset(rom_offset, smc_offset)
         capture_name: str | None = None
         if capture and capture.frame:
             capture_name = f"0x{rom_offset:06X} (f{capture.frame})"

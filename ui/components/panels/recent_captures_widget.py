@@ -441,13 +441,52 @@ class RecentCapturesWidget(QWidget):
     def has_capture(self, offset: int) -> bool:
         """Check if a specific offset is already in the list.
 
+        Checks both FILE offsets (immutable capture identity) and ROM offsets
+        (which may be updated after alignment). For explicit type-specific
+        lookups, use has_capture_by_file_offset() or has_capture_by_rom_offset().
+
         Args:
-            offset: The offset to check.
+            offset: The offset to check (FILE or ROM).
 
         Returns:
-            True if present, False otherwise.
+            True if present as either FILE or ROM offset, False otherwise.
         """
-        return any(c.offset == offset for c in self._captures)
+        # Check FILE offsets in capture list
+        if any(c.offset == offset for c in self._captures):
+            return True
+        # Check ROM offsets in item data (may differ after alignment)
+        return self.has_capture_by_rom_offset(offset)
+
+    def has_capture_by_file_offset(self, file_offset: int) -> bool:
+        """Check if a capture with specific FILE offset exists.
+
+        FILE offset is the immutable identity from Mesen capture.
+
+        Args:
+            file_offset: The FILE offset to check.
+
+        Returns:
+            True if a capture with this FILE offset exists.
+        """
+        return any(c.offset == file_offset for c in self._captures)
+
+    def has_capture_by_rom_offset(self, rom_offset: int) -> bool:
+        """Check if a capture with specific ROM offset exists.
+
+        ROM offset may be updated after alignment adjustment.
+
+        Args:
+            rom_offset: The ROM offset to check.
+
+        Returns:
+            True if a capture with this ROM offset exists in item data.
+        """
+        for i in range(self._list_widget.count()):
+            item = self._list_widget.item(i)
+            item_data = item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(item_data, dict) and item_data.get("rom_offset") == rom_offset:
+                return True
+        return False
 
     def update_capture_offset(self, old_rom_offset: int, new_rom_offset: int) -> bool:
         """Update a capture's offset after HAL alignment adjustment.
@@ -498,31 +537,46 @@ class RecentCapturesWidget(QWidget):
                     )
                     self._captures[captures_index] = updated_capture
 
-                # Update display text: replace old ROM offset hex with new
-                old_hex = f"0x{old_rom_offset:06X}"
-                new_hex = f"0x{new_rom_offset:06X}"
+                # Update display text: try ROM offset first, then FILE offset
+                # Display may show either format depending on how capture was added
+                old_rom_hex = f"0x{old_rom_offset:06X}"
+                new_rom_hex = f"0x{new_rom_offset:06X}"
                 current_text = item.text()
-                # Try exact replacement first (case-sensitive)
-                if old_hex in current_text:
-                    new_text = current_text.replace(old_hex, new_hex)
-                elif old_hex.lower() in current_text.lower():
-                    # Case-insensitive replacement
+                new_text = current_text
+
+                # Calculate FILE offset equivalents using stored offsets
+                old_file_offset = item_data.get("file_offset", old_rom_offset)
+                smc_offset = old_file_offset - old_rom_offset
+                new_file_offset = new_rom_offset + smc_offset
+                old_file_hex = f"0x{old_file_offset:06X}"
+                new_file_hex = f"0x{new_file_offset:06X}"
+
+                # Try ROM offset replacement first
+                if old_rom_hex in current_text:
+                    new_text = current_text.replace(old_rom_hex, new_rom_hex)
+                elif old_rom_hex.lower() in current_text.lower():
                     import re
 
-                    new_text = re.sub(re.escape(old_hex), new_hex, current_text, flags=re.IGNORECASE)
-                else:
-                    # Offset not found in display text (display shows FILE offset, not ROM)
-                    # In this case, don't change the display text
-                    new_text = current_text
+                    new_text = re.sub(re.escape(old_rom_hex), new_rom_hex, current_text, flags=re.IGNORECASE)
+                # Then try FILE offset replacement (display shows FILE offset when SMC header present)
+                elif old_file_hex in current_text:
+                    new_text = current_text.replace(old_file_hex, new_file_hex)
+                    # Also update the stored file_offset for consistency
+                    item_data["file_offset"] = new_file_offset
+                elif old_file_hex.lower() in current_text.lower():
+                    import re
+
+                    new_text = re.sub(re.escape(old_file_hex), new_file_hex, current_text, flags=re.IGNORECASE)
+                    item_data["file_offset"] = new_file_offset
 
                 item.setText(new_text)
+                item.setData(Qt.ItemDataRole.UserRole, item_data)
 
-                # Update tooltip with new ROM offset
-                item_data_dict = item.data(Qt.ItemDataRole.UserRole)
-                file_offset = item_data_dict.get("file_offset", 0)
+                # Update tooltip with both ROM and FILE offsets
+                display_file_offset = item_data.get("file_offset", new_file_offset)
                 item.setToolTip(
                     f"ROM Offset: 0x{new_rom_offset:06X}\n"
-                    f"Mesen FILE: 0x{file_offset:06X}\n"
+                    f"Mesen FILE: 0x{display_file_offset:06X}\n"
                     f"Frame: N/A\n"  # Frame is not tracked through alignment adjustment
                     f"(Adjusted from 0x{old_rom_offset:06X})"
                 )
