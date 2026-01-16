@@ -343,10 +343,11 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         return panel
 
     def _create_right_panel(self) -> QWidget:
-        """Create the sidebar panel with History, Scan Results, and Bookmarks.
+        """Create the sidebar panel with History, Nearby, Scan Results, and Bookmarks.
 
         The sidebar provides:
         - History of visited offsets (auto-tracked)
+        - Nearby sprite previews at fixed byte deltas from current position
         - Scan results from Find Sprites operation
         - User bookmarks
         """
@@ -357,6 +358,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Connect sidebar signals to dialog handlers
         self._sidebar.history_offset_selected.connect(self.set_offset)
         self._sidebar.history_offset_applied.connect(self._apply_offset_from_history)
+        self._sidebar.nearby_offset_selected.connect(self.set_offset)
         self._sidebar.scan_result_selected.connect(self.set_offset)
         self._sidebar.scan_result_applied.connect(self._apply_offset_from_scan)
         self._sidebar.bookmark_selected.connect(self.set_offset)
@@ -502,6 +504,10 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Track stable visits for history (>500ms dwell time)
         self._schedule_history_tracking(offset)
+
+        # Update nearby panel in sidebar (debounced internally)
+        if self._sidebar is not None:
+            self._sidebar.update_nearby_offsets(offset, self.rom_size)
 
     def _schedule_history_tracking(self, offset: int) -> None:
         """Schedule history tracking for an offset after dwell time.
@@ -928,6 +934,10 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Update window title
         self.view_state_manager.update_title_with_rom(rom_path)
+
+        # Update sidebar with ROM extractor for nearby panel
+        if self._sidebar is not None and self.rom_extractor is not None:
+            self._sidebar.set_rom_extractor(self.rom_extractor, rom_path)
 
         # Update search coordinator with ROM data
         if self._search_coordinator is not None:
