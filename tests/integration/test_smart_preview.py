@@ -171,3 +171,135 @@ class TestBackgroundPreloadStalenessCheck:
         assert len(preview_received) == 1, (
             f"Current request (id={current_request_id}) should be processed, but got {len(preview_received)} previews."
         )
+
+
+@pytest.mark.skip_thread_cleanup(reason="Uses PreviewWorkerPool which owns worker threads")
+class TestCachePoisoningPrevention:
+    """Tests for cache key correctness in background preload handling.
+
+    Bug (Issue 1 from desync report): Background preloads used self._current_offset
+    for the cache key instead of actual_offset, causing cache poisoning when
+    the user changed offsets before a background preload completed.
+
+    Scenario:
+    1. User viewing offset 0x010000 (_current_offset = 0x010000)
+    2. Background preload requests offset 0x020000 (does NOT update _current_offset)
+    3. Worker completes with data for 0x020000
+    4. BUG: Cache stores under key 0x010000 instead of 0x020000
+    5. Cache is now corrupted - offset 0x010000 has wrong data
+    """
+
+    def test_background_preload_uses_actual_offset_for_cache_key(self, qtbot, tmp_path):
+        """
+        BUG REPRODUCTION: Background preload should cache under actual_offset, not _current_offset.
+
+        This test will FAIL before the fix is applied.
+        """
+        from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
+
+        coordinator = SmartPreviewCoordinator()
+
+        # Set up a ROM data provider so caching logic is exercised
+        test_rom_path = tmp_path / "test.sfc"
+        test_rom_path.write_bytes(b"\x00" * 0x100000)  # 1MB fake ROM
+
+        def rom_data_provider():
+            return (str(test_rom_path), b"\x00" * 100)
+
+        coordinator.set_rom_data_provider(rom_data_provider)
+
+        # User is currently viewing offset A
+        offset_a = 0x010000
+        coordinator._current_offset = offset_a
+
+        # Background preload completes for offset B (different from current)
+        offset_b = 0x020000
+        test_tile_data_b = b"\xbb" * 32  # Data for offset B
+        background_request_id = -1001  # Negative = background preload
+
+        coordinator._on_worker_preview_ready(
+            request_id=background_request_id,
+            tile_data=test_tile_data_b,
+            width=8,
+            height=8,
+            sprite_name="sprite_at_offset_b",
+            compressed_size=32,
+            slack_size=0,
+            actual_offset=offset_b,  # Worker completed for offset B
+            hal_succeeded=True,
+            header_bytes=b"",
+        )
+
+        # KEY ASSERTIONS:
+        # 1. Cache should contain data under key for offset_b, not offset_a
+        cache_key_b = coordinator._cache.make_key(str(test_rom_path), offset_b)
+        cache_key_a = coordinator._cache.make_key(str(test_rom_path), offset_a)
+
+        cached_data_b = coordinator._cache.get(cache_key_b)
+        cached_data_a = coordinator._cache.get(cache_key_a)
+
+        # Default empty tuple returned when cache miss (SpritePreviewCache.get() returns this)
+        default_cache_miss = (b"", 0, 0, None, 0, 0, -1, True, b"")
+
+        # Offset B should be in cache (this is what the preload was for)
+        assert cached_data_b != default_cache_miss, (
+            f"Data for offset_b (0x{offset_b:X}) should be cached under its own key. "
+            f"Bug: Cache stores under _current_offset (0x{offset_a:X}) instead of actual_offset."
+        )
+
+        # Offset A should NOT have the data (it wasn't preloaded)
+        assert cached_data_a == default_cache_miss, (
+            f"Offset A (0x{offset_a:X}) should NOT be cached because no preload was done for it. "
+            f"Bug: Background preload for offset_b poisoned cache entry for offset_a."
+        )
+
+        # Verify the cached data is correct
+        tile_data, width, height, sprite_name, *_ = cached_data_b
+        assert tile_data == test_tile_data_b, "Cached tile data should match preload data"
+        assert sprite_name == "sprite_at_offset_b", "Cached sprite name should match"
+
+    def test_user_request_still_caches_correctly(self, qtbot, tmp_path):
+        """
+        User-triggered requests (positive IDs) should still cache correctly.
+
+        Ensures the fix doesn't break normal user-triggered caching.
+        """
+        from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
+
+        coordinator = SmartPreviewCoordinator()
+
+        # Set up ROM data provider
+        test_rom_path = tmp_path / "test.sfc"
+        test_rom_path.write_bytes(b"\x00" * 0x100000)
+
+        def rom_data_provider():
+            return (str(test_rom_path), b"\x00" * 100)
+
+        coordinator.set_rom_data_provider(rom_data_provider)
+
+        # User requests offset A (which sets _current_offset)
+        offset_a = 0x030000
+        coordinator._current_offset = offset_a
+        test_tile_data = b"\xaa" * 32
+        user_request_id = 1  # Positive = user request
+
+        coordinator._on_worker_preview_ready(
+            request_id=user_request_id,
+            tile_data=test_tile_data,
+            width=8,
+            height=8,
+            sprite_name="user_sprite",
+            compressed_size=32,
+            slack_size=0,
+            actual_offset=offset_a,  # Same as _current_offset for user requests
+            hal_succeeded=True,
+            header_bytes=b"",
+        )
+
+        # Cache should contain data under offset_a
+        cache_key = coordinator._cache.make_key(str(test_rom_path), offset_a)
+        cached_data = coordinator._cache.get(cache_key)
+
+        assert cached_data is not None, "User request should be cached"
+        tile_data, *_ = cached_data
+        assert tile_data == test_tile_data, "Cached tile data should match"

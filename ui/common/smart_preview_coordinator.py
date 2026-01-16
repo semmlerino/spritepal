@@ -590,10 +590,12 @@ class SmartPreviewCoordinator(QObject):
                 )
 
                 # Save to memory cache
-                cache_key = self._cache.make_key(rom_path, self._current_offset)
+                # NOTE: Use actual_offset (the offset the worker processed), not
+                # self._current_offset (which may have changed during background preloads)
+                cache_key = self._cache.make_key(rom_path, actual_offset)
                 self._cache.put(cache_key, preview_data)
                 logger.debug(
-                    f"Cached preview for 0x{self._current_offset:06X}: {len(tile_data)} bytes "
+                    f"Cached preview for 0x{actual_offset:06X}: {len(tile_data)} bytes "
                     f"(slack: {slack_size}, hal: {hal_succeeded}, header: {len(header_bytes)})"
                 )
             except Exception as e:
