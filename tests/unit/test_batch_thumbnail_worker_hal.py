@@ -183,19 +183,20 @@ class TestBatchThumbnailWorkerHALAlignment:
             "reads a chunk instead of using the full ROM like preview worker does."
         )
 
-    def test_thumbnail_signal_uses_aligned_offset_after_offset_hunting(self, tmp_path):
+    def test_thumbnail_signal_preserves_original_offset_after_offset_hunting(self, tmp_path):
         """
-        Thumbnail worker should update request.offset when offset hunting succeeds.
+        Thumbnail worker should NOT mutate request.offset when offset hunting succeeds.
 
         When HAL decompression fails at the requested offset but succeeds at an
-        adjusted offset (via get_offset_candidates), the worker should update
-        request.offset to the aligned value. This ensures the thumbnail_ready
-        signal emits the correct offset that matches the actual data.
+        adjusted offset (via get_offset_candidates), the worker should use the
+        aligned offset INTERNALLY for decompression, but emit the thumbnail_ready
+        signal with the ORIGINAL offset.
 
-        Bug: Currently request.offset is NOT updated after alignment, causing
-        the signal to emit the wrong (unaligned) offset.
+        Why: The browser item stores the original offset. If we emit with the
+        aligned offset, the thumbnail won't be applied to the correct item,
+        causing a desync between thumbnails and browser items.
 
-        Reference: preview_worker_pool.py:267 correctly does `self.offset = try_offset`
+        This is the correct fix for the desync bug described in Issue #3.
         """
         # Create mock ROM with SMC header (512 bytes) + ROM data
         smc_header = b"\x00" * 512
@@ -258,14 +259,14 @@ class TestBatchThumbnailWorkerHALAlignment:
 
             worker._clear_rom_data()
 
-        # KEY ASSERTION: After alignment succeeds, request.offset should be updated
-        # to the aligned offset. This is what the thumbnail_ready signal will use.
+        # KEY ASSERTION: After alignment succeeds, request.offset should REMAIN
+        # at the original offset. The thumbnail_ready signal uses this offset,
+        # and it MUST match the offset stored in the browser item.
         #
-        # This test FAILS with current buggy code where request.offset remains 0x100
-        # even though the thumbnail was generated from data at 0x102.
-        assert request.offset == aligned_offset, (
-            f"Expected request.offset to be updated to aligned offset 0x{aligned_offset:X}, "
-            f"but it remained at 0x{request.offset:X}. "
-            f"The thumbnail was generated from data at 0x{aligned_offset:X} but the signal "
-            f"will incorrectly emit offset 0x{request.offset:X}."
+        # The thumbnail was generated from data at 0x102 (aligned), but the signal
+        # should emit 0x100 (original) so it matches the browser item.
+        assert request.offset == requested_offset, (
+            f"Expected request.offset to remain at original offset 0x{requested_offset:X}, "
+            f"but it was mutated to 0x{request.offset:X}. "
+            f"Mutating the offset causes desync between thumbnails and browser items."
         )

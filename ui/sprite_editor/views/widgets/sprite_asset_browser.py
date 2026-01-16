@@ -151,6 +151,8 @@ class SpriteAssetBrowser(QWidget):
     # Signals
     sprite_selected = Signal(int, str)  # offset, source_type
     sprite_activated = Signal(int, str)  # double-click -> offset, source_type
+    local_file_selected = Signal(str, str)  # path, name
+    local_file_activated = Signal(str, str)  # double-click -> path, name
     rename_requested = Signal(int, str)  # offset, new_name
     delete_requested = Signal(int, str)  # offset, source_type
     save_to_library_requested = Signal(int, str)  # offset, source_type
@@ -363,11 +365,16 @@ class SpriteAssetBrowser(QWidget):
         if "offset" not in data and "path" not in data:
             return
 
-        # Emit signal with offset and source type
+        # Emit signal based on item type
         if "offset" in data:
             offset = data["offset"]
             source_type = data["source_type"]
             self.sprite_selected.emit(offset, source_type)
+        elif "path" in data:
+            # Local file - has path but no offset
+            path = data["path"]
+            name = data.get("name", "")
+            self.local_file_selected.emit(path, name)
 
     def _on_item_activated(self, item: QTreeWidgetItem, column: int) -> None:
         """
@@ -385,11 +392,16 @@ class SpriteAssetBrowser(QWidget):
         if "offset" not in data and "path" not in data:
             return
 
-        # Emit activation signal
+        # Emit activation signal based on item type
         if "offset" in data:
             offset = data["offset"]
             source_type = data["source_type"]
             self.sprite_activated.emit(offset, source_type)
+        elif "path" in data:
+            # Local file - has path but no offset
+            path = data["path"]
+            name = data.get("name", "")
+            self.local_file_activated.emit(path, name)
 
     def _show_context_menu(self, position: QPoint) -> None:
         """
@@ -646,16 +658,19 @@ class SpriteAssetBrowser(QWidget):
         self._local_category.takeChildren()
         self._update_placeholder(self._local_category)
 
-    def set_thumbnail(self, offset: int, thumbnail: QPixmap) -> None:
+    def set_thumbnail(self, offset: int, thumbnail: QPixmap, source_type: str | None = None) -> None:
         """
-        Set or update thumbnail for ALL sprites with matching offset.
+        Set or update thumbnail for sprites with matching offset.
 
-        Multiple items can share the same offset (e.g., ROM sprite and Mesen
-        capture for the same sprite). All matching items receive the thumbnail.
+        When source_type is provided, only updates items matching BOTH
+        offset and source_type. When source_type is None, updates ALL
+        items with matching offset (backwards-compatible behavior).
 
         Args:
             offset: ROM offset
             thumbnail: Thumbnail pixmap
+            source_type: Optional filter - only update this source type
+                        ("rom", "mesen", "library"). If None, updates all.
         """
         updated_count = 0
         iterator = QTreeWidgetItemIterator(self.tree)
@@ -663,6 +678,11 @@ class SpriteAssetBrowser(QWidget):
             item = iterator.value()
             data = item.data(0, Qt.ItemDataRole.UserRole)
             if isinstance(data, dict) and data.get("offset") == offset:
+                # If source_type specified, require exact match
+                if source_type is not None:
+                    if data.get("source_type") != source_type:
+                        iterator += 1
+                        continue
                 data["thumbnail"] = thumbnail
                 item.setData(0, Qt.ItemDataRole.UserRole, data)
                 updated_count += 1
@@ -670,7 +690,15 @@ class SpriteAssetBrowser(QWidget):
 
         if updated_count > 0:
             self.tree.viewport().update()
-            logger.debug("Set thumbnail for offset 0x%06X on %d items", offset, updated_count)
+            if source_type:
+                logger.debug(
+                    "Set thumbnail for offset 0x%06X source_type=%s on %d items",
+                    offset,
+                    source_type,
+                    updated_count,
+                )
+            else:
+                logger.debug("Set thumbnail for offset 0x%06X on %d items", offset, updated_count)
 
     def clear_thumbnail(self, offset: int) -> bool:
         """
@@ -787,6 +815,39 @@ class SpriteAssetBrowser(QWidget):
             if isinstance(data, dict) and data.get("offset") == offset:
                 self.tree.setCurrentItem(item)
                 return True
+            iterator += 1
+        return False
+
+    def select_sprite(self, offset: int, source_type: str | None = None) -> bool:
+        """
+        Select sprite by ROM offset and optional source type.
+
+        When source_type is provided, matches BOTH offset and source_type
+        for precise selection across categories. This prevents selecting
+        the wrong item when multiple categories share the same offset.
+
+        Args:
+            offset: ROM offset to select
+            source_type: Optional source type ("rom", "mesen", "library")
+                        If None, falls back to offset-only matching.
+
+        Returns:
+            True if sprite was found and selected
+        """
+        iterator = QTreeWidgetItemIterator(self.tree)
+        while iterator.value():
+            item = iterator.value()
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("offset") == offset:
+                # If source_type specified, require exact match
+                if source_type is not None:
+                    if data.get("source_type") == source_type:
+                        self.tree.setCurrentItem(item)
+                        return True
+                else:
+                    # Fallback: offset-only matching (backwards compatibility)
+                    self.tree.setCurrentItem(item)
+                    return True
             iterator += 1
         return False
 

@@ -4,6 +4,7 @@ ROM Workflow Controller for the Sprite Editor.
 Coordinates ROM loading, previewing, editing, and injection.
 """
 
+import pathlib
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -98,6 +99,7 @@ class ROMWorkflowController(QObject):
         self._checksum_valid: bool = True
         self._loaded_rom_checksum: int | None = None  # SNES internal checksum for capture validation
         self.state: str = "preview"  # 'preview', 'edit', 'save'
+        self._current_source_type: str = "rom"  # Source type of currently selected sprite
 
         # Current sprite data
         self.current_tile_data: bytes | None = None
@@ -166,11 +168,17 @@ class ROMWorkflowController(QObject):
             logger.debug("Thumbnail worker connected for asset browser")
 
     def _on_thumbnail_ready(self, offset: int, thumbnail: QImage) -> None:
-        """Handle thumbnail ready from worker."""
+        """Handle thumbnail ready from worker.
+
+        Worker-generated thumbnails apply only to "rom" and "mesen" items.
+        Library items use their saved thumbnails and should not be overwritten.
+        """
         if self._view:
             pixmap = QPixmap.fromImage(thumbnail)
-            self._view.set_thumbnail(offset, pixmap)
-            logger.debug(f"Thumbnail set for offset 0x{offset:06X}")
+            # Apply to ROM and Mesen items only - library items have saved thumbnails
+            self._view.set_thumbnail(offset, pixmap, source_type="rom")
+            self._view.set_thumbnail(offset, pixmap, source_type="mesen")
+            logger.debug(f"Thumbnail set for offset 0x{offset:06X} (rom/mesen only)")
 
     def set_message_service(self, service: "StatusBarManager | None") -> None:
         """Inject message service after construction (for deferred initialization)."""
@@ -307,6 +315,8 @@ class ROMWorkflowController(QObject):
         # Asset browser signals
         self._view.sprite_selected.connect(self._on_sprite_selected)
         self._view.sprite_activated.connect(self._on_sprite_activated)
+        self._view.local_file_selected.connect(self._on_local_file_selected)
+        self._view.local_file_activated.connect(self._on_local_file_activated)
         self._view.asset_browser.save_to_library_requested.connect(self._on_save_to_library)
         self._view.asset_browser.rename_requested.connect(self._on_asset_renamed)
         self._view.asset_browser.delete_requested.connect(self._on_asset_deleted)
@@ -336,7 +346,7 @@ class ROMWorkflowController(QObject):
 
     def _on_sprite_selected(self, offset: int, source_type: str) -> None:
         """Handle sprite selection from asset browser."""
-        self.set_offset(offset)
+        self.set_offset(offset, source_type=source_type)
 
     def _on_sprite_activated(self, offset: int, source_type: str) -> None:
         """Handle sprite activation (double-click) - enter edit mode."""
@@ -360,6 +370,148 @@ class ROMWorkflowController(QObject):
         self._pending_open_offset = offset
         logger.debug("[DOUBLE-CLICK] Flag set, calling set_offset")
         self.set_offset(offset)
+
+    def _on_local_file_selected(self, path: str, name: str) -> None:
+        """Handle local file selection - preview the file.
+
+        Local files (e.g., .spritepal projects, images) are previewed in the editor
+        without requiring a ROM offset.
+
+        Args:
+            path: Path to the local file
+            name: Display name of the file
+        """
+        logger.debug(f"Local file selected: {name} ({path})")
+        self._preview_local_file(path, name)
+
+    def _on_local_file_activated(self, path: str, name: str) -> None:
+        """Handle local file activation (double-click) - open in editor.
+
+        Args:
+            path: Path to the local file
+            name: Display name of the file
+        """
+        logger.debug(f"Local file activated: {name} ({path})")
+        self._open_local_file_in_editor(path, name)
+
+    def _preview_local_file(self, path: str, name: str) -> None:
+        """Preview a local file in the editor.
+
+        Args:
+            path: Path to the local file
+            name: Display name of the file
+        """
+        from pathlib import Path
+
+        file_path = Path(path)
+        if not file_path.exists():
+            if self._message_service:
+                self._message_service.show_message(f"File not found: {path}")
+            return
+
+        suffix = file_path.suffix.lower()
+
+        if suffix == ".spritepal":
+            # Preview sprite project - show info
+            if self._message_service:
+                self._message_service.show_message(f"Selected project: {name}. Double-click to load.")
+        elif suffix in {".png", ".bmp", ".gif"}:
+            # Preview image - show info
+            if self._message_service:
+                self._message_service.show_message(f"Selected image: {name}. Double-click to import.")
+        elif self._message_service:
+            self._message_service.show_message(f"Unknown file type: {suffix}")
+
+    def _open_local_file_in_editor(self, path: str, name: str) -> None:
+        """Open a local file in the editor for editing.
+
+        Args:
+            path: Path to the local file
+            name: Display name of the file
+        """
+        from pathlib import Path
+
+        file_path = Path(path)
+        if not file_path.exists():
+            if self._message_service:
+                self._message_service.show_message(f"File not found: {path}")
+            return
+
+        suffix = file_path.suffix.lower()
+
+        if suffix == ".spritepal":
+            # Load sprite project via existing load_sprite_project logic
+            self._load_project_from_path(file_path)
+        elif suffix in {".png", ".bmp", ".gif"}:
+            # Import image as new sprite via import dialog
+            self._import_image_from_path(file_path)
+        elif self._message_service:
+            self._message_service.show_message(f"Cannot open file type: {suffix}")
+
+    def _load_project_from_path(self, file_path: "pathlib.Path") -> None:
+        """Load a .spritepal project file directly.
+
+        Args:
+            file_path: Path to the project file
+        """
+        from core.sprite_project import SpriteProject, SpriteProjectError
+
+        try:
+            project = SpriteProject.load(file_path)
+
+            # Load tile data into editor
+            self._load_tile_data_into_editor(
+                project.tile_data,
+                project.width,
+                project.height,
+            )
+
+            # Set palette from project if available
+            if project.palette_colors:
+                self._editing_controller.set_palette(
+                    colors=list(project.palette_colors),
+                    name=project.palette_name or project.name,
+                )
+
+            # Update state
+            self.current_tile_data = project.tile_data
+            self.current_tile_offset = project.original_rom_offset
+            self.current_offset = project.original_rom_offset
+            self.current_width = project.width
+            self.current_height = project.height
+            self.current_sprite_name = project.name
+            self.original_compressed_size = project.original_compressed_size
+            self.current_header_bytes = project.header_bytes or b""
+
+            # Switch to edit state
+            self.state = "edit"
+            if self._view:
+                self._view.set_workflow_state("edit")
+                self._view.set_action_text("Save to ROM")
+                self._view.set_offset(project.original_rom_offset)
+
+            if self._message_service:
+                self._message_service.show_message(f"Loaded project: {project.name}")
+
+            logger.info(f"Loaded sprite project from {file_path}")
+
+        except SpriteProjectError as e:
+            logger.exception(f"Failed to load sprite project: {e}")
+            if self._message_service:
+                self._message_service.show_message(f"Failed to load project: {e}")
+
+    def _import_image_from_path(self, file_path: "pathlib.Path") -> None:
+        """Import an image file into the editor.
+
+        Args:
+            file_path: Path to the image file
+        """
+        # For now, inform the user to use the import dialog manually
+        # A future enhancement could pre-populate the file path
+        if self._message_service:
+            self._message_service.show_message(
+                f"To import {file_path.name}: Open a sprite first, then use Import Image"
+            )
 
     def _on_save_to_library(self, offset: int, source_type: str) -> None:
         """Save sprite to library."""
@@ -579,15 +731,14 @@ class ROMWorkflowController(QObject):
         for sprite in library.sprites:
             if sprite.rom_hash == rom_hash:
                 # Add to Library category (not ROM Sprites)
+                # Library sprites use their saved thumbnails - do NOT queue
+                # worker thumbnail generation as that would overwrite saved thumbnails
                 thumbnail = self._load_library_thumbnail(sprite)
                 self._view.add_library_sprite(
                     sprite.name,
                     sprite.rom_offset,
                     thumbnail=thumbnail,
                 )
-                # Request fresh thumbnail
-                if self._thumbnail_controller:
-                    self._thumbnail_controller.queue_thumbnail(sprite.rom_offset)
                 count += 1
 
         if count > 0:
@@ -812,13 +963,18 @@ class ROMWorkflowController(QObject):
         browser.select_sprite_by_offset(offset)
         logger.info("ensure_and_select_capture: completed for offset 0x%06X", offset)
 
-    def set_offset(self, offset: int, *, auto_open: bool = False) -> None:
+    def set_offset(self, offset: int, *, auto_open: bool = False, source_type: str | None = None) -> None:
         """Set current ROM offset and request preview.
 
         Args:
             offset: ROM offset to navigate to.
             auto_open: If True, automatically open in editor when preview completes.
+            source_type: Source type of the sprite ("rom", "mesen", "library").
+                        Used for precise asset browser selection.
         """
+        # Store current source type for selection synchronization
+        if source_type:
+            self._current_source_type = source_type
         # Check ROM availability first
         if not self.rom_path:
             if self._message_service:
@@ -851,9 +1007,9 @@ class ROMWorkflowController(QObject):
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 )
                 if reply == QMessageBox.StandardButton.No:
-                    # Reset to current offset
+                    # Reset to current offset with current source type
                     if self._view:
-                        self._view.set_offset(self.current_offset)
+                        self._view.set_offset(self.current_offset, self._current_source_type)
                     return
 
             # Always transition to preview when leaving edit state
@@ -868,7 +1024,7 @@ class ROMWorkflowController(QObject):
         self.current_tile_offset = -1  # Invalidate data offset
         self._clear_arrangement()  # Clear arrangement when changing offset
         if self._view:
-            self._view.set_offset(offset)
+            self._view.set_offset(offset, self._current_source_type)
             self._view.hide_palette_warning()
 
         # Emit change for external listeners (e.g. MainWindow toolbar)
@@ -2012,16 +2168,36 @@ class ROMWorkflowController(QObject):
         """Save current sprite as a .spritepal project file."""
         from pathlib import Path
 
+        from PIL import Image
         from PySide6.QtWidgets import QFileDialog, QMessageBox
 
         from core.sprite_project import SpriteProject, SpriteProjectError
 
+        from ..services import ImageConverter
+
         # Check if we have sprite data to save
-        tile_data = self.current_tile_data
-        if self.current_tile_offset != self.current_offset or tile_data is None:
+        if self.current_tile_offset != self.current_offset or self.current_tile_data is None:
             if self._message_service:
                 self._message_service.show_message("No sprite loaded to save")
             return
+
+        # Get tile data - use edited data if available, otherwise use original
+        if self.state == "edit" and self._editing_controller.has_image():
+            # Convert edited image data back to 4bpp tile data
+            image_data = self._editing_controller.get_image_data()
+            if image_data is not None:
+                img = Image.fromarray(image_data, mode="P")
+                img.putpalette(self._editing_controller.get_flat_palette())
+                converter = ImageConverter()
+                tile_data = converter.image_to_tiles(img)
+                logger.debug(
+                    "save_sprite_project: using edited tile data (%d bytes)",
+                    len(tile_data),
+                )
+            else:
+                tile_data = self.current_tile_data
+        else:
+            tile_data = self.current_tile_data
 
         # Get palette from editing controller
         palette_model = self._editing_controller.palette_model
@@ -2239,9 +2415,9 @@ class ROMWorkflowController(QObject):
                 self._pending_open_offset = actual_offset
             # Update current offset to match reality
             self.current_offset = actual_offset
-            # Update UI
+            # Update UI (preserve current source type during offset adjustment)
             if self._view:
-                self._view.set_offset(actual_offset)
+                self._view.set_offset(actual_offset, self._current_source_type)
                 # Update asset browser item offset - this emits item_offset_changed signal
                 # which automatically re-queues thumbnail for the new offset
                 self._view.asset_browser.update_sprite_offset(old_offset, actual_offset)

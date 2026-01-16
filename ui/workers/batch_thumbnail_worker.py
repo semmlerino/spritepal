@@ -535,9 +535,10 @@ class BatchThumbnailWorker(QObject):
                                     f"Thumbnail: adjusted offset 0x{request.offset:06X} -> 0x{try_offset:06X} "
                                     f"(delta: {try_offset - request.offset:+d})"
                                 )
-                                # Update request.offset so signal emits aligned offset
-                                # (matches preview_worker_pool.py:267)
-                                request.offset = try_offset
+                                # NOTE: Do NOT mutate request.offset here!
+                                # The thumbnail must be emitted with the ORIGINAL offset so it
+                                # matches the item in the asset browser. Mutating the offset
+                                # causes desync between thumbnail and browser item.
                             # Align tile data to 32-byte boundaries (some assets have header bytes)
                             original_len = len(decompressed_data)
                             decompressed_data = align_tile_data(decompressed_data)

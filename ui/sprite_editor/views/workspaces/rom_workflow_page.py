@@ -46,6 +46,8 @@ class ROMWorkflowPage(QWidget):
     offset_changed = Signal(int)
     sprite_selected = Signal(int, str)  # offset, source_type
     sprite_activated = Signal(int, str)  # offset, source_type
+    local_file_selected = Signal(str, str)  # path, name
+    local_file_activated = Signal(str, str)  # path, name
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -121,6 +123,8 @@ class ROMWorkflowPage(QWidget):
         # Forward signals from asset browser
         self._asset_browser.sprite_selected.connect(self.sprite_selected.emit)
         self._asset_browser.sprite_activated.connect(self.sprite_activated.emit)
+        self._asset_browser.local_file_selected.connect(self.local_file_selected.emit)
+        self._asset_browser.local_file_activated.connect(self.local_file_activated.emit)
 
         left_layout.addWidget(self._asset_browser, 1)
 
@@ -186,11 +190,22 @@ class ROMWorkflowPage(QWidget):
         """Set checksum validity in source bar."""
         self._source_bar.set_checksum_valid(valid)
 
-    def set_offset(self, offset: int) -> None:
-        """Update displayed ROM offset in source bar and asset browser selection."""
+    def set_offset(self, offset: int, source_type: str | None = None) -> None:
+        """Update displayed ROM offset in source bar and asset browser selection.
+
+        Args:
+            offset: ROM offset to display.
+            source_type: Optional source type for precise selection ("rom", "mesen", "library").
+                        If provided, selects matching offset AND source_type.
+                        If None, falls back to offset-only matching.
+        """
         self._source_bar.set_offset(offset)
-        # Synchronize asset browser selection
-        self._asset_browser.select_sprite_by_offset(offset)
+        # Synchronize asset browser selection with composite identity
+        if source_type:
+            self._asset_browser.select_sprite(offset, source_type)
+        else:
+            # Fallback: offset-only matching (backwards compatibility)
+            self._asset_browser.select_sprite_by_offset(offset)
 
     def set_mapping_type(self, mapping_type: RomMappingType) -> None:
         """Set ROM mapping type for SNES address conversion in source bar."""
@@ -220,9 +235,16 @@ class ROMWorkflowPage(QWidget):
     # Delegation methods for SpriteAssetBrowser
     # =========================================================================
 
-    def set_thumbnail(self, offset: int, pixmap: QPixmap) -> None:
-        """Set thumbnail for a sprite in asset browser."""
-        self._asset_browser.set_thumbnail(offset, pixmap)
+    def set_thumbnail(self, offset: int, pixmap: QPixmap, source_type: str | None = None) -> None:
+        """Set thumbnail for a sprite in asset browser.
+
+        Args:
+            offset: ROM offset of the sprite.
+            pixmap: Thumbnail image.
+            source_type: Optional filter - only update this source type
+                        ("rom", "mesen", "library"). If None, updates all.
+        """
+        self._asset_browser.set_thumbnail(offset, pixmap, source_type)
 
     def add_rom_sprite(self, name: str, offset: int) -> None:
         """Add a ROM sprite to the asset browser."""

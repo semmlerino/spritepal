@@ -50,15 +50,19 @@ class ThumbnailCache(BaseLRUCache[QImage]):
         return img.sizeInBytes()
 
     @staticmethod
-    def make_key(offset: int, size: int) -> str:
+    def make_key(offset: int, size: int, source_type: str = "") -> str:
         """
-        Create a cache key from offset and size.
+        Create a cache key from offset, size, and optional source type.
 
         Args:
             offset: ROM offset of the sprite
             size: Compressed size of the sprite
+            source_type: Optional source type ("rom", "mesen", "library").
+                        Empty string for backwards compatibility.
 
         Returns:
-            String key in format "offset:size"
+            String key in format "offset:size" or "offset:size:source_type"
         """
+        if source_type:
+            return f"{offset}:{size}:{source_type}"
         return f"{offset}:{size}"
