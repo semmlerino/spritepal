@@ -68,8 +68,8 @@ class TestManualOffsetDialog:
         assert dialog.browse_tab.position_slider.value() == new_value
 
         # Verify display updated
-        offset_text = dialog.browse_tab.offset_label.text()
-        assert f"{new_value:06X}" in offset_text or f"{new_value:X}" in offset_text
+        offset_text = dialog.browse_tab.manual_spinbox.text()
+        assert f"{new_value:X}" in offset_text.upper()
 
     def test_manual_offset_input(self, manual_offset_dialog, test_rom_with_sprites, qtbot):
         """Test manual offset input via spinbox."""

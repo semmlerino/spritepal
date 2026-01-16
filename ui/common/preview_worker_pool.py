@@ -228,8 +228,12 @@ class PooledPreviewWorker(SpritePreviewWorker):
 
                 # Try to extract as compressed sprite
                 rom_injector = self.extractor.rom_injector
+                # Trust primary offsets even if compression ratio looks odd; enforce on alternates.
                 compressed_size, tile_data, slack_size = rom_injector.find_compressed_sprite(
-                    rom_data, try_offset, expected_size
+                    rom_data,
+                    try_offset,
+                    expected_size,
+                    enforce_ratio=not is_primary_offset,
                 )
 
                 # Handle empty data case first (early continue pattern)

@@ -130,11 +130,13 @@ class TestRealDialogInitialization:
         # Verify real Qt widgets exist
         assert dialog is not None
 
-        # Check for expected child widgets (tab widget is a key component)
-        if hasattr(dialog, "tab_widget"):
-            assert dialog.tab_widget is not None
-            # Should have tabs
+        # Check for expected child widgets (tab widget is a key component in some versions,
+        # but has been replaced by a sidebar in recent redesigns)
+        if hasattr(dialog, "tab_widget") and dialog.tab_widget is not None:
+            # Should have tabs if it exists
             assert dialog.tab_widget.count() >= 0
+        elif hasattr(dialog, "_sidebar"):
+            assert dialog._sidebar is not None
 
         dialog.close()
 

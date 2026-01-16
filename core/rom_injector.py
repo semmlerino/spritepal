@@ -154,7 +154,12 @@ class ROMInjector(SpriteInjector):
         logger.info(f"ROM header checksum updated: 0x{old_checksum:04X} -> 0x{checksum:04X}")
 
     def find_compressed_sprite(
-        self, rom_data: bytes | bytearray | memoryview, offset: int, expected_size: int | None = None
+        self,
+        rom_data: bytes | bytearray | memoryview,
+        offset: int,
+        expected_size: int | None = None,
+        *,
+        enforce_ratio: bool = True,
     ) -> tuple[int, bytes, int]:
         """
         Find and decompress sprite data at given offset.
@@ -163,6 +168,7 @@ class ROMInjector(SpriteInjector):
             rom_data: ROM data (bytes, bytearray, or memoryview)
             offset: Offset in ROM where compressed sprite starts
             expected_size: Expected decompressed size (will truncate if larger)
+            enforce_ratio: If True, reject candidates with invalid compression ratios
 
         Returns:
             Tuple of (compressed_size, decompressed_data, slack_size)
@@ -291,7 +297,12 @@ class ROMInjector(SpriteInjector):
                         f"Rejected: invalid compression ratio ({compression_ratio:.2%}) at 0x{offset:X}. "
                         f"compressed={compressed_size}, decompressed={original_size}"
                     )
-                    return 0, b"", 0  # Reject this candidate
+                    if enforce_ratio:
+                        return 0, b"", 0  # Reject this candidate
+                    logger.debug(
+                        "Continuing despite invalid compression ratio (enforce_ratio=False) for offset 0x%X",
+                        offset,
+                    )
 
             if original_size > 0:
                 compression_ratio = compressed_size / original_size

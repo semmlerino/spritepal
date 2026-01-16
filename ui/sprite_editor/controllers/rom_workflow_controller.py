@@ -2491,10 +2491,10 @@ class ROMWorkflowController(QObject):
 
         # Clear loading state
         self._preview_pending = False
-        if self._is_view_valid():
-            self._view.set_action_loading(False)
-            self._view.set_action_text("Open in Editor")
-            self._view.source_bar.set_action_enabled(True)
+        if (view := self._view) and isValid(view):
+            view.set_action_loading(False)
+            view.set_action_text("Open in Editor")
+            view.source_bar.set_action_enabled(True)
 
         if self._is_view_valid():
             if hal_succeeded:
@@ -2563,10 +2563,10 @@ class ROMWorkflowController(QObject):
         self._pending_open_offset = -1
         # Clear loading state
         self._preview_pending = False
-        if self._is_view_valid():
-            self._view.set_action_loading(False)
-            self._view.set_action_text("Open in Editor")
-            self._view.source_bar.set_action_enabled(True)
+        if (view := self._view) and isValid(view):
+            view.set_action_loading(False)
+            view.set_action_text("Open in Editor")
+            view.source_bar.set_action_enabled(True)
         if self._message_service:
             self._message_service.show_message(f"Preview error: {error_msg}")
 

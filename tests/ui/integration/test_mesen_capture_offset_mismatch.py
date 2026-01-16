@@ -15,6 +15,7 @@ to alternate offsets (which are speculative attempts to correct DMA jitter).
 
 from __future__ import annotations
 
+import weakref
 from unittest.mock import MagicMock
 
 import pytest
@@ -214,6 +215,52 @@ class TestPreviewWorkerOffsetSelection:
         assert actual_offset == original_offset, (
             f"BUG: Original offset 0x{original_offset:X} should be used, "
             f"but got 0x{actual_offset:X} (delta: {actual_offset - original_offset:+d})"
+        )
+
+    def test_preview_worker_prefers_primary_offset_when_ratio_check_rejects(self, qtbot, tmp_path):
+        """Bug repro: preview worker should not skip primary offset due to ratio validation."""
+        from ui.common.preview_worker_pool import PooledPreviewWorker
+        from ui.common.smart_preview_coordinator import PendingPreviewRequest
+
+        class DummyPool:
+            def _return_worker(self, _worker) -> None:
+                return None
+
+        rom_path = tmp_path / "dummy.sfc"
+        rom_path.write_bytes(b"\x00" * 0x400000)
+
+        primary_offset = 0x293AEB
+        adjusted_offset = primary_offset + 2
+        primary_data = bytes([0] * 128)
+        adjusted_data = bytes([0xFF] * 128)
+
+        def mock_find_compressed_sprite(rom_data, offset, expected_size=None, **kwargs):
+            enforce_ratio = kwargs.get("enforce_ratio", True)
+            if offset == primary_offset:
+                if enforce_ratio:
+                    return 0, b"", 0
+                return 64, primary_data, 8
+            if offset == adjusted_offset:
+                return 64, adjusted_data, 8
+            return 0, b"", 0
+
+        extractor = MagicMock()
+        extractor.rom_injector = MagicMock()
+        extractor.rom_injector.find_compressed_sprite.side_effect = mock_find_compressed_sprite
+
+        worker = PooledPreviewWorker(weakref.ref(DummyPool()))
+        request = PendingPreviewRequest(
+            request_id=1,
+            offset=primary_offset,
+            rom_path=str(rom_path),
+            full_decompression=True,
+        )
+        worker.setup_request(request, extractor)
+
+        worker._run_with_cancellation_checks()
+
+        assert worker.offset == primary_offset, (
+            f"Expected primary offset 0x{primary_offset:X} to be used, got 0x{worker.offset:X} instead"
         )
 
 

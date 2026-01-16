@@ -255,23 +255,22 @@ class UnifiedManualOffsetDialog(CleanupDialog):
     def _create_left_panel(self) -> QWidget:
         """Create the main content panel with preview and navigation controls.
 
-        New layout (no tabs):
-        - Preview widget (dominant, at top)
-        - Comparison pin slots (below preview)
-        - Navigation controls from browse tab (offset, palette, step, prev/next)
-        - Position slider (ROM map)
+        New layout (Controls First):
+        - Navigation controls (BrowseTab) at TOP for "Address Bar" feel
+        - Preview widget (dominant, middle)
+        - Mini ROM map
+        - Status panel (always visible footer)
         """
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setSpacing(SPACING_SMALL)
         layout.setContentsMargins(SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD)
 
-        # Title with better styling
-        title = QLabel("Manual Offset Browser")
-        title.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLORS['highlight']};")
-        layout.addWidget(title, 0)
+        # 1. Navigation Controls (Top)
+        self.browse_tab = SimpleBrowseTab()
+        layout.addWidget(self.browse_tab, 0)  # Fixed height
 
-        # Preview widget with frame for better visibility - this is the main focus
+        # 2. Preview widget (Middle, Dominant)
         preview_frame = QFrame()
         preview_frame.setFrameStyle(QFrame.Shape.StyledPanel)
         preview_frame.setStyleSheet(f"""
@@ -284,7 +283,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         preview_layout = QVBoxLayout(preview_frame)
         preview_layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
 
-        # Preview widget configured to expand
         self.preview_widget = SpritePreviewWidget()
         self.preview_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.preview_widget.similarity_search_requested.connect(self._on_similarity_search_requested)
@@ -292,7 +290,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         layout.addWidget(preview_frame, 3)  # Give preview most of the stretch
 
-        # Comparison pin area (initially hidden, shows when pins are active)
+        # 3. Comparison pin area (initially hidden)
         self._comparison_frame = QFrame()
         self._comparison_frame.setStyleSheet(f"""
             QFrame {{
@@ -306,38 +304,32 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._comparison_label = QLabel("No pins - Use Ctrl+P to pin current offset for comparison")
         self._comparison_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-style: italic;")
         comparison_layout.addWidget(self._comparison_label)
-        self._comparison_frame.hide()  # Hidden until pins are used
+        self._comparison_frame.hide()
         layout.addWidget(self._comparison_frame, 0)
 
-        # Browse tab contains navigation controls (offset input, slider, buttons)
-        # We keep it but remove the tab wrapper
-        self.browse_tab = SimpleBrowseTab()
-        layout.addWidget(self.browse_tab, 0)  # No stretch - fixed height for controls
-
-        # Mini ROM map for position context
+        # 4. Mini ROM map
         self.mini_rom_map = ROMMapWidget()
         self.mini_rom_map.setMaximumHeight(_MAX_MINI_MAP_HEIGHT)
         self.mini_rom_map.setMinimumHeight(_MIN_MINI_MAP_HEIGHT)
         self.mini_rom_map.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.mini_rom_map, 0)
 
-        # Smart tab, History tab, Gallery tab - no longer used in main view
-        # They are replaced by the sidebar
-        self.smart_tab = SimpleSmartTab()
-        self.smart_tab.hide()  # Keep for backward compatibility but hide
-        self.history_tab = SimpleHistoryTab()
-        self.history_tab.hide()  # Moved to sidebar
-        self.gallery_tab = SpriteGalleryTab()
-        self.gallery_tab.hide()  # Merged into scan results
-
-        # Status panel - collapsed by default (less important now)
-        self.status_collapsible = CollapsibleGroupBox("Status", collapsed=True)
+        # 5. Status panel (Footer, always visible)
         self.status_panel = StatusPanel(settings_manager=self.settings_manager, rom_cache=self.rom_cache)
-        self.status_collapsible.add_widget(self.status_panel)
+        # Use simpler styling for footer integration if needed, but standard panel is fine
         self._setup_cache_context_menu()
-        layout.addWidget(self.status_collapsible, 0)
+        layout.addWidget(self.status_panel, 0)
 
-        # Tab widget is no longer used
+        # Hidden tabs (legacy/sidebar moved)
+        self.smart_tab = SimpleSmartTab()
+        self.smart_tab.hide()
+        self.history_tab = SimpleHistoryTab()
+        self.history_tab.hide()
+        self.gallery_tab = SpriteGalleryTab()
+        self.gallery_tab.hide()
+        
+        # Remove unused refs
+        self.status_collapsible = None
         self.tab_widget = None
 
         return panel
@@ -448,6 +440,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self.browse_tab.find_next_clicked.connect(self._find_next_sprite)
         self.browse_tab.find_prev_clicked.connect(self._find_prev_sprite)
         self.browse_tab.find_sprites_requested.connect(self._scan_for_sprites)
+        self.browse_tab.apply_requested.connect(self._apply_offset)
 
         # Connect smart preview coordinator to browse tab
         if self._smart_preview_coordinator:
@@ -1250,8 +1243,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     def _setup_cache_context_menu(self) -> None:
         """Set up context menu for cache management."""
-        if self._cache_controller is not None and self.status_collapsible is not None:
-            self._cache_controller.set_status_widget(self.status_collapsible)
+        # Context menu disabled as status_collapsible is removed
+        pass
 
     def _show_cache_context_menu(self, position: QPoint) -> None:
         """Show cache management context menu."""

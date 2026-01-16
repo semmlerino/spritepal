@@ -99,7 +99,12 @@ class ROMExtractor:
     # -------------------------------------------------------------------------
 
     def find_compressed_sprite(
-        self, rom_data: bytes | bytearray, offset: int, expected_size: int | None = None
+        self,
+        rom_data: bytes | bytearray,
+        offset: int,
+        expected_size: int | None = None,
+        *,
+        enforce_ratio: bool = True,
     ) -> tuple[int, bytes, int]:
         """Find and decompress sprite data at given offset.
 
@@ -109,11 +114,12 @@ class ROMExtractor:
             rom_data: ROM data
             offset: Offset in ROM where compressed sprite starts
             expected_size: Expected decompressed size (will truncate if larger)
+            enforce_ratio: If True, reject candidates with invalid compression ratios
 
         Returns:
             Tuple of (compressed_size, decompressed_data, slack_size)
         """
-        return self.rom_injector.find_compressed_sprite(rom_data, offset, expected_size)
+        return self.rom_injector.find_compressed_sprite(rom_data, offset, expected_size, enforce_ratio=enforce_ratio)
 
     def read_rom_header(self, rom_path: str) -> ROMHeader:
         """Read ROM header information.

@@ -550,7 +550,7 @@ local LOOKBACK_WINDOW = 90       -- Frames to look back at session start (raise 
 local LOOKBACK_REQUIRE_SINCE_LAST_SESSION = true  -- Avoid attributing DMAs from earlier sessions
 local LOOKBACK_ALLOW_UNMATCHED = false  -- If false, unmatched sessions won't claim lookback DMAs
 local SESSION_DEDUP_WINDOW = 4   -- Skip duplicate ptr sessions within N frames (0 disables)
-local ACTIVATE_AT_FRAME = 1500   -- Delay tracking/UI until this frame (0 = immediate)
+local ACTIVATE_AT_FRAME = 2800   -- Delay tracking/UI until this frame (0 = immediate)
 
 -- Staging WRAM buffer ranges for Kirby Super Star
 -- The game uses TWO decompression areas:
