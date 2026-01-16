@@ -78,14 +78,74 @@ All major controllers and views should expose high-level facade methods (`get_*`
    - ❌ CANNOT import from: ANY SpritePal modules
    - Purpose: Shared utilities, constants, helpers
 
+### UI Services Layer (`ui/services/`)
+
+The UI services layer contains **workflow coordinators** that orchestrate UI operations without being tied to specific widgets. These coordinators bridge the gap between MainWindow and Core managers.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     MainWindow                               │
+│  - UI construction, signal connections, user action handlers │
+└─────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   UI Services (`ui/services/`)               │
+│  ExtractionWorkflowCoordinator:                              │
+│    - Manages extraction worker lifecycle                     │
+│    - Validates extraction parameters                         │
+│    - Emits signals: extraction_started, extraction_failed,   │
+│      vram_extraction_finished, rom_extraction_finished       │
+│    - Delegates to CoreOperationsManager for business logic   │
+│                                                              │
+│  DialogCoordinator:                                          │
+│    - Manages dialog lifecycle and modality                   │
+│    - Handles dialog result callbacks                         │
+└─────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Core Managers (`core/managers/`)           │
+│  - Business logic, state ownership, service coordination    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Import Rules for UI Services:**
+- ✅ CAN import from: `core/`, `core/managers/`, `core/services/`, `utils/`
+- ❌ CANNOT import from: `ui/` widgets directly (use signals)
+- Purpose: Workflow orchestration, worker lifecycle management
+
+**ExtractionWorkflowCoordinator Example:**
+```python
+from core.app_context import get_app_context
+from ui.services import ExtractionWorkflowCoordinator
+
+# Create coordinator (typically done in MainWindow._setup_managers)
+coordinator = ExtractionWorkflowCoordinator(get_app_context())
+
+# Connect signals for UI updates
+coordinator.extraction_started.connect(self._on_extraction_started)
+coordinator.extraction_failed.connect(self._on_extraction_failed)
+coordinator.vram_extraction_finished.connect(self._on_vram_finished)
+
+# For preview/palette updates, connect to CoreOperationsManager directly
+# (ExtractionResult contains PIL.Image which can't be serialized)
+coordinator.core_operations_manager.extraction_completed.connect(
+    self._on_extraction_completed
+)
+
+# Start extraction
+coordinator.start_vram_extraction(params)
+```
+
 ### Naming Conventions: Manager vs Coordinator
 
 SpritePal uses two naming patterns for orchestration classes. Choose based on **where the class lives and what it owns**:
 
 | Pattern | Layer | State Ownership | Example |
 |---------|-------|-----------------|---------|
-| **Manager** | Core (`core/managers/`) | Owns business state | `ExtractionManager`, `SessionManager` |
-| **Coordinator** | UI (`ui/managers/`) | Coordinates widgets, no business state | `PreviewCoordinator`, `TabCoordinator` |
+| **Manager** | Core (`core/managers/`) | Owns business state | `CoreOperationsManager`, `ApplicationStateManager` |
+| **Coordinator** | UI (`ui/services/`, `ui/managers/`) | Coordinates workflows, no business state | `ExtractionWorkflowCoordinator`, `DialogCoordinator` |
 
 **When to use each:**
 
@@ -774,4 +834,4 @@ This subsystem is used by:
 
 ---
 
-*Last updated: January 12, 2026 (Service consolidation in AppContext documented in CLAUDE.md)*
+*Last updated: January 16, 2026 (UI Services layer and ExtractionWorkflowCoordinator added)*
