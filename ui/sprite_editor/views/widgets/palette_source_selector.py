@@ -204,6 +204,9 @@ class PaletteSourceSelector(QWidget):
             self._combo_box.setCurrentIndex(index)
             return
 
+        # When selecting a standard source, remove the [Modified] entry
+        self.remove_custom_item()
+
         for i in range(self._combo_box.count()):
             if (
                 self._combo_box.itemData(i, self._SOURCE_TYPE_ROLE) == source_type
@@ -324,3 +327,66 @@ class PaletteSourceSelector(QWidget):
         # Reset to default if nothing selected
         if self._combo_box.currentIndex() < 0:
             self._combo_box.setCurrentIndex(0)
+
+    def remove_custom_item(self) -> None:
+        """Remove the '[Modified]' entry from the combo box if it exists.
+
+        This should be called when selecting a standard source to clean up
+        the UI state.
+        """
+        # Find and remove the custom item (source_type == "")
+        for i in range(self._combo_box.count()):
+            if self._combo_box.itemData(i, self._SOURCE_TYPE_ROLE) == "":
+                self._combo_box.removeItem(i)
+                # Adjust separator index if we removed an item before it
+                if i < self._separator_index:
+                    self._separator_index -= 1
+                break
+
+    def clear_all_sources(self) -> None:
+        """Clear all non-default sources (mesen, rom, file, preset, custom).
+
+        Preserves the default source and the manual palette option.
+        """
+        # Remove all non-default, non-manual sources (iterate backwards)
+        i = self._combo_box.count() - 1
+        while i >= 0:
+            source_type = self._combo_box.itemData(i, self._SOURCE_TYPE_ROLE)
+            # Keep "default" and "manual" (the action item)
+            if source_type not in ("default", self._MANUAL_PALETTE_MARKER, None):
+                self._combo_box.removeItem(i)
+                # Adjust separator index if we removed an item before it
+                if i < self._separator_index:
+                    self._separator_index -= 1
+            i -= 1
+
+        # Reset to default
+        self._combo_box.setCurrentIndex(0)
+
+    def clear_sources_by_type(self, source_type: str) -> None:
+        """Clear sources of a specific type.
+
+        Args:
+            source_type: Type of source to clear ("mesen", "rom", "preset", "file", or "" for custom)
+        """
+        if source_type == "mesen":
+            self.clear_mesen_sources()
+        elif source_type == "rom":
+            self.clear_rom_sources()
+        elif source_type == "":
+            self.remove_custom_item()
+        else:
+            # Generic clearing for other types (preset, file, etc.)
+            i = self._combo_box.count() - 1
+            while i >= 0:
+                item_type = self._combo_box.itemData(i, self._SOURCE_TYPE_ROLE)
+                if item_type == source_type:
+                    self._combo_box.removeItem(i)
+                    # Adjust separator index if we removed an item before it
+                    if i < self._separator_index:
+                        self._separator_index -= 1
+                i -= 1
+
+            # Reset to default if nothing selected
+            if self._combo_box.currentIndex() < 0:
+                self._combo_box.setCurrentIndex(0)

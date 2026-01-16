@@ -29,5 +29,5 @@ def test_revert_to_original_forces_rom_reload():
         # Verify fix: it calls set_offset with auto_open=True
         mock_set_offset.assert_called_once_with(0x1000, auto_open=True)
 
-    # Verify undo history was cleared to avoid double prompt in set_offset
-    assert mock_editing.undo_manager.clear.called
+    # Verify undo history was cleared (via clear_undo_history which emits signal)
+    assert mock_editing.clear_undo_history.called

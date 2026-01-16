@@ -1163,8 +1163,8 @@ class ROMWorkflowController(QObject):
 
         # Reload the original sprite data
         logger.info("Reverting sprite to original ROM data at offset 0x%06X", self.current_offset)
-        # Clear undo history so set_offset doesn't prompt again
-        self._editing_controller.undo_manager.clear()
+        # Clear undo history using public API so signal is emitted
+        self._editing_controller.clear_undo_history()
         self.set_offset(self.current_offset, auto_open=True)
 
         if self._message_service:

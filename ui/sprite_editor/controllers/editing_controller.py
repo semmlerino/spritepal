@@ -214,8 +214,9 @@ class EditingController(QObject):
         if palette:
             self.set_palette(palette)
 
-        # Clear undo history
+        # Clear undo history and emit state change so UI updates
         self.undo_manager.clear()
+        self._emit_undo_state()
 
         self.imageChanged.emit()
 
