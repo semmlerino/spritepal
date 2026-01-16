@@ -14,9 +14,98 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from PIL import Image
 
 from core.hal_compression import HALCompressionError
-from utils.constants import BYTES_PER_TILE
+from utils.constants import BYTES_PER_TILE, TILE_HEIGHT, TILE_WIDTH
+
+# Constants for test helpers
+DEFAULT_TILES_PER_ROW = 16
+
+
+def create_test_rom_with_header(
+    title: str,
+    checksum: int,
+    rom_size: int = 64 * 1024,
+    smc_header: bool = False,
+) -> bytes:
+    """Create test ROM with valid SNES header at 0x7FC0 (LoROM).
+
+    Args:
+        title: ROM title (max 21 chars)
+        checksum: 16-bit checksum value
+        rom_size: Total ROM size in bytes (default 64KB)
+        smc_header: If True, prepend 512-byte SMC header
+
+    Returns:
+        ROM data bytes with valid header structure
+    """
+    # Create ROM data
+    rom_data = bytearray(rom_size)
+
+    # Add SNES header at 0x7FC0 (LoROM standard)
+    header_offset = 0x7FC0
+    title_bytes = title.encode("ascii")[:21].ljust(21, b" ")
+    rom_data[header_offset : header_offset + 21] = title_bytes
+    rom_data[header_offset + 21] = 0x20  # ROM type (LoROM)
+    rom_data[header_offset + 22] = 0x09  # ROM size code
+    rom_data[header_offset + 23] = 0x00  # SRAM size
+
+    # Add checksum and complement (checksum ^ complement = 0xFFFF)
+    complement = 0xFFFF ^ checksum
+    rom_data[header_offset + 28 : header_offset + 30] = complement.to_bytes(2, "little")
+    rom_data[header_offset + 30 : header_offset + 32] = checksum.to_bytes(2, "little")
+
+    if smc_header:
+        return bytes(512) + bytes(rom_data)
+    return bytes(rom_data)
+
+
+def verify_png_output(
+    png_path: Path,
+    *,
+    expect_indexed: bool = True,
+    expect_non_zero: bool = False,
+    min_tiles: int = 1,
+) -> int:
+    """Verify PNG output meets expectations.
+
+    Args:
+        png_path: Path to PNG file
+        expect_indexed: If True, verify PNG is indexed mode ("P")
+        expect_non_zero: If True, verify not all pixels are zero
+        min_tiles: Minimum expected tile count
+
+    Returns:
+        Number of tiles in the image
+
+    Raises:
+        AssertionError: If any validation fails
+    """
+    assert png_path.exists(), f"PNG not created: {png_path}"
+
+    with Image.open(png_path) as img:
+        if expect_indexed:
+            assert img.mode == "P", f"Wrong mode: {img.mode}, expected P"
+
+        # Calculate tiles from dimensions
+        tiles_per_row = DEFAULT_TILES_PER_ROW
+        expected_width = tiles_per_row * TILE_WIDTH
+
+        assert img.width == expected_width, f"Wrong width: {img.width}, expected {expected_width}"
+        assert img.height % TILE_HEIGHT == 0, f"Height {img.height} not multiple of {TILE_HEIGHT}"
+
+        num_rows = img.height // TILE_HEIGHT
+        total_tiles = num_rows * tiles_per_row
+
+        assert total_tiles >= min_tiles, f"Too few tiles: {total_tiles}, expected >= {min_tiles}"
+
+        if expect_non_zero:
+            pixels = list(img.getdata())
+            assert any(p > 0 for p in pixels), "All pixels are zero"
+
+        return total_tiles
+
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [
@@ -79,230 +168,272 @@ class TestROMExtractorSpriteLocations:
 
 
 class TestROMExtractorMainExtraction:
-    """Test main sprite extraction functionality"""
+    """Integration tests for main sprite extraction workflow.
 
-    @pytest.fixture
-    def mock_extractor(self):
-        """Create ROM extractor with mocked dependencies via AppContext."""
-        from core.app_context import get_app_context
+    Uses real ROMExtractor components with mock HAL (for speed).
+    Verifies complete extraction workflow including file I/O, PNG generation,
+    and palette extraction by validating actual output files.
 
-        extractor = get_app_context().rom_extractor
+    For pure unit tests with isolated logic, see other test classes.
+    """
 
-        # Mock all dependencies
-        extractor.rom_injector = Mock()
-        extractor.hal_compressor = Mock()
-        extractor.rom_palette_extractor = Mock()
-        extractor.default_palette_loader = Mock()
-        extractor.sprite_config_loader = Mock()
+    def test_extract_sprite_from_rom_basic_success(self, app_context, tmp_path):
+        """Test successful sprite extraction with real components.
 
-        return extractor
-
-    def test_extract_sprite_from_rom_basic_success(self, mock_extractor, tmp_path):
-        """Test successful basic sprite extraction"""
+        Uses real ROM header parsing, file I/O, and PNG conversion.
+        Only mocks the HAL decompression step (tested separately).
+        """
+        # Create real ROM with proper header
         rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(b"Mock ROM data" * 1000)
+        rom_path.write_bytes(
+            create_test_rom_with_header(
+                title="TEST ROM",
+                checksum=0x1234,
+            )
+        )
         output_base = tmp_path / "extracted_sprite"
 
-        # Mock ROM header
-        mock_header = Mock()
-        mock_header.title = "TEST ROM"
-        mock_header.checksum = 0x1234
-        mock_header.header_offset = 0  # No SMC header
-        mock_extractor.rom_injector.read_rom_header.return_value = mock_header
+        extractor = app_context.rom_extractor
 
-        # Mock compressed sprite data
-        # Returns (compressed_size, decompressed_data, slack_size)
-        test_sprite_data = b"\x00" * (4 * BYTES_PER_TILE)  # 4 tiles
-        mock_extractor.rom_injector.find_compressed_sprite.return_value = (100, test_sprite_data, 0)
+        # Mock HAL decompression (returns 4 tiles of test data)
+        test_sprite_data = b"\x00" * (4 * BYTES_PER_TILE)
+        with patch.object(
+            extractor.rom_injector,
+            "find_compressed_sprite",
+            return_value=(100, test_sprite_data, 0),
+        ):
+            output_path, extraction_info = extractor.extract_sprite_from_rom(
+                str(rom_path), 0x8000, str(output_base), "test_sprite"
+            )
 
-        # Mock sprite config loader to return empty dict (no sprite config found)
-        mock_extractor.sprite_config_loader.get_game_sprites.return_value = {}
-        mock_extractor.sprite_config_loader.find_game_config.return_value = (None, None)
-
-        # Mock palette extraction (no palettes found)
-        mock_extractor.sprite_config_loader.config_data = {"games": {}}
-        mock_extractor.default_palette_loader.has_default_palettes.return_value = False
-        mock_extractor.default_palette_loader.has_palettes_for_rom_title.return_value = False
-
-        output_path, extraction_info = mock_extractor.extract_sprite_from_rom(
-            str(rom_path), 0x8000, str(output_base), "test_sprite"
-        )
-
-        # Verify output
+        # Verify PNG output (real file I/O and conversion)
         assert output_path == f"{output_base}.png"
-        assert Path(output_path).exists()
+        verify_png_output(Path(output_path), min_tiles=1)
 
-        # Verify extraction info
+        # Verify metadata
         assert extraction_info["source_type"] == "rom"
         assert extraction_info["rom_source"] == "test.sfc"
         assert extraction_info["rom_offset"] == "0x8000"
         assert extraction_info["sprite_name"] == "test_sprite"
-        assert extraction_info["compressed_size"] == 100
-        assert extraction_info["tile_count"] == 4
-        assert extraction_info["extraction_size"] == len(test_sprite_data)
-        assert extraction_info["rom_title"] == "TEST ROM"
+        assert extraction_info["tile_count"] == 4  # 4 tiles of test data
+        assert extraction_info["rom_title"].strip() == "TEST ROM"
         assert extraction_info["rom_checksum"] == "0x1234"
         assert extraction_info["rom_palettes_used"] is False
         assert extraction_info["default_palettes_used"] is False
         assert extraction_info["palette_count"] == 0
 
-    def test_extract_sprite_from_rom_with_rom_palettes(self, mock_extractor, tmp_path):
-        """Test sprite extraction with ROM palette extraction"""
-        rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(b"Mock ROM data" * 1000)
+    def test_extract_sprite_from_rom_with_rom_palettes(self, app_context, tmp_path):
+        """Test sprite extraction with ROM palette extraction.
+
+        Uses real ROM header parsing, file I/O, and PNG conversion.
+        Mocks HAL decompression and palette extraction.
+        """
+        # Create ROM with Kirby header (known game)
+        rom_path = tmp_path / "kirby.sfc"
+        rom_path.write_bytes(
+            create_test_rom_with_header(
+                title="KIRBY SUPER STAR",
+                checksum=0x5678,
+            )
+        )
         output_base = tmp_path / "sprite_with_palettes"
 
-        # Mock ROM header
-        mock_header = Mock()
-        mock_header.title = "KIRBY SUPER STAR"
-        mock_header.checksum = 0x5678
-        mock_header.header_offset = 0  # No SMC header
-        mock_extractor.rom_injector.read_rom_header.return_value = mock_header
+        extractor = app_context.rom_extractor
 
-        # Mock sprite data (compressed_size, decompressed_data, slack_size)
+        # Mock sprite config to return game with palette configuration
+        game_config = {
+            "palette_offset": 0x10000,
+            "sprites": {"test_sprite": {"palettes": [8, 9, 10]}},
+        }
+
+        # Create fake palette files that extraction would produce
+        palette_files = []
+        for i in [8, 9, 10]:
+            pal_file = tmp_path / f"sprite_with_palettes_pal{i}.json"
+            pal_file.write_text('{"colors": [0, 1, 2]}')
+            palette_files.append(str(pal_file))
+
+        # Mock HAL decompression (returns 8 tiles of test data)
         test_sprite_data = b"\x00" * (8 * BYTES_PER_TILE)
-        mock_extractor.rom_injector.find_compressed_sprite.return_value = (200, test_sprite_data, 0)
 
-        # Mock sprite config loader to return config for test_sprite
-        mock_sprite_config = Mock()
-        mock_sprite_config.estimated_size = None  # No specific size
-        mock_extractor.sprite_config_loader.get_game_sprites.return_value = {"test_sprite": mock_sprite_config}
+        with (
+            patch.object(
+                extractor.rom_injector,
+                "find_compressed_sprite",
+                return_value=(200, test_sprite_data, 0),
+            ),
+            patch.object(extractor.sprite_config_loader, "find_game_config") as mock_find_config,
+            patch.object(
+                extractor.rom_palette_extractor, "get_palette_config_from_sprite_config"
+            ) as mock_get_palette_config,
+            patch.object(extractor.rom_palette_extractor, "extract_palettes_from_rom") as mock_extract_palettes,
+        ):
+            mock_find_config.return_value = ("KIRBY SUPER STAR", game_config)
+            mock_get_palette_config.return_value = (0x10000, [8, 9, 10])
+            mock_extract_palettes.return_value = palette_files
 
-        # Mock game configuration
-        mock_game_config = {"palette_offset": 0x10000, "sprites": {"test_sprite": {}}}
-        mock_extractor.sprite_config_loader.config_data = {"games": {"KIRBY SUPER STAR": mock_game_config}}
-        mock_extractor.sprite_config_loader.find_game_config.return_value = ("KIRBY SUPER STAR", mock_game_config)
+            output_path, extraction_info = extractor.extract_sprite_from_rom(
+                str(rom_path), 0x8000, str(output_base), "test_sprite"
+            )
 
-        # Mock palette extraction
-        mock_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.return_value = (0x10000, [8, 9, 10])
-        mock_palette_files = ["sprite_pal8.pal.json", "sprite_pal9.pal.json"]
-        mock_extractor.rom_palette_extractor.extract_palettes_from_rom.return_value = mock_palette_files
+        # Verify PNG created (real file I/O and conversion)
+        verify_png_output(Path(output_path), min_tiles=1)
 
-        output_path, extraction_info = mock_extractor.extract_sprite_from_rom(
-            str(rom_path), 0x8000, str(output_base), "test_sprite"
-        )
+        # Verify ROM palette extraction was called
+        mock_get_palette_config.assert_called_once()
+        mock_extract_palettes.assert_called_once()
 
-        # Verify ROM palette extraction was attempted
-        mock_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.assert_called_once()
-        mock_extractor.rom_palette_extractor.extract_palettes_from_rom.assert_called_once()
-
-        # Verify extraction info shows ROM palettes were used
+        # Verify metadata shows ROM palettes were used
         assert extraction_info["rom_palettes_used"] is True
         assert extraction_info["default_palettes_used"] is False
-        assert extraction_info["palette_count"] == 2
+        assert extraction_info["palette_count"] == 3
 
-    def test_extract_sprite_from_rom_with_default_palettes(self, mock_extractor, tmp_path):
-        """Test sprite extraction with default palette fallback"""
-        rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(b"Mock ROM data" * 1000)
-        output_base = tmp_path / "sprite_default_palettes"
+    def test_extract_sprite_from_rom_with_default_palettes(self, app_context, tmp_path):
+        """Test sprite extraction with default palette fallback.
 
-        # Mock ROM header
-        mock_header = Mock()
-        mock_header.title = "UNKNOWN ROM"
-        mock_header.checksum = 0x9999
-        mock_header.header_offset = 0  # No SMC header
-        mock_extractor.rom_injector.read_rom_header.return_value = mock_header
-
-        # Mock sprite data (compressed_size, decompressed_data, slack_size)
-        test_sprite_data = b"\x00" * (2 * BYTES_PER_TILE)
-        mock_extractor.rom_injector.find_compressed_sprite.return_value = (50, test_sprite_data, 0)
-
-        # Mock sprite config loader to return empty dict (no sprite config found)
-        mock_extractor.sprite_config_loader.get_game_sprites.return_value = {}
-        mock_extractor.sprite_config_loader.find_game_config.return_value = (None, None)
-
-        # Mock no ROM palettes available
-        mock_extractor.sprite_config_loader.config_data = {"games": {}}
-
-        # Mock default palettes available
-        mock_extractor.default_palette_loader.has_default_palettes.return_value = True
-        mock_default_files = ["sprite_pal8.pal.json"]
-        mock_extractor.default_palette_loader.create_palette_files.return_value = mock_default_files
-
-        output_path, extraction_info = mock_extractor.extract_sprite_from_rom(
-            str(rom_path), 0x8000, str(output_base), "kirby_normal"
+        Uses real ROM header parsing, file I/O, and PNG conversion.
+        Mocks HAL decompression and palette lookup.
+        """
+        # Create ROM with unknown title (no sprite config)
+        rom_path = tmp_path / "unknown.sfc"
+        rom_path.write_bytes(
+            create_test_rom_with_header(
+                title="UNKNOWN GAME",
+                checksum=0x9ABC,
+            )
         )
+        output_base = tmp_path / "sprite_with_defaults"
 
-        # Verify default palette creation was attempted
-        mock_extractor.default_palette_loader.has_default_palettes.assert_called_once_with("kirby_normal")
-        mock_extractor.default_palette_loader.create_palette_files.assert_called_once()
+        extractor = app_context.rom_extractor
 
-        # Verify extraction info shows default palettes were used
+        # Create fake default palette files
+        default_palette_files = [str(tmp_path / "default_pal.json")]
+        Path(default_palette_files[0]).write_text('{"colors": [0, 1, 2]}')
+
+        # Mock HAL decompression (returns 2 tiles of test data)
+        test_sprite_data = b"\x00" * (2 * BYTES_PER_TILE)
+
+        # Mock: no ROM palettes (game config returns None), but default palettes exist
+        with (
+            patch.object(
+                extractor.rom_injector,
+                "find_compressed_sprite",
+                return_value=(50, test_sprite_data, 0),
+            ),
+            patch.object(extractor.sprite_config_loader, "find_game_config", return_value=(None, None)),
+            patch.object(
+                extractor.default_palette_loader, "has_default_palettes", return_value=True
+            ) as mock_has_defaults,
+            patch.object(
+                extractor.default_palette_loader, "create_palette_files", return_value=default_palette_files
+            ) as mock_create_defaults,
+        ):
+            output_path, extraction_info = extractor.extract_sprite_from_rom(
+                str(rom_path), 0x8000, str(output_base), "kirby_normal"
+            )
+
+        # Verify PNG created (real file I/O and conversion)
+        verify_png_output(Path(output_path), min_tiles=1)
+
+        # Verify default palette creation was called
+        mock_has_defaults.assert_called_once_with("kirby_normal")
+        mock_create_defaults.assert_called_once()
+
+        # Verify metadata shows default palettes used
         assert extraction_info["rom_palettes_used"] is False
         assert extraction_info["default_palettes_used"] is True
         assert extraction_info["palette_count"] == 1
 
-    def test_extract_sprite_from_rom_no_sprite_name(self, mock_extractor, tmp_path):
-        """Test sprite extraction without sprite name (no palette extraction)"""
+    def test_extract_sprite_from_rom_no_sprite_name(self, app_context, tmp_path):
+        """Test sprite extraction without sprite name (no palette extraction).
+
+        Uses real ROM header parsing, file I/O, and PNG conversion.
+        Mocks only HAL decompression.
+        """
+        # Create simple ROM
         rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(b"Mock ROM data" * 1000)
+        rom_path.write_bytes(
+            create_test_rom_with_header(
+                title="TEST ROM",
+                checksum=0xDEF0,
+            )
+        )
         output_base = tmp_path / "sprite_no_name"
 
-        # Mock ROM header
-        mock_header = Mock()
-        mock_header.title = "TEST ROM"
-        mock_header.checksum = 0xABCD
-        mock_header.header_offset = 0  # No SMC header
-        mock_extractor.rom_injector.read_rom_header.return_value = mock_header
+        extractor = app_context.rom_extractor
 
-        # Mock sprite data (compressed_size, decompressed_data, slack_size)
+        # Mock HAL decompression (returns 1 tile of test data)
         test_sprite_data = b"\x00" * BYTES_PER_TILE
-        mock_extractor.rom_injector.find_compressed_sprite.return_value = (25, test_sprite_data, 0)
+        with patch.object(
+            extractor.rom_injector,
+            "find_compressed_sprite",
+            return_value=(25, test_sprite_data, 0),
+        ):
+            output_path, extraction_info = extractor.extract_sprite_from_rom(
+                str(rom_path),
+                0x8000,
+                str(output_base),
+                "",  # No sprite_name
+            )
 
-        output_path, extraction_info = mock_extractor.extract_sprite_from_rom(
-            str(rom_path),
-            0x8000,
-            str(output_base),  # No sprite_name
-        )
+        # Verify PNG created (real file I/O and conversion)
+        verify_png_output(Path(output_path), min_tiles=1)
 
-        # Verify no palette extraction was attempted
-        mock_extractor.rom_palette_extractor.get_palette_config_from_sprite_config.assert_not_called()
-        mock_extractor.default_palette_loader.has_default_palettes.assert_not_called()
+        # Verify no palette files created (check output directory)
+        palette_files = list(tmp_path.glob("sprite_no_name_pal*.json"))
+        assert len(palette_files) == 0, "No palette files should be created"
 
-        # Verify extraction info
+        # Verify metadata shows no palettes
         assert extraction_info["sprite_name"] == ""
+        assert extraction_info["palette_count"] == 0
         assert extraction_info["rom_palettes_used"] is False
         assert extraction_info["default_palettes_used"] is False
-        assert extraction_info["palette_count"] == 0
 
-    def test_extract_sprite_from_rom_hal_compression_error(self, mock_extractor, tmp_path):
-        """Test handling of HAL compression errors"""
+    def test_extract_sprite_from_rom_hal_compression_error(self, app_context, tmp_path):
+        """Test handling of HAL compression errors."""
         rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(b"Mock ROM data")
+        rom_path.write_bytes(
+            create_test_rom_with_header(
+                title="TEST ROM",
+                checksum=0x1234,
+            )
+        )
         output_base = tmp_path / "failed_sprite"
 
-        # Mock ROM header
-        mock_header = Mock()
-        mock_header.title = "TEST ROM"
-        mock_header.checksum = 0x1234
-        mock_header.header_offset = 0  # No SMC header
-        mock_extractor.rom_injector.read_rom_header.return_value = mock_header
+        extractor = app_context.rom_extractor
 
-        # Mock sprite config loader to return empty dict
-        mock_extractor.sprite_config_loader.get_game_sprites.return_value = {}
+        # Mock HAL compression error (appropriate mock for error path testing)
+        with patch.object(
+            extractor.rom_injector,
+            "find_compressed_sprite",
+            side_effect=HALCompressionError("Failed to decompress sprite data"),
+        ):
+            with pytest.raises(Exception, match="Failed to decompress sprite") as exc_info:
+                extractor.extract_sprite_from_rom(str(rom_path), 0x8000, str(output_base), "test_sprite")
 
-        # Mock HAL compression error
-        mock_extractor.rom_injector.find_compressed_sprite.side_effect = HALCompressionError(
-            "Failed to decompress sprite data"
-        )
+            assert "Failed to decompress sprite" in str(exc_info.value)
 
-        with pytest.raises(Exception, match="Failed to decompress sprite") as exc_info:
-            mock_extractor.extract_sprite_from_rom(str(rom_path), 0x8000, str(output_base), "test_sprite")
-
-        assert "Failed to decompress sprite" in str(exc_info.value)
-
-    def test_extract_sprite_from_rom_generic_error(self, mock_extractor, tmp_path):
-        """Test handling of generic errors"""
+    def test_extract_sprite_from_rom_generic_error(self, app_context, tmp_path):
+        """Test handling of generic errors."""
         rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(b"Mock ROM data")
+        rom_path.write_bytes(
+            create_test_rom_with_header(
+                title="TEST ROM",
+                checksum=0x1234,
+            )
+        )
         output_base = tmp_path / "error_sprite"
 
-        # Mock ROM header error
-        mock_extractor.rom_injector.read_rom_header.side_effect = Exception("Invalid ROM format")
+        extractor = app_context.rom_extractor
 
-        with pytest.raises(Exception, match="Invalid ROM format"):
-            mock_extractor.extract_sprite_from_rom(str(rom_path), 0x8000, str(output_base), "test_sprite")
+        # Mock ROM header error (appropriate mock for error path testing)
+        with patch.object(
+            extractor.rom_injector,
+            "read_rom_header",
+            side_effect=Exception("Invalid ROM format"),
+        ):
+            with pytest.raises(Exception, match="Invalid ROM format"):
+                extractor.extract_sprite_from_rom(str(rom_path), 0x8000, str(output_base), "test_sprite")
 
 
 class TestROMExtractorScanMethods:

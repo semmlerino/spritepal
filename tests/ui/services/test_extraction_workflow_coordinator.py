@@ -26,9 +26,7 @@ class TestExtractionWorkflowCoordinatorVRAMExtraction:
 
         # Track signal emissions
         signals_emitted: list[tuple[str, str]] = []
-        coordinator.extraction_started.connect(
-            lambda mode: signals_emitted.append(("started", mode))
-        )
+        coordinator.extraction_started.connect(lambda mode: signals_emitted.append(("started", mode)))
 
         # Create dummy VRAM file
         vram_file = tmp_path / "vram.bin"
@@ -62,9 +60,7 @@ class TestExtractionWorkflowCoordinatorVRAMExtraction:
 
         # Track signal emissions
         signals_emitted: list[tuple[str, str]] = []
-        coordinator.extraction_failed.connect(
-            lambda msg: signals_emitted.append(("failed", msg))
-        )
+        coordinator.extraction_failed.connect(lambda msg: signals_emitted.append(("failed", msg)))
 
         # Create invalid extraction params (VRAM file doesn't exist)
         params = {
@@ -95,9 +91,7 @@ class TestExtractionWorkflowCoordinatorVRAMExtraction:
 
         # Track signal emissions
         signals_emitted: list[tuple[str, str]] = []
-        coordinator.extraction_failed.connect(
-            lambda msg: signals_emitted.append(("failed", msg))
-        )
+        coordinator.extraction_failed.connect(lambda msg: signals_emitted.append(("failed", msg)))
 
         # Create valid VRAM file
         vram_file = tmp_path / "vram.bin"
@@ -162,9 +156,7 @@ class TestExtractionWorkflowCoordinatorROMExtraction:
 
         # Track signal emissions
         signals_emitted: list[tuple[str, str]] = []
-        coordinator.extraction_started.connect(
-            lambda mode: signals_emitted.append(("started", mode))
-        )
+        coordinator.extraction_started.connect(lambda mode: signals_emitted.append(("started", mode)))
 
         # Create dummy ROM file
         rom_file = tmp_path / "game.sfc"
@@ -195,9 +187,7 @@ class TestExtractionWorkflowCoordinatorROMExtraction:
 
         # Track signal emissions
         signals_emitted: list[tuple[str, str]] = []
-        coordinator.extraction_failed.connect(
-            lambda msg: signals_emitted.append(("failed", msg))
-        )
+        coordinator.extraction_failed.connect(lambda msg: signals_emitted.append(("failed", msg)))
 
         # Create invalid extraction params (ROM file doesn't exist)
         params = {
@@ -232,9 +222,7 @@ class TestExtractionWorkflowCoordinatorSignals:
         assert hasattr(ExtractionWorkflowCoordinator, "vram_extraction_finished")
         assert hasattr(ExtractionWorkflowCoordinator, "rom_extraction_finished")
 
-    def test_extraction_failed_signal_emitted_on_validation_error(
-        self, app_context, tmp_path
-    ):
+    def test_extraction_failed_signal_emitted_on_validation_error(self, app_context, tmp_path):
         """Test that extraction_failed signal is emitted on validation error."""
         from ui.services.extraction_workflow_coordinator import (
             ExtractionWorkflowCoordinator,
