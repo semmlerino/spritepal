@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QKeySequence
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -29,8 +29,6 @@ from ui.common.spacing_constants import (
     SPACING_SMALL,
     SPACING_STANDARD,
 )
-from ui.common.widget_helpers import create_styled_label
-from ui.styles import get_prominent_action_button_style
 from ui.styles.theme import COLORS
 from utils.constants import (
     MIN_SPRITE_SIZE,

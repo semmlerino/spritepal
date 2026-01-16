@@ -63,6 +63,7 @@ class OffsetBrowserSidebar(QWidget):
     scan_result_selected = Signal(int)
     scan_result_applied = Signal(int)
     bookmark_selected = Signal(int)
+    add_bookmark_requested = Signal()  # Request parent to add bookmark at current offset
 
     def __init__(
         self,
@@ -111,6 +112,38 @@ class OffsetBrowserSidebar(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(SPACING_SMALL)
         layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
+
+        # Header with global actions
+        header_layout = QHBoxLayout()
+        
+        # Sidebar Title
+        title_label = QLabel("Navigation")
+        title_label.setStyleSheet("font-weight: bold; color: " + COLORS["text_secondary"])
+        header_layout.addWidget(title_label)
+        
+        header_layout.addStretch()
+        
+        # Add Bookmark Button (Always visible)
+        self._add_bookmark_btn = QPushButton("★ Bookmark")
+        self._add_bookmark_btn.setToolTip("Bookmark current offset")
+        self._add_bookmark_btn.setFixedHeight(24)
+        self._add_bookmark_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self._add_bookmark_btn.clicked.connect(self._on_add_bookmark_clicked)
+        self._add_bookmark_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {COLORS["panel_background"]};
+                border: 1px solid {COLORS["border"]};
+                color: {COLORS["text_primary"]};
+                padding: 0 8px;
+            }}
+            QPushButton:hover {{
+                border-color: {COLORS["primary"]};
+                background-color: {COLORS["surface_hover"]};
+            }}
+        """)
+        header_layout.addWidget(self._add_bookmark_btn)
+        
+        layout.addLayout(header_layout)
 
         # History panel - starts collapsed, expands on first navigation
         self._history_panel = CollapsibleGroupBox("History", collapsed=True)
@@ -168,14 +201,7 @@ class OffsetBrowserSidebar(QWidget):
         self._bookmarks_list.itemClicked.connect(self._on_bookmark_item_clicked)
         self._bookmarks_panel.add_widget(self._bookmarks_list)
 
-        # Bookmark controls
-        bookmark_controls = QHBoxLayout()
-        self._add_bookmark_btn = QPushButton("Add Current")
-        self._add_bookmark_btn.setFixedHeight(24)
-        self._add_bookmark_btn.clicked.connect(self._on_add_bookmark_clicked)
-        bookmark_controls.addWidget(self._add_bookmark_btn)
-        bookmark_controls.addStretch()
-        self._bookmarks_panel.add_layout(bookmark_controls)
+        # Note: Add Bookmark button moved to header
 
         layout.addWidget(self._bookmarks_panel)
 
@@ -334,10 +360,9 @@ class OffsetBrowserSidebar(QWidget):
     def _on_add_bookmark_clicked(self) -> None:
         """Handle add bookmark button click.
 
-        This should be connected to the parent dialog's current offset.
+        Emits add_bookmark_requested so parent dialog can handle it with current offset.
         """
-        # The parent dialog should handle this via signal connection
-        pass
+        self.add_bookmark_requested.emit()
 
     def set_bookmark_manager(self, manager: BookmarkManager) -> None:
         """Set the bookmark manager.

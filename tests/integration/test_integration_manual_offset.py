@@ -33,7 +33,6 @@ class TestManualOffsetDialog:
         # Verify main components exist
         assert dialog.browse_tab is not None
         assert dialog.smart_tab is not None
-        assert dialog.history_tab is not None
         assert dialog.preview_widget is not None
 
         # Verify browse tab components

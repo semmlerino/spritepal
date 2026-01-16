@@ -7,7 +7,8 @@ simplified dialog with proper tab integration and signal coordination.
 This dialog provides:
 - Working slider that updates offset
 - Preview widget display
-- Three functional tabs (Browse, Smart, History)
+- Two functional tabs (Browse, Smart)
+- Sidebar for History, Nearby, Scan Results, and Bookmarks
 - Proper signals (offset_changed, sprite_found)
 - Methods needed by ROM extraction panel
 """
@@ -89,7 +90,7 @@ _MIN_MINI_MAP_HEIGHT = 40
 from ui.common.signal_utils import is_valid_qt as _is_valid_qt, safe_disconnect as _safe_disconnect
 
 # Import tab widgets from the new module
-from ui.tabs.manual_offset import SimpleBrowseTab, SimpleHistoryTab, SimpleSmartTab
+from ui.tabs.manual_offset import SimpleBrowseTab, SimpleSmartTab
 
 
 class UnifiedManualOffsetDialog(CleanupDialog):
@@ -123,7 +124,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self.tab_widget: QTabWidget | None = None
         self.browse_tab: SimpleBrowseTab | None = None
         self.smart_tab: SimpleSmartTab | None = None
-        self.history_tab: SimpleHistoryTab | None = None
         self.gallery_tab: SpriteGalleryTab | None = None
         self.preview_widget: SpritePreviewWidget | None = None
         self.status_panel: StatusPanel | None = None
@@ -323,8 +323,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Hidden tabs (legacy/sidebar moved)
         self.smart_tab = SimpleSmartTab()
         self.smart_tab.hide()
-        self.history_tab = SimpleHistoryTab()
-        self.history_tab.hide()
         self.gallery_tab = SpriteGalleryTab()
         self.gallery_tab.hide()
         
@@ -354,6 +352,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._sidebar.scan_result_selected.connect(self.set_offset)
         self._sidebar.scan_result_applied.connect(self._apply_offset_from_scan)
         self._sidebar.bookmark_selected.connect(self.set_offset)
+        self._sidebar.add_bookmark_requested.connect(self._handle_add_bookmark_request)
 
         return self._sidebar
 
@@ -446,15 +445,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         if self._smart_preview_coordinator:
             self.browse_tab.connect_smart_preview_coordinator(self._smart_preview_coordinator)
 
-        # Smart tab signals (kept for backward compatibility, though hidden)
-        if self.smart_tab is not None:
-            self.smart_tab.smart_mode_changed.connect(self._on_smart_mode_changed)
-            self.smart_tab.region_changed.connect(self._on_region_changed)
-            self.smart_tab.offset_requested.connect(self._on_offset_requested)
-
-        # History tab signals (now handled by sidebar, but keep for compatibility)
-        if self.history_tab is not None:
-            self.history_tab.sprite_selected.connect(self._on_sprite_selected)
+        # Connect Sidebar signals (now primary navigation)
 
         # Gallery tab signals (now handled by sidebar scan results)
         if self.gallery_tab is not None:
@@ -807,10 +798,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         Args:
             block: True to block signals, False to unblock
         """
-        widgets: list[QWidget | None] = [
+        widgets = [
             self.browse_tab,
             self.smart_tab,
-            self.history_tab,
             self.gallery_tab,
             self.preview_widget,
         ]
@@ -844,14 +834,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             _safe_disconnect(self.browse_tab.find_next_clicked)
             _safe_disconnect(self.browse_tab.find_prev_clicked)
             _safe_disconnect(self.browse_tab.find_sprites_requested)
-
-        if self.smart_tab is not None and _is_valid_qt(self.smart_tab):
-            _safe_disconnect(self.smart_tab.smart_mode_changed)
-            _safe_disconnect(self.smart_tab.region_changed)
-            _safe_disconnect(self.smart_tab.offset_requested)
-
-        if self.history_tab is not None and _is_valid_qt(self.history_tab):
-            _safe_disconnect(self.history_tab.sprite_selected)
 
         if self.gallery_tab is not None and _is_valid_qt(self.gallery_tab):
             _safe_disconnect(self.gallery_tab.sprite_selected)
@@ -1148,14 +1130,12 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         return ROM_SIZE_2MB
 
     def add_found_sprite(self, offset: int, quality: float = 1.0) -> None:
-        """Add found sprite to history."""
-        if self.history_tab is not None:
-            self.history_tab.add_sprite(offset, quality)
-
-            # Update tab title with count
-            count = self.history_tab.get_sprite_count()
-            if self.tab_widget is not None:
-                self.tab_widget.setTabText(2, f"History ({count})")
+        """Add found sprite to history.
+        
+        Note: Sidebar history is automatically updated via set_offset dwell timer.
+        This method is kept for compatibility but no longer updates a separate history tab.
+        """
+        pass
 
     # ROM Cache Integration Methods
 
@@ -1484,6 +1464,13 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         self._sidebar.set_scan_results(results)
         self._update_status(f"Found {len(results)} sprites - see Scan Results in sidebar")
+
+    def _handle_add_bookmark_request(self) -> None:
+        """Handle request from sidebar to bookmark current offset."""
+        if self._bookmark_manager:
+            self._bookmark_manager.add_bookmark(self.get_current_offset())
+            if self._sidebar:
+                self._sidebar.refresh_bookmarks()
 
     # Bookmark methods have been extracted to BookmarkManager
     # See: ui/dialogs/services/bookmark_manager.py
