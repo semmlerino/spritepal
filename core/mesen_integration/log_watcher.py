@@ -70,15 +70,12 @@ class LogWatcher(QObject):
         watch_started: Emitted when file watching begins.
         watch_stopped: Emitted when file watching stops.
         error_occurred: Emitted on errors. Args: (error_message: str)
-        directory_warning: Emitted when watched directory doesn't exist.
-                          Args: (warning_message: str)
     """
 
     offset_discovered = Signal(object)  # CapturedOffset
     watch_started = Signal()
     watch_stopped = Signal()
     error_occurred = Signal(str)
-    directory_warning = Signal(str)
 
     # Polling interval in milliseconds (for WSL/Windows cross-filesystem compatibility)
     POLL_INTERVAL_MS = 500
@@ -204,13 +201,12 @@ class LogWatcher(QObject):
             self._watcher.addPath(str(self._watching_dir))
             logger.debug("Watching directory: %s", self._watching_dir)
         else:
-            # Emit warning - directory doesn't exist
-            warning_msg = (
-                f"Mesen2 output directory does not exist: {self._watching_dir}\n"
-                "Captures from Mesen2 will not be detected until this directory is created."
+            # Log warning - directory doesn't exist
+            logger.warning(
+                "Mesen2 output directory does not exist: %s\n"
+                "Captures from Mesen2 will not be detected until this directory is created.",
+                self._watching_dir,
             )
-            logger.warning(warning_msg)
-            self.directory_warning.emit(warning_msg)
 
         if log_path.exists():
             stat = log_path.stat()

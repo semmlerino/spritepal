@@ -74,33 +74,6 @@ class TestMesen2ModuleInit:
         module = Mesen2Module(log_watcher=mock_log_watcher)
         assert module.log_watcher is mock_log_watcher
 
-    def test_init_forwards_signals(self, qtbot: QtBot, mock_log_watcher: Mock) -> None:
-        """Module forwards LogWatcher signals."""
-        module = Mesen2Module(log_watcher=mock_log_watcher)
-
-        # Test offset_discovered forwarding
-        with qtbot.waitSignal(module.offset_discovered, timeout=1000):
-            capture = CapturedOffset(
-                offset=0x100000,
-                frame=1800,
-                timestamp=datetime.now(UTC),
-                raw_line="test line",
-            )
-            mock_log_watcher.offset_discovered.emit(capture)
-
-        # Test watch_started forwarding
-        with qtbot.waitSignal(module.watch_started, timeout=1000):
-            mock_log_watcher.watch_started.emit()
-
-        # Test watch_stopped forwarding
-        with qtbot.waitSignal(module.watch_stopped, timeout=1000):
-            mock_log_watcher.watch_stopped.emit()
-
-        # Test error_occurred forwarding
-        with qtbot.waitSignal(module.error_occurred, timeout=1000):
-            mock_log_watcher.error_occurred.emit("test error")
-
-
 class TestMesen2ModuleProperties:
     """Test Mesen2Module properties."""
 

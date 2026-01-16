@@ -101,9 +101,6 @@ def test_auto_open_workflow(qtbot, workflow_controller, mock_editing_controller)
     """
     Test the full flow: set_offset(auto_open=True) -> preview ready -> open in editor -> state change.
     """
-    # Setup Spies
-    spy_state = QSignalSpy(workflow_controller.workflow_state_changed)
-
     # Prerequisite: Load a ROM (to set rom_path)
     workflow_controller.rom_path = "dummy.sfc"
     workflow_controller.rom_size = 2048
@@ -116,7 +113,7 @@ def test_auto_open_workflow(qtbot, workflow_controller, mock_editing_controller)
     assert workflow_controller.preview_coordinator.last_requested_offset == 0x100
 
     # State should still be 'preview' (or unset/initial) before preview returns
-    assert spy_state.count() == 0
+    assert workflow_controller.state != "edit"
 
     # Action 2: Simulate Preview Ready (Async response)
     # Mock SpriteRenderer to avoid PIL image processing (causes thread-safety issues)
@@ -133,8 +130,7 @@ def test_auto_open_workflow(qtbot, workflow_controller, mock_editing_controller)
 
     # Assert Final State
     # Should have transitioned to 'edit' because auto_open was True
-    assert spy_state.count() > 0
-    assert spy_state.at(0)[0] == "edit"
+    assert workflow_controller.state == "edit"
 
     # Verify EditingController was called (Integration point)
     mock_editing_controller.load_image.assert_called()
@@ -144,8 +140,6 @@ def test_preview_only_workflow(qtbot, workflow_controller, mock_editing_controll
     """
     Test flow: set_offset(auto_open=False) -> preview ready -> NO state change to edit.
     """
-    spy_state = QSignalSpy(workflow_controller.workflow_state_changed)
-
     workflow_controller.rom_path = "dummy.sfc"
     workflow_controller.rom_size = 2048
 
@@ -158,7 +152,7 @@ def test_preview_only_workflow(qtbot, workflow_controller, mock_editing_controll
 
     # Assert
     # Should NOT have transitioned to 'edit'
-    assert spy_state.count() == 0
+    assert workflow_controller.state != "edit"
 
     # Editing controller should NOT have been called
     mock_editing_controller.load_image.assert_not_called()
@@ -168,8 +162,6 @@ def test_state_transition_edit_to_preview(qtbot, workflow_controller, mock_editi
     """
     Test that setting offset while in 'edit' mode transitions back to 'preview'.
     """
-    spy_state = QSignalSpy(workflow_controller.workflow_state_changed)
-
     workflow_controller.rom_path = "dummy.sfc"
     workflow_controller.rom_size = 2048
 
@@ -180,5 +172,4 @@ def test_state_transition_edit_to_preview(qtbot, workflow_controller, mock_editi
     workflow_controller.set_offset(0x300)
 
     # Assert transition to 'preview'
-    assert spy_state.count() > 0
-    assert spy_state.at(0)[0] == "preview"
+    assert workflow_controller.state == "preview"

@@ -17,7 +17,6 @@ class TestROMWorkflowStateTransitions:
         - state becomes "preview"
         - left panel enabled
         - workspace disabled
-        - workflow_state_changed signal emitted with "preview"
         """
         from ui.sprite_editor.controllers.editing_controller import EditingController
         from ui.sprite_editor.controllers.rom_workflow_controller import (
@@ -73,10 +72,6 @@ class TestROMWorkflowStateTransitions:
         # Ensure no unsaved changes (undo_manager.can_undo() returns False)
         assert not editing_controller.undo_manager.can_undo()
 
-        # Track signal emissions
-        state_changes: list[str] = []
-        controller.workflow_state_changed.connect(state_changes.append)
-
         # Change offset while in edit mode (no unsaved changes)
         controller.set_offset(0x2000)
 
@@ -85,7 +80,6 @@ class TestROMWorkflowStateTransitions:
         assert controller.current_offset == 0x2000
         assert view.left_panel.isEnabled(), "Left panel should be enabled in preview state"
         assert not view.workspace.isEnabled(), "Workspace should be disabled in preview state"
-        assert "preview" in state_changes, "workflow_state_changed should emit 'preview'"
 
     def test_offset_change_with_unsaved_changes_shows_dialog(self, qtbot, tmp_path, monkeypatch):
         """

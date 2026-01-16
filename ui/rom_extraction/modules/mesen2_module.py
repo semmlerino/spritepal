@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject
 
 from utils.logging_config import get_logger
 
@@ -31,24 +31,9 @@ class Mesen2Module(QObject):
 
     This module:
     - Manages LogWatcher start/stop lifecycle
-    - Forwards signals from LogWatcher to connected widgets
     - Handles persistent clicks loading
     - Provides clean dependency injection for panels
-
-    Signals:
-        offset_discovered: Forwarded from LogWatcher when new offset found.
-                          Args: (CapturedOffset)
-        watch_started: Forwarded from LogWatcher when watching begins.
-        watch_stopped: Forwarded from LogWatcher when watching stops.
-        error_occurred: Forwarded from LogWatcher on errors.
-                       Args: (error_message: str)
     """
-
-    # Signals forwarded from LogWatcher
-    offset_discovered = Signal(object)  # CapturedOffset
-    watch_started = Signal()
-    watch_stopped = Signal()
-    error_occurred = Signal(str)
 
     def __init__(
         self,
@@ -65,16 +50,8 @@ class Mesen2Module(QObject):
         super().__init__(parent)
         self._log_watcher = log_watcher
         self._connected_widgets: list[MesenCapturesSection] = []
-        self._setup_log_watcher_signals()
 
         logger.debug("Mesen2Module initialized")
-
-    def _setup_log_watcher_signals(self) -> None:
-        """Connect LogWatcher signals to forward to this module's signals."""
-        self._log_watcher.offset_discovered.connect(self.offset_discovered.emit)
-        self._log_watcher.watch_started.connect(self.watch_started.emit)
-        self._log_watcher.watch_stopped.connect(self.watch_stopped.emit)
-        self._log_watcher.error_occurred.connect(self.error_occurred.emit)
 
     @property
     def log_watcher(self) -> LogWatcher:

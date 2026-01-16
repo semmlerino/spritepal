@@ -50,16 +50,16 @@ class ROMWorkflowController(QObject):
         ROMWorkflowPage.sprite_selected/activated → this handlers → set_offset/open_in_editor
 
     Consumers:
-        - ROMWorkflowPage: Receives rom_info_updated, workflow_state_changed
+        - ROMWorkflowPage: Receives rom_info_updated
         - MainWindow/StatusBar: May connect for progress/status updates
     """
 
     # Signals (originate here, consumed by views)
     rom_info_updated = Signal(str)  # ROM title → ROMWorkflowPage.source_bar.set_info
-    workflow_state_changed = Signal(str)  # 'preview'/'edit'/'save' → view state updates
-    sprite_extracted = Signal(object, int)  # image, tile_count - for integration (e.g. history)
     offset_changed = Signal(int)  # Emitted when offset changes (for sync with other UI)
-    capture_offset_adjusted = Signal(int, int)  # (old_rom_offset, new_rom_offset) - ROM offsets (headerless) adjusted by HAL alignment
+    capture_offset_adjusted = Signal(
+        int, int
+    )  # (old_rom_offset, new_rom_offset) - ROM offsets (headerless) adjusted by HAL alignment
 
     def __init__(
         self,
@@ -101,6 +101,7 @@ class ROMWorkflowController(QObject):
 
         # Current sprite data
         self.current_tile_data: bytes | None = None
+        self.current_tile_offset: int = -1  # Offset current_tile_data belongs to
         self.current_width: int = 0
         self.current_height: int = 0
         self.current_sprite_name: str = ""
@@ -339,7 +340,7 @@ class ROMWorkflowController(QObject):
         logger.debug(f"[DOUBLE-CLICK] _on_sprite_activated called: offset=0x{offset:06X}, source={source_type}")
 
         # If we already have tile data for this offset, open directly without re-requesting preview
-        if self.current_offset == offset and self.current_tile_data:
+        if self.current_tile_offset == offset and self.current_tile_data:
             logger.debug("[DOUBLE-CLICK] Already have data for this offset, requesting full preview before opening")
             self.set_offset(offset, auto_open=True)
             return
@@ -444,7 +445,7 @@ class ROMWorkflowController(QObject):
         data_to_render: bytes | None = None
 
         # Strategy 1: Use current decompressed data if available
-        if self.current_offset == offset and self.current_tile_data:
+        if self.current_tile_offset == offset and self.current_tile_data:
             data_to_render = self.current_tile_data
             logger.debug("Using current_tile_data for thumbnail: 0x%06X", offset)
 
@@ -852,9 +853,10 @@ class ROMWorkflowController(QObject):
             if self._view:
                 self._view.set_action_text("Open in Editor")
                 self._view.set_workflow_state("preview")
-            self.workflow_state_changed.emit("preview")
 
         self.current_offset = offset
+        self.current_tile_data = None  # Clear stale data while new preview loads
+        self.current_tile_offset = -1  # Invalidate data offset
         self._clear_arrangement()  # Clear arrangement when changing offset
         if self._view:
             self._view.set_offset(offset)
@@ -890,11 +892,12 @@ class ROMWorkflowController(QObject):
 
     def open_in_editor(self) -> None:
         """Load the current preview into the pixel editor."""
-        logger.debug(f"[OPEN] open_in_editor called, tile_data={self.current_tile_data is not None}")
-        if not self.current_tile_data:
-            logger.debug("[OPEN] No tile data, returning early")
+        logger.debug(f"[OPEN] open_in_editor called, tile_data={self.current_tile_data is not None}, offset=0x{self.current_offset:X}")
+        
+        if self.current_tile_offset != self.current_offset or not self.current_tile_data:
+            logger.debug(f"[OPEN] Data-offset mismatch or no data: tile_offset=0x{self.current_tile_offset:X}, current_offset=0x{self.current_offset:X}")
             if self._message_service:
-                self._message_service.show_message("No sprite data to edit")
+                self._message_service.show_message("No sprite data to edit for current offset")
             return
         # Warn if raw sprite (no HAL compression)
         if self.current_compression_type == CompressionType.RAW:
@@ -1084,11 +1087,6 @@ class ROMWorkflowController(QObject):
             if self._view.workspace:
                 self._view.workspace.set_save_project_enabled(True)
                 self._view.workspace.set_arrange_enabled(True)
-        self.workflow_state_changed.emit("edit")
-
-        # Emit sprite_extracted for external listeners (e.g. history, status)
-        tile_count = len(self.current_tile_data) // 32 if self.current_tile_data else 0
-        self.sprite_extracted.emit(image, tile_count)
 
         logger.debug("[OPEN] Sprite loaded in editor, state changed to 'edit'")
 
@@ -1999,7 +1997,7 @@ class ROMWorkflowController(QObject):
 
         # Check if we have sprite data to save
         tile_data = self.current_tile_data
-        if tile_data is None:
+        if self.current_tile_offset != self.current_offset or tile_data is None:
             if self._message_service:
                 self._message_service.show_message("No sprite loaded to save")
             return
@@ -2148,7 +2146,6 @@ class ROMWorkflowController(QObject):
 
         # Update state
         self.state = "edit"
-        self.workflow_state_changed.emit("edit")
 
         # Enable save project button
         if self._view and self._view.workspace:
@@ -2240,6 +2237,7 @@ class ROMWorkflowController(QObject):
             f"header_bytes={len(header_bytes)}"
         )
         self.current_tile_data = tile_data
+        self.current_tile_offset = actual_offset
         self.current_width = width
         self.current_height = height
         self.current_sprite_name = sprite_name
@@ -2314,6 +2312,7 @@ class ROMWorkflowController(QObject):
     def _on_preview_error(self, error_msg: str) -> None:
         """Handle preview error."""
         self.current_tile_data = None
+        self.current_tile_offset = -1
         # Clear pending flags to prevent stale auto-opens after errors
         self._pending_open_in_editor = False
         self._pending_open_offset = -1

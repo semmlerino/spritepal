@@ -552,7 +552,7 @@ class SmartPreviewCoordinator(QObject):
         )
         # Check if this is still the current request
         with QMutexLocker(self._mutex):
-            if request_id < self._request_counter - 1:  # Allow some lag
+            if request_id < self._request_counter:
                 logger.debug(f"[COORD] Ignoring stale request {request_id} (current={self._request_counter})")
                 return
 

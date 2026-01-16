@@ -69,8 +69,7 @@ class TestBug2CaptureOffsetAdjustment:
         item = widget._list_widget.item(0)
         item_data = item.data(Qt.ItemDataRole.UserRole)
         assert item_data.get("rom_offset") == new_rom_offset, (
-            f"Updated ROM offset is {item_data.get('rom_offset'):06X}, "
-            f"expected {new_rom_offset:06X}"
+            f"Updated ROM offset is {item_data.get('rom_offset'):06X}, expected {new_rom_offset:06X}"
         )
 
         # FILE offset should remain unchanged
@@ -115,9 +114,7 @@ class TestBug3SMCOffsetStaleness:
         assert widget.get_capture_count() == 1
         item = widget._list_widget.item(0)
         item_data = item.data(Qt.ItemDataRole.UserRole)
-        assert item_data.get("rom_offset") == file_offset, (
-            "With SMC offset 0, ROM offset should equal FILE offset"
-        )
+        assert item_data.get("rom_offset") == file_offset, "With SMC offset 0, ROM offset should equal FILE offset"
         assert item_data.get("file_offset") == file_offset
 
         # Now load SMC ROM and set SMC offset
@@ -128,8 +125,7 @@ class TestBug3SMCOffsetStaleness:
         item = widget._list_widget.item(0)
         item_data = item.data(Qt.ItemDataRole.UserRole)
         assert item_data.get("rom_offset") == expected_rom_offset, (
-            f"After set_smc_offset, ROM offset is {item_data.get('rom_offset'):06X}, "
-            f"expected {expected_rom_offset:06X}"
+            f"After set_smc_offset, ROM offset is {item_data.get('rom_offset'):06X}, expected {expected_rom_offset:06X}"
         )
 
         # FILE offset should remain unchanged
@@ -178,9 +174,7 @@ class TestBug3SMCOffsetStaleness:
                 f"expected {expected_rom_offset:06X} (FILE 0x{file_offset:06X} - SMC {smc_offset})"
             )
 
-            assert item_data.get("file_offset") == file_offset, (
-                f"Item {i}: FILE offset should be unchanged"
-            )
+            assert item_data.get("file_offset") == file_offset, f"Item {i}: FILE offset should be unchanged"
 
 
 class TestOffsetNormalizationEdgeCases:
@@ -236,9 +230,7 @@ class TestOffsetNormalizationEdgeCases:
         # Should not be adjusted
         item = widget._list_widget.item(0)
         item_data = item.data(Qt.ItemDataRole.UserRole)
-        assert item_data.get("rom_offset") == file_offset, (
-            "Offset below SMC header should not be adjusted"
-        )
+        assert item_data.get("rom_offset") == file_offset, "Offset below SMC header should not be adjusted"
 
     def test_update_capture_offset_returns_false_for_missing_offset(self, qtbot):
         """Verify that update_capture_offset returns False when offset not found."""

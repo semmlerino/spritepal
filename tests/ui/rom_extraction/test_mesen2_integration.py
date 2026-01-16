@@ -116,21 +116,21 @@ class TestMesen2Integration:
         mock_log_watcher: MockLogWatcher,
         captures_widget: MesenCapturesSection,
     ) -> None:
-        """Watch state changes propagate to widget."""
+        """Watch state changes propagate correctly."""
         mesen2_module.connect_to_widget(captures_widget)
 
         # Initially watching
         assert mesen2_module.is_watching
 
-        # Stop watching
-        with qtbot.waitSignal(mesen2_module.watch_stopped, timeout=1000):
+        # Stop watching - verify via LogWatcher signal directly
+        with qtbot.waitSignal(mock_log_watcher.watch_stopped, timeout=1000):
             mesen2_module.stop_watching()
 
         # Module should not be watching
         assert not mesen2_module.is_watching
 
-        # Start watching again
-        with qtbot.waitSignal(mesen2_module.watch_started, timeout=1000):
+        # Start watching again - verify via LogWatcher signal directly
+        with qtbot.waitSignal(mock_log_watcher.watch_started, timeout=1000):
             mesen2_module.start_watching()
 
         # Module should be watching
