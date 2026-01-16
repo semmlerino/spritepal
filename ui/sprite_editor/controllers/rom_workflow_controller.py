@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage, QPixmap
+from shiboken6 import isValid
 
 from core.mesen_integration.log_watcher import CapturedOffset
 from core.types import CompressionType
@@ -2490,12 +2491,12 @@ class ROMWorkflowController(QObject):
 
         # Clear loading state
         self._preview_pending = False
-        if self._view:
+        if self._is_view_valid():
             self._view.set_action_loading(False)
             self._view.set_action_text("Open in Editor")
             self._view.source_bar.set_action_enabled(True)
 
-        if self._view:
+        if self._is_view_valid():
             if hal_succeeded:
                 slack_info = f" (+{slack_size} slack)" if slack_size > 0 else ""
                 msg = f"Sprite found! Original size: {compressed_size} bytes{slack_info}"
@@ -2525,7 +2526,7 @@ class ROMWorkflowController(QObject):
                         )
 
                 # Validation: Warn if size is not a multiple of 32 bytes (SNES tile size)
-                if len(tile_data) % 32 != 0:
+                if len(tile_data) % 32 != 0 and self._is_view_valid():
                     from PySide6.QtWidgets import QMessageBox
 
                     reply = QMessageBox.warning(
@@ -2549,6 +2550,10 @@ class ROMWorkflowController(QObject):
                     f"vs actual=0x{actual_offset:X}, keeping flags for pending request"
                 )
 
+    def _is_view_valid(self) -> bool:
+        """Check if the view exists and is still valid (not deleted by C++)."""
+        return self._view is not None and isValid(self._view)
+
     def _on_preview_error(self, error_msg: str) -> None:
         """Handle preview error."""
         self.current_tile_data = None
@@ -2558,7 +2563,7 @@ class ROMWorkflowController(QObject):
         self._pending_open_offset = -1
         # Clear loading state
         self._preview_pending = False
-        if self._view:
+        if self._is_view_valid():
             self._view.set_action_loading(False)
             self._view.set_action_text("Open in Editor")
             self._view.source_bar.set_action_enabled(True)
