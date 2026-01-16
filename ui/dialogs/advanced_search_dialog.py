@@ -465,21 +465,21 @@ class AdvancedSearchDialog(QDialog):
 
     # NOTE: _create_filters_group has been replaced by SearchFiltersWidget
 
-    def _update_similarity_label(self, value: int):
+    def _update_similarity_label(self, value: int) -> None:
         """Update similarity label text."""
         if self.similarity_label:
             self.similarity_label.setText(f"{value}%")
 
-    def _focus_search(self):
+    def _focus_search(self) -> None:
         """Focus the search input field."""
         self.start_offset_edit.setFocus()
 
-    def _show_history_tab(self):
+    def _show_history_tab(self) -> None:
         """Show the history tab."""
         if self.tabs:
             self.tabs.setCurrentIndex(3)
 
-    def _setup_shortcuts(self):
+    def _setup_shortcuts(self) -> None:
         """Setup keyboard shortcuts."""
         # Ctrl+F - Focus search
         QShortcut(QKeySequence("Ctrl+F"), self).activated.connect(self._focus_search)
@@ -493,7 +493,7 @@ class AdvancedSearchDialog(QDialog):
         # Ctrl+H - Show history
         QShortcut(QKeySequence("Ctrl+H"), self).activated.connect(self._show_history_tab)
 
-    def _start_search(self):
+    def _start_search(self) -> None:
         """Start the search based on current tab."""
         if self.search_worker is not None and self.search_worker.isRunning():
             return
@@ -508,7 +508,7 @@ class AdvancedSearchDialog(QDialog):
             self._start_pattern_search()
         # SearchTab.HISTORY doesn't trigger a search
 
-    def _start_parallel_search(self):
+    def _start_parallel_search(self) -> None:
         """Start parallel search."""
         # Get parameters
         start_text = self.start_offset_edit.text()
@@ -572,7 +572,7 @@ class AdvancedSearchDialog(QDialog):
         self.search_started.emit()
         self.search_worker.start()
 
-    def _start_visual_search(self):
+    def _start_visual_search(self) -> None:
         """Start visual similarity search."""
         # Check if similarity index exists first
         if not self._check_similarity_index_exists():
@@ -667,7 +667,7 @@ class AdvancedSearchDialog(QDialog):
         self.search_started.emit()
         self.search_worker.start()
 
-    def _start_pattern_search(self):
+    def _start_pattern_search(self) -> None:
         """Start pattern search with comprehensive options."""
         # Get pattern input
         pattern_text = self.pattern_edit.toPlainText().strip()
@@ -798,7 +798,7 @@ class AdvancedSearchDialog(QDialog):
         # Default to 16-byte alignment for pattern searches
         return 16
 
-    def _connect_worker_signals(self):
+    def _connect_worker_signals(self) -> None:
         """Connect search worker signals."""
         if self.search_worker:
             self.search_worker.result_found.connect(self._add_result)
@@ -815,7 +815,7 @@ class AdvancedSearchDialog(QDialog):
                 self.search_worker.search_complete.disconnect(self._search_complete)
                 self.search_worker.error.disconnect(self._search_error)
 
-    def _add_result(self, result: SearchResult):
+    def _add_result(self, result: SearchResult) -> None:
         """Add result to list with enhanced pattern search support."""
         self.current_results.append(result)
 
@@ -871,7 +871,7 @@ class AdvancedSearchDialog(QDialog):
         if self.results_label:
             self.results_label.setText(f"Found {len(self.current_results)} {result_type}")
 
-    def _search_complete(self, results: list[Any]):  # pyright: ignore[reportExplicitAny] - SearchResult list from worker
+    def _search_complete(self, results: list[Any]) -> None:  # pyright: ignore[reportExplicitAny] - SearchResult list from worker
         """Handle search completion."""
         if self.search_button:
             self.search_button.setEnabled(True)
@@ -893,7 +893,7 @@ class AdvancedSearchDialog(QDialog):
             self.results_label.setText(f"Search complete: {len(results)} sprites found")
         self.search_completed.emit(len(results))
 
-    def _search_error(self, error_msg: str):
+    def _search_error(self, error_msg: str) -> None:
         """Handle search error."""
         if self.search_button:
             self.search_button.setEnabled(True)
@@ -905,20 +905,20 @@ class AdvancedSearchDialog(QDialog):
             self.results_label.setText(f"Search error: {error_msg}")
         logger.error(f"Search error: {error_msg}")
 
-    def _stop_search(self):
+    def _stop_search(self) -> None:
         """Stop current search."""
         if self.search_worker is not None and self.search_worker.isRunning():
             self.search_worker.cancel()
             if self.results_label:
                 self.results_label.setText("Search cancelled")
 
-    def _on_result_selected(self, item: QListWidgetItem):
+    def _on_result_selected(self, item: QListWidgetItem) -> None:
         """Handle result selection."""
         result = item.data(Qt.ItemDataRole.UserRole)
         if result:
             self.sprite_selected.emit(result.offset)
 
-    def _browse_reference_sprite(self):
+    def _browse_reference_sprite(self) -> None:
         """Browse for reference sprite (thread-safe)."""
         # For now, use a simple dialog to input an offset
         # In a full implementation, this could open a sprite browser
@@ -1095,7 +1095,7 @@ class AdvancedSearchDialog(QDialog):
             self._uploaded_image = None
             return False
 
-    def _on_reference_offset_changed(self):
+    def _on_reference_offset_changed(self) -> None:
         """Handle changes to reference offset text."""
         offset_text = self.ref_offset_edit.text().strip()
         if not offset_text:
@@ -1114,7 +1114,7 @@ class AdvancedSearchDialog(QDialog):
         # Update preview
         self._update_reference_preview(offset)
 
-    def _update_reference_preview(self, offset: int):
+    def _update_reference_preview(self, offset: int) -> None:
         """Update the reference sprite preview."""
         try:
             # Create a preview request
@@ -1142,7 +1142,7 @@ class AdvancedSearchDialog(QDialog):
                 self.ref_preview_label.setText(f"Preview error: {str(e)[:50]}...")
                 self.ref_preview_label.setPixmap(QPixmap())
 
-    def _show_visual_search_results(self, results: list[Any]):  # pyright: ignore[reportExplicitAny] - SearchResult list from worker
+    def _show_visual_search_results(self, results: list[Any]) -> None:  # pyright: ignore[reportExplicitAny] - SearchResult list from worker
         """Show visual search results in similarity dialog."""
         try:
             # Convert SearchResult objects back to SimilarityMatch for the dialog
@@ -1180,7 +1180,7 @@ class AdvancedSearchDialog(QDialog):
         index_path = Path(self.rom_path).with_suffix(".similarity_index")
         return index_path.exists()
 
-    def _offer_to_build_similarity_index(self):
+    def _offer_to_build_similarity_index(self) -> None:
         """Offer to build similarity index if it doesn't exist (thread-safe)."""
         from PySide6.QtCore import QThread
         from PySide6.QtWidgets import QMessageBox
@@ -1209,7 +1209,7 @@ class AdvancedSearchDialog(QDialog):
             if self.results_label:
                 self.results_label.setText(f"Error: {e}")
 
-    def _build_similarity_index(self):
+    def _build_similarity_index(self) -> None:
         """Build similarity index for the current ROM (thread-safe)."""
         # This would be implemented to scan the ROM and build the index
         # For now, show a placeholder message
@@ -1237,7 +1237,7 @@ class AdvancedSearchDialog(QDialog):
             if self.results_label:
                 self.results_label.setText(f"Error: {e}")
 
-    def _clear_history(self):
+    def _clear_history(self) -> None:
         """Clear search history."""
         if self.search_history:
             self.search_history.clear()
@@ -1245,7 +1245,7 @@ class AdvancedSearchDialog(QDialog):
             self.history_list.clear()
         self._save_history()
 
-    def _update_history_display(self):
+    def _update_history_display(self) -> None:
         """Update history list display."""
         if self.history_list:
             self.history_list.clear()
@@ -1255,7 +1255,7 @@ class AdvancedSearchDialog(QDialog):
             if self.history_list:
                 self.history_list.addItem(item)
 
-    def _save_history(self):
+    def _save_history(self) -> None:
         """Save search history to file."""
         history_file = Path.home() / ".spritepal" / "search_history.json"
         history_file.parent.mkdir(exist_ok=True)
@@ -1285,7 +1285,7 @@ class AdvancedSearchDialog(QDialog):
         with Path(history_file).open("w") as f:
             json.dump(data, f, indent=2)
 
-    def _load_history(self):
+    def _load_history(self) -> None:
         """Load search history from file."""
         history_file = Path.home() / ".spritepal" / "search_history.json"
         if not history_file.exists():
@@ -1312,7 +1312,7 @@ class AdvancedSearchDialog(QDialog):
             logger.exception(f"Failed to load search history: {e}")
 
     @override
-    def closeEvent(self, event: Any):  # pyright: ignore[reportExplicitAny] - Qt event can be QCloseEvent
+    def closeEvent(self, event: Any) -> None:  # pyright: ignore[reportExplicitAny] - Qt event can be QCloseEvent
         """Handle dialog close event with proper thread cleanup."""
         # Stop any running search worker using safe cleanup (never terminate)
         if self.search_worker and self.search_worker.isRunning():

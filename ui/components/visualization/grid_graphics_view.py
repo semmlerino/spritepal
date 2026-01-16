@@ -63,7 +63,7 @@ class GridGraphicsView(QGraphicsView):
     zoom_changed = Signal(float)  # Zoom level changed
     tiles_dropped = Signal(list, object, object, QObject)  # sources, source_anchor, target_anchor, drag_source
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.tile_width = 8
         self.tile_height = 8
@@ -130,7 +130,7 @@ class GridGraphicsView(QGraphicsView):
         # Enable keyboard focus
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-    def set_grid_dimensions(self, cols: int, rows: int, tile_width: int, tile_height: int):
+    def set_grid_dimensions(self, cols: int, rows: int, tile_width: int, tile_height: int) -> None:
         """Set the grid dimensions"""
         self.grid_cols = cols
         self.grid_rows = rows
@@ -138,7 +138,7 @@ class GridGraphicsView(QGraphicsView):
         self.tile_height = tile_height
         self._update_grid_lines()
 
-    def clear_selection(self):
+    def clear_selection(self) -> None:
         """Clear current selection"""
         if self.current_selection:
             self.current_selection.clear()
@@ -160,7 +160,7 @@ class GridGraphicsView(QGraphicsView):
         tiles: list[TilePosition],
         color: QColor | None = None,
         manager: GridArrangementManager | None = None,
-    ):
+    ) -> None:
         """Highlight arranged tiles and show order indices"""
         if color is None:
             color = self.arranged_color
@@ -188,7 +188,7 @@ class GridGraphicsView(QGraphicsView):
                 scene.addItem(rect)
                 self.selection_rects[tile_pos] = rect
 
-    def set_unarranged_opacity(self, arranged_tiles: list[TilePosition]):
+    def set_unarranged_opacity(self, arranged_tiles: list[TilePosition]) -> None:
         """Dim unarranged tiles to make arranged ones pop"""
         scene = self.scene()
         if not scene or not self.pixmap_item:
@@ -224,7 +224,7 @@ class GridGraphicsView(QGraphicsView):
         scene.addItem(self.dimming_overlay)
 
     @override
-    def mousePressEvent(self, event: QMouseEvent | None):
+    def mousePressEvent(self, event: QMouseEvent | None) -> None:
         """Handle mouse press"""
         if not event:
             return
@@ -306,7 +306,7 @@ class GridGraphicsView(QGraphicsView):
         super().mousePressEvent(event)
 
     @override
-    def mouseMoveEvent(self, event: QMouseEvent | None):
+    def mouseMoveEvent(self, event: QMouseEvent | None) -> None:
         """Handle mouse move"""
         if not event:
             return
@@ -347,7 +347,7 @@ class GridGraphicsView(QGraphicsView):
 
         super().mouseMoveEvent(event)
 
-    def _execute_drag(self):
+    def _execute_drag(self) -> None:
         """Execute a drag operation for tile reordering"""
         if self._drag_tile is None:
             return
@@ -540,7 +540,7 @@ class GridGraphicsView(QGraphicsView):
                 event.acceptProposedAction()
 
     @override
-    def wheelEvent(self, event: QWheelEvent | None):
+    def wheelEvent(self, event: QWheelEvent | None) -> None:
         """Handle mouse wheel for zooming (no modifier required)"""
         if event:
             delta = event.angleDelta().y()
@@ -637,21 +637,21 @@ class GridGraphicsView(QGraphicsView):
             # Emit zoom change signal
             self.zoom_changed.emit(self.zoom_level)
 
-    def zoom_in(self):
+    def zoom_in(self) -> None:
         """Zoom in by a fixed factor"""
         viewport = self.viewport()
         if viewport:
             center = viewport.rect().center()
             self._zoom_at_point(center, 1.25)
 
-    def zoom_out(self):
+    def zoom_out(self) -> None:
         """Zoom out by a fixed factor"""
         viewport = self.viewport()
         if viewport:
             center = viewport.rect().center()
             self._zoom_at_point(center, 0.8)
 
-    def zoom_to_fit(self):
+    def zoom_to_fit(self) -> None:
         """Zoom to fit the scene content"""
         if self.scene():
             # Reset zoom first
@@ -670,7 +670,7 @@ class GridGraphicsView(QGraphicsView):
             # Emit zoom change signal
             self.zoom_changed.emit(self.zoom_level)
 
-    def reset_zoom(self):
+    def reset_zoom(self) -> None:
         """Reset zoom to 1:1"""
         self.resetTransform()
         self.zoom_level = 1.0
@@ -678,12 +678,12 @@ class GridGraphicsView(QGraphicsView):
         # Emit zoom change signal
         self.zoom_changed.emit(self.zoom_level)
 
-    def get_zoom_level(self):
+    def get_zoom_level(self) -> float:
         """Get current zoom level"""
         return self.zoom_level
 
     @override
-    def mouseReleaseEvent(self, event: QMouseEvent | None):
+    def mouseReleaseEvent(self, event: QMouseEvent | None) -> None:
         """Handle mouse release"""
         if event and event.button() == Qt.MouseButton.LeftButton:
             if self._marquee_active:
@@ -904,7 +904,7 @@ class GridGraphicsView(QGraphicsView):
         # Move focus to new position
         self._set_keyboard_focus(new_pos)
 
-    def _handle_tile_selection_key(self):
+    def _handle_tile_selection_key(self) -> None:
         """Handle Space/Enter key for tile selection"""
         if not self.keyboard_focus_pos:
             return
@@ -921,7 +921,7 @@ class GridGraphicsView(QGraphicsView):
         self._update_selection_display()
         self.tiles_selected.emit(list(self.current_selection))
 
-    def _set_keyboard_focus(self, tile_pos: TilePosition):
+    def _set_keyboard_focus(self, tile_pos: TilePosition) -> None:
         """Set keyboard focus to a specific tile"""
         if not self._is_valid_tile(tile_pos):
             return
@@ -935,7 +935,7 @@ class GridGraphicsView(QGraphicsView):
         # Ensure the focused tile is visible
         self._ensure_tile_visible(tile_pos)
 
-    def _clear_keyboard_focus(self):
+    def _clear_keyboard_focus(self) -> None:
         """Clear keyboard focus"""
         self.keyboard_focus_pos = None
         self.keyboard_nav_active = False
@@ -947,7 +947,7 @@ class GridGraphicsView(QGraphicsView):
                 scene.removeItem(self.keyboard_focus_rect)
             self.keyboard_focus_rect = None
 
-    def _update_keyboard_focus_display(self):
+    def _update_keyboard_focus_display(self) -> None:
         """Update visual display of keyboard focus"""
         scene = self.scene()
         if not scene or not self.keyboard_focus_pos:
@@ -969,7 +969,7 @@ class GridGraphicsView(QGraphicsView):
         self.keyboard_focus_rect.setZValue(10)  # Above other elements
         scene.addItem(self.keyboard_focus_rect)
 
-    def _ensure_tile_visible(self, tile_pos: TilePosition):
+    def _ensure_tile_visible(self, tile_pos: TilePosition) -> None:
         """Ensure a tile is visible in the viewport"""
         x = tile_pos.col * self.tile_width
         y = tile_pos.row * self.tile_height
@@ -997,11 +997,11 @@ class GridGraphicsView(QGraphicsView):
         # Keep focus indicator visible but maybe dim it
         # This allows users to see where they were when returning focus
 
-    def update_grid(self):
+    def update_grid(self) -> None:
         """Public method to refresh the grid line display"""
         self._update_grid_lines()
 
-    def _update_grid_lines(self):
+    def _update_grid_lines(self) -> None:
         """Update grid line display"""
         # Clear existing grid lines
         scene = self.scene()
@@ -1035,7 +1035,7 @@ class GridGraphicsView(QGraphicsView):
             if line:
                 self.grid_lines.append(line)
 
-    def _update_rectangle_selection(self, start: TilePosition, end: TilePosition):
+    def _update_rectangle_selection(self, start: TilePosition, end: TilePosition) -> None:
         """Update rectangle selection"""
         min_row = min(start.row, end.row)
         max_row = max(start.row, end.row)
@@ -1047,7 +1047,7 @@ class GridGraphicsView(QGraphicsView):
         }
         self._update_selection_display()
 
-    def _update_selection_display(self):
+    def _update_selection_display(self) -> None:
         """Update visual display of selection"""
         # Clear existing selection rects
         scene = self.scene()
@@ -1069,7 +1069,7 @@ class GridGraphicsView(QGraphicsView):
                 scene.addItem(rect)
                 self.selection_rects[tile_pos] = rect
 
-    def _update_hover(self, tile_pos: TilePosition):
+    def _update_hover(self, tile_pos: TilePosition) -> None:
         """Update hover display"""
         scene = self.scene()
         if self.hover_rect is not None:

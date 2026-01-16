@@ -32,7 +32,7 @@ class BaseExtractionWidget(QWidget):
     Subclasses should call _setup_widget_with_group() in _setup_ui() for
     consistent layout pattern:
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         inner_layout = QHBoxLayout()
         inner_layout.setSpacing(SPACING_MEDIUM)
         # ... add widgets to inner_layout ...

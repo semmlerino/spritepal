@@ -62,7 +62,7 @@ from ui.common.spacing_constants import SPACING_SMALL, SPACING_STANDARD
 from ui.styles.theme import COLORS
 
 
-def get_main_thread():
+def get_main_thread() -> QThread | None:
     """Get main thread safely."""
     app = QApplication.instance()
     return app.thread() if app else None
@@ -319,7 +319,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         return panel
 
-    def _setup_custom_buttons(self):
+    def _setup_custom_buttons(self) -> None:
         """Set up custom dialog buttons with improved layout."""
         if self.button_box is None:
             return
@@ -365,7 +365,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             }
         """)
 
-    def _setup_smart_preview_coordinator(self):
+    def _setup_smart_preview_coordinator(self) -> None:
         """Set up SmartPreviewCoordinator for efficient preview generation."""
         # Create coordinator owned by this dialog
         self._smart_preview_coordinator = SmartPreviewCoordinator(self)
@@ -385,13 +385,13 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         logger.debug("Smart preview coordinator setup complete")
 
-    def _setup_preview_timer(self):
+    def _setup_preview_timer(self) -> None:
         """Set up preview update timer."""
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
         self._preview_timer.timeout.connect(self._update_preview)
 
-    def _connect_signals(self):
+    def _connect_signals(self) -> None:
         """Connect internal signals."""
         if self.browse_tab is None or self.smart_tab is None or self.history_tab is None or self.gallery_tab is None:
             return
@@ -461,7 +461,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             else:
                 raise
 
-    def _on_offset_requested(self, offset: int):
+    def _on_offset_requested(self, offset: int) -> None:
         """Handle offset request from smart tab."""
         if self.browse_tab is not None:
             self.browse_tab.set_offset(offset)
@@ -477,11 +477,11 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         """Handle sprite selection from history or gallery - navigate to browse tab."""
         self._navigate_to_browse_tab(offset)
 
-    def _on_smart_mode_changed(self, enabled: bool):
+    def _on_smart_mode_changed(self, enabled: bool) -> None:
         """Handle smart mode toggle."""
         # Could implement smart mode behavior here
 
-    def _on_region_changed(self, region_index: int):
+    def _on_region_changed(self, region_index: int) -> None:
         """Handle region change."""
         # Could implement region-specific behavior here
 
@@ -515,13 +515,13 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         """
         self.set_offset(offset)
 
-    def _request_preview_update(self, delay_ms: int = 100):
+    def _request_preview_update(self, delay_ms: int = 100) -> None:
         """Request preview update with debouncing."""
         if self._preview_timer is not None:
             self._preview_timer.stop()
             self._preview_timer.start(delay_ms)
 
-    def _update_preview(self):
+    def _update_preview(self) -> None:
         """Update sprite preview."""
         if not self._has_rom_data() or self.browse_tab is None:
             return
@@ -544,7 +544,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                 self.preview_worker.preview_error.connect(self._on_preview_error)
                 self.preview_worker.start()
 
-    def _on_preview_ready(self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int):
+    def _on_preview_ready(
+        self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int
+    ) -> None:
         """Handle preview ready."""
         if self.preview_widget is not None:
             self.preview_widget.load_sprite_from_4bpp(tile_data, width, height, sprite_name)
@@ -552,7 +554,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         current_offset = self.get_current_offset()
         self._update_status(f"Sprite found at 0x{current_offset:06X} (size: {compressed_size} bytes)")
 
-    def _on_preview_error(self, error_msg: str):
+    def _on_preview_error(self, error_msg: str) -> None:
         """Handle preview error."""
         # Don't clear the preview widget on errors - keep the last valid preview visible
         # This prevents black flashing when rapidly moving the slider
@@ -562,7 +564,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         current_offset = self.get_current_offset()
         self._update_status(f"No sprite at 0x{current_offset:06X}")
 
-    def _apply_offset(self):
+    def _apply_offset(self) -> None:
         """Apply current offset and close dialog."""
         offset = self.get_current_offset()
         sprite_name = f"manual_0x{offset:X}"
@@ -570,7 +572,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self.sprite_found.emit(offset, sprite_name)
         self.hide()
 
-    def _update_status(self, message: str):
+    def _update_status(self, message: str) -> None:
         """Update status message."""
         if self.status_panel is not None:
             self.status_panel.update_status(message)
@@ -624,7 +626,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         if isinstance(self._smart_preview_coordinator, SmartPreviewCoordinator):
             self._smart_preview_coordinator.blockSignals(block)
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up resources to prevent memory leaks."""
         logger.debug(f"Cleaning up UnifiedManualOffsetDialog {self._debug_id}")
 
@@ -852,7 +854,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     def _on_smart_preview_cached(
         self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int
-    ):
+    ) -> None:
         """Handle cached preview from smart coordinator."""
         logger.debug(
             f"[SIGNAL_RECEIVED] _on_smart_preview_cached called: data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}, compressed_size={compressed_size}"
@@ -891,7 +893,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         logger.info("[PREVIEW_CACHED] ========== END ===========")
 
-    def _on_smart_preview_error(self, error_msg: str):
+    def _on_smart_preview_error(self, error_msg: str) -> None:
         """Handle preview error from smart coordinator."""
         logger.warning("[PREVIEW_ERROR] ========== START ===========")
         logger.warning(f"[PREVIEW_ERROR] Error message: {error_msg}")
@@ -1163,7 +1165,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         if constrained_x != x or constrained_y != y:
             self.move(constrained_x, constrained_y)
 
-    def _on_search_sprite_found(self, offset: int, quality: float):
+    def _on_search_sprite_found(self, offset: int, quality: float) -> None:
         """Handle sprite found during navigation search"""
         if self.browse_tab is not None:
             self.browse_tab.set_offset(offset)
@@ -1173,7 +1175,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         self._update_status(f"Found sprite at 0x{offset:06X} (quality: {quality:.2f})")
 
-    def _on_search_complete(self, found: bool):
+    def _on_search_complete(self, found: bool) -> None:
         """Handle search completion"""
         if not found:
             self._update_status("No sprites found in search direction")
@@ -1181,7 +1183,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
     # Bookmark methods have been extracted to BookmarkManager
     # See: ui/dialogs/services/bookmark_manager.py
 
-    def _on_similarity_search_requested(self, target_offset: int):
+    def _on_similarity_search_requested(self, target_offset: int) -> None:
         """Handle similarity search request from preview widget."""
         logger.info(f"Similarity search requested for offset 0x{target_offset:06X}")
 
@@ -1189,7 +1191,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self.set_offset(target_offset)
         self._update_status(f"Navigated to similar sprite at 0x{target_offset:06X}")
 
-    def _show_goto_dialog(self):
+    def _show_goto_dialog(self) -> None:
         """Show go to offset dialog.
 
         Supports multiple address formats:
@@ -1226,7 +1228,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             except ValueError as e:
                 self._update_status(f"Invalid offset: {e}")
 
-    def _load_cached_sprites_for_map(self):
+    def _load_cached_sprites_for_map(self) -> None:
         """Load cached sprites for mini ROM map visualization"""
         if not self.rom_path or not self.mini_rom_map:
             return

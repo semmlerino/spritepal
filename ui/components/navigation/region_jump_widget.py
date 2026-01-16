@@ -47,7 +47,7 @@ class RegionJumpWidget(QWidget):
     region_selected = Signal(int)  # Emitted when region is selected
     offset_requested = Signal(int)  # Emitted for direct offset jump
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
 
         # State
@@ -200,14 +200,14 @@ class RegionJumpWidget(QWidget):
 
         layout.addWidget(container)
 
-    def _connect_signals(self):
+    def _connect_signals(self) -> None:
         """Connect internal signals"""
         if self.region_combo is not None:
             self.region_combo.currentIndexChanged.connect(self._on_region_changed)
         if self.go_button is not None:
             self.go_button.clicked.connect(self._on_go_clicked)
 
-    def _on_region_changed(self, index: int):
+    def _on_region_changed(self, index: int) -> None:
         """Handle region selection change"""
         if 0 <= index < len(self.regions):
             self.current_region_index = index
@@ -218,18 +218,18 @@ class RegionJumpWidget(QWidget):
             if self.offset_spinbox is not None:
                 self.offset_spinbox.setValue(region.center_offset)
 
-    def _on_go_clicked(self):
+    def _on_go_clicked(self) -> None:
         """Handle go button click"""
         if 0 <= self.current_region_index < len(self.regions):
             self.region_selected.emit(self.current_region_index)
 
-    def _on_offset_jump(self):
+    def _on_offset_jump(self) -> None:
         """Handle direct offset jump"""
         if self.offset_spinbox is not None:
             offset = self.offset_spinbox
             self.offset_requested.emit(offset)
 
-    def _update_stats_display(self):
+    def _update_stats_display(self) -> None:
         """Update region statistics display"""
         if self.stats_label is None:
             return
@@ -287,7 +287,7 @@ class RegionJumpWidget(QWidget):
 
     # Public API
 
-    def set_regions(self, regions: list[SpriteRegion]):
+    def set_regions(self, regions: list[SpriteRegion]) -> None:
         """Set available regions"""
         self.regions = regions
         self.current_region_index = -1
@@ -319,7 +319,7 @@ class RegionJumpWidget(QWidget):
 
         self._update_stats_display()
 
-    def set_smart_mode(self, enabled: bool):
+    def set_smart_mode(self, enabled: bool) -> None:
         """Enable/disable smart mode features"""
         self.smart_mode = enabled
 
@@ -376,17 +376,17 @@ class RegionJumpWidget(QWidget):
         """Get currently selected region index"""
         return self.current_region_index
 
-    def set_current_region(self, index: int):
+    def set_current_region(self, index: int) -> None:
         """Set current region programmatically"""
         if self.region_combo and 0 <= index < len(self.regions):
             self.region_combo.setCurrentIndex(index)
 
-    def set_rom_size(self, size: int):
+    def set_rom_size(self, size: int) -> None:
         """Update ROM size for offset limits"""
         if self.offset_spinbox is not None:
             self.offset_spinbox.setMaximum(size)
 
-    def highlight_region_for_offset(self, offset: int):
+    def highlight_region_for_offset(self, offset: int) -> None:
         """Highlight the region containing the given offset"""
         for i, region in enumerate(self.regions):
             if region.start_offset <= offset <= region.end_offset:

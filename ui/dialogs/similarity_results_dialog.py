@@ -35,7 +35,7 @@ class SimilarityResultWidget(QFrame):
 
     sprite_selected = Signal(int)  # Emitted when sprite is selected
 
-    def __init__(self, match: SimilarityMatch, thumbnail: QPixmap | None = None, parent: QWidget | None = None):
+    def __init__(self, match: SimilarityMatch, thumbnail: QPixmap | None = None, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.match = match
         self.thumbnail = thumbnail
@@ -60,7 +60,7 @@ class SimilarityResultWidget(QFrame):
 
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Setup the UI for this result widget."""
         layout = QVBoxLayout()
         layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
@@ -129,7 +129,7 @@ class SimilarityResultWidget(QFrame):
         self.setLayout(layout)
 
     @override
-    def mousePressEvent(self, event: Any):  # pyright: ignore[reportExplicitAny] - Qt mouse event
+    def mousePressEvent(self, event: Any) -> None:  # pyright: ignore[reportExplicitAny] - Qt mouse event
         """Handle mouse clicks to select sprite."""
         if event.button() == Qt.MouseButton.LeftButton:
             self.sprite_selected.emit(self.match.offset)
@@ -141,7 +141,7 @@ class SimilarityResultsDialog(DialogBase):
 
     sprite_selected = Signal(int)  # Emitted when user selects a sprite
 
-    def __init__(self, matches: list[SimilarityMatch], source_offset: int, parent: QWidget | None = None):
+    def __init__(self, matches: list[SimilarityMatch], source_offset: int, parent: QWidget | None = None) -> None:
         # Declare instance variables before super().__init__()
         self.matches = matches
         self.source_offset = source_offset
@@ -156,7 +156,7 @@ class SimilarityResultsDialog(DialogBase):
         )
 
     @override
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Setup the dialog UI - called by BaseDialog."""
         layout = QVBoxLayout()
 
@@ -219,7 +219,7 @@ class SimilarityResultsDialog(DialogBase):
         # Set layout on content widget (BaseDialog pattern)
         self.content_widget.setLayout(layout)
 
-    def _on_sprite_selected(self, offset: int):
+    def _on_sprite_selected(self, offset: int) -> None:
         """Handle sprite selection."""
         self.sprite_selected.emit(offset)
         self.accept()  # Close dialog after selection

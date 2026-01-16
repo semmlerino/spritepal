@@ -68,7 +68,7 @@ class FullscreenSpriteViewer(QWidget):
     sprite_changed = Signal(int)  # Emits current sprite offset
     viewer_closed = Signal()  # Emits when viewer is closed
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         """
         Initialize the fullscreen sprite viewer.
 
@@ -103,7 +103,7 @@ class FullscreenSpriteViewer(QWidget):
         # Set focus to receive keyboard events
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Setup the fullscreen viewer UI."""
         # Main layout - center everything
         main_layout = QVBoxLayout()
@@ -184,7 +184,7 @@ class FullscreenSpriteViewer(QWidget):
 
         self.setLayout(main_layout)
 
-    def _setup_fullscreen(self):
+    def _setup_fullscreen(self) -> None:
         """Configure widget for fullscreen display."""
         # Use clean, minimal window flags to avoid conflicts with window managers
         # Removed WindowStaysOnTopHint and WindowMaximizeButtonHint that can interfere
@@ -259,7 +259,7 @@ class FullscreenSpriteViewer(QWidget):
 
         return True
 
-    def _update_sprite_display(self):
+    def _update_sprite_display(self) -> None:
         """Update the sprite display with the current sprite."""
         if not self.sprites_data or self.current_index >= len(self.sprites_data):
             return
@@ -387,7 +387,7 @@ class FullscreenSpriteViewer(QWidget):
 
         return scaled
 
-    def _update_info_overlay(self):
+    def _update_info_overlay(self) -> None:
         """Update the information overlay."""
         if not self.sprites_data or self.current_index >= len(self.sprites_data):
             return
@@ -416,7 +416,7 @@ class FullscreenSpriteViewer(QWidget):
             else:
                 self.info_overlay.hide()
 
-    def _navigate_to_sprite(self, direction: int):
+    def _navigate_to_sprite(self, direction: int) -> None:
         """
         Navigate to previous (-1) or next (1) sprite.
 
@@ -480,7 +480,7 @@ class FullscreenSpriteViewer(QWidget):
             self.cursor_timer.stop()
             self.cursor_timer.start(3000)
 
-    def _apply_fullscreen_with_fallbacks(self):
+    def _apply_fullscreen_with_fallbacks(self) -> None:
         """Apply fullscreen using multiple strategies with fallbacks."""
         target_screen = self._get_target_screen()
         screen_geometry = target_screen.geometry() if target_screen else None
@@ -554,7 +554,7 @@ class FullscreenSpriteViewer(QWidget):
             logger.error(f"Manual geometry fullscreen failed: {e}")
             return False
 
-    def _log_fullscreen_result(self):
+    def _log_fullscreen_result(self) -> None:
         """Log the final fullscreen result for debugging."""
         try:
             actual_geometry = self.geometry()
@@ -585,7 +585,7 @@ class FullscreenSpriteViewer(QWidget):
         except Exception as e:
             logger.error(f"Error logging fullscreen result: {e}")
 
-    def _try_fullscreen_recovery(self):
+    def _try_fullscreen_recovery(self) -> None:
         """Attempt to recover from partial fullscreen coverage."""
         logger.info("Attempting fullscreen recovery...")
 

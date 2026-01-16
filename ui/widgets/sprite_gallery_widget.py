@@ -53,7 +53,7 @@ class SpriteGalleryWidget(QWidget):
     selection_changed = Signal(list)  # Emits list of selected offsets
     thumbnail_request = Signal(int, int)  # Request thumbnail (offset, priority)
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         """
         Initialize the sprite gallery widget.
 
@@ -86,7 +86,7 @@ class SpriteGalleryWidget(QWidget):
 
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Setup the gallery UI."""
         layout = QVBoxLayout()
         layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
@@ -341,7 +341,7 @@ class SpriteGalleryWidget(QWidget):
         controls.setLayout(layout)
         return controls
 
-    def set_sprites(self, sprites: list[dict[str, object]]):
+    def set_sprites(self, sprites: list[dict[str, object]]) -> None:
         """
         Set the sprites to display in the gallery.
 
@@ -366,7 +366,7 @@ class SpriteGalleryWidget(QWidget):
 
         logger.debug(f"Gallery populated with {len(sprites)} sprites using virtual scrolling")
 
-    def set_thumbnail(self, offset: int, pixmap: QPixmap):
+    def set_thumbnail(self, offset: int, pixmap: QPixmap) -> None:
         """
         Set thumbnail for a sprite.
 
@@ -378,7 +378,7 @@ class SpriteGalleryWidget(QWidget):
             self.model.set_thumbnail(offset, pixmap)
             logger.debug(f"Thumbnail set for offset 0x{offset:06X}")
 
-    def _update_visible_thumbnails(self):
+    def _update_visible_thumbnails(self) -> None:
         """Request thumbnails for visible items only."""
         if not self.list_view or not self.model:
             return
@@ -443,16 +443,16 @@ class SpriteGalleryWidget(QWidget):
         if offset is not None:
             self.sprite_double_clicked.emit(offset)
 
-    def _on_model_selection_changed(self, selected_offsets: list[int]):
+    def _on_model_selection_changed(self, selected_offsets: list[int]) -> None:
         """Handle selection change from model."""
         self.selection_changed.emit(selected_offsets)
         self._update_status()
 
-    def _on_thumbnail_needed(self, offset: int, priority: int):
+    def _on_thumbnail_needed(self, offset: int, priority: int) -> None:
         """Handle thumbnail request from model."""
         self.thumbnail_request.emit(offset, priority)
 
-    def _on_size_changed(self, value: int):
+    def _on_size_changed(self, value: int) -> None:
         """Handle thumbnail size change."""
         self.thumbnail_size = value
         if self.size_label:
@@ -471,7 +471,7 @@ class SpriteGalleryWidget(QWidget):
         # Trigger thumbnail reload for new size
         self.viewport_timer.start()
 
-    def _apply_filters(self):
+    def _apply_filters(self) -> None:
         """Apply current filters to the gallery."""
         if not self.model:
             return
@@ -485,7 +485,7 @@ class SpriteGalleryWidget(QWidget):
         # Trigger thumbnail loading for newly visible items
         self.viewport_timer.start()
 
-    def _apply_sort(self):
+    def _apply_sort(self) -> None:
         """Apply sorting to the sprite data."""
         if not self.model:
             return
@@ -496,17 +496,17 @@ class SpriteGalleryWidget(QWidget):
         # Trigger thumbnail loading for newly visible items
         self.viewport_timer.start()
 
-    def _select_all(self):
+    def _select_all(self) -> None:
         """Select all visible thumbnails."""
         if self.model:
             self.model.select_all()
 
-    def _clear_selection(self):
+    def _clear_selection(self) -> None:
         """Clear all selections."""
         if self.model:
             self.model.clear_selection()
 
-    def _update_status(self):
+    def _update_status(self) -> None:
         """Update the status label."""
         if not self.model:
             if self.status_label:
@@ -559,7 +559,7 @@ class SpriteGalleryWidget(QWidget):
                     return offset
         return None
 
-    def force_layout_update(self):
+    def force_layout_update(self) -> None:
         """Force the gallery to recalculate its layout."""
         if self.list_view:
             self.list_view.reset()

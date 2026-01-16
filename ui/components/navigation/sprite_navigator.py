@@ -59,7 +59,7 @@ class SpriteThumbnail(QWidget):
 
     clicked = Signal(int)  # Emitted when thumbnail is clicked
 
-    def __init__(self, offset: int = 0, parent: QWidget | None = None):
+    def __init__(self, offset: int = 0, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.offset = offset
         self.quality = 0.0
@@ -98,7 +98,7 @@ class SpriteThumbnail(QWidget):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.preview_label.mousePressEvent = lambda e: self.clicked.emit(self.offset)
 
-    def set_sprite(self, pixmap: QPixmap, offset: int, quality: float = 1.0):
+    def set_sprite(self, pixmap: QPixmap, offset: int, quality: float = 1.0) -> None:
         """Update thumbnail with sprite data"""
         self.offset = offset
         self.quality = quality
@@ -135,7 +135,7 @@ class SpriteThumbnail(QWidget):
             }}
         """)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear thumbnail display"""
         self.preview_label.clear()
         self.preview_label.setText("Empty")
@@ -169,7 +169,7 @@ class SpriteNavigator(QWidget):
     region_changed = Signal(int)  # Emitted when region selection changes
     navigation_mode_changed = Signal(str)  # "manual" or "smart"
 
-    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCache):
+    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCache) -> None:
         super().__init__(parent)
 
         # State
@@ -394,7 +394,7 @@ class SpriteNavigator(QWidget):
         help_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(help_text)
 
-    def _connect_signals(self):
+    def _connect_signals(self) -> None:
         """Connect internal signals"""
         # ROM map interaction
         if self.rom_map is not None:
@@ -411,7 +411,7 @@ class SpriteNavigator(QWidget):
             self.region_jump.region_selected.connect(self._on_region_selected)
             self.region_jump.offset_requested.connect(self._navigate_to_offset)
 
-    def _set_navigation_mode(self, mode: str):
+    def _set_navigation_mode(self, mode: str) -> None:
         """Switch between manual and smart navigation modes"""
         self.navigation_mode = mode
 
@@ -429,15 +429,15 @@ class SpriteNavigator(QWidget):
 
         self.navigation_mode_changed.emit(mode)
 
-    def _on_map_clicked(self, offset: int):
+    def _on_map_clicked(self, offset: int) -> None:
         """Handle click on ROM map"""
         self._navigate_to_offset(offset)
 
-    def _on_thumbnail_clicked(self, offset: int):
+    def _on_thumbnail_clicked(self, offset: int) -> None:
         """Handle thumbnail click"""
         self._navigate_to_offset(offset)
 
-    def _on_region_selected(self, region_index: int):
+    def _on_region_selected(self, region_index: int) -> None:
         """Handle region selection"""
         if 0 <= region_index < len(self.sprite_regions):
             region = self.sprite_regions[region_index]
@@ -445,7 +445,7 @@ class SpriteNavigator(QWidget):
             self._navigate_to_offset(region.center_offset)
             self.region_changed.emit(region_index)
 
-    def _navigate_to_offset(self, offset: int):
+    def _navigate_to_offset(self, offset: int) -> None:
         """Navigate to specific offset with history tracking"""
         if offset == self.current_offset:
             return
@@ -467,21 +467,21 @@ class SpriteNavigator(QWidget):
         # Emit signal
         self.offset_changed.emit(offset)
 
-    def _navigate_next_sprite(self):
+    def _navigate_next_sprite(self) -> None:
         """Navigate to next sprite based on mode"""
         if self.navigation_mode == "smart":
             self._navigate_smart_next()
         else:
             self._navigate_manual_next()
 
-    def _navigate_prev_sprite(self):
+    def _navigate_prev_sprite(self) -> None:
         """Navigate to previous sprite based on mode"""
         if self.navigation_mode == "smart":
             self._navigate_smart_prev()
         else:
             self._navigate_manual_prev()
 
-    def _navigate_manual_next(self):
+    def _navigate_manual_next(self) -> None:
         """Find next sprite in manual mode"""
         # Look for next sprite after current offset
         next_offset = None
@@ -496,7 +496,7 @@ class SpriteNavigator(QWidget):
             # No sprite found, step forward
             self._navigate_to_offset(self.current_offset + NAVIGATION_STEP_MEDIUM)
 
-    def _navigate_manual_prev(self):
+    def _navigate_manual_prev(self) -> None:
         """Find previous sprite in manual mode"""
         # Look for previous sprite before current offset
         prev_offset = None
@@ -511,7 +511,7 @@ class SpriteNavigator(QWidget):
             # No sprite found, step backward
             self._navigate_to_offset(self.current_offset - NAVIGATION_STEP_MEDIUM)
 
-    def _navigate_smart_next(self):
+    def _navigate_smart_next(self) -> None:
         """Navigate to next region in smart mode"""
         if not self.sprite_regions or not self.region_jump:
             return
@@ -521,7 +521,7 @@ class SpriteNavigator(QWidget):
             self.region_jump.set_current_region(current_region + 1)
             self._on_region_selected(current_region + 1)
 
-    def _navigate_smart_prev(self):
+    def _navigate_smart_prev(self) -> None:
         """Navigate to previous region in smart mode"""
         if not self.sprite_regions or not self.region_jump:
             return
@@ -531,7 +531,7 @@ class SpriteNavigator(QWidget):
             self.region_jump.set_current_region(current_region - 1)
             self._on_region_selected(current_region - 1)
 
-    def _update_position_display(self):
+    def _update_position_display(self) -> None:
         """Update position and context labels"""
         if self.position_label is not None:
             self.position_label.setText(f"0x{self.current_offset:06X}")
@@ -560,7 +560,7 @@ class SpriteNavigator(QWidget):
             if self.context_label:
                 self.context_label.setText(context)
 
-    def _update_rom_map(self):
+    def _update_rom_map(self) -> None:
         """Update ROM map visualization"""
         if self.rom_map is not None:
             self.rom_map.set_current_offset(self.current_offset)
@@ -572,7 +572,7 @@ class SpriteNavigator(QWidget):
                         self.rom_map.set_current_region(i)
                         break
 
-    def _update_nearby_thumbnails(self):
+    def _update_nearby_thumbnails(self) -> None:
         """Update thumbnail previews of nearby sprites"""
         # Throttle updates
         current_time = time.time()
@@ -606,7 +606,7 @@ class SpriteNavigator(QWidget):
             else:
                 thumbnail.clear()
 
-    def _request_thumbnail_preview(self, offset: int, quality: float, thumbnail_index: int):
+    def _request_thumbnail_preview(self, offset: int, quality: float, thumbnail_index: int) -> None:
         """Request preview generation for a thumbnail"""
         if not self.extraction_manager or not self.rom_path:
             return
@@ -633,7 +633,9 @@ class SpriteNavigator(QWidget):
         except Exception as e:
             logger.warning(f"Failed to request thumbnail preview: {e}")
 
-    def _on_thumbnail_ready(self, offset: int, quality: float, index: int, tile_data: bytes, width: int, height: int):
+    def _on_thumbnail_ready(
+        self, offset: int, quality: float, index: int, tile_data: bytes, width: int, height: int
+    ) -> None:
         """Handle thumbnail preview ready"""
         try:
             # Convert to QPixmap
@@ -662,7 +664,7 @@ class SpriteNavigator(QWidget):
         except Exception as e:
             logger.warning(f"Failed to process thumbnail: {e}")
 
-    def _update_navigation_for_smart_mode(self):
+    def _update_navigation_for_smart_mode(self) -> None:
         """Update navigation UI for smart mode"""
         if self.rom_map is not None:
             self.rom_map.set_sprite_regions(self.sprite_regions)
@@ -671,7 +673,7 @@ class SpriteNavigator(QWidget):
         if self.region_jump is not None:
             self.region_jump.set_regions(self.sprite_regions)
 
-    def _add_to_history(self, offset: int):
+    def _add_to_history(self, offset: int) -> None:
         """Add offset to navigation history"""
         # Remove any forward history if we're not at the end
         if self.history_index < len(self.navigation_history) - 1:
@@ -686,7 +688,7 @@ class SpriteNavigator(QWidget):
         else:
             self.history_index += 1
 
-    def _cleanup_preview_workers(self):
+    def _cleanup_preview_workers(self) -> None:
         """Clean up completed preview workers"""
         active_workers = []
         for worker in self.preview_workers:
@@ -698,7 +700,7 @@ class SpriteNavigator(QWidget):
 
     # Public API
 
-    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: CoreOperationsManager):
+    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: CoreOperationsManager) -> None:
         """Set ROM data for navigation"""
         self.rom_path = rom_path
         self.rom_size = rom_size
@@ -715,7 +717,7 @@ class SpriteNavigator(QWidget):
         # Load sprite data from cache if available
         self._load_cached_sprites()
 
-    def set_found_sprites(self, sprites: list[tuple[int, float]]):
+    def set_found_sprites(self, sprites: list[tuple[int, float]]) -> None:
         """Set found sprite locations"""
         self.found_sprites = sprites
 
@@ -735,7 +737,7 @@ class SpriteNavigator(QWidget):
         # Update thumbnails
         self._update_nearby_thumbnails()
 
-    def add_found_sprite(self, offset: int, quality: float = 1.0):
+    def add_found_sprite(self, offset: int, quality: float = 1.0) -> None:
         """Add a single found sprite"""
         self.found_sprites.append((offset, quality))
 
@@ -753,11 +755,11 @@ class SpriteNavigator(QWidget):
         """Get current navigation offset"""
         return self.current_offset
 
-    def set_current_offset(self, offset: int):
+    def set_current_offset(self, offset: int) -> None:
         """Set current offset programmatically"""
         self._navigate_to_offset(offset)
 
-    def _load_cached_sprites(self):
+    def _load_cached_sprites(self) -> None:
         """Load sprite locations from cache"""
         if not self.rom_path or not self.rom_cache:
             return
@@ -782,7 +784,7 @@ class SpriteNavigator(QWidget):
     # Keyboard navigation
 
     @override
-    def keyPressEvent(self, event: QKeyEvent | None):
+    def keyPressEvent(self, event: QKeyEvent | None) -> None:
         """Handle keyboard navigation"""
         if not event:
             return
@@ -824,7 +826,7 @@ class SpriteNavigator(QWidget):
         else:
             super().keyPressEvent(event)
 
-    def _navigate_back(self):
+    def _navigate_back(self) -> None:
         """Navigate back in history"""
         if self.history_index > 0:
             self.history_index -= 1
@@ -835,7 +837,7 @@ class SpriteNavigator(QWidget):
             self._update_nearby_thumbnails()
             self.offset_changed.emit(offset)
 
-    def _navigate_forward(self):
+    def _navigate_forward(self) -> None:
         """Navigate forward in history"""
         if self.history_index < len(self.navigation_history) - 1:
             self.history_index += 1
@@ -846,7 +848,7 @@ class SpriteNavigator(QWidget):
             self._update_nearby_thumbnails()
             self.offset_changed.emit(offset)
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up resources"""
         # Clean up all preview workers
         for worker in self.preview_workers:

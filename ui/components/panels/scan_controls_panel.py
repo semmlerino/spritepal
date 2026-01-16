@@ -60,7 +60,7 @@ class ScanControlsPanel(QWidget):
     partial_scan_detected = Signal(object)  # cache info for resume dialog (use object to avoid PySide6 copy warning)
     sprites_detected = Signal(list)  # List of (offset, quality) tuples for region detection
 
-    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCache):
+    def __init__(self, parent: QWidget | None = None, *, rom_cache: ROMCache) -> None:
         # Step 1: Declare all instance variables with type hints
         # State
         self.rom_path: str = ""
@@ -144,14 +144,14 @@ class ScanControlsPanel(QWidget):
 
         self.setLayout(layout)
 
-    def _connect_signals(self):
+    def _connect_signals(self) -> None:
         """Connect internal signals"""
         _ = self.scan_range_btn.clicked.connect(self._scan_range)
         _ = self.scan_all_btn.clicked.connect(self._scan_all)
         _ = self.pause_btn.clicked.connect(self._toggle_pause)
         _ = self.stop_btn.clicked.connect(self._stop_scan)
 
-    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: CoreOperationsManager):
+    def set_rom_data(self, rom_path: str, rom_size: int, extraction_manager: CoreOperationsManager) -> None:
         """Set ROM data for scanning operations"""
         with QMutexLocker(self._manager_mutex):
             self.rom_path = rom_path
@@ -191,15 +191,15 @@ class ScanControlsPanel(QWidget):
                 return None
             return operation(self.extraction_manager, self.rom_extractor)
 
-    def set_rom_map(self, rom_map: ROMMapWidget):
+    def set_rom_map(self, rom_map: ROMMapWidget) -> None:
         """Set the ROM map reference for visualization updates"""
         self.rom_map = rom_map
 
-    def set_current_offset(self, offset: int):
+    def set_current_offset(self, offset: int) -> None:
         """Update the current offset for range scanning"""
         self.current_offset = offset
 
-    def _scan_range(self):
+    def _scan_range(self) -> None:
         """Scan a range around current offset"""
         # Quick check if managers exist (safe under short lock)
         has_managers = self._with_managers_safely(lambda em, re: True)
@@ -244,7 +244,7 @@ class ScanControlsPanel(QWidget):
 
         self._start_range_scan(start_offset, end_offset)
 
-    def _scan_all(self):
+    def _scan_all(self) -> None:
         """Scan entire ROM"""
         # Quick check if managers exist (safe under short lock)
         has_managers = self._with_managers_safely(lambda em, re: True)
@@ -286,7 +286,7 @@ class ScanControlsPanel(QWidget):
         # Start full ROM scan
         self._start_range_scan(start_offset, end_offset)
 
-    def _start_range_scan(self, start_offset: int, end_offset: int):
+    def _start_range_scan(self, start_offset: int, end_offset: int) -> None:
         """Start scanning a specific range"""
         self.is_scanning = True
         if self.found_sprites:
@@ -310,7 +310,7 @@ class ScanControlsPanel(QWidget):
         # Create range scanning worker
         self._start_range_scan_worker(start_offset, end_offset)
 
-    def _start_range_scan_worker(self, start_offset: int, end_offset: int):
+    def _start_range_scan_worker(self, start_offset: int, end_offset: int) -> None:
         """Start the worker thread for range scanning with enhanced error recovery"""
         # Extract necessary data under mutex protection
         rom_extractor = self._with_managers_safely(lambda em, re: re)
@@ -378,7 +378,7 @@ class ScanControlsPanel(QWidget):
             self.scan_status_changed.emit(f"Unexpected scan error: {e}")
             self._finish_scan()
 
-    def _on_range_sprite_found(self, offset: int, quality: float):
+    def _on_range_sprite_found(self, offset: int, quality: float) -> None:
         """Handle sprite found during range scan"""
         # Add to our found sprites list
         self.found_sprites.append((offset, quality))
@@ -400,11 +400,11 @@ class ScanControlsPanel(QWidget):
         count = len(self.found_sprites)
         self.scan_status_changed.emit(f"Scanning... Found {count} sprite{'s' if count != 1 else ''}")
 
-    def _on_range_scan_progress(self, current_offset: int, progress_pct: int):
+    def _on_range_scan_progress(self, current_offset: int, progress_pct: int) -> None:
         """Handle progress updates during range scan"""
         self.progress_update.emit(current_offset, progress_pct)
 
-    def _on_range_scan_complete(self, found: bool):
+    def _on_range_scan_complete(self, found: bool) -> None:
         """Handle range scan completion"""
         self._finish_scan()
 
@@ -415,7 +415,7 @@ class ScanControlsPanel(QWidget):
         else:
             self.scan_status_changed.emit("Range scan complete: No sprites found")
 
-    def _toggle_pause(self):
+    def _toggle_pause(self) -> None:
         """Toggle pause/resume for the current scan"""
         if self.range_scan_worker is None:
             return
@@ -425,23 +425,23 @@ class ScanControlsPanel(QWidget):
         else:
             self.range_scan_worker.pause_scan()
 
-    def _stop_scan(self):
+    def _stop_scan(self) -> None:
         """Stop the current scan"""
         if self.range_scan_worker is not None:
             self.range_scan_worker.stop_scan()
 
-    def _on_scan_paused(self):
+    def _on_scan_paused(self) -> None:
         """Handle scan paused signal"""
         self.pause_btn.setText("Resume")
         self.scan_status_changed.emit("Scan paused - click Resume to continue")
 
-    def _on_scan_resumed(self):
+    def _on_scan_resumed(self) -> None:
         """Handle scan resumed signal"""
         self.pause_btn.setText("Pause")
         count = len(self.found_sprites)
         self.scan_status_changed.emit(f"Scanning... Found {count} sprite{'s' if count != 1 else ''}")
 
-    def _on_scan_stopped(self):
+    def _on_scan_stopped(self) -> None:
         """Handle scan stopped signal"""
         self._finish_scan()
 
@@ -460,7 +460,7 @@ class ScanControlsPanel(QWidget):
         self.pause_btn.setVisible(is_scanning)
         self.stop_btn.setVisible(is_scanning)
 
-    def _finish_scan(self):
+    def _finish_scan(self) -> None:
         """Common scan cleanup operations"""
         self.is_scanning = False
         self._set_scanning_mode(False)
@@ -472,7 +472,7 @@ class ScanControlsPanel(QWidget):
         # Emit scan finished signal
         self.scan_finished.emit()
 
-    def cleanup_workers(self):
+    def cleanup_workers(self) -> None:
         """Clean up any running worker threads with timeouts to prevent hangs"""
         WorkerManager.cleanup_worker_attr(self, "range_scan_worker", timeout=5000)
 

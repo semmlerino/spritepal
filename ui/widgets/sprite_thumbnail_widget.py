@@ -26,7 +26,7 @@ class SpriteThumbnailWidget(QWidget):
     double_clicked = Signal(int)  # offset
     selected = Signal(bool)  # selection state
 
-    def __init__(self, offset: int = 0, size: int = 384, parent: QWidget | None = None):
+    def __init__(self, offset: int = 0, size: int = 384, parent: QWidget | None = None) -> None:
         """
         Initialize sprite thumbnail widget.
 
@@ -55,7 +55,7 @@ class SpriteThumbnailWidget(QWidget):
 
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Setup the thumbnail UI."""
         # Adjust label height based on thumbnail size
         label_height = 40 if self.thumbnail_size >= 256 else 30
@@ -110,7 +110,7 @@ class SpriteThumbnailWidget(QWidget):
         # Set tooltip
         self.setToolTip(f"Offset: {self.offset_text}")
 
-    def set_sprite_data(self, pixmap: QPixmap, sprite_info: dict[str, object] | None = None):
+    def set_sprite_data(self, pixmap: QPixmap, sprite_info: dict[str, object] | None = None) -> None:
         """
         Set the sprite thumbnail data.
 
@@ -136,7 +136,7 @@ class SpriteThumbnailWidget(QWidget):
             # Show placeholder
             self._show_placeholder()
 
-    def _show_placeholder(self):
+    def _show_placeholder(self) -> None:
         """Show a placeholder when no sprite is loaded."""
         label_size = self.thumbnail_label.size() if self.thumbnail_label else QSize(384, 384)
         placeholder = QPixmap(label_size)
@@ -174,7 +174,7 @@ class SpriteThumbnailWidget(QWidget):
         if self.thumbnail_label:
             self.thumbnail_label.setPixmap(placeholder)
 
-    def _update_info_display(self):
+    def _update_info_display(self) -> None:
         """Update the info display based on sprite metadata."""
         if not self.sprite_info:
             return
@@ -224,7 +224,7 @@ class SpriteThumbnailWidget(QWidget):
 
         self.setToolTip("\n".join(filter(None, tooltip_parts)))
 
-    def set_selected(self, selected: bool):
+    def set_selected(self, selected: bool) -> None:
         """
         Set the selection state of the thumbnail.
 
@@ -235,7 +235,7 @@ class SpriteThumbnailWidget(QWidget):
         self._update_style()
         self.selected.emit(selected)
 
-    def _update_style(self):
+    def _update_style(self) -> None:
         """Update the visual style based on state."""
         if self.is_selected:
             border_color = COLORS["border_focus"]

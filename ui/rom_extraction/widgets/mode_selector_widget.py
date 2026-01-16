@@ -18,7 +18,7 @@ class ModeSelectorWidget(BaseExtractionWidget):
         super().__init__(parent)
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Initialize the user interface"""
         mode_layout = self._create_hbox_layout()
 

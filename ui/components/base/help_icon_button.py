@@ -48,7 +48,7 @@ class HelpIconButton(QToolButton):
         short_text: str = "",
         detailed_text: str = "",
         parent: QWidget | None = None,
-    ):
+    ) -> None:
         super().__init__(parent)
         self._short_text = short_text
         self._detailed_text = detailed_text
@@ -137,7 +137,7 @@ class HelpLabel(QWidget):
         short_help: str = "",
         detailed_help: str = "",
         parent: QWidget | None = None,
-    ):
+    ) -> None:
         super().__init__(parent)
 
         layout = QVBoxLayout(self)
@@ -179,7 +179,7 @@ class InfoBanner(QFrame):
         parent: Parent widget
     """
 
-    def __init__(self, message: str, parent: QWidget | None = None):
+    def __init__(self, message: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._message = message
         self._collapsed = False

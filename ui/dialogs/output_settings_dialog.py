@@ -56,7 +56,7 @@ class OutputSettingsDialog(DialogBase):
         suggested_name: str = "",
         is_rom_mode: bool = False,
         default_directory: str = "",
-    ):
+    ) -> None:
         """Initialize the output settings dialog.
 
         Args:

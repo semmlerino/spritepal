@@ -24,7 +24,7 @@ from ui.styles.theme import COLORS
 class RangeScanDialog(DialogBase):
     """Dialog for selecting range scanning parameters"""
 
-    def __init__(self, rom_size: int, current_offset: int = 0, parent: QWidget | None = None):
+    def __init__(self, rom_size: int, current_offset: int = 0, parent: QWidget | None = None) -> None:
         # Step 1: Declare instance variables BEFORE super().__init__()
         self.current_offset = current_offset
         self.rom_size = rom_size

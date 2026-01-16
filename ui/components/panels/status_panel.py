@@ -25,7 +25,7 @@ class StatusPanel(QWidget):
 
     def __init__(
         self, parent: QWidget | None = None, *, settings_manager: ApplicationStateManager, rom_cache: ROMCache
-    ):
+    ) -> None:
         super().__init__(parent)
         self.setStyleSheet(get_panel_style())
 
@@ -62,22 +62,22 @@ class StatusPanel(QWidget):
 
         self.setLayout(layout)
 
-    def update_status(self, message: str):
+    def update_status(self, message: str) -> None:
         """Update the status message"""
         if self.detection_info:
             self.detection_info.setText(message)
 
-    def show_progress(self, minimum: int = 0, maximum: int = 100):
+    def show_progress(self, minimum: int = 0, maximum: int = 100) -> None:
         """Show and configure the progress bar"""
         self.scan_progress.setRange(minimum, maximum)
         self.scan_progress.setValue(minimum)
         self.scan_progress.setVisible(True)
 
-    def hide_progress(self):
+    def hide_progress(self) -> None:
         """Hide the progress bar"""
         self.scan_progress.setVisible(False)
 
-    def update_progress(self, value: int):
+    def update_progress(self, value: int) -> None:
         """Update the progress bar value"""
         if self.scan_progress.isVisible():
             self.scan_progress.setValue(value)

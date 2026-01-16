@@ -98,7 +98,7 @@ class ROMFileWidget(BaseExtractionWidget):
 
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Initialize the user interface - flat layout without group box"""
         rom_layout = self._create_vbox_layout()
 
@@ -160,7 +160,7 @@ class ROMFileWidget(BaseExtractionWidget):
                 "3. Click Extract to begin"
             )
 
-    def set_rom_path(self, path: str):
+    def set_rom_path(self, path: str) -> None:
         """Set the ROM path display"""
         self._rom_path = path
         if self.rom_path_edit:
@@ -169,7 +169,7 @@ class ROMFileWidget(BaseExtractionWidget):
         if path:
             self._check_cache_status()
 
-    def set_info_text(self, html: str):
+    def set_info_text(self, html: str) -> None:
         """Set the ROM info display text (supports HTML)"""
         # Append cache status if available
         if self._cache_status["has_cache"]:
@@ -184,7 +184,7 @@ class ROMFileWidget(BaseExtractionWidget):
             self.rom_info_label.setText(html)
             self.rom_info_label.setToolTip("")  # Clear getting started tooltip
 
-    def show_loading(self, message: str = "Loading ROM header..."):
+    def show_loading(self, message: str = "Loading ROM header...") -> None:
         """Show loading indicator with optional message.
 
         Args:
@@ -194,11 +194,11 @@ class ROMFileWidget(BaseExtractionWidget):
         if self.rom_info_label:
             self.rom_info_label.setText(f'<span style="color: {COLORS["info"]};">{message}</span>')
 
-    def hide_loading(self):
+    def hide_loading(self) -> None:
         """Hide loading indicator."""
         self.loading_progress.hide()
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear the ROM selection"""
         self._rom_path = ""
         self._cache_status = {"has_cache": False, "cache_type": None}
@@ -206,7 +206,7 @@ class ROMFileWidget(BaseExtractionWidget):
             self.rom_path_edit.setText("")
         self._set_empty_state_guidance()
 
-    def _check_cache_status(self):
+    def _check_cache_status(self) -> None:
         """Check cache status for the current ROM"""
         if not self._rom_path or not self._rom_cache.cache_enabled:
             self._cache_status = {"has_cache": False, "cache_type": None}
@@ -271,7 +271,7 @@ class ROMFileWidget(BaseExtractionWidget):
         """Get the current cache status"""
         return self._cache_status.copy()
 
-    def refresh_cache_status(self):
+    def refresh_cache_status(self) -> None:
         """Refresh cache status and update display"""
         if self._rom_path:
             self._check_cache_status()

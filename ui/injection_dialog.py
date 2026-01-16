@@ -63,7 +63,7 @@ class InjectionDialog(TabbedDialog):
         *,
         injection_manager: CoreOperationsManager,
         settings_manager: ApplicationStateManager,
-    ):
+    ) -> None:
         # Step 1: Declare instance variables BEFORE super().__init__()
         self.sprite_path = sprite_path
         self.metadata_path = metadata_path

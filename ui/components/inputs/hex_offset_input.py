@@ -47,7 +47,7 @@ class HexOffsetInput(QWidget):
         decimal_width: int = 60,
         label_prefix: str = "",
         external_change_callback: Callable[[str | None], None] | None = None,
-    ):
+    ) -> None:
         super().__init__(parent)
 
         self._with_decimal_display = with_decimal_display
@@ -135,7 +135,7 @@ class HexOffsetInput(QWidget):
             logger.warning(f"Unexpected error parsing hex offset '{text}': {e}")
             return None
 
-    def _on_text_changed(self, text: str):
+    def _on_text_changed(self, text: str) -> None:
         """
         Handle text change events.
 
@@ -191,7 +191,7 @@ class HexOffsetInput(QWidget):
         """Get the current raw text value"""
         return self.hex_edit.text()
 
-    def set_text(self, text: str | int | None):
+    def set_text(self, text: str | int | None) -> None:
         """Set the input text (triggers validation)"""
         if text is None:
             converted_text = ""
@@ -204,11 +204,11 @@ class HexOffsetInput(QWidget):
         if self.hex_edit:
             self.hex_edit.setText(converted_text)
 
-    def set_placeholder(self, placeholder: str):
+    def set_placeholder(self, placeholder: str) -> None:
         """Set the placeholder text"""
         self.hex_edit.setPlaceholderText(placeholder)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear the input"""
         if self.hex_edit:
             self.hex_edit.clear()

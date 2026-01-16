@@ -16,7 +16,7 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         super().__init__(parent)
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Initialize the user interface - collapsible section, starts collapsed"""
         cgram_layout = self._create_vbox_layout()
 
@@ -48,10 +48,10 @@ class CGRAMSelectorWidget(BaseExtractionWidget):
         """Get the current CGRAM path"""
         return self.cgram_path_edit.text()
 
-    def set_cgram_path(self, path: str):
+    def set_cgram_path(self, path: str) -> None:
         """Set the CGRAM path"""
         self.cgram_path_edit.setText(path)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear the CGRAM path"""
         self.cgram_path_edit.clear()

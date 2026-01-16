@@ -36,7 +36,7 @@ class ImportExportPanel(QWidget):
     sprites_imported = Signal(list)  # List of (offset, quality) tuples
     status_changed = Signal(str)  # Status message
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setStyleSheet(get_panel_style())
 
@@ -73,25 +73,25 @@ class ImportExportPanel(QWidget):
 
         self.setLayout(layout)
 
-    def _connect_signals(self):
+    def _connect_signals(self) -> None:
         """Connect internal signals"""
         _ = self.export_btn.clicked.connect(self._export_offsets)
         _ = self.import_btn.clicked.connect(self._import_offsets)
 
-    def set_rom_data(self, rom_path: str, rom_size: int):
+    def set_rom_data(self, rom_path: str, rom_size: int) -> None:
         """Set ROM data for import/export operations"""
         self.rom_path = rom_path
         self.rom_size = rom_size
 
-    def set_rom_map(self, rom_map: ROMMapWidget):
+    def set_rom_map(self, rom_map: ROMMapWidget) -> None:
         """Set the ROM map reference for visualization updates"""
         self.rom_map = rom_map
 
-    def set_found_sprites(self, sprites: list[tuple[int, float]]):
+    def set_found_sprites(self, sprites: list[tuple[int, float]]) -> None:
         """Update the list of found sprites for export"""
         self.found_sprites = sprites.copy()
 
-    def _export_offsets(self):
+    def _export_offsets(self) -> None:
         """Export found offsets to file"""
         if not self.found_sprites:
             _ = QMessageBox.information(
@@ -198,7 +198,7 @@ class ImportExportPanel(QWidget):
             self.status_changed.emit(error_msg)
             _ = QMessageBox.critical(self, "Export Failed", error_msg, QMessageBox.StandardButton.Ok)
 
-    def _import_offsets(self):
+    def _import_offsets(self) -> None:
         """Import offsets from file"""
         # Get file path
         file_path = browse_for_open_file(self, "Import Sprite Offsets", "JSON Files (*.json);;All Files (*)")

@@ -182,7 +182,7 @@ class GridArrangementDialog(SplitterDialog):
             self.update_status("Error: Unable to load sprite file")
 
     @override
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Set up the dialog UI using SplitterDialog panels"""
         # Call parent _setup_ui first to initialize the main splitter
         super()._setup_ui()
@@ -369,7 +369,7 @@ class GridArrangementDialog(SplitterDialog):
         grid_group.setLayout(grid_layout)
         return grid_group
 
-    def _initialize_grid_view(self):
+    def _initialize_grid_view(self) -> None:
         """Initialize the grid view with image data if available."""
         if self.original_image is not None:
             pixmap = self._create_pixmap_from_image(self.original_image)
@@ -384,7 +384,7 @@ class GridArrangementDialog(SplitterDialog):
             # Create placeholder for error state
             self.pixmap_item = None
 
-    def _connect_grid_view_signals(self):
+    def _connect_grid_view_signals(self) -> None:
         """Connect all grid view signals."""
         self.grid_view.tile_clicked.connect(self._on_tile_clicked)
         self.grid_view.tiles_selected.connect(self._on_tiles_selected)
@@ -425,7 +425,7 @@ class GridArrangementDialog(SplitterDialog):
 
         return actions_group
 
-    def _add_action_buttons(self, layout: QHBoxLayout):
+    def _add_action_buttons(self, layout: QHBoxLayout) -> None:
         """Add action buttons to the given layout.
 
         Args:
@@ -482,7 +482,7 @@ class GridArrangementDialog(SplitterDialog):
         _ = self.palette_toggle_btn.toggled.connect(self._on_palette_toggle_clicked)
         layout.addWidget(self.palette_toggle_btn)
 
-    def _add_shortcut_legend(self, layout: QHBoxLayout):
+    def _add_shortcut_legend(self, layout: QHBoxLayout) -> None:
         """Add a collapsible shortcut legend to the given layout."""
         # Container for the toggle button and legend content
         legend_container = QFrame()
@@ -515,7 +515,7 @@ class GridArrangementDialog(SplitterDialog):
 
         layout.addWidget(legend_container)
 
-    def _on_legend_toggled(self, expanded: bool):
+    def _on_legend_toggled(self, expanded: bool) -> None:
         """Handle legend toggle button state change."""
         self._legend_content.setVisible(expanded)
         arrow = Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow
@@ -529,7 +529,7 @@ class GridArrangementDialog(SplitterDialog):
         """Return the current legend text content."""
         return self._legend_content.text()
 
-    def _add_zoom_controls(self, layout: QHBoxLayout):
+    def _add_zoom_controls(self, layout: QHBoxLayout) -> None:
         """Add zoom control buttons to the given layout.
 
         Args:
@@ -580,7 +580,7 @@ class GridArrangementDialog(SplitterDialog):
         self.zoom_reset_btn.setToolTip("Reset zoom to 1:1 [Ctrl+0]")
         layout.addWidget(self.zoom_reset_btn)
 
-    def _on_arrangement_width_changed(self, value: int):
+    def _on_arrangement_width_changed(self, value: int) -> None:
         """Handle arrangement width change"""
         # Update the arrangement manager's target width for auto-placement FIRST
         # (before UI updates that may fail in test environments)
@@ -596,7 +596,7 @@ class GridArrangementDialog(SplitterDialog):
                 pass
         # self._update_preview()  # Preview removed
 
-    def _add_all_tiles(self):
+    def _add_all_tiles(self) -> None:
         """Add all tiles from the grid to the arrangement"""
         tiles_to_add = []
         for row in range(self.grid_view.grid_rows):
@@ -612,7 +612,7 @@ class GridArrangementDialog(SplitterDialog):
             )
             self.undo_stack.push(command)
 
-    def _magic_wand_selection(self):
+    def _magic_wand_selection(self) -> None:
         """Select all non-empty tiles (with any non-zero pixels)"""
         non_empty_tiles = []
         for pos, img in self.tiles.items():
@@ -665,7 +665,7 @@ class GridArrangementDialog(SplitterDialog):
         """Handle tile selection"""
         self._update_status(f"Selected {len(tiles)} tiles")
 
-    def _add_selection(self):
+    def _add_selection(self) -> None:
         """Add current selection to arrangement canvas (next available slots)"""
         selection = list(self.grid_view.current_selection)
 
@@ -695,7 +695,7 @@ class GridArrangementDialog(SplitterDialog):
         else:
             self._update_status("Selected tiles are already arranged")
 
-    def _remove_selection(self):
+    def _remove_selection(self) -> None:
         """Remove current selection from arrangement grid mapping"""
         # 1. Check arrangement grid selection first (direct canvas deletion)
         if hasattr(self, "arrangement_grid"):
@@ -743,7 +743,7 @@ class GridArrangementDialog(SplitterDialog):
         self.grid_view.clear_selection()
         self._update_displays()
 
-    def _create_group(self):
+    def _create_group(self) -> None:
         """Create a group from current selection"""
         selection = list(self.grid_view.current_selection)
 
@@ -788,7 +788,7 @@ class GridArrangementDialog(SplitterDialog):
         self._update_status(f"Created group with {len(selection)} tiles")
         self.grid_view.clear_selection()
 
-    def _clear_arrangement(self):
+    def _clear_arrangement(self) -> None:
         """Clear all arrangements"""
         if not self.arrangement_manager:
             return
@@ -1014,7 +1014,7 @@ class GridArrangementDialog(SplitterDialog):
         )
         return result == QMessageBox.StandardButton.Yes
 
-    def _on_arrangement_changed(self):
+    def _on_arrangement_changed(self) -> None:
         """Handle arrangement change"""
         # Clear apply result when arrangement changes, as it's no longer valid for the current state
         # Guard: don't clear if we are currently in the middle of applying (auto-hide update)
@@ -1051,7 +1051,7 @@ class GridArrangementDialog(SplitterDialog):
 
         self._update_arrangement_canvas()
 
-    def _on_palette_mode_changed(self, enabled: bool):
+    def _on_palette_mode_changed(self, enabled: bool) -> None:
         """Handle palette mode change"""
         if hasattr(self, "palette_toggle_btn") and self.palette_toggle_btn.isChecked() != enabled:
             # Block signals to avoid feedback loop if setChecked triggers toggled
@@ -1147,7 +1147,7 @@ class GridArrangementDialog(SplitterDialog):
         anchor: TilePosition,
         target_anchor: TilePosition,
         source_widget: QObject,
-    ):
+    ) -> None:
         """Handle tiles dropped on the arrangement canvas"""
 
         # Calculate offset from anchor for each tile
@@ -1248,7 +1248,7 @@ class GridArrangementDialog(SplitterDialog):
         else:
             self.arrangement_grid.clear_selection()
 
-    def _update_displays(self):
+    def _update_displays(self) -> None:
         """Update all display elements"""
         # Update source grid image (palette application)
         self._update_source_grid_image()
@@ -1260,7 +1260,7 @@ class GridArrangementDialog(SplitterDialog):
         # Update arrangement canvas
         self._update_arrangement_canvas()
 
-    def _update_source_grid_image(self):
+    def _update_source_grid_image(self) -> None:
         """Update the source grid image based on palette mode."""
         if self.original_image is None or self.pixmap_item is None:
             return
@@ -1273,12 +1273,12 @@ class GridArrangementDialog(SplitterDialog):
         pixmap = self._create_pixmap_from_image(display_image)
         self.pixmap_item.setPixmap(pixmap)
 
-    def _on_palette_toggle_clicked(self, checked: bool):
+    def _on_palette_toggle_clicked(self, checked: bool) -> None:
         """Handle palette toggle button click."""
         if checked != self.colorizer.is_palette_mode():
             self.toggle_palette_application()
 
-    def _update_arrangement_canvas(self):
+    def _update_arrangement_canvas(self) -> None:
         """Update the arrangement canvas view"""
         if not hasattr(self, "arrangement_grid"):
             return
@@ -1550,23 +1550,23 @@ class GridArrangementDialog(SplitterDialog):
             self._update_status(f"Export failed: {e!s}")
             _ = QMessageBox.warning(self, "Export Error", f"Failed to export arrangement:\n{e!s}")
 
-    def _update_status(self, message: str):
+    def _update_status(self, message: str) -> None:
         """Update status bar message"""
         self.update_status(message)
 
-    def _update_zoom_level_display(self):
+    def _update_zoom_level_display(self) -> None:
         """Update the zoom level display"""
         if hasattr(self, "zoom_level_label"):
             zoom_percent = int(self.grid_view.get_zoom_level() * 100)
             if self.zoom_level_label:
                 self.zoom_level_label.setText(f"{zoom_percent}%")
 
-    def _on_zoom_changed(self, zoom_level: int):
+    def _on_zoom_changed(self, zoom_level: int) -> None:
         """Handle zoom level change"""
         self._update_zoom_level_display()
 
     @override
-    def keyPressEvent(self, a0: QKeyEvent | None):
+    def keyPressEvent(self, a0: QKeyEvent | None) -> None:
         """Handle keyboard shortcuts"""
         if not a0:
             return
@@ -1630,12 +1630,12 @@ class GridArrangementDialog(SplitterDialog):
             self._update_zoom_level_display()
             super().keyPressEvent(a0)
 
-    def set_palettes(self, palettes_dict: dict[int, Any]):  # pyright: ignore[reportExplicitAny] - palette data
+    def set_palettes(self, palettes_dict: dict[int, Any]) -> None:  # pyright: ignore[reportExplicitAny] - palette data
         """Set available palettes for colorization"""
         self.colorizer.set_palettes(palettes_dict)
         self._update_displays()
 
-    def set_initial_palette_state(self, index: int, enabled: bool):
+    def set_initial_palette_state(self, index: int, enabled: bool) -> None:
         """Set the initial palette selection and mode.
 
         Args:

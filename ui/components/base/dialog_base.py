@@ -32,7 +32,7 @@ class DialogBase(QDialog):
 
     ```python
     class MyDialog(DialogBase):
-        def __init__(self, parent: QWidget | None = None):
+        def __init__(self, parent: QWidget | None = None) -> None:
             # Step 1: Declare instance variables BEFORE super()
             self.my_widget: QWidget | None = None
             self.my_data: list[str] = []
@@ -40,7 +40,7 @@ class DialogBase(QDialog):
             # Step 2: Call parent init (this calls _setup_ui)
             super().__init__(parent)
 
-        def _setup_ui(self):
+        def _setup_ui(self) -> None:
             # Step 3: Create widgets (safe - variables already declared)
             self.my_widget = QWidget()
     ```

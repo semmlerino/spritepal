@@ -20,7 +20,7 @@ class OutputNameWidget(BaseExtractionWidget):
         super().__init__(parent)
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Initialize the user interface"""
         output_layout = self._create_hbox_layout()
 
@@ -39,10 +39,10 @@ class OutputNameWidget(BaseExtractionWidget):
         """Get the current output name"""
         return self.output_name_edit.text().strip()
 
-    def set_output_name(self, name: str):
+    def set_output_name(self, name: str) -> None:
         """Set the output name"""
         self.output_name_edit.setText(name)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear the output name"""
         self.output_name_edit.clear()

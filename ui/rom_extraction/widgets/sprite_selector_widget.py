@@ -36,7 +36,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         """Apply consistent monospace styling to offset label."""
         self.offset_label.setStyleSheet(f"font-family: monospace; color: {COLORS[color_key]}; font-size: 14px;")
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Initialize the user interface"""
         sprite_layout = self._create_vbox_layout()
 
@@ -116,7 +116,7 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         """Get number of top-level items."""
         return self.sprite_tree.topLevelItemCount()
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear sprite selection"""
         self.sprite_tree.clear()
         self.offset_label.setText("--")
@@ -153,15 +153,15 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         item.setExpanded(True)
         return item
 
-    def insert_separator(self, index: int):
+    def insert_separator(self, index: int) -> None:
         """Insert a separator (No-op for tree)."""
         pass
 
-    def set_enabled(self, enabled: bool):
+    def set_enabled(self, enabled: bool) -> None:
         """Enable/disable the sprite tree"""
         self.sprite_tree.setEnabled(enabled)
 
-    def get_current_data(self):
+    def get_current_data(self) -> None:
         """Get data for current selection"""
         current = self.sprite_tree.currentItem()
         if current:
@@ -179,22 +179,22 @@ class SpriteSelectorWidget(BaseExtractionWidget):
                 return
             iterator += 1
 
-    def set_offset_text(self, text: str):
+    def set_offset_text(self, text: str) -> None:
         """Update the offset label"""
         self.offset_label.setText(text)
         self.offset_label.setEnabled(True)  # Enable when value is set
         # Use highlighted color for actual offset values
         self._set_offset_label_style("border_focus")
 
-    def set_find_button_enabled(self, enabled: bool):
+    def set_find_button_enabled(self, enabled: bool) -> None:
         """Enable/disable find sprites button"""
         self.find_sprites_btn.setEnabled(enabled)
 
-    def set_find_button_text(self, text: str):
+    def set_find_button_text(self, text: str) -> None:
         """Update find sprites button text"""
         self.find_sprites_btn.setText(text)
 
-    def set_find_button_tooltip(self, tooltip: str):
+    def set_find_button_tooltip(self, tooltip: str) -> None:
         """Update find sprites button tooltip"""
         self.find_sprites_btn.setToolTip(tooltip)
 

@@ -88,7 +88,7 @@ class ExtractionPanel(QGroupBox):
         # Enable keyboard focus for shortcuts
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Set up the UI"""
         layout = QVBoxLayout()
 
@@ -283,7 +283,7 @@ class ExtractionPanel(QGroupBox):
 
         self.setLayout(layout)
 
-    def _connect_signals(self):
+    def _connect_signals(self) -> None:
         """Connect internal signals"""
         _ = self.vram_drop.file_dropped.connect(self._on_file_changed)
         _ = self.cgram_drop.file_dropped.connect(self._on_file_changed)
@@ -305,7 +305,7 @@ class ExtractionPanel(QGroupBox):
         if self.has_vram() and file_path == self.vram_drop.get_file_path():
             self.offset_changed.emit(self.get_vram_offset())
 
-    def _check_extraction_ready(self):
+    def _check_extraction_ready(self) -> None:
         """Check if we're ready to extract with validation feedback"""
         reasons: list[str] = []
 
@@ -503,7 +503,7 @@ class ExtractionPanel(QGroupBox):
         self.offset_slider.setSingleStep(step)
         self.offset_slider.setPageStep(page_step)
 
-    def clear_files(self):
+    def clear_files(self) -> None:
         """Clear all loaded files"""
         if self.vram_drop:
             self.vram_drop.clear()
@@ -513,31 +513,31 @@ class ExtractionPanel(QGroupBox):
             self.oam_drop.clear()
         self._check_extraction_ready()
 
-    def has_vram(self):
+    def has_vram(self) -> bool:
         """Check if VRAM is loaded"""
         return self.vram_drop.has_file()
 
-    def has_cgram(self):
+    def has_cgram(self) -> bool:
         """Check if CGRAM is loaded"""
         return self.cgram_drop.has_file()
 
-    def has_oam(self):
+    def has_oam(self) -> bool:
         """Check if OAM is loaded"""
         return self.oam_drop.has_file()
 
-    def get_vram_path(self):
+    def get_vram_path(self) -> str:
         """Get VRAM file path"""
         return self.vram_drop.get_file_path()
 
-    def get_cgram_path(self):
+    def get_cgram_path(self) -> str:
         """Get CGRAM file path"""
         return self.cgram_drop.get_file_path()
 
-    def get_oam_path(self):
+    def get_oam_path(self) -> str:
         """Get OAM file path"""
         return self.oam_drop.get_file_path()
 
-    def get_vram_offset(self):
+    def get_vram_offset(self) -> int:
         """Get the current VRAM offset value"""
         # Use the preset to determine offset
         if self.preset_combo.currentIndex() == 0:  # Kirby Sprites
@@ -566,7 +566,7 @@ class ExtractionPanel(QGroupBox):
         self.files_changed.emit()
         self._check_extraction_ready()
 
-    def get_session_data(self):
+    def get_session_data(self) -> dict[str, str | int]:
         """Get current session data for saving"""
         return {
             "vram_path": self.get_vram_path(),
@@ -601,7 +601,7 @@ class ExtractionPanel(QGroupBox):
         # Emit mode changed signal
         self.mode_changed.emit(index)
 
-    def is_grayscale_mode(self):
+    def is_grayscale_mode(self) -> bool:
         """Check if grayscale extraction mode is selected"""
         return self.mode_combo.currentIndex() == 1
 

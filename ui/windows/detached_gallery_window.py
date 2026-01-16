@@ -67,7 +67,7 @@ class DetachedGalleryWindow(QMainWindow):
         extraction_manager: CoreOperationsManager,
         settings_manager: ApplicationStateManager,
         rom_cache: ROMCache,
-    ):
+    ) -> None:
         """
         Initialize the detached gallery window.
 
@@ -114,7 +114,7 @@ class DetachedGalleryWindow(QMainWindow):
         # Load last ROM if available
         self._load_last_rom()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Setup the window UI for proper gallery display."""
         # Create central widget
         central_widget = QWidget()
@@ -293,7 +293,7 @@ class DetachedGalleryWindow(QMainWindow):
             }}
         """)
 
-    def _create_menu_bar(self):
+    def _create_menu_bar(self) -> None:
         """Create the menu bar."""
         menubar = self.menuBar()
 
@@ -353,7 +353,7 @@ class DetachedGalleryWindow(QMainWindow):
         show_results_action.triggered.connect(self._show_scan_results)
         view_menu.addAction(show_results_action)
 
-    def _create_toolbar(self):
+    def _create_toolbar(self) -> None:
         """Create the toolbar."""
         toolbar = QToolBar()
         toolbar.setMovable(False)
@@ -403,7 +403,7 @@ class DetachedGalleryWindow(QMainWindow):
         extract_action.triggered.connect(self._extract_selected_sprite)
         toolbar.addAction(extract_action)
 
-    def set_sprites(self, sprites: list[dict[str, object]]):
+    def set_sprites(self, sprites: list[dict[str, object]]) -> None:
         """
         Set the sprites to display.
 
@@ -415,7 +415,7 @@ class DetachedGalleryWindow(QMainWindow):
             self.gallery_widget.set_sprites(sprites)
             logger.info(f"Detached gallery loaded {len(sprites)} sprites")
 
-    def copy_thumbnails_from(self, source_gallery: SpriteGalleryWidget | None):
+    def copy_thumbnails_from(self, source_gallery: SpriteGalleryWidget | None) -> None:
         """
         Copy thumbnail pixmaps from another gallery widget.
 
@@ -460,20 +460,20 @@ class DetachedGalleryWindow(QMainWindow):
         # Store for potential future use
         self.rom_extractor = rom_extractor
 
-    def _on_sprite_double_clicked(self, offset: int):
+    def _on_sprite_double_clicked(self, offset: int) -> None:
         """Handle sprite double-click."""
         logger.debug(f"Sprite double-clicked in detached window: 0x{offset:06X}")
         # Could close window and navigate to sprite in main window
         self.sprite_selected.emit(offset)
 
-    def _toggle_fullscreen(self):
+    def _toggle_fullscreen(self) -> None:
         """Toggle fullscreen mode."""
         if self.isFullScreen():
             self.showNormal()
         else:
             self.showFullScreen()
 
-    def _fit_to_window(self):
+    def _fit_to_window(self) -> None:
         """Adjust gallery to fit window width."""
         # New API: Gallery uses QListView which auto-adjusts layout
         # No manual column recalculation needed
@@ -481,7 +481,7 @@ class DetachedGalleryWindow(QMainWindow):
             # Force a repaint to ensure layout is current
             self.gallery_widget.update()
 
-    def _reset_view(self):
+    def _reset_view(self) -> None:
         """Reset to default view settings."""
         if self.gallery_widget:
             # Reset thumbnail size
@@ -494,7 +494,7 @@ class DetachedGalleryWindow(QMainWindow):
             # Force update to apply changes
             self.gallery_widget.update()
 
-    def _create_status_bar(self):
+    def _create_status_bar(self) -> None:
         """Create the status bar."""
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
@@ -507,7 +507,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         self.status_bar.showMessage("Ready - Load a ROM to start scanning")
 
-    def load_rom(self, rom_path: str):
+    def load_rom(self, rom_path: str) -> None:
         """Load a ROM file programmatically.
 
         Args:
@@ -516,7 +516,7 @@ class DetachedGalleryWindow(QMainWindow):
         self._set_rom_file(rom_path)
         self._save_last_rom(rom_path)
 
-    def _load_rom(self):
+    def _load_rom(self) -> None:
         """Load a ROM file."""
         filename = browse_for_open_file(self, "Select ROM File", "SNES ROM Files (*.sfc *.smc);;All Files (*.*)")
 
@@ -525,7 +525,7 @@ class DetachedGalleryWindow(QMainWindow):
             # Save as last used ROM
             self._save_last_rom(filename)
 
-    def _load_last_rom(self):
+    def _load_last_rom(self) -> None:
         """Load the last selected ROM if available."""
         try:
             settings = self.settings_manager
@@ -546,7 +546,7 @@ class DetachedGalleryWindow(QMainWindow):
             logger.error(f"Error loading last ROM: {e}")
             self.status_bar.showMessage("Ready - Load a ROM to start scanning")
 
-    def _save_last_rom(self, rom_path: str):
+    def _save_last_rom(self, rom_path: str) -> None:
         """Save the ROM path as the last used ROM."""
         try:
             settings = self.settings_manager
@@ -561,7 +561,7 @@ class DetachedGalleryWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Error saving last ROM: {e}")
 
-    def _add_to_recent_roms(self, rom_path: str):
+    def _add_to_recent_roms(self, rom_path: str) -> None:
         """Add a ROM to the recent ROMs list."""
         try:
             settings = self.settings_manager
@@ -589,7 +589,7 @@ class DetachedGalleryWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Error updating recent ROMs: {e}")
 
-    def _update_recent_roms_menu(self):
+    def _update_recent_roms_menu(self) -> None:
         """Update the recent ROMs menu."""
         if self.recent_roms_menu:
             self.recent_roms_menu.clear()
@@ -626,7 +626,7 @@ class DetachedGalleryWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Error updating recent ROMs menu: {e}")
 
-    def _load_recent_rom(self, rom_path: str):
+    def _load_recent_rom(self, rom_path: str) -> None:
         """Load a ROM from the recent list."""
         if Path(rom_path).exists():
             self._set_rom_file(rom_path)
@@ -634,7 +634,7 @@ class DetachedGalleryWindow(QMainWindow):
         else:
             QMessageBox.warning(self, "ROM Not Found", f"The ROM file no longer exists:\n{rom_path}")
 
-    def _set_rom_file(self, filename: str):
+    def _set_rom_file(self, filename: str) -> None:
         """Set the ROM file and update UI."""
         from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
 
@@ -662,7 +662,7 @@ class DetachedGalleryWindow(QMainWindow):
             logger.error(f"Error loading ROM: {e}")
             UserErrorDialog.display_error(self, "Error Loading ROM", f"Could not load ROM file: {e}")
 
-    def _load_cached_sprites(self):
+    def _load_cached_sprites(self) -> None:
         """Load cached sprites for the current ROM if available."""
         if not self.rom_path:
             return
@@ -709,7 +709,7 @@ class DetachedGalleryWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Error loading cached sprites: {e}")
 
-    def _scan_rom(self):
+    def _scan_rom(self) -> None:
         """Scan the ROM for sprites."""
         if not self.rom_path:
             QMessageBox.information(self, "No ROM Loaded", "Please load a ROM file first using File > Load ROM.")
@@ -723,7 +723,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         self._start_scan()
 
-    def _scan_custom_range(self):
+    def _scan_custom_range(self) -> None:
         """Scan a custom range of the ROM for sprites."""
         if not self.rom_path:
             QMessageBox.information(self, "No ROM Loaded", "Please load a ROM file first using File > Load ROM.")
@@ -755,7 +755,7 @@ class DetachedGalleryWindow(QMainWindow):
         # Start scan with custom range
         self._start_scan(start_offset, end_offset)
 
-    def _start_scan(self, start_offset: int | None = None, end_offset: int | None = None):
+    def _start_scan(self, start_offset: int | None = None, end_offset: int | None = None) -> None:
         """Start the ROM scanning process."""
         if not self.rom_path:
             self.status_bar.showMessage("No ROM loaded - cannot start scan")
@@ -822,7 +822,7 @@ class DetachedGalleryWindow(QMainWindow):
             self.status_bar.showMessage(f"Scan failed to start: {e}")
             WorkerManager.cleanup_worker_attr(self, "scan_worker")
 
-    def _on_sprite_found(self, sprite_info: dict[str, object]):
+    def _on_sprite_found(self, sprite_info: dict[str, object]) -> None:
         """Handle sprite found during scan."""
         # Convert to the format expected by gallery
         sprite = {
@@ -846,16 +846,16 @@ class DetachedGalleryWindow(QMainWindow):
 
         logger.debug(f"Added sprite at 0x{sprite_info['offset']:06X} to gallery")
 
-    def _on_scan_progress(self, percent: int, message: str):
+    def _on_scan_progress(self, percent: int, message: str) -> None:
         """Handle scan progress update."""
         self.progress_bar.setValue(percent)
         self.status_bar.showMessage(f"Scanning: {message}")
 
-    def _on_cache_status(self, status: str):
+    def _on_cache_status(self, status: str) -> None:
         """Handle cache status update."""
         self.status_bar.showMessage(f"Cache: {status}")
 
-    def _on_scan_error(self, error_message: str):
+    def _on_scan_error(self, error_message: str) -> None:
         """Handle scan error."""
         logger.error(f"ROM scan error: {error_message}")
         self.scanning = False
@@ -875,7 +875,7 @@ class DetachedGalleryWindow(QMainWindow):
             self._disconnect_scan_worker_signals()
         WorkerManager.cleanup_worker_attr(self, "scan_worker")
 
-    def _on_scan_finished(self):
+    def _on_scan_finished(self) -> None:
         """Handle scan completion."""
         try:
             self.scanning = False
@@ -914,7 +914,7 @@ class DetachedGalleryWindow(QMainWindow):
             if self.progress_bar:
                 self.progress_bar.setVisible(False)
 
-    def _on_scan_timeout(self):
+    def _on_scan_timeout(self) -> None:
         """Handle scan timeout."""
         logger.warning("ROM scan timed out after 5 minutes")
         self.scanning = False
@@ -945,7 +945,7 @@ class DetachedGalleryWindow(QMainWindow):
             self.scan_timeout_timer.stop()
             self.scan_timeout_timer = None
 
-    def _cleanup_existing_workers(self):
+    def _cleanup_existing_workers(self) -> None:
         """Clean up any existing workers to prevent thread leaks and crashes from signal connections."""
         workers_cleaned = 0
 
@@ -1017,7 +1017,7 @@ class DetachedGalleryWindow(QMainWindow):
         else:
             logger.debug("No existing workers to clean up")
 
-    def _disconnect_scan_worker_signals(self):
+    def _disconnect_scan_worker_signals(self) -> None:
         """Safely disconnect all signals from scan worker to prevent crashes."""
         if not self.scan_worker:
             return
@@ -1055,7 +1055,7 @@ class DetachedGalleryWindow(QMainWindow):
         except (RuntimeError, TypeError):
             pass
 
-    def _disconnect_thumbnail_worker_signals(self):
+    def _disconnect_thumbnail_worker_signals(self) -> None:
         """Safely disconnect all signals from thumbnail worker to prevent crashes."""
         if not self.thumbnail_controller:
             return
@@ -1092,7 +1092,7 @@ class DetachedGalleryWindow(QMainWindow):
             except (RuntimeError, TypeError):
                 pass
 
-    def _generate_thumbnails(self):
+    def _generate_thumbnails(self) -> None:
         """Generate actual thumbnails from ROM data for the found sprites."""
         # Guard against starting thumbnail generation when window is closing
         # This can happen if _load_cached_sprites scheduled a QTimer.singleShot
@@ -1143,7 +1143,7 @@ class DetachedGalleryWindow(QMainWindow):
         if not self.thumbnail_controller:
             logger.error("Failed to create thumbnail controller - cannot generate thumbnails")
 
-    def _on_thumbnail_ready(self, offset: int, pixmap: QPixmap):
+    def _on_thumbnail_ready(self, offset: int, pixmap: QPixmap) -> None:
         """Handle thumbnail ready from worker."""
         logger.debug(f"Thumbnail ready for offset 0x{offset:06X}")
 
@@ -1154,11 +1154,11 @@ class DetachedGalleryWindow(QMainWindow):
         self.gallery_widget.set_thumbnail(offset, pixmap)
         logger.debug(f"Set thumbnail for sprite at 0x{offset:06X}")
 
-    def _on_thumbnail_progress(self, percent: int, message: str):
+    def _on_thumbnail_progress(self, percent: int, message: str) -> None:
         """Handle thumbnail generation progress."""
         self.status_bar.showMessage(f"Generating thumbnails: {percent}% - {message}")
 
-    def _refresh_thumbnails(self):
+    def _refresh_thumbnails(self) -> None:
         """Refresh all thumbnail images."""
         if not self.sprites_data or not self.rom_path:
             QMessageBox.information(self, "No Sprites", "No sprites to refresh. Load a ROM and scan for sprites first.")
@@ -1173,7 +1173,7 @@ class DetachedGalleryWindow(QMainWindow):
         # Regenerate all thumbnails
         self._generate_thumbnails()
 
-    def _extract_selected_sprite(self):
+    def _extract_selected_sprite(self) -> None:
         """Extract the currently selected sprite."""
         if not self.gallery_widget:
             QMessageBox.information(self, "No Gallery", "Gallery is not initialized.")
@@ -1198,7 +1198,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         self._perform_extraction(selected_offset, filename)
 
-    def _perform_extraction(self, offset: int, output_path: str):
+    def _perform_extraction(self, offset: int, output_path: str) -> None:
         """Perform the sprite extraction."""
         from ui.dialogs import UserErrorDialog  # Lazy import to avoid cross-UI coupling
 
@@ -1241,7 +1241,7 @@ class DetachedGalleryWindow(QMainWindow):
             self.status_bar.showMessage("Extraction error")
             UserErrorDialog.display_error(self, "Extraction Error", f"Could not extract sprite: {e}")
 
-    def _show_scan_results(self):
+    def _show_scan_results(self) -> None:
         """Show detailed scan results in a dialog."""
         if not self.sprites_data:
             QMessageBox.information(
@@ -1289,7 +1289,7 @@ class DetachedGalleryWindow(QMainWindow):
         dialog.exec()
 
     @override
-    def keyPressEvent(self, event: QKeyEvent):
+    def keyPressEvent(self, event: QKeyEvent) -> None:
         """Handle keyboard events."""
         key = event.key()
 
@@ -1302,7 +1302,7 @@ class DetachedGalleryWindow(QMainWindow):
 
         event.accept()
 
-    def _open_fullscreen_viewer(self):
+    def _open_fullscreen_viewer(self) -> None:
         """Open the fullscreen sprite viewer for the currently selected sprite."""
         if not self.gallery_widget or not self.sprites_data:
             logger.warning("Cannot open fullscreen viewer: no sprites available")
@@ -1336,21 +1336,21 @@ class DetachedGalleryWindow(QMainWindow):
         else:
             logger.error("Failed to initialize fullscreen viewer with sprite data")
 
-    def _on_fullscreen_viewer_closed(self):
+    def _on_fullscreen_viewer_closed(self) -> None:
         """Handle fullscreen viewer being closed."""
         logger.debug("Fullscreen viewer closed")
         # Ensure focus returns to main window
         self.activateWindow()
         self.raise_()
 
-    def _on_fullscreen_sprite_changed(self, offset: int):
+    def _on_fullscreen_sprite_changed(self, offset: int) -> None:
         """Handle sprite change in fullscreen viewer."""
         logger.debug(f"Fullscreen viewer changed to sprite 0x{offset:06X}")
         # Could update selection in gallery to match if desired
         # For now, just log the change
 
     @override
-    def closeEvent(self, event: QCloseEvent):
+    def closeEvent(self, event: QCloseEvent) -> None:
         """Handle window close event."""
         logger.info("DetachedGalleryWindow closing, cleaning up workers")
 
@@ -1366,7 +1366,7 @@ class DetachedGalleryWindow(QMainWindow):
         super().closeEvent(event)
 
     @override
-    def showEvent(self, event: QShowEvent):
+    def showEvent(self, event: QShowEvent) -> None:
         """Handle show event to ensure proper layout."""
         super().showEvent(event)
 

@@ -92,7 +92,7 @@ class SearchFiltersWidget(QWidget):
         collapsible: bool = False,
         expanded: bool = True,
         title: str = "Filters",
-    ):
+    ) -> None:
         super().__init__(parent)
         self._collapsible = collapsible
         self._expanded = expanded

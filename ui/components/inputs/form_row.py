@@ -38,7 +38,7 @@ class FormRow(QWidget):
         spacing: int = SPACING_SMALL,
         help_text: str = "",
         label_alignment: Qt.AlignmentFlag | None = None,
-    ):
+    ) -> None:
         super().__init__(parent)
 
         self._orientation = orientation
@@ -95,7 +95,7 @@ class FormRow(QWidget):
         if orientation == "horizontal":
             self.main_layout.addWidget(self.input_container, 1)  # Stretch factor 1
 
-    def set_input_widget(self, widget: QWidget):
+    def set_input_widget(self, widget: QWidget) -> None:
         """Set or replace the input widget"""
         # Remove existing input widget if any
         if self.input_widget is not None:
@@ -108,7 +108,7 @@ class FormRow(QWidget):
         insert_index = 0 if self.help_label is None else self.input_layout.count() - 1
         self.input_layout.insertWidget(insert_index, widget)
 
-    def set_label_text(self, text: str):
+    def set_label_text(self, text: str) -> None:
         """Update the label text"""
         if self.label:
             self.label.setText(text)
@@ -117,7 +117,7 @@ class FormRow(QWidget):
         """Get the current label text"""
         return self.label.text()
 
-    def set_help_text(self, text: str):
+    def set_help_text(self, text: str) -> None:
         """Set or update help text"""
         if self.help_label is not None:
             self.help_label.setText(text)
@@ -127,14 +127,14 @@ class FormRow(QWidget):
             self.help_label.setWordWrap(True)
             self.input_layout.addWidget(self.help_label)
 
-    def clear_help_text(self):
+    def clear_help_text(self) -> None:
         """Remove help text"""
         if self.help_label is not None:
             self.input_layout.removeWidget(self.help_label)
             self.help_label.setParent(None)
             self.help_label = None
 
-    def set_validation_state(self, is_valid: bool, error_message: str = ""):
+    def set_validation_state(self, is_valid: bool, error_message: str = "") -> None:
         """Set validation state with optional error message"""
         if not is_valid and error_message:
             if self.help_label is None:
@@ -154,11 +154,11 @@ class FormRow(QWidget):
             if self.help_label:
                 self.help_label.setStyleSheet(get_muted_text_style(color_level="medium"))
 
-    def set_label_width(self, width: int):
+    def set_label_width(self, width: int) -> None:
         """Set the label width"""
         self.label.setMinimumWidth(width)
 
-    def add_stretch(self):
+    def add_stretch(self) -> None:
         """Add stretch to the main layout"""
         self.main_layout.addStretch()
 

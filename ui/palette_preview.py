@@ -126,12 +126,12 @@ class PaletteColorWidget(QWidget):
             pass
 
     @override
-    def mousePressEvent(self, a0: QMouseEvent | None):
+    def mousePressEvent(self, a0: QMouseEvent | None) -> None:
         """Handle mouse press"""
         if a0 and a0.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self.index)
 
-    def set_color(self, color: tuple[int, int, int] | None):
+    def set_color(self, color: tuple[int, int, int] | None) -> None:
         """Set the color with validation"""
         # Validate color - use default if invalid
         if color is None or len(color) != 3 or not all(0 <= c <= 255 for c in color):
@@ -194,7 +194,7 @@ class PaletteWidget(QFrame):
         self.colors = []
         _clear_palette_widgets(self.color_widgets)
 
-    def set_name(self, name: str):
+    def set_name(self, name: str) -> None:
         """Set the palette name"""
         self.name = name
         if name:
@@ -290,14 +290,14 @@ class PalettePreviewWidget(QWidget):
     - Click collapsed row to expand it
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._expanded_index = 8  # Default to first palette (index 8)
         self._active_indices: list[int] = []  # Palettes marked as active
         self._has_palettes = False  # Track whether any palettes are loaded
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Set up the UI with expandable layout"""
         self._main_layout = QVBoxLayout(self)
         self._main_layout.setSpacing(SPACING_TINY)
@@ -440,7 +440,7 @@ class PalettePreviewWidget(QWidget):
         for palette_index, colors in palettes_dict.items():
             self.set_palette(palette_index, colors)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear all palettes"""
         # Reset to empty state
         self._has_palettes = False

@@ -38,14 +38,14 @@ class CleanupDialog(DialogBase):
 
     Usage:
         class MyDialog(CleanupDialog):
-            def __init__(self, parent: QWidget | None = None):
+            def __init__(self, parent: QWidget | None = None) -> None:
                 # Declare instance variables BEFORE super()
                 self._my_worker: MyWorker | None = None
                 self._my_thread: QThread | None = None
 
                 super().__init__(parent, title="My Dialog")
 
-            def _setup_ui(self):
+            def _setup_ui(self) -> None:
                 # Create worker and thread
                 self._my_worker = MyWorker()
                 self._my_thread = QThread()

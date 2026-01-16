@@ -54,17 +54,17 @@ class ROMMapWidget(QWidget):
         self.setMouseTracking(True)
         self.hover_offset: int | None = None
 
-    def set_rom_size(self, size: int):
+    def set_rom_size(self, size: int) -> None:
         """Update the ROM size"""
         self.rom_size = size
         self.update()
 
-    def set_current_offset(self, offset: int):
+    def set_current_offset(self, offset: int) -> None:
         """Update the current offset position"""
         self.current_offset = offset
         self.update()
 
-    def add_found_sprite(self, offset: int, quality: float = 1.0):
+    def add_found_sprite(self, offset: int, quality: float = 1.0) -> None:
         """Add a found sprite location with memory management"""
         # Check for duplicates (same offset)
         for i, (existing_offset, existing_quality) in enumerate(self.found_sprites):
@@ -84,7 +84,7 @@ class ROMMapWidget(QWidget):
 
         self._schedule_update()
 
-    def add_found_sprites_batch(self, sprites: list[tuple[int, float]]):
+    def add_found_sprites_batch(self, sprites: list[tuple[int, float]]) -> None:
         """Add multiple sprites efficiently"""
         # Create a set of existing offsets for quick lookup
         existing_offsets = {offset for offset, _ in self.found_sprites}
@@ -101,7 +101,7 @@ class ROMMapWidget(QWidget):
 
             self._schedule_update()
 
-    def clear_sprites(self):
+    def clear_sprites(self) -> None:
         """Clear all found sprite markers"""
         if self.found_sprites:  # Only clear if there are sprites
             self.found_sprites = []
@@ -111,23 +111,23 @@ class ROMMapWidget(QWidget):
         """Get the current number of sprites in the map"""
         return len(self.found_sprites)
 
-    def set_sprite_regions(self, regions: list[SpriteRegion]):
+    def set_sprite_regions(self, regions: list[SpriteRegion]) -> None:
         """Set sprite regions for visualization"""
         self.sprite_regions = regions
         self.update()
 
-    def set_current_region(self, region_index: int):
+    def set_current_region(self, region_index: int) -> None:
         """Highlight the current region"""
         if self.current_region_index != region_index:
             self.current_region_index = region_index
             self.update()
 
-    def toggle_region_highlight(self, enabled: bool):
+    def toggle_region_highlight(self, enabled: bool) -> None:
         """Toggle region highlighting on/off"""
         self.highlight_regions = enabled
         self.update()
 
-    def _cleanup_sprites(self):
+    def _cleanup_sprites(self) -> None:
         """Clean up sprites when memory usage gets too high"""
         if len(self.found_sprites) <= SPRITE_CLEANUP_TARGET:
             return
@@ -139,7 +139,7 @@ class ROMMapWidget(QWidget):
         # Re-sort by offset for consistent visualization
         self.found_sprites.sort(key=lambda x: x[0])
 
-    def _schedule_update(self):
+    def _schedule_update(self) -> None:
         """Schedule a widget update, optimizing for performance"""
         if self.isVisible():
             self.update()
@@ -147,7 +147,7 @@ class ROMMapWidget(QWidget):
             self._needs_update = True
 
     @override
-    def showEvent(self, event: QShowEvent):
+    def showEvent(self, event: QShowEvent) -> None:
         """Handle widget becoming visible"""
         super().showEvent(event)
         if self._needs_update:
@@ -155,7 +155,7 @@ class ROMMapWidget(QWidget):
             self._needs_update = False
 
     @override
-    def paintEvent(self, a0: QPaintEvent | None):
+    def paintEvent(self, a0: QPaintEvent | None) -> None:
         """Paint the ROM map visualization with error recovery"""
         try:
             painter = QPainter(self)
@@ -287,7 +287,7 @@ class ROMMapWidget(QWidget):
             logger.exception("Unexpected error in ROM map paint event")
 
     @override
-    def mousePressEvent(self, a0: QMouseEvent | None):
+    def mousePressEvent(self, a0: QMouseEvent | None) -> None:
         """Handle mouse clicks on the ROM map"""
         if a0 and a0.button() == Qt.MouseButton.LeftButton:
             # Calculate offset from click position
@@ -296,7 +296,7 @@ class ROMMapWidget(QWidget):
             self.offset_clicked.emit(offset)
 
     @override
-    def mouseMoveEvent(self, a0: QMouseEvent | None):
+    def mouseMoveEvent(self, a0: QMouseEvent | None) -> None:
         """Handle mouse hover to show offset preview"""
         if a0:
             self.hover_offset = int((a0.position().x() / self.width()) * self.rom_size)

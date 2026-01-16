@@ -99,11 +99,11 @@ class FileSelector(QWidget):
         _ = self.browse_button.clicked.connect(self._browse_file)
         self._layout.addWidget(self.browse_button)
 
-    def _on_path_changed(self, text: str):
+    def _on_path_changed(self, text: str) -> None:
         """Handle path text changes"""
         self.path_changed.emit(text)
 
-    def _browse_file(self):
+    def _browse_file(self) -> None:
         """
         Browse for file using appropriate dialog.
 
@@ -152,7 +152,7 @@ class FileSelector(QWidget):
         """Get the current file path"""
         return self.path_edit.text()
 
-    def set_path(self, path: str | None):
+    def set_path(self, path: str | None) -> None:
         """Set the file path"""
         if path is None:
             converted_path = ""
@@ -162,7 +162,7 @@ class FileSelector(QWidget):
 
         self.path_edit.setText(converted_path)
 
-    def clear_path(self):
+    def clear_path(self) -> None:
         """Clear the file path"""
         self.path_edit.clear()
 
@@ -180,11 +180,11 @@ class FileSelector(QWidget):
         dir_path = path_obj.parent
         return dir_path.exists() if dir_path != Path() else True
 
-    def set_placeholder(self, placeholder: str):
+    def set_placeholder(self, placeholder: str) -> None:
         """Set the placeholder text"""
         self.path_edit.setPlaceholderText(placeholder)
 
-    def set_read_only(self, read_only: bool):
+    def set_read_only(self, read_only: bool) -> None:
         """Set read-only state of the path input"""
         self.path_edit.setReadOnly(read_only)
 
@@ -196,6 +196,6 @@ class FileSelector(QWidget):
         else:
             self.path_edit.setFocus()
 
-    def set_browse_enabled(self, enabled: bool):
+    def set_browse_enabled(self, enabled: bool) -> None:
         """Enable/disable the browse button"""
         self.browse_button.setEnabled(enabled)

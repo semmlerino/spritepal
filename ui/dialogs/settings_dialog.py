@@ -42,7 +42,9 @@ class SettingsDialog(DialogBase):
     settings_changed = Signal()
     cache_cleared = Signal()
 
-    def __init__(self, parent: WidgetParent = None, *, settings_manager: ApplicationStateManager, rom_cache: ROMCache):
+    def __init__(
+        self, parent: WidgetParent = None, *, settings_manager: ApplicationStateManager, rom_cache: ROMCache
+    ) -> None:
         # Store original settings to detect changes
         self._original_settings: dict[str, object] = {}
 
@@ -66,7 +68,7 @@ class SettingsDialog(DialogBase):
         self._update_cache_stats()
 
     @override
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Set up the settings dialog UI"""
         # Create tab widget
         self.tab_widget = QTabWidget()
@@ -338,7 +340,7 @@ class SettingsDialog(DialogBase):
         widget.setLayout(layout)
         return widget
 
-    def _load_original_settings(self):
+    def _load_original_settings(self) -> None:
         """Load original settings for change detection"""
         self._original_settings = {
             "restore_window": self.settings_manager.get("ui", "restore_position", True),
@@ -354,7 +356,7 @@ class SettingsDialog(DialogBase):
             "show_indicators": self.settings_manager.get("cache", "show_indicators", True),
         }
 
-    def _load_settings(self):
+    def _load_settings(self) -> None:
         """Load current settings into UI"""
         # General settings
         self.restore_window_check.setChecked(bool(self.settings_manager.get("ui", "restore_position", True)))
@@ -384,7 +386,7 @@ class SettingsDialog(DialogBase):
         # Update original settings to reflect what was just loaded
         self._load_original_settings()
 
-    def _save_settings(self):
+    def _save_settings(self) -> None:
         """Save settings from UI"""
         # General settings
         self.settings_manager.set("ui", "restore_position", self.restore_window_check.isChecked())
@@ -421,7 +423,7 @@ class SettingsDialog(DialogBase):
         # Emit signal
         self.settings_changed.emit()
 
-    def _update_cache_stats(self):
+    def _update_cache_stats(self) -> None:
         """Update cache statistics display"""
         try:
             stats = self.rom_cache.get_cache_stats()
@@ -467,11 +469,11 @@ class SettingsDialog(DialogBase):
             if self.status_bar is not None:
                 self.status_bar.showMessage(f"Error reading cache: {e!s}")
 
-    def _on_cache_enabled_changed(self, checked: bool):
+    def _on_cache_enabled_changed(self, checked: bool) -> None:
         """Handle cache enabled state change"""
         self._update_cache_controls_state()
 
-    def _update_cache_controls_state(self):
+    def _update_cache_controls_state(self) -> None:
         """Update the enabled state of cache controls"""
         enabled = self.cache_enabled_check.isChecked()
 
@@ -484,7 +486,7 @@ class SettingsDialog(DialogBase):
         self.show_indicators_check.setEnabled(enabled)
         self.clear_cache_button.setEnabled(enabled)
 
-    def _browse_dumps_directory(self):
+    def _browse_dumps_directory(self) -> None:
         """Browse for default dumps directory"""
         current_dir = self.dumps_dir_edit.text() or str(Path.home())
 
@@ -493,7 +495,7 @@ class SettingsDialog(DialogBase):
         if dir_path:
             self.dumps_dir_edit.setText(dir_path)
 
-    def _browse_mesen_directory(self):
+    def _browse_mesen_directory(self) -> None:
         """Browse for Mesen2 output directory"""
         current_dir = self.mesen_dir_edit.text() or str(Path.home())
 
@@ -502,11 +504,11 @@ class SettingsDialog(DialogBase):
         if dir_path:
             self.mesen_dir_edit.setText(dir_path)
 
-    def _clear_mesen_directory(self):
+    def _clear_mesen_directory(self) -> None:
         """Clear the Mesen2 directory setting to use the default"""
         self.mesen_dir_edit.clear()
 
-    def _browse_cache_location(self):
+    def _browse_cache_location(self) -> None:
         """Browse for cache directory"""
         current_dir = self.cache_location_edit.text() or str(Path.home())
 
@@ -515,7 +517,7 @@ class SettingsDialog(DialogBase):
         if dir_path:
             self.cache_location_edit.setText(dir_path)
 
-    def _clear_cache(self):
+    def _clear_cache(self) -> None:
         """Clear the ROM cache"""
         # Confirm action
         reply = QMessageBox.question(
@@ -547,7 +549,7 @@ class SettingsDialog(DialogBase):
                 QMessageBox.critical(self, "Error", f"Failed to clear cache: {e!s}")
 
     @override
-    def accept(self):
+    def accept(self) -> None:
         """Handle dialog acceptance"""
         # Check if settings have changed
         if self._has_settings_changed():

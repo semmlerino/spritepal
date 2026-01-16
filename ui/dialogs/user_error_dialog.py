@@ -94,7 +94,7 @@ class UserErrorDialog(DialogBase):
         },
     }
 
-    def __init__(self, error_message: str, technical_details: str | None = None, parent: QWidget | None = None):
+    def __init__(self, error_message: str, technical_details: str | None = None, parent: QWidget | None = None) -> None:
         # Find matching error type first
         error_info = self._find_error_mapping(error_message)
 

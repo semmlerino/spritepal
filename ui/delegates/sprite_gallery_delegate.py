@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 class SpriteGalleryDelegate(QStyledItemDelegate):
     """Custom delegate for rendering sprites in gallery view."""
 
-    def __init__(self, parent: QObject | None = None):
+    def __init__(self, parent: QObject | None = None) -> None:
         """Initialize the sprite gallery delegate."""
         super().__init__(parent)
 

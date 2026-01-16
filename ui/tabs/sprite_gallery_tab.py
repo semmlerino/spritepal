@@ -44,7 +44,7 @@ class SpriteGalleryTab(QWidget):
     sprite_selected = Signal(int)  # Navigate to sprite
     sprites_exported = Signal(list)  # Sprites exported
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None) -> None:
         """
         Initialize the sprite gallery tab.
 
@@ -72,7 +72,7 @@ class SpriteGalleryTab(QWidget):
 
         self._setup_ui()
 
-    def _setup_ui(self):
+    def _setup_ui(self) -> None:
         """Setup the tab UI."""
         layout = QVBoxLayout()
         layout.setContentsMargins(SPACING_TINY, SPACING_TINY, SPACING_TINY, SPACING_TINY)
@@ -168,7 +168,7 @@ class SpriteGalleryTab(QWidget):
         widget.setLayout(layout)
         return widget
 
-    def set_rom_data(self, rom_path: str, rom_size: int, rom_extractor: ROMExtractor):
+    def set_rom_data(self, rom_path: str, rom_size: int, rom_extractor: ROMExtractor) -> None:
         """
         Set the ROM data for the gallery.
 
@@ -198,7 +198,7 @@ class SpriteGalleryTab(QWidget):
             self.sprites_data = []
             self.gallery_widget.set_sprites([])
 
-    def _scan_for_sprites(self):
+    def _scan_for_sprites(self) -> None:
         """Scan the ROM for all sprites."""
         if not self.rom_path:
             QMessageBox.warning(self, "No ROM", "Please load a ROM first")
@@ -231,7 +231,7 @@ class SpriteGalleryTab(QWidget):
         # Create and start scan worker
         self._start_sprite_scan()
 
-    def _scan_custom_range(self):
+    def _scan_custom_range(self) -> None:
         """Scan a custom range of the ROM for sprites."""
         if not self.rom_path:
             QMessageBox.warning(self, "No ROM", "Please load a ROM first")
@@ -257,7 +257,7 @@ class SpriteGalleryTab(QWidget):
         # Start scan with custom range
         self._start_sprite_scan(start_offset, end_offset)
 
-    def _start_sprite_scan(self, start_offset: int | None = None, end_offset: int | None = None):
+    def _start_sprite_scan(self, start_offset: int | None = None, end_offset: int | None = None) -> None:
         """Start the sprite scanning process."""
         # Use SpriteFinder to scan
         finder = SpriteFinder()
@@ -367,7 +367,7 @@ class SpriteGalleryTab(QWidget):
                 self.progress_dialog.close()
                 self.progress_dialog = None
 
-    def _refresh_thumbnails(self):
+    def _refresh_thumbnails(self) -> None:
         """Refresh thumbnail images - now handled on-demand by virtual scrolling."""
         if not self.sprites_data or not self.rom_path:
             logger.warning("Cannot refresh thumbnails: no sprites or ROM path")
@@ -382,7 +382,7 @@ class SpriteGalleryTab(QWidget):
 
         logger.info("Thumbnail refresh triggered - will load on demand as items become visible")
 
-    def _on_thumbnail_ready(self, offset: int, pixmap: QPixmap):
+    def _on_thumbnail_ready(self, offset: int, pixmap: QPixmap) -> None:
         """
         Handle thumbnail ready from worker.
 
@@ -395,7 +395,7 @@ class SpriteGalleryTab(QWidget):
         # Set thumbnail in gallery widget (now uses model)
         self.gallery_widget.set_thumbnail(offset, pixmap)
 
-    def _on_thumbnail_request(self, offset: int, priority: int):
+    def _on_thumbnail_request(self, offset: int, priority: int) -> None:
         """
         Handle thumbnail request from gallery widget.
 
@@ -416,15 +416,15 @@ class SpriteGalleryTab(QWidget):
         # Queue thumbnail with priority
         self.thumbnail_controller.queue_thumbnail(offset, self.gallery_widget.thumbnail_size, priority)
 
-    def _on_sprite_selected(self, offset: int):
+    def _on_sprite_selected(self, offset: int) -> None:
         """Handle sprite selection in gallery."""
         logger.debug(f"Sprite selected at offset: 0x{offset:06X}")
 
-    def _on_sprite_double_clicked(self, offset: int):
+    def _on_sprite_double_clicked(self, offset: int) -> None:
         """Handle sprite double-click - navigate to it."""
         self.sprite_selected.emit(offset)
 
-    def _on_selection_changed(self, selected_offsets: list[int]):
+    def _on_selection_changed(self, selected_offsets: list[int]) -> None:
         """Handle selection change in gallery."""
         count = len(selected_offsets)
 
@@ -433,12 +433,12 @@ class SpriteGalleryTab(QWidget):
             if "Export" in action.text():
                 action.setEnabled(count >= 1)
 
-    def _export_selected(self):
+    def _export_selected(self) -> None:
         """Export selected sprites as individual PNG files."""
         # Export functionality is not yet implemented
         QMessageBox.information(self, "Not Implemented", "Sprite export is not yet implemented.")
 
-    def _open_detached_gallery(self):
+    def _open_detached_gallery(self) -> None:
         """Open the gallery in a separate window to avoid stretching issues."""
         # Create or show existing detached window
         if not self.detached_window:
@@ -484,7 +484,7 @@ class SpriteGalleryTab(QWidget):
 
         logger.info("Opened detached gallery window")
 
-    def _on_detached_closed(self):
+    def _on_detached_closed(self) -> None:
         """Handle detached window closing."""
         if self.detached_window:
             # Disconnect signals
@@ -495,7 +495,7 @@ class SpriteGalleryTab(QWidget):
             self.detached_window = None
             logger.info("Detached gallery window closed")
 
-    def _on_detached_thumbnail_ready(self, offset: int, pixmap: QPixmap):
+    def _on_detached_thumbnail_ready(self, offset: int, pixmap: QPixmap) -> None:
         """Update thumbnail in detached window."""
         if (
             self.detached_window
@@ -514,7 +514,7 @@ class SpriteGalleryTab(QWidget):
                     break
             thumbnail.set_sprite_data(pixmap, sprite_info)
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up resources."""
         # Close detached window if open
         if self.detached_window:
@@ -546,7 +546,7 @@ class SpriteGalleryTab(QWidget):
 
         return cache_dir / cache_filename
 
-    def _save_scan_cache(self):
+    def _save_scan_cache(self) -> None:
         """Save scan results to a cache file for later use."""
         if not self.sprites_data or not self.rom_path:
             return
@@ -571,7 +571,7 @@ class SpriteGalleryTab(QWidget):
         except Exception as e:
             logger.error(f"Failed to save scan cache: {e}")
 
-    def _load_scan_cache(self, rom_path: str | None = None):
+    def _load_scan_cache(self, rom_path: str | None = None) -> bool:
         """Load previously saved scan results from cache."""
         if not rom_path:
             rom_path = self.rom_path
@@ -631,6 +631,8 @@ class SpriteGalleryTab(QWidget):
                         )
 
                 return True
+            # Empty sprites data - cache exists but no sprites
+            return False
         except Exception as e:
             logger.error(f"Failed to load scan cache: {e}")
             return False
