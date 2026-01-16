@@ -561,22 +561,20 @@ class RecentCapturesWidget(QWidget):
                 # Then try FILE offset replacement (display shows FILE offset when SMC header present)
                 elif old_file_hex in current_text:
                     new_text = current_text.replace(old_file_hex, new_file_hex)
-                    # Also update the stored file_offset for consistency
-                    item_data["file_offset"] = new_file_offset
                 elif old_file_hex.lower() in current_text.lower():
                     import re
 
                     new_text = re.sub(re.escape(old_file_hex), new_file_hex, current_text, flags=re.IGNORECASE)
-                    item_data["file_offset"] = new_file_offset
 
                 item.setText(new_text)
                 item.setData(Qt.ItemDataRole.UserRole, item_data)
 
                 # Update tooltip with both ROM and FILE offsets
-                display_file_offset = item_data.get("file_offset", new_file_offset)
+                # Use original FILE offset for identity consistency in tooltip
+                original_file_offset = item_data.get("file_offset", old_file_offset)
                 item.setToolTip(
                     f"ROM Offset: 0x{new_rom_offset:06X}\n"
-                    f"Mesen FILE: 0x{display_file_offset:06X}\n"
+                    f"Mesen FILE: 0x{original_file_offset:06X}\n"
                     f"Frame: N/A\n"  # Frame is not tracked through alignment adjustment
                     f"(Adjusted from 0x{old_rom_offset:06X})"
                 )
