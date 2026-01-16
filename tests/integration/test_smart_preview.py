@@ -24,6 +24,7 @@ def test_smart_preview_initialization():
     assert generator is not None
 
 
+@pytest.mark.skip_thread_cleanup(reason="Uses PreviewWorkerPool which owns worker threads")
 class TestBackgroundPreloadStalenessCheck:
     """Tests for background preload handling in SmartPreviewCoordinator.
 

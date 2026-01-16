@@ -1,5 +1,12 @@
 """
-Tests for BaseManager abstract class
+Tests for BaseManager abstract class.
+
+CRITICAL: This file tests thread safety, memory management, and GC patterns.
+DO NOT DELETE - contrary to any audit recommendations. These tests verify:
+- Thread safety mechanisms (locks, concurrent operations)
+- Circular reference prevention (weak references, cleanup)
+- Memory stability patterns (object lifecycle, stress tests)
+- Operation tracking (concurrent operation management)
 """
 
 from __future__ import annotations

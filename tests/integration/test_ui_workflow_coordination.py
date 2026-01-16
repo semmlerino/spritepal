@@ -1,11 +1,12 @@
 """
-Comprehensive Integration Tests for Complete UI Workflows.
+UI Workflow Coordination Tests.
 
-These tests cover end-to-end user workflows that would catch the bugs we fixed:
-- Complete ROM loading -> scanning -> thumbnail generation -> fullscreen viewing cycle
-- Gallery window lifecycle with proper cleanup
-- Worker management across multiple operations
-- Performance with realistic user scenarios
+Tests UI state machine transitions and coordination with mocked workers.
+Verifies proper state management, signal handling, and component interactions.
+
+Note: These tests use mock workers, so they don't catch actual threading or
+worker lifecycle bugs. For tests with real workers, see:
+- tests/integration/test_sprite_gallery_integration.py
 """
 
 from __future__ import annotations
