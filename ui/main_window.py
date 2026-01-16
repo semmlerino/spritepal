@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from core.workers import ROMExtractionWorker, VRAMExtractionWorker
     from ui.injection_dialog import InjectionDialog
     from ui.services.dialog_coordinator import DialogCoordinator
+    from ui.services.extraction_workflow_coordinator import ExtractionWorkflowCoordinator
 
 from typing import override
 
@@ -153,12 +154,15 @@ class MainWindow(QMainWindow):
         self.output_settings_manager: OutputSettingsManager
         self.keyboard_shortcut_manager: KeyboardShortcutManager
 
+        # Extraction workflow coordinator (manages worker lifecycle and signals)
+        self._extraction_coordinator: ExtractionWorkflowCoordinator | None = None
+
         self._output_path = ""
         self._extracted_files = []
         self._dialog_coordinator = None  # Lazy initialization for dialog service
         self._last_undo_state = (False, False)
 
-        # Worker management (Phase 4d: direct extraction orchestration)
+        # Worker management - retained for cleanup compatibility during transition
         self._vram_worker: VRAMExtractionWorker | None = None
         self._rom_worker: ROMExtractionWorker | None = None
         self._manager_connections: list[object] = []
@@ -685,6 +689,13 @@ class MainWindow(QMainWindow):
 
     def _setup_managers(self) -> None:
         """Set up all UI managers"""
+        from core.app_context import get_app_context
+        from ui.services.extraction_workflow_coordinator import ExtractionWorkflowCoordinator
+
+        # Create extraction workflow coordinator (manages worker lifecycle)
+        app_context = get_app_context()
+        self._extraction_coordinator = ExtractionWorkflowCoordinator(app_context)
+
         # Create managers in dependency order
         self.status_bar_manager = StatusBarManager(
             self.status_bar, settings_manager=self.settings_manager, rom_cache=self.rom_cache
@@ -1038,10 +1049,15 @@ class MainWindow(QMainWindow):
                 return
 
             self._output_path = params["output_base"]
-            self.status_bar_manager.show_message("Extracting sprites from ROM...")
-            self.toolbar_manager.set_extract_enabled(False)
-            # Start ROM extraction directly (Phase 4e: controller removal)
-            self._start_rom_extraction(params)
+
+            # Use coordinator if available, fallback to direct extraction
+            if self._extraction_coordinator is not None:
+                self._extraction_coordinator.start_rom_extraction(params)
+            else:
+                # Fallback: update status and start directly (during tests without coordinator)
+                self.status_bar_manager.show_message("Extracting sprites from ROM...")
+                self.toolbar_manager.set_extract_enabled(False)
+                self._start_rom_extraction(params)
 
     def _handle_vram_extraction(
         self,
@@ -1060,16 +1076,47 @@ class MainWindow(QMainWindow):
         self._vram_output_name = output_name
         self._vram_export_palettes = export_palette_files
         self._vram_include_metadata = include_metadata
-
         self._output_path = output_name
-        self.status_bar_manager.show_message("Extracting sprites from VRAM...")
-        self.toolbar_manager.set_extract_enabled(False)
 
-        # Start extraction directly (Phase 4d: controller removal)
-        self._start_vram_extraction()
+        # Build params dict for coordinator
+        params = {
+            "vram_path": self.extraction_panel.get_vram_path(),
+            "cgram_path": self.extraction_panel.get_cgram_path()
+            if not self.extraction_panel.is_grayscale_mode()
+            else "",
+            "oam_path": self.extraction_panel.get_oam_path(),
+            "vram_offset": self.extraction_panel.get_vram_offset(),
+            "output_base": output_name,
+            "create_grayscale": export_palette_files,
+            "create_metadata": include_metadata,
+            "grayscale_mode": self.extraction_panel.is_grayscale_mode(),
+        }
+
+        # Use coordinator if available, fallback to direct extraction
+        if self._extraction_coordinator is not None:
+            self._extraction_coordinator.start_vram_extraction(params)
+        else:
+            # Fallback: update status and start directly (during tests without coordinator)
+            self.status_bar_manager.show_message("Extracting sprites from VRAM...")
+            self.toolbar_manager.set_extract_enabled(False)
+            self._start_vram_extraction()
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # EXTRACTION COORDINATOR SIGNAL HANDLERS
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def _on_coordinator_extraction_started(self, mode: str) -> None:
+        """Handle extraction started signal from coordinator.
+
+        Args:
+            mode: Extraction mode ("VRAM" or "ROM")
+        """
+        self.status_bar_manager.show_message(f"Extracting sprites from {mode}...")
+        self.toolbar_manager.set_extract_enabled(False)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # VRAM EXTRACTION ORCHESTRATION (Phase 4d: moved from ExtractionController)
+    # LEGACY: This section is being migrated to ExtractionWorkflowCoordinator
     # ═══════════════════════════════════════════════════════════════════════════
 
     def _start_vram_extraction(self) -> None:
@@ -1593,6 +1640,17 @@ class MainWindow(QMainWindow):
         self.keyboard_shortcut_manager.mesen_capture_requested.connect(self._on_mesen_capture_shortcut)
         self.keyboard_shortcut_manager.manual_offset_requested.connect(self._on_manual_offset_shortcut)
         self.keyboard_shortcut_manager.focus_output_requested.connect(self._on_focus_output_shortcut)
+
+        # Connect extraction workflow coordinator signals
+        if self._extraction_coordinator is not None:
+            self._extraction_coordinator.extraction_started.connect(self._on_coordinator_extraction_started)
+            self._extraction_coordinator.extraction_failed.connect(self.extraction_failed)
+            self._extraction_coordinator.vram_extraction_finished.connect(self._on_vram_extraction_finished)
+            self._extraction_coordinator.rom_extraction_finished.connect(self._on_rom_extraction_finished)
+            # Connect to CoreOperationsManager for preview/palette updates (has PIL.Image)
+            self._extraction_coordinator.core_operations_manager.extraction_completed.connect(
+                self._on_extraction_completed
+            )
 
         # Note: Output settings are now shown in a dialog on Extract click
         # The output_settings_manager just tracks the suggested output name
