@@ -374,9 +374,9 @@ reportUnreachable = true
 # Stricter checks
 reportMissingParameterType = true
 reportCallInDefaultInitializer = true
-reportImplicitStringConcatenation = false
+reportImplicitStringConcatenation = false  # Used intentionally for multiline strings
 reportPrivateImportUsage = true
-reportConstantRedefinition = false
+reportConstantRedefinition = true
 reportImplicitOverride = true
 reportPropertyTypeMismatch = true
 reportTypeCommentUsage = true

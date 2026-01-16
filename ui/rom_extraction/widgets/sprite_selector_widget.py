@@ -161,8 +161,8 @@ class SpriteSelectorWidget(BaseExtractionWidget):
         """Enable/disable the sprite tree"""
         self.sprite_tree.setEnabled(enabled)
 
-    def get_current_data(self) -> None:
-        """Get data for current selection"""
+    def get_current_data(self) -> object | None:
+        """Get data for current selection."""
         current = self.sprite_tree.currentItem()
         if current:
             return current.data(0, Qt.ItemDataRole.UserRole)

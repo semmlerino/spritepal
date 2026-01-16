@@ -869,7 +869,9 @@ class ROMExtractionPanel(QWidget):
         # Get sprite data for preset mode
         sprite_data: tuple[str, int] | None = None
         if not self._params_controller.is_manual_mode:
-            sprite_data = self.sprite_selector_widget.get_current_data()
+            data = self.sprite_selector_widget.get_current_data()
+            if data is not None:
+                sprite_data = data  # type: ignore[assignment]  # Qt data() returns object
 
         return self._params_controller.get_params_dict(
             rom_path=self.rom_path,

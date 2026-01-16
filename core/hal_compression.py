@@ -38,10 +38,10 @@ class HALResultStatus(Enum):
 try:
     from PySide6.QtWidgets import QApplication
 
-    QT_AVAILABLE = True
+    _qt_available = True
 except ImportError:
     QApplication = None
-    QT_AVAILABLE = False
+    _qt_available = False
 
 
 def _is_wsl_environment() -> bool:
@@ -520,7 +520,7 @@ class HALProcessPool:
 
     def _connect_qt_cleanup(self) -> None:
         """Connect cleanup to QApplication.aboutToQuit signal if Qt is available."""
-        if not QT_AVAILABLE or self._qt_cleanup_connected:
+        if not _qt_available or self._qt_cleanup_connected:
             return
 
         try:
