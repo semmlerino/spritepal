@@ -16,6 +16,57 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 
+def get_signal_receivers(obj: QObject, signal: Any) -> int:
+    """Get the number of receivers connected to a Qt signal.
+
+    In PySide6, QObject.receivers() requires a string in SIGNAL format.
+    This helper handles the conversion from SignalInstance to the proper format.
+
+    Args:
+        obj: The QObject that owns the signal.
+        signal: The signal to check (e.g., obj.someSignal).
+
+    Returns:
+        Number of connected receivers.
+    """
+    from PySide6.QtCore import SIGNAL
+
+    # Get signal name from the SignalInstance
+    # SignalInstance has a 'signal' attribute containing the signature
+    if hasattr(signal, "signal"):
+        # signal.signal is like "2preview_ready(bytes,int,int,str,int,int,int,bool)"
+        # We need to pass it to SIGNAL() to get proper format
+        sig_str = signal.signal
+        # Remove the leading '2' if present (Qt internal marker)
+        sig_str = sig_str.removeprefix("2")
+        return obj.receivers(SIGNAL(sig_str))
+    else:
+        # Fallback: try direct string representation
+        return 0
+
+
+def assert_has_receivers(obj: QObject, signal: Any, context: str = "") -> None:
+    """Assert that a Qt signal has at least one connected receiver.
+
+    Uses QObject.receivers() to check connection count. Note that this counts
+    connections but cannot identify specific receivers (e.g., lambdas).
+
+    Args:
+        obj: The QObject that owns the signal.
+        signal: The signal to check (e.g., obj.someSignal).
+        context: Optional context string for error messages.
+
+    Raises:
+        AssertionError: If the signal has no receivers.
+
+    Example:
+        assert_has_receivers(coordinator, coordinator.preview_ready, "preview_ready -> controller")
+    """
+    count = get_signal_receivers(obj, signal)
+    ctx_msg = f" ({context})" if context else ""
+    assert count > 0, f"Signal has no receivers{ctx_msg}. Expected at least 1, got {count}."
+
+
 class MultiSignalRecorder(QObject):
     """Records emissions from multiple Qt signals with timestamps and argument capture.
 
