@@ -207,6 +207,10 @@ class PooledPreviewWorker(SpritePreviewWorker):
         offsets_to_try = get_offset_candidates(self.offset, len(rom_data))
         slack_size = 0
 
+        # Track the original (primary) offset - we should trust it if decompression succeeds
+        # Offset hunting exists to correct DMA timing jitter, NOT to "improve" quality
+        primary_offset = self.offset
+
         for try_offset in offsets_to_try:
             try:
                 # Check interruption right before decompression
@@ -214,68 +218,69 @@ class PooledPreviewWorker(SpritePreviewWorker):
                     logger.debug(f"Request {request_id} interrupted before decompression")
                     return
 
-                if try_offset != self.offset:
+                is_primary_offset = try_offset == primary_offset
+                if not is_primary_offset:
                     logger.debug(
-                        f"[TRACE] Trying adjusted offset 0x{try_offset:X} (delta: {try_offset - self.offset:+d})"
+                        f"[TRACE] Trying adjusted offset 0x{try_offset:X} (delta: {try_offset - primary_offset:+d})"
                     )
                 else:
                     logger.debug(f"[TRACE] Attempting HAL decompression at offset 0x{try_offset:X}")
 
                 # Try to extract as compressed sprite
                 rom_injector = self.extractor.rom_injector
-                if try_offset == self.offset:
-                    # Capture slack for primary offset
-                    compressed_size, tile_data, slack_size = rom_injector.find_compressed_sprite(
-                        rom_data, try_offset, expected_size
+                compressed_size, tile_data, slack_size = rom_injector.find_compressed_sprite(
+                    rom_data, try_offset, expected_size
+                )
+
+                # Handle empty data case first (early continue pattern)
+                if not tile_data or len(tile_data) == 0:
+                    logger.debug(f"[TRACE] HAL decompression returned empty data at offset 0x{try_offset:X}")
+                    continue
+
+                # For PRIMARY offset: trust it if decompression succeeded
+                # The has_nonzero_content check is meant to filter garbage at ALTERNATE offsets,
+                # not to reject valid mostly-black sprites at the user's requested offset.
+                # Fix for bug: clicking 0x293AEB opened 0x293AED because the sprite was mostly black.
+                if is_primary_offset:
+                    # Primary offset decompression succeeded - use it immediately
+                    decompression_succeeded = True
+                    logger.debug(f"[TRACE] Primary offset 0x{try_offset:X} decompressed successfully, using it")
+                elif has_nonzero_content(tile_data):
+                    # Alternate offset: validate that it's reasonable sprite data
+                    decompression_succeeded = True
+                    logger.info(
+                        f"[TRACE] Successfully decompressed using adjusted offset 0x{try_offset:X} (delta: {try_offset - primary_offset:+d})"
                     )
                 else:
-                    # Capture slack for variant offsets
-                    compressed_size, tile_data, slack_size = rom_injector.find_compressed_sprite(
-                        rom_data, try_offset, expected_size
-                    )
-
-                if tile_data and len(tile_data) > 0:
-                    # Validate that it's reasonable sprite data using shared utility
-                    if has_nonzero_content(tile_data):
-                        decompression_succeeded = True
-                        if try_offset != self.offset:
-                            logger.info(
-                                f"[TRACE] Successfully decompressed using adjusted offset 0x{try_offset:X} (delta: {try_offset - self.offset:+d})"
-                            )
-                        logger.debug(
-                            f"[TRACE] Successfully decompressed {len(tile_data)} bytes from offset 0x{try_offset:X}"
-                        )
-                        logger.debug(f"[TRACE] Compressed size: {compressed_size} bytes, slack: {slack_size} bytes")
-                        logger.debug(
-                            f"[TRACE] First 20 bytes of decompressed data: {tile_data[:20].hex() if tile_data else 'None'}"
-                        )
-
-                        # Align tile data to 32-byte boundaries
-                        # Some HAL-compressed assets have header bytes that cause misalignment
-                        # Store header bytes for restoration during injection (prevents color shift bug)
-                        original_len = len(tile_data)
-                        header_bytes_count = original_len % 32
-                        header_bytes = tile_data[:header_bytes_count] if header_bytes_count > 0 else b""
-                        tile_data = align_tile_data(tile_data)
-                        if len(tile_data) != original_len:
-                            logger.debug(
-                                f"[TRACE] Aligned tile data: {original_len} -> {len(tile_data)} bytes "
-                                f"(removed {original_len - len(tile_data)} header byte(s), stored for injection)"
-                            )
-
-                        # Update the actual offset used for display purposes
-                        self.offset = try_offset
-                        break
+                    # Alternate offset with mostly-zero data - skip it
                     logger.debug(
                         f"[TRACE] HAL decompression at 0x{try_offset:X} returned mostly zeros, trying next offset"
                     )
-                else:
-                    logger.debug(f"[TRACE] HAL decompression returned empty data at offset 0x{try_offset:X}")
+                    continue
 
-                # Check interruption after decompression
-                if self.isInterruptionRequested():
-                    logger.debug(f"Request {request_id} interrupted after decompression")
-                    return
+                # Decompression succeeded (either primary or validated alternate)
+                logger.debug(f"[TRACE] Successfully decompressed {len(tile_data)} bytes from offset 0x{try_offset:X}")
+                logger.debug(f"[TRACE] Compressed size: {compressed_size} bytes, slack: {slack_size} bytes")
+                logger.debug(
+                    f"[TRACE] First 20 bytes of decompressed data: {tile_data[:20].hex() if tile_data else 'None'}"
+                )
+
+                # Align tile data to 32-byte boundaries
+                # Some HAL-compressed assets have header bytes that cause misalignment
+                # Store header bytes for restoration during injection (prevents color shift bug)
+                original_len = len(tile_data)
+                header_bytes_count = original_len % 32
+                header_bytes = tile_data[:header_bytes_count] if header_bytes_count > 0 else b""
+                tile_data = align_tile_data(tile_data)
+                if len(tile_data) != original_len:
+                    logger.debug(
+                        f"[TRACE] Aligned tile data: {original_len} -> {len(tile_data)} bytes "
+                        f"(removed {original_len - len(tile_data)} header byte(s), stored for injection)"
+                    )
+
+                # Update the actual offset used for display purposes
+                self.offset = try_offset
+                break
 
             except Exception as decomp_error:
                 # HAL decompression failed - this is normal for non-compressed offsets
