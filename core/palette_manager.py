@@ -81,6 +81,13 @@ class PaletteManager:
 
             self.palettes[pal_idx] = colors
 
+    def refresh_palettes(self) -> None:
+        """Re-extract palettes from current CGRAM data.
+
+        Public API for triggering palette re-extraction after CGRAM updates.
+        """
+        self._extract_palettes()
+
     def get_palette(self, palette_index: int) -> list[list[int]]:
         """Get a specific palette"""
         return self.palettes.get(palette_index, [[0, 0, 0]] * COLORS_PER_PALETTE)

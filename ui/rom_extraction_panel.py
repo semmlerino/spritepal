@@ -896,6 +896,15 @@ class ROMExtractionPanel(QWidget):
         """
         return self._params_controller
 
+    @property
+    def worker_orchestrator(self) -> ROMWorkerOrchestrator:
+        """Access worker orchestrator for signal connections.
+
+        Returns:
+            The ROMWorkerOrchestrator managing background workers.
+        """
+        return self._worker_orchestrator
+
     def clear_files(self):
         """Clear all file selections.
 

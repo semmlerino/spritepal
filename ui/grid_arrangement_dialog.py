@@ -861,6 +861,10 @@ class GridArrangementDialog(SplitterDialog):
         self.grid_view.clear_selection()
         self._update_status("Reset layout to 1:1 mapping")
 
+    def apply_overlay(self) -> None:
+        """Apply current overlay to tiles. Public API for testing."""
+        self._apply_overlay()
+
     def _apply_overlay(self) -> None:
         """Apply overlay image to tiles, sampling and quantizing pixels."""
         if not self.overlay_layer.has_image():

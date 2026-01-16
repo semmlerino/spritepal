@@ -152,9 +152,9 @@ class TestSmartPreviewCoordinatorPerformance:
         # Should handle rapid updates efficiently due to debouncing
         assert submission_time < perf_bound(1.0), f"Rapid update submission too slow: {submission_time:.3f}s"
 
-        # Check performance metrics (if available)
-        if hasattr(self.coordinator, "_performance_metrics"):
-            metrics = self.coordinator._performance_metrics
+        # Check performance metrics (if available via public API)
+        metrics = self.coordinator.get_performance_metrics()
+        if metrics is not None:
             total_requests = metrics.get("total_requests", 0)
 
             # Should have fewer actual preview generations than input requests

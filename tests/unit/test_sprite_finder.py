@@ -297,4 +297,4 @@ class TestSpriteFinderIntegration:
 
                 # Verify validation was performed
                 for candidate in candidates:
-                    assert "visual_metrics" in candidate.__dict__ or candidate.visual_metrics is not None
+                    assert candidate.visual_metrics is not None

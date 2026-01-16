@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 from PySide6.QtTest import QSignalSpy
+from PySide6.QtWidgets import QComboBox
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
@@ -37,7 +38,7 @@ class TestManualPaletteSelectionRestore:
         spy = QSignalSpy(selector.manualPaletteRequested)
 
         # Find the manual palette entry (last item)
-        combo = selector._combo_box
+        combo = selector.findChild(QComboBox)
         manual_index = combo.count() - 1
 
         combo.setCurrentIndex(manual_index)
@@ -59,7 +60,7 @@ class TestManualPaletteSelectionRestore:
         assert selector.get_selected_source() == ("rom", 8)
 
         # Find and select manual palette entry
-        combo = selector._combo_box
+        combo = selector.findChild(QComboBox)
         manual_index = combo.count() - 1
 
         # This triggers manual palette selection which should restore previous
@@ -82,7 +83,7 @@ class TestManualPaletteSelectionRestore:
         spy = QSignalSpy(selector.sourceChanged)
 
         # Select manual palette
-        combo = selector._combo_box
+        combo = selector.findChild(QComboBox)
         manual_index = combo.count() - 1
         combo.setCurrentIndex(manual_index)
 
@@ -97,7 +98,7 @@ class TestManualPaletteSelectionRestore:
         # Don't add any palette sources, start from default state
 
         # Find and select manual palette entry
-        combo = selector._combo_box
+        combo = selector.findChild(QComboBox)
         manual_index = combo.count() - 1
 
         combo.setCurrentIndex(manual_index)

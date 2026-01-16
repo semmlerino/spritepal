@@ -624,6 +624,24 @@ class SmartPreviewCoordinator(QObject):
         self.preview_error.emit(error_msg)
         logger.debug(f"Preview error for request {request_id}: {error_msg}")
 
+    def get_performance_metrics(self) -> dict[str, object] | None:
+        """Get performance metrics if tracking enabled.
+
+        Returns:
+            Performance metrics dict, or None if not available.
+        """
+        return getattr(self, "_performance_metrics", None)
+
+    def get_cache_stats(self) -> dict[str, int]:
+        """Get cache statistics.
+
+        Returns:
+            Dict with 'size' key indicating current cache size.
+        """
+        if hasattr(self, "_cache") and self._cache:
+            return {"size": len(self._cache)}
+        return {}
+
     def cleanup(self) -> None:
         """Clean up resources."""
         logger.debug("Cleaning up SmartPreviewCoordinator")

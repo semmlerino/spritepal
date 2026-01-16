@@ -77,7 +77,7 @@ class TestPaletteManager:
     def test_extract_palettes(self, palette_manager, sample_cgram_data):
         """Test palette extraction from CGRAM"""
         palette_manager.cgram_data = sample_cgram_data
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         # Check we have 16 palettes
         assert len(palette_manager.palettes) == 16
@@ -109,14 +109,14 @@ class TestPaletteManager:
             cgram_data[0] = low
             cgram_data[1] = high
             palette_manager.cgram_data = bytes(cgram_data + bytearray(510))
-            palette_manager._extract_palettes()
+            palette_manager.refresh_palettes()
 
             assert palette_manager.palettes[0][0] == expected
 
     def test_get_palette(self, palette_manager, sample_cgram_data):
         """Test getting specific palette"""
         palette_manager.cgram_data = sample_cgram_data
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         # Get existing palette
         pal8 = palette_manager.get_palette(8)
@@ -131,7 +131,7 @@ class TestPaletteManager:
     def test_get_sprite_palettes(self, palette_manager, sample_cgram_data):
         """Test getting only sprite palettes (8-15)"""
         palette_manager.cgram_data = sample_cgram_data
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         sprite_pals = palette_manager.get_sprite_palettes()
 
@@ -142,7 +142,7 @@ class TestPaletteManager:
     def test_create_palette_json(self, palette_manager, sample_cgram_data):
         """Test creating palette JSON file"""
         palette_manager.cgram_data = sample_cgram_data
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         with tempfile.NamedTemporaryFile(suffix=".pal.json", delete=False) as f:
             output_path = f.name
@@ -180,7 +180,7 @@ class TestPaletteManager:
     def test_palette_info(self, palette_manager, sample_cgram_data, pal_idx, expected_name):
         """Test palette naming from PALETTE_INFO"""
         palette_manager.cgram_data = sample_cgram_data
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         with tempfile.NamedTemporaryFile(suffix=".pal.json", delete=False) as f:
             palette_manager.create_palette_json(pal_idx, f.name)
@@ -220,7 +220,7 @@ class TestPaletteManagerExtended:
 
     def test_extract_palettes_with_no_data(self, palette_manager):
         """Test extracting palettes when no CGRAM data is loaded"""
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
         assert palette_manager.palettes == {}
 
     def test_extract_palettes_with_truncated_data(self, palette_manager):
@@ -229,7 +229,7 @@ class TestPaletteManagerExtended:
         truncated_data = bytearray(100)
         palette_manager.cgram_data = bytes(truncated_data)
 
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         # Should handle truncated data gracefully
         assert len(palette_manager.palettes) == 16
@@ -239,7 +239,7 @@ class TestPaletteManagerExtended:
     def test_create_metadata_json(self, palette_manager, sample_cgram_data):
         """Test creating metadata.json file"""
         palette_manager.cgram_data = sample_cgram_data
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         with tempfile.TemporaryDirectory() as temp_dir:
             output_base = Path(temp_dir) / "test_sprites"
@@ -340,7 +340,7 @@ class TestPaletteManagerExtended:
     def test_create_palette_json_without_companion_image(self, palette_manager, sample_cgram_data):
         """Test creating palette JSON without companion image"""
         palette_manager.cgram_data = sample_cgram_data
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         with tempfile.NamedTemporaryFile(suffix=".pal.json", delete=False) as f:
             output_path = f.name
@@ -372,7 +372,7 @@ class TestPaletteManagerExtended:
         cgram_data[1] = 0x7F  # Max high byte
 
         palette_manager.cgram_data = bytes(cgram_data)
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         # Should convert to maximum RGB values
         assert palette_manager.palettes[0][0] == [255, 255, 255]  # Max RGB
@@ -380,7 +380,7 @@ class TestPaletteManagerExtended:
     def test_palette_json_with_io_error(self, palette_manager, sample_cgram_data):
         """Test palette JSON creation with I/O error"""
         palette_manager.cgram_data = sample_cgram_data
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         # Try to write to invalid path
         # atomic_write tries to create parent directories first, so we get
@@ -399,7 +399,7 @@ class TestPaletteManagerExtended:
     def test_get_palette_boundary_conditions(self, palette_manager, sample_cgram_data):
         """Test get_palette with boundary conditions"""
         palette_manager.cgram_data = sample_cgram_data
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         # Test valid palette
         pal8 = palette_manager.get_palette(8)
@@ -424,7 +424,7 @@ class TestPaletteManagerExtended:
         # Create CGRAM data with only some palettes
         cgram_data = bytearray(256)  # Only first 8 palettes
         palette_manager.cgram_data = bytes(cgram_data)
-        palette_manager._extract_palettes()
+        palette_manager.refresh_palettes()
 
         sprite_palettes = palette_manager.get_sprite_palettes()
 

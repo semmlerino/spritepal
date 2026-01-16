@@ -116,7 +116,7 @@ def test_sprite_location_error_disables_extraction(qtbot, app_context):
 
     # Simulate sprite location error via orchestrator signal
     # This is the public way the panel receives this error
-    panel._worker_orchestrator.sprite_locations_error.emit("Test error: failed to load locations")
+    panel.worker_orchestrator.sprite_locations_error.emit("Test error: failed to load locations")
 
     # Verify: readiness check was triggered and resulted in not-ready state
     assert len(ready_states) > 0, "Expected extraction_ready signal after sprite error"

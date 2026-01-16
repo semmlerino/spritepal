@@ -151,7 +151,7 @@ class TestTileIdentityEndToEnd:
         dialog.overlay_layer.set_position(0, 0)
 
         # STAGE 5: Apply overlay - should sample at canvas (0, 0), store at TilePosition(1, 2)
-        dialog._apply_overlay()
+        dialog.apply_overlay()
         # Process events to handle the deferred QMessageBox
         qtbot.wait(10)
 
@@ -224,7 +224,7 @@ class TestTileIdentityEndToEnd:
         dialog.arrangement_manager.set_item_at(0, 0, ArrangementType.TILE, "1,2")
         dialog.overlay_layer.import_image(distinctive_overlay)
         dialog.overlay_layer.set_position(0, 0)
-        dialog._apply_overlay()
+        dialog.apply_overlay()
         # Process events to handle the deferred QMessageBox
         qtbot.wait(10)
         dialog.accept()
@@ -294,7 +294,7 @@ class TestApplyThenRearrangeDataLoss:
         # Apply overlay
         dialog.overlay_layer.import_image(distinctive_overlay)
         dialog.overlay_layer.set_position(0, 0)
-        dialog._apply_overlay()
+        dialog.apply_overlay()
         # Process events to handle the deferred QMessageBox
         qtbot.wait(10)
 
@@ -348,7 +348,7 @@ class TestApplyThenRearrangeDataLoss:
         dialog.arrangement_manager.set_item_at(0, 0, ArrangementType.TILE, "0,0")
         dialog.overlay_layer.import_image(distinctive_overlay)
         dialog.overlay_layer.set_position(0, 0)
-        dialog._apply_overlay()
+        dialog.apply_overlay()
         # Process events to handle the deferred QMessageBox
         qtbot.wait(10)
 
@@ -387,7 +387,7 @@ class TestApplyThenRearrangeDataLoss:
         # Apply overlay (covers both tiles)
         dialog.overlay_layer.import_image(distinctive_overlay)
         dialog.overlay_layer.set_position(0, 0)
-        dialog._apply_overlay()
+        dialog.apply_overlay()
         # Process events to handle the deferred QMessageBox
         qtbot.wait(10)
 
