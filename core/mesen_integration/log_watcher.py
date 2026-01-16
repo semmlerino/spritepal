@@ -130,6 +130,40 @@ class LogWatcher(QObject):
                 return capture
         return None
 
+    def get_capture_by_file_offset(self, file_offset: int) -> CapturedOffset | None:
+        """Get a capture by FILE offset (raw Mesen output).
+
+        The FILE offset is the original offset reported by Mesen, which includes
+        any SMC header. This is the immutable identity of the capture.
+
+        Args:
+            file_offset: FILE offset to look up (raw Mesen offset)
+
+        Returns:
+            The CapturedOffset if found, None otherwise
+        """
+        for capture in self._recent_captures:
+            if capture.offset == file_offset:
+                return capture
+        return None
+
+    def get_capture_by_rom_offset(self, rom_offset: int, smc_header_offset: int = 0) -> CapturedOffset | None:
+        """Get a capture by ROM offset (converts to FILE offset internally).
+
+        Use this method when you have a ROM offset (headerless) and need to
+        find the corresponding capture, which stores FILE offsets.
+
+        Args:
+            rom_offset: ROM offset to look up (headerless)
+            smc_header_offset: SMC header size (typically 0x200 or 0)
+
+        Returns:
+            The CapturedOffset if found, None otherwise
+        """
+        # Convert ROM offset to FILE offset
+        file_offset = rom_offset + smc_header_offset
+        return self.get_capture_by_file_offset(file_offset)
+
     def _resolve_output_directory(self, output_dir: Path | str | None = None) -> Path:
         """Resolve the Mesen2 output directory.
 

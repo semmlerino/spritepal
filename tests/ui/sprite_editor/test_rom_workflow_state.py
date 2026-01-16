@@ -256,3 +256,159 @@ class TestSMCHeaderConfiguration:
             widget.setText(f"FILE OFFSET: 0x{file_offset:06X}")
 
         assert widget.offset() == expected_rom_offset
+
+
+class TestSourceTypePreservation:
+    """Tests for source type preservation during sprite activation.
+
+    REGRESSION: Source type (ROM/Mesen/Library) was being lost when activating
+    sprites, causing category confusion when multiple sources have the same offset.
+    """
+
+    def test_sprite_activated_preserves_source_type_mesen(self, qtbot, tmp_path, monkeypatch):
+        """Source type 'mesen' should be preserved when sprite is activated.
+
+        Bug: _on_sprite_activated received source_type but didn't pass it to
+        set_offset(), causing _current_source_type to not be updated.
+        """
+        from ui.sprite_editor.controllers.editing_controller import EditingController
+        from ui.sprite_editor.controllers.rom_workflow_controller import (
+            ROMWorkflowController,
+        )
+        from ui.sprite_editor.views.workspaces.rom_workflow_page import ROMWorkflowPage
+
+        editing_controller = EditingController()
+        controller = ROMWorkflowController(parent=None, editing_controller=editing_controller)
+        view = ROMWorkflowPage()
+        qtbot.addWidget(view)
+        controller.set_view(view)
+
+        # Set up ROM state
+        dummy_rom = tmp_path / "test.sfc"
+        dummy_rom.write_bytes(b"\x00" * 0x10000)
+        controller.rom_path = str(dummy_rom)
+        controller.rom_size = 0x10000
+
+        # Mock preview to complete immediately
+        def fake_preview(offset: int) -> None:
+            controller._on_preview_ready(
+                tile_data=b"\x00" * 64,
+                width=8,
+                height=8,
+                sprite_name="test_sprite",
+                compressed_size=32,
+                slack_size=0,
+                actual_offset=offset,
+                hal_succeeded=True,
+            )
+
+        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", fake_preview)
+        monkeypatch.setattr(controller.preview_coordinator, "request_full_preview", fake_preview)
+
+        # Initial state with ROM source type
+        controller.set_offset(0x1000, source_type="rom")
+        assert controller._current_source_type == "rom"
+
+        # Activate sprite from Mesen category (simulating double-click)
+        controller._on_sprite_activated(0x2000, "mesen")
+
+        # Source type should be updated to 'mesen'
+        assert controller._current_source_type == "mesen", (
+            f"Source type should be 'mesen' but was '{controller._current_source_type}'"
+        )
+
+    def test_sprite_activated_preserves_source_type_library(self, qtbot, tmp_path, monkeypatch):
+        """Source type 'library' should be preserved when sprite is activated."""
+        from ui.sprite_editor.controllers.editing_controller import EditingController
+        from ui.sprite_editor.controllers.rom_workflow_controller import (
+            ROMWorkflowController,
+        )
+        from ui.sprite_editor.views.workspaces.rom_workflow_page import ROMWorkflowPage
+
+        editing_controller = EditingController()
+        controller = ROMWorkflowController(parent=None, editing_controller=editing_controller)
+        view = ROMWorkflowPage()
+        qtbot.addWidget(view)
+        controller.set_view(view)
+
+        # Set up ROM state
+        dummy_rom = tmp_path / "test.sfc"
+        dummy_rom.write_bytes(b"\x00" * 0x10000)
+        controller.rom_path = str(dummy_rom)
+        controller.rom_size = 0x10000
+
+        # Mock preview
+        def fake_preview(offset: int) -> None:
+            controller._on_preview_ready(
+                tile_data=b"\x00" * 64,
+                width=8,
+                height=8,
+                sprite_name="test_sprite",
+                compressed_size=32,
+                slack_size=0,
+                actual_offset=offset,
+                hal_succeeded=True,
+            )
+
+        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", fake_preview)
+        monkeypatch.setattr(controller.preview_coordinator, "request_full_preview", fake_preview)
+
+        # Activate sprite from Library category
+        controller._on_sprite_activated(0x3000, "library")
+
+        assert controller._current_source_type == "library", (
+            f"Source type should be 'library' but was '{controller._current_source_type}'"
+        )
+
+    def test_sprite_activated_with_same_offset_preserves_source_type(self, qtbot, tmp_path, monkeypatch):
+        """Source type should be preserved even when same offset is already loaded.
+
+        This tests the early-return path where current_tile_offset == offset.
+        """
+        from ui.sprite_editor.controllers.editing_controller import EditingController
+        from ui.sprite_editor.controllers.rom_workflow_controller import (
+            ROMWorkflowController,
+        )
+        from ui.sprite_editor.views.workspaces.rom_workflow_page import ROMWorkflowPage
+
+        editing_controller = EditingController()
+        controller = ROMWorkflowController(parent=None, editing_controller=editing_controller)
+        view = ROMWorkflowPage()
+        qtbot.addWidget(view)
+        controller.set_view(view)
+
+        # Set up ROM state
+        dummy_rom = tmp_path / "test.sfc"
+        dummy_rom.write_bytes(b"\x00" * 0x10000)
+        controller.rom_path = str(dummy_rom)
+        controller.rom_size = 0x10000
+
+        # Mock preview
+        def fake_preview(offset: int) -> None:
+            controller._on_preview_ready(
+                tile_data=b"\x00" * 64,
+                width=8,
+                height=8,
+                sprite_name="test_sprite",
+                compressed_size=32,
+                slack_size=0,
+                actual_offset=offset,
+                hal_succeeded=True,
+            )
+
+        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", fake_preview)
+        monkeypatch.setattr(controller.preview_coordinator, "request_full_preview", fake_preview)
+
+        # Load offset from ROM source
+        controller.set_offset(0x4000, source_type="rom")
+        controller.current_tile_offset = 0x4000  # Simulate tile data being available
+        controller.current_tile_data = b"\x00" * 64
+        assert controller._current_source_type == "rom"
+
+        # Activate SAME offset from Mesen source (different category, same offset)
+        controller._on_sprite_activated(0x4000, "mesen")
+
+        # Even though offset is same, source type should update to mesen
+        assert controller._current_source_type == "mesen", (
+            f"Source type should update to 'mesen' even for same offset, but was '{controller._current_source_type}'"
+        )

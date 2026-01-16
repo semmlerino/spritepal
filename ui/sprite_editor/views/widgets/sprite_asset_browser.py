@@ -554,30 +554,36 @@ class SpriteAssetBrowser(QWidget):
         item.setData(0, Qt.ItemDataRole.UserRole, data)
         self._update_placeholder(self._rom_category)
 
-    def add_mesen_capture(self, name: str, offset: int, thumbnail: QPixmap | None = None) -> None:
+    def add_mesen_capture(
+        self, name: str, offset: int, frame: int | None = None, thumbnail: QPixmap | None = None
+    ) -> None:
         """
         Add a Mesen2 capture to the browser.
 
-        Idempotent: if a capture with this offset already exists, it's skipped.
+        Idempotent: if a capture with this offset (and frame, if provided) already
+        exists, it's skipped. Different frames at the same offset are allowed.
 
         Args:
             name: Sprite name
             offset: ROM offset
+            frame: Optional frame number for deduplication
             thumbnail: Optional thumbnail pixmap
         """
         # Skip if already exists (idempotent)
-        if self.has_mesen_capture(offset):
-            logger.debug("add_mesen_capture: skipping duplicate offset 0x%06X", offset)
+        # When frame is provided, only skip if exact (offset, frame) match
+        if self.has_mesen_capture(offset, frame=frame):
+            logger.debug("add_mesen_capture: skipping duplicate offset 0x%06X frame %s", offset, frame)
             return
 
-        logger.info("add_mesen_capture: adding %s (0x%06X)", name, offset)
+        logger.info("add_mesen_capture: adding %s (0x%06X, frame=%s)", name, offset, frame)
         item = QTreeWidgetItem(self._mesen_category)
         item.setText(0, name)
 
-        # Store data
+        # Store data including frame for deduplication
         data = {
             "name": name,
             "offset": offset,
+            "frame": frame,
             "source_type": "mesen",
             "thumbnail": thumbnail,
         }
@@ -851,19 +857,29 @@ class SpriteAssetBrowser(QWidget):
             iterator += 1
         return False
 
-    def has_mesen_capture(self, offset: int) -> bool:
-        """Check if a Mesen capture with this offset exists in the browser.
+    def has_mesen_capture(self, offset: int, frame: int | None = None) -> bool:
+        """Check if a Mesen capture with this offset (and optionally frame) exists.
 
         Args:
             offset: ROM offset to check
+            frame: Optional frame number. If provided, only matches captures with
+                   the same offset AND frame. If None, matches any capture with
+                   the offset regardless of frame.
 
         Returns:
-            True if a Mesen capture with this offset exists
+            True if a matching Mesen capture exists
         """
         for i in range(self._mesen_category.childCount()):
             item = self._mesen_category.child(i)
             data = item.data(0, Qt.ItemDataRole.UserRole)
             if isinstance(data, dict) and data.get("offset") == offset:
+                # If frame is specified, also check frame match
+                if frame is not None:
+                    if data.get("frame") == frame:
+                        return True
+                    # Different frame at same offset - keep looking
+                    continue
+                # No frame specified - match any capture at this offset
                 return True
         return False
 

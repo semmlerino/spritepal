@@ -269,7 +269,8 @@ class ROMWorkflowController(QObject):
 
         rom_offset = self.normalize_mesen_offset(capture.offset)
         name = self._get_capture_name(capture)
-        self._view.add_mesen_capture(name, rom_offset)
+        # Pass frame for proper deduplication (same offset, different frames should both appear)
+        self._view.add_mesen_capture(name, rom_offset, frame=capture.frame)
 
         # Request thumbnail if worker is ready
         if self._thumbnail_controller:
@@ -352,10 +353,14 @@ class ROMWorkflowController(QObject):
         """Handle sprite activation (double-click) - enter edit mode."""
         logger.debug(f"[DOUBLE-CLICK] _on_sprite_activated called: offset=0x{offset:06X}, source={source_type}")
 
+        # Always update source type to preserve category identity
+        # This ensures the correct category is highlighted even when offset collides
+        self._current_source_type = source_type
+
         # If we already have tile data for this offset, open directly without re-requesting preview
         if self.current_tile_offset == offset and self.current_tile_data:
             logger.debug("[DOUBLE-CLICK] Already have data for this offset, requesting full preview before opening")
-            self.set_offset(offset, auto_open=True)
+            self.set_offset(offset, auto_open=True, source_type=source_type)
             return
 
         # If we are already waiting for this offset (preview pending), just set the flag
@@ -369,7 +374,7 @@ class ROMWorkflowController(QObject):
         self._pending_open_in_editor = True
         self._pending_open_offset = offset
         logger.debug("[DOUBLE-CLICK] Flag set, calling set_offset")
-        self.set_offset(offset)
+        self.set_offset(offset, source_type=source_type)
 
     def _on_local_file_selected(self, path: str, name: str) -> None:
         """Handle local file selection - preview the file.
@@ -589,13 +594,33 @@ class ROMWorkflowController(QObject):
     def _generate_library_thumbnail(self, offset: int) -> Image.Image | None:
         """Generate PIL Image thumbnail for library storage.
 
-        Attempts three strategies in order:
+        When in edit mode and generating thumbnail for the currently edited sprite,
+        uses the edited pixel data instead of the original ROM data.
+
+        For other cases, attempts three strategies in order:
         1. Use current_tile_data if offset matches (already decompressed from preview)
         2. Attempt HAL decompression
         3. Fall back to raw ROM bytes
         """
         if not self.rom_path:
             return None
+
+        # Strategy 0: Use edited pixels if we're in edit mode for this offset
+        if self.state == "edit" and self.current_tile_offset == offset:
+            edited_data = self._editing_controller.get_image_data()
+            if edited_data is not None:
+                try:
+                    flat_palette = self._editing_controller.get_flat_palette()
+                    img = Image.fromarray(edited_data, mode="P")
+                    img.putpalette(flat_palette)
+                    # Create thumbnail
+                    thumb_size = (64, 64)
+                    img.thumbnail(thumb_size, Image.Resampling.NEAREST)
+                    logger.debug("Using edited pixels for library thumbnail: 0x%06X", offset)
+                    return img
+                except Exception as e:
+                    logger.debug("Failed to use edited pixels for thumbnail: %s", e)
+                    # Fall through to other strategies
 
         data_to_render: bytes | None = None
 
@@ -1332,20 +1357,38 @@ class ROMWorkflowController(QObject):
         Allows users to rearrange scattered tiles into a contiguous layout
         for easier editing. The arrangement is persisted to a sidecar file
         so it can be reloaded across sessions.
+
+        When in edit mode, uses the edited pixel data (if available) instead of
+        the original ROM tile data, so edits are visible in the arrangement preview.
         """
         if not self.current_tile_data:
             if self._message_service:
                 self._message_service.show_message("No sprite data to arrange")
             return
 
-        # Create a temporary PNG from the current tile data for the dialog
+        # Create a temporary PNG from the current data for the dialog
         import tempfile
         from pathlib import Path
 
+        from PIL import Image as PILImage
+
         from ..services import SpriteRenderer
 
-        renderer = SpriteRenderer()
-        image = renderer.render_4bpp(self.current_tile_data, self.current_width, self.current_height)
+        # Check if we're in edit mode and have edited pixels
+        image: PILImage.Image | None = None
+        if self.state == "edit":
+            edited_data = self._editing_controller.get_image_data()
+            if edited_data is not None:
+                # Use edited pixels - create image with current palette
+                flat_palette = self._editing_controller.get_flat_palette()
+                image = PILImage.fromarray(edited_data, mode="P")
+                image.putpalette(flat_palette)
+                logger.debug("Using edited pixels for arrangement dialog")
+
+        # Fall back to ROM tile data if not in edit mode or no edited pixels
+        if image is None:
+            renderer = SpriteRenderer()
+            image = renderer.render_4bpp(self.current_tile_data, self.current_width, self.current_height)
 
         # Save to temp file for dialog
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:

@@ -250,9 +250,9 @@ class ROMWorkflowPage(QWidget):
         """Add a ROM sprite to the asset browser."""
         self._asset_browser.add_rom_sprite(name, offset)
 
-    def add_mesen_capture(self, name: str, offset: int) -> None:
+    def add_mesen_capture(self, name: str, offset: int, frame: int | None = None) -> None:
         """Add a Mesen capture to the asset browser."""
-        self._asset_browser.add_mesen_capture(name, offset)
+        self._asset_browser.add_mesen_capture(name, offset, frame=frame)
 
     def add_library_sprite(self, name: str, offset: int, thumbnail: QPixmap | None = None) -> None:
         """Add a library sprite to the asset browser."""

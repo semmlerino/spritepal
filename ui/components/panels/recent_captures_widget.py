@@ -456,6 +456,10 @@ class RecentCapturesWidget(QWidget):
         (e.g., due to HAL compression alignment), this method updates both
         the display text and internal data to reflect the corrected offset.
 
+        The FILE offset (CapturedOffset.offset) is preserved as it represents
+        the original Mesen capture identity. Only the ROM offset used for
+        display and sprite loading is updated.
+
         Args:
             old_rom_offset: Original ROM offset (headerless) before alignment
             new_rom_offset: Adjusted ROM offset (headerless) after alignment
@@ -481,14 +485,16 @@ class RecentCapturesWidget(QWidget):
                 # Note: _captures is in reverse order (most recent at index 0)
                 captures_index = self._list_widget.count() - 1 - i
                 if captures_index < len(self._captures):
-                    file_offset = self._captures[captures_index].offset
-                    # Create updated CapturedOffset (frozen dataclass, so must replace)
+                    original_capture = self._captures[captures_index]
+                    # Create updated CapturedOffset preserving FILE offset
+                    # CapturedOffset is frozen, so we must create a new instance
+                    # The offset field is the FILE offset - it must NOT change
                     updated_capture = CapturedOffset(
-                        offset=new_rom_offset,  # Update FILE offset to the adjusted value
-                        frame=self._captures[captures_index].frame,
-                        timestamp=self._captures[captures_index].timestamp,
-                        raw_line=self._captures[captures_index].raw_line,
-                        rom_checksum=self._captures[captures_index].rom_checksum,
+                        offset=original_capture.offset,  # Preserve FILE offset (immutable identity)
+                        frame=original_capture.frame,
+                        timestamp=original_capture.timestamp,
+                        raw_line=original_capture.raw_line,
+                        rom_checksum=original_capture.rom_checksum,
                     )
                     self._captures[captures_index] = updated_capture
 
@@ -508,6 +514,7 @@ class RecentCapturesWidget(QWidget):
                     # Offset not found in display text (display shows FILE offset, not ROM)
                     # In this case, don't change the display text
                     new_text = current_text
+
                 item.setText(new_text)
 
                 # Update tooltip with new ROM offset
