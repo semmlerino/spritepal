@@ -135,6 +135,21 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._search_coordinator: SpriteSearchCoordinator | None = None
         self._advanced_search_dialog: QDialog | None = None
 
+        # New sidebar widget (replaces tabs)
+        # Import at runtime to avoid circular imports
+        from ui.widgets.offset_browser_sidebar import OffsetBrowserSidebar
+
+        self._sidebar: OffsetBrowserSidebar | None = None
+
+        # Comparison pin slots
+        self._comparison_frame: QFrame | None = None
+        self._comparison_label: QLabel | None = None
+        self._pinned_offsets: list[int] = []  # Up to 2 pinned offsets for comparison
+
+        # History tracking timer
+        self._history_timer: QTimer | None = None
+        self._pending_history_offset: int = 0
+
         # Business logic state
         self.rom_path: str = ""
         self.rom_size: int = ROM_SIZE_4MB
@@ -200,6 +215,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._search_coordinator = SpriteSearchCoordinator(self, self.rom_cache, self)
         self._search_coordinator.sprite_found.connect(self._on_search_sprite_found)
         self._search_coordinator.search_complete.connect(self._on_search_complete)
+        self._search_coordinator.scan_complete.connect(self._on_scan_results_ready)
         self._search_coordinator.status_message.connect(self._update_status)
         self._search_coordinator.offset_requested.connect(self.set_offset)
 
@@ -210,18 +226,19 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     @override
     def _setup_ui(self) -> None:
-        """Set up the dialog UI."""
+        """Set up the dialog UI with new single-panel + sidebar layout."""
         try:
             logger.debug("Starting _setup_ui")
 
-            # Create left and right panels
-            left_panel = self._create_left_panel()
-            right_panel = self._create_right_panel()
+            # Create main content (preview + controls) and sidebar
+            main_panel = self._create_left_panel()
+            sidebar_panel = self._create_right_panel()
 
-            # Add panels to splitter with better proportions
-            # Left panel should be wider for controls, right panel narrower for preview
-            self.add_panel(left_panel, stretch_factor=3)
-            self.add_panel(right_panel, stretch_factor=2)
+            # Add panels to splitter - main content gets more space
+            # Main panel (preview + controls): stretch 4
+            # Sidebar (history, scan results, bookmarks): stretch 1
+            self.add_panel(main_panel, stretch_factor=4)
+            self.add_panel(sidebar_panel, stretch_factor=1)
 
             logger.debug("_setup_ui completed successfully")
 
@@ -230,71 +247,31 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             import traceback
 
             logger.error(f"Traceback: {traceback.format_exc()}")
-            # Don't re-raise - this might be causing the dialog deletion
             logger.error("Continuing despite _setup_ui error to avoid dialog deletion")
 
         # Set up custom buttons
         self._setup_custom_buttons()
 
     def _create_left_panel(self) -> QWidget:
-        """Create the left panel with tabs and collapsible status."""
-        panel = QWidget()
-        layout = QVBoxLayout(panel)
+        """Create the main content panel with preview and navigation controls.
 
-        # Apply compact layout configuration
-        layout.setSpacing(SPACING_SMALL)
-        layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
-
-        # Tab widget
-        self.tab_widget = QTabWidget()
-
-        # Create and add tabs
-        self.browse_tab = SimpleBrowseTab()
-        self.smart_tab = SimpleSmartTab()
-        self.history_tab = SimpleHistoryTab()
-        self.gallery_tab = SpriteGalleryTab()
-
-        self.tab_widget.addTab(self.browse_tab, "Browse")
-        self.tab_widget.addTab(self.smart_tab, "Smart")
-        self.tab_widget.addTab(self.history_tab, "History")
-        self.tab_widget.addTab(self.gallery_tab, "Gallery")
-
-        # Add tab widget with stretch to fill available space
-        layout.addWidget(self.tab_widget, 1)  # Give it stretch value to expand
-
-        # Status panel - expanded by default for better visibility
-        self.status_collapsible = CollapsibleGroupBox("Status", collapsed=False)
-        self.status_panel = StatusPanel(settings_manager=self.settings_manager, rom_cache=self.rom_cache)
-        self.status_collapsible.add_widget(self.status_panel)
-
-        # Add context menu for cache management
-        self._setup_cache_context_menu()
-
-        layout.addWidget(self.status_collapsible, 0)  # No stretch - fixed size
-
-        # Mini ROM map for position context with flexible height
-        self.mini_rom_map = ROMMapWidget()
-        self.mini_rom_map.setMaximumHeight(_MAX_MINI_MAP_HEIGHT)
-        self.mini_rom_map.setMinimumHeight(_MIN_MINI_MAP_HEIGHT)
-        self.mini_rom_map.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        layout.addWidget(self.mini_rom_map, 0)  # No stretch - fixed height
-        # The tab widget with stretch=1 will expand to fill available space
-
-        return panel
-
-    def _create_right_panel(self) -> QWidget:
-        """Create the right panel with preview."""
+        New layout (no tabs):
+        - Preview widget (dominant, at top)
+        - Comparison pin slots (below preview)
+        - Navigation controls from browse tab (offset, palette, step, prev/next)
+        - Position slider (ROM map)
+        """
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setSpacing(SPACING_SMALL)
         layout.setContentsMargins(SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD)
 
         # Title with better styling
-        title = QLabel("Sprite Preview")
+        title = QLabel("Manual Offset Browser")
         title.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {COLORS['highlight']};")
-        layout.addWidget(title, 0)  # No stretch for title
+        layout.addWidget(title, 0)
 
-        # Preview widget with frame for better visibility
+        # Preview widget with frame for better visibility - this is the main focus
         preview_frame = QFrame()
         preview_frame.setFrameStyle(QFrame.Shape.StyledPanel)
         preview_frame.setStyleSheet(f"""
@@ -307,17 +284,84 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         preview_layout = QVBoxLayout(preview_frame)
         preview_layout.setContentsMargins(SPACING_SMALL, SPACING_SMALL, SPACING_SMALL, SPACING_SMALL)
 
-        # Preview widget configured to expand within frame
+        # Preview widget configured to expand
         self.preview_widget = SpritePreviewWidget()
         self.preview_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.preview_widget.similarity_search_requested.connect(self._on_similarity_search_requested)
         preview_layout.addWidget(self.preview_widget)
 
-        layout.addWidget(preview_frame, 1)  # Give frame all the stretch
+        layout.addWidget(preview_frame, 3)  # Give preview most of the stretch
 
-        # No controls section needed - preview widget handles its own controls
+        # Comparison pin area (initially hidden, shows when pins are active)
+        self._comparison_frame = QFrame()
+        self._comparison_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {COLORS["panel_background"]};
+                border-radius: 4px;
+                padding: 4px;
+            }}
+        """)
+        comparison_layout = QVBoxLayout(self._comparison_frame)
+        comparison_layout.setContentsMargins(4, 4, 4, 4)
+        self._comparison_label = QLabel("No pins - Use Ctrl+P to pin current offset for comparison")
+        self._comparison_label.setStyleSheet(f"color: {COLORS['text_muted']}; font-style: italic;")
+        comparison_layout.addWidget(self._comparison_label)
+        self._comparison_frame.hide()  # Hidden until pins are used
+        layout.addWidget(self._comparison_frame, 0)
+
+        # Browse tab contains navigation controls (offset input, slider, buttons)
+        # We keep it but remove the tab wrapper
+        self.browse_tab = SimpleBrowseTab()
+        layout.addWidget(self.browse_tab, 0)  # No stretch - fixed height for controls
+
+        # Mini ROM map for position context
+        self.mini_rom_map = ROMMapWidget()
+        self.mini_rom_map.setMaximumHeight(_MAX_MINI_MAP_HEIGHT)
+        self.mini_rom_map.setMinimumHeight(_MIN_MINI_MAP_HEIGHT)
+        self.mini_rom_map.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        layout.addWidget(self.mini_rom_map, 0)
+
+        # Smart tab, History tab, Gallery tab - no longer used in main view
+        # They are replaced by the sidebar
+        self.smart_tab = SimpleSmartTab()
+        self.smart_tab.hide()  # Keep for backward compatibility but hide
+        self.history_tab = SimpleHistoryTab()
+        self.history_tab.hide()  # Moved to sidebar
+        self.gallery_tab = SpriteGalleryTab()
+        self.gallery_tab.hide()  # Merged into scan results
+
+        # Status panel - collapsed by default (less important now)
+        self.status_collapsible = CollapsibleGroupBox("Status", collapsed=True)
+        self.status_panel = StatusPanel(settings_manager=self.settings_manager, rom_cache=self.rom_cache)
+        self.status_collapsible.add_widget(self.status_panel)
+        self._setup_cache_context_menu()
+        layout.addWidget(self.status_collapsible, 0)
+
+        # Tab widget is no longer used
+        self.tab_widget = None
 
         return panel
+
+    def _create_right_panel(self) -> QWidget:
+        """Create the sidebar panel with History, Scan Results, and Bookmarks.
+
+        The sidebar provides:
+        - History of visited offsets (auto-tracked)
+        - Scan results from Find Sprites operation
+        - User bookmarks
+        """
+        from ui.widgets.offset_browser_sidebar import OffsetBrowserSidebar
+
+        self._sidebar = OffsetBrowserSidebar(self, bookmark_manager=self._bookmark_manager)
+
+        # Connect sidebar signals to dialog handlers
+        self._sidebar.history_offset_selected.connect(self.set_offset)
+        self._sidebar.history_offset_applied.connect(self._apply_offset_from_history)
+        self._sidebar.scan_result_selected.connect(self.set_offset)
+        self._sidebar.scan_result_applied.connect(self._apply_offset_from_scan)
+        self._sidebar.bookmark_selected.connect(self.set_offset)
+
+        return self._sidebar
 
     def _setup_custom_buttons(self) -> None:
         """Set up custom dialog buttons with improved layout."""
@@ -392,11 +436,11 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._preview_timer.timeout.connect(self._update_preview)
 
     def _connect_signals(self) -> None:
-        """Connect internal signals."""
-        if self.browse_tab is None or self.smart_tab is None or self.history_tab is None or self.gallery_tab is None:
+        """Connect internal signals for the new single-panel + sidebar layout."""
+        if self.browse_tab is None:
             return
 
-        # Browse tab signals
+        # Browse tab signals - these are the main navigation controls
         self.browse_tab.offset_changed.connect(self._on_offset_changed)
         self.browse_tab.find_next_clicked.connect(self._find_next_sprite)
         self.browse_tab.find_prev_clicked.connect(self._find_prev_sprite)
@@ -406,19 +450,28 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         if self._smart_preview_coordinator:
             self.browse_tab.connect_smart_preview_coordinator(self._smart_preview_coordinator)
 
-        # Smart tab signals
-        self.smart_tab.smart_mode_changed.connect(self._on_smart_mode_changed)
-        self.smart_tab.region_changed.connect(self._on_region_changed)
-        self.smart_tab.offset_requested.connect(self._on_offset_requested)
+        # Smart tab signals (kept for backward compatibility, though hidden)
+        if self.smart_tab is not None:
+            self.smart_tab.smart_mode_changed.connect(self._on_smart_mode_changed)
+            self.smart_tab.region_changed.connect(self._on_region_changed)
+            self.smart_tab.offset_requested.connect(self._on_offset_requested)
 
-        # History tab signals
-        self.history_tab.sprite_selected.connect(self._on_sprite_selected)
+        # History tab signals (now handled by sidebar, but keep for compatibility)
+        if self.history_tab is not None:
+            self.history_tab.sprite_selected.connect(self._on_sprite_selected)
 
-        # Gallery tab signals - uses same handler as history (both navigate to browse tab)
-        self.gallery_tab.sprite_selected.connect(self._on_sprite_selected)
+        # Gallery tab signals (now handled by sidebar scan results)
+        if self.gallery_tab is not None:
+            self.gallery_tab.sprite_selected.connect(self._on_sprite_selected)
+
+        # Track offset visits for history (add to sidebar after stable dwell)
+        # This is done in _on_offset_changed with a timer
 
     def _on_offset_changed(self, offset: int) -> None:
-        """Handle offset changes from browse tab."""
+        """Handle offset changes from browse tab.
+
+        Also tracks history: offsets with >500ms dwell time are added to sidebar history.
+        """
         # Prevent re-entrant calls for the same offset
         if self._last_offset_processed == offset:
             return
@@ -446,6 +499,35 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Schedule predictive preloading for adjacent offsets
         self._schedule_adjacent_preloading(offset)
+
+        # Track stable visits for history (>500ms dwell time)
+        self._schedule_history_tracking(offset)
+
+    def _schedule_history_tracking(self, offset: int) -> None:
+        """Schedule history tracking for an offset after dwell time.
+
+        Only adds to history if the user stays at this offset for >500ms.
+
+        Args:
+            offset: The offset to potentially add to history.
+        """
+        # Cancel any pending history timer
+        if self._history_timer is not None:
+            self._history_timer.stop()
+            self._history_timer.deleteLater()
+            self._history_timer = None
+
+        # Create new timer for this offset
+        self._pending_history_offset = offset
+        self._history_timer = QTimer(self)
+        self._history_timer.setSingleShot(True)
+        self._history_timer.timeout.connect(self._commit_offset_to_history)
+        self._history_timer.start(500)  # 500ms dwell time
+
+    def _commit_offset_to_history(self) -> None:
+        """Commit the pending offset to history after dwell time elapsed."""
+        if hasattr(self, "_pending_history_offset"):
+            self._add_to_history(self._pending_history_offset)
 
     def _emit_offset_changed(self, offset: int) -> None:
         """Emit offset changed signal safely.
@@ -507,6 +589,113 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         if self._search_coordinator is not None:
             self._search_coordinator.find_sprite(current_offset, forward)
 
+    def _navigate_by_delta(self, delta: int) -> None:
+        """Navigate offset by a given delta value.
+
+        Args:
+            delta: Positive for forward, negative for backward.
+        """
+        if not self._has_rom_data() or self.browse_tab is None:
+            return
+
+        current = self.get_current_offset()
+        new_offset = current + delta
+
+        # Clamp to valid range
+        new_offset = max(0, min(new_offset, self.rom_size - 1))
+
+        if new_offset != current:
+            self.set_offset(new_offset)
+
+    def _get_step_size(self) -> int:
+        """Get the current step size from the browse tab.
+
+        Returns:
+            Step size in bytes for Ctrl+Arrow navigation.
+        """
+        if self.browse_tab is not None:
+            return self.browse_tab.get_step_size()
+        return 0x100  # Default fallback
+
+    def _pin_current_offset(self) -> None:
+        """Pin the current offset for comparison.
+
+        Pinned offsets are displayed alongside the main preview for A/B comparison.
+        Supports up to 2 pinned offsets. Pinning a third will replace the oldest.
+        """
+        current = self.get_current_offset()
+
+        # Don't pin duplicates
+        if current in self._pinned_offsets:
+            self._update_status(f"Offset 0x{current:06X} is already pinned")
+            return
+
+        # Limit to 2 pins - remove oldest if full
+        if len(self._pinned_offsets) >= 2:
+            removed = self._pinned_offsets.pop(0)
+            self._update_status(f"Replaced pin 0x{removed:06X} with 0x{current:06X}")
+        else:
+            self._update_status(f"Pinned offset 0x{current:06X} for comparison")
+
+        self._pinned_offsets.append(current)
+        self._update_comparison_display()
+
+    def _clear_pinned_offsets(self) -> None:
+        """Clear all pinned comparison offsets."""
+        if self._pinned_offsets:
+            self._pinned_offsets.clear()
+            self._update_comparison_display()
+            self._update_status("Cleared comparison pins")
+
+    def _update_comparison_display(self) -> None:
+        """Update the comparison display with pinned offsets."""
+        if self._comparison_frame is None or self._comparison_label is None:
+            return
+
+        if not self._pinned_offsets:
+            self._comparison_frame.hide()
+            self._comparison_label.setText("No pins - Use Ctrl+P to pin current offset for comparison")
+            return
+
+        # Show frame and update label
+        self._comparison_frame.show()
+
+        # Build label text showing pinned offsets
+        pin_texts = []
+        for i, offset in enumerate(self._pinned_offsets):
+            label = chr(ord("A") + i)  # A, B
+            pin_texts.append(f"[{label}] 0x{offset:06X}")
+
+        self._comparison_label.setText(" | ".join(pin_texts) + " - Press Escape to clear")
+        self._comparison_label.setStyleSheet(f"color: {COLORS['highlight']}; font-weight: bold;")
+
+    def _apply_offset_from_history(self, offset: int) -> None:
+        """Apply an offset from history (double-click).
+
+        Args:
+            offset: The offset to apply.
+        """
+        self.set_offset(offset)
+        self._apply_offset()
+
+    def _apply_offset_from_scan(self, offset: int) -> None:
+        """Apply an offset from scan results (double-click).
+
+        Args:
+            offset: The offset to apply.
+        """
+        self.set_offset(offset)
+        self._apply_offset()
+
+    def _add_to_history(self, offset: int) -> None:
+        """Add an offset to the sidebar history.
+
+        Args:
+            offset: The offset to add.
+        """
+        if hasattr(self, "_sidebar") and self._sidebar is not None:
+            self._sidebar.add_to_history(offset)
+
     def _jump_to_sprite(self, offset: int) -> None:
         """Jump to a specific sprite offset.
 
@@ -565,12 +754,19 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._update_status(f"No sprite at 0x{current_offset:06X}")
 
     def _apply_offset(self) -> None:
-        """Apply current offset and close dialog."""
+        """Apply current offset to the editor.
+
+        Unlike the previous implementation, this does NOT close the dialog.
+        The user can continue browsing and apply different offsets.
+        """
         offset = self.get_current_offset()
         sprite_name = f"manual_0x{offset:X}"
-        # Emit signal directly
+
+        # Emit signal to update the editor
         self.sprite_found.emit(offset, sprite_name)
-        self.hide()
+
+        # Show confirmation but keep dialog open for continued browsing
+        self._update_status(f"Applied offset 0x{offset:06X} - continue browsing or press Escape to close")
 
     def _update_status(self, message: str) -> None:
         """Update status message."""
@@ -1065,37 +1261,102 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     @override
     def keyPressEvent(self, event: QKeyEvent | None) -> None:
-        """Handle keyboard shortcuts."""
-        if event:
-            if event.key() == Qt.Key.Key_Escape:
-                if self.view_state_manager.handle_escape_key():
-                    event.accept()
-                else:
-                    self.hide()
-                    event.accept()
-            elif event.key() == Qt.Key.Key_F11:
-                self.view_state_manager.toggle_fullscreen()
-                event.accept()
-            elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-                self._apply_offset()
-                event.accept()
-            elif event.key() == Qt.Key.Key_G and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                # Ctrl+G - Go to offset
-                self._show_goto_dialog()
-                event.accept()
-            elif event.key() == Qt.Key.Key_D and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                # Ctrl+D - Add bookmark
-                if self._bookmark_manager:
-                    self._bookmark_manager.add_bookmark(self.get_current_offset())
-                event.accept()
-            elif event.key() == Qt.Key.Key_B and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                # Ctrl+B - Show bookmarks menu
-                if self._bookmark_manager:
-                    menu = self._bookmark_manager.create_menu()
-                    menu.exec(self.mapToGlobal(self.rect().center()))
-                event.accept()
+        """Handle keyboard shortcuts for offset navigation.
 
-        if event is not None:
+        Navigation granularities:
+        - Arrow keys: ±16 bytes (one tile row for 4bpp 8x8 tiles)
+        - Shift+Arrow: ±32 bytes (one complete tile)
+        - Ctrl+Arrow: ±step_size (user-configurable)
+        - Page Up/Down: ±4096 bytes (4KB coarse scan)
+        - Home/End: Jump to ROM start/end
+        """
+        if event is None:
+            return
+
+        key = event.key()
+        modifiers = event.modifiers()
+
+        # Navigation constants
+        TILE_ROW_BYTES = 16  # One row of an 8x8 4bpp tile
+        TILE_BYTES = 32  # One complete 8x8 4bpp tile
+        COARSE_STEP = 4096  # 4KB for coarse navigation
+
+        # Check for navigation keys
+        if key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
+            direction = 1 if key in (Qt.Key.Key_Right, Qt.Key.Key_Down) else -1
+
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                # Ctrl+Arrow: Use user-configured step size
+                step = self._get_step_size()
+            elif modifiers & Qt.KeyboardModifier.ShiftModifier:
+                # Shift+Arrow: One tile (32 bytes)
+                step = TILE_BYTES
+            else:
+                # Plain arrow: One tile row (16 bytes)
+                step = TILE_ROW_BYTES
+
+            self._navigate_by_delta(direction * step)
+            event.accept()
+            return
+
+        if key in (Qt.Key.Key_PageUp, Qt.Key.Key_PageDown):
+            direction = 1 if key == Qt.Key.Key_PageDown else -1
+            self._navigate_by_delta(direction * COARSE_STEP)
+            event.accept()
+            return
+
+        if key == Qt.Key.Key_Home:
+            self.set_offset(0)
+            event.accept()
+            return
+
+        if key == Qt.Key.Key_End:
+            self.set_offset(max(0, self.rom_size - 1))
+            event.accept()
+            return
+
+        # Non-navigation keys
+        if key == Qt.Key.Key_Escape:
+            # First clear comparison pins if any, then handle escape
+            if self._pinned_offsets:
+                self._clear_pinned_offsets()
+                event.accept()
+            elif self.view_state_manager.handle_escape_key():
+                event.accept()
+            else:
+                self.hide()
+                event.accept()
+        elif key == Qt.Key.Key_F11:
+            self.view_state_manager.toggle_fullscreen()
+            event.accept()
+        elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self._apply_offset()
+            event.accept()
+        elif key == Qt.Key.Key_G and modifiers & Qt.KeyboardModifier.ControlModifier:
+            # Ctrl+G - Go to offset
+            self._show_goto_dialog()
+            event.accept()
+        elif key == Qt.Key.Key_D and modifiers & Qt.KeyboardModifier.ControlModifier:
+            # Ctrl+D - Add bookmark
+            if self._bookmark_manager:
+                self._bookmark_manager.add_bookmark(self.get_current_offset())
+            event.accept()
+        elif key == Qt.Key.Key_B and modifiers & Qt.KeyboardModifier.ControlModifier:
+            # Ctrl+B - Show bookmarks menu
+            if self._bookmark_manager:
+                menu = self._bookmark_manager.create_menu()
+                menu.exec(self.mapToGlobal(self.rect().center()))
+            event.accept()
+        elif key == Qt.Key.Key_P and modifiers & Qt.KeyboardModifier.ControlModifier:
+            # Ctrl+P - Pin current offset for comparison
+            self._pin_current_offset()
+            event.accept()
+        elif key == Qt.Key.Key_V and modifiers & Qt.KeyboardModifier.ControlModifier:
+            # Ctrl+V - Paste offset from clipboard
+            if self.browse_tab is not None:
+                self.browse_tab._paste_from_clipboard()
+            event.accept()
+        else:
             super().keyPressEvent(event)
 
     @override
@@ -1179,6 +1440,28 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         """Handle search completion"""
         if not found:
             self._update_status("No sprites found in search direction")
+
+    def _on_scan_results_ready(self, sprites: list[dict[str, object]]) -> None:
+        """Handle scan results from sprite search coordinator.
+
+        Populates the sidebar scan results panel.
+
+        Args:
+            sprites: List of found sprite dicts with offset, tile_count, etc.
+        """
+        if self._sidebar is None:
+            return
+
+        # Convert sprites to format expected by sidebar
+        results: list[dict[str, int | float]] = []
+        for sprite in sprites:
+            offset = sprite.get("offset", 0)
+            quality = sprite.get("quality", 0.0)
+            if isinstance(offset, int) and isinstance(quality, (int, float)):
+                results.append({"offset": offset, "quality": float(quality)})
+
+        self._sidebar.set_scan_results(results)
+        self._update_status(f"Found {len(results)} sprites - see Scan Results in sidebar")
 
     # Bookmark methods have been extracted to BookmarkManager
     # See: ui/dialogs/services/bookmark_manager.py
