@@ -1906,6 +1906,10 @@ class ROMWorkflowController(QObject):
                 except OSError:
                     self._rom_mtime = None
 
+                # Recreate thumbnail worker with updated ROM path
+                # (worker stores rom_path at init and doesn't update it)
+                self._setup_thumbnail_worker()
+
                 if self._view:
                     self._view.set_checksum_valid(True)
                     self._view.set_rom_path(self.rom_path)

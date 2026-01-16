@@ -182,3 +182,90 @@ class TestBatchThumbnailWorkerHALAlignment:
             f"A 64KB ({0x10000} byte) chunk indicates the bug where thumbnail worker "
             "reads a chunk instead of using the full ROM like preview worker does."
         )
+
+    def test_thumbnail_signal_uses_aligned_offset_after_offset_hunting(self, tmp_path):
+        """
+        Thumbnail worker should update request.offset when offset hunting succeeds.
+
+        When HAL decompression fails at the requested offset but succeeds at an
+        adjusted offset (via get_offset_candidates), the worker should update
+        request.offset to the aligned value. This ensures the thumbnail_ready
+        signal emits the correct offset that matches the actual data.
+
+        Bug: Currently request.offset is NOT updated after alignment, causing
+        the signal to emit the wrong (unaligned) offset.
+
+        Reference: preview_worker_pool.py:267 correctly does `self.offset = try_offset`
+        """
+        # Create mock ROM with SMC header (512 bytes) + ROM data
+        smc_header = b"\x00" * 512
+        rom_content = bytes(range(256)) * 300  # ~76KB of patterned data
+        rom_data = smc_header + rom_content
+
+        # Write to temp file
+        rom_file = tmp_path / "test.smc"
+        rom_file.write_bytes(rom_data)
+
+        # Create mocks
+        mock_extractor = MagicMock()
+        mock_injector = MagicMock()
+        mock_extractor.rom_injector = mock_injector
+
+        # CRITICAL: Simulate offset hunting - first offset FAILS, adjusted offset SUCCEEDS
+        # Requested offset: 0x100
+        # Aligned offset (success): 0x102 (delta +2)
+        requested_offset = 0x100
+        aligned_offset = 0x102  # get_offset_candidates would try this after 0x100 fails
+
+        def mock_find_compressed_sprite(rom_data, offset, expected_size=None):
+            """Fail at requested offset, succeed at aligned offset."""
+            if offset == aligned_offset:
+                # Return valid data at aligned offset
+                return (100, b"\x01" * 32, 0)
+            else:
+                # Fail at other offsets (including requested offset 0x100)
+                return (0, None, 0)
+
+        mock_injector.find_compressed_sprite.side_effect = mock_find_compressed_sprite
+
+        # Create worker
+        with patch("ui.workers.batch_thumbnail_worker.TileRenderer") as mock_renderer_class:
+            mock_renderer = MagicMock()
+            mock_renderer_class.return_value = mock_renderer
+            mock_image = MagicMock()
+            mock_image.mode = "P"
+            mock_image.size = (8, 8)
+            mock_renderer.render_tiles.return_value = mock_image
+
+            worker = BatchThumbnailWorker(
+                rom_path=str(rom_file),
+                rom_extractor=mock_extractor,
+            )
+
+            # Manually load ROM data
+            worker._load_rom_data()
+
+            # Create request with original offset
+            request = ThumbnailRequest(offset=requested_offset, size=96)
+
+            with patch.object(worker, "_pil_to_qimage") as mock_pil_to_qimage:
+                mock_qimage = MagicMock()
+                mock_qimage.isNull.return_value = False
+                mock_qimage.scaled.return_value = mock_qimage
+                mock_pil_to_qimage.return_value = mock_qimage
+
+                worker._generate_thumbnail(request)
+
+            worker._clear_rom_data()
+
+        # KEY ASSERTION: After alignment succeeds, request.offset should be updated
+        # to the aligned offset. This is what the thumbnail_ready signal will use.
+        #
+        # This test FAILS with current buggy code where request.offset remains 0x100
+        # even though the thumbnail was generated from data at 0x102.
+        assert request.offset == aligned_offset, (
+            f"Expected request.offset to be updated to aligned offset 0x{aligned_offset:X}, "
+            f"but it remained at 0x{request.offset:X}. "
+            f"The thumbnail was generated from data at 0x{aligned_offset:X} but the signal "
+            f"will incorrectly emit offset 0x{request.offset:X}."
+        )

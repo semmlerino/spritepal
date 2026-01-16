@@ -201,3 +201,115 @@ class TestClearThumbnailMultipleMatches:
         result = browser.clear_thumbnail(0x9999)
 
         assert result is False, "Should return False when no items match"
+
+
+class TestUpdateSpriteOffsetMultipleMatches:
+    """Tests for update_sprite_offset when multiple items share the same offset.
+
+    Bug: update_sprite_offset returns after first match, leaving other items
+    with stale offset values. This causes desync when a sprite exists in both
+    ROM Sprites and Mesen Captures categories.
+    """
+
+    def test_update_sprite_offset_updates_all_items_with_same_offset(self, browser, qtbot: QtBot) -> None:
+        """
+        BUG REPRODUCTION: When ROM sprite and Mesen capture share same offset,
+        update_sprite_offset should update BOTH items, not just the first match.
+
+        This test will FAIL before the fix is applied.
+        """
+        old_offset = 0x3C6EF1
+        new_offset = 0x3C6EF3  # Simulating +2 alignment adjustment
+
+        # Add ROM sprite and Mesen capture at same offset
+        browser.add_rom_sprite("ROM Sprite", old_offset)
+        browser.add_mesen_capture("Mesen Capture", old_offset)
+
+        # Verify setup
+        rom_category = browser._rom_category
+        mesen_category = browser._mesen_category
+        rom_item = rom_category.child(0)
+        mesen_item = mesen_category.child(0)
+
+        assert rom_item is not None, "ROM item should exist"
+        assert mesen_item is not None, "Mesen item should exist"
+
+        # Update offset (simulating alignment adjustment from preview coordinator)
+        result = browser.update_sprite_offset(old_offset, new_offset)
+
+        # Refresh data after update
+        rom_data = rom_item.data(0, Qt.ItemDataRole.UserRole)
+        mesen_data = mesen_item.data(0, Qt.ItemDataRole.UserRole)
+
+        # Both items should have updated offset
+        assert rom_data.get("offset") == new_offset, (
+            f"ROM item offset not updated: expected 0x{new_offset:X}, "
+            f"got 0x{rom_data.get('offset'):X}. "
+            "update_sprite_offset stopped at first match."
+        )
+        assert mesen_data.get("offset") == new_offset, (
+            f"Mesen item offset not updated: expected 0x{new_offset:X}, "
+            f"got 0x{mesen_data.get('offset'):X}. "
+            "update_sprite_offset stopped at first match."
+        )
+        assert result is True, "Should return True when items were updated"
+
+    def test_update_sprite_offset_emits_signal_for_each_item(self, browser, qtbot: QtBot) -> None:
+        """
+        The item_offset_changed signal should be emitted for EACH updated item,
+        so the thumbnail controller can re-queue thumbnails correctly.
+        """
+        old_offset = 0x1000
+        new_offset = 0x1002
+
+        # Add multiple items at same offset
+        browser.add_rom_sprite("ROM Sprite", old_offset)
+        browser.add_mesen_capture("Mesen Capture", old_offset)
+
+        # Track signal emissions
+        signal_count = 0
+
+        def on_offset_changed(old: int, new: int) -> None:
+            nonlocal signal_count
+            signal_count += 1
+
+        browser.item_offset_changed.connect(on_offset_changed)
+
+        browser.update_sprite_offset(old_offset, new_offset)
+
+        # Should emit once per updated item
+        assert signal_count == 2, (
+            f"Expected 2 signal emissions (one per item), got {signal_count}. "
+            "update_sprite_offset should emit for each updated item."
+        )
+
+    def test_update_sprite_offset_updates_display_text_for_all_items(self, browser, qtbot: QtBot) -> None:
+        """
+        When items have offset in display text (like Mesen captures),
+        all matching items should have their text updated.
+
+        Note: add_mesen_capture is idempotent (skips duplicate offsets),
+        so we use ROM sprite + Mesen capture which both have the offset.
+        """
+        old_offset = 0x293AEB
+        new_offset = 0x293AED
+
+        # Add a ROM sprite (no offset in name) and a Mesen capture (offset in name)
+        browser.add_rom_sprite("Plain Name", old_offset)
+        browser.add_mesen_capture(f"0x{old_offset:06X} (capture)", old_offset)
+
+        browser.update_sprite_offset(old_offset, new_offset)
+
+        rom_category = browser._rom_category
+        mesen_category = browser._mesen_category
+        rom_item = rom_category.child(0)
+        mesen_item = mesen_category.child(0)
+
+        # ROM sprite text should be unchanged (no offset in name)
+        assert rom_item.text(0) == "Plain Name", f"ROM item text should not change: {rom_item.text(0)}"
+
+        # Mesen capture text should have updated offset
+        assert f"0x{new_offset:06X}" in mesen_item.text(0), f"Mesen item text not updated: {mesen_item.text(0)}"
+        assert f"0x{old_offset:06X}" not in mesen_item.text(0), (
+            f"Mesen item still has old offset in text: {mesen_item.text(0)}"
+        )

@@ -831,20 +831,21 @@ class SpriteAssetBrowser(QWidget):
         return False
 
     def update_sprite_offset(self, old_offset: int, new_offset: int) -> bool:
-        """Update any sprite item's offset after alignment adjustment.
+        """Update ALL sprite items' offset after alignment adjustment.
 
-        Searches all categories (ROM, Mesen, Library) for an item with
-        old_offset and updates it to new_offset. This should be called
-        when preview discovers the actual sprite offset differs from
-        the requested offset.
+        Searches all categories (ROM, Mesen, Library) for items with
+        old_offset and updates them to new_offset. Multiple items can
+        share the same offset (e.g., ROM sprite and Mesen capture for
+        the same sprite). All matching items are updated.
 
         Args:
             old_offset: Original requested offset
             new_offset: Actual aligned offset
 
         Returns:
-            True if item was found and updated, False otherwise
+            True if any items were found and updated, False otherwise
         """
+        updated_count = 0
         iterator = QTreeWidgetItemIterator(self.tree)
         while iterator.value():
             item = iterator.value()
@@ -867,9 +868,13 @@ class SpriteAssetBrowser(QWidget):
 
                 logger.debug("update_sprite_offset: 0x%06X -> 0x%06X", old_offset, new_offset)
                 self.item_offset_changed.emit(old_offset, new_offset)
-                return True
+                updated_count += 1
+                # Continue iterating - don't return early (multiple items can match)
             iterator += 1
-        return False
+
+        if updated_count > 0:
+            logger.debug("update_sprite_offset: updated %d items", updated_count)
+        return updated_count > 0
 
     def ensure_mesen_capture(self, offset: int, name: str | None = None) -> None:
         """Ensure a Mesen capture exists, adding if not present.

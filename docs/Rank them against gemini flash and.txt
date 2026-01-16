@@ -1,0 +1,12 @@
+Rank them against gemini flash and pro
+
+A = codex medium
+B = codex xhigh
+
+C = Gemini Flash 
+D = Gemini Pro
+
+E = codex medium no serena
+F = Claude Code
+
+Dbis = also gemini pro?

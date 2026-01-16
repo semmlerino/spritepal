@@ -551,8 +551,10 @@ class SmartPreviewCoordinator(QObject):
             f"actual_offset=0x{actual_offset:X}, hal_succeeded={hal_succeeded}, header_bytes={len(header_bytes)}"
         )
         # Check if this is still the current request
+        # Note: Negative request IDs are used for background preloads and should
+        # bypass the staleness check - they're always valid for caching purposes.
         with QMutexLocker(self._mutex):
-            if request_id < self._request_counter:
+            if request_id >= 0 and request_id < self._request_counter:
                 logger.debug(f"[COORD] Ignoring stale request {request_id} (current={self._request_counter})")
                 return
 
