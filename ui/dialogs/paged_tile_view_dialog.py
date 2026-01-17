@@ -16,6 +16,8 @@ from PySide6.QtWidgets import QDialogButtonBox, QPushButton, QVBoxLayout, QWidge
 if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent
 
+    from core.rom_extractor import ROMExtractor
+
 from core.default_palette_loader import DefaultPaletteLoader
 from ui.common.spacing_constants import SPACING_SMALL
 from ui.components.base.cleanup_dialog import CleanupDialog
@@ -56,6 +58,7 @@ class PagedTileViewDialog(CleanupDialog):
         rom_data: bytes,
         palette: list[list[int]] | None = None,
         initial_offset: int = 0,
+        rom_extractor: ROMExtractor | None = None,
     ) -> None:
         """
         Initialize the paged tile view dialog.
@@ -65,11 +68,13 @@ class PagedTileViewDialog(CleanupDialog):
             rom_data: Raw ROM byte data to display
             palette: Optional palette for tile rendering
             initial_offset: Starting offset to navigate to
+            rom_extractor: Optional ROM extractor for decompression mode
         """
         # Store data before super().__init__ calls _setup_ui
         self._rom_data = rom_data
         self._palette = palette
         self._initial_offset = initial_offset
+        self._rom_extractor = rom_extractor
         self._selected_offset: int | None = None
 
         # Initialize tile view widget reference
@@ -95,6 +100,10 @@ class PagedTileViewDialog(CleanupDialog):
         # Create tile view widget
         self._tile_view = PagedTileViewWidget()
         self._tile_view.set_rom_data(self._rom_data)
+
+        # Set ROM injector for decompression mode (if extractor provided)
+        if self._rom_extractor is not None:
+            self._tile_view.set_rom_injector(self._rom_extractor.rom_injector)
 
         # Load default palettes from config
         self._load_default_palettes()

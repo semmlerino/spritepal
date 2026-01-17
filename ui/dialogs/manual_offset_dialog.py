@@ -425,6 +425,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                     rom_data=rom_data,
                     palette=self._current_palette,
                     initial_offset=self.get_current_offset(),
+                    rom_extractor=self.rom_extractor,
                 )
                 self._tile_grid_dialog.offset_selected.connect(self.set_offset)
             else:
@@ -433,6 +434,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                 if self._tile_grid_dialog._tile_view is not None:
                     self._tile_grid_dialog._tile_view.set_rom_data(rom_data)
                     self._tile_grid_dialog._tile_view.set_palette(self._current_palette)
+                    # Update ROM injector in case extractor changed
+                    if self.rom_extractor is not None:
+                        self._tile_grid_dialog._tile_view.set_rom_injector(self.rom_extractor.rom_injector)
                 # Navigate to current offset
                 self._tile_grid_dialog.go_to_offset(self.get_current_offset())
 

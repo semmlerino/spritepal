@@ -628,3 +628,71 @@ class TestPagedTileViewWidget:
 
         assert result is not None
         assert result["name"] == "my_custom_palette.pal"  # Stem of filename
+
+
+class TestTileGridHighlight:
+    """Test the highlight feature for go-to-offset."""
+
+    @pytest.fixture
+    def sample_rom_data(self) -> bytes:
+        """Create sample ROM data for testing."""
+        return bytes(range(256)) * 1000  # 256000 bytes
+
+    def test_set_highlight_creates_rect(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test that setting a highlight creates a rectangle."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Wait for page render to complete
+        qtbot.waitUntil(lambda: widget._graphics_view._pixmap_item is not None, timeout=5000)
+
+        # Set highlight on current page
+        widget._graphics_view.set_highlight(0x1000)
+
+        assert widget._graphics_view._highlight_offset == 0x1000
+        assert widget._graphics_view._highlight_rect is not None
+
+    def test_set_highlight_none_clears_rect(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test that setting highlight to None clears it."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Wait for page render to complete
+        qtbot.waitUntil(lambda: widget._graphics_view._pixmap_item is not None, timeout=5000)
+
+        # Set then clear highlight
+        widget._graphics_view.set_highlight(0x1000)
+        assert widget._graphics_view._highlight_rect is not None
+
+        widget._graphics_view.set_highlight(None)
+        assert widget._graphics_view._highlight_rect is None
+        assert widget._graphics_view._highlight_offset is None
+
+    def test_goto_offset_sets_highlight(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test that go-to-offset sets the highlight."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Use go-to-offset input
+        widget._offset_input.setText("0x1000")
+        widget._on_goto_offset()
+
+        assert widget._graphics_view._highlight_offset == 0x1000
+
+    def test_tile_click_clears_highlight(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test that clicking a tile clears the highlight."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Set highlight
+        widget._graphics_view.set_highlight(0x1000)
+        assert widget._graphics_view._highlight_offset is not None
+
+        # Simulate tile click
+        widget._on_tile_clicked(0x2000)
+
+        assert widget._graphics_view._highlight_offset is None
