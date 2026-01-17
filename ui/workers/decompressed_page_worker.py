@@ -142,7 +142,7 @@ class DecompressedPageWorker(BaseWorker):
 
         try:
             # Attempt HAL decompression
-            compressed_size, tile_data, slack = self._rom_injector.find_compressed_sprite(
+            _compressed_size, tile_data, _slack = self._rom_injector.find_compressed_sprite(
                 self._rom_data,
                 offset,
                 expected_size=4096,  # Max 128 tiles * 32 bytes

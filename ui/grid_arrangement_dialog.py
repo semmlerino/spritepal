@@ -144,6 +144,11 @@ class GridArrangementDialog(SplitterDialog):
         # This persists through arrangement changes (unlike _apply_result which is cleared).
         # Used by get_arrangement_result() to determine whether to export modified tiles.
         self._tiles_have_been_modified: bool = False
+        # Track which tile positions were actually modified by apply operations.
+        # Only these tiles should be returned in get_arrangement_result().
+        # Without this, unmodified P-mode tiles would be corrupted when processed
+        # as L-mode tiles by _update_tile_data_from_modified_tiles().
+        self._actually_modified_positions: set[TilePosition] = set()
 
         # Persistent overlay item
         self.overlay_item: OverlayGraphicsItem | None = None
@@ -1160,6 +1165,8 @@ class GridArrangementDialog(SplitterDialog):
         self._apply_result = result
         # Mark that tiles have been modified (this flag persists through arrangement changes)
         self._tiles_have_been_modified = True
+        # Track which tile positions were actually modified (accumulates across multiple applies)
+        self._actually_modified_positions.update(result.modified_tiles.keys())
 
         # Clear colorizer cache BEFORE push so _update_displays() shows modified tiles
         # (push calls execute() which calls the callback immediately)
@@ -1900,11 +1907,15 @@ class GridArrangementDialog(SplitterDialog):
             metadata["overlay_opacity"] = state.get("opacity", 0.5)
             metadata["overlay_visible"] = state.get("visible", True)
 
-        # Include modified tiles if any Apply operation was performed
-        # self.tiles contains the current pixel state (potentially modified by ApplyOverlayCommand)
-        # Use _tiles_have_been_modified flag which persists through arrangement changes
-        # (unlike _apply_result which is cleared when arrangement changes)
-        modified_tiles = self.tiles.copy() if self._tiles_have_been_modified else None
+        # Include ONLY actually modified tiles (not all tiles)
+        # This prevents palette corruption: unmodified P-mode tiles would be corrupted
+        # if processed as L-mode tiles by _update_tile_data_from_modified_tiles().
+        # _actually_modified_positions tracks which tiles were changed by ApplyOverlay.
+        modified_tiles = (
+            {pos: self.tiles[pos] for pos in self._actually_modified_positions if pos in self.tiles}
+            if self._actually_modified_positions
+            else None
+        )
 
         keep_arrangement = True
         if hasattr(self, "keep_layout_check"):
