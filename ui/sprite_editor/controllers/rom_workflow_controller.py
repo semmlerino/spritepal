@@ -102,6 +102,10 @@ class ROMWorkflowController(QObject):
         self.state: str = "preview"  # 'preview', 'edit', 'save'
         self._current_source_type: str = "rom"  # Source type of currently selected sprite
 
+        # Track offset adjustments to prevent duplicate captures after resync
+        # Maps original ROM offset -> adjusted ROM offset
+        self._adjusted_offsets: dict[int, int] = {}
+
         # Current sprite data
         self.current_tile_data: bytes | None = None
         self.current_tile_offset: int = -1  # Offset current_tile_data belongs to
@@ -270,6 +274,20 @@ class ROMWorkflowController(QObject):
             return
 
         rom_offset = self.normalize_mesen_offset(capture.offset)
+
+        # Check if this offset was already adjusted - skip if the adjusted version exists
+        # This prevents duplicates when resync re-normalizes the original offset
+        if rom_offset in self._adjusted_offsets:
+            adjusted = self._adjusted_offsets[rom_offset]
+            if self._view.asset_browser.has_mesen_capture(adjusted, frame=capture.frame):
+                logger.debug(
+                    "Skipping already-adjusted capture 0x%06X -> 0x%06X (frame=%s)",
+                    rom_offset,
+                    adjusted,
+                    capture.frame,
+                )
+                return
+
         name = self._get_capture_name(capture)
         # Pass frame for proper deduplication (same offset, different frames should both appear)
         self._view.add_mesen_capture(name, rom_offset, frame=capture.frame)
@@ -909,6 +927,9 @@ class ROMWorkflowController(QObject):
         if self._view:
             self._view.clear_asset_browser()
 
+        # Clear adjusted offset tracking for new ROM
+        self._adjusted_offsets.clear()
+
         self.rom_path = path
         # Store SMC header offset and calculate actual ROM size
         # header.header_offset is 512 for SMC-headered ROMs, 0 otherwise
@@ -1004,7 +1025,7 @@ class ROMWorkflowController(QObject):
             logger.debug("  syncing persistent: 0x%06X", capture.offset)
             self._add_capture_to_browser(capture)
 
-    def ensure_and_select_capture(self, offset: int, name: str | None = None) -> None:
+    def ensure_and_select_capture(self, offset: int, name: str | None = None, frame: int | None = None) -> None:
         """Ensure a Mesen capture exists in the asset browser and select it.
 
         Called when opening a capture from RecentCapturesWidget to sync with
@@ -1013,11 +1034,13 @@ class ROMWorkflowController(QObject):
         Args:
             offset: ROM offset of the capture
             name: Display name for the capture (defaults to hex offset)
+            frame: Optional frame number for deduplication (same offset, different frames are separate)
         """
         logger.info(
-            "ensure_and_select_capture called: offset=0x%06X, name=%s, view=%s, log_watcher=%s",
+            "ensure_and_select_capture called: offset=0x%06X, name=%s, frame=%s, view=%s, log_watcher=%s",
             offset,
             name,
+            frame,
             self._view is not None,
             self.log_watcher is not None,
         )
@@ -1031,9 +1054,9 @@ class ROMWorkflowController(QObject):
 
         # Then ensure the specific capture exists and select it
         browser = self._view.asset_browser
-        browser.ensure_mesen_capture(offset, name)
-        browser.select_sprite_by_offset(offset)
-        logger.info("ensure_and_select_capture: completed for offset 0x%06X", offset)
+        browser.ensure_mesen_capture(offset, name, frame=frame)
+        browser.select_sprite_by_offset(offset, frame=frame)
+        logger.info("ensure_and_select_capture: completed for offset 0x%06X frame=%s", offset, frame)
 
     def set_offset(self, offset: int, *, auto_open: bool = False, source_type: str | None = None) -> None:
         """Set current ROM offset and request preview.
@@ -2500,6 +2523,8 @@ class ROMWorkflowController(QObject):
             logger.info(
                 f"[PREVIEW] Offset adjusted from 0x{old_offset:06X} to 0x{actual_offset:06X} (delta: {offset_delta:+d})"
             )
+            # Track this adjustment to prevent duplicates during resync
+            self._adjusted_offsets[old_offset] = actual_offset
             # Keep pending auto-open aligned with the adjusted offset.
             if self._pending_open_in_editor and self._pending_open_offset not in (-1, actual_offset):
                 self._pending_open_offset = actual_offset

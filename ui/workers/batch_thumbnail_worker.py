@@ -514,6 +514,7 @@ class BatchThumbnailWorker(QObject):
         try:
             # Try to decompress sprite at offset
             decompressed_data = None
+            primary_offset = request.offset
 
             if self.rom_extractor and self._rom_data_for_hal:
                 # Try HAL decompression with offset hunting (matches preview_worker_pool behavior)
@@ -528,7 +529,30 @@ class BatchThumbnailWorker(QObject):
                             try_offset,
                             expected_size=None,
                         )
-                        if data and has_nonzero_content(data):
+                        if not data or len(data) == 0:
+                            continue
+
+                        is_primary_offset = try_offset == primary_offset
+
+                        # Trust primary offset if HAL decompression succeeded
+                        # (matches preview_worker_pool behavior - don't skip mostly-black sprites)
+                        if is_primary_offset:
+                            decompressed_data = data
+                            # Align tile data to 32-byte boundaries (some assets have header bytes)
+                            original_len = len(decompressed_data)
+                            decompressed_data = align_tile_data(decompressed_data)
+                            if len(decompressed_data) != original_len:
+                                logger.debug(
+                                    f"Aligned HAL data: {original_len} -> {len(decompressed_data)} bytes "
+                                    f"(removed {original_len - len(decompressed_data)} header byte(s)) "
+                                    f"from 0x{try_offset:06X}"
+                                )
+                            else:
+                                logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{try_offset:06X}")
+                            break
+                        if has_nonzero_content(data):
+                            # Non-primary offset: require visible content to prevent
+                            # shifting to wrong nearby sprite
                             decompressed_data = data
                             if try_offset != request.offset:
                                 logger.info(

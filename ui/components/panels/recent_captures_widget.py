@@ -568,6 +568,11 @@ class RecentCapturesWidget(QWidget):
                 item_data["rom_offset"] = new_rom_offset
                 item_data["offset"] = new_rom_offset  # Keep backward compat field in sync
                 # FILE offset stays unchanged - it's the original capture point
+
+                # Clear old thumbnail to prevent stale display
+                if "thumbnail" in item_data:
+                    item_data["thumbnail"] = None
+
                 item.setData(Qt.ItemDataRole.UserRole, item_data)
 
                 # Also update the underlying _captures list
@@ -630,6 +635,10 @@ class RecentCapturesWidget(QWidget):
                 )
 
                 logger.debug("Updated capture ROM offset: 0x%06X -> 0x%06X", old_rom_offset, new_rom_offset)
+
+                # Request new thumbnail for corrected offset
+                self.thumbnail_requested.emit(new_rom_offset)
+
                 return True
 
         return False

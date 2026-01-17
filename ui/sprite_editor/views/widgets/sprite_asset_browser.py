@@ -826,12 +826,14 @@ class SpriteAssetBrowser(QWidget):
             counts[category] = count
         return counts
 
-    def select_sprite_by_offset(self, offset: int) -> bool:
+    def select_sprite_by_offset(self, offset: int, frame: int | None = None) -> bool:
         """
         Select sprite by ROM offset.
 
         Args:
             offset: ROM offset to select
+            frame: Optional frame number. If provided, only select captures with
+                   matching offset AND frame. If None, selects first match regardless of frame.
 
         Returns:
             True if sprite was found and selected
@@ -841,6 +843,15 @@ class SpriteAssetBrowser(QWidget):
             item = iterator.value()
             data = item.data(0, Qt.ItemDataRole.UserRole)
             if isinstance(data, dict) and data.get("offset") == offset:
+                # If frame is specified, also check frame match
+                if frame is not None:
+                    if data.get("frame") == frame:
+                        self.tree.setCurrentItem(item)
+                        return True
+                    # Different frame at same offset - keep looking
+                    iterator += 1
+                    continue
+                # No frame specified - select first match
                 self.tree.setCurrentItem(item)
                 return True
             iterator += 1
@@ -991,7 +1002,7 @@ class SpriteAssetBrowser(QWidget):
             logger.debug("update_sprite_offset: updated %d items", updated_count)
         return updated_count > 0
 
-    def ensure_mesen_capture(self, offset: int, name: str | None = None) -> None:
+    def ensure_mesen_capture(self, offset: int, name: str | None = None, frame: int | None = None) -> None:
         """Ensure a Mesen capture exists, adding if not present.
 
         This is idempotent - if the capture already exists, no change is made.
@@ -999,8 +1010,9 @@ class SpriteAssetBrowser(QWidget):
         Args:
             offset: ROM offset of the capture
             name: Display name for the capture (defaults to hex offset)
+            frame: Optional frame number for deduplication (same offset, different frames are separate)
         """
-        if self.has_mesen_capture(offset):
+        if self.has_mesen_capture(offset, frame=frame):
             return
         display_name = name or f"0x{offset:06X}"
-        self.add_mesen_capture(display_name, offset)
+        self.add_mesen_capture(display_name, offset, frame=frame)
