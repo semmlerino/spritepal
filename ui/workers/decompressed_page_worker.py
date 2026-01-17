@@ -146,7 +146,7 @@ class DecompressedPageWorker(BaseWorker):
                 self._rom_data,
                 offset,
                 expected_size=4096,  # Max 128 tiles * 32 bytes
-                enforce_ratio=False,  # Allow any compression ratio for exploration
+                enforce_ratio=True,  # Reject invalid ratios to filter out garbage
             )
 
             if not tile_data or len(tile_data) < 32:
