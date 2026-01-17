@@ -1,5 +1,7 @@
--- sprite_rom_finder.lua v44
+-- sprite_rom_finder.lua v45
 -- Click on any sprite to get its ROM source offset
+-- v45: FIX King Dedede attribution - recognize SA-1 LoROM mirrors (banks $00-$3F/$80-$BF at $8000-$FFFF)
+--      as valid ROM sources. DMAs from addresses like $02:F681 now get proper file offsets.
 -- v44: FIX Poppy Bros attribution - compare ROM banks before preserving FE52 attributions
 --      (different bank = different sprite, don't preserve stale idx from unrelated sprite)
 -- v44: ADD palette dump on click - shows CGRAM colors in BGR555 and RGB hex formats
@@ -365,27 +367,48 @@ local sa1_fxb_shadow = 0x03  -- $2223: F0-FF bank mapping (default=3, maps to RO
 -- SA-1 bank registers ($2220-$2223) which can change during gameplay.
 -- Level 1 uses power-on defaults, but Level 2+ may use different mappings.
 -- v35: Use shadow values since these registers are write-only
+-- v45: Also handle SA-1 LoROM mirrors (banks $00-$3F/$80-$BF at $8000-$FFFF)
 local function cpu_to_file_offset(ptr)
     local bank = (ptr >> 16) & 0xFF
     local addr = ptr & 0xFFFF
 
-    -- SA-1: ROM window is C0-FF (no addr restriction - full 64KB banks)
-    if bank < 0xC0 or bank > 0xFF then return nil end
-
-    -- Use shadowed bank register values (captured via write callbacks)
-    local bank_base, bank_reg
-    if bank >= 0xC0 and bank <= 0xCF then
-        bank_base, bank_reg = 0xC0, sa1_cxb_shadow
-    elseif bank >= 0xD0 and bank <= 0xDF then
-        bank_base, bank_reg = 0xD0, sa1_dxb_shadow
-    elseif bank >= 0xE0 and bank <= 0xEF then
-        bank_base, bank_reg = 0xE0, sa1_exb_shadow
-    else  -- F0-FF
-        bank_base, bank_reg = 0xF0, sa1_fxb_shadow
+    -- SA-1 HiROM-style: Full 64KB banks at C0-FF
+    if bank >= 0xC0 and bank <= 0xFF then
+        local bank_base, bank_reg
+        if bank >= 0xC0 and bank <= 0xCF then
+            bank_base, bank_reg = 0xC0, sa1_cxb_shadow
+        elseif bank >= 0xD0 and bank <= 0xDF then
+            bank_base, bank_reg = 0xD0, sa1_dxb_shadow
+        elseif bank >= 0xE0 and bank <= 0xEF then
+            bank_base, bank_reg = 0xE0, sa1_exb_shadow
+        else  -- F0-FF
+            bank_base, bank_reg = 0xF0, sa1_fxb_shadow
+        end
+        local file_off = (bank_reg * 0x100000) + ((bank - bank_base) * 0x10000) + addr + ROM_HEADER
+        return file_off
     end
 
-    local file_off = (bank_reg * 0x100000) + ((bank - bank_base) * 0x10000) + addr + ROM_HEADER
-    return file_off
+    -- SA-1 LoROM-style: Banks $00-$3F and $80-$BF at $8000-$FFFF
+    -- These are 32KB windows into the same ROM space as C0-FF banks
+    if addr >= 0x8000 then
+        local effective_bank = bank & 0x3F  -- Strip mirror bit ($80+)
+        if effective_bank <= 0x3F then
+            local bank_reg
+            if effective_bank <= 0x1F then
+                -- Banks $00-$1F (and $80-$9F) use CXB
+                bank_reg = sa1_cxb_shadow
+            else
+                -- Banks $20-$3F (and $A0-$BF) use DXB
+                bank_reg = sa1_dxb_shadow
+                effective_bank = effective_bank - 0x20
+            end
+            -- LoROM: 32KB per bank at $8000-$FFFF
+            local file_off = (bank_reg * 0x100000) + (effective_bank * 0x8000) + (addr - 0x8000) + ROM_HEADER
+            return file_off
+        end
+    end
+
+    return nil
 end
 
 --------------------------------------------------------------------------------
@@ -1366,21 +1389,26 @@ local function on_dma_enable(addr, value)
                     -- v38 FIX: Direct ROM→VRAM DMA (no staging buffer)
                     -- For Poppy Bros and other sprites that bypass staging, the DMA source
                     -- address IS the ROM location. Convert it directly to file offset.
-                    -- Check if source is in ROM bank range (C0-FF for SA-1)
+                    -- v45 FIX: Also check SA-1 LoROM mirrors (banks $00-$3F/$80-$BF at $8000-$FFFF)
                     local src_bank = (src_addr >> 16) & 0xFF
-                    if src_bank >= 0xC0 and src_bank <= 0xFF then
+                    local src_addr_low = src_addr & 0xFFFF
+                    local is_hirom = (src_bank >= 0xC0 and src_bank <= 0xFF)
+                    local is_lorom = (src_addr_low >= 0x8000 and
+                                      ((src_bank >= 0x00 and src_bank <= 0x3F) or
+                                       (src_bank >= 0x80 and src_bank <= 0xBF)))
+                    if is_hirom or is_lorom then
                         -- Direct ROM source - use DMA source as the pointer
                         session_ptr = src_addr
                         file_off = cpu_to_file_offset(src_addr)
                         -- Try to find idx from ptr_to_idx table
                         session_idx = ptr_to_idx[src_addr]
-                        attrib_mode = "direct_rom"
+                        attrib_mode = is_lorom and "direct_lorom" or "direct_rom"
                         session_frame = frame_count
                         -- DEBUG: Log direct ROM attribution (every 60 frames)
                         if frame_count % 60 == 0 then
-                            log(string.format("DBG DIRECT_ROM: src=%06X file=%s vram=$%04X",
+                            log(string.format("DBG DIRECT_ROM: src=%06X file=%s vram=$%04X mode=%s",
                                 src_addr, file_off and string.format("0x%06X", file_off) or "nil",
-                                local_vram_logical))
+                                local_vram_logical, attrib_mode))
                         end
                     end
                 end

@@ -414,6 +414,39 @@ spritepal/
 
 **Available Lua scripts:** `sprite_rom_finder.lua` (recommended), `sprite_identifier.lua`, `vram_tile_dump.lua`, `asset_selector_tracer_v3.lua`, and more in `mesen2_integration/lua_scripts/`
 
+### Extracting Palettes from CGRAM Dumps
+
+When you have a CGRAM dump file (e.g., from Mesen2's Debug → Memory Viewer → CGRAM → Export):
+
+1. **CGRAM structure:** 512 bytes total, 256 colors in BGR555 format (2 bytes/color)
+2. **Sprite palettes:** Located at $100-$1FF (upper 256 bytes), 8 palettes of 16 colors each
+3. **Palette offsets:** Palette N starts at offset `0x100 + (N * 32)`
+
+**Extract to SpritePal JSON format:**
+```python
+import json
+
+with open("CGRAMdump.dmp", "rb") as f:
+    data = f.read()
+
+palette_num = 7  # Sprite palette 0-7
+offset = 0x100 + (palette_num * 32)
+palette_data = data[offset:offset + 32]
+
+colors = []
+for i in range(0, 32, 2):
+    bgr = palette_data[i] | (palette_data[i+1] << 8)
+    r = (bgr & 0x1F) << 3
+    g = ((bgr >> 5) & 0x1F) << 3
+    b = ((bgr >> 10) & 0x1F) << 3
+    colors.append([r, g, b])
+
+with open("output/my_palette.pal.json", "w") as f:
+    json.dump({"name": "My Palette", "colors": colors}, f, indent=2)
+```
+
+**OAM palette mapping:** The sprite's OAM attribute byte bits 1-3 specify palette 0-7, which maps to CGRAM $100+N*32.
+
 ---
 
 ## Advanced Topics

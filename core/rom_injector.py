@@ -605,17 +605,35 @@ class ROMInjector(SpriteInjector):
                     f"tile data now {len(tile_data)} bytes"
                 )
 
-            # Find and decompress original sprite for size comparison
+            # Find and analyze original sprite for size comparison
             logger.info("Analyzing original sprite data in ROM")
-            original_size, original_data, slack_size = self.find_compressed_sprite(self.rom_data, file_offset)
-            logger.debug(f"Original sprite: {original_size} bytes compressed, {len(original_data)} bytes decompressed")
+            logger.info(f"Compression type: {compression_type.value}")
 
-            if original_size == 0:
+            if compression_type == CompressionType.UNKNOWN:
                 return (
                     False,
-                    f"Failed to decompress original sprite at offset 0x{sprite_offset:X}. "
-                    "Aborting injection to prevent ROM corruption.",
+                    "Compression type unknown. Please re-extract the sprite to detect "
+                    "whether it uses HAL compression or is raw tile data.",
                 )
+
+            if compression_type == CompressionType.RAW:
+                # RAW mode: original data is uncompressed, use tile_data size as reference
+                # For raw sprites, we assume the new data replaces the same amount of raw data
+                original_size = len(tile_data)  # Use new tile data size as the slot size
+                original_data = b""  # Not needed for RAW injection
+                slack_size = 0  # No slack detection for raw data
+                logger.info(f"RAW mode: using tile data size ({original_size} bytes) as slot size")
+            else:
+                # HAL mode: decompress original to get size
+                original_size, original_data, slack_size = self.find_compressed_sprite(self.rom_data, file_offset)
+                logger.debug(f"Original sprite: {original_size} bytes compressed, {len(original_data)} bytes decompressed")
+
+                if original_size == 0:
+                    return (
+                        False,
+                        f"Failed to decompress original sprite at offset 0x{sprite_offset:X}. "
+                        "Aborting injection to prevent ROM corruption.",
+                    )
 
             if slack_size > 0:
                 logger.info(f"Available slack space after sprite: {slack_size} bytes")
