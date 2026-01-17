@@ -8,7 +8,7 @@ This dialog provides:
 - Working slider that updates offset
 - Preview widget display
 - Two functional tabs (Browse, Smart)
-- Sidebar for History, Nearby, Scan Results, and Bookmarks
+- Sidebar for Nearby and Bookmarks
 - Proper signals (offset_changed, sprite_found)
 - Methods needed by ROM extraction panel
 """
@@ -146,10 +146,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._comparison_label: QLabel | None = None
         self._pinned_offsets: list[int] = []  # Up to 2 pinned offsets for comparison
 
-        # History tracking timer
-        self._history_timer: QTimer | None = None
-        self._pending_history_offset: int = 0
-
         # Business logic state
         self.rom_path: str = ""
         self.rom_size: int = ROM_SIZE_4MB
@@ -236,7 +232,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
             # Add panels to splitter - main content gets more space
             # Main panel (preview + controls): stretch 4
-            # Sidebar (history, scan results, bookmarks): stretch 1
+            # Sidebar (bookmarks): stretch 1
             self.add_panel(main_panel, stretch_factor=4)
             self.add_panel(sidebar_panel, stretch_factor=1)
 
@@ -333,12 +329,10 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         return panel
 
     def _create_right_panel(self) -> QWidget:
-        """Create the sidebar panel with History, Nearby, Scan Results, and Bookmarks.
+        """Create the sidebar panel with Nearby and Bookmarks.
 
         The sidebar provides:
-        - History of visited offsets (auto-tracked)
         - Nearby sprite previews at fixed byte deltas from current position
-        - Scan results from Find Sprites operation
         - User bookmarks
         """
         from ui.widgets.offset_browser_sidebar import OffsetBrowserSidebar
@@ -346,11 +340,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._sidebar = OffsetBrowserSidebar(self, bookmark_manager=self._bookmark_manager)
 
         # Connect sidebar signals to dialog handlers
-        self._sidebar.history_offset_selected.connect(self.set_offset)
-        self._sidebar.history_offset_applied.connect(self._apply_offset_from_history)
         self._sidebar.nearby_offset_selected.connect(self.set_offset)
-        self._sidebar.scan_result_selected.connect(self.set_offset)
-        self._sidebar.scan_result_applied.connect(self._apply_offset_from_scan)
         self._sidebar.bookmark_selected.connect(self.set_offset)
         self._sidebar.add_bookmark_requested.connect(self._handle_add_bookmark_request)
 
@@ -448,17 +438,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Connect Sidebar signals (now primary navigation)
 
         # Gallery tab signals (now handled by sidebar scan results)
-        if self.gallery_tab is not None:
-            self.gallery_tab.sprite_selected.connect(self._on_sprite_selected)
-
-        # Track offset visits for history (add to sidebar after stable dwell)
-        # This is done in _on_offset_changed with a timer
 
     def _on_offset_changed(self, offset: int) -> None:
-        """Handle offset changes from browse tab.
-
-        Also tracks history: offsets with >500ms dwell time are added to sidebar history.
-        """
+        """Handle offset changes from browse tab."""
         # Prevent re-entrant calls for the same offset
         if self._last_offset_processed == offset:
             return
@@ -487,38 +469,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Schedule predictive preloading for adjacent offsets
         self._schedule_adjacent_preloading(offset)
 
-        # Track stable visits for history (>500ms dwell time)
-        self._schedule_history_tracking(offset)
-
         # Update nearby panel in sidebar (debounced internally)
         if self._sidebar is not None:
             self._sidebar.update_nearby_offsets(offset, self.rom_size)
-
-    def _schedule_history_tracking(self, offset: int) -> None:
-        """Schedule history tracking for an offset after dwell time.
-
-        Only adds to history if the user stays at this offset for >500ms.
-
-        Args:
-            offset: The offset to potentially add to history.
-        """
-        # Cancel any pending history timer
-        if self._history_timer is not None:
-            self._history_timer.stop()
-            self._history_timer.deleteLater()
-            self._history_timer = None
-
-        # Create new timer for this offset
-        self._pending_history_offset = offset
-        self._history_timer = QTimer(self)
-        self._history_timer.setSingleShot(True)
-        self._history_timer.timeout.connect(self._commit_offset_to_history)
-        self._history_timer.start(200)  # 200ms dwell time (snappier history)
-
-    def _commit_offset_to_history(self) -> None:
-        """Commit the pending offset to history after dwell time elapsed."""
-        if hasattr(self, "_pending_history_offset"):
-            self._add_to_history(self._pending_history_offset)
 
     def _emit_offset_changed(self, offset: int) -> None:
         """Emit offset changed signal safely.
@@ -547,7 +500,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             self.tab_widget.setCurrentIndex(0)
 
     def _on_sprite_selected(self, offset: int) -> None:
-        """Handle sprite selection from history or gallery - navigate to browse tab."""
+        """Handle sprite selection from scan results or gallery - navigate to browse tab."""
         self._navigate_to_browse_tab(offset)
 
     def _on_smart_mode_changed(self, enabled: bool) -> None:
@@ -659,33 +612,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         self._comparison_label.setText(" | ".join(pin_texts) + " - Press Escape to clear")
         self._comparison_label.setStyleSheet(f"color: {COLORS['highlight']}; font-weight: bold;")
-
-    def _apply_offset_from_history(self, offset: int) -> None:
-        """Apply an offset from history (double-click).
-
-        Args:
-            offset: The offset to apply.
-        """
-        self.set_offset(offset)
-        self._apply_offset()
-
-    def _apply_offset_from_scan(self, offset: int) -> None:
-        """Apply an offset from scan results (double-click).
-
-        Args:
-            offset: The offset to apply.
-        """
-        self.set_offset(offset)
-        self._apply_offset()
-
-    def _add_to_history(self, offset: int) -> None:
-        """Add an offset to the sidebar history.
-
-        Args:
-            offset: The offset to add.
-        """
-        if hasattr(self, "_sidebar") and self._sidebar is not None:
-            self._sidebar.add_to_history(offset)
 
     def _jump_to_sprite(self, offset: int) -> None:
         """Jump to a specific sprite offset.
@@ -1130,10 +1056,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         return ROM_SIZE_2MB
 
     def add_found_sprite(self, offset: int, quality: float = 1.0) -> None:
-        """Add found sprite to history.
+        """Add found sprite to map.
         
-        Note: Sidebar history is automatically updated via set_offset dwell timer.
-        This method is kept for compatibility but no longer updates a separate history tab.
+        This method is kept for compatibility with callers.
         """
         pass
 
@@ -1433,7 +1358,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         if self.browse_tab is not None:
             self.browse_tab.set_offset(offset)
 
-        # Add to history
         self.add_found_sprite(offset, quality)
 
         self._update_status(f"Found sprite at 0x{offset:06X} (quality: {quality:.2f})")
@@ -1446,24 +1370,10 @@ class UnifiedManualOffsetDialog(CleanupDialog):
     def _on_scan_results_ready(self, sprites: list[dict[str, object]]) -> None:
         """Handle scan results from sprite search coordinator.
 
-        Populates the sidebar scan results panel.
-
         Args:
             sprites: List of found sprite dicts with offset, tile_count, etc.
         """
-        if self._sidebar is None:
-            return
-
-        # Convert sprites to format expected by sidebar
-        results: list[dict[str, int | float]] = []
-        for sprite in sprites:
-            offset = sprite.get("offset", 0)
-            quality = sprite.get("quality", 0.0)
-            if isinstance(offset, int) and isinstance(quality, (int, float)):
-                results.append({"offset": offset, "quality": float(quality)})
-
-        self._sidebar.set_scan_results(results)
-        self._update_status(f"Found {len(results)} sprites - see Scan Results in sidebar")
+        self._update_status(f"Found {len(sprites)} sprites")
 
     def _handle_add_bookmark_request(self) -> None:
         """Handle request from sidebar to bookmark current offset."""

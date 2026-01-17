@@ -1,6 +1,6 @@
 """Sidebar widget for the Manual Offset Browser.
 
-Contains History, Nearby Sprites, Scan Results, and Bookmarks panels in a collapsible layout.
+Contains Nearby Sprites and Bookmarks panels in a collapsible layout.
 """
 
 from __future__ import annotations
@@ -35,33 +35,21 @@ logger = logging.getLogger(__name__)
 # Constants for Nearby panel
 NEARBY_DELTAS_CORE = [-128, -64, -32, 32, 64, 128]
 NEARBY_DELTAS_EXTENDED = [-1024, -512, -256, 256, 512, 1024]
-NEARBY_SIZES: dict[str, int] = {"small": 36, "medium": 48, "large": 64}
+NEARBY_SIZES: dict[str, int] = {"small": 48, "medium": 64, "large": 96}
 NEARBY_UPDATE_DEBOUNCE_MS = 300
 
 
 class OffsetBrowserSidebar(QWidget):
-    """Sidebar for the Manual Offset Browser with History, Nearby, Scan Results, and Bookmarks.
+    """Sidebar for the Manual Offset Browser with Nearby and Bookmarks.
 
     Signals:
-        history_offset_selected: Emitted when a history item is clicked.
-            Args: offset (int)
-        history_offset_applied: Emitted when a history item is double-clicked.
-            Args: offset (int)
         nearby_offset_selected: Emitted when a nearby thumbnail is clicked.
-            Args: offset (int)
-        scan_result_selected: Emitted when a scan result is clicked.
-            Args: offset (int)
-        scan_result_applied: Emitted when a scan result is double-clicked.
             Args: offset (int)
         bookmark_selected: Emitted when a bookmark is clicked.
             Args: offset (int)
     """
 
-    history_offset_selected = Signal(int)
-    history_offset_applied = Signal(int)
     nearby_offset_selected = Signal(int)
-    scan_result_selected = Signal(int)
-    scan_result_applied = Signal(int)
     bookmark_selected = Signal(int)
     add_bookmark_requested = Signal()  # Request parent to add bookmark at current offset
 
@@ -79,13 +67,6 @@ class OffsetBrowserSidebar(QWidget):
         """
         super().__init__(parent)
         self._bookmark_manager = bookmark_manager
-
-        # History tracking
-        self._history_offsets: list[int] = []
-        self._max_history_items = 50
-
-        # Scan results
-        self._scan_results: list[dict[str, int | float]] = []
 
         # Nearby panel state
         self._nearby_labels: list[QLabel] = []
@@ -145,54 +126,10 @@ class OffsetBrowserSidebar(QWidget):
         
         layout.addLayout(header_layout)
 
-        # History panel - starts collapsed, expands on first navigation
-        self._history_panel = CollapsibleGroupBox("History", collapsed=True)
-        self._history_list = QListWidget()
-        self._history_list.setMaximumHeight(150)
-        self._history_list.itemClicked.connect(self._on_history_item_clicked)
-        self._history_list.itemDoubleClicked.connect(self._on_history_item_double_clicked)
-        self._history_panel.add_widget(self._history_list)
-
-        # History controls
-        history_controls = QHBoxLayout()
-        clear_history_btn = QPushButton("Clear")
-        clear_history_btn.setFixedHeight(24)
-        clear_history_btn.clicked.connect(self.clear_history)
-        history_controls.addWidget(clear_history_btn)
-        history_controls.addStretch()
-        self._history_panel.add_layout(history_controls)
-
-        layout.addWidget(self._history_panel)
-
         # Nearby panel - shows sprite previews at fixed offsets around current position
         self._nearby_panel = CollapsibleGroupBox("Nearby", collapsed=False)
         self._setup_nearby_panel()
         layout.addWidget(self._nearby_panel)
-
-        # Scan Results panel - hidden until scan completes
-        self._scan_panel = CollapsibleGroupBox("Scan Results", collapsed=True)
-        self._scan_label = QLabel("No scan performed")
-        self._scan_label.setStyleSheet(f"color: {COLORS['text_muted']};")
-        self._scan_panel.add_widget(self._scan_label)
-
-        self._scan_list = QListWidget()
-        self._scan_list.setMaximumHeight(200)
-        self._scan_list.itemClicked.connect(self._on_scan_item_clicked)
-        self._scan_list.itemDoubleClicked.connect(self._on_scan_item_double_clicked)
-        self._scan_list.hide()
-        self._scan_panel.add_widget(self._scan_list)
-
-        # Scan controls
-        scan_controls = QHBoxLayout()
-        self._clear_scan_btn = QPushButton("Clear")
-        self._clear_scan_btn.setFixedHeight(24)
-        self._clear_scan_btn.clicked.connect(self.clear_scan_results)
-        self._clear_scan_btn.setEnabled(False)
-        scan_controls.addWidget(self._clear_scan_btn)
-        scan_controls.addStretch()
-        self._scan_panel.add_layout(scan_controls)
-
-        layout.addWidget(self._scan_panel)
 
         # Bookmarks panel - visible if bookmarks exist
         self._bookmarks_panel = CollapsibleGroupBox("Bookmarks", collapsed=True)
@@ -211,125 +148,6 @@ class OffsetBrowserSidebar(QWidget):
         # Set minimum width for sidebar
         self.setMinimumWidth(150)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
-
-    # ============= History Management =============
-
-    def add_to_history(self, offset: int) -> None:
-        """Add an offset to the history.
-
-        Args:
-            offset: The offset to add.
-        """
-        # Don't add duplicates of the most recent item
-        if self._history_offsets and self._history_offsets[0] == offset:
-            return
-
-        # Add to front of list
-        self._history_offsets.insert(0, offset)
-
-        # Enforce max size
-        if len(self._history_offsets) > self._max_history_items:
-            self._history_offsets = self._history_offsets[: self._max_history_items]
-
-        # Update UI
-        self._update_history_list()
-
-        # Expand history panel on first entry
-        if len(self._history_offsets) == 1:
-            self._history_panel.set_collapsed(False)
-
-    def _update_history_list(self) -> None:
-        """Update the history list widget."""
-        self._history_list.clear()
-        for offset in self._history_offsets:
-            item = QListWidgetItem(f"0x{offset:06X}")
-            item.setData(256, offset)  # Qt.ItemDataRole.UserRole = 256
-            self._history_list.addItem(item)
-
-    def clear_history(self) -> None:
-        """Clear all history items."""
-        self._history_offsets.clear()
-        self._history_list.clear()
-
-    def get_history_offsets(self) -> list[int]:
-        """Get the list of history offsets.
-
-        Returns:
-            List of offsets in history (most recent first).
-        """
-        return list(self._history_offsets)
-
-    def _on_history_item_clicked(self, item: QListWidgetItem) -> None:
-        """Handle history item single click."""
-        offset = item.data(256)
-        if offset is not None:
-            self.history_offset_selected.emit(offset)
-
-    def _on_history_item_double_clicked(self, item: QListWidgetItem) -> None:
-        """Handle history item double click."""
-        offset = item.data(256)
-        if offset is not None:
-            self.history_offset_applied.emit(offset)
-
-    # ============= Scan Results Management =============
-
-    def set_scan_results(self, results: list[dict[str, int | float]]) -> None:
-        """Set scan results.
-
-        Args:
-            results: List of dicts with 'offset' and optionally 'quality' keys.
-        """
-        self._scan_results = results
-        self._update_scan_list()
-
-        # Show/expand panel if results exist
-        if results:
-            self._scan_label.hide()
-            self._scan_list.show()
-            self._scan_panel.set_collapsed(False)
-            self._clear_scan_btn.setEnabled(True)
-        else:
-            self._scan_label.setText("No sprites found")
-            self._scan_label.show()
-            self._scan_list.hide()
-            self._clear_scan_btn.setEnabled(False)
-
-    def _update_scan_list(self) -> None:
-        """Update the scan results list widget."""
-        self._scan_list.clear()
-        self._scan_label.setText(f"{len(self._scan_results)} sprites found")
-
-        for result in self._scan_results:
-            offset = result.get("offset", 0)
-            quality = result.get("quality", 0.0)
-            if isinstance(offset, int):
-                text = f"0x{offset:06X}"
-                if isinstance(quality, float) and quality > 0:
-                    text += f" ({quality:.1%})"
-                item = QListWidgetItem(text)
-                item.setData(256, offset)
-                self._scan_list.addItem(item)
-
-    def clear_scan_results(self) -> None:
-        """Clear all scan results."""
-        self._scan_results.clear()
-        self._scan_list.clear()
-        self._scan_label.setText("No scan performed")
-        self._scan_label.show()
-        self._scan_list.hide()
-        self._clear_scan_btn.setEnabled(False)
-
-    def _on_scan_item_clicked(self, item: QListWidgetItem) -> None:
-        """Handle scan result single click."""
-        offset = item.data(256)
-        if offset is not None:
-            self.scan_result_selected.emit(offset)
-
-    def _on_scan_item_double_clicked(self, item: QListWidgetItem) -> None:
-        """Handle scan result double click."""
-        offset = item.data(256)
-        if offset is not None:
-            self.scan_result_applied.emit(offset)
 
     # ============= Bookmarks Management =============
 
@@ -575,12 +393,13 @@ class OffsetBrowserSidebar(QWidget):
         label.setStyleSheet(
             f"""
             QLabel {{
-                background-color: {COLORS["input_background"]};
-                border: 1px solid {COLORS["border"]};
-                border-radius: 4px;
+                background-color: #2D2D2D;
+                border: 2px solid {COLORS["border"]};
+                border-radius: 6px;
             }}
             QLabel:hover {{
                 border-color: {COLORS["primary"]};
+                background-color: #353535;
             }}
             """
         )
@@ -849,14 +668,17 @@ class OffsetBrowserSidebar(QWidget):
         label.setStyleSheet(
             f"""
             QLabel {{
-                background-color: {COLORS["input_background"]};
-                border: 1px solid {COLORS["border"]};
-                border-radius: 4px;
+                background-color: #2D2D2D;
+                border: 2px solid {COLORS["border"]};
+                border-radius: 6px;
                 color: {COLORS["text_muted"]};
-                font-size: 9px;
+                font-size: 11px;
+                font-weight: bold;
             }}
             QLabel:hover {{
                 border-color: {COLORS["primary"]};
+                background-color: #353535;
+                color: {COLORS["text_primary"]};
             }}
             """
         )
@@ -874,11 +696,12 @@ class OffsetBrowserSidebar(QWidget):
             label.setStyleSheet(
                 f"""
                 QLabel {{
-                    background-color: {COLORS["input_background"]};
-                    border: 1px solid {COLORS["border"]};
-                    border-radius: 4px;
+                    background-color: #2D2D2D;
+                    border: 2px solid {COLORS["border"]};
+                    border-radius: 6px;
                     color: {COLORS["text_muted"]};
-                    font-size: 9px;
+                    font-size: 11px;
+                    font-weight: bold;
                 }}
                 """
             )

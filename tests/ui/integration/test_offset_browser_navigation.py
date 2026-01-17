@@ -212,57 +212,6 @@ class TestDialogBehavior:
         assert offset_browser.isVisible()
 
 
-class TestHistoryTracking:
-    """Tests for sidebar history tracking."""
-
-    def test_sidebar_exists(self, offset_browser):
-        """Sidebar widget is created."""
-        assert offset_browser._sidebar is not None
-
-    def test_history_tracks_offsets(self, qtbot: QtBot, offset_browser):
-        """History tracks visited offsets after dwell time."""
-        if offset_browser._sidebar is None:
-            pytest.skip("Sidebar not available")
-
-        offset_browser.set_offset(0x1000)
-
-        # Wait for dwell time (500ms) + some buffer
-        qtbot.wait(600)
-
-        history = offset_browser._sidebar.get_history_offsets()
-        assert 0x1000 in history
-
-    def test_rapid_navigation_does_not_pollute_history(self, qtbot: QtBot, offset_browser):
-        """Rapid navigation doesn't add entries to history."""
-        if offset_browser._sidebar is None:
-            pytest.skip("Sidebar not available")
-
-        # Navigate rapidly without waiting
-        for _ in range(5):
-            qtbot.keyClick(offset_browser, Qt.Key.Key_Right)
-
-        # No dwell time elapsed, so history should be empty
-        history = offset_browser._sidebar.get_history_offsets()
-        assert len(history) == 0
 
 
-class TestSidebarScanResults:
-    """Tests for sidebar scan results integration."""
 
-    def test_scan_results_populate_sidebar(self, qtbot: QtBot, offset_browser):
-        """Scan results are routed to sidebar."""
-        if offset_browser._sidebar is None:
-            pytest.skip("Sidebar not available")
-
-        # Simulate scan results
-        test_results = [
-            {"offset": 0x1000, "quality": 0.95},
-            {"offset": 0x2000, "quality": 0.85},
-        ]
-
-        # Convert to the format the handler expects
-        offset_browser._on_scan_results_ready(test_results)
-
-        # Verify sidebar was populated
-        # The sidebar converts to its own format, so check via the list widget
-        assert offset_browser._sidebar._scan_list.count() == 2
