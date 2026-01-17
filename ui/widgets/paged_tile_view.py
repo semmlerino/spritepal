@@ -361,6 +361,7 @@ class PagedTileViewWidget(QWidget):
         self._rows = GRID_PRESETS_RAW[DEFAULT_PRESET_INDEX_RAW][2]
         self._current_page = 0
         self._total_pages = 0
+        self._decomp_base_offset = 0  # Custom start offset for decompressed mode
 
         # Worker and cache (raw mode)
         self._worker: PagedTileViewWorker | None = None
@@ -656,7 +657,10 @@ class PagedTileViewWidget(QWidget):
 
     def go_to_offset(self, offset: int) -> None:
         """
-        Navigate to the page containing a specific ROM offset.
+        Navigate to a specific ROM offset.
+
+        In raw mode: Navigates to the page containing the offset.
+        In decompressed mode: Sets the offset as cell 0 (page 0).
 
         Args:
             offset: ROM byte offset
@@ -664,9 +668,19 @@ class PagedTileViewWidget(QWidget):
         if len(self._rom_data) == 0:
             return
 
-        bytes_per_page = self._cols * self._rows * BYTES_PER_TILE
-        page = offset // bytes_per_page
-        self.go_to_page(page)
+        # Clamp to valid range
+        offset = max(0, min(offset, len(self._rom_data) - 1))
+
+        if self._view_mode == ViewMode.DECOMPRESSED:
+            # In decompressed mode, set the offset as the base (cell 0 of page 0)
+            self._decomp_base_offset = offset
+            self._update_page_count()
+            self.go_to_page(0)
+            logger.debug(f"Decompressed mode: set base offset to 0x{offset:06X}")
+        else:
+            # In raw mode, navigate to the page containing the offset
+            page = offset // self._bytes_per_page
+            self.go_to_page(page)
 
     def get_current_offset(self) -> int:
         """Get the starting offset of the current page."""
@@ -694,14 +708,25 @@ class PagedTileViewWidget(QWidget):
             self._total_pages = 0
             return
 
-        self._total_pages = max(1, (len(self._rom_data) + self._bytes_per_page - 1) // self._bytes_per_page)
+        if self._view_mode == ViewMode.DECOMPRESSED:
+            # In decompressed mode, count pages from the base offset
+            remaining = len(self._rom_data) - self._decomp_base_offset
+            self._total_pages = max(1, (remaining + self._bytes_per_page - 1) // self._bytes_per_page)
+        else:
+            self._total_pages = max(1, (len(self._rom_data) + self._bytes_per_page - 1) // self._bytes_per_page)
 
     def _page_to_offset(self, page: int) -> int:
         """Convert page number to ROM byte offset."""
+        if self._view_mode == ViewMode.DECOMPRESSED:
+            # In decompressed mode, use custom base offset so user-specified
+            # offsets appear at cell 0
+            return self._decomp_base_offset + page * self._bytes_per_page
         return page * self._bytes_per_page
 
     def _offset_to_page(self, offset: int) -> int:
         """Convert ROM byte offset to page number."""
+        if self._view_mode == ViewMode.DECOMPRESSED:
+            return (offset - self._decomp_base_offset) // self._bytes_per_page
         return offset // self._bytes_per_page
 
     def _update_navigation_state(self) -> None:
@@ -916,6 +941,9 @@ class PagedTileViewWidget(QWidget):
 
         logger.debug(f"View mode changed to: {new_mode.name}")
         self._view_mode = new_mode
+
+        # Reset decomp base offset when switching modes
+        self._decomp_base_offset = 0
 
         # Show/hide decomp-specific controls
         is_decomp = new_mode == ViewMode.DECOMPRESSED
