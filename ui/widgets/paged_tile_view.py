@@ -400,7 +400,7 @@ class PagedTileViewWidget(QWidget):
         layout.addWidget(self._status_label)
 
     def _create_navigation_bar(self) -> QFrame:
-        """Create the navigation bar with page controls."""
+        """Create the navigation bar with page controls (two rows)."""
         frame = QFrame()
         frame.setStyleSheet(f"""
             QFrame {{
@@ -410,19 +410,24 @@ class PagedTileViewWidget(QWidget):
             }}
         """)
 
-        layout = QHBoxLayout(frame)
-        layout.setContentsMargins(SPACING_SMALL, SPACING_TINY, SPACING_SMALL, SPACING_TINY)
-        layout.setSpacing(SPACING_STANDARD)
+        # Main vertical layout for two rows
+        main_layout = QVBoxLayout(frame)
+        main_layout.setContentsMargins(SPACING_SMALL, SPACING_TINY, SPACING_SMALL, SPACING_TINY)
+        main_layout.setSpacing(SPACING_TINY)
+
+        # === Row 1: View settings and page navigation ===
+        row1 = QHBoxLayout()
+        row1.setSpacing(SPACING_STANDARD)
 
         # Grid size selector
-        layout.addWidget(QLabel("Grid:"))
+        row1.addWidget(QLabel("Grid:"))
         self._grid_combo = QComboBox()
         self._populate_grid_combo()  # Populate based on current mode
         self._grid_combo.currentIndexChanged.connect(self._on_grid_size_changed)
-        layout.addWidget(self._grid_combo)
+        row1.addWidget(self._grid_combo)
 
         # View mode toggle (Raw / Decomp)
-        layout.addWidget(QLabel("Mode:"))
+        row1.addWidget(QLabel("Mode:"))
         self._mode_group = QButtonGroup(self)
         self._raw_mode_btn = QRadioButton("Raw")
         self._raw_mode_btn.setToolTip("Show raw tile bytes (fast)")
@@ -432,13 +437,13 @@ class PagedTileViewWidget(QWidget):
         self._mode_group.addButton(self._raw_mode_btn, 0)
         self._mode_group.addButton(self._decomp_mode_btn, 1)
         self._mode_group.idClicked.connect(self._on_view_mode_changed)
-        layout.addWidget(self._raw_mode_btn)
-        layout.addWidget(self._decomp_mode_btn)
+        row1.addWidget(self._raw_mode_btn)
+        row1.addWidget(self._decomp_mode_btn)
 
         # Step size selector (visible only in decomp mode)
         self._step_label = QLabel("Step:")
         self._step_label.setVisible(False)
-        layout.addWidget(self._step_label)
+        row1.addWidget(self._step_label)
         self._step_combo = QComboBox()
         for name, _ in STEP_SIZE_OPTIONS:
             self._step_combo.addItem(name)
@@ -446,73 +451,79 @@ class PagedTileViewWidget(QWidget):
         self._step_combo.currentIndexChanged.connect(self._on_step_size_changed)
         self._step_combo.setVisible(False)
         self._step_combo.setToolTip("Byte offset between grid cells")
-        layout.addWidget(self._step_combo)
+        row1.addWidget(self._step_combo)
 
         # Prefetch button (visible only in decomp mode)
         self._prefetch_btn = QPushButton("\u21bb Prefetch")  # Clockwise arrow
         self._prefetch_btn.setToolTip("Cache nearby pages (\u00b12) in background")
         self._prefetch_btn.clicked.connect(self._on_prefetch_clicked)
         self._prefetch_btn.setVisible(False)
-        layout.addWidget(self._prefetch_btn)
+        row1.addWidget(self._prefetch_btn)
+
+        # Separator
+        row1.addStretch()
 
         # Page navigation
-        layout.addWidget(QLabel("Page:"))
+        row1.addWidget(QLabel("Page:"))
 
         self._prev_btn = QPushButton("<")
         self._prev_btn.setFixedWidth(30)
         self._prev_btn.setToolTip("Previous page (Page Up)")
         self._prev_btn.clicked.connect(self._go_prev_page)
-        layout.addWidget(self._prev_btn)
+        row1.addWidget(self._prev_btn)
 
         self._page_spinbox = QSpinBox()
         self._page_spinbox.setMinimum(1)
         self._page_spinbox.setMaximum(1)
         self._page_spinbox.setFixedWidth(70)
         self._page_spinbox.valueChanged.connect(self._on_page_spinbox_changed)
-        layout.addWidget(self._page_spinbox)
+        row1.addWidget(self._page_spinbox)
 
         self._page_total_label = QLabel("/ 0")
-        layout.addWidget(self._page_total_label)
+        row1.addWidget(self._page_total_label)
 
         self._next_btn = QPushButton(">")
         self._next_btn.setFixedWidth(30)
         self._next_btn.setToolTip("Next page (Page Down)")
         self._next_btn.clicked.connect(self._go_next_page)
-        layout.addWidget(self._next_btn)
+        row1.addWidget(self._next_btn)
 
-        # Spacer
-        layout.addStretch()
+        main_layout.addLayout(row1)
+
+        # === Row 2: Go to offset, zoom, palette controls ===
+        row2 = QHBoxLayout()
+        row2.setSpacing(SPACING_STANDARD)
 
         # Go to offset input
-        layout.addWidget(QLabel("Go to:"))
+        row2.addWidget(QLabel("Go to:"))
         self._offset_input = QLineEdit()
         self._offset_input.setPlaceholderText("0x294D0A")
         self._offset_input.setFixedWidth(100)
         self._offset_input.setToolTip("Enter offset (hex with 0x prefix, or decimal)")
         self._offset_input.returnPressed.connect(self._on_goto_offset)
-        layout.addWidget(self._offset_input)
+        row2.addWidget(self._offset_input)
 
         self._goto_btn = QPushButton("Go")
         self._goto_btn.setFixedWidth(40)
         self._goto_btn.setToolTip("Jump to offset (Enter)")
         self._goto_btn.clicked.connect(self._on_goto_offset)
-        layout.addWidget(self._goto_btn)
-
-        # Spacer
-        layout.addStretch()
+        row2.addWidget(self._goto_btn)
 
         # Zoom controls
         self._zoom_fit_btn = QPushButton("Fit")
         self._zoom_fit_btn.setToolTip("Reset zoom to fit (Home)")
         self._zoom_fit_btn.clicked.connect(self._reset_zoom)
-        layout.addWidget(self._zoom_fit_btn)
+        row2.addWidget(self._zoom_fit_btn)
+
+        # Separator
+        row2.addStretch()
 
         # Palette toggle checkbox
         self._palette_checkbox = QCheckBox("Palette")
         self._palette_checkbox.setChecked(True)
         self._palette_checkbox.setToolTip("Show tiles with palette colors (uncheck for grayscale)")
         self._palette_checkbox.toggled.connect(self._on_palette_toggled)
-        layout.addWidget(self._palette_checkbox)
+        row2.addWidget(self._palette_checkbox)
 
         # Palette selector dropdown
         self._palette_combo = QComboBox()
@@ -520,7 +531,7 @@ class PagedTileViewWidget(QWidget):
         self._palette_combo.setToolTip("Select palette for tile rendering")
         self._palette_combo.setMinimumWidth(100)
         self._palette_combo.currentTextChanged.connect(self._on_palette_selected)
-        layout.addWidget(self._palette_combo)
+        row2.addWidget(self._palette_combo)
 
         # Palette management menu button
         self._palette_menu_btn = QToolButton()
@@ -536,13 +547,18 @@ class PagedTileViewWidget(QWidget):
         self._action_delete = self._palette_menu.addAction("Delete")
         self._action_delete.triggered.connect(self._on_delete_palette)
         self._palette_menu_btn.setMenu(self._palette_menu)
-        layout.addWidget(self._palette_menu_btn)
+        row2.addWidget(self._palette_menu_btn)
         self._update_palette_menu_state()
+
+        # Separator
+        row2.addStretch()
 
         # Offset display
         self._offset_label = QLabel("Offset: --")
         self._offset_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
-        layout.addWidget(self._offset_label)
+        row2.addWidget(self._offset_label)
+
+        main_layout.addLayout(row2)
 
         return frame
 
