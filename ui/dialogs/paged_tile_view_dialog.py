@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QDialogButtonBox, QPushButton, QVBoxLayout, QWidge
 if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent
 
+from core.default_palette_loader import DefaultPaletteLoader
 from ui.common.spacing_constants import SPACING_SMALL
 from ui.components.base.cleanup_dialog import CleanupDialog
 from ui.widgets.paged_tile_view import PagedTileViewWidget
@@ -90,8 +91,13 @@ class PagedTileViewDialog(CleanupDialog):
         # Create tile view widget
         self._tile_view = PagedTileViewWidget()
         self._tile_view.set_rom_data(self._rom_data)
+
+        # Load default palettes from config
+        self._load_default_palettes()
+
+        # Set the provided palette (if any) as "Current" and select it
         if self._palette is not None:
-            self._tile_view.set_palette(self._palette)
+            self._tile_view.set_palette(self._palette, name="Current")
 
         # Navigate to initial offset
         if self._initial_offset > 0:
@@ -118,6 +124,44 @@ class PagedTileViewDialog(CleanupDialog):
         button_box.addButton(close_btn, QDialogButtonBox.ButtonRole.RejectRole)
 
         layout.addWidget(button_box)
+
+    def _load_default_palettes(self) -> None:
+        """Load default palettes into the dropdown."""
+        if self._tile_view is None:
+            return
+
+        try:
+            # Try to get loader from app context first
+            try:
+                from core.app_context import get_app_context
+
+                loader = get_app_context().default_palette_loader
+            except (RuntimeError, AttributeError):
+                # App context not available, create standalone loader
+                loader = DefaultPaletteLoader()
+
+            # Get all Kirby palettes
+            kirby_palettes = loader.get_all_kirby_palettes()
+
+            # Add each palette to the dropdown
+            for index, colors in sorted(kirby_palettes.items()):
+                # Find the palette name from the loader data
+                name = f"Kirby Palette {index}"
+
+                # Look for specific names in the palette data
+                for palette_entry in loader.get_all_presets():
+                    if palette_entry.get("index") == index:
+                        name = palette_entry.get("name", name)
+                        break
+
+                # Convert RGBColor tuples to lists for compatibility
+                palette_as_lists: list[list[int]] = [list(c) for c in colors]
+                self._tile_view.add_palette_option(name, palette_as_lists)
+
+            logger.debug(f"Loaded {len(kirby_palettes)} default palettes")
+
+        except Exception as e:
+            logger.warning(f"Failed to load default palettes: {e}")
 
     def _on_tile_clicked(self, offset: int) -> None:
         """Handle tile click from the tile view."""

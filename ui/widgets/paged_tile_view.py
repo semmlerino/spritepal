@@ -13,6 +13,7 @@ from typing import override
 from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtGui import QImage, QKeyEvent, QMouseEvent, QPainter, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QFrame,
     QGraphicsPixmapItem,
@@ -171,6 +172,12 @@ class PagedTileViewWidget(QWidget):
         self._rom_data: bytes = b""
         self._palette: list[list[int]] | None = None
         self._palette_hash: int = 0
+        self._palette_enabled: bool = True  # Whether to use palette (vs grayscale)
+
+        # Available palettes: dict of name -> palette (list of 16 RGB lists)
+        # "Grayscale" always available; others added via add_palette_option()
+        self._palette_options: dict[str, list[list[int]] | None] = {"Grayscale": None}
+        self._selected_palette_name: str = "Grayscale"
 
         # Grid configuration
         self._cols = GRID_PRESETS[DEFAULT_PRESET_INDEX][1]
@@ -283,6 +290,21 @@ class PagedTileViewWidget(QWidget):
         self._zoom_fit_btn.clicked.connect(self._reset_zoom)
         layout.addWidget(self._zoom_fit_btn)
 
+        # Palette toggle checkbox
+        self._palette_checkbox = QCheckBox("Palette")
+        self._palette_checkbox.setChecked(True)
+        self._palette_checkbox.setToolTip("Show tiles with palette colors (uncheck for grayscale)")
+        self._palette_checkbox.toggled.connect(self._on_palette_toggled)
+        layout.addWidget(self._palette_checkbox)
+
+        # Palette selector dropdown
+        self._palette_combo = QComboBox()
+        self._palette_combo.addItem("Grayscale")
+        self._palette_combo.setToolTip("Select palette for tile rendering")
+        self._palette_combo.setMinimumWidth(100)
+        self._palette_combo.currentTextChanged.connect(self._on_palette_selected)
+        layout.addWidget(self._palette_combo)
+
         # Offset display
         self._offset_label = QLabel("Offset: --")
         self._offset_label.setStyleSheet(f"color: {COLORS['text_secondary']};")
@@ -308,19 +330,48 @@ class PagedTileViewWidget(QWidget):
         self._update_navigation_state()
         self._request_page_render()
 
-    def set_palette(self, palette: list[list[int]] | None) -> None:
+    def set_palette(self, palette: list[list[int]] | None, name: str = "Custom") -> None:
         """
         Set the palette for tile rendering.
 
         Args:
             palette: List of 16 RGB color lists, or None for grayscale
+            name: Display name for the palette in the dropdown (default: "Custom")
         """
-        new_hash = _compute_palette_hash(palette)
-        if new_hash != self._palette_hash:
+        if palette is not None:
+            # Add/update as a named palette option
+            self.add_palette_option(name, palette)
+
+            # Select it in the dropdown (this will trigger _on_palette_selected)
+            # Block signals to avoid double-rendering
+            self._palette_combo.blockSignals(True)
+            index = self._palette_combo.findText(name)
+            if index >= 0:
+                self._palette_combo.setCurrentIndex(index)
+            self._palette_combo.blockSignals(False)
+
+            # Update internal state
+            self._selected_palette_name = name
             self._palette = palette
-            self._palette_hash = new_hash
-            # Re-render current page with new palette
-            self._request_page_render()
+            self._palette_hash = _compute_palette_hash(palette)
+            self._palette_checkbox.setEnabled(True)
+            self._palette_checkbox.setChecked(True)
+            self._palette_enabled = True
+        else:
+            # Select Grayscale
+            self._palette_combo.blockSignals(True)
+            self._palette_combo.setCurrentIndex(0)  # Grayscale is always first
+            self._palette_combo.blockSignals(False)
+
+            self._selected_palette_name = "Grayscale"
+            self._palette = None
+            self._palette_hash = 0
+            self._palette_checkbox.setEnabled(False)
+            self._palette_checkbox.setChecked(False)
+            self._palette_enabled = False
+
+        # Re-render current page with new palette
+        self._request_page_render()
 
     def set_grid_dimensions(self, cols: int, rows: int) -> None:
         """
@@ -432,8 +483,12 @@ class PagedTileViewWidget(QWidget):
 
         offset = self._page_to_offset(self._current_page)
 
+        # Get effective palette (None for grayscale when disabled)
+        effective_palette = self._palette if self._palette_enabled else None
+        effective_hash = self._palette_hash if self._palette_enabled else 0
+
         # Check cache first
-        cached_image = self._cache.get_page(offset, self._cols, self._rows, self._palette_hash)
+        cached_image = self._cache.get_page(offset, self._cols, self._rows, effective_hash)
         if cached_image is not None:
             logger.debug(f"Cache hit for page {self._current_page}")
             self._display_page(cached_image, offset)
@@ -452,7 +507,7 @@ class PagedTileViewWidget(QWidget):
             offset=offset,
             cols=self._cols,
             rows=self._rows,
-            palette=self._palette,
+            palette=effective_palette,
         )
         self._worker.page_ready.connect(self._on_page_ready)
         self._worker.error.connect(self._on_worker_error)
@@ -508,6 +563,97 @@ class PagedTileViewWidget(QWidget):
         if 0 <= index < len(GRID_PRESETS):
             _, cols, rows = GRID_PRESETS[index]
             self.set_grid_dimensions(cols, rows)
+
+    def _on_palette_toggled(self, checked: bool) -> None:
+        """Handle palette toggle checkbox state change."""
+        self._palette_enabled = checked
+        logger.debug(f"Palette preview {'enabled' if checked else 'disabled'}")
+        # Re-render current page with new palette setting
+        self._request_page_render()
+
+    def _on_palette_selected(self, name: str) -> None:
+        """Handle palette dropdown selection."""
+        if not name or name == self._selected_palette_name:
+            return
+
+        self._selected_palette_name = name
+        palette = self._palette_options.get(name)
+
+        logger.debug(f"Palette selected: {name}")
+
+        # Update the internal palette and re-render
+        self._palette = palette
+        self._palette_hash = _compute_palette_hash(palette)
+
+        # Update checkbox state based on whether a non-grayscale palette is selected
+        has_palette = palette is not None
+        self._palette_checkbox.setEnabled(has_palette)
+        if has_palette:
+            self._palette_checkbox.setChecked(True)
+            self._palette_enabled = True
+        else:
+            self._palette_checkbox.setChecked(False)
+            self._palette_enabled = False
+
+        self._request_page_render()
+
+    def add_palette_option(self, name: str, palette: list[list[int]]) -> None:
+        """
+        Add a palette option to the dropdown.
+
+        Args:
+            name: Display name for the palette
+            palette: List of 16 RGB color lists
+        """
+        if name in self._palette_options:
+            # Update existing palette
+            self._palette_options[name] = palette
+            logger.debug(f"Updated palette option: {name}")
+        else:
+            self._palette_options[name] = palette
+            self._palette_combo.addItem(name)
+            logger.debug(f"Added palette option: {name}")
+
+    def clear_palette_options(self) -> None:
+        """Clear all palette options except Grayscale."""
+        # Block signals during clear to avoid triggering re-renders
+        self._palette_combo.blockSignals(True)
+
+        # Keep only Grayscale
+        self._palette_options = {"Grayscale": None}
+        self._palette_combo.clear()
+        self._palette_combo.addItem("Grayscale")
+        self._selected_palette_name = "Grayscale"
+
+        # Update internal state
+        self._palette = None
+        self._palette_hash = 0
+        self._palette_checkbox.setEnabled(False)
+        self._palette_checkbox.setChecked(False)
+        self._palette_enabled = False
+
+        self._palette_combo.blockSignals(False)
+        logger.debug("Cleared all palette options")
+
+    def select_palette(self, name: str) -> bool:
+        """
+        Select a palette by name.
+
+        Args:
+            name: Name of the palette to select
+
+        Returns:
+            True if palette was found and selected, False otherwise
+        """
+        if name not in self._palette_options:
+            logger.warning(f"Palette not found: {name}")
+            return False
+
+        index = self._palette_combo.findText(name)
+        if index >= 0:
+            self._palette_combo.setCurrentIndex(index)
+            return True
+        return False
 
     def _on_goto_offset(self) -> None:
         """Handle go-to-offset button click or Enter key in offset input."""

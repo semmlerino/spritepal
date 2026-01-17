@@ -301,3 +301,172 @@ class TestPagedTileViewWidget:
         widget._on_goto_offset()
 
         assert "exceeds ROM size" in widget._status_label.text()
+
+    def test_palette_checkbox_default_state(self, qtbot) -> None:
+        """Test palette checkbox is checked by default."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        assert widget._palette_checkbox.isChecked()
+        assert widget._palette_enabled is True
+
+    def test_palette_toggle_disables_palette(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test unchecking palette checkbox disables palette rendering."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Set a palette
+        palette = [[i * 16, i * 16, i * 16] for i in range(16)]
+        widget.set_palette(palette)
+        assert widget._palette_enabled is True
+
+        # Uncheck the palette checkbox
+        widget._palette_checkbox.setChecked(False)
+
+        assert widget._palette_enabled is False
+
+    def test_palette_toggle_enables_palette(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test checking palette checkbox enables palette rendering."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Set a palette and disable it
+        palette = [[i * 16, i * 16, i * 16] for i in range(16)]
+        widget.set_palette(palette)
+        widget._palette_checkbox.setChecked(False)
+        assert widget._palette_enabled is False
+
+        # Re-check the palette checkbox
+        widget._palette_checkbox.setChecked(True)
+
+        assert widget._palette_enabled is True
+
+    def test_palette_checkbox_disabled_when_no_palette(self, qtbot) -> None:
+        """Test palette checkbox is disabled when no palette is set."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # Set palette to None
+        widget.set_palette(None)
+
+        assert not widget._palette_checkbox.isEnabled()
+        assert not widget._palette_checkbox.isChecked()
+
+    def test_palette_checkbox_enabled_when_palette_set(self, qtbot) -> None:
+        """Test palette checkbox is enabled when a palette is set."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # First set to None to disable
+        widget.set_palette(None)
+        assert not widget._palette_checkbox.isEnabled()
+
+        # Now set a real palette
+        palette = [[i * 16, i * 16, i * 16] for i in range(16)]
+        widget.set_palette(palette)
+
+        # Checkbox should be enabled (but may not be checked due to previous None)
+        assert widget._palette_checkbox.isEnabled()
+
+    def test_palette_dropdown_default_has_grayscale(self, qtbot) -> None:
+        """Test palette dropdown has Grayscale option by default."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        assert widget._palette_combo.count() == 1
+        assert widget._palette_combo.itemText(0) == "Grayscale"
+
+    def test_add_palette_option(self, qtbot) -> None:
+        """Test adding a palette option to the dropdown."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        palette = [[i * 16, i * 16, i * 16] for i in range(16)]
+        widget.add_palette_option("Test Palette", palette)
+
+        assert widget._palette_combo.count() == 2
+        assert widget._palette_combo.itemText(1) == "Test Palette"
+        assert "Test Palette" in widget._palette_options
+
+    def test_set_palette_with_name(self, qtbot) -> None:
+        """Test setting palette with a custom name."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        palette = [[255, 0, 0]] + [[i * 16, i * 16, i * 16] for i in range(1, 16)]
+        widget.set_palette(palette, name="Red Palette")
+
+        assert widget._palette_combo.currentText() == "Red Palette"
+        assert widget._selected_palette_name == "Red Palette"
+        assert widget._palette == palette
+
+    def test_select_palette_by_name(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test selecting a palette by name."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Add two palettes
+        palette1 = [[255, 0, 0] for _ in range(16)]
+        palette2 = [[0, 255, 0] for _ in range(16)]
+        widget.add_palette_option("Red", palette1)
+        widget.add_palette_option("Green", palette2)
+
+        # Select Green
+        result = widget.select_palette("Green")
+        assert result is True
+        assert widget._palette_combo.currentText() == "Green"
+
+    def test_select_nonexistent_palette(self, qtbot) -> None:
+        """Test selecting a palette that doesn't exist."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        result = widget.select_palette("Nonexistent")
+        assert result is False
+
+    def test_clear_palette_options(self, qtbot) -> None:
+        """Test clearing all palette options."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # Add some palettes
+        palette1 = [[255, 0, 0] for _ in range(16)]
+        palette2 = [[0, 255, 0] for _ in range(16)]
+        widget.add_palette_option("Red", palette1)
+        widget.add_palette_option("Green", palette2)
+        assert widget._palette_combo.count() == 3
+
+        # Clear all
+        widget.clear_palette_options()
+
+        assert widget._palette_combo.count() == 1
+        assert widget._palette_combo.itemText(0) == "Grayscale"
+        assert widget._selected_palette_name == "Grayscale"
+        assert widget._palette is None
+
+    def test_palette_selection_updates_state(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test that selecting a palette updates checkbox and internal state."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Add a palette and select it
+        palette = [[255, 0, 0] for _ in range(16)]
+        widget.add_palette_option("Red", palette)
+        widget.select_palette("Red")
+
+        # Checkbox should be enabled and checked
+        assert widget._palette_checkbox.isEnabled()
+        assert widget._palette_checkbox.isChecked()
+        assert widget._palette_enabled is True
+
+        # Now select Grayscale
+        widget.select_palette("Grayscale")
+
+        # Checkbox should be disabled and unchecked
+        assert not widget._palette_checkbox.isEnabled()
+        assert not widget._palette_checkbox.isChecked()
+        assert widget._palette_enabled is False
