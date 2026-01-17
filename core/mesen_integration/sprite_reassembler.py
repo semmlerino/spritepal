@@ -281,29 +281,31 @@ class SpriteReassembler:
         #   [tile]   [tile+1]
         #   [tile+16][tile+17]
         # For larger sprites, pattern continues with 16-tile row stride
+        SNES_TILE_ROW_STRIDE = 16
 
-        # For now, assume contiguous tiles (simpler case)
-        # TODO: Handle SNES tile arrangement with 16-tile row stride
-        tile_count = tiles_wide * tiles_high
-        start_offset = entry.tile * BYTES_PER_TILE
-        end_offset = start_offset + (tile_count * BYTES_PER_TILE)
+        # Extract tiles using SNES stride, reassemble contiguously for renderer
+        tile_bytes = bytearray()
+        base_tile = entry.tile
 
-        if end_offset > len(tiles_data):
-            logger.warning(
-                f"OAM entry {entry.id} tile range exceeds decompressed data (need {end_offset}, have {len(tiles_data)})"
-            )
-            # Try to render what we have
-            available_tiles = (len(tiles_data) - start_offset) // BYTES_PER_TILE
-            if available_tiles <= 0:
-                return None
-            tiles_wide = min(tiles_wide, available_tiles)
-            tiles_high = 1
-            end_offset = start_offset + (tiles_wide * BYTES_PER_TILE)
+        for row in range(tiles_high):
+            for col in range(tiles_wide):
+                # SNES tile index = base + col + (row * 16)
+                tile_index = base_tile + col + (row * SNES_TILE_ROW_STRIDE)
+                tile_start = tile_index * BYTES_PER_TILE
+                tile_end = tile_start + BYTES_PER_TILE
 
-        tile_bytes = tiles_data[start_offset:end_offset]
+                if tile_end <= len(tiles_data):
+                    tile_bytes.extend(tiles_data[tile_start:tile_end])
+                else:
+                    logger.warning(
+                        f"OAM entry {entry.id} tile {tile_index} out of bounds (offset {tile_end} > {len(tiles_data)})"
+                    )
+                    tile_bytes.extend(b"\x00" * BYTES_PER_TILE)
+
+        tile_bytes_final = bytes(tile_bytes)
 
         # Render tiles
-        img = self.tile_renderer.render_tiles(tile_bytes, tiles_wide, tiles_high, palette_index)
+        img = self.tile_renderer.render_tiles(tile_bytes_final, tiles_wide, tiles_high, palette_index)
 
         if img is None:
             return None
