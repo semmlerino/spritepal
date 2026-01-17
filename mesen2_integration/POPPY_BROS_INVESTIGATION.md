@@ -11,11 +11,11 @@
 
 ---
 
-## Resolution Summary (v43)
+## Resolution Summary (v44)
 
-**STATUS: NOW WITH VERIFICATION** (2026-01-15)
+**STATUS: POPPY BROS FIX** (2026-01-17)
 
-Multiple bugs were fixed across v38-v43:
+Multiple bugs were fixed across v38-v44:
 
 1. **Direct ROM DMAs (v38)**: Poppy Bros sprites are DMA'd directly from ROM banks (ED/EE/EF) to VRAM, bypassing the staging buffer
 2. **DMA callbacks registered too late (v38)**: Callbacks were registered at frame 2800, missing level-load DMAs
@@ -27,6 +27,7 @@ Multiple bugs were fixed across v38-v43:
 8. **Aggressive staging clear (v42)**: v40's 1000-frame window was too permissive - now ALWAYS clears when no session matches
 9. **Callback double-registration (v43)**: Callbacks were registered at script start AND in `activate_tracking()`, causing duplicate processing
 10. **Byte-compare verification (v43)**: New "VERIFY" step compares VRAM tile bytes against ROM bytes at reported offset
+11. **Bank comparison for FE52 preservation (v44)**: v38's FE52 preservation logic was too aggressive - it preserved Kirby's idx=43 attribution even when Poppy Bros (different ROM bank) overwrote the staging buffer. Fix: compare ROM banks before preserving - same bank = animation update (preserve), different bank = different sprite (don't preserve)
 
 **New in v43 - Byte-Compare Verification:**
 When clicking a sprite, the log now shows:
@@ -44,6 +45,32 @@ VERIFY: ✗ MISMATCH (5/32 bytes = 15%)
 ```
 
 This provides **deterministic proof** of attribution correctness without manual hex-editor verification.
+
+**New in v44 - Bank Comparison Fix:**
+
+The v38 fix added logic to preserve FE52 attributions when a DP session (idx=?) overwrites a staging chunk - the idea was to keep the "original graphics source" for animation updates. However, this caused Poppy Bros sprites to incorrectly inherit Kirby's idx=43 attribution because:
+
+1. Kirby loads at level transition via FE52 table (idx=43, bank E9)
+2. Poppy Bros loads later via DP pointer (idx=?, banks E6/DC)
+3. Both write to the same staging buffer chunks
+4. v38 logic preserved Kirby's idx=43 even though Poppy Bros data is from a DIFFERENT bank
+
+**Fix:** Before preserving FE52 attribution, compare ROM banks:
+- Same bank (e.g., both E9) = animation update for same sprite → preserve
+- Different bank (e.g., E9 vs E6) = different sprite entirely → don't preserve
+
+**Expected behavior after v44:**
+- Poppy Bros sprites should get attributions from their actual ROM source banks (E6, DC, EB, EC, etc.) instead of inheriting Kirby's E9 bank attributions
+- Byte verification should show MATCH instead of MISMATCH
+- Note: Exact offsets depend on which session is active when specific staging chunks are written; the key is that the bank should match the actual sprite data source
+
+**Also in v44 - Palette Dump:**
+Clicking a sprite now shows its CGRAM palette:
+```
+OAM palette: 3 (CGRAM $160-$17F)
+PALETTE BGR555: 0000 7FFF 5294 3DEF ...
+PALETTE RGB[0-7]: #000000 #FFFFFF #A5A5A5 #7B7B7B ...
+```
 
 **Known working reference:**
 - Waddle Dee (Level 1): `0x25AD84` (bank E5) - **CONFIRMED CORRECT**

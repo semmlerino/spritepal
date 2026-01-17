@@ -4,6 +4,51 @@ All notable changes to the sprite extraction pipeline documentation and tooling.
 
 ---
 
+## sprite_rom_finder.lua v44 - Poppy Bros Fix + Palette Dump (2026-01-17)
+
+### Bank-Aware FE52 Attribution Preservation
+
+Fixed incorrect attribution for sprites not in the FE52 table (like Poppy Bros) that share staging buffer space with FE52-indexed sprites (like Kirby).
+
+**Root cause:**
+- v38 added logic to preserve FE52 attributions when DP sessions (idx=?) overwrite staging chunks
+- This was intended for animation updates (same sprite, new frame)
+- But it incorrectly preserved Kirby's idx=43/E9 bank attribution when Poppy Bros (E6/DC bank) wrote to the same staging chunks
+
+**Fix:**
+Before preserving FE52 attribution, compare ROM banks:
+- Same bank (e.g., E9 → E9) = animation update for same sprite → preserve
+- Different bank (e.g., E9 → E6) = different sprite → allow new attribution
+
+**Result:**
+- Poppy Bros Sr now correctly reports FILE offset 0x1CF3FE (bank DC) instead of 0x294D0A (Kirby's E9)
+- Byte verification shows MATCH instead of MISMATCH
+
+### Palette Dump on Click
+
+Clicking a sprite now shows its CGRAM palette colors:
+```
+OAM palette: 3 (CGRAM $160-$17F)
+PALETTE BGR555: 0000 7FFF 5294 3DEF 2D6B 1CE7 0C63 0000 ...
+PALETTE RGB[0-7]: #000000 #FFFFFF #A5A5A5 #7B7B7B #5A5A5A #393939 #181818 #000000
+```
+
+This lets you capture the exact runtime palette for any sprite.
+
+---
+
+## sprite_rom_finder.lua v38-v43 - Poppy Bros Investigation Series (2026-01-15)
+
+See `mesen2_integration/POPPY_BROS_INVESTIGATION.md` for full details on bugs fixed:
+- v38: Direct ROM DMAs, early callback registration, FE52 session priority
+- v39: Tile address calculation (column overflow)
+- v40: Stale staging attribution during WRITE
+- v41: Stale staging attribution during DMA READ
+- v42: Aggressive staging clear (ALWAYS clear when no session)
+- v43: Callback double-registration fix, byte-compare verification
+
+---
+
 ## sprite_rom_finder.lua v25 - Slot Preference + Correctness Fixes (2026-01-04)
 
 ### Forward Attribution Slot Preference

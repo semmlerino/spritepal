@@ -1,5 +1,8 @@
--- sprite_rom_finder.lua v43
+-- sprite_rom_finder.lua v44
 -- Click on any sprite to get its ROM source offset
+-- v44: FIX Poppy Bros attribution - compare ROM banks before preserving FE52 attributions
+--      (different bank = different sprite, don't preserve stale idx from unrelated sprite)
+-- v44: ADD palette dump on click - shows CGRAM colors in BGR555 and RGB hex formats
 -- v43: FIX callback double-registration (all callbacks now registered once at script start)
 -- v43: ADD byte-compare verification (compare VRAM tile bytes vs ROM bytes at reported offset)
 -- v42: ALWAYS clear staging attribution when no session matches (v40 was too permissive)
@@ -189,6 +192,34 @@ local function fmt_bytes(data, max_bytes)
         table.insert(parts, "...")
     end
     return table.concat(parts, " ")
+end
+
+-- v44: Read and format CGRAM palette for sprite
+-- palette_idx: 0-7 (sprite palettes)
+-- Returns: table of 16 BGR555 color values, formatted string
+local function read_sprite_palette(palette_idx)
+    local cgram_base = 0x100 + palette_idx * 32  -- Sprite palettes start at $100
+    local colors = {}
+    local hex_parts = {}
+
+    for i = 0, 15 do
+        local addr = cgram_base + i * 2
+        local lo = emu.read(addr, emu.memType.snesCgRam)
+        local hi = emu.read(addr + 1, emu.memType.snesCgRam)
+        local bgr555 = lo + hi * 256
+        table.insert(colors, bgr555)
+        table.insert(hex_parts, string.format("%04X", bgr555))
+    end
+
+    return colors, table.concat(hex_parts, " ")
+end
+
+-- v44: Convert BGR555 to RGB hex string for display
+local function bgr555_to_rgb_hex(bgr555)
+    local r = (bgr555 & 0x1F) * 255 // 31
+    local g = ((bgr555 >> 5) & 0x1F) * 255 // 31
+    local b = ((bgr555 >> 10) & 0x1F) * 255 // 31
+    return string.format("#%02X%02X%02X", r, g, b)
 end
 
 -- Persistent recent clicks (last 5)
@@ -773,12 +804,19 @@ end
 local function match_recent_session()
     local best = nil
     local best_rank = 999
+    local most_recent_dp = nil  -- v44: Track most recent DP session for bank comparison
+
     for i = #recent_sessions, 1, -1 do
         local s = recent_sessions[i]
         local age = frame_count - s.frame
         if age > SESSION_MATCH_WINDOW then
             -- older than window; list is chronological, stop early
             break
+        end
+
+        -- v44: Track most recent DP session (first one we see, since we iterate newest to oldest)
+        if not is_fe52_session(s) and not most_recent_dp then
+            most_recent_dp = s
         end
 
         -- v38: FE52 sessions with known idx get highest priority (rank 0)
@@ -795,13 +833,32 @@ local function match_recent_session()
         if s.idx_known and rank < best_rank then
             best = s
             best_rank = rank
-            -- Short-circuit: if we found FE52 session with known idx, can't do better
-            if best_rank == 0 then return best end
+            -- v44 REVISED: Don't short-circuit yet - we need to check for newer DP sessions with different bank
+            -- Old code: if best_rank == 0 then return best end
         elseif not best then
             -- Fallback to any session if none with known idx yet
             best = s
         end
     end
+
+    -- v44: If we picked an FE52 session but there's a more recent DP session from a DIFFERENT ROM region,
+    -- the DP session represents a different sprite loading, so use it instead.
+    -- NOTE: We compare file offsets (via cpu_to_file_offset) rather than just bank bytes, because
+    -- SA-1 bank registers ($2220-$2223) can remap which 1MB block a bank range points to.
+    if best and is_fe52_session(best) and most_recent_dp and most_recent_dp.frame > best.frame then
+        local fe52_file = best.ptr and cpu_to_file_offset(best.ptr)
+        local dp_file = most_recent_dp.ptr and cpu_to_file_offset(most_recent_dp.ptr)
+        -- Compare 1MB blocks (bits 20+) - different block = different sprite data region
+        local fe52_block = fe52_file and (fe52_file >> 20)
+        local dp_block = dp_file and (dp_file >> 20)
+        if fe52_block and dp_block and fe52_block ~= dp_block then
+            -- Different 1MB ROM block = different sprite, use the more recent DP session
+            log(string.format("DBG BANK_OVERRIDE: FE52 idx=%s file=0x%06X block=%d overridden by DP %s file=0x%06X block=%d (frame %d vs %d)",
+                tostring(best.idx), fe52_file or 0, fe52_block, fmt_addr(most_recent_dp.ptr), dp_file or 0, dp_block, best.frame, most_recent_dp.frame))
+            return most_recent_dp
+        end
+    end
+
     return best
 end
 
@@ -1022,12 +1079,28 @@ local function on_staging_write(address, value)
     -- Find current active session
     local sess = match_recent_session()
     if sess then
-        -- v38 FIX: Preserve FE52 attributions - don't let DP sessions overwrite valid idx
+        -- v38 FIX (revised v44): Preserve FE52 attributions only for same-sprite animation updates
         -- Initial sprite load (from FE52) happens during level transition, but animation
         -- updates (from DP) happen later. We want to keep the original graphics source.
+        -- HOWEVER: If the new session is from a DIFFERENT ROM bank, it's a different sprite
+        -- entirely (e.g., Poppy Bros in E6/DC bank vs Kirby in E9 bank). Don't preserve in that case.
         if existing and existing.idx ~= nil and sess.idx == nil then
-            -- Existing has valid idx (from FE52), new session doesn't - keep existing
-            return
+            -- Compare ROM file offsets (1MB blocks) - same block = animation update (preserve), different = new sprite
+            -- Using file offsets accounts for SA-1 bank register remapping
+            local existing_file = existing.file_offset or (existing.ptr and cpu_to_file_offset(existing.ptr))
+            local sess_file = sess.ptr and cpu_to_file_offset(sess.ptr)
+            local existing_block = existing_file and (existing_file >> 20)
+            local sess_block = sess_file and (sess_file >> 20)
+            -- v44 DEBUG: Log block comparison
+            log(string.format("DBG BLOCK_CMP chunk=%d existing=0x%06X(%d) sess=0x%06X(%d) existing_idx=%s",
+                chunk_idx, existing_file or 0, existing_block or -1, sess_file or 0, sess_block or -1, tostring(existing.idx)))
+            if existing_block and sess_block and existing_block == sess_block then
+                -- Same 1MB block = same sprite region, preserve FE52 attribution
+                log(string.format("DBG BLOCK_CMP PRESERVE (same block %d)", existing_block))
+                return
+            end
+            -- Different block = different sprite, fall through to update attribution
+            log(string.format("DBG BLOCK_CMP REPLACE (block %d -> %d)", existing_block or -1, sess_block or -1))
         end
 
         staging_owner_map[chunk_idx] = {
@@ -2089,6 +2162,17 @@ local function on_left_click(mouse, coord_debug)
     log(string.format("SELECTED: SPRITE #%d at (%d,%d) size=%dx%d [%d of %d candidates]",
         spr.index, spr.x, spr.y, spr.width, spr.height,
         selected_candidate_idx, #candidates_under_cursor))
+    log(string.format("OAM palette: %d (CGRAM $%03X-$%03X)",
+        spr.palette, 0x100 + spr.palette * 32, 0x100 + spr.palette * 32 + 31))
+    -- v44: Dump actual CGRAM palette colors
+    local pal_colors, pal_hex = read_sprite_palette(spr.palette)
+    log(string.format("PALETTE BGR555: %s", pal_hex))
+    -- Show first 8 colors as RGB hex (most commonly used)
+    local rgb_parts = {}
+    for i = 1, 8 do
+        table.insert(rgb_parts, bgr555_to_rgb_hex(pal_colors[i]))
+    end
+    log(string.format("PALETTE RGB[0-7]: %s", table.concat(rgb_parts, " ")))
     if spr.width > 8 or spr.height > 8 then
         if tile_info then
             log(string.format("Tile under cursor: %d,%d of %dx%d",
@@ -2478,11 +2562,14 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v43")
+log("SPRITE ROM FINDER v44")
 log("========================================")
+log("v44: FIX Poppy Bros attribution - file offset comparison in match_recent_session()")
+log("  - Compare 1MB ROM blocks (via cpu_to_file_offset) to handle SA-1 bank remapping")
+log("  - If DP session is more recent AND from different 1MB block than FE52, use DP session")
+log("  - Look for DBG BANK_OVERRIDE / DBG BLOCK_CMP messages to see when override happens")
+log("  - NEW: Click now shows CGRAM palette colors (BGR555 + RGB hex)")
 log("v43: FIX callback double-registration + ADD byte-compare verification")
-log("  - All callbacks now registered ONCE at script start (no duplicates)")
-log("  - Clicks now show VERIFY: MATCH/MISMATCH to prove attribution correctness")
 log("v42: ALWAYS clear staging attribution when no session matches")
 log("v41: Clear stale staging attribution during DMA READ")
 log("v40: Clear stale staging attribution during staging WRITE")

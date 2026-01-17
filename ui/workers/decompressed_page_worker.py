@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Constants for sprite thumbnail rendering
-CELL_SIZE = 32  # Size of each cell in pixels
+CELL_SIZE = 256  # Size of each cell in pixels (larger for better sprite visibility)
 PLACEHOLDER_COLOR = QColor(80, 80, 80)  # Gray for failed decompression
 PLACEHOLDER_TEXT_COLOR = QColor(150, 150, 150)  # Light gray for "?" text
 
@@ -142,7 +142,7 @@ class DecompressedPageWorker(BaseWorker):
 
         try:
             # Attempt HAL decompression
-            _, tile_data, _ = self._rom_injector.find_compressed_sprite(
+            compressed_size, tile_data, slack = self._rom_injector.find_compressed_sprite(
                 self._rom_data,
                 offset,
                 expected_size=4096,  # Max 128 tiles * 32 bytes

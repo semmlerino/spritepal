@@ -2,9 +2,25 @@
 
 Complete toolkit for tracing and extracting sprites from Kirby Super Star using Mesen 2's debugging features.
 
-## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v33)
+## 🎯 Fastest Method: Click-to-Find (sprite_rom_finder.lua v44)
 
 **One-click ROM offset lookup** - no manual breakpoints needed.
+
+### NEW in v44: Bank-Aware Attribution + Palette Dump
+
+**Bank Comparison Fix:**
+- Fixed incorrect attribution for sprites not in the FE52 table (like Poppy Bros)
+- When different sprites share staging buffer space, attributions are now correctly assigned based on ROM bank
+- Poppy Bros sprites now show correct ROM offsets instead of incorrectly inheriting Kirby's attribution
+
+**Palette Dump on Click:**
+Clicking a sprite now shows its CGRAM palette colors:
+```
+OAM palette: 3 (CGRAM $160-$17F)
+PALETTE BGR555: 0000 7FFF 5294 3DEF 2D6B 1CE7 0C63 0000 ...
+PALETTE RGB[0-7]: #000000 #FFFFFF #A5A5A5 #7B7B7B #5A5A5A #393939 #181818 #000000
+```
+This lets you capture the exact runtime palette for any sprite to use in SpritePal.
 
 ### How it works
 ```
@@ -91,6 +107,9 @@ run_sprite_rom_finder.bat
    - `idx` = asset selector index
    - `ptr` = CPU address (e.g., `E9:E667`)
    - `FILE: 0x0NNNNN` = ROM file offset
+   - `OAM palette: N` = palette index (v44)
+   - `PALETTE BGR555:` = raw CGRAM colors (v44)
+   - `PALETTE RGB:` = converted RGB hex colors (v44)
 
 ### Controls
 | Input | Action |
