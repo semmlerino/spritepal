@@ -488,6 +488,56 @@ class RecentCapturesWidget(QWidget):
                 return True
         return False
 
+    def _find_capture_index_by_file_offset(self, file_offset: int) -> int | None:
+        """Find the index of a capture by its FILE offset.
+
+        FILE offset is the immutable identity from Mesen capture.
+
+        Args:
+            file_offset: The FILE offset to search for.
+
+        Returns:
+            The index if found, None otherwise.
+        """
+        for i, capture in enumerate(self._captures):
+            if capture.offset == file_offset:
+                return i
+        return None
+
+    def _remove_capture_at_index(self, index: int) -> None:
+        """Remove a capture at the given index from both list widget and internal list.
+
+        Args:
+            index: The index of the capture to remove.
+        """
+        if 0 <= index < len(self._captures):
+            self._captures.pop(index)
+        if 0 <= index < self._list_widget.count():
+            self._list_widget.takeItem(index)
+
+    def update_or_add_capture(self, capture: CapturedOffset, request_thumbnail: bool = True) -> None:
+        """Update an existing capture or add it if new.
+
+        If a capture with the same FILE offset already exists, it is removed
+        and the new capture (with updated timestamp/frame) is added at the top.
+        This handles the case where a user re-clicks the same sprite in Mesen2.
+
+        Args:
+            capture: The captured offset from LogWatcher.
+            request_thumbnail: If True, emit thumbnail_requested signal.
+        """
+        existing_index = self._find_capture_index_by_file_offset(capture.offset)
+        if existing_index is not None:
+            logger.debug(
+                "Updating existing capture at index %d: %s",
+                existing_index,
+                capture.offset_hex,
+            )
+            self._remove_capture_at_index(existing_index)
+
+        # Add at top (add_capture inserts at position 0)
+        self.add_capture(capture, request_thumbnail=request_thumbnail)
+
     def update_capture_offset(self, old_rom_offset: int, new_rom_offset: int) -> bool:
         """Update a capture's offset after HAL alignment adjustment.
 

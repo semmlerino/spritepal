@@ -555,28 +555,47 @@ class SpriteAssetBrowser(QWidget):
         self._update_placeholder(self._rom_category)
 
     def add_mesen_capture(
-        self, name: str, offset: int, frame: int | None = None, thumbnail: QPixmap | None = None
+        self,
+        name: str,
+        offset: int,
+        frame: int | None = None,
+        thumbnail: QPixmap | None = None,
+        update_if_exists: bool = False,
     ) -> None:
         """
         Add a Mesen2 capture to the browser.
 
         Idempotent: if a capture with this offset (and frame, if provided) already
-        exists, it's skipped. Different frames at the same offset are allowed.
+        exists, it's skipped by default. Different frames at the same offset are allowed.
 
         Args:
             name: Sprite name
             offset: ROM offset
             frame: Optional frame number for deduplication
             thumbnail: Optional thumbnail pixmap
+            update_if_exists: If True, remove existing capture and re-add at top
+                             when the same offset is captured again. This handles
+                             re-clicking the same sprite in Mesen2.
         """
-        # Skip if already exists (idempotent)
-        # When frame is provided, only skip if exact (offset, frame) match
+        # Check if already exists
         if self.has_mesen_capture(offset, frame=frame):
-            logger.debug("add_mesen_capture: skipping duplicate offset 0x%06X frame %s", offset, frame)
-            return
+            if update_if_exists:
+                # Remove existing and re-add (to move to top with new data)
+                existing_item = self._find_mesen_capture_item_by_offset(offset)
+                if existing_item is not None:
+                    logger.debug("add_mesen_capture: updating existing offset 0x%06X", offset)
+                    index = self._mesen_category.indexOfChild(existing_item)
+                    self._mesen_category.takeChild(index)
+            else:
+                logger.debug(
+                    "add_mesen_capture: skipping duplicate offset 0x%06X frame %s",
+                    offset,
+                    frame,
+                )
+                return
 
         logger.info("add_mesen_capture: adding %s (0x%06X, frame=%s)", name, offset, frame)
-        item = QTreeWidgetItem(self._mesen_category)
+        item = QTreeWidgetItem()
         item.setText(0, name)
 
         # Store data including frame for deduplication
@@ -588,6 +607,9 @@ class SpriteAssetBrowser(QWidget):
             "thumbnail": thumbnail,
         }
         item.setData(0, Qt.ItemDataRole.UserRole, data)
+
+        # Insert at top (index 0) for most-recent-first ordering
+        self._mesen_category.insertChild(0, item)
         self._update_placeholder(self._mesen_category)
         logger.debug(
             "add_mesen_capture: category now has %d children",
@@ -856,6 +878,22 @@ class SpriteAssetBrowser(QWidget):
                     return True
             iterator += 1
         return False
+
+    def _find_mesen_capture_item_by_offset(self, offset: int) -> QTreeWidgetItem | None:
+        """Find a Mesen capture item by ROM offset.
+
+        Args:
+            offset: ROM offset to search for.
+
+        Returns:
+            The QTreeWidgetItem if found, None otherwise.
+        """
+        for i in range(self._mesen_category.childCount()):
+            item = self._mesen_category.child(i)
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("offset") == offset:
+                return item
+        return None
 
     def has_mesen_capture(self, offset: int, frame: int | None = None) -> bool:
         """Check if a Mesen capture with this offset (and optionally frame) exists.

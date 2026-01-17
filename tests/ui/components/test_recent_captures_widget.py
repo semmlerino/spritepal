@@ -107,3 +107,93 @@ class TestFileOffsetImmutability:
 
         # Assert: FILE offset should also be stored/preserved in item data
         assert item_data.get("file_offset") == sample_capture.offset
+
+
+class TestUpdateOrAddCapture:
+    """Tests for update_or_add_capture method (handles re-clicking same sprite)."""
+
+    def test_update_or_add_capture_adds_new_capture(
+        self, widget: RecentCapturesWidget, sample_capture: CapturedOffset
+    ) -> None:
+        """New capture should be added when no existing capture with same offset."""
+        assert widget.get_capture_count() == 0
+
+        widget.update_or_add_capture(sample_capture, request_thumbnail=False)
+
+        assert widget.get_capture_count() == 1
+        assert widget.has_capture_by_file_offset(sample_capture.offset)
+
+    def test_update_or_add_capture_updates_existing(
+        self, widget: RecentCapturesWidget, sample_capture: CapturedOffset
+    ) -> None:
+        """Existing capture should be updated (removed and re-added at top)."""
+        # Add initial capture
+        widget.add_capture(sample_capture, request_thumbnail=False)
+        assert widget.get_capture_count() == 1
+
+        # Create updated capture with same offset but different frame
+        updated_capture = CapturedOffset(
+            offset=sample_capture.offset,  # Same FILE offset
+            frame=200,  # Different frame
+            timestamp=datetime.now(),
+            raw_line=f"FILE: {sample_capture.offset:#x} Frame: 200",
+            rom_checksum=sample_capture.rom_checksum,
+        )
+
+        widget.update_or_add_capture(updated_capture, request_thumbnail=False)
+
+        # Should still have only 1 capture (not duplicated)
+        assert widget.get_capture_count() == 1
+        # The capture at top should have the new frame
+        assert widget._captures[0].frame == 200
+
+    def test_update_or_add_capture_moves_to_top(self, widget: RecentCapturesWidget) -> None:
+        """Updated capture should be moved to top of list."""
+        # Add two captures
+        capture1 = CapturedOffset(
+            offset=0x3C7001,
+            frame=100,
+            timestamp=datetime.now(),
+            raw_line="FILE: 0x3C7001 Frame: 100",
+            rom_checksum=0xA1B2,
+        )
+        capture2 = CapturedOffset(
+            offset=0x3C8000,
+            frame=150,
+            timestamp=datetime.now(),
+            raw_line="FILE: 0x3C8000 Frame: 150",
+            rom_checksum=0xA1B2,
+        )
+        widget.add_capture(capture1, request_thumbnail=False)  # At top
+        widget.add_capture(capture2, request_thumbnail=False)  # New top
+
+        # capture2 is at index 0, capture1 is at index 1
+        assert widget._captures[0].offset == 0x3C8000
+        assert widget._captures[1].offset == 0x3C7001
+
+        # Update capture1 (re-click)
+        updated_capture1 = CapturedOffset(
+            offset=0x3C7001,  # Same as capture1
+            frame=999,  # Different frame
+            timestamp=datetime.now(),
+            raw_line="FILE: 0x3C7001 Frame: 999",
+            rom_checksum=0xA1B2,
+        )
+        widget.update_or_add_capture(updated_capture1, request_thumbnail=False)
+
+        # Now updated_capture1 should be at top
+        assert widget.get_capture_count() == 2
+        assert widget._captures[0].offset == 0x3C7001
+        assert widget._captures[0].frame == 999  # New frame
+        assert widget._captures[1].offset == 0x3C8000
+
+    def test_update_or_add_capture_emits_thumbnail_request(
+        self, widget: RecentCapturesWidget, sample_capture: CapturedOffset, qtbot
+    ) -> None:
+        """Thumbnail should be requested when request_thumbnail=True."""
+        with qtbot.waitSignal(widget.thumbnail_requested, timeout=1000) as blocker:
+            widget.update_or_add_capture(sample_capture, request_thumbnail=True)
+
+        # Signal should have been emitted with ROM offset (normalized)
+        rom_offset = widget._normalize_offset(sample_capture.offset)
+        assert blocker.args == [rom_offset]

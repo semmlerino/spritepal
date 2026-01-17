@@ -149,6 +149,7 @@ class ROMWorkflowController(QObject):
         if not self.log_watcher:
             return
         self.log_watcher.offset_discovered.connect(self._on_offset_discovered)
+        self.log_watcher.offset_rediscovered.connect(self._on_offset_rediscovered)
         # Start watching if not already
         self.log_watcher.start_watching()
 
@@ -276,6 +277,51 @@ class ROMWorkflowController(QObject):
         # Request thumbnail if worker is ready
         if self._thumbnail_controller:
             self._thumbnail_controller.queue_thumbnail(rom_offset)
+
+    def _on_offset_rediscovered(self, capture: object) -> None:
+        """Handle re-capture of existing offset from Mesen2 log.
+
+        This is called when the user clicks on the same sprite again.
+        The existing entry is updated (moved to top with new timestamp/frame).
+        """
+        if not isinstance(capture, CapturedOffset):
+            return
+
+        # Queue if view not ready yet
+        if self._view is None:
+            # For rediscoveries, we still queue them - they'll be processed in order
+            self._pending_captures.append(capture)
+            logger.debug("Queued rediscovered capture 0x%06X (view not ready)", capture.offset)
+            return
+
+        # Process immediately with update flag
+        self._update_capture_in_browser(capture)
+
+    def _update_capture_in_browser(self, capture: CapturedOffset) -> None:
+        """Update an existing capture in the browser (move to top with new data).
+
+        This handles re-clicking the same sprite - the old entry is removed
+        and a new one is added at the top with updated timestamp/frame.
+        """
+        if not self._view:
+            return
+
+        # Validate ROM identity
+        if not self._validate_capture_rom_match(capture):
+            # Mismatched ROM - don't update browser
+            return
+
+        rom_offset = self.normalize_mesen_offset(capture.offset)
+        name = self._get_capture_name(capture)
+
+        # Update existing (remove and re-add at top)
+        self._view.add_mesen_capture(name, rom_offset, frame=capture.frame, update_if_exists=True)
+
+        # Re-request thumbnail (user may want fresh thumbnail)
+        if self._thumbnail_controller:
+            self._thumbnail_controller.queue_thumbnail(rom_offset)
+
+        logger.debug("Updated capture in browser: 0x%06X", rom_offset)
 
     def set_view(self, view: "ROMWorkflowPage") -> None:
         """Set the view and connect signals."""

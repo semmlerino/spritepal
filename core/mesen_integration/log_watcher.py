@@ -67,12 +67,15 @@ class LogWatcher(QObject):
     Signals:
         offset_discovered: Emitted when a new offset is found in the log.
                           Args: (CapturedOffset)
+        offset_rediscovered: Emitted when an existing offset is re-captured.
+                            Args: (CapturedOffset) - updated with new timestamp/frame
         watch_started: Emitted when file watching begins.
         watch_stopped: Emitted when file watching stops.
         error_occurred: Emitted on errors. Args: (error_message: str)
     """
 
-    offset_discovered = Signal(object)  # CapturedOffset
+    offset_discovered = Signal(object)  # CapturedOffset (new offset)
+    offset_rediscovered = Signal(object)  # CapturedOffset (re-capture of existing)
     watch_started = Signal()
     watch_stopped = Signal()
     error_occurred = Signal(str)
@@ -366,6 +369,21 @@ class LogWatcher(QObject):
         self._recent_captures.clear()
         logger.debug("Cleared offset history")
 
+    def _update_recent_capture(self, new_capture: CapturedOffset) -> None:
+        """Update an existing capture with new timestamp/frame and move it to the top.
+
+        This is called when a previously-seen offset is re-captured. The old capture
+        is removed and the new capture (with updated frame info) is inserted at the top.
+        """
+        # Find and remove the existing capture with the same offset
+        self._recent_captures = [c for c in self._recent_captures if c.offset != new_capture.offset]
+        # Insert the new capture at the top
+        self._recent_captures.insert(0, new_capture)
+
+        # Trim to max size
+        if len(self._recent_captures) > self._max_recent:
+            self._recent_captures = self._recent_captures[: self._max_recent]
+
     def cleanup(self) -> None:
         """Cleanup resources."""
         self.stop_watching()
@@ -418,7 +436,11 @@ class LogWatcher(QObject):
             content = self._offset_file.read_text(encoding="utf-8", errors="replace")
             capture = self._parse_line(content)
 
-            if capture is not None and capture.offset not in self._seen_offsets:
+            if capture is None:
+                return
+
+            if capture.offset not in self._seen_offsets:
+                # New offset - add to seen set and emit offset_discovered
                 self._seen_offsets.add(capture.offset)
                 self._recent_captures.insert(0, capture)
 
@@ -427,6 +449,11 @@ class LogWatcher(QObject):
 
                 logger.info("Discovered offset from last_offset.txt: %s", capture.offset_hex)
                 self.offset_discovered.emit(capture)
+            else:
+                # Re-capture of existing offset - update and emit offset_rediscovered
+                self._update_recent_capture(capture)
+                logger.info("Rediscovered offset from last_offset.txt: %s", capture.offset_hex)
+                self.offset_rediscovered.emit(capture)
 
         except OSError as e:
             logger.debug("Offset file poll error: %s", e)
@@ -471,7 +498,11 @@ class LogWatcher(QObject):
 
         for line in new_content.splitlines():
             capture = self._parse_line(line)
-            if capture is not None and capture.offset not in self._seen_offsets:
+            if capture is None:
+                continue
+
+            if capture.offset not in self._seen_offsets:
+                # New offset - add to seen set and emit offset_discovered
                 self._seen_offsets.add(capture.offset)
                 self._recent_captures.insert(0, capture)
 
@@ -481,6 +512,11 @@ class LogWatcher(QObject):
 
                 logger.info("Discovered offset: %s", capture.offset_hex)
                 self.offset_discovered.emit(capture)
+            else:
+                # Re-capture of existing offset - update and emit offset_rediscovered
+                self._update_recent_capture(capture)
+                logger.info("Rediscovered offset: %s", capture.offset_hex)
+                self.offset_rediscovered.emit(capture)
 
     def _parse_line(self, line: str) -> CapturedOffset | None:
         """Parse a log line for ROM offset."""

@@ -110,6 +110,7 @@ class Mesen2Module(QObject):
 
         This method establishes the signal chain:
         - LogWatcher.offset_discovered -> widget.add_capture()
+        - LogWatcher.offset_rediscovered -> widget.update_or_add_capture()
         - LogWatcher.watch_started -> widget.set_watching(True)
         - LogWatcher.watch_stopped -> widget.set_watching(False)
 
@@ -127,6 +128,7 @@ class Mesen2Module(QObject):
 
         # Connect log_watcher signals to widget methods
         self._log_watcher.offset_discovered.connect(widget.add_capture)
+        self._log_watcher.offset_rediscovered.connect(widget.update_or_add_capture)
         self._log_watcher.watch_started.connect(lambda: widget.set_watching(True))
         self._log_watcher.watch_stopped.connect(lambda: widget.set_watching(False))
 
@@ -183,6 +185,7 @@ class Mesen2Module(QObject):
         # Disconnect signals
         try:
             self._log_watcher.offset_discovered.disconnect(widget.add_capture)
+            self._log_watcher.offset_rediscovered.disconnect(widget.update_or_add_capture)
             self._log_watcher.watch_started.disconnect()
             self._log_watcher.watch_stopped.disconnect()
         except (RuntimeError, TypeError) as e:

@@ -84,6 +84,18 @@ class MesenCapturesSection(QWidget):
         """
         self._captures_widget.add_capture(capture)
 
+    def update_or_add_capture(self, capture: CapturedOffset) -> None:
+        """Update an existing capture or add it if new.
+
+        If a capture with the same FILE offset already exists, it is removed
+        and the new capture (with updated timestamp/frame) is added at the top.
+        This handles re-clicking the same sprite in Mesen2.
+
+        Args:
+            capture: The captured offset from LogWatcher.
+        """
+        self._captures_widget.update_or_add_capture(capture)
+
     def load_persistent(self, captures: list[CapturedOffset]) -> None:
         """Load persistent captures from file.
 

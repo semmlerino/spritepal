@@ -79,6 +79,7 @@ class MockLogWatcher(QObject):
     """Mock LogWatcher with real Qt signals for testing."""
 
     offset_discovered = Signal(object)
+    offset_rediscovered = Signal(object)
     watch_started = Signal()
     watch_stopped = Signal()
     error_occurred = Signal(str)
