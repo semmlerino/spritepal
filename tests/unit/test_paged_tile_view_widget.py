@@ -235,3 +235,69 @@ class TestPagedTileViewWidget:
 
         assert widget._cols == small_cols
         assert widget._rows == small_rows
+
+    def test_goto_offset_hex_with_prefix(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test go-to-offset with 0x hex prefix."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Calculate target offset in page 1
+        bytes_per_page = widget._cols * widget._rows * BYTES_PER_TILE
+        target_offset = bytes_per_page + 0x1000
+
+        # Type offset in input and trigger
+        widget._offset_input.setText(f"0x{target_offset:X}")
+        widget._on_goto_offset()
+
+        assert widget._current_page == 1
+
+    def test_goto_offset_hex_without_prefix(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test go-to-offset with plain hex (no prefix)."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Calculate target offset in page 1
+        bytes_per_page = widget._cols * widget._rows * BYTES_PER_TILE
+        target_offset = bytes_per_page + 0x1000
+
+        # Type offset without 0x prefix
+        widget._offset_input.setText(f"{target_offset:X}")
+        widget._on_goto_offset()
+
+        assert widget._current_page == 1
+
+    def test_goto_offset_clears_input(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test that go-to-offset clears the input field after success."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        widget._offset_input.setText("0x1000")
+        widget._on_goto_offset()
+
+        assert widget._offset_input.text() == ""
+
+    def test_goto_offset_invalid_format(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test go-to-offset with invalid format shows error."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        widget._offset_input.setText("not_a_number")
+        widget._on_goto_offset()
+
+        assert "Invalid offset format" in widget._status_label.text()
+
+    def test_goto_offset_exceeds_rom(self, qtbot, sample_rom_data: bytes) -> None:
+        """Test go-to-offset with offset beyond ROM size shows error."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+        widget.set_rom_data(sample_rom_data)
+
+        # Try offset way beyond ROM size
+        widget._offset_input.setText("0xFFFFFFFF")
+        widget._on_goto_offset()
+
+        assert "exceeds ROM size" in widget._status_label.text()

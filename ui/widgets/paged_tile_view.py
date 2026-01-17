@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QGraphicsView,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QSizePolicy,
     QSpinBox,
@@ -258,6 +259,24 @@ class PagedTileViewWidget(QWidget):
         # Spacer
         layout.addStretch()
 
+        # Go to offset input
+        layout.addWidget(QLabel("Go to:"))
+        self._offset_input = QLineEdit()
+        self._offset_input.setPlaceholderText("0x294D0A")
+        self._offset_input.setFixedWidth(100)
+        self._offset_input.setToolTip("Enter offset (hex with 0x prefix, or decimal)")
+        self._offset_input.returnPressed.connect(self._on_goto_offset)
+        layout.addWidget(self._offset_input)
+
+        self._goto_btn = QPushButton("Go")
+        self._goto_btn.setFixedWidth(40)
+        self._goto_btn.setToolTip("Jump to offset (Enter)")
+        self._goto_btn.clicked.connect(self._on_goto_offset)
+        layout.addWidget(self._goto_btn)
+
+        # Spacer
+        layout.addStretch()
+
         # Zoom controls
         self._zoom_fit_btn = QPushButton("Fit")
         self._zoom_fit_btn.setToolTip("Reset zoom to fit (Home)")
@@ -489,6 +508,40 @@ class PagedTileViewWidget(QWidget):
         if 0 <= index < len(GRID_PRESETS):
             _, cols, rows = GRID_PRESETS[index]
             self.set_grid_dimensions(cols, rows)
+
+    def _on_goto_offset(self) -> None:
+        """Handle go-to-offset button click or Enter key in offset input."""
+        text = self._offset_input.text().strip()
+        if not text:
+            return
+
+        try:
+            # Parse offset - handle hex (0x prefix or plain) and decimal
+            if text.lower().startswith("0x"):
+                offset = int(text, 16)
+            elif all(c in "0123456789abcdefABCDEF" for c in text):
+                # Looks like hex without prefix
+                offset = int(text, 16)
+            else:
+                # Try decimal
+                offset = int(text)
+
+            # Validate range
+            if offset < 0:
+                self._status_label.setText(f"Invalid offset: {text} (negative)")
+                return
+
+            if len(self._rom_data) > 0 and offset >= len(self._rom_data):
+                self._status_label.setText(f"Offset 0x{offset:X} exceeds ROM size (0x{len(self._rom_data):X})")
+                return
+
+            # Navigate to offset
+            self.go_to_offset(offset)
+            self._offset_input.clear()
+            logger.debug(f"Jumped to offset 0x{offset:06X}")
+
+        except ValueError:
+            self._status_label.setText(f"Invalid offset format: {text}")
 
     def _reset_zoom(self) -> None:
         """Reset zoom to fit entire grid."""
