@@ -77,6 +77,8 @@ class OffsetBrowserSidebar(QWidget):
         self._rom_extractor: ROMExtractor | None = None
         self._rom_path: str = ""
         self._nearby_current_offset_label: QLabel | None = None
+        self._current_palette: list[list[int]] | None = None
+        self._use_custom_palette: bool = False
 
         # Configurable nearby panel settings
         self._nearby_thumbnail_size: int = NEARBY_SIZES["medium"]
@@ -234,6 +236,40 @@ class OffsetBrowserSidebar(QWidget):
             btn.clicked.connect(lambda checked, k=key: self._on_size_changed(k))
             size_row.addWidget(btn)
             self._nearby_size_buttons[key] = btn
+        
+        # Add palette toggle
+        self._palette_toggle_btn = QPushButton("🎨")
+        self._palette_toggle_btn.setFixedSize(24, 20)
+        self._palette_toggle_btn.setCheckable(True)
+        self._palette_toggle_btn.setEnabled(False)  # Disabled until palette set
+        self._palette_toggle_btn.setToolTip("Toggle Palette Preview (No palette loaded)")
+        self._palette_toggle_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: {COLORS["input_background"]};
+                border: 1px solid {COLORS["border"]};
+                border-radius: 3px;
+                font-size: 12px;
+                padding: 0;
+            }}
+            QPushButton:checked {{
+                background-color: {COLORS["highlight"]};
+                border-color: {COLORS["highlight"]};
+                color: white;
+            }}
+            QPushButton:hover:!checked {{
+                border-color: {COLORS["primary"]};
+            }}
+            QPushButton:disabled {{
+                color: {COLORS["text_muted"]};
+                border-color: {COLORS["border"]};
+                background-color: {COLORS["panel_background"]};
+            }}
+            """
+        )
+        self._palette_toggle_btn.clicked.connect(self._on_palette_toggled)
+        size_row.addWidget(self._palette_toggle_btn)
+
         size_row.addStretch()
 
         size_widget = QWidget()
@@ -313,6 +349,37 @@ class OffsetBrowserSidebar(QWidget):
         # Rebuild grid and regenerate thumbnails
         self._rebuild_nearby_grid()
         if self._pending_nearby_center > 0:
+            self._do_nearby_update()
+
+    def set_palette(self, palette: list[list[int]] | None) -> None:
+        """Set the palette to use for previews.
+
+        Args:
+            palette: List of 16 RGB colors (as [r, g, b] lists) or None.
+        """
+        self._current_palette = palette
+        has_palette = palette is not None and len(palette) > 0
+
+        if self._palette_toggle_btn:
+            self._palette_toggle_btn.setEnabled(has_palette)
+            if has_palette:
+                self._palette_toggle_btn.setToolTip("Toggle Palette Preview")
+                # Auto-enable if it was previously checked or if it's the first time
+                # (Optional: preserve user preference or auto-enable)
+            else:
+                self._palette_toggle_btn.setToolTip("Toggle Palette Preview (No palette loaded)")
+                self._palette_toggle_btn.setChecked(False)
+                self._use_custom_palette = False
+
+        # If we have a palette and use_custom is true, refresh
+        if self._use_custom_palette and has_palette:
+            if self._pending_nearby_rom_size > 0:
+                self._do_nearby_update()
+
+    def _on_palette_toggled(self, checked: bool) -> None:
+        """Handle palette toggle click."""
+        self._use_custom_palette = checked
+        if self._pending_nearby_rom_size > 0:
             self._do_nearby_update()
 
     def _on_expand_toggled(self) -> None:
@@ -560,8 +627,15 @@ class OffsetBrowserSidebar(QWidget):
             width_tiles = min(4, num_tiles)
             height_tiles = (num_tiles + width_tiles - 1) // width_tiles
 
+            # Determine palette to use
+            custom_palette = self._current_palette if self._use_custom_palette else None
+
             image = renderer.render_tiles(
-                render_data[: width_tiles * height_tiles * 32], width_tiles, height_tiles, palette_index=None
+                render_data[: width_tiles * height_tiles * 32],
+                width_tiles,
+                height_tiles,
+                palette_index=None,
+                custom_palette=custom_palette,
             )
 
             if image is None:

@@ -43,7 +43,12 @@ class TileRenderer:
             self.default_palettes = {8: [[i * 16, i * 16, i * 16] for i in range(16)]}
 
     def render_tiles(
-        self, tile_data: bytes, width_tiles: int, height_tiles: int, palette_index: int | None = None
+        self,
+        tile_data: bytes,
+        width_tiles: int,
+        height_tiles: int,
+        palette_index: int | None = None,
+        custom_palette: list[list[int]] | None = None,
     ) -> Image.Image | None:
         """
         Render 4bpp tile data to an image.
@@ -53,12 +58,14 @@ class TileRenderer:
             width_tiles: Width in tiles
             height_tiles: Height in tiles
             palette_index: Palette index to use (0-15) or None for grayscale
+            custom_palette: Optional custom palette (list of 16 RGB lists) to use, overrides palette_index
 
         Returns:
             PIL Image or None if rendering fails
         """
         logger.debug(
-            f"render_tiles called: data_len={len(tile_data)}, dims={width_tiles}x{height_tiles}, palette={palette_index}"
+            f"render_tiles called: data_len={len(tile_data)}, dims={width_tiles}x{height_tiles}, "
+            f"palette_idx={palette_index}, custom_palette={'Yes' if custom_palette else 'No'}"
         )
         try:
             # Validate input (BYTES_PER_TILE = 32 for 4bpp format)
@@ -72,7 +79,10 @@ class TileRenderer:
                 )
 
             # Get palette
-            if palette_index is None:
+            if custom_palette is not None:
+                palette = custom_palette
+                logger.debug("Using custom palette")
+            elif palette_index is None:
                 # Use grayscale palette when None is specified
                 palette = [[i * 17, i * 17, i * 17] for i in range(16)]  # 0-255 range
                 logger.debug("Using grayscale palette (palette_index=None)")

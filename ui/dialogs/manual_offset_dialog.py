@@ -856,6 +856,19 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Load any cached sprites for visualization
         self._load_cached_sprites_for_map()
 
+    def set_preview_palette(self, palette: list[list[int]] | None) -> None:
+        """Set the palette to use for nearby sprite previews.
+
+        Args:
+            palette: List of 16 RGB colors (as [r, g, b] lists) or None.
+        """
+        if self._sidebar is not None:
+            self._sidebar.set_palette(palette)
+        
+        # Also could update main preview if we wanted to enforce it there,
+        # but preview_widget typically handles its own palette logic or uses default.
+        # For now, we focus on nearby thumbnails as requested.
+
     def _scan_for_sprites(self) -> None:
         """Scan ROM for HAL-compressed sprites using a background worker."""
         if self._search_coordinator is not None:

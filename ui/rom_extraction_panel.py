@@ -602,6 +602,25 @@ class ROMExtractionPanel(QWidget):
         # Configure the dialog with ROM data
         self._manual_offset_dialog.set_rom_data(self.rom_path, self.rom_size, self.extraction_manager)
 
+        # Set preview palette from CGRAM if available
+        cgram_path = self.cgram_selector_widget.get_cgram_path()
+        if cgram_path:
+            try:
+                from core.palette_manager import PaletteManager
+                
+                manager = PaletteManager()
+                manager.load_cgram(cgram_path)
+                # Use Palette 8 (first sprite palette) by default for preview
+                # This matches typical game usage where sprites use palettes 8-15
+                palette = manager.get_palette(8)
+                self._manual_offset_dialog.set_preview_palette(palette)
+                logger.debug(f"Loaded preview palette from {cgram_path}")
+            except Exception as e:
+                logger.warning(f"Failed to load preview palette from {cgram_path}: {e}")
+                self._manual_offset_dialog.set_preview_palette(None)
+        else:
+            self._manual_offset_dialog.set_preview_palette(None)
+
         # Set initial offset from controller
         initial_offset = self._params_controller.manual_offset
         logger.info("open_manual_offset_dialog: setting initial_offset to 0x%06X", initial_offset)

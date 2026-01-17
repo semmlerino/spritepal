@@ -644,3 +644,50 @@ class TestNearbyKeyboardShortcuts:
 
         # Should still be collapsed (no change from modifier key)
         assert not sidebar._nearby_expanded
+
+
+class TestNearbyPaletteControl:
+    """Tests for palette control in nearby panel."""
+
+    def test_palette_toggle_exists(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify palette toggle button is created."""
+        assert hasattr(sidebar, "_palette_toggle_btn")
+        assert sidebar._palette_toggle_btn is not None
+
+    def test_palette_toggle_disabled_by_default(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify palette toggle is disabled when no palette is set."""
+        assert not sidebar._palette_toggle_btn.isEnabled()
+        assert not sidebar._palette_toggle_btn.isChecked()
+
+    def test_set_palette_enables_toggle(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify setting a palette enables the toggle."""
+        # Create a dummy palette (16 colors)
+        dummy_palette = [[i, i, i] for i in range(16)]
+        sidebar.set_palette(dummy_palette)
+        
+        assert sidebar._palette_toggle_btn.isEnabled()
+        assert "Toggle Palette Preview" in sidebar._palette_toggle_btn.toolTip()
+
+    def test_clear_palette_disables_toggle(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify clearing palette disables the toggle."""
+        dummy_palette = [[i, i, i] for i in range(16)]
+        sidebar.set_palette(dummy_palette)
+        assert sidebar._palette_toggle_btn.isEnabled()
+        
+        sidebar.set_palette(None)
+        assert not sidebar._palette_toggle_btn.isEnabled()
+        assert not sidebar._palette_toggle_btn.isChecked()
+
+    def test_toggle_updates_state(self, sidebar: OffsetBrowserSidebar) -> None:
+        """Verify clicking toggle updates internal state."""
+        dummy_palette = [[i, i, i] for i in range(16)]
+        sidebar.set_palette(dummy_palette)
+        
+        # Click to enable
+        sidebar._palette_toggle_btn.click()
+        assert sidebar._use_custom_palette
+        
+        # Click to disable
+        sidebar._palette_toggle_btn.click()
+        assert not sidebar._use_custom_palette
+
