@@ -21,8 +21,10 @@ from PySide6.QtGui import (
     QPixmap,
 )
 from PySide6.QtWidgets import (
+    QHBoxLayout,
     QLineEdit,
     QMenu,
+    QPushButton,
     QStyledItemDelegate,
     QStyleOptionViewItem,
     QTreeWidget,
@@ -157,6 +159,7 @@ class SpriteAssetBrowser(QWidget):
     delete_requested = Signal(int, str)  # offset, source_type
     save_to_library_requested = Signal(int, str)  # offset, source_type
     item_offset_changed = Signal(int, int)  # old_offset, new_offset (e.g., alignment correction)
+    refresh_requested = Signal()  # user wants full cache refresh and thumbnail re-extraction
 
     # Category names
     CATEGORY_ROM = "ROM Sprites"
@@ -174,6 +177,19 @@ class SpriteAssetBrowser(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(SPACING_SMALL)
+
+        # Toolbar with refresh button
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        toolbar_layout.setSpacing(SPACING_SMALL)
+
+        self._refresh_btn = QPushButton("Refresh Thumbnails")
+        self._refresh_btn.setToolTip("Clear caches and re-extract all thumbnails from ROM")
+        self._refresh_btn.clicked.connect(self._on_refresh_clicked)
+        toolbar_layout.addWidget(self._refresh_btn)
+        toolbar_layout.addStretch()
+
+        layout.addLayout(toolbar_layout)
 
         # Search bar
         self.search_edit = QLineEdit()
@@ -801,6 +817,41 @@ class SpriteAssetBrowser(QWidget):
 
             item.setHidden(not matches)
             iterator += 1
+
+    def _on_refresh_clicked(self) -> None:
+        """Handle refresh button click - clear thumbnails and emit signal for cache clearing."""
+        # Clear all thumbnails from tree
+        self._clear_all_thumbnails()
+        # Emit signal for controller to clear caches and re-request thumbnails
+        self.refresh_requested.emit()
+
+    def _clear_all_thumbnails(self) -> None:
+        """Clear all thumbnails from tree items."""
+        iterator = QTreeWidgetItemIterator(self.tree)
+        while iterator.value():
+            item = iterator.value()
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and "thumbnail" in data:
+                data["thumbnail"] = None
+                item.setData(0, Qt.ItemDataRole.UserRole, data)
+            iterator += 1
+        self.tree.viewport().update()
+
+    def get_all_offsets(self) -> list[int]:
+        """Get offsets for all sprite items in the browser.
+
+        Returns:
+            List of ROM offsets for all sprites (excludes categories and local files).
+        """
+        offsets: list[int] = []
+        iterator = QTreeWidgetItemIterator(self.tree)
+        while iterator.value():
+            item = iterator.value()
+            data = item.data(0, Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and "offset" in data:
+                offsets.append(data["offset"])
+            iterator += 1
+        return offsets
 
     def get_item_count(self) -> dict[str, int]:
         """

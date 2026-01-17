@@ -137,6 +137,7 @@ class RecentCapturesWidget(QWidget):
     offset_activated = Signal(int)
     save_to_library_requested = Signal(int)
     thumbnail_requested = Signal(int)  # Emitted when a capture needs a thumbnail
+    refresh_requested = Signal()  # Emitted when user requests full cache refresh
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -248,6 +249,11 @@ class RecentCapturesWidget(QWidget):
 
         header_layout.addStretch()
 
+        self._refresh_btn = QPushButton("Refresh", parent=self)
+        self._refresh_btn.setFixedWidth(55)
+        self._refresh_btn.setToolTip("Re-extract all thumbnails from ROM")
+        header_layout.addWidget(self._refresh_btn)
+
         self._clear_btn = QPushButton("Clear", parent=self)
         self._clear_btn.setFixedWidth(50)
         self._clear_btn.setToolTip("Clear all captured offsets")
@@ -306,6 +312,7 @@ class RecentCapturesWidget(QWidget):
         self._list_widget.itemClicked.connect(self._on_item_clicked)
         self._list_widget.itemDoubleClicked.connect(self._on_item_double_clicked)
         self._list_widget.customContextMenuRequested.connect(self._show_context_menu)
+        self._refresh_btn.clicked.connect(self._on_refresh_clicked)
         self._clear_btn.clicked.connect(self.clear)
 
     def add_capture(self, capture: CapturedOffset, request_thumbnail: bool = True) -> None:
@@ -433,6 +440,27 @@ class RecentCapturesWidget(QWidget):
                 rom_offset = data.get("offset")
                 if rom_offset is not None:
                     self.thumbnail_requested.emit(rom_offset)
+
+    def _on_refresh_clicked(self) -> None:
+        """Handle refresh button click - clear thumbnails and request re-extraction."""
+        # Clear thumbnails from display
+        self._clear_all_thumbnails()
+        # Emit signal for parent to clear caches
+        self.refresh_requested.emit()
+        # Re-request all thumbnails
+        self.request_all_thumbnails()
+
+    def _clear_all_thumbnails(self) -> None:
+        """Clear all thumbnails from list items."""
+        for i in range(self._list_widget.count()):
+            item = self._list_widget.item(i)
+            if item is None:  # type: ignore[reportUnnecessaryComparison]
+                continue
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict):
+                data["thumbnail"] = None
+                item.setData(Qt.ItemDataRole.UserRole, data)
+        self._list_widget.viewport().update()
 
     def get_capture_count(self) -> int:
         """Get the number of captured offsets."""

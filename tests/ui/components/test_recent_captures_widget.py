@@ -197,3 +197,67 @@ class TestUpdateOrAddCapture:
         # Signal should have been emitted with ROM offset (normalized)
         rom_offset = widget._normalize_offset(sample_capture.offset)
         assert blocker.args == [rom_offset]
+
+
+class TestRefreshButton:
+    """Tests for refresh button functionality."""
+
+    def test_refresh_button_exists(self, widget: RecentCapturesWidget) -> None:
+        """Widget should have a refresh button."""
+        assert hasattr(widget, "_refresh_btn")
+        assert widget._refresh_btn is not None
+
+    def test_refresh_button_emits_signal(
+        self, widget: RecentCapturesWidget, sample_capture: CapturedOffset, qtbot
+    ) -> None:
+        """Clicking refresh should emit refresh_requested signal."""
+        # Add a capture first
+        widget.add_capture(sample_capture, request_thumbnail=False)
+
+        with qtbot.waitSignal(widget.refresh_requested, timeout=1000):
+            widget._refresh_btn.click()
+
+    def test_refresh_clears_thumbnails(
+        self, widget: RecentCapturesWidget, sample_capture: CapturedOffset, qtbot
+    ) -> None:
+        """Refresh should clear thumbnails from items."""
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QPixmap
+
+        # Add capture with a thumbnail
+        widget.add_capture(sample_capture, request_thumbnail=False)
+        item = widget._list_widget.item(0)
+        data = item.data(Qt.ItemDataRole.UserRole)
+        # Set a mock thumbnail
+        data["thumbnail"] = QPixmap(32, 32)
+        item.setData(Qt.ItemDataRole.UserRole, data)
+
+        # Verify thumbnail is set
+        data_before = widget._list_widget.item(0).data(Qt.ItemDataRole.UserRole)
+        assert data_before["thumbnail"] is not None
+
+        # Click refresh (use internal method to avoid signal timing)
+        widget._clear_all_thumbnails()
+
+        # Verify thumbnail is cleared
+        data_after = widget._list_widget.item(0).data(Qt.ItemDataRole.UserRole)
+        assert data_after["thumbnail"] is None
+
+    def test_refresh_re_requests_thumbnails(
+        self, widget: RecentCapturesWidget, sample_capture: CapturedOffset, qtbot
+    ) -> None:
+        """Refresh should re-request thumbnails for all captures."""
+        # Add capture
+        widget.add_capture(sample_capture, request_thumbnail=False)
+
+        # Track thumbnail requests
+        requests: list[int] = []
+        widget.thumbnail_requested.connect(lambda offset: requests.append(offset))
+
+        # Trigger refresh click
+        widget._on_refresh_clicked()
+
+        # Should have requested thumbnail for the capture
+        assert len(requests) == 1
+        rom_offset = widget._normalize_offset(sample_capture.offset)
+        assert requests[0] == rom_offset

@@ -108,9 +108,7 @@ class SimpleBrowseTab(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setSpacing(SPACING_SMALL)
-        layout.setContentsMargins(
-            SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD
-        )
+        layout.setContentsMargins(SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD, SPACING_STANDARD)
 
         # Main control section with improved styling
         controls_frame = QFrame()
@@ -124,9 +122,7 @@ class SimpleBrowseTab(QWidget):
         """)
         controls_layout = QVBoxLayout(controls_frame)
         controls_layout.setSpacing(SPACING_SMALL)
-        controls_layout.setContentsMargins(
-            SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM
-        )
+        controls_layout.setContentsMargins(SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM, SPACING_MEDIUM)
 
         # Common Styles
         action_btn_style = f"""
@@ -142,7 +138,7 @@ class SimpleBrowseTab(QWidget):
                 border-color: {COLORS["highlight"]};
             }}
         """
-        
+
         prominent_btn_style = f"""
             QPushButton {{
                 padding: 6px 16px;
@@ -224,7 +220,7 @@ class SimpleBrowseTab(QWidget):
         address_row.addWidget(self.paste_button)
 
         address_row.addStretch()
-        
+
         # Position Label
         self.position_label = QLabel(self._format_position(self._current_offset))
         position_font = QFont()
@@ -244,7 +240,7 @@ class SimpleBrowseTab(QWidget):
         # Step Back (Large)
         step_prev_btn = QPushButton("◀")
         step_prev_btn.setToolTip("Step Backward (Arrow Left)")
-        step_prev_btn.setFixedSize(40, 32) # Bigger target
+        step_prev_btn.setFixedSize(40, 32)  # Bigger target
         step_prev_btn.setStyleSheet(step_btn_style)
         step_prev_btn.clicked.connect(self._on_prev_step_clicked)
         nav_row.addWidget(step_prev_btn)
@@ -257,7 +253,7 @@ class SimpleBrowseTab(QWidget):
         self.position_slider.setMaximum(max_slider_value)
         safe_current_offset = min(self._current_offset, max_slider_value)
         self.position_slider.setValue(safe_current_offset)
-        self.position_slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding) # Fill height
+        self.position_slider.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)  # Fill height
         self.position_slider.valueChanged.connect(self._on_slider_changed)
         if self.position_slider:
             self._update_slider_style(focus_active=False)
@@ -266,7 +262,7 @@ class SimpleBrowseTab(QWidget):
         # Step Fwd (Large)
         step_next_btn = QPushButton("▶")
         step_next_btn.setToolTip("Step Forward (Arrow Right)")
-        step_next_btn.setFixedSize(40, 32) # Bigger target
+        step_next_btn.setFixedSize(40, 32)  # Bigger target
         step_next_btn.setStyleSheet(step_btn_style)
         step_next_btn.clicked.connect(self._on_next_step_clicked)
         nav_row.addWidget(step_next_btn)
@@ -282,8 +278,8 @@ class SimpleBrowseTab(QWidget):
         self.focus_mode_check = QCheckBox("Focus Mode")
         self.focus_mode_check.setToolTip("Zoom slider to a 32KB window around current offset")
         self.focus_mode_check.setStyleSheet(f"""
-            QCheckBox {{ color: {COLORS['text_secondary']}; font-weight: bold; }}
-            QCheckBox::indicator:checked {{ background-color: {COLORS['highlight']}; border-color: {COLORS['highlight']}; }}
+            QCheckBox {{ color: {COLORS["text_secondary"]}; font-weight: bold; }}
+            QCheckBox::indicator:checked {{ background-color: {COLORS["highlight"]}; border-color: {COLORS["highlight"]}; }}
         """)
         self.focus_mode_check.toggled.connect(self._on_focus_toggled)
         utility_row.addWidget(self.focus_mode_check)
@@ -314,7 +310,9 @@ class SimpleBrowseTab(QWidget):
 
         # Range Label
         self.range_label = QLabel(f"Range: 0x0 - 0x{self._rom_size:X}")
-        self.range_label.setStyleSheet(f"font-family: monospace; color: {COLORS['text_muted']}; font-size: 10px; margin-left: 8px;")
+        self.range_label.setStyleSheet(
+            f"font-family: monospace; color: {COLORS['text_muted']}; font-size: 10px; margin-left: 8px;"
+        )
         utility_row.addWidget(self.range_label)
 
         utility_row.addStretch()
@@ -328,7 +326,7 @@ class SimpleBrowseTab(QWidget):
         utility_row.addWidget(self.prev_button)
 
         self.find_sprites_button = QPushButton("Find All")
-        self.find_sprites_button.setStyleSheet(action_btn_style) # Demoted from prominent
+        self.find_sprites_button.setStyleSheet(action_btn_style)  # Demoted from prominent
         self.find_sprites_button.setToolTip("Scan entire ROM for HAL-compressed sprites (Ctrl+F)")
         self.find_sprites_button.clicked.connect(self._on_find_sprites)
         utility_row.addWidget(self.find_sprites_button)
@@ -415,43 +413,43 @@ class SimpleBrowseTab(QWidget):
     def _update_slider_range(self) -> None:
         """Update slider min/max/value based on focus mode."""
         self.position_slider.blockSignals(True)
-        
+
         if self._focus_mode_active:
             # Focus Mode: Slider represents a window around current offset
             # We want the slider to be centered if possible
             # Range: current - window/2 to current + window/2
-            
+
             # Note: We can't actually change the range dynamically while dragging without jumping.
             # Instead, when focus is enabled, we set the range relative to the *current* offset.
             # As the user moves the slider, the offset changes within that fixed window.
             # If they want to move the window, they must exit focus mode or use step buttons.
-            
+
             # Actually, better behavior: When focus enabled, set range to window around CURRENT.
             # When slider moves, offset updates.
             # If offset is updated externally (e.g. step buttons), does the window move?
             # Yes, if we recenter the window on external updates.
-            
+
             center = self._current_offset
             half_window = self._focus_window_size // 2
-            
+
             min_val = max(0, center - half_window)
             max_val = min(self._rom_size, center + half_window)
-            
+
             self.position_slider.setMinimum(min_val)
             self.position_slider.setMaximum(max_val)
             self.position_slider.setValue(self._current_offset)
-            
+
             self.range_label.setText(f"Focus: 0x{min_val:X} - 0x{max_val:X}")
-            
+
         else:
             # Full ROM Mode
             max_val = min(self._rom_size, 0x7FFFFFFF)
             self.position_slider.setMinimum(0)
             self.position_slider.setMaximum(max_val)
             self.position_slider.setValue(self._current_offset)
-            
+
             self.range_label.setText(f"0x0 - 0x{self._rom_size:X}")
-            
+
         self.position_slider.blockSignals(False)
 
     def _format_position(self, offset: int) -> str:
@@ -493,7 +491,7 @@ class SimpleBrowseTab(QWidget):
         """Handle manual spinbox changes."""
         self._current_offset = value
         self._update_displays()
-        
+
         # If in focus mode, we might need to recenter the window if the value went out of bounds,
         # or just update the slider value.
         if self._focus_mode_active:
@@ -519,7 +517,6 @@ class SimpleBrowseTab(QWidget):
         if self.position_label:
             self.position_label.setText(self._format_position(self._current_offset))
 
-
     def get_current_offset(self) -> int:
         """
         Get current offset.
@@ -544,7 +541,7 @@ class SimpleBrowseTab(QWidget):
             self.manual_spinbox.blockSignals(True)
             self.manual_spinbox.setValue(offset)
             self.manual_spinbox.blockSignals(False)
-            
+
             # Handle slider update (with focus mode logic)
             if self._focus_mode_active:
                 # Always recenter on external offset set

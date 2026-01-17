@@ -321,7 +321,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self.smart_tab.hide()
         self.gallery_tab = SpriteGalleryTab()
         self.gallery_tab.hide()
-        
+
         # Remove unused refs
         self.status_collapsible = None
         self.tab_widget = None
@@ -864,10 +864,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         """
         if self._sidebar is not None:
             self._sidebar.set_palette(palette)
-        
-        # Also could update main preview if we wanted to enforce it there,
-        # but preview_widget typically handles its own palette logic or uses default.
-        # For now, we focus on nearby thumbnails as requested.
+
+        if self.preview_widget is not None:
+            self.preview_widget.set_custom_palette(palette)
 
     def _scan_for_sprites(self) -> None:
         """Scan ROM for HAL-compressed sprites using a background worker."""
@@ -1070,7 +1069,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
     def add_found_sprite(self, offset: int, quality: float = 1.0) -> None:
         """Add found sprite to map.
-        
+
         This method is kept for compatibility with callers.
         """
         pass

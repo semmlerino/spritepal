@@ -314,7 +314,7 @@ class TestNearbySizeControl:
         assert "large" in sidebar._nearby_size_buttons
 
     def test_medium_is_default(self, sidebar: OffsetBrowserSidebar) -> None:
-        """Verify medium (48px) is default size."""
+        """Verify medium (96px) is default size."""
         assert sidebar._nearby_thumbnail_size == NEARBY_SIZES["medium"]
         assert sidebar._nearby_size_buttons["medium"].isChecked()
         assert not sidebar._nearby_size_buttons["small"].isChecked()
@@ -486,11 +486,11 @@ class TestNearbyTooltips:
     def test_size_buttons_have_tooltips(self, sidebar: OffsetBrowserSidebar) -> None:
         """Verify S/M/L buttons have descriptive tooltips with keyboard shortcuts."""
         assert "[1]" in sidebar._nearby_size_buttons["small"].toolTip()
-        assert "36px" in sidebar._nearby_size_buttons["small"].toolTip()
+        assert "64px" in sidebar._nearby_size_buttons["small"].toolTip()
         assert "[2]" in sidebar._nearby_size_buttons["medium"].toolTip()
-        assert "48px" in sidebar._nearby_size_buttons["medium"].toolTip()
+        assert "96px" in sidebar._nearby_size_buttons["medium"].toolTip()
         assert "[3]" in sidebar._nearby_size_buttons["large"].toolTip()
-        assert "64px" in sidebar._nearby_size_buttons["large"].toolTip()
+        assert "128px" in sidebar._nearby_size_buttons["large"].toolTip()
 
     def test_expand_button_has_tooltip(self, sidebar: OffsetBrowserSidebar) -> None:
         """Verify expand button has tooltip with shortcut hint."""
@@ -664,7 +664,7 @@ class TestNearbyPaletteControl:
         # Create a dummy palette (16 colors)
         dummy_palette = [[i, i, i] for i in range(16)]
         sidebar.set_palette(dummy_palette)
-        
+
         assert sidebar._palette_toggle_btn.isEnabled()
         assert "Toggle Palette Preview" in sidebar._palette_toggle_btn.toolTip()
 
@@ -673,7 +673,7 @@ class TestNearbyPaletteControl:
         dummy_palette = [[i, i, i] for i in range(16)]
         sidebar.set_palette(dummy_palette)
         assert sidebar._palette_toggle_btn.isEnabled()
-        
+
         sidebar.set_palette(None)
         assert not sidebar._palette_toggle_btn.isEnabled()
         assert not sidebar._palette_toggle_btn.isChecked()
@@ -682,12 +682,11 @@ class TestNearbyPaletteControl:
         """Verify clicking toggle updates internal state."""
         dummy_palette = [[i, i, i] for i in range(16)]
         sidebar.set_palette(dummy_palette)
-        
+
         # Click to enable
         sidebar._palette_toggle_btn.click()
         assert sidebar._use_custom_palette
-        
+
         # Click to disable
         sidebar._palette_toggle_btn.click()
         assert not sidebar._use_custom_palette
-

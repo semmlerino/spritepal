@@ -155,3 +155,110 @@ class TestAssetBrowserOffsetUpdate:
         success = browser.update_sprite_offset(0x999999, 0x999998)
 
         assert not success
+
+
+class TestSpriteAssetBrowserRefresh:
+    """Tests for refresh button functionality in SpriteAssetBrowser."""
+
+    def test_refresh_button_exists(self, qtbot):
+        """Widget should have a refresh button."""
+        from ui.sprite_editor.views.widgets.sprite_asset_browser import (
+            SpriteAssetBrowser,
+        )
+
+        browser = SpriteAssetBrowser()
+        qtbot.addWidget(browser)
+
+        assert hasattr(browser, "_refresh_btn")
+        assert browser._refresh_btn is not None
+
+    def test_refresh_button_emits_signal(self, qtbot):
+        """Clicking refresh should emit refresh_requested signal."""
+        from ui.sprite_editor.views.widgets.sprite_asset_browser import (
+            SpriteAssetBrowser,
+        )
+
+        browser = SpriteAssetBrowser()
+        qtbot.addWidget(browser)
+
+        # Add a sprite
+        browser.add_rom_sprite("Test Sprite", 0x1000)
+
+        with qtbot.waitSignal(browser.refresh_requested, timeout=1000):
+            browser._refresh_btn.click()
+
+    def test_refresh_clears_thumbnails(self, qtbot):
+        """Refresh should clear thumbnails from items."""
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QPixmap
+
+        from ui.sprite_editor.views.widgets.sprite_asset_browser import (
+            SpriteAssetBrowser,
+        )
+
+        browser = SpriteAssetBrowser()
+        qtbot.addWidget(browser)
+
+        # Add sprite and set thumbnail
+        browser.add_rom_sprite("Test Sprite", 0x1000)
+        test_pixmap = QPixmap(32, 32)
+        browser.set_thumbnail(0x1000, test_pixmap)
+
+        # Verify thumbnail is set
+        rom_category = None
+        for i in range(browser.tree.topLevelItemCount()):
+            item = browser.tree.topLevelItem(i)
+            if item.text(0) == "ROM Sprites":
+                rom_category = item
+                break
+
+        sprite_item = rom_category.child(0)
+        data_before = sprite_item.data(0, Qt.ItemDataRole.UserRole)
+        assert data_before["thumbnail"] is not None
+
+        # Clear thumbnails
+        browser._clear_all_thumbnails()
+
+        # Verify thumbnail is cleared
+        data_after = sprite_item.data(0, Qt.ItemDataRole.UserRole)
+        assert data_after["thumbnail"] is None
+
+    def test_get_all_offsets_returns_all_sprite_offsets(self, qtbot):
+        """get_all_offsets should return offsets for all sprites."""
+        from ui.sprite_editor.views.widgets.sprite_asset_browser import (
+            SpriteAssetBrowser,
+        )
+
+        browser = SpriteAssetBrowser()
+        qtbot.addWidget(browser)
+
+        # Add multiple sprites
+        browser.add_rom_sprite("Sprite 1", 0x1000)
+        browser.add_rom_sprite("Sprite 2", 0x2000)
+        browser.add_mesen_capture("Capture 1", 0x3000)
+
+        offsets = browser.get_all_offsets()
+
+        assert len(offsets) == 3
+        assert 0x1000 in offsets
+        assert 0x2000 in offsets
+        assert 0x3000 in offsets
+
+    def test_get_all_offsets_excludes_categories_and_local_files(self, qtbot):
+        """get_all_offsets should exclude categories and local files."""
+        from ui.sprite_editor.views.widgets.sprite_asset_browser import (
+            SpriteAssetBrowser,
+        )
+
+        browser = SpriteAssetBrowser()
+        qtbot.addWidget(browser)
+
+        # Add sprite and local file
+        browser.add_rom_sprite("Sprite 1", 0x1000)
+        browser.add_local_file("/path/to/file.png", "file.png")
+
+        offsets = browser.get_all_offsets()
+
+        # Should only have the ROM sprite offset, not local file
+        assert len(offsets) == 1
+        assert 0x1000 in offsets

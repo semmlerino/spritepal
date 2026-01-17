@@ -387,6 +387,7 @@ class ROMWorkflowController(QObject):
         self._view.asset_browser.rename_requested.connect(self._on_asset_renamed)
         self._view.asset_browser.delete_requested.connect(self._on_asset_deleted)
         self._view.asset_browser.item_offset_changed.connect(self._on_item_offset_changed)
+        self._view.asset_browser.refresh_requested.connect(self._on_asset_browser_refresh)
 
         # EditWorkspace signals (save/export)
         self._view.workspace.saveToRomRequested.connect(self.prepare_injection)
@@ -808,6 +809,37 @@ class ROMWorkflowController(QObject):
             # Queue generation at corrected offset
             self._thumbnail_controller.queue_thumbnail(new_offset)
             logger.debug("Re-queued thumbnail for aligned offset 0x%06X (was 0x%06X)", new_offset, old_offset)
+
+    def _on_asset_browser_refresh(self) -> None:
+        """Handle refresh button click - clear caches and re-request thumbnails.
+
+        This performs full cache invalidation:
+        1. Clears in-memory thumbnail cache in worker
+        2. Clears disk preview cache for current ROM
+        3. Re-queues thumbnails for all items in browser
+        """
+        # Clear in-memory cache
+        if self._thumbnail_controller and self._thumbnail_controller.worker:
+            self._thumbnail_controller.worker.clear_cache()
+            logger.debug("Cleared thumbnail worker in-memory cache")
+
+        # Clear disk cache for current ROM
+        if self.rom_path and self.rom_cache:
+            removed = self.rom_cache.clear_preview_cache(self.rom_path)
+            logger.debug("Cleared %d disk preview cache files for %s", removed, self.rom_path)
+
+        # Re-queue thumbnails for all offsets in browser
+        self._request_all_asset_thumbnails()
+
+    def _request_all_asset_thumbnails(self) -> None:
+        """Request thumbnails for all sprites in the asset browser."""
+        if not self._view or not self._thumbnail_controller:
+            return
+
+        offsets = self._view.asset_browser.get_all_offsets()
+        if offsets:
+            self._thumbnail_controller.queue_batch(offsets)
+            logger.debug("Queued %d thumbnails for refresh", len(offsets))
 
     def _load_library_sprites(self) -> None:
         """Load sprites from library that match current ROM."""

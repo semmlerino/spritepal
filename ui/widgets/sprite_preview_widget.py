@@ -59,6 +59,7 @@ class SpritePreviewWidget(QWidget):
         self.palettes: list[list[tuple[int, int, int]]] = []
         self.current_palette_index: int | None = None  # Default to grayscale (None = grayscale)
         self.sprite_data: bytes | None = None
+        self.sprite_size: tuple[int, int] | None = None
         self._update_in_progress = False  # Guard against concurrent updates
         self._default_palette_loader: DefaultPaletteLoader | None = None  # Lazy init via property
 
@@ -290,6 +291,7 @@ class SpritePreviewWidget(QWidget):
 
         # Store grayscale data for palette swapping
         self.sprite_data = img.tobytes()
+        self.sprite_size = img.size
 
         # Apply current palette
         self._update_preview_with_palette(img)
@@ -407,14 +409,54 @@ class SpritePreviewWidget(QWidget):
             # Get the actual palette index from combo box data (could be None for grayscale)
             palette_data = self.palette_combo.itemData(index) if self.palette_combo else None
             self.current_palette_index = palette_data
+
             # Recreate image from grayscale data
-            # Assume square sprite for now
-            size = int(len(self.sprite_data) ** 0.5)
-            img = Image.frombytes("L", (size, size), self.sprite_data)
+            if self.sprite_size:
+                img = Image.frombytes("L", self.sprite_size, self.sprite_data)
+            else:
+                # Fallback to square assumption if size not set (should not happen with new logic)
+                size = int(len(self.sprite_data) ** 0.5)
+                img = Image.frombytes("L", (size, size), self.sprite_data)
+
             self._update_preview_with_palette(img)
             # Emit -1 for grayscale, otherwise the palette index
             emit_value = -1 if self.current_palette_index is None else self.current_palette_index
             self.palette_changed.emit(emit_value)
+
+    def set_custom_palette(self, palette: list[list[int]] | None) -> None:
+        """Set a custom palette to be used for the preview.
+
+        Args:
+            palette: A single palette (list of 16 RGB colors) or None to use defaults.
+        """
+        if palette:
+            # Set the custom palette
+            # Cast to expected type (list of lists of ints is compatible with list of lists of tuples for this usage)
+            self.palettes = [palette]  # type: ignore
+            self.current_palette_index = 0
+
+            # Update combo box
+            if self.palette_combo:
+                self.palette_combo.blockSignals(True)
+                self.palette_combo.clear()
+                self.palette_combo.addItem("Custom Palette", 0)
+                self.palette_combo.setCurrentIndex(0)
+                self.palette_combo.blockSignals(False)
+        else:
+            # Clear custom palette (will fall back to defaults on next load)
+            self.palettes = []
+            self.current_palette_index = None
+            if self.palette_combo:
+                self.palette_combo.clear()
+
+        # If we have sprite data loaded, refresh the preview immediately
+        if self.sprite_data:
+            if self.sprite_size:
+                img = Image.frombytes("L", self.sprite_size, self.sprite_data)
+            else:
+                size = int(len(self.sprite_data) ** 0.5)
+                img = Image.frombytes("L", (size, size), self.sprite_data)
+            self._update_preview_with_palette(img)
 
     def load_sprite_from_4bpp(
         self,

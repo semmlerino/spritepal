@@ -269,6 +269,7 @@ class ROMExtractionPanel(QWidget):
         self.mesen_captures_section.offset_activated.connect(self._on_mesen2_offset_activated)
         self.mesen_captures_section.watching_changed.connect(self.mesen2_watching_changed.emit)
         self.mesen_captures_section.thumbnail_requested.connect(self._on_thumbnail_requested)
+        self.mesen_captures_section.refresh_requested.connect(self._on_captures_refresh_requested)
 
         # Wire up log watcher if module provided (dependency injection)
         if self._mesen2_module is not None:
@@ -323,6 +324,23 @@ class ROMExtractionPanel(QWidget):
             pixmap = QPixmap.fromImage(qimage)
             self.mesen_captures_section.set_thumbnail(offset, pixmap)
             logger.debug("Set thumbnail for capture at offset 0x%06X", offset)
+
+    def _on_captures_refresh_requested(self) -> None:
+        """Handle refresh button click - clear caches and re-extract thumbnails.
+
+        This performs full cache invalidation:
+        1. Clears in-memory thumbnail cache in worker
+        2. Clears disk preview cache for current ROM
+        """
+        # Clear in-memory cache
+        if self._thumbnail_controller is not None and self._thumbnail_controller.worker:
+            self._thumbnail_controller.worker.clear_cache()
+            logger.debug("Cleared thumbnail worker in-memory cache")
+
+        # Clear disk cache for current ROM
+        if self.rom_path and self.rom_cache:
+            removed = self.rom_cache.clear_preview_cache(self.rom_path)
+            logger.debug("Cleared %d disk preview cache files for %s", removed, self.rom_path)
 
     def _setup_capture_thumbnail_worker(self) -> None:
         """Setup thumbnail worker for Mesen captures after ROM is loaded."""
@@ -605,11 +623,11 @@ class ROMExtractionPanel(QWidget):
         # Set preview palette from CGRAM if available, otherwise use default
         cgram_path = self.cgram_selector_widget.get_cgram_path()
         palette = None
-        
+
         if cgram_path:
             try:
                 from core.palette_manager import PaletteManager
-                
+
                 manager = PaletteManager()
                 manager.load_cgram(cgram_path)
                 # Use Palette 8 (first sprite palette) by default for preview
@@ -621,6 +639,7 @@ class ROMExtractionPanel(QWidget):
 
         if palette is None:
             from core.palette_manager import PaletteManager
+
             # Use default SNES palette as fallback (convert tuples to lists for consistency)
             default_pal = PaletteManager.get_default_snes_palette()
             palette = [list(c) for c in default_pal]

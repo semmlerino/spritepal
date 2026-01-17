@@ -210,8 +210,3 @@ class TestDialogBehavior:
 
         # Dialog is still visible
         assert offset_browser.isVisible()
-
-
-
-
-

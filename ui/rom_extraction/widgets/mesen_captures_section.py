@@ -46,6 +46,7 @@ class MesenCapturesSection(QWidget):
     offset_activated = Signal(int)
     save_to_library_requested = Signal(int)
     thumbnail_requested = Signal(int)  # Forwarded: capture needs thumbnail
+    refresh_requested = Signal()  # Forwarded: user wants full cache refresh
 
     # Additional signal for status bar integration
     watching_changed = Signal(bool)
@@ -73,6 +74,7 @@ class MesenCapturesSection(QWidget):
         self._captures_widget.offset_activated.connect(self.offset_activated.emit)
         self._captures_widget.save_to_library_requested.connect(self.save_to_library_requested.emit)
         self._captures_widget.thumbnail_requested.connect(self.thumbnail_requested.emit)
+        self._captures_widget.refresh_requested.connect(self.refresh_requested.emit)
 
     # Public methods for parent to call
 

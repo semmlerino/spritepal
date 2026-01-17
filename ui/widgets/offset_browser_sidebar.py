@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 # Constants for Nearby panel
 NEARBY_DELTAS_CORE = [-128, -64, -32, 32, 64, 128]
 NEARBY_DELTAS_EXTENDED = [-1024, -512, -256, 256, 512, 1024]
-NEARBY_SIZES: dict[str, int] = {"small": 48, "medium": 64, "large": 96}
+NEARBY_SIZES: dict[str, int] = {"small": 64, "medium": 96, "large": 128}
 NEARBY_UPDATE_DEBOUNCE_MS = 300
 
 
@@ -98,14 +98,14 @@ class OffsetBrowserSidebar(QWidget):
 
         # Header with global actions
         header_layout = QHBoxLayout()
-        
+
         # Sidebar Title
         title_label = QLabel("Navigation")
         title_label.setStyleSheet("font-weight: bold; color: " + COLORS["text_secondary"])
         header_layout.addWidget(title_label)
-        
+
         header_layout.addStretch()
-        
+
         # Add Bookmark Button (Always visible)
         self._add_bookmark_btn = QPushButton("★ Bookmark")
         self._add_bookmark_btn.setToolTip("Bookmark current offset")
@@ -125,7 +125,7 @@ class OffsetBrowserSidebar(QWidget):
             }}
         """)
         header_layout.addWidget(self._add_bookmark_btn)
-        
+
         layout.addLayout(header_layout)
 
         # Nearby panel - shows sprite previews at fixed offsets around current position
@@ -204,9 +204,9 @@ class OffsetBrowserSidebar(QWidget):
 
         # Tooltip map for size buttons with shortcut hints
         tooltip_map = {
-            "small": "Small thumbnails (36px) [1]",
-            "medium": "Medium thumbnails (48px) [2]",
-            "large": "Large thumbnails (64px) [3]",
+            "small": "Small thumbnails (64px) [1]",
+            "medium": "Medium thumbnails (96px) [2]",
+            "large": "Large thumbnails (128px) [3]",
         }
 
         for key, label in [("small", "S"), ("medium", "M"), ("large", "L")]:
@@ -236,7 +236,7 @@ class OffsetBrowserSidebar(QWidget):
             btn.clicked.connect(lambda checked, k=key: self._on_size_changed(k))
             size_row.addWidget(btn)
             self._nearby_size_buttons[key] = btn
-        
+
         # Add palette toggle
         self._palette_toggle_btn = QPushButton("🎨")
         self._palette_toggle_btn.setFixedSize(24, 20)
@@ -617,14 +617,14 @@ class OffsetBrowserSidebar(QWidget):
 
             # Render to image
             renderer = TileRenderer()
-            # Calculate tile dimensions for small preview (assume 4x4 tiles = 32x32 pixels)
-            num_tiles = min(len(render_data) // 32, 16)  # Max 16 tiles
+            # Calculate tile dimensions for preview (assume 8x8 tiles = 64x64 pixels)
+            num_tiles = min(len(render_data) // 32, 64)  # Increase to 64 tiles
             if num_tiles < 1:
                 self._set_nearby_thumbnail_error(index, "No tiles")
                 return
 
             # Try to make a square layout
-            width_tiles = min(4, num_tiles)
+            width_tiles = min(8, num_tiles)  # Wider grid
             height_tiles = (num_tiles + width_tiles - 1) // width_tiles
 
             # Determine palette to use
