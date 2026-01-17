@@ -470,3 +470,161 @@ class TestPagedTileViewWidget:
         assert not widget._palette_checkbox.isEnabled()
         assert not widget._palette_checkbox.isChecked()
         assert widget._palette_enabled is False
+
+    def test_user_palette_tracking(self, qtbot) -> None:
+        """Test that user palettes are tracked separately from built-in ones."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # Add built-in palette (default behavior)
+        palette1 = [[255, 0, 0] for _ in range(16)]
+        widget.add_palette_option("Built-in", palette1)
+        assert "Built-in" not in widget._user_palettes
+
+        # Add user palette
+        palette2 = [[0, 255, 0] for _ in range(16)]
+        widget.add_palette_option("User Palette", palette2, is_user_palette=True)
+        assert "User Palette" in widget._user_palettes
+
+    def test_get_user_palettes(self, qtbot) -> None:
+        """Test retrieving user palettes for persistence."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # Add mix of built-in and user palettes
+        palette1 = [[255, 0, 0] for _ in range(16)]
+        palette2 = [[0, 255, 0] for _ in range(16)]
+        palette3 = [[0, 0, 255] for _ in range(16)]
+
+        widget.add_palette_option("Built-in", palette1)
+        widget.add_palette_option("User1", palette2, is_user_palette=True)
+        widget.add_palette_option("User2", palette3, is_user_palette=True)
+
+        user_palettes = widget.get_user_palettes()
+
+        assert len(user_palettes) == 2
+        assert "User1" in user_palettes
+        assert "User2" in user_palettes
+        assert "Built-in" not in user_palettes
+        assert user_palettes["User1"] == palette2
+        assert user_palettes["User2"] == palette3
+
+    def test_load_user_palettes(self, qtbot) -> None:
+        """Test loading user palettes from saved data."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        palette1 = [[255, 0, 0] for _ in range(16)]
+        palette2 = [[0, 255, 0] for _ in range(16)]
+
+        saved_palettes = {
+            "Saved1": palette1,
+            "Saved2": palette2,
+        }
+
+        widget.load_user_palettes(saved_palettes)
+
+        assert "Saved1" in widget._palette_options
+        assert "Saved2" in widget._palette_options
+        assert "Saved1" in widget._user_palettes
+        assert "Saved2" in widget._user_palettes
+        assert widget._palette_combo.count() == 3  # Grayscale + 2 loaded
+
+    def test_clear_palette_options_clears_user_palettes(self, qtbot) -> None:
+        """Test that clear_palette_options also clears user palette tracking."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # Add user palette
+        palette = [[255, 0, 0] for _ in range(16)]
+        widget.add_palette_option("User Palette", palette, is_user_palette=True)
+        assert len(widget._user_palettes) == 1
+
+        widget.clear_palette_options()
+
+        assert len(widget._user_palettes) == 0
+
+    def test_palette_menu_button_exists(self, qtbot) -> None:
+        """Test that palette management menu button exists."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        assert widget._palette_menu_btn is not None
+        assert widget._palette_menu is not None
+        assert widget._action_load is not None
+        assert widget._action_rename is not None
+        assert widget._action_delete is not None
+
+    def test_rename_delete_disabled_for_builtin(self, qtbot) -> None:
+        """Test that rename/delete are disabled for built-in palettes."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # Grayscale is selected by default
+        assert not widget._action_rename.isEnabled()
+        assert not widget._action_delete.isEnabled()
+
+    def test_rename_delete_enabled_for_user_palette(self, qtbot) -> None:
+        """Test that rename/delete are enabled for user palettes."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # Add and select user palette
+        palette = [[255, 0, 0] for _ in range(16)]
+        widget.add_palette_option("User Palette", palette, is_user_palette=True)
+        widget.select_palette("User Palette")
+
+        assert widget._action_rename.isEnabled()
+        assert widget._action_delete.isEnabled()
+
+    def test_load_palette_file_valid(self, qtbot, tmp_path) -> None:
+        """Test loading a valid palette file."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # Create a test palette file
+        palette_data = {
+            "name": "Test Palette",
+            "colors": [[255, 0, 0], [0, 255, 0], [0, 0, 255]] + [[0, 0, 0] for _ in range(13)],
+        }
+        palette_file = tmp_path / "test.pal.json"
+        palette_file.write_text(__import__("json").dumps(palette_data))
+
+        result = widget._load_palette_file(palette_file)
+
+        assert result is not None
+        assert result["name"] == "Test Palette"
+        assert len(result["colors"]) == 16
+        assert result["colors"][0] == [255, 0, 0]
+
+    def test_load_palette_file_missing_colors(self, qtbot, tmp_path) -> None:
+        """Test loading a palette file without colors field."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # Create an invalid palette file
+        palette_data = {"name": "Invalid Palette"}
+        palette_file = tmp_path / "invalid.pal.json"
+        palette_file.write_text(__import__("json").dumps(palette_data))
+
+        import pytest
+
+        with pytest.raises(ValueError, match="Missing 'colors' field"):
+            widget._load_palette_file(palette_file)
+
+    def test_load_palette_file_uses_filename_if_no_name(self, qtbot, tmp_path) -> None:
+        """Test that palette name defaults to filename if not in file."""
+        widget = PagedTileViewWidget()
+        qtbot.addWidget(widget)
+
+        # Create a palette file without name
+        palette_data = {
+            "colors": [[255, 0, 0] for _ in range(16)],
+        }
+        palette_file = tmp_path / "my_custom_palette.pal.json"
+        palette_file.write_text(__import__("json").dumps(palette_data))
+
+        result = widget._load_palette_file(palette_file)
+
+        assert result is not None
+        assert result["name"] == "my_custom_palette.pal"  # Stem of filename

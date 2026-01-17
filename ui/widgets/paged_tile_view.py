@@ -7,24 +7,39 @@ quickly browsing through ROM data to find sprites.
 
 from __future__ import annotations
 
+import json
 import logging
-from typing import override
+from pathlib import Path
+from typing import TypedDict, override
+
+
+class PaletteFileData(TypedDict):
+    """Type for palette file data."""
+
+    name: str
+    colors: list[list[int]]
+
 
 from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtGui import QImage, QKeyEvent, QMouseEvent, QPainter, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QFileDialog,
     QFrame,
     QGraphicsPixmapItem,
     QGraphicsScene,
     QGraphicsView,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
+    QMenu,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QSpinBox,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -49,6 +64,9 @@ GRID_PRESETS: list[tuple[str, int, int]] = [
 ]
 
 DEFAULT_PRESET_INDEX = 2  # Large (50x50)
+
+# Default directory for palette files
+DEFAULT_PALETTE_DIR = Path("output")
 
 
 class TileGridGraphicsView(QGraphicsView):
@@ -179,6 +197,10 @@ class PagedTileViewWidget(QWidget):
         self._palette_options: dict[str, list[list[int]] | None] = {"Grayscale": None}
         self._selected_palette_name: str = "Grayscale"
 
+        # Track user-loaded palettes (vs built-in like Grayscale and Kirby palettes)
+        self._user_palettes: set[str] = set()
+        self._last_palette_dir: Path = DEFAULT_PALETTE_DIR
+
         # Grid configuration
         self._cols = GRID_PRESETS[DEFAULT_PRESET_INDEX][1]
         self._rows = GRID_PRESETS[DEFAULT_PRESET_INDEX][2]
@@ -304,6 +326,23 @@ class PagedTileViewWidget(QWidget):
         self._palette_combo.setMinimumWidth(100)
         self._palette_combo.currentTextChanged.connect(self._on_palette_selected)
         layout.addWidget(self._palette_combo)
+
+        # Palette management menu button
+        self._palette_menu_btn = QToolButton()
+        self._palette_menu_btn.setText("...")
+        self._palette_menu_btn.setToolTip("Palette management: Load, Rename, Delete")
+        self._palette_menu_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._palette_menu = QMenu(self._palette_menu_btn)
+        self._action_load = self._palette_menu.addAction("Load Palette...")
+        self._action_load.triggered.connect(self._on_load_palette)
+        self._palette_menu.addSeparator()
+        self._action_rename = self._palette_menu.addAction("Rename...")
+        self._action_rename.triggered.connect(self._on_rename_palette)
+        self._action_delete = self._palette_menu.addAction("Delete")
+        self._action_delete.triggered.connect(self._on_delete_palette)
+        self._palette_menu_btn.setMenu(self._palette_menu)
+        layout.addWidget(self._palette_menu_btn)
+        self._update_palette_menu_state()
 
         # Offset display
         self._offset_label = QLabel("Offset: --")
@@ -596,14 +635,201 @@ class PagedTileViewWidget(QWidget):
             self._palette_enabled = False
 
         self._request_page_render()
+        self._update_palette_menu_state()
 
-    def add_palette_option(self, name: str, palette: list[list[int]]) -> None:
+    def _update_palette_menu_state(self) -> None:
+        """Update palette menu actions based on current selection."""
+        # Rename and Delete are only available for user-loaded palettes
+        current_name = self._selected_palette_name
+        is_user_palette = current_name in self._user_palettes
+        self._action_rename.setEnabled(is_user_palette)
+        self._action_delete.setEnabled(is_user_palette)
+
+    def _on_load_palette(self) -> None:
+        """Handle Load Palette action - open file dialog to load .pal.json files."""
+        # Determine default directory
+        start_dir = str(self._last_palette_dir)
+        if not Path(start_dir).exists():
+            # Try to find the output folder relative to the project
+            project_output = Path(__file__).parent.parent.parent / "output"
+            if project_output.exists():
+                start_dir = str(project_output)
+            else:
+                start_dir = str(Path.home())
+
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Load Palette Files",
+            start_dir,
+            "Palette Files (*.pal.json);;JSON Files (*.json);;All Files (*)",
+        )
+
+        if not file_paths:
+            return
+
+        # Remember the directory for next time
+        self._last_palette_dir = Path(file_paths[0]).parent
+
+        loaded_count = 0
+        for file_path in file_paths:
+            try:
+                palette_data = self._load_palette_file(Path(file_path))
+                if palette_data:
+                    name = palette_data["name"]
+                    colors = palette_data["colors"]
+
+                    # Add to options and mark as user palette
+                    self.add_palette_option(name, colors, is_user_palette=True)
+                    loaded_count += 1
+                    logger.info(f"Loaded palette: {name} from {file_path}")
+
+            except Exception as e:
+                logger.error(f"Failed to load palette from {file_path}: {e}")
+                QMessageBox.warning(
+                    self,
+                    "Load Failed",
+                    f"Failed to load palette from:\n{file_path}\n\nError: {e}",
+                )
+
+        if loaded_count > 0:
+            # Select the last loaded palette
+            self._status_label.setText(f"Loaded {loaded_count} palette(s)")
+
+    def _load_palette_file(self, file_path: Path) -> PaletteFileData | None:
+        """
+        Load a palette from a .pal.json file.
+
+        Args:
+            file_path: Path to the palette file
+
+        Returns:
+            PaletteFileData with "name" and "colors" keys, or None on failure
+        """
+        try:
+            with open(file_path, encoding="utf-8") as f:
+                data = json.load(f)
+
+            # Validate structure
+            if "colors" not in data:
+                raise ValueError("Missing 'colors' field")
+
+            colors = data["colors"]
+            if not isinstance(colors, list) or len(colors) < 1:
+                raise ValueError("'colors' must be a non-empty list")
+
+            # Validate and normalize colors
+            normalized_colors: list[list[int]] = []
+            for color in colors:
+                if (isinstance(color, list | tuple)) and len(color) >= 3:
+                    normalized_colors.append([int(color[0]), int(color[1]), int(color[2])])
+                else:
+                    raise ValueError(f"Invalid color format: {color}")
+
+            # Get name from file or generate from filename
+            name = data.get("name", file_path.stem)
+            if not name:
+                name = file_path.stem
+
+            return PaletteFileData(name=str(name), colors=normalized_colors)
+
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON: {e}") from e
+
+    def _on_rename_palette(self) -> None:
+        """Handle Rename action - rename the currently selected user palette."""
+        current_name = self._selected_palette_name
+
+        if current_name not in self._user_palettes:
+            QMessageBox.warning(
+                self,
+                "Cannot Rename",
+                "Only user-loaded palettes can be renamed.",
+            )
+            return
+
+        # Show input dialog
+        new_name, ok = QInputDialog.getText(
+            self,
+            "Rename Palette",
+            "Enter new name:",
+            text=current_name,
+        )
+
+        if not ok or not new_name or new_name == current_name:
+            return
+
+        # Check for name conflict
+        if new_name in self._palette_options and new_name != current_name:
+            QMessageBox.warning(
+                self,
+                "Name Conflict",
+                f"A palette named '{new_name}' already exists.",
+            )
+            return
+
+        # Rename the palette
+        palette = self._palette_options.pop(current_name)
+        self._palette_options[new_name] = palette
+        self._user_palettes.discard(current_name)
+        self._user_palettes.add(new_name)
+
+        # Update the combo box
+        index = self._palette_combo.findText(current_name)
+        if index >= 0:
+            self._palette_combo.setItemText(index, new_name)
+
+        self._selected_palette_name = new_name
+        logger.info(f"Renamed palette: {current_name} -> {new_name}")
+        self._status_label.setText(f"Renamed palette to '{new_name}'")
+
+    def _on_delete_palette(self) -> None:
+        """Handle Delete action - remove the currently selected user palette."""
+        current_name = self._selected_palette_name
+
+        if current_name not in self._user_palettes:
+            QMessageBox.warning(
+                self,
+                "Cannot Delete",
+                "Only user-loaded palettes can be deleted.",
+            )
+            return
+
+        # Confirm deletion
+        result = QMessageBox.question(
+            self,
+            "Delete Palette",
+            f"Delete palette '{current_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if result != QMessageBox.StandardButton.Yes:
+            return
+
+        # Remove from data structures
+        self._palette_options.pop(current_name, None)
+        self._user_palettes.discard(current_name)
+
+        # Remove from combo box
+        index = self._palette_combo.findText(current_name)
+        if index >= 0:
+            self._palette_combo.blockSignals(True)
+            self._palette_combo.removeItem(index)
+            self._palette_combo.blockSignals(False)
+
+        # Select Grayscale
+        self._palette_combo.setCurrentIndex(0)
+        logger.info(f"Deleted palette: {current_name}")
+        self._status_label.setText(f"Deleted palette '{current_name}'")
+
+    def add_palette_option(self, name: str, palette: list[list[int]], *, is_user_palette: bool = False) -> None:
         """
         Add a palette option to the dropdown.
 
         Args:
             name: Display name for the palette
             palette: List of 16 RGB color lists
+            is_user_palette: True if this is a user-loaded palette (can be renamed/deleted)
         """
         if name in self._palette_options:
             # Update existing palette
@@ -614,6 +840,10 @@ class PagedTileViewWidget(QWidget):
             self._palette_combo.addItem(name)
             logger.debug(f"Added palette option: {name}")
 
+        # Track user palettes
+        if is_user_palette:
+            self._user_palettes.add(name)
+
     def clear_palette_options(self) -> None:
         """Clear all palette options except Grayscale."""
         # Block signals during clear to avoid triggering re-renders
@@ -621,6 +851,7 @@ class PagedTileViewWidget(QWidget):
 
         # Keep only Grayscale
         self._palette_options = {"Grayscale": None}
+        self._user_palettes.clear()
         self._palette_combo.clear()
         self._palette_combo.addItem("Grayscale")
         self._selected_palette_name = "Grayscale"
@@ -633,7 +864,33 @@ class PagedTileViewWidget(QWidget):
         self._palette_enabled = False
 
         self._palette_combo.blockSignals(False)
+        self._update_palette_menu_state()
         logger.debug("Cleared all palette options")
+
+    def get_user_palettes(self) -> dict[str, list[list[int]]]:
+        """
+        Get all user-loaded palettes for persistence.
+
+        Returns:
+            Dict mapping palette names to color lists (only user palettes)
+        """
+        result: dict[str, list[list[int]]] = {}
+        for name in self._user_palettes:
+            palette = self._palette_options.get(name)
+            if palette is not None:
+                result[name] = palette
+        return result
+
+    def load_user_palettes(self, palettes: dict[str, list[list[int]]]) -> None:
+        """
+        Load user palettes from saved data.
+
+        Args:
+            palettes: Dict mapping palette names to color lists
+        """
+        for name, colors in palettes.items():
+            self.add_palette_option(name, colors, is_user_palette=True)
+        logger.debug(f"Loaded {len(palettes)} user palettes")
 
     def select_palette(self, name: str) -> bool:
         """

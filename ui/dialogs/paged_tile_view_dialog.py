@@ -21,6 +21,10 @@ from ui.common.spacing_constants import SPACING_SMALL
 from ui.components.base.cleanup_dialog import CleanupDialog
 from ui.widgets.paged_tile_view import PagedTileViewWidget
 
+# Settings keys for user palettes
+USER_PALETTES_CATEGORY = "tile_grid_browser"
+USER_PALETTES_KEY = "user_palettes"
+
 logger = logging.getLogger(__name__)
 
 # Default dialog size
@@ -95,6 +99,9 @@ class PagedTileViewDialog(CleanupDialog):
         # Load default palettes from config
         self._load_default_palettes()
 
+        # Load saved user palettes from settings
+        self._load_saved_user_palettes()
+
         # Set the provided palette (if any) as "Current" and select it
         if self._palette is not None:
             self._tile_view.set_palette(self._palette, name="Current")
@@ -163,6 +170,57 @@ class PagedTileViewDialog(CleanupDialog):
         except Exception as e:
             logger.warning(f"Failed to load default palettes: {e}")
 
+    def _load_saved_user_palettes(self) -> None:
+        """Load saved user palettes from application settings."""
+        if self._tile_view is None:
+            return
+
+        try:
+            from core.app_context import get_app_context
+
+            state_manager = get_app_context().application_state_manager
+            saved_palettes = state_manager.get(USER_PALETTES_CATEGORY, USER_PALETTES_KEY, None)
+
+            if saved_palettes and isinstance(saved_palettes, dict):
+                # Convert back to proper format (JSON may have nested lists)
+                palettes: dict[str, list[list[int]]] = {}
+                for name, colors in saved_palettes.items():
+                    if isinstance(colors, list) and len(colors) > 0:
+                        # Ensure colors are in list[list[int]] format
+                        palettes[name] = [[int(c) for c in color] for color in colors]
+
+                self._tile_view.load_user_palettes(palettes)
+                logger.debug(f"Loaded {len(palettes)} saved user palettes")
+
+        except (RuntimeError, AttributeError) as e:
+            logger.debug(f"App context not available for loading palettes: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to load saved user palettes: {e}")
+
+    def _save_user_palettes(self) -> None:
+        """Save user palettes to application settings."""
+        if self._tile_view is None:
+            return
+
+        try:
+            from core.app_context import get_app_context
+
+            state_manager = get_app_context().application_state_manager
+            user_palettes = self._tile_view.get_user_palettes()
+
+            if user_palettes:
+                state_manager.set(USER_PALETTES_CATEGORY, USER_PALETTES_KEY, user_palettes)
+                logger.debug(f"Saved {len(user_palettes)} user palettes")
+            else:
+                # Clear saved palettes if none remain
+                state_manager.set(USER_PALETTES_CATEGORY, USER_PALETTES_KEY, {})
+                logger.debug("Cleared saved user palettes")
+
+        except (RuntimeError, AttributeError) as e:
+            logger.debug(f"App context not available for saving palettes: {e}")
+        except Exception as e:
+            logger.warning(f"Failed to save user palettes: {e}")
+
     def _on_tile_clicked(self, offset: int) -> None:
         """Handle tile click from the tile view."""
         self._selected_offset = offset
@@ -206,6 +264,9 @@ class PagedTileViewDialog(CleanupDialog):
     @override
     def closeEvent(self, event: QCloseEvent | None) -> None:
         """Handle dialog close."""
+        # Save user palettes before cleanup
+        self._save_user_palettes()
+
         # Clean up the tile view
         if self._tile_view is not None:
             self._tile_view.cleanup()
