@@ -272,6 +272,11 @@ class ApplicationStateManager(BaseManager):
                 "rom": [],
                 "max_recent": 10,
             },
+            "tile_grid": {
+                "cols": 50,
+                "rows": 50,
+                "last_page": 0,
+            },
         }
 
     def _merge_with_defaults(self, data: dict[str, dict[str, object]]) -> dict[str, dict[str, object]]:

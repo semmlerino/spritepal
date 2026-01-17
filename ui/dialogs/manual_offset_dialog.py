@@ -72,6 +72,7 @@ def get_main_thread() -> QThread | None:
 from ui.components.base.cleanup_dialog import CleanupDialog
 from ui.components.panels import StatusPanel
 from ui.components.visualization.rom_map_widget import ROMMapWidget
+from ui.dialogs.paged_tile_view_dialog import PagedTileViewDialog
 from ui.dialogs.services import BookmarkManager, CacheStatusController, ViewStateManager
 from ui.rom_extraction.workers import SpritePreviewWorker
 from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
@@ -134,6 +135,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._cache_controller: CacheStatusController | None = None
         self._search_coordinator: SpriteSearchCoordinator | None = None
         self._advanced_search_dialog: QDialog | None = None
+        self._tile_grid_dialog: PagedTileViewDialog | None = None
+        self._current_palette: list[list[int]] | None = None
 
         # New sidebar widget (replaces tabs)
         # Import at runtime to avoid circular imports
@@ -374,6 +377,12 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             bookmarks_menu_btn.setMenu(self._bookmark_manager.create_menu())
         self.button_box.addButton(bookmarks_menu_btn, self.button_box.ButtonRole.ActionRole)
 
+        # Tile Grid browser button
+        tile_grid_btn = QPushButton("Tile Grid...")
+        tile_grid_btn.setToolTip("Open tile grid browser for fast ROM scanning")
+        tile_grid_btn.clicked.connect(self._show_tile_grid_dialog)
+        self.button_box.addButton(tile_grid_btn, self.button_box.ButtonRole.ActionRole)
+
         # Standard dialog buttons (right side)
         close_btn = QPushButton("Close")
         close_btn.setToolTip("Close this dialog")
@@ -391,6 +400,49 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                 padding: 4px 12px;
             }
         """)
+
+    def _show_tile_grid_dialog(self) -> None:
+        """Show the tile grid browser dialog for fast ROM scanning."""
+        if not self.rom_path:
+            self._update_status("No ROM loaded - load a ROM first")
+            return
+
+        try:
+            # Read ROM data from file
+            from pathlib import Path
+
+            rom_file = Path(self.rom_path)
+            if not rom_file.exists():
+                self._update_status(f"ROM file not found: {self.rom_path}")
+                return
+
+            rom_data = rom_file.read_bytes()
+
+            # Create or reuse dialog
+            if self._tile_grid_dialog is None:
+                self._tile_grid_dialog = PagedTileViewDialog(
+                    parent=self,
+                    rom_data=rom_data,
+                    palette=self._current_palette,
+                    initial_offset=self.get_current_offset(),
+                )
+                self._tile_grid_dialog.offset_selected.connect(self.set_offset)
+            else:
+                # Update ROM data in case it changed
+                self._tile_grid_dialog._rom_data = rom_data
+                if self._tile_grid_dialog._tile_view is not None:
+                    self._tile_grid_dialog._tile_view.set_rom_data(rom_data)
+                    self._tile_grid_dialog._tile_view.set_palette(self._current_palette)
+                # Navigate to current offset
+                self._tile_grid_dialog.go_to_offset(self.get_current_offset())
+
+            self._tile_grid_dialog.show()
+            self._tile_grid_dialog.raise_()
+            self._tile_grid_dialog.activateWindow()
+
+        except Exception as e:
+            logger.error(f"Failed to open tile grid dialog: {e}", exc_info=True)
+            self._update_status(f"Error opening tile grid: {e}")
 
     def _setup_smart_preview_coordinator(self) -> None:
         """Set up SmartPreviewCoordinator for efficient preview generation."""
@@ -862,11 +914,17 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         Args:
             palette: List of 16 RGB colors (as [r, g, b] lists) or None.
         """
+        self._current_palette = palette
+
         if self._sidebar is not None:
             self._sidebar.set_palette(palette)
 
         if self.preview_widget is not None:
             self.preview_widget.set_custom_palette(palette)
+
+        # Update tile grid dialog if open
+        if self._tile_grid_dialog is not None:
+            self._tile_grid_dialog.set_palette(palette)
 
     def _scan_for_sprites(self) -> None:
         """Scan ROM for HAL-compressed sprites using a background worker."""

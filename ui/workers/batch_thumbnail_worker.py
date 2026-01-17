@@ -817,12 +817,19 @@ class ThumbnailWorkerController(QObject):
         self.worker: BatchThumbnailWorker | None = None
         self._thread: QThread | None = None
         self._cleanup_called = False
+        # Store ROM context for auto-restart when worker auto-stops
+        self._rom_path: str | None = None
+        self._rom_extractor: ROMExtractor | None = None
 
     def start_worker(self, rom_path: str, rom_extractor: ROMExtractor) -> None:
         """Start worker with proper thread management."""
         if self._thread and self._thread.isRunning():
             logger.warning("Worker already running, stopping first")
             self.stop_worker()
+
+        # Store ROM context for auto-restart
+        self._rom_path = rom_path
+        self._rom_extractor = rom_extractor
 
         # Create worker and thread
         self.worker = BatchThumbnailWorker(rom_path, rom_extractor)
@@ -845,6 +852,33 @@ class ThumbnailWorkerController(QObject):
         # Start thread
         self._thread.start()
 
+    def _ensure_worker_running(self) -> bool:
+        """Ensure worker is running, restarting if needed.
+
+        The worker auto-stops after being idle. This method checks if the thread
+        is still running and restarts if necessary.
+
+        Returns:
+            True if worker is running (or was restarted), False if cannot restart.
+        """
+        # Check if thread is running (handle C++ object deletion)
+        try:
+            if self._thread and self._thread.isRunning():
+                return True
+        except RuntimeError:
+            # C++ object already deleted by deleteLater() - treat as stopped
+            self._thread = None
+            self.worker = None
+
+        # Worker has auto-stopped - try to restart if we have ROM context
+        if self._rom_path and self._rom_extractor:
+            logger.debug("Worker auto-stopped, restarting for new requests")
+            self.start_worker(self._rom_path, self._rom_extractor)
+            return True
+
+        logger.warning("Cannot restart worker - no ROM context stored")
+        return False
+
     @Slot(int, QImage)
     def _on_thumbnail_ready(self, offset: int, qimage: QImage) -> None:
         """Convert QImage to QPixmap in main thread and forward signal."""
@@ -853,12 +887,22 @@ class ThumbnailWorkerController(QObject):
             self.thumbnail_ready.emit(offset, pixmap)
 
     def queue_thumbnail(self, offset: int, size: int = 384, priority: int = 0) -> None:
-        """Queue a thumbnail for generation."""
+        """Queue a thumbnail for generation.
+
+        If the worker has auto-stopped due to idle timeout, this will restart it.
+        """
+        if not self._ensure_worker_running():
+            return
         if self.worker:
             self.worker.queue_thumbnail(offset, size, priority)
 
     def queue_batch(self, offsets: list[int], size: int = 384, priority_start: int = 0) -> None:
-        """Queue multiple thumbnails for generation."""
+        """Queue multiple thumbnails for generation.
+
+        If the worker has auto-stopped due to idle timeout, this will restart it.
+        """
+        if not self._ensure_worker_running():
+            return
         if self.worker:
             self.worker.queue_batch(offsets, size, priority_start)
 
