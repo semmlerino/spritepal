@@ -418,6 +418,17 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
             rom_data = rom_file.read_bytes()
 
+            # Strip SMC header if present so offsets match the sprite editor
+            # This ensures offset 0x2847C8 refers to the same location in both views
+            if self.rom_extractor is not None:
+                try:
+                    header = self.rom_extractor.read_rom_header(self.rom_path)
+                    if header.header_offset > 0:
+                        logger.debug(f"Stripping {header.header_offset}-byte SMC header for tile grid")
+                        rom_data = rom_data[header.header_offset:]
+                except Exception as e:
+                    logger.warning(f"Could not read ROM header to strip SMC: {e}")
+
             # Create or reuse dialog
             if self._tile_grid_dialog is None:
                 self._tile_grid_dialog = PagedTileViewDialog(
