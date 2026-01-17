@@ -602,8 +602,10 @@ class ROMExtractionPanel(QWidget):
         # Configure the dialog with ROM data
         self._manual_offset_dialog.set_rom_data(self.rom_path, self.rom_size, self.extraction_manager)
 
-        # Set preview palette from CGRAM if available
+        # Set preview palette from CGRAM if available, otherwise use default
         cgram_path = self.cgram_selector_widget.get_cgram_path()
+        palette = None
+        
         if cgram_path:
             try:
                 from core.palette_manager import PaletteManager
@@ -611,15 +613,20 @@ class ROMExtractionPanel(QWidget):
                 manager = PaletteManager()
                 manager.load_cgram(cgram_path)
                 # Use Palette 8 (first sprite palette) by default for preview
-                # This matches typical game usage where sprites use palettes 8-15
                 palette = manager.get_palette(8)
-                self._manual_offset_dialog.set_preview_palette(palette)
                 logger.debug(f"Loaded preview palette from {cgram_path}")
             except Exception as e:
                 logger.warning(f"Failed to load preview palette from {cgram_path}: {e}")
-                self._manual_offset_dialog.set_preview_palette(None)
-        else:
-            self._manual_offset_dialog.set_preview_palette(None)
+                # Will fall back to default below
+
+        if palette is None:
+            from core.palette_manager import PaletteManager
+            # Use default SNES palette as fallback (convert tuples to lists for consistency)
+            default_pal = PaletteManager.get_default_snes_palette()
+            palette = [list(c) for c in default_pal]
+            logger.debug("Using default SNES palette for preview")
+
+        self._manual_offset_dialog.set_preview_palette(palette)
 
         # Set initial offset from controller
         initial_offset = self._params_controller.manual_offset
