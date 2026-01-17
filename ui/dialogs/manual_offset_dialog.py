@@ -425,7 +425,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                     header = self.rom_extractor.read_rom_header(self.rom_path)
                     if header.header_offset > 0:
                         logger.debug(f"Stripping {header.header_offset}-byte SMC header for tile grid")
-                        rom_data = rom_data[header.header_offset:]
+                        rom_data = rom_data[header.header_offset :]
                 except Exception as e:
                     logger.warning(f"Could not read ROM header to strip SMC: {e}")
 

@@ -25,13 +25,13 @@ class GridImageProcessor:
         self.original_image: Image.Image | None = None
 
     def load_sprite(self, sprite_path: str) -> Image.Image:
-        """Load sprite image and convert to appropriate mode
+        """Load sprite image preserving palette mode for colorization
 
         Args:
             sprite_path: Path to the sprite image file
 
         Returns:
-            Loaded image in grayscale mode
+            Loaded image (preserves P mode for indexed images, converts others to L)
 
         Raises:
             Exception: If image cannot be loaded
@@ -40,10 +40,12 @@ class GridImageProcessor:
             # Load the sprite sheet
             image = Image.open(sprite_path)
 
-            # Convert palette mode images to grayscale for proper display
+            # Preserve palette mode images (P) so PaletteColorizer can use
+            # the original palette indices (0-15) for correct color mapping.
+            # Only convert non-palette, non-grayscale images to grayscale.
             if image.mode == "P":
-                # Convert palette indices to actual grayscale values
-                image = image.convert("L")
+                # Keep as-is - palette indices are preserved for colorization
+                pass
             elif image.mode not in ["L", "1"]:
                 # Convert any other mode (RGB, RGBA, etc.) to grayscale
                 image = image.convert("L")
