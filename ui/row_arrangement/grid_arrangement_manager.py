@@ -868,3 +868,32 @@ class GridArrangementManager(QObject):
             list(self._arrangement_order),
             dict(self._grid_mapping),
         )
+
+    def mirror_grid_mapping(self, horizontal: bool = True) -> dict[tuple[int, int], tuple[ArrangementType, str]]:
+        """Create a mirrored version of the grid mapping.
+
+        Args:
+            horizontal: If True, mirror left-right. If False, mirror top-bottom.
+
+        Returns:
+            New grid mapping with mirrored positions.
+        """
+        if not self._grid_mapping:
+            return {}
+
+        # Find bounding box
+        rows = [pos[0] for pos in self._grid_mapping]
+        cols = [pos[1] for pos in self._grid_mapping]
+        max_row = max(rows)
+        max_col = max(cols)
+
+        new_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = {}
+        for (row, col), item in self._grid_mapping.items():
+            if horizontal:
+                new_col = max_col - col
+                new_mapping[(row, new_col)] = item
+            else:
+                new_row = max_row - row
+                new_mapping[(new_row, col)] = item
+
+        return new_mapping

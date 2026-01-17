@@ -643,3 +643,105 @@ class ApplyOverlayCommand:
         for pos, img in self._previous_tiles.items():
             self.tiles[pos] = img
         self.callback()
+
+
+@dataclass
+class MirrorGridCommand:
+    """Command to mirror the grid arrangement horizontally or vertically."""
+
+    manager: GridArrangementManager
+    horizontal: bool  # True = horizontal (left-right), False = vertical (top-bottom)
+    # Store previous state for undo
+    previous_tiles: list[TilePosition] = field(default_factory=list)
+    previous_groups: dict[str, TileGroup] = field(default_factory=dict)
+    previous_tile_to_group: dict[TilePosition, str] = field(default_factory=dict)
+    previous_order: list[tuple[ArrangementType, str]] = field(default_factory=list)
+    previous_grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = field(default_factory=dict)
+
+    @property
+    def description(self) -> str:
+        direction = "horizontally" if self.horizontal else "vertically"
+        return f"Mirror {direction}"
+
+    def execute(self) -> None:
+        # Capture current state if not already done
+        if not self.previous_grid_mapping:
+            (
+                self.previous_tiles,
+                self.previous_groups,
+                self.previous_tile_to_group,
+                self.previous_order,
+                self.previous_grid_mapping,
+            ) = self.manager.get_state_snapshot()
+
+        # Create mirrored mapping
+        new_mapping = self.manager.mirror_grid_mapping(self.horizontal)
+
+        # Restore with new mapping (keep other state the same)
+        self.manager._restore_state_no_history(
+            list(self.previous_tiles),
+            dict(self.previous_groups),
+            dict(self.previous_tile_to_group),
+            list(self.previous_order),
+            new_mapping,
+        )
+
+    def undo(self) -> None:
+        self.manager._restore_state_no_history(
+            self.previous_tiles,
+            self.previous_groups,
+            self.previous_tile_to_group,
+            self.previous_order,
+            self.previous_grid_mapping,
+        )
+
+
+@dataclass
+class LoadArrangementCommand:
+    """Command to load an arrangement from config (undoable)."""
+
+    manager: GridArrangementManager
+    # New state to load
+    new_tiles: list[TilePosition]
+    new_groups: dict[str, TileGroup]
+    new_tile_to_group: dict[TilePosition, str]
+    new_order: list[tuple[ArrangementType, str]]
+    new_grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]]
+    # Previous state for undo
+    previous_tiles: list[TilePosition] = field(default_factory=list)
+    previous_groups: dict[str, TileGroup] = field(default_factory=dict)
+    previous_tile_to_group: dict[TilePosition, str] = field(default_factory=dict)
+    previous_order: list[tuple[ArrangementType, str]] = field(default_factory=list)
+    previous_grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = field(default_factory=dict)
+
+    @property
+    def description(self) -> str:
+        return "Load arrangement"
+
+    def execute(self) -> None:
+        # Capture current state if not already done
+        if not self.previous_tiles and not self.previous_grid_mapping:
+            (
+                self.previous_tiles,
+                self.previous_groups,
+                self.previous_tile_to_group,
+                self.previous_order,
+                self.previous_grid_mapping,
+            ) = self.manager.get_state_snapshot()
+
+        self.manager._restore_state_no_history(
+            self.new_tiles,
+            self.new_groups,
+            self.new_tile_to_group,
+            self.new_order,
+            self.new_grid_mapping,
+        )
+
+    def undo(self) -> None:
+        self.manager._restore_state_no_history(
+            self.previous_tiles,
+            self.previous_groups,
+            self.previous_tile_to_group,
+            self.previous_order,
+            self.previous_grid_mapping,
+        )

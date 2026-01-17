@@ -63,6 +63,8 @@ from .row_arrangement.undo_redo import (
     CanvasPlaceItemsCommand,
     CanvasRemoveMultipleItemsCommand,
     ClearGridCommand,
+    LoadArrangementCommand,
+    MirrorGridCommand,
     RestoreGridStateCommand,
     UndoRedoStack,
 )
@@ -423,6 +425,11 @@ class GridArrangementDialog(SplitterDialog):
 
         main_actions_layout.addLayout(row2_layout)
 
+        # Row 3: Arrangement file operations and mirror
+        row3_layout = QHBoxLayout()
+        self._add_arrangement_file_buttons(row3_layout)
+        main_actions_layout.addLayout(row3_layout)
+
         return actions_group
 
     def _add_action_buttons(self, layout: QHBoxLayout) -> None:
@@ -579,6 +586,36 @@ class GridArrangementDialog(SplitterDialog):
         self.zoom_reset_btn.setMaximumWidth(40)
         self.zoom_reset_btn.setToolTip("Reset zoom to 1:1 [Ctrl+0]")
         layout.addWidget(self.zoom_reset_btn)
+
+    def _add_arrangement_file_buttons(self, layout: QHBoxLayout) -> None:
+        """Add arrangement file operation buttons."""
+        self.save_arrangement_btn = QPushButton("Save Arrangement", self)
+        self.save_arrangement_btn.setToolTip("Save current arrangement to a file")
+        _ = self.save_arrangement_btn.clicked.connect(self._save_arrangement)
+        layout.addWidget(self.save_arrangement_btn)
+
+        self.load_arrangement_btn = QPushButton("Load Arrangement", self)
+        self.load_arrangement_btn.setToolTip("Load a previously saved arrangement")
+        _ = self.load_arrangement_btn.clicked.connect(self._load_arrangement)
+        layout.addWidget(self.load_arrangement_btn)
+
+        # Separator
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.VLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(sep)
+
+        self.mirror_h_btn = QPushButton("\u2194 Mirror H", self)
+        self.mirror_h_btn.setToolTip("Mirror arrangement horizontally (left-right)")
+        _ = self.mirror_h_btn.clicked.connect(self._mirror_horizontal)
+        layout.addWidget(self.mirror_h_btn)
+
+        self.mirror_v_btn = QPushButton("\u2195 Mirror V", self)
+        self.mirror_v_btn.setToolTip("Mirror arrangement vertically (top-bottom)")
+        _ = self.mirror_v_btn.clicked.connect(self._mirror_vertical)
+        layout.addWidget(self.mirror_v_btn)
+
+        layout.addStretch()
 
     def _on_arrangement_width_changed(self, value: int) -> None:
         """Handle arrangement width change"""
@@ -860,6 +897,190 @@ class GridArrangementDialog(SplitterDialog):
 
         self.grid_view.clear_selection()
         self._update_status("Reset layout to 1:1 mapping")
+
+    def _save_arrangement(self) -> None:
+        """Save current arrangement to a JSON file."""
+        from PySide6.QtWidgets import QFileDialog
+
+        if self.arrangement_manager.get_arranged_count() == 0:
+            self._update_status("Nothing to save - no tiles arranged")
+            return
+
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Arrangement",
+            "",
+            "Arrangement Files (*.arrangement.json);;All Files (*)",
+        )
+        if not path:
+            return
+        if not path.endswith(".arrangement.json"):
+            path += ".arrangement.json"
+
+        metadata = self.preview_generator.create_arrangement_preview_data(self.arrangement_manager, self.processor)
+
+        import json
+
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2)
+
+        self._update_status(f"Arrangement saved to {Path(path).name}")
+
+    def _load_arrangement(self) -> None:
+        """Load arrangement from a JSON file."""
+        from PySide6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Load Arrangement",
+            "",
+            "Arrangement Files (*.arrangement.json);;All Files (*)",
+        )
+        if not path:
+            return
+
+        import json
+
+        try:
+            with open(path, encoding="utf-8") as f:
+                metadata = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            _ = QMessageBox.warning(
+                self,
+                "Load Failed",
+                f"Failed to load arrangement file:\n{e!s}",
+            )
+            return
+
+        # Validate dimensions match
+        loaded_dims = metadata.get("grid_dimensions", {})
+        if loaded_dims.get("rows") != self.processor.grid_rows or loaded_dims.get("cols") != self.processor.grid_cols:
+            result = QMessageBox.warning(
+                self,
+                "Dimension Mismatch",
+                f"Loaded arrangement has different dimensions.\n"
+                f"Current: {self.processor.grid_rows}\u00d7{self.processor.grid_cols}\n"
+                f"Loaded: {loaded_dims.get('rows')}\u00d7{loaded_dims.get('cols')}\n\n"
+                "Load anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if result != QMessageBox.StandardButton.Yes:
+                return
+
+        # Parse metadata into state components
+        new_tiles, new_groups, new_tile_to_group, new_order, new_grid_mapping = self._parse_arrangement_metadata(
+            metadata
+        )
+
+        # Create undoable command
+        cmd = LoadArrangementCommand(
+            manager=self.arrangement_manager,
+            new_tiles=new_tiles,
+            new_groups=new_groups,
+            new_tile_to_group=new_tile_to_group,
+            new_order=new_order,
+            new_grid_mapping=new_grid_mapping,
+        )
+        self.undo_stack.push(cmd)
+        self._update_displays()
+        self._update_status(f"Arrangement loaded from {Path(path).name}")
+
+    def _parse_arrangement_metadata(
+        self, metadata: dict[str, object]
+    ) -> tuple[
+        list[TilePosition],
+        dict[str, TileGroup],
+        dict[TilePosition, str],
+        list[tuple[ArrangementType, str]],
+        dict[tuple[int, int], tuple[ArrangementType, str]],
+    ]:
+        """Parse arrangement metadata into state components.
+
+        Args:
+            metadata: Metadata dict from create_arrangement_preview_data()
+
+        Returns:
+            Tuple of (tiles, groups, tile_to_group, order, grid_mapping)
+        """
+        # 1. Parse groups
+        groups: dict[str, TileGroup] = {}
+        groups_data = cast(list[dict[str, object]], metadata.get("groups", []))
+        for g_data in groups_data:
+            group_id = str(g_data["id"])
+            tiles_data = cast(list[dict[str, int]], g_data["tiles"])
+            tiles = [TilePosition(int(t["row"]), int(t["col"])) for t in tiles_data]
+            groups[group_id] = TileGroup(
+                id=group_id,
+                tiles=tiles,
+                width=int(str(g_data["width"])),
+                height=int(str(g_data["height"])),
+                name=str(g_data.get("name", "")),
+            )
+
+        # 2. Reconstruct tile_to_group mapping
+        tile_to_group: dict[TilePosition, str] = {}
+        for group in groups.values():
+            for tile in group.tiles:
+                tile_to_group[tile] = group.id
+
+        # 3. Parse arrangement order
+        order: list[tuple[ArrangementType, str]] = []
+        order_data = cast(list[dict[str, str]], metadata.get("arrangement_order", []))
+        for item in order_data:
+            arr_type = ArrangementType(item["type"])
+            order.append((arr_type, str(item["key"])))
+
+        # 4. Parse grid mapping (if available)
+        grid_mapping: dict[tuple[int, int], tuple[ArrangementType, str]] = {}
+        raw_mapping = cast(dict[str, dict[str, str]], metadata.get("grid_mapping", {}))
+        for key_str, val_data in raw_mapping.items():
+            try:
+                r, c = map(int, key_str.split(","))
+                arr_type = ArrangementType(val_data["type"])
+                grid_mapping[(r, c)] = (arr_type, str(val_data["key"]))
+            except (ValueError, KeyError):
+                continue
+
+        # 5. Build tiles list from order/groups
+        tiles: list[TilePosition] = []
+        for arr_type, key in order:
+            if arr_type == ArrangementType.TILE:
+                r, c = map(int, key.split(","))
+                tiles.append(TilePosition(r, c))
+            elif arr_type == ArrangementType.GROUP:
+                if key in groups:
+                    tiles.extend(groups[key].tiles)
+            elif arr_type == ArrangementType.ROW:
+                tiles.extend([TilePosition(int(key), c) for c in range(self.processor.grid_cols)])
+            elif arr_type == ArrangementType.COLUMN:
+                tiles.extend([TilePosition(r, int(key)) for r in range(self.processor.grid_rows)])
+
+        # Remove duplicates preserving order
+        unique_tiles = list(dict.fromkeys(tiles))
+
+        return unique_tiles, groups, tile_to_group, order, grid_mapping
+
+    def _mirror_horizontal(self) -> None:
+        """Mirror the arrangement horizontally."""
+        if not self.arrangement_manager.get_grid_mapping():
+            self._update_status("Nothing to mirror")
+            return
+
+        cmd = MirrorGridCommand(manager=self.arrangement_manager, horizontal=True)
+        self.undo_stack.push(cmd)
+        self._update_displays()
+        self._update_status("Mirrored horizontally")
+
+    def _mirror_vertical(self) -> None:
+        """Mirror the arrangement vertically."""
+        if not self.arrangement_manager.get_grid_mapping():
+            self._update_status("Nothing to mirror")
+            return
+
+        cmd = MirrorGridCommand(manager=self.arrangement_manager, horizontal=False)
+        self.undo_stack.push(cmd)
+        self._update_displays()
+        self._update_status("Mirrored vertically")
 
     def apply_overlay(self) -> None:
         """Apply current overlay to tiles. Public API for testing."""
