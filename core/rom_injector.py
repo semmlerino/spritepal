@@ -15,6 +15,7 @@ from pathlib import Path
 from core.hal_compression import HALCompressionError, HALCompressor
 from core.hal_parser import HALParser
 from core.injector import SpriteInjector
+from core.rom_palette_injector import ROMPaletteInjector
 from core.rom_validator import ROMHeader, ROMValidator
 from core.sprite_config_loader import SpriteConfigLoader
 from core.types import CompressionType
@@ -64,7 +65,8 @@ class ROMInjector(SpriteInjector):
         self.rom_data: bytearray | None = None
         self.header: ROMHeader | None = None
         self.sprite_config_loader = sprite_config_loader or SpriteConfigLoader()
-        logger.debug("ROMInjector initialized with HAL compression support")
+        self.palette_injector = ROMPaletteInjector()
+        logger.debug("ROMInjector initialized with HAL compression and palette injection support")
 
     @staticmethod
     def get_modified_rom_path(rom_path: str) -> str:
@@ -626,7 +628,9 @@ class ROMInjector(SpriteInjector):
             else:
                 # HAL mode: decompress original to get size
                 original_size, original_data, slack_size = self.find_compressed_sprite(self.rom_data, file_offset)
-                logger.debug(f"Original sprite: {original_size} bytes compressed, {len(original_data)} bytes decompressed")
+                logger.debug(
+                    f"Original sprite: {original_size} bytes compressed, {len(original_data)} bytes decompressed"
+                )
 
                 if original_size == 0:
                     return (
@@ -825,6 +829,41 @@ class ROMInjector(SpriteInjector):
                     f"ROM header checksum updated: 0x{self.header.checksum:04X}\n"
                     f"Total time: {total_time:.2f} seconds{force_warning}"
                 )
+
+    def inject_palette_to_rom(
+        self,
+        rom_path: str,
+        output_path: str,
+        palette_offset: int,
+        colors: list[tuple[int, int, int]],
+        *,
+        create_backup: bool = True,
+        ignore_checksum: bool = False,
+    ) -> tuple[bool, str]:
+        """
+        Inject palette data directly into ROM file.
+
+        Delegates to palette_injector.inject_palette_to_rom().
+
+        Args:
+            rom_path: Path to input ROM
+            output_path: Path for output ROM
+            palette_offset: Offset in ROM where palette data is located
+            colors: List of 16 RGB color tuples to inject
+            create_backup: Create backup before modification (if output == input)
+            ignore_checksum: If True, warn on checksum mismatch instead of failing
+
+        Returns:
+            Tuple of (success, message)
+        """
+        return self.palette_injector.inject_palette_to_rom(
+            rom_path,
+            output_path,
+            palette_offset,
+            colors,
+            create_backup=create_backup,
+            ignore_checksum=ignore_checksum,
+        )
 
     def find_sprite_locations(self, rom_path: str) -> dict[str, SpritePointer]:
         """

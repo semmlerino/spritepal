@@ -179,6 +179,40 @@ class ROMExtractor:
             header_bytes,
         )
 
+    def inject_palette_to_rom(
+        self,
+        rom_path: str,
+        output_path: str,
+        palette_offset: int,
+        colors: list[tuple[int, int, int]],
+        *,
+        create_backup: bool = True,
+        ignore_checksum: bool = False,
+    ) -> tuple[bool, str]:
+        """Inject palette data directly into ROM file.
+
+        Delegates to rom_injector.inject_palette_to_rom().
+
+        Args:
+            rom_path: Path to input ROM
+            output_path: Path for output ROM
+            palette_offset: Offset in ROM where palette data is located
+            colors: List of 16 RGB color tuples to inject
+            create_backup: Create backup before modification (if output == input)
+            ignore_checksum: If True, warn on checksum mismatch instead of failing
+
+        Returns:
+            Tuple of (success, message)
+        """
+        return self.rom_injector.inject_palette_to_rom(
+            rom_path,
+            output_path,
+            palette_offset,
+            colors,
+            create_backup=create_backup,
+            ignore_checksum=ignore_checksum,
+        )
+
     # -------------------------------------------------------------------------
     # Core extraction methods
     # -------------------------------------------------------------------------

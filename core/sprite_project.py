@@ -82,6 +82,7 @@ class SpriteProject:
     compression_type: str = "hal"
     rom_title: str = ""
     rom_checksum: str = ""
+    palette_rom_offset: int | None = None  # ROM offset for palette injection
 
     # Edit metadata
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -113,6 +114,10 @@ class SpriteProject:
                 "compression_type": self.compression_type,
                 "rom_title": self.rom_title,
                 "rom_checksum": self.rom_checksum,
+                "palette_rom_offset": self.palette_rom_offset,
+                "palette_rom_offset_hex": (
+                    f"0x{self.palette_rom_offset:06X}" if self.palette_rom_offset is not None else None
+                ),
             },
             "edit_metadata": {
                 "created_at": self.created_at.isoformat(),
@@ -206,6 +211,7 @@ class SpriteProject:
             compression_type=cast(str, injection.get("compression_type", "hal")),
             rom_title=cast(str, injection.get("rom_title", "")),
             rom_checksum=cast(str, injection.get("rom_checksum", "")),
+            palette_rom_offset=cast(int | None, injection.get("palette_rom_offset")),
             created_at=created_at,
             last_modified=last_modified,
             notes=cast(str, edit.get("notes", "")),
