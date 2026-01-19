@@ -1808,18 +1808,26 @@ class GridArrangementDialog(SplitterDialog):
         # Show color mapping dialog if we have a palette
         color_mappings: dict[tuple[int, int, int], int] | None = None
         if palette is not None:
-            from ui.dialogs.color_mapping_dialog import ColorMappingDialog, extract_unique_colors
+            from ui.dialogs.color_mapping_dialog import (
+                ColorMappingDialog,
+                extract_colors_from_sampled_overlay,
+            )
 
-            # Get the overlay image and extract unique colors
-            overlay_image = self.overlay_layer.image
-            if overlay_image is not None:
-                unique_colors = extract_unique_colors(overlay_image)
-                if unique_colors:
-                    # Show the color mapping dialog
-                    mapping_dialog = ColorMappingDialog(unique_colors, palette, self)
-                    if mapping_dialog.exec() != QDialog.DialogCode.Accepted:
-                        return  # User cancelled
-                    color_mappings = mapping_dialog.color_mappings
+            # Extract colors from the ACTUAL sampled pixels (what will be applied),
+            # not the original overlay image. This ensures color mappings match
+            # even when the overlay is scaled/resampled.
+            unique_colors = extract_colors_from_sampled_overlay(
+                overlay_layer=self.overlay_layer,
+                grid_mapping=self.arrangement_manager.get_grid_mapping(),
+                tile_width=self.processor.tile_width,
+                tile_height=self.processor.tile_height,
+            )
+            if unique_colors:
+                # Show the color mapping dialog
+                mapping_dialog = ColorMappingDialog(unique_colors, palette, self)
+                if mapping_dialog.exec() != QDialog.DialogCode.Accepted:
+                    return  # User cancelled
+                color_mappings = mapping_dialog.color_mappings
 
         # Create ApplyOperation
         operation = ApplyOperation(

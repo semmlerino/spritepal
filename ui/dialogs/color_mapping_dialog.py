@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import Qt, Signal
@@ -19,6 +20,9 @@ from ui.components.base.dialog_base import DialogBase
 
 if TYPE_CHECKING:
     from PIL import Image
+
+    from ui.row_arrangement.grid_arrangement_manager import ArrangementType
+    from ui.row_arrangement.overlay_layer import OverlayLayer
 
 
 def _color_distance_sq(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> int:
@@ -334,5 +338,74 @@ def extract_unique_colors(
         g = int((packed_color >> 8) & 0xFF)
         b = int(packed_color & 0xFF)
         color_counts[(r, g, b)] = int(count)
+
+    return color_counts
+
+
+def extract_colors_from_sampled_overlay(
+    overlay_layer: OverlayLayer,
+    grid_mapping: Mapping[tuple[int, int], tuple[ArrangementType, str]],
+    tile_width: int,
+    tile_height: int,
+    alpha_threshold: int = 128,
+) -> dict[tuple[int, int, int], int]:
+    """Extract unique colors from the actual sampled overlay regions.
+
+    This extracts colors from exactly what will be applied - the sampled/resampled
+    pixels, not the original overlay image. This ensures color mappings match
+    the actual applied pixels even when the overlay is scaled.
+
+    Args:
+        overlay_layer: The OverlayLayer to sample from
+        grid_mapping: Canvas position -> (type, key) mapping
+        tile_width: Width of each tile in pixels
+        tile_height: Height of each tile in pixels
+        alpha_threshold: Alpha value below which pixels are considered transparent
+
+    Returns:
+        Dict mapping RGB tuples to pixel counts
+    """
+    import numpy as np
+
+    # Import here to avoid issues at module load time
+    from ui.row_arrangement.grid_arrangement_manager import ArrangementType as ArrType
+
+    all_pixels: list[tuple[int, int, int]] = []
+
+    # Sample each tile region and collect pixels
+    for (r, c), (arr_type, _key) in grid_mapping.items():
+        if arr_type != ArrType.TILE:
+            continue
+
+        # Calculate canvas position
+        tile_x = c * tile_width
+        tile_y = r * tile_height
+
+        # Sample from overlay (this uses the same method as ApplyOperation)
+        region = overlay_layer.sample_region(tile_x, tile_y, tile_width, tile_height)
+        if region is None:
+            continue
+
+        # Convert to RGBA if needed
+        if region.mode != "RGBA":
+            region = region.convert("RGBA")
+
+        # Extract opaque pixels
+        pixels = np.array(region)
+        flat = pixels.reshape(-1, 4)
+        opaque_mask = flat[:, 3] >= alpha_threshold
+        opaque_pixels = flat[opaque_mask]
+
+        # Collect RGB tuples
+        for pixel in opaque_pixels:
+            all_pixels.append((int(pixel[0]), int(pixel[1]), int(pixel[2])))
+
+    if not all_pixels:
+        return {}
+
+    # Count unique colors
+    color_counts: dict[tuple[int, int, int], int] = {}
+    for rgb in all_pixels:
+        color_counts[rgb] = color_counts.get(rgb, 0) + 1
 
     return color_counts
