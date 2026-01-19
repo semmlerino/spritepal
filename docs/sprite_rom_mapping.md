@@ -302,18 +302,101 @@ If tiles aren't found, try a different OBSEL value with `--obsel 0x00`.
 - **Duplicate patterns**: Simple patterns (solid colors) may match multiple ROM locations
 - **Verify visually**: Render the tiles at found addresses to confirm
 
+## Mesen 2 Capture Import (Quick Path)
+
+The fastest way to edit boss sprites is to capture them directly from Mesen 2 and import the JSON:
+
+### Workflow: Capture → Import → Edit → Reinject
+
+1. **Capture in Mesen 2**:
+   - Load the game in Mesen 2
+   - Play until the boss sprite is visible
+   - Pause emulation
+   - Run the `sprite_rom_finder.lua` script (already set up in `tools/mesen2/`)
+   - Click on the sprite to capture its OAM and VRAM data
+   - This creates `mesen2_exchange/sprite_capture_*.json`
+
+2. **Import Capture in SpritePal**:
+   - Open any sprite in SpritePal's sprite editor
+   - Click **Arrange Tiles** to open the arrangement dialog
+   - Click **Import Capture** and select the JSON file from step 1
+   - **ROM Search Prompt**: If no `vram_attribution.json` exists, you'll be asked:
+     - *"Would you like to search for tile ROM offsets by scanning the ROM file?"*
+     - Click **Yes** and select your ROM file
+     - The system searches for each tile's exact 32-byte 4bpp data in ROM
+   - Grid populates with captured tiles arranged by palette group
+
+3. **Edit Tiles**: Use the editor's drawing tools to modify tiles in the arrangement grid
+
+4. **Reinject**: Click **Save Raw Tiles** to write modified tiles back to their original ROM addresses
+   - Output: `*_modified.sfc` with tiles written to exact scattered ROM offsets
+
+### Two Methods for VRAM→ROM Mapping
+
+When importing a capture, the system needs to know where each tile's data lives in ROM:
+
+| Method | How It Works | Pros | Cons |
+|--------|------------|------|------|
+| **ROM Search** (Default) | Search ROM file for exact 32-byte tile patterns | Simple, no setup | May find wrong match if pattern is duplicated |
+| **Attribution File** (Optional) | Traces actual VRAM writes during emulation | Accurate, handles duplicates | Requires Lua script, must capture during gameplay |
+
+### Creating VRAM Attribution File (Optional)
+
+For sprites with repeated patterns or compressed data, use the attribution file method:
+
+1. **Run sprite_rom_finder.lua in Mesen 2**:
+   ```
+   tools/mesen2/run_sprite_rom_finder.bat
+   ```
+
+2. **Play the game** until the target sprites are loaded into VRAM
+
+3. **Press E key** to export VRAM→ROM attribution map
+   - Creates: `mesen2_exchange/vram_attribution.json`
+   - Contains actual VRAM source addresses from DMA traces
+
+4. **Capture with E key already pressed** to generate the attribution data, then capture the sprite normally
+
+5. **When importing capture**, if `vram_attribution.json` exists, it will be used instead of ROM search
+
+### Example: Import and Edit King Dedede
+
+```
+1. In Mesen 2:
+   - Load Kirby Super Star, fight King Dedede
+   - Press E to trace VRAM writes
+   - Click on Dedede sprite
+   - Capture saved to mesen2_exchange/sprite_capture_FRAME.json
+
+2. In SpritePal:
+   - Arrange Tiles → Import Capture → select sprite_capture_FRAME.json
+   - System offers ROM search
+   - Click Yes, select Kirby.sfc
+   - Tiles populate in grid (organized by palette)
+   - Edit pixels
+   - Save Raw Tiles
+   - Modified ROM written to Kirby_modified.sfc
+
+3. Test:
+   - Load Kirby_modified.sfc in Mesen 2
+   - Fight King Dedede again
+   - Your edits appear in-game
+```
+
 ## Sprite Editor Integration
 
 The ROM map data can be imported directly into SpritePal's sprite editor for editing and reinjection.
 
-### Workflow: Import → Edit → Reinject
+### Workflow: ROM Map File → Import → Edit → Reinject
+
+For advanced workflows (batch processing, separate mapping step):
 
 1. **Create ROM Map**: Use `sprite_rom_mapper.py` to create a JSON map file
 2. **Import in Editor**:
    - Open any sprite in SpritePal's sprite editor
    - Click **Arrange Tiles** to open the arrangement dialog
    - Click **Import ROM Map** and select:
-     - The ROM map JSON file
+     - The ROM map JSON file (from `sprite_rom_mapper.py`)
      - The ROM file
      - (Optional) CGRAM dump for accurate palette
 3. **Edit Tiles**: Use the editor's drawing tools to modify tiles
@@ -379,3 +462,34 @@ cat DededeDMP/dedede_complete_map.json | python -m json.tool | head -50
 ```
 
 To map more frames, capture additional dumps and re-run the batch processor.
+
+## Technical Notes
+
+### 4bpp Tile Format and Palette Indices
+
+SNES uses 4-bit-per-pixel (4bpp) format for sprite graphics:
+- Each pixel is a 4-bit value (0-15), selecting one of 16 colors in the active palette
+- 8×8 tile = 64 pixels = 32 bytes of data
+
+**Important:** When editing tiles in SpritePal, pixel values are stored as palette indices (0-15), not grayscale values. The conversion to 4bpp format automatically handles this:
+
+- If pixel values are in range 0-15 → used directly as palette indices
+- If pixel values are 0-255 → scaled to 0-15 by dividing by 16
+
+This ensures edited tiles maintain the correct palette colors when injected back to ROM.
+
+### Raw Tile Injection
+
+When you click **Save Raw Tiles**, the workflow:
+
+1. **Extract tiles**: Split the edited image into 8×8 tiles
+2. **Convert to 4bpp**: Each tile converted to 32 bytes of SNES 4bpp format
+3. **Find changes**: Compare each tile to the original (from ROM map)
+4. **Write to ROM**: Only modified tiles written to their exact ROM offsets
+5. **Preserve adjacent data**: Only 32 bytes per tile written - no overflow
+
+Example:
+- Original Dedede sprite: 24 tiles at scattered addresses (0x017361-0x017941)
+- You edit 4 tiles
+- Only those 4 tiles (128 bytes total) written to ROM
+- Original ROM copied to `*_modified.sfc` with minimal changes
