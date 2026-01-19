@@ -375,6 +375,98 @@ class OverlayLayer(QObject):
 
         return result
 
+    def sample_region_direct(
+        self, tile_x: int, tile_y: int, tile_width: int, tile_height: int
+    ) -> Image.Image | None:
+        """Sample a tile-sized region directly from the original image at 1:1 pixels.
+
+        Unlike sample_region(), this ignores the visual scale and samples the original
+        image pixels directly. This preserves full detail for pixel-perfect overlays.
+
+        The visual position (x, y) is used to determine alignment, but the scale is
+        treated as 1.0 for sampling purposes.
+
+        Args:
+            tile_x: X position of tile on canvas (pixels).
+            tile_y: Y position of tile on canvas (pixels).
+            tile_width: Width of tile (pixels).
+            tile_height: Height of tile (pixels).
+
+        Returns:
+            RGBA image of the sampled region at 1:1, or None if no overlap.
+        """
+        if self._image is None:
+            return None
+
+        # Treat overlay as 1:1 (ignore visual scale for sampling)
+        # Use visual position but original image dimensions
+        overlay_x = self._x
+        overlay_y = self._y
+        overlay_w = self._image.width
+        overlay_h = self._image.height
+
+        # Define rects
+        tile_rect = (tile_x, tile_y, tile_x + tile_width, tile_y + tile_height)
+        overlay_rect = (overlay_x, overlay_y, overlay_x + overlay_w, overlay_y + overlay_h)
+
+        # Calculate intersection
+        ix1 = max(tile_rect[0], overlay_rect[0])
+        iy1 = max(tile_rect[1], overlay_rect[1])
+        ix2 = min(tile_rect[2], overlay_rect[2])
+        iy2 = min(tile_rect[3], overlay_rect[3])
+
+        # Check for valid overlap
+        if ix2 <= ix1 or iy2 <= iy1:
+            return None
+
+        # Source rect in original image (1:1, so same offset from overlay origin)
+        src_x = int(ix1 - overlay_x)
+        src_y = int(iy1 - overlay_y)
+        src_w = int(ix2 - ix1)
+        src_h = int(iy2 - iy1)
+
+        # Destination position in tile
+        dst_x = int(ix1 - tile_x)
+        dst_y = int(iy1 - tile_y)
+
+        if src_w <= 0 or src_h <= 0:
+            return None
+
+        # Crop directly from original (no resize = no pixel loss)
+        try:
+            cropped = self._image.crop((src_x, src_y, src_x + src_w, src_y + src_h))
+        except Exception:
+            return None
+
+        # Compose into full tile
+        result = Image.new("RGBA", (tile_width, tile_height), (0, 0, 0, 0))
+        result.paste(cropped, (dst_x, dst_y))
+
+        return result
+
+    def covers_tile_direct(self, tile_x: int, tile_y: int, tile_width: int, tile_height: int) -> bool:
+        """Check if the overlay (at 1:1 scale) fully covers a tile region.
+
+        Like covers_tile() but ignores visual scale.
+        """
+        if self._image is None:
+            return False
+
+        # Use original image dimensions (1:1)
+        overlay_w = self._image.width
+        overlay_h = self._image.height
+        overlay_rect = (self._x, self._y, self._x + overlay_w, self._y + overlay_h)
+
+        tile_rect = (tile_x, tile_y, tile_x + tile_width, tile_y + tile_height)
+
+        # Tile is fully covered if it's completely inside the overlay
+        return (
+            tile_rect[0] >= overlay_rect[0]
+            and tile_rect[1] >= overlay_rect[1]
+            and tile_rect[2] <= overlay_rect[2]
+            and tile_rect[3] <= overlay_rect[3]
+        )
+
     def covers_tile(self, tile_x: int, tile_y: int, tile_width: int, tile_height: int) -> bool:
         """Check if the overlay fully covers a tile region.
 
