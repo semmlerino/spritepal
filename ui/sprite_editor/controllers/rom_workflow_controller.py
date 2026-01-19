@@ -1184,7 +1184,12 @@ class ROMWorkflowController(QObject):
         elif self.state == "edit":
             self.prepare_injection()
         elif self.state == "save":
-            self.save_to_rom()
+            # Use raw tile injection if ROM map data is present (boss sprites),
+            # otherwise use HAL-compressed injection (regular sprites)
+            if self._current_rom_map_data:
+                self.save_raw_tiles_to_rom()
+            else:
+                self.save_to_rom()
 
     def open_in_editor(self) -> None:
         """Load the current preview into the pixel editor."""
@@ -1381,7 +1386,11 @@ class ROMWorkflowController(QObject):
         # Change state
         self.state = "edit"
         if self._view:
-            self._view.set_action_text("Save to ROM")
+            # Use different button text for raw tile mode (ROM map import)
+            if self._current_rom_map_data:
+                self._view.set_action_text("Save Raw Tiles")
+            else:
+                self._view.set_action_text("Save to ROM")
             self._view.set_workflow_state("edit")
             # Enable save project button and arrange tiles when sprite is loaded for editing
             if self._view.workspace:
@@ -1752,6 +1761,7 @@ class ROMWorkflowController(QObject):
         """Clear current arrangement state."""
         self._current_arrangement = None
         self._arrangement_config = None
+        self._current_rom_map_data = None
 
     def show_import_dialog(self) -> None:
         """Open the image import dialog to import an external image.
@@ -2034,6 +2044,12 @@ class ROMWorkflowController(QObject):
 
     def prepare_injection(self) -> None:
         """Transition from editing to save confirmation with size comparison."""
+        # For ROM map imports (boss sprites), use raw tile injection directly
+        # (save_raw_tiles_to_rom has its own confirmation dialog)
+        if self._current_rom_map_data:
+            self.save_raw_tiles_to_rom()
+            return
+
         # For RAW sprites, show a warning about no compression being applied
         if self.current_compression_type == CompressionType.RAW:
             from PySide6.QtWidgets import QMessageBox
