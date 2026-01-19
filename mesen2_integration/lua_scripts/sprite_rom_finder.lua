@@ -379,78 +379,6 @@ local function export_vram_attribution()
     return count
 end
 
--- Export FE52 pointer table (STATIC ROM DATA - only need to export once per ROM!)
--- Call this with 'T' key to export the complete idx→ROM offset table
-local FE52_TABLE_FILE = OUTPUT_DIR .. "fe52_pointer_table.json"
-
-local function export_fe52_table()
-    local f = io.open(FE52_TABLE_FILE, "w")
-    if not f then
-        log("ERROR: Cannot open FE52 table file for writing")
-        return 0
-    end
-
-    -- Build list of all idx→ptr mappings from idx_database
-    local entries = {}
-    local count = 0
-    for idx, data in pairs(idx_database) do
-        if data and data.ptr then
-            -- Calculate file offset using SA-1 mapping
-            local ptr = data.ptr
-            local bank = math.floor(ptr / 65536)
-            local offset = ptr % 65536
-            local file_offset = nil
-
-            -- SA-1 default mapping: file = (bank - 0xC0) * 0x10000 + offset
-            if bank >= 0xC0 and bank <= 0xFF then
-                file_offset = (bank - 0xC0) * 0x10000 + offset
-            elseif bank == 0x7E then
-                -- WRAM pointer (staging buffer, not direct ROM)
-                file_offset = nil
-            end
-
-            table.insert(entries, {
-                idx = idx,
-                ptr = ptr,
-                ptr_str = string.format("%02X:%04X", bank, offset),
-                file_offset = file_offset,
-            })
-            count = count + 1
-        end
-    end
-
-    -- Sort by idx for consistent output
-    table.sort(entries, function(a, b) return a.idx < b.idx end)
-
-    -- Write JSON
-    f:write("{\n")
-    f:write('  "description": "FE52 Pointer Table - STATIC ROM DATA (export once per ROM)",\n')
-    f:write('  "table_address": "01:FE52 (CPU) / 0x00FE52 (file)",\n')
-    f:write(string.format('  "export_time": "%s",\n', os.date("%Y-%m-%d %H:%M:%S")))
-    f:write(string.format('  "entry_count": %d,\n', count))
-    f:write('  "entries": [\n')
-
-    for i, entry in ipairs(entries) do
-        f:write(string.format(
-            '    {"idx":%d,"ptr":%d,"ptr_str":"%s","file_offset":%s}',
-            entry.idx,
-            entry.ptr,
-            entry.ptr_str,
-            entry.file_offset and tostring(entry.file_offset) or "null"
-        ))
-        if i < #entries then f:write(",") end
-        f:write("\n")
-    end
-
-    f:write("  ]\n")
-    f:write("}\n")
-    f:close()
-
-    log(string.format("EXPORT: Wrote FE52 pointer table (%d entries) to %s", count, FE52_TABLE_FILE))
-    log("  This is STATIC ROM data - you only need to export this ONCE per ROM!")
-    return count
-end
-
 -- Load persistent clicks on script start
 load_recent_clicks()
 
@@ -722,6 +650,78 @@ for _, base in ipairs(DP_PTR_SLOTS) do
     for i = 0, DP_PTR_SLOT_SIZE - 1 do
         DP_PTR_SLOT_BY_OFFSET[base + i] = base
     end
+end
+
+-- Export FE52 pointer table (STATIC ROM DATA - only need to export once per ROM!)
+-- Call this with 'T' key to export the complete idx→ROM offset table
+local FE52_TABLE_FILE = OUTPUT_DIR .. "fe52_pointer_table.json"
+
+local function export_fe52_table()
+    local f = io.open(FE52_TABLE_FILE, "w")
+    if not f then
+        log("ERROR: Cannot open FE52 table file for writing")
+        return 0
+    end
+
+    -- Build list of all idx→ptr mappings from idx_database
+    local entries = {}
+    local count = 0
+    for idx, data in pairs(idx_database) do
+        if data and data.ptr then
+            -- Calculate file offset using SA-1 mapping
+            local ptr = data.ptr
+            local bank = math.floor(ptr / 65536)
+            local offset = ptr % 65536
+            local file_offset = nil
+
+            -- SA-1 default mapping: file = (bank - 0xC0) * 0x10000 + offset
+            if bank >= 0xC0 and bank <= 0xFF then
+                file_offset = (bank - 0xC0) * 0x10000 + offset
+            elseif bank == 0x7E then
+                -- WRAM pointer (staging buffer, not direct ROM)
+                file_offset = nil
+            end
+
+            table.insert(entries, {
+                idx = idx,
+                ptr = ptr,
+                ptr_str = string.format("%02X:%04X", bank, offset),
+                file_offset = file_offset,
+            })
+            count = count + 1
+        end
+    end
+
+    -- Sort by idx for consistent output
+    table.sort(entries, function(a, b) return a.idx < b.idx end)
+
+    -- Write JSON
+    f:write("{\n")
+    f:write('  "description": "FE52 Pointer Table - STATIC ROM DATA (export once per ROM)",\n')
+    f:write('  "table_address": "01:FE52 (CPU) / 0x00FE52 (file)",\n')
+    f:write(string.format('  "export_time": "%s",\n', os.date("%Y-%m-%d %H:%M:%S")))
+    f:write(string.format('  "entry_count": %d,\n', count))
+    f:write('  "entries": [\n')
+
+    for i, entry in ipairs(entries) do
+        f:write(string.format(
+            '    {"idx":%d,"ptr":%d,"ptr_str":"%s","file_offset":%s}',
+            entry.idx,
+            entry.ptr,
+            entry.ptr_str,
+            entry.file_offset and tostring(entry.file_offset) or "null"
+        ))
+        if i < #entries then f:write(",") end
+        f:write("\n")
+    end
+
+    f:write("  ]\n")
+    f:write("}\n")
+    f:close()
+
+    log(string.format("EXPORT: Wrote FE52 pointer table (%d entries) to %s", count, FE52_TABLE_FILE))
+    log("  This is STATIC ROM data - you only need to export this ONCE per ROM!")
+    return count
 end
 
 --------------------------------------------------------------------------------
