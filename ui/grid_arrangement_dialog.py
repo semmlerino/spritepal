@@ -1051,11 +1051,50 @@ class GridArrangementDialog(SplitterDialog):
             _ = QMessageBox.warning(self, "Import Failed", "Capture contains no sprite entries")
             return
 
-        # 2.5. Try to load VRAM→ROM attribution data (optional enhancement)
+        # 2.5. Try to load VRAM→ROM attribution data or offer ROM search
         attribution_map = None
+        vram_to_rom_offsets: dict[int, int] = {}
+
         attribution_file = find_attribution_file(path)
         if attribution_file:
             attribution_map = load_vram_attribution(attribution_file)
+
+        # If no attribution file, offer to search ROM for tiles
+        if attribution_map is None:
+            search_result = QMessageBox.question(
+                self,
+                "ROM Search",
+                "No VRAM attribution file found.\n\n"
+                "Would you like to search for tile ROM offsets by scanning the ROM file?\n\n"
+                "This enables 'Save Raw Tiles' for reinjection.\n"
+                "(Required for boss sprites like King Dedede)",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if search_result == QMessageBox.StandardButton.Yes:
+                rom_path, _ = QFileDialog.getOpenFileName(
+                    self,
+                    "Select ROM File",
+                    str(Path.cwd()),
+                    "ROM Files (*.sfc *.smc);;All Files (*)",
+                )
+                if rom_path:
+                    try:
+                        with open(rom_path, "rb") as f:
+                            rom_data = f.read()
+                        vram_to_rom_offsets = self._search_capture_tiles_in_rom(capture, rom_data)
+                        if vram_to_rom_offsets:
+                            logger.info(
+                                "Found %d tile ROM offsets via ROM search",
+                                len(vram_to_rom_offsets),
+                            )
+                        else:
+                            _ = QMessageBox.warning(
+                                self,
+                                "No Matches",
+                                "No tiles found in ROM. Tiles may be compressed or generated dynamically.",
+                            )
+                    except OSError as e:
+                        _ = QMessageBox.warning(self, "ROM Read Error", f"Failed to read ROM: {e}")
 
         # 3. Show import options dialog
         dialog = CaptureImportDialog(capture, self)
@@ -1110,18 +1149,38 @@ class GridArrangementDialog(SplitterDialog):
             first_palette = min(arrangement_data.palettes.keys())
             self.colorizer.set_selected_palette(first_palette)
 
-        # 9. Build ROMMapData for reinjection if attribution data available
+        # 9. Build ROMMapData for reinjection if VRAM→ROM mapping available
         rom_map_data = None
+
+        # Create simple adapter for ROM search results if no attribution map
+        class ROMSearchAdapter:
+            """Adapter to make ROM search results work like VRAMAttributionMap."""
+
+            def __init__(self, offsets: dict[int, int]) -> None:
+                self._offsets = offsets
+
+            def get_rom_offset(self, vram_addr: int) -> int | None:
+                return self._offsets.get(vram_addr)
+
+        # Use attribution map if available, otherwise use ROM search results
+        effective_map: object | None = None
         if attribution_map:
+            effective_map = attribution_map
+        elif vram_to_rom_offsets:
+            effective_map = ROMSearchAdapter(vram_to_rom_offsets)
+
+        if effective_map:
             rom_map_data = self._build_rom_map_from_capture(
                 arrangement_data,
-                attribution_map,
+                effective_map,
                 path,
             )
             if rom_map_data:
                 self._rom_map_data = rom_map_data
+                source = "attribution file" if attribution_map else "ROM search"
                 logger.info(
-                    "Built ROM map from capture: %d tiles with ROM offsets",
+                    "Built ROM map from capture (%s): %d tiles with ROM offsets",
+                    source,
                     len(rom_map_data.tiles),
                 )
 
@@ -1486,6 +1545,60 @@ class GridArrangementDialog(SplitterDialog):
             tiles=rom_tiles,
             palette=palette,
         )
+
+    def _search_capture_tiles_in_rom(
+        self,
+        capture: object,  # CaptureResult
+        rom_data: bytes,
+    ) -> dict[int, int]:
+        """Search for capture tile data in ROM by exact byte match.
+
+        For boss sprites stored as raw 4bpp tiles at scattered ROM addresses,
+        this finds the ROM offset for each tile by searching for its exact bytes.
+
+        Args:
+            capture: CaptureResult with tile data
+            rom_data: Full ROM file contents
+
+        Returns:
+            Dict mapping VRAM byte address → ROM offset
+        """
+        vram_to_rom: dict[int, int] = {}
+
+        # Access entries from capture (CaptureResult type)
+        entries = getattr(capture, "entries", [])
+
+        for entry in entries:
+            # Each entry has a tiles list with TileData objects
+            tiles = getattr(entry, "tiles", [])
+            for tile in tiles:
+                vram_addr = getattr(tile, "vram_addr", None)
+                data_hex = getattr(tile, "data_hex", None)
+
+                if vram_addr is None or not data_hex:
+                    continue
+
+                # Convert hex string to bytes
+                try:
+                    tile_bytes = bytes.fromhex(data_hex)
+                except ValueError:
+                    continue
+
+                # Skip empty tiles (all zeros)
+                if tile_bytes == b"\x00" * 32:
+                    continue
+
+                # Search for exact match in ROM
+                pos = rom_data.find(tile_bytes)
+                if pos >= 0:
+                    vram_to_rom[vram_addr] = pos
+                    logger.debug(
+                        "Found tile VRAM 0x%04X at ROM 0x%06X",
+                        vram_addr,
+                        pos,
+                    )
+
+        return vram_to_rom
 
     def _create_composite_from_tiles(self) -> None:
         """Create a composite original_image from the current tiles dictionary."""
