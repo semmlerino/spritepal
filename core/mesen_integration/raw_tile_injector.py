@@ -54,10 +54,20 @@ def image_to_4bpp_tile(tile_img: Image.Image) -> bytes:
     pixels: list[int]
     if tile_img.mode == "P":
         pixels = [int(p) for p in tile_img.getdata()]
+    elif tile_img.mode == "L":
+        # Grayscale - check if already palette indices (0-15) or full grayscale (0-255)
+        raw_pixels = [int(p) for p in tile_img.getdata()]
+        max_val = max(raw_pixels) if raw_pixels else 0
+        if max_val <= 15:
+            # Already palette indices, use directly
+            pixels = raw_pixels
+        else:
+            # Full grayscale 0-255, convert to 0-15
+            pixels = [min(15, p // 16) for p in raw_pixels]
     elif tile_img.mode in ("RGB", "RGBA"):
         # For RGB, use luminance as index (simplified)
         # In practice, you'd want proper palette matching
-        tile_img = tile_img.convert("L")  # Grayscale
+        tile_img = tile_img.convert("L")
         pixels = [min(15, int(p) // 16) for p in tile_img.getdata()]
     else:
         tile_img = tile_img.convert("L")
