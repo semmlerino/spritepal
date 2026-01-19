@@ -998,17 +998,23 @@ class GridArrangementDialog(SplitterDialog):
 
     def _import_mesen_capture(self) -> None:
         """Import Mesen 2 capture and populate grid with tiles."""
+        from pathlib import Path
+
         from PySide6.QtWidgets import QFileDialog
 
         from core.mesen_integration.capture_to_arrangement import CaptureToArrangementConverter
         from core.mesen_integration.click_extractor import MesenCaptureParser
         from ui.dialogs.capture_import_dialog import CaptureImportDialog
 
-        # 1. File selection
+        # 1. File selection - use project root for default directory
+        default_dir = Path(__file__).parent.parent / "mesen2_exchange"
+        if not default_dir.exists():
+            default_dir = Path.cwd()
+
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Import Mesen 2 Capture",
-            "mesen2_exchange/",
+            str(default_dir),
             "Capture Files (*.json);;All Files (*)",
         )
         if not path:
