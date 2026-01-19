@@ -376,3 +376,180 @@ class TestCaptureArrangementData:
             total_tiles=0,
         )
         assert data.palette_indices == [0, 3, 7]
+
+
+class TestVRAMAddressTracking:
+    """Tests for VRAM address tracking through capture conversion."""
+
+    @pytest.fixture
+    def capture_with_positioned_tiles(self, obsel_config: OBSELConfig) -> CaptureResult:
+        """Create capture with tiles at specific VRAM addresses and positions."""
+        # Create 4 tiles with distinct VRAM addresses for a 16x16 sprite
+        tiles = [
+            TileData(tile_index=10, vram_addr=0x6000, pos_x=0, pos_y=0, data_hex="FF" * 32),
+            TileData(tile_index=11, vram_addr=0x6020, pos_x=1, pos_y=0, data_hex="FF" * 32),
+            TileData(tile_index=26, vram_addr=0x6200, pos_x=0, pos_y=1, data_hex="FF" * 32),
+            TileData(tile_index=27, vram_addr=0x6220, pos_x=1, pos_y=1, data_hex="FF" * 32),
+        ]
+        entry = OAMEntry(
+            id=0,
+            x=0,
+            y=0,
+            tile=10,
+            width=16,
+            height=16,
+            flip_h=False,
+            flip_v=False,
+            palette=7,
+            tiles=tiles,
+        )
+        return CaptureResult(
+            frame=100,
+            visible_count=1,
+            obsel=obsel_config,
+            entries=[entry],
+            palettes={7: [0x000000] + [0xFF0000] * 15},
+            timestamp=12345,
+        )
+
+    def test_vram_addresses_populated(self, capture_with_positioned_tiles: CaptureResult) -> None:
+        """vram_addresses dict is populated during conversion."""
+        converter = CaptureToArrangementConverter()
+        result = converter.convert(
+            capture_with_positioned_tiles,
+            filter_garbage_tiles=False,
+            cluster_sprites=False,
+        )
+
+        assert len(result.groups) == 1
+        group = result.groups[0]
+
+        # Should have vram_addresses populated
+        assert len(group.vram_addresses) > 0
+
+    def test_vram_addresses_match_grid_positions(self, capture_with_positioned_tiles: CaptureResult) -> None:
+        """vram_addresses correctly maps grid positions to VRAM addresses."""
+        converter = CaptureToArrangementConverter()
+        result = converter.convert(
+            capture_with_positioned_tiles,
+            filter_garbage_tiles=False,
+            cluster_sprites=False,
+        )
+
+        group = result.groups[0]
+
+        # 16x16 sprite should have 2x2 tiles
+        assert group.width_tiles == 2
+        assert group.height_tiles == 2
+
+        # Check VRAM addresses for each grid position
+        # (0,0) should map to first tile's vram_addr
+        assert (0, 0) in group.vram_addresses
+        assert group.vram_addresses[(0, 0)] == 0x6000
+
+        # (0,1) should map to second tile's vram_addr
+        assert (0, 1) in group.vram_addresses
+        assert group.vram_addresses[(0, 1)] == 0x6020
+
+        # (1,0) should map to third tile's vram_addr
+        assert (1, 0) in group.vram_addresses
+        assert group.vram_addresses[(1, 0)] == 0x6200
+
+        # (1,1) should map to fourth tile's vram_addr
+        assert (1, 1) in group.vram_addresses
+        assert group.vram_addresses[(1, 1)] == 0x6220
+
+    def test_vram_addresses_only_for_visible_tiles(self, obsel_config: OBSELConfig) -> None:
+        """vram_addresses only includes positions with actual tiles."""
+        # Create sparse tile data (only some positions filled)
+        tiles = [
+            TileData(tile_index=10, vram_addr=0x6000, pos_x=0, pos_y=0, data_hex="FF" * 32),
+            # Skip (1,0), (0,1) - only top-left and bottom-right have data
+            TileData(tile_index=27, vram_addr=0x6220, pos_x=1, pos_y=1, data_hex="FF" * 32),
+        ]
+        entry = OAMEntry(
+            id=0,
+            x=0,
+            y=0,
+            tile=10,
+            width=16,
+            height=16,
+            flip_h=False,
+            flip_v=False,
+            palette=0,
+            tiles=tiles,
+        )
+        capture = CaptureResult(
+            frame=100,
+            visible_count=1,
+            obsel=obsel_config,
+            entries=[entry],
+            palettes={0: [0x000000] * 16},
+            timestamp=12345,
+        )
+
+        converter = CaptureToArrangementConverter()
+        result = converter.convert(capture, filter_garbage_tiles=False, cluster_sprites=False)
+
+        group = result.groups[0]
+
+        # Only 2 positions should have VRAM addresses
+        assert len(group.vram_addresses) == 2
+        assert (0, 0) in group.vram_addresses
+        assert (1, 1) in group.vram_addresses
+        # Positions without tiles should not be in vram_addresses
+        assert (0, 1) not in group.vram_addresses
+        assert (1, 0) not in group.vram_addresses
+
+    def test_vram_addresses_with_multiple_sprites(self, obsel_config: OBSELConfig) -> None:
+        """vram_addresses works correctly when multiple sprites are composited."""
+        # Two 8x8 sprites side by side
+        tile1 = TileData(tile_index=10, vram_addr=0x6000, pos_x=0, pos_y=0, data_hex="FF" * 32)
+        tile2 = TileData(tile_index=11, vram_addr=0x6020, pos_x=0, pos_y=0, data_hex="FF" * 32)
+
+        entry1 = OAMEntry(
+            id=0,
+            x=0,
+            y=0,
+            tile=10,
+            width=8,
+            height=8,
+            flip_h=False,
+            flip_v=False,
+            palette=0,
+            tiles=[tile1],
+        )
+        entry2 = OAMEntry(
+            id=1,
+            x=8,
+            y=0,
+            tile=11,
+            width=8,
+            height=8,
+            flip_h=False,
+            flip_v=False,
+            palette=0,
+            tiles=[tile2],
+        )
+
+        capture = CaptureResult(
+            frame=100,
+            visible_count=2,
+            obsel=obsel_config,
+            entries=[entry1, entry2],
+            palettes={0: [0x000000] * 16},
+            timestamp=12345,
+        )
+
+        converter = CaptureToArrangementConverter()
+        result = converter.convert(capture, filter_garbage_tiles=False, cluster_sprites=False)
+
+        group = result.groups[0]
+
+        # Should be 2x1 tiles
+        assert group.width_tiles == 2
+        assert group.height_tiles == 1
+
+        # Each position should have correct VRAM address
+        assert group.vram_addresses[(0, 0)] == 0x6000
+        assert group.vram_addresses[(0, 1)] == 0x6020
