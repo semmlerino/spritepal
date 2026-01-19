@@ -88,13 +88,13 @@ class OverlayControls(QGroupBox):
         scale_row = QHBoxLayout()
         scale_row.addWidget(QLabel("Scale:"))
         self.scale_slider = QSlider(Qt.Orientation.Horizontal)
-        self.scale_slider.setRange(1, 75)  # 0.1% to 7.5%
+        self.scale_slider.setRange(1, 500)  # 0.1% to 50%
         self.scale_slider.setValue(50)  # Default 5.0%
-        self.scale_slider.setToolTip("Overlay scale (0.1-7.5%)")
+        self.scale_slider.setToolTip("Overlay scale (0.1-50%)")
         scale_row.addWidget(self.scale_slider)
 
         self.scale_spin = QDoubleSpinBox()
-        self.scale_spin.setRange(0.1, 7.5)
+        self.scale_spin.setRange(0.1, 50.0)
         self.scale_spin.setSingleStep(0.1)
         self.scale_spin.setValue(5.0)
         self.scale_spin.setSuffix("%")
@@ -201,7 +201,7 @@ class OverlayControls(QGroupBox):
         self._overlay.set_position(x, y)
 
     def _on_scale_slider_changed(self, value: int) -> None:
-        """Handle scale slider changes (1-75 = 0.1%-7.5%)."""
+        """Handle scale slider changes (1-500 = 0.1%-50%)."""
         scale_percent = value / 10.0
         self.scale_spin.blockSignals(True)
         self.scale_spin.setValue(scale_percent)
@@ -209,7 +209,7 @@ class OverlayControls(QGroupBox):
         self._overlay.set_scale(scale_percent / 100.0)
 
     def _on_scale_spin_changed(self, value: float) -> None:
-        """Handle scale spinbox changes (0.1-7.5)."""
+        """Handle scale spinbox changes (0.1-50.0)."""
         slider_value = int(value * 10)
         self.scale_slider.blockSignals(True)
         self.scale_slider.setValue(slider_value)
