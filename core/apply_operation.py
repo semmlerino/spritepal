@@ -71,6 +71,7 @@ class ApplyOperation:
         tile_width: int,
         tile_height: int,
         palette: list[tuple[int, int, int]] | None = None,
+        color_mappings: dict[tuple[int, int, int], int] | None = None,
     ) -> None:
         """Initialize the Apply operation.
 
@@ -81,6 +82,8 @@ class ApplyOperation:
             tile_width: Width of each tile in pixels.
             tile_height: Height of each tile in pixels.
             palette: Optional palette for quantization (16 RGB colors).
+            color_mappings: Optional custom color mappings (RGB -> palette index).
+                If provided, these mappings override the default nearest-color matching.
         """
         self._overlay = overlay
         self._grid_mapping = grid_mapping
@@ -88,6 +91,7 @@ class ApplyOperation:
         self._tile_width = tile_width
         self._tile_height = tile_height
         self._palette = palette
+        self._color_mappings = color_mappings
 
     def validate(self) -> list[ApplyWarning]:
         """Validate the Apply operation and return warnings.
@@ -258,18 +262,27 @@ class ApplyOperation:
                     pixels_out[x, y] = 0
                     continue
 
-                # Find closest palette color, skipping index 0 (reserved for transparency)
-                # SNES sprites use index 0 as the transparent color, so opaque pixels
-                # must never be assigned to index 0, even if it's the closest match.
-                min_dist = float("inf")
-                best_idx = 1  # Default to index 1 (not 0 which is transparent)
-                for idx, (pr, pg, pb) in enumerate(palette):
-                    if idx == 0:
-                        continue  # Skip index 0 for opaque pixels
-                    dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2
-                    if dist < min_dist:
-                        min_dist = dist
-                        best_idx = idx
+                rgb = (r, g, b)
+
+                # Check custom color mappings first (user-specified overrides)
+                if self._color_mappings is not None and rgb in self._color_mappings:
+                    best_idx = self._color_mappings[rgb]
+                    # Ensure opaque pixels never use index 0 (transparency)
+                    if best_idx == 0:
+                        best_idx = 1  # Fallback to index 1
+                else:
+                    # Find closest palette color, skipping index 0 (reserved for transparency)
+                    # SNES sprites use index 0 as the transparent color, so opaque pixels
+                    # must never be assigned to index 0, even if it's the closest match.
+                    min_dist = float("inf")
+                    best_idx = 1  # Default to index 1 (not 0 which is transparent)
+                    for idx, (pr, pg, pb) in enumerate(palette):
+                        if idx == 0:
+                            continue  # Skip index 0 for opaque pixels
+                        dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2
+                        if dist < min_dist:
+                            min_dist = dist
+                            best_idx = idx
 
                 # Store as grayscale value (index * 16 for 4bpp SNES format)
                 pixels_out[x, y] = best_idx * 16

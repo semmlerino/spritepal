@@ -27,6 +27,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QDialog,
     QDialogButtonBox,
     QFrame,
     QGraphicsPixmapItem,
@@ -1785,6 +1786,22 @@ class GridArrangementDialog(SplitterDialog):
             if palette_idx in palettes:
                 palette = palettes[palette_idx]
 
+        # Show color mapping dialog if we have a palette
+        color_mappings: dict[tuple[int, int, int], int] | None = None
+        if palette is not None:
+            from ui.dialogs.color_mapping_dialog import ColorMappingDialog, extract_unique_colors
+
+            # Get the overlay image and extract unique colors
+            overlay_image = self.overlay_layer.image
+            if overlay_image is not None:
+                unique_colors = extract_unique_colors(overlay_image)
+                if unique_colors:
+                    # Show the color mapping dialog
+                    mapping_dialog = ColorMappingDialog(unique_colors, palette, self)
+                    if mapping_dialog.exec() != QDialog.DialogCode.Accepted:
+                        return  # User cancelled
+                    color_mappings = mapping_dialog.color_mappings
+
         # Create ApplyOperation
         operation = ApplyOperation(
             overlay=self.overlay_layer,
@@ -1793,6 +1810,7 @@ class GridArrangementDialog(SplitterDialog):
             tile_width=self.processor.tile_width,
             tile_height=self.processor.tile_height,
             palette=palette,
+            color_mappings=color_mappings,
         )
 
         # Validate first
