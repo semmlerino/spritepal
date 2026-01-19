@@ -1,5 +1,9 @@
--- sprite_rom_finder.lua v45
+-- sprite_rom_finder.lua v46
 -- Click on any sprite to get its ROM source offset
+-- v46: ADD fallback search when verification fails (0% match):
+--      1. Search vram_owner_map for alternative attributions that verify against VRAM bytes
+--      2. If no alternative found, search ROM directly for matching byte patterns
+--      This handles both mis-attribution and HAL-compressed sprites where attribution is lost.
 -- v45: FIX King Dedede attribution - recognize SA-1 LoROM mirrors (banks $00-$3F/$80-$BF at $8000-$FFFF)
 --      as valid ROM sources. DMAs from addresses like $02:F681 now get proper file offsets.
 -- v44: FIX Poppy Bros attribution - compare ROM banks before preserving FE52 attributions
@@ -630,6 +634,188 @@ local staging_owner_map = {}     -- v36: Maps staging buffer offset -> {idx, ptr
 -- v13: Cached counts for draw_debug_info (avoids expensive pairs() every frame)
 local cached_counts = { vram = 0, owner = 0, idx = 0, last_frame = -1 }
 local COUNT_CACHE_INTERVAL = 30  -- update counts every N frames
+
+-- v46: Search for alternative attributions when verification fails
+-- Collects unique file_offsets from vram_owner_map and verifies each against VRAM data
+-- Returns: best_offset, best_pct, best_ptr, best_idx (or nil if none found with >50% match)
+local function find_verified_alternative(vram_word, exclude_offset)
+    -- Collect unique file_offsets from all vram_owner_map entries
+    local candidates = {}
+    local seen = {}
+
+    -- First, check entries near the target VRAM word (same sprite region)
+    for w = vram_word - 0x100, vram_word + 0x100 do
+        local owner = vram_owner_map[w]
+        if owner and owner.file_offset and owner.file_offset ~= exclude_offset then
+            if not seen[owner.file_offset] then
+                seen[owner.file_offset] = true
+                table.insert(candidates, {
+                    file_offset = owner.file_offset,
+                    ptr = owner.ptr,
+                    idx = owner.idx,
+                    distance = math.abs(w - vram_word)
+                })
+            end
+        end
+    end
+
+    -- Also check all entries in case sprite data is scattered
+    for w, owner in pairs(vram_owner_map) do
+        if owner.file_offset and owner.file_offset ~= exclude_offset and not seen[owner.file_offset] then
+            seen[owner.file_offset] = true
+            table.insert(candidates, {
+                file_offset = owner.file_offset,
+                ptr = owner.ptr,
+                idx = owner.idx,
+                distance = math.abs(w - vram_word)
+            })
+        end
+    end
+
+    -- Sort by distance (prefer nearby VRAM words)
+    table.sort(candidates, function(a, b) return a.distance < b.distance end)
+
+    -- Verify each candidate (limit to first 20 to avoid slowdown)
+    local best_offset, best_pct, best_ptr, best_idx = nil, 0, nil, nil
+    local checked = 0
+    for _, cand in ipairs(candidates) do
+        if checked >= 20 then break end
+        checked = checked + 1
+
+        local match_cnt, total, match_pct = verify_tile_bytes(vram_word, cand.file_offset)
+        if match_pct and match_pct > best_pct then
+            best_pct = match_pct
+            best_offset = cand.file_offset
+            best_ptr = cand.ptr
+            best_idx = cand.idx
+        end
+        -- Early exit if we find a perfect match
+        if match_pct and match_pct == 100 then break end
+    end
+
+    -- Only return if we found something reasonably good (>50% match)
+    if best_pct > 50 then
+        return best_offset, best_pct, best_ptr, best_idx
+    end
+    return nil, nil, nil, nil
+end
+
+-- v46: Search ROM directly for bytes matching VRAM tile data
+-- This handles cases where attribution is lost (e.g., HAL-compressed sprites)
+-- Returns: best_offset, match_pct (or nil if no good match found)
+local function search_rom_for_vram_bytes(vram_word)
+    -- Read VRAM tile bytes (32 bytes for 4bpp 8x8 tile)
+    local vram_data = {}
+    local vram_byte_addr = vram_word * 2
+    for i = 0, 31 do
+        local byte = emu.read(vram_byte_addr + i, emu.memType.snesVideoRam)
+        table.insert(vram_data, byte or 0)
+    end
+
+    -- Skip if tile is empty or mostly zeros
+    local nonzero = 0
+    for i = 1, 32 do
+        if vram_data[i] ~= 0 then nonzero = nonzero + 1 end
+    end
+    if nonzero < 4 then
+        return nil, nil, "tile too empty"
+    end
+
+    -- Create search signature from first 8 bytes
+    local sig = {}
+    for i = 1, 8 do
+        table.insert(sig, vram_data[i])
+    end
+
+    -- Search ROM in sprite data regions
+    -- Kirby Super Star sprite regions: 0x010000-0x050000, 0x200000-0x300000
+    local search_regions = {
+        {start = 0x010000, stop = 0x050000, name = "LoROM sprites"},
+        {start = 0x200000, stop = 0x300000, name = "HiROM sprites"},
+    }
+
+    local matches = {}
+    local rom_size = emu.read(0, emu.memType.snesPrgRom) and 0x400000 or 0  -- Assume 4MB max
+
+    for _, region in ipairs(search_regions) do
+        local region_start = region.start
+        local region_stop = math.min(region.stop, rom_size)
+
+        -- Search for signature match (step by 32 bytes - tile boundary)
+        for offset = region_start, region_stop - 32, 32 do
+            -- Quick check: first byte match
+            local first = emu.read(offset, emu.memType.snesPrgRom)
+            if first == sig[1] then
+                -- Check full signature (8 bytes)
+                local sig_match = true
+                for i = 2, 8 do
+                    local rom_byte = emu.read(offset + i - 1, emu.memType.snesPrgRom)
+                    if rom_byte ~= sig[i] then
+                        sig_match = false
+                        break
+                    end
+                end
+
+                if sig_match then
+                    -- Verify full 32-byte match
+                    local match_count = 0
+                    for i = 1, 32 do
+                        local rom_byte = emu.read(offset + i - 1, emu.memType.snesPrgRom)
+                        if rom_byte == vram_data[i] then
+                            match_count = match_count + 1
+                        end
+                    end
+                    local pct = math.floor((match_count / 32) * 100)
+                    if pct >= 75 then  -- Good enough match
+                        table.insert(matches, {offset = offset, pct = pct, region = region.name})
+                    end
+                end
+            end
+        end
+
+        -- Also search at non-tile-aligned offsets (slower, sample every 256 bytes)
+        for offset = region_start, region_stop - 32, 256 do
+            local first = emu.read(offset, emu.memType.snesPrgRom)
+            if first == sig[1] then
+                local sig_match = true
+                for i = 2, 8 do
+                    local rom_byte = emu.read(offset + i - 1, emu.memType.snesPrgRom)
+                    if rom_byte ~= sig[i] then
+                        sig_match = false
+                        break
+                    end
+                end
+                if sig_match then
+                    local match_count = 0
+                    for i = 1, 32 do
+                        local rom_byte = emu.read(offset + i - 1, emu.memType.snesPrgRom)
+                        if rom_byte == vram_data[i] then
+                            match_count = match_count + 1
+                        end
+                    end
+                    local pct = math.floor((match_count / 32) * 100)
+                    if pct >= 75 then
+                        -- Check if we already have this offset
+                        local dominated = false
+                        for _, m in ipairs(matches) do
+                            if m.offset == offset then dominated = true; break end
+                        end
+                        if not dominated then
+                            table.insert(matches, {offset = offset, pct = pct, region = region.name})
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Return best match
+    if #matches > 0 then
+        table.sort(matches, function(a, b) return a.pct > b.pct end)
+        return matches[1].offset, matches[1].pct, matches
+    end
+    return nil, nil, nil
+end
 
 local function is_valid_ptr(ptr)
     local bank = (ptr >> 16) & 0xFF
@@ -2247,7 +2433,59 @@ local function on_left_click(mouse, coord_debug)
                         log(string.format("        First mismatch at byte %d", first_mismatch or -1))
                         log(string.format("        VRAM: %s", fmt_bytes(vram_data, 16)))
                         log(string.format("        ROM:  %s", fmt_bytes(rom_data, 16)))
-                        log("        Attribution may be WRONG - investigate offset")
+
+                        -- v45: Try to find a better attribution from other tracked sprites
+                        log("        Searching for alternative attribution...")
+                        local alt_offset, alt_pct, alt_ptr, alt_idx =
+                            find_verified_alternative(selected_vram_word, display_file_offset)
+                        if alt_offset then
+                            log(string.format("        FOUND ALTERNATIVE: 0x%06X (%d%% match)", alt_offset, alt_pct))
+                            -- Update display values to use the verified alternative
+                            display_file_offset = alt_offset
+                            display_ptr = alt_ptr
+                            display_idx = alt_idx
+                            -- Update selected_result too
+                            selected_result.display_file_offset = alt_offset
+                            selected_result.display_ptr = alt_ptr
+                            selected_result.display_idx = alt_idx
+                            if alt_pct == 100 then
+                                log("        Attribution CORRECTED - using verified alternative")
+                            else
+                                log(string.format("        Best available (%d%% match) - may still be approximate", alt_pct))
+                            end
+                        else
+                            -- v46: Try direct ROM search for the VRAM bytes
+                            log("        No vram_owner_map alternative - searching ROM directly...")
+                            local rom_offset, rom_pct, rom_matches = search_rom_for_vram_bytes(selected_vram_word)
+                            if rom_offset then
+                                log(string.format("        ROM SEARCH FOUND: 0x%06X (%d%% match)", rom_offset, rom_pct))
+                                if rom_matches and #rom_matches > 1 then
+                                    log(string.format("        (%d total matches found)", #rom_matches))
+                                    for i = 2, math.min(5, #rom_matches) do
+                                        log(string.format("          also: 0x%06X (%d%%)", rom_matches[i].offset, rom_matches[i].pct))
+                                    end
+                                end
+                                -- Update display values to use ROM search result
+                                display_file_offset = rom_offset
+                                display_ptr = nil  -- Unknown ptr for ROM search results
+                                display_idx = nil
+                                selected_result.display_file_offset = rom_offset
+                                selected_result.display_ptr = nil
+                                selected_result.display_idx = nil
+                                log("        Attribution CORRECTED via ROM search")
+                            else
+                                -- v46: For HAL-compressed sprites, suggest user-confirmed offsets
+                                -- and show the VRAM signature for manual ROM searching
+                                log("        ROM search found no matches - sprite is likely HAL-compressed")
+                                log("        VRAM signature (first 8 bytes): " .. fmt_bytes(vram_data, 8))
+                                log("")
+                                log("        KNOWN DEDEDE OFFSETS (user-confirmed):")
+                                log("          0x017681 - Dedede sprites (HAL compressed)")
+                                log("          0x017742 - Dedede sprites (HAL compressed)")
+                                log("")
+                                log("        To find more: search decompressed data from nearby offsets")
+                            end
+                        end
                     end
                 else
                     log("VERIFY: (unable to read bytes)")

@@ -408,4 +408,67 @@ Once you have a ROM offset from sprite_rom_finder.lua, you can open it directly 
 
 ---
 
+## 🖼️ Runtime Sprite Reconstruction (NEW)
+
+Reconstruct sprites directly from Mesen 2 memory dumps - no ROM offset needed.
+
+### Quick Start
+
+1. **Pause** Mesen 2 on frame with target sprite visible
+2. **Export** from Debug → Memory Viewer:
+   - OAM (Sprites) → `MySprite_OAM.dmp`
+   - VRAM → `MySprite_VRAM.dmp`
+   - CGRAM → `MySprite_CGRAM.dmp`
+3. **Run** reconstruction:
+   ```bash
+   python scripts/reconstruct_from_dumps.py /path/to/dumps --obsel 0x63 -o output.png
+   ```
+
+### OBSEL Values
+
+| Game | OBSEL | Notes |
+|------|-------|-------|
+| Kirby Super Star | `0x63` | name_base=3, size_select=3 (16×16/32×32) |
+
+### Example Output
+
+```bash
+$ python scripts/reconstruct_from_dumps.py DededeDMP --obsel 0x63 -o dedede.png
+
+OAM:   Dedede_F71_OAM.dmp (544 bytes)
+VRAM:  Dedede_F71_VRAM.dmp (65536 bytes)
+CGRAM: Dedede_F71_CGRAM.dmp (512 bytes)
+OBSEL: 0x63 (size_select=3)
+Parsed 128 OAM entries, 12 potentially visible
+Drew 12 sprite instances
+Saved: dedede.png
+```
+
+### Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/reconstruct_from_dumps.py` | Reconstruct PNG from OAM/VRAM/CGRAM dumps |
+| `scripts/compare_memory_dumps.py` | Verify Lua captures match Mesen exports |
+| `lua_scripts/mesen2_sprite_capture.lua` | Runtime capture with OBSEL latch |
+
+### Garbage Tile Filtering
+
+Some frames have remnant VRAM data in unused tiles. Filter specific tiles:
+```python
+garbage_tiles = {0x03, 0x04}
+clean = [e for e in entries if e.tile not in garbage_tiles]
+```
+
+### Full Documentation
+
+See `copy/EXTRACTION_SUMMARY.md` for complete technical reference including:
+- OAM structure (544 bytes)
+- OBSEL register fields
+- Tile address calculation
+- 4bpp planar format
+- All bugs fixed
+
+---
+
 *Toolkit for Kirby Super Star sprite extraction via Mesen 2 debugging*

@@ -4,7 +4,7 @@ cd /d "C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal"
 set MESEN_EXE=.\tools\mesen2\Mesen2.exe
 set ROM_PATH=roms\Kirby Super Star (USA).sfc
 set LUA_PATH=mesen2_integration\lua_scripts\sprite_rom_finder.lua
-set MOVIE_PATH=C:\Users\gabri\Documents\Mesen2\Movies\Kirby Super Star (USA).mmo
+set MOVIE_PATH=C:\Users\gabri\Documents\Mesen2\Movies\HeavyLobster.mmo
 
 echo ========================================
 echo SPRITE ROM FINDER v9 (Movie Mode)
