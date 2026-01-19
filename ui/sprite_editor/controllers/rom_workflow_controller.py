@@ -1522,6 +1522,7 @@ class ROMWorkflowController(QObject):
                 tiles_per_row,
                 self._view,
                 arrangement_config=self._arrangement_config,
+                rom_path=self.rom_path,
             )
             dialog.setWindowTitle(f"Arrange Tiles - {self.current_sprite_name}")
 

@@ -104,12 +104,14 @@ class GridArrangementDialog(SplitterDialog):
         tiles_per_row: int = 16,
         parent: QWidget | None = None,
         arrangement_config: ArrangementConfig | None = None,
+        rom_path: str | None = None,
     ) -> None:
         # Step 1: Declare instance variables BEFORE super().__init__()
         self.sprite_path = sprite_path
         self.tiles_per_row = tiles_per_row
         self.output_path = None
         self.arrangement_config = arrangement_config
+        self._loaded_rom_path = rom_path  # ROM path for capture import fallback
 
         # Initialize components
         self.processor = GridImageProcessor()
@@ -1059,42 +1061,52 @@ class GridArrangementDialog(SplitterDialog):
         if attribution_file:
             attribution_map = load_vram_attribution(attribution_file)
 
-        # If no attribution file, offer to search ROM for tiles
+        # If no attribution file, search ROM for tiles
+        # Use loaded ROM if available, otherwise prompt for ROM file
         if attribution_map is None:
-            search_result = QMessageBox.question(
-                self,
-                "ROM Search",
-                "No VRAM attribution file found.\n\n"
-                "Would you like to search for tile ROM offsets by scanning the ROM file?\n\n"
-                "This enables 'Save Raw Tiles' for reinjection.\n"
-                "(Required for boss sprites like King Dedede)",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if search_result == QMessageBox.StandardButton.Yes:
-                rom_path, _ = QFileDialog.getOpenFileName(
+            rom_path_to_use: str | None = None
+
+            # Try to use the already-loaded ROM first
+            if self._loaded_rom_path and Path(self._loaded_rom_path).is_file():
+                rom_path_to_use = self._loaded_rom_path
+                logger.info("Using loaded ROM for tile search: %s", rom_path_to_use)
+            else:
+                # No ROM loaded - ask user to select one
+                search_result = QMessageBox.question(
                     self,
-                    "Select ROM File",
-                    str(Path.cwd()),
-                    "ROM Files (*.sfc *.smc);;All Files (*)",
+                    "ROM Search",
+                    "No VRAM attribution file found.\n\n"
+                    "Would you like to search for tile ROM offsets by scanning a ROM file?\n\n"
+                    "This enables 'Save Raw Tiles' for reinjection.\n"
+                    "(Required for boss sprites like King Dedede)",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 )
-                if rom_path:
-                    try:
-                        with open(rom_path, "rb") as f:
-                            rom_data = f.read()
-                        vram_to_rom_offsets = self._search_capture_tiles_in_rom(capture, rom_data)
-                        if vram_to_rom_offsets:
-                            logger.info(
-                                "Found %d tile ROM offsets via ROM search",
-                                len(vram_to_rom_offsets),
-                            )
-                        else:
-                            _ = QMessageBox.warning(
-                                self,
-                                "No Matches",
-                                "No tiles found in ROM. Tiles may be compressed or generated dynamically.",
-                            )
-                    except OSError as e:
-                        _ = QMessageBox.warning(self, "ROM Read Error", f"Failed to read ROM: {e}")
+                if search_result == QMessageBox.StandardButton.Yes:
+                    rom_path_to_use, _ = QFileDialog.getOpenFileName(
+                        self,
+                        "Select ROM File",
+                        str(Path.cwd()),
+                        "ROM Files (*.sfc *.smc);;All Files (*)",
+                    )
+
+            if rom_path_to_use:
+                try:
+                    with open(rom_path_to_use, "rb") as f:
+                        rom_data = f.read()
+                    vram_to_rom_offsets = self._search_capture_tiles_in_rom(capture, rom_data)
+                    if vram_to_rom_offsets:
+                        logger.info(
+                            "Found %d tile ROM offsets via ROM search",
+                            len(vram_to_rom_offsets),
+                        )
+                    else:
+                        _ = QMessageBox.warning(
+                            self,
+                            "No Matches",
+                            "No tiles found in ROM. Tiles may be compressed or generated dynamically.",
+                        )
+                except OSError as e:
+                    _ = QMessageBox.warning(self, "ROM Read Error", f"Failed to read ROM: {e}")
 
         # 3. Show import options dialog
         dialog = CaptureImportDialog(capture, self)
