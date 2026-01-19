@@ -309,7 +309,8 @@ class TestImportMesenCapture:
                     with patch("ui.dialogs.capture_import_dialog.CaptureImportDialog") as mock_dialog:
                         mock_dialog_instance = MagicMock()
                         mock_dialog_instance.exec.return_value = mock_dialog.DialogCode.Accepted
-                        mock_dialog_instance.selected_palettes = {0}
+                        # Use selected_clusters (new API) instead of selected_palettes
+                        mock_dialog_instance.selected_clusters = [MagicMock(id=0, palette_index=0)]
                         mock_dialog_instance.filter_garbage_tiles = False
                         mock_dialog.return_value = mock_dialog_instance
 
@@ -317,7 +318,8 @@ class TestImportMesenCapture:
                             "core.mesen_integration.capture_to_arrangement.CaptureToArrangementConverter"
                         ) as mock_converter:
                             mock_converter_instance = MagicMock()
-                            mock_converter_instance.convert.return_value = sample_arrangement_data
+                            # Use convert_clusters (new API) instead of convert
+                            mock_converter_instance.convert_clusters.return_value = sample_arrangement_data
                             mock_converter.return_value = mock_converter_instance
 
                             dialog._import_mesen_capture()
@@ -356,7 +358,8 @@ class TestImportMesenCaptureEdgeCases:
                 with patch("ui.dialogs.capture_import_dialog.CaptureImportDialog") as mock_dialog:
                     mock_dialog_instance = MagicMock()
                     mock_dialog_instance.exec.return_value = mock_dialog.DialogCode.Accepted
-                    mock_dialog_instance.selected_palettes = {0}
+                    # Use selected_clusters (new API) instead of selected_palettes
+                    mock_dialog_instance.selected_clusters = [MagicMock(id=0, palette_index=0)]
                     mock_dialog_instance.filter_garbage_tiles = False
                     mock_dialog.return_value = mock_dialog_instance
 
@@ -364,7 +367,8 @@ class TestImportMesenCaptureEdgeCases:
                         "core.mesen_integration.capture_to_arrangement.CaptureToArrangementConverter"
                     ) as mock_converter:
                         mock_converter_instance = MagicMock()
-                        mock_converter_instance.convert.return_value = sample_arrangement_data
+                        # Use convert_clusters (new API) instead of convert
+                        mock_converter_instance.convert_clusters.return_value = sample_arrangement_data
                         mock_converter.return_value = mock_converter_instance
 
                         # Reject the confirmation
@@ -407,7 +411,8 @@ class TestImportMesenCaptureEdgeCases:
                 with patch("ui.dialogs.capture_import_dialog.CaptureImportDialog") as mock_dialog:
                     mock_dialog_instance = MagicMock()
                     mock_dialog_instance.exec.return_value = mock_dialog.DialogCode.Accepted
-                    mock_dialog_instance.selected_palettes = {0}
+                    # Use selected_clusters (new API) instead of selected_palettes
+                    mock_dialog_instance.selected_clusters = [MagicMock(id=0, palette_index=0)]
                     mock_dialog_instance.filter_garbage_tiles = True
                     mock_dialog.return_value = mock_dialog_instance
 
@@ -415,7 +420,8 @@ class TestImportMesenCaptureEdgeCases:
                         "core.mesen_integration.capture_to_arrangement.CaptureToArrangementConverter"
                     ) as mock_converter:
                         mock_converter_instance = MagicMock()
-                        mock_converter_instance.convert.return_value = empty_data
+                        # Use convert_clusters (new API) instead of convert
+                        mock_converter_instance.convert_clusters.return_value = empty_data
                         mock_converter.return_value = mock_converter_instance
 
                         with patch("PySide6.QtWidgets.QMessageBox.warning") as mock_warning:

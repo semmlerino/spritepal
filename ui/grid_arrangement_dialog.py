@@ -1128,6 +1128,11 @@ class GridArrangementDialog(SplitterDialog):
         self.processor.grid_cols = max(self.processor.grid_cols, max_cols)
         self.processor.tiles = self.tiles  # Sync processor's tile reference
 
+        # Mark ALL imported tiles as modified so they flow back to workflow
+        # This is critical for reinjection - without this, imported data is lost on accept
+        self._actually_modified_positions.clear()
+        self._actually_modified_positions.update(self.tiles.keys())
+
         # Recreate arrangement manager with new dimensions to match imported data
         # (preserves signal connections by reconnecting after creation)
         old_manager = self.arrangement_manager
@@ -1166,6 +1171,16 @@ class GridArrangementDialog(SplitterDialog):
                 self.processor.tile_width,
                 self.processor.tile_height,
             )
+
+        # Update tiles_per_row to reflect imported grid dimensions
+        # This is critical for correct byte offset calculation when converting back to 4bpp
+        self.tiles_per_row = self.processor.grid_cols
+
+        # Update width spinner to show new dimensions
+        if hasattr(self, "width_spin"):
+            self.width_spin.blockSignals(True)
+            self.width_spin.setValue(self.processor.grid_cols)
+            self.width_spin.blockSignals(False)
 
         # Refresh display
         self._update_displays()

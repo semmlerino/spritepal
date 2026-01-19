@@ -1528,11 +1528,11 @@ class ROMWorkflowController(QObject):
             if dialog.exec():
                 result = dialog.arrangement_result
                 if result:
-                    # 1. Update tile data if overlay was applied (regardless of arrangement)
+                    # 1. Update tile data if tiles were modified (overlay or capture import)
                     if result.modified_tiles:
-                        # Use the SAME tiles_per_row that was used to initialize the dialog
-                        self._update_tile_data_from_modified_tiles(result.modified_tiles, tiles_per_row)
-                        logger.info("Updated current_tile_data with modified pixels from overlay")
+                        # Use result.tiles_per_row which may differ from original if capture was imported
+                        self._update_tile_data_from_modified_tiles(result.modified_tiles, result.tiles_per_row)
+                        logger.info("Updated current_tile_data with modified pixels")
 
                     # 2. Handle arrangement persistence
                     if result.keep_arrangement and result.bridge.has_arrangement:
@@ -1566,17 +1566,40 @@ class ROMWorkflowController(QObject):
         Converts each modified tile back to 4bpp SNES format and patches
         it into the current_tile_data bytearray.
 
+        If the modified tiles require more space than current_tile_data,
+        the buffer is resized (for Mesen capture import scenario).
+
         Args:
             modified_tiles: Dict mapping TilePosition to modified PIL image
             tiles_per_row: Number of tiles per row in the source grid (physical layout)
         """
-        if not self.current_tile_data:
-            return
-
         from core.tile_utils import encode_4bpp_tile
 
-        # Convert to bytearray for modification
-        data_mutable = bytearray(self.current_tile_data)
+        # Calculate required buffer size from modified tiles
+        if modified_tiles:
+            max_row = max(pos.row for pos in modified_tiles)
+            required_tiles = (max_row + 1) * tiles_per_row
+            required_bytes = required_tiles * 32
+        else:
+            max_row = 0
+            required_bytes = 0
+
+        # Initialize or resize buffer as needed
+        if not self.current_tile_data:
+            # Create new buffer if none exists (capture import without existing sprite)
+            data_mutable = bytearray(required_bytes)
+            logger.info(f"Created new tile data buffer: {required_bytes} bytes")
+        elif required_bytes > len(self.current_tile_data):
+            # Resize buffer to accommodate imported tiles
+            data_mutable = bytearray(required_bytes)
+            # Copy existing data (though for capture import this may not be relevant)
+            data_mutable[:len(self.current_tile_data)] = self.current_tile_data
+            logger.info(f"Resized tile data buffer: {len(self.current_tile_data)} -> {required_bytes} bytes")
+            # Update dimensions to match new data
+            self.current_width = tiles_per_row * 8
+            self.current_height = (max_row + 1) * 8
+        else:
+            data_mutable = bytearray(self.current_tile_data)
 
         for pos, img in modified_tiles.items():
             # Calculate byte offset for this tile
@@ -1587,11 +1610,27 @@ class ROMWorkflowController(QObject):
                 logger.warning(f"Tile {pos} (index {tile_idx}) out of bounds for data of size {len(data_mutable)}")
                 continue
 
-            # Convert PIL image (assumed L mode with values 0-15 * 16) to indices
-            # ApplyOperation._quantize_to_palette writes indices * 16
+            # Convert PIL image to indices
+            # Indexed tiles from Mesen capture use gray = index * 17 (0-255 range)
+            # Overlay tiles use gray = index * 16 (0-240 range)
+            # Both need to map back to 0-15 palette indices
             img_l = img.convert("L")
             pixels = np.array(img_l, dtype=np.uint8)
-            indices = (pixels // 16).flatten()
+
+            # Handle both index*17 (Mesen capture) and index*16 (overlay) mappings
+            # For index*17: 0,17,34,...,255 -> divide by 17
+            # For index*16: 0,16,32,...,240 -> divide by 16
+            # We can distinguish by checking if max value > 240
+            max_val = pixels.max()
+            if max_val > 240:
+                # Mesen capture format: index * 17
+                indices = (pixels / 17).astype(np.uint8).flatten()
+            else:
+                # Overlay format: index * 16
+                indices = (pixels // 16).flatten()
+
+            # Clamp to valid 4bpp range
+            indices = np.clip(indices, 0, 15)
 
             # Encode back to 4bpp
             tile_bytes = encode_4bpp_tile(indices)
