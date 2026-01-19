@@ -245,7 +245,12 @@ class ColorMappingDialog(DialogBase):
             reverse=True,
         )
 
-        for color, pixel_count in sorted_colors:
+        # Limit displayed colors to prevent UI slowdown
+        max_displayed = 50
+        displayed_colors = sorted_colors[:max_displayed]
+        hidden_count = len(sorted_colors) - len(displayed_colors)
+
+        for color, pixel_count in displayed_colors:
             initial_idx = self._color_mappings[color]
             row = ColorMappingRow(color, pixel_count, self._palette, initial_idx)
             _ = row.mapping_changed.connect(self._on_mapping_changed)
@@ -257,9 +262,16 @@ class ColorMappingDialog(DialogBase):
         content_layout.addWidget(scroll)
 
         # Summary
-        summary = QLabel(
-            f"Total: {len(self._overlay_colors)} unique colors, {sum(self._overlay_colors.values())} pixels"
-        )
+        if hidden_count > 0:
+            summary = QLabel(
+                f"Showing top {max_displayed} of {len(self._overlay_colors)} unique colors "
+                f"({sum(self._overlay_colors.values())} total pixels)\n"
+                f"Note: {hidden_count} minor colors will use nearest-color matching."
+            )
+        else:
+            summary = QLabel(
+                f"Total: {len(self._overlay_colors)} unique colors, {sum(self._overlay_colors.values())} pixels"
+            )
         content_layout.addWidget(summary)
 
         self.set_content_layout(content_layout)
@@ -284,27 +296,43 @@ def extract_unique_colors(
     Returns:
         Dict mapping RGB tuples to pixel counts
     """
+    import numpy as np
+
     if image.mode != "RGBA":
         image = image.convert("RGBA")
 
-    pixels = image.load()
-    if pixels is None:
+    # Convert to numpy array for fast processing
+    pixels = np.array(image)
+
+    # Flatten to (N, 4) where N is total pixels
+    flat_pixels = pixels.reshape(-1, 4)
+
+    # Filter out transparent pixels if requested
+    if ignore_transparent:
+        opaque_mask = flat_pixels[:, 3] >= alpha_threshold
+        flat_pixels = flat_pixels[opaque_mask]
+
+    if len(flat_pixels) == 0:
         return {}
 
+    # Get RGB only (drop alpha)
+    rgb_pixels = flat_pixels[:, :3]
+
+    # Use numpy unique to count colors efficiently
+    # Pack RGB into single integers for fast comparison
+    packed = (
+        rgb_pixels[:, 0].astype(np.uint32) << 16
+        | rgb_pixels[:, 1].astype(np.uint32) << 8
+        | rgb_pixels[:, 2].astype(np.uint32)
+    )
+    unique_packed, counts = np.unique(packed, return_counts=True)
+
+    # Unpack back to RGB tuples
     color_counts: dict[tuple[int, int, int], int] = {}
-
-    for y in range(image.height):
-        for x in range(image.width):
-            pixel = pixels[x, y]
-            if not isinstance(pixel, tuple) or len(pixel) != 4:
-                continue
-
-            r, g, b, a = pixel
-
-            if ignore_transparent and a < alpha_threshold:
-                continue
-
-            rgb = (r, g, b)
-            color_counts[rgb] = color_counts.get(rgb, 0) + 1
+    for packed_color, count in zip(unique_packed, counts, strict=False):
+        r = int((packed_color >> 16) & 0xFF)
+        g = int((packed_color >> 8) & 0xFF)
+        b = int(packed_color & 0xFF)
+        color_counts[(r, g, b)] = int(count)
 
     return color_counts
