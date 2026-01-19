@@ -84,4 +84,3 @@ import_analysis_report.json
 init_order_issues.json
 .venv/
 archive_obsolete_*/
-mesen2_exchange/

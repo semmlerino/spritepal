@@ -1,5 +1,8 @@
--- sprite_rom_finder.lua v46
+-- sprite_rom_finder.lua v47
 -- Click on any sprite to get its ROM source offset
+-- v47: ADD E key to export VRAM→ROM attribution map (vram_attribution.json)
+--      ADD T key to export FE52 pointer table (STATIC - only need once per ROM!)
+--      Both exports written to mesen2_exchange/ directory for SpritePal import.
 -- v46: ADD fallback search when verification fails (0% match):
 --      1. Search vram_owner_map for alternative attributions that verify against VRAM bytes
 --      2. If no alternative found, search ROM directly for matching byte patterns
@@ -91,6 +94,7 @@ local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\work
 local LOG_FILE = OUTPUT_DIR .. "sprite_rom_finder.log"
 local OFFSET_FILE = OUTPUT_DIR .. "last_offset.txt"  -- Simple file for SpritePal to watch
 local CLICKS_FILE = OUTPUT_DIR .. "recent_clicks.json"  -- Persistent last 5 clicks
+local ATTRIBUTION_FILE = OUTPUT_DIR .. "vram_attribution.json"  -- VRAM→ROM mapping export
 
 -- SMC header offset: Keep this at 0 when using with SpritePal.
 -- SpritePal automatically handles SMC headers based on ROM file analysis.
@@ -314,6 +318,137 @@ local function add_recent_click(offset, frame)
     end
 
     save_recent_clicks()
+end
+
+-- Export VRAM→ROM attribution map to JSON (for SpritePal capture import)
+-- Call this with 'E' key to export current vram_owner_map
+local function export_vram_attribution()
+    local f = io.open(ATTRIBUTION_FILE, "w")
+    if not f then
+        log("ERROR: Cannot open attribution file for writing")
+        return 0
+    end
+
+    -- Build list of attribution entries
+    local entries = {}
+    local count = 0
+    for vram_word, owner in pairs(vram_owner_map) do
+        if owner and (owner.idx or owner.file_offset) then
+            table.insert(entries, {
+                vram_word = vram_word,
+                vram_byte = vram_word * 2,  -- Convert word to byte address
+                idx = owner.idx,
+                ptr = owner.ptr,
+                file_offset = owner.file_offset,
+                frame = owner.frame,
+                mode = owner.mode
+            })
+            count = count + 1
+        end
+    end
+
+    -- Sort by vram_word for consistent output
+    table.sort(entries, function(a, b) return a.vram_word < b.vram_word end)
+
+    -- Write JSON
+    f:write("{\n")
+    f:write(string.format('  "export_frame": %d,\n', frame_count))
+    f:write(string.format('  "export_time": "%s",\n', os.date("%Y-%m-%d %H:%M:%S")))
+    f:write(string.format('  "entry_count": %d,\n', count))
+    f:write('  "entries": [\n')
+
+    for i, entry in ipairs(entries) do
+        f:write(string.format(
+            '    {"vram_word":%d,"vram_byte":%d,"idx":%s,"ptr":%s,"file_offset":%s,"frame":%s}',
+            entry.vram_word,
+            entry.vram_byte,
+            entry.idx and tostring(entry.idx) or "null",
+            entry.ptr and tostring(entry.ptr) or "null",
+            entry.file_offset and tostring(entry.file_offset) or "null",
+            entry.frame and tostring(entry.frame) or "null"
+        ))
+        if i < #entries then f:write(",") end
+        f:write("\n")
+    end
+
+    f:write("  ]\n")
+    f:write("}\n")
+    f:close()
+
+    log(string.format("EXPORT: Wrote %d VRAM→ROM attributions to %s", count, ATTRIBUTION_FILE))
+    return count
+end
+
+-- Export FE52 pointer table (STATIC ROM DATA - only need to export once per ROM!)
+-- Call this with 'T' key to export the complete idx→ROM offset table
+local FE52_TABLE_FILE = OUTPUT_DIR .. "fe52_pointer_table.json"
+
+local function export_fe52_table()
+    local f = io.open(FE52_TABLE_FILE, "w")
+    if not f then
+        log("ERROR: Cannot open FE52 table file for writing")
+        return 0
+    end
+
+    -- Build list of all idx→ptr mappings from idx_database
+    local entries = {}
+    local count = 0
+    for idx, data in pairs(idx_database) do
+        if data and data.ptr then
+            -- Calculate file offset using SA-1 mapping
+            local ptr = data.ptr
+            local bank = math.floor(ptr / 65536)
+            local offset = ptr % 65536
+            local file_offset = nil
+
+            -- SA-1 default mapping: file = (bank - 0xC0) * 0x10000 + offset
+            if bank >= 0xC0 and bank <= 0xFF then
+                file_offset = (bank - 0xC0) * 0x10000 + offset
+            elseif bank == 0x7E then
+                -- WRAM pointer (staging buffer, not direct ROM)
+                file_offset = nil
+            end
+
+            table.insert(entries, {
+                idx = idx,
+                ptr = ptr,
+                ptr_str = string.format("%02X:%04X", bank, offset),
+                file_offset = file_offset,
+            })
+            count = count + 1
+        end
+    end
+
+    -- Sort by idx for consistent output
+    table.sort(entries, function(a, b) return a.idx < b.idx end)
+
+    -- Write JSON
+    f:write("{\n")
+    f:write('  "description": "FE52 Pointer Table - STATIC ROM DATA (export once per ROM)",\n')
+    f:write('  "table_address": "01:FE52 (CPU) / 0x00FE52 (file)",\n')
+    f:write(string.format('  "export_time": "%s",\n', os.date("%Y-%m-%d %H:%M:%S")))
+    f:write(string.format('  "entry_count": %d,\n', count))
+    f:write('  "entries": [\n')
+
+    for i, entry in ipairs(entries) do
+        f:write(string.format(
+            '    {"idx":%d,"ptr":%d,"ptr_str":"%s","file_offset":%s}',
+            entry.idx,
+            entry.ptr,
+            entry.ptr_str,
+            entry.file_offset and tostring(entry.file_offset) or "null"
+        ))
+        if i < #entries then f:write(",") end
+        f:write("\n")
+    end
+
+    f:write("  ]\n")
+    f:write("}\n")
+    f:close()
+
+    log(string.format("EXPORT: Wrote FE52 pointer table (%d entries) to %s", count, FE52_TABLE_FILE))
+    log("  This is STATIC ROM data - you only need to export this ONCE per ROM!")
+    return count
 end
 
 -- Load persistent clicks on script start
@@ -2540,6 +2675,8 @@ local prev_key_down = false
 -- v33: New key state for labels, filter, navigation
 local prev_key_r = false
 local prev_key_x = false
+local prev_key_e = false  -- Export attribution
+local prev_key_t = false  -- Export FE52 table
 local prev_key_left = false
 local prev_key_right = false
 
@@ -2746,6 +2883,23 @@ local function on_frame()
     end
     prev_key_x = key_x
 
+    -- E key exports VRAM→ROM attribution map (keyboard)
+    local key_e = emu.isKeyPressed("E")
+    if key_e and not prev_key_e then
+        local count = export_vram_attribution()
+        -- Also display on screen briefly
+        emu.drawString(80, 100, string.format("Exported %d VRAM attributions", count), 0x00FF00, 0x80000000)
+    end
+    prev_key_e = key_e
+
+    -- T key exports FE52 pointer table (STATIC ROM DATA - only need once per ROM!)
+    local key_t = emu.isKeyPressed("T")
+    if key_t and not prev_key_t then
+        local count = export_fe52_table()
+        emu.drawString(80, 110, string.format("Exported FE52 table (%d entries)", count), 0x00FFFF, 0x80000000)
+    end
+    prev_key_t = key_t
+
     -- v33: Left/Right d-pad cycle through visible sprites for info panel (controller)
     local key_left = input.left or false
     local key_right = input.right or false
@@ -2828,8 +2982,12 @@ end
 --------------------------------------------------------------------------------
 
 log("========================================")
-log("SPRITE ROM FINDER v44")
+log("SPRITE ROM FINDER v45")
 log("========================================")
+log("v45: ADD VRAM→ROM attribution export (E key)")
+log("  - Press E to export vram_owner_map to vram_attribution.json")
+log("  - JSON contains {vram_word, vram_byte, idx, ptr, file_offset, frame} per tile")
+log("  - Use with SpritePal capture import to trace tiles back to ROM")
 log("v44: FIX Poppy Bros attribution - file offset comparison in match_recent_session()")
 log("  - Compare 1MB ROM blocks (via cpu_to_file_offset) to handle SA-1 bank remapping")
 log("  - If DP session is more recent AND from different 1MB block than FE52, use DP session")
@@ -2902,6 +3060,8 @@ log("SELECT = toggle HUD ignore (y < 32)")
 log("START = toggle bounding box overlay")
 log("R = toggle always-on sprite labels")
 log("X = cycle filter mode (ALL/NO_HUD/LARGE/MOVING)")
+log("E = export VRAM→ROM attribution map (for SpritePal capture import)")
+log("T = export FE52 pointer table (STATIC - only need once per ROM!)")
 log("LEFT/RIGHT = navigate sprites (logs attribution)")
 log("L = reset history (fresh capture)")
 log("RIGHT-CLICK = clear panel")

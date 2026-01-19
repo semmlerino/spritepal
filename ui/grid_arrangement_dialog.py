@@ -1004,6 +1004,10 @@ class GridArrangementDialog(SplitterDialog):
 
         from core.mesen_integration.capture_to_arrangement import CaptureToArrangementConverter
         from core.mesen_integration.click_extractor import MesenCaptureParser
+        from core.mesen_integration.vram_attribution import (
+            find_attribution_file,
+            load_vram_attribution,
+        )
         from ui.dialogs.capture_import_dialog import CaptureImportDialog
 
         # 1. File selection - use project root for default directory
@@ -1031,6 +1035,12 @@ class GridArrangementDialog(SplitterDialog):
         if not capture.entries:
             _ = QMessageBox.warning(self, "Import Failed", "Capture contains no sprite entries")
             return
+
+        # 2.5. Try to load VRAM→ROM attribution data (optional enhancement)
+        attribution_map = None
+        attribution_file = find_attribution_file(path)
+        if attribution_file:
+            attribution_map = load_vram_attribution(attribution_file)
 
         # 3. Show import options dialog
         dialog = CaptureImportDialog(capture, self)
@@ -1085,9 +1095,27 @@ class GridArrangementDialog(SplitterDialog):
             first_palette = min(arrangement_data.palettes.keys())
             self.colorizer.set_selected_palette(first_palette)
 
-        self._update_status(
-            f"Imported {arrangement_data.total_tiles} tiles from {len(dialog.selected_clusters)} sprites"
-        )
+        # 9. Build status message with ROM attribution info if available
+        status_msg = f"Imported {arrangement_data.total_tiles} tiles from {len(dialog.selected_clusters)} sprites"
+
+        if attribution_map:
+            # Find ROM offsets for the captured VRAM tiles
+            rom_offsets: set[int] = set()
+            for entry in capture.entries:
+                for tile in entry.tiles:
+                    offset = attribution_map.get_rom_offset(tile.vram_addr)
+                    if offset is not None:
+                        rom_offsets.add(offset)
+
+            if rom_offsets:
+                # Store for potential reinjection
+                self._rom_attribution_offsets = rom_offsets
+                offset_strs = [f"0x{off:06X}" for off in sorted(rom_offsets)[:3]]
+                if len(rom_offsets) > 3:
+                    offset_strs.append(f"... (+{len(rom_offsets) - 3} more)")
+                status_msg += f" | ROM: {', '.join(offset_strs)}"
+
+        self._update_status(status_msg)
 
     def _populate_from_capture_data(
         self,
