@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast, override
 
 if TYPE_CHECKING:
+    from core.mesen_integration.capture_to_arrangement import CaptureArrangementData
     from ui.sprite_editor.services.arrangement_bridge import ArrangementBridge
 
 from PIL import Image
@@ -604,6 +605,11 @@ class GridArrangementDialog(SplitterDialog):
         _ = self.load_arrangement_btn.clicked.connect(self._load_arrangement)
         layout.addWidget(self.load_arrangement_btn)
 
+        self.import_capture_btn = QPushButton("Import Capture", self)
+        self.import_capture_btn.setToolTip("Import Mesen 2 sprite capture as editable tiles")
+        _ = self.import_capture_btn.clicked.connect(self._import_mesen_capture)
+        layout.addWidget(self.import_capture_btn)
+
         # Separator
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.VLine)
@@ -989,6 +995,190 @@ class GridArrangementDialog(SplitterDialog):
         self.undo_stack.push(cmd)
         self._update_displays()
         self._update_status(f"Arrangement loaded from {Path(path).name}")
+
+    def _import_mesen_capture(self) -> None:
+        """Import Mesen 2 capture and populate grid with tiles."""
+        from PySide6.QtWidgets import QFileDialog
+
+        from core.mesen_integration.capture_to_arrangement import CaptureToArrangementConverter
+        from core.mesen_integration.click_extractor import MesenCaptureParser
+        from ui.dialogs.capture_import_dialog import CaptureImportDialog
+
+        # 1. File selection
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import Mesen 2 Capture",
+            "mesen2_exchange/",
+            "Capture Files (*.json);;All Files (*)",
+        )
+        if not path:
+            return
+
+        # 2. Parse capture
+        try:
+            parser = MesenCaptureParser()
+            capture = parser.parse_file(path)
+        except Exception as e:
+            _ = QMessageBox.warning(self, "Import Failed", f"Failed to parse capture:\n{e}")
+            return
+
+        if not capture.entries:
+            _ = QMessageBox.warning(self, "Import Failed", "Capture contains no sprite entries")
+            return
+
+        # 3. Show import options dialog
+        dialog = CaptureImportDialog(capture, self)
+        if dialog.exec() != CaptureImportDialog.DialogCode.Accepted:
+            return
+
+        # 4. Convert to arrangement data
+        converter = CaptureToArrangementConverter()
+        arrangement_data = converter.convert(
+            capture,
+            source_path=path,
+            selected_palettes=dialog.selected_palettes,
+            filter_garbage_tiles=dialog.filter_garbage_tiles,
+        )
+
+        if not arrangement_data.has_tiles:
+            _ = QMessageBox.warning(
+                self,
+                "Import Failed",
+                "No tiles extracted from capture.\nTry selecting different palettes or disabling garbage filter.",
+            )
+            return
+
+        # 5. Confirm if replacing existing arrangement
+        if self.arrangement_manager.get_arranged_count() > 0:
+            result = QMessageBox.question(
+                self,
+                "Replace Arrangement?",
+                "Importing will replace the current arrangement.\nContinue?",
+            )
+            if result != QMessageBox.StandardButton.Yes:
+                return
+            # Clear existing arrangement
+            self.arrangement_manager.clear()
+            self.undo_stack.clear()
+
+        # 6. Populate grid with captured tiles
+        self._populate_from_capture_data(arrangement_data)
+
+        self._update_status(
+            f"Imported {arrangement_data.total_tiles} tiles from {len(arrangement_data.groups)} palette groups"
+        )
+
+    def _populate_from_capture_data(
+        self,
+        data: CaptureArrangementData,
+    ) -> None:
+        """Populate arrangement grid with captured tile data.
+
+        Args:
+            data: CaptureArrangementData from the converter
+        """
+        arrangement_data = data
+
+        # Clear existing tiles dictionary and replace with captured tiles
+        # This is an import operation - we're creating a new tile set from scratch
+        self.tiles.clear()
+
+        # Calculate total grid dimensions
+        # Lay out groups vertically with spacing
+        current_row = 0
+        max_cols = 0
+
+        for group in arrangement_data.groups:
+            # Place group tiles starting at current_row
+            for (tile_row, tile_col), tile_img in group.tiles.items():
+                grid_row = current_row + tile_row
+                grid_col = tile_col
+                pos = TilePosition(grid_row, grid_col)
+
+                # Store tile image
+                self.tiles[pos] = tile_img
+                max_cols = max(max_cols, grid_col + 1)
+
+            # Move down for next group (with 1-row spacing)
+            current_row += group.height_tiles + 1
+
+        # Update processor grid dimensions
+        self.processor.grid_rows = current_row
+        self.processor.grid_cols = max(self.processor.grid_cols, max_cols)
+        self.processor.tiles = self.tiles  # Sync processor's tile reference
+
+        # Recreate arrangement manager with new dimensions to match imported data
+        # (preserves signal connections by reconnecting after creation)
+        old_manager = self.arrangement_manager
+        safe_disconnect(old_manager.arrangement_changed)
+        self.arrangement_manager = GridArrangementManager(
+            self.processor.grid_rows,
+            self.processor.grid_cols,
+        )
+        self.arrangement_manager.arrangement_changed.connect(self._on_arrangement_changed)
+
+        # Re-add all tiles to the new manager
+        for pos in self.tiles:
+            _ = self.arrangement_manager.set_item_at(
+                pos.row,
+                pos.col,
+                ArrangementType.TILE,
+                f"{pos.row},{pos.col}",
+            )
+
+        # Create composite image for display
+        self._create_composite_from_tiles()
+
+        # Reinitialize grid view with new dimensions
+        self.grid_view.set_grid_dimensions(
+            self.processor.grid_rows,
+            self.processor.grid_cols,
+            self.processor.tile_width,
+            self.processor.tile_height,
+        )
+
+        # Update arrangement canvas dimensions
+        if hasattr(self, "arrangement_grid"):
+            self.arrangement_grid.set_grid_dimensions(
+                self.processor.grid_rows,
+                self.processor.grid_cols,
+                self.processor.tile_width,
+                self.processor.tile_height,
+            )
+
+        # Refresh display
+        self._update_displays()
+
+    def _create_composite_from_tiles(self) -> None:
+        """Create a composite original_image from the current tiles dictionary."""
+        if not self.tiles:
+            return
+
+        # Calculate grid dimensions from tiles
+        max_row = max(pos.row for pos in self.tiles)
+        max_col = max(pos.col for pos in self.tiles)
+
+        # Get tile dimensions (assume all tiles are same size)
+        sample_tile = next(iter(self.tiles.values()))
+        tile_w, tile_h = sample_tile.size
+
+        # Create composite image
+        width = (max_col + 1) * tile_w
+        height = (max_row + 1) * tile_h
+        composite = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+
+        # Paste each tile
+        for pos, tile_img in self.tiles.items():
+            x = pos.col * tile_w
+            y = pos.row * tile_h
+            composite.paste(tile_img, (x, y))
+
+        self.original_image = composite
+
+        # Update pixmap item if it exists
+        if self.pixmap_item is not None:
+            pixmap = self._create_pixmap_from_image(composite)
+            self.pixmap_item.setPixmap(pixmap)
 
     def _parse_arrangement_metadata(
         self, metadata: dict[str, object]
