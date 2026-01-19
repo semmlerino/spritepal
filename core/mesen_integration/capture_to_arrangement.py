@@ -56,6 +56,9 @@ class PaletteGroup:
     tiles: dict[tuple[int, int], Image.Image] = field(default_factory=dict)  # (row, col) -> 8x8 tile
     width_tiles: int = 0
     height_tiles: int = 0
+    # VRAM address for each grid position - used for ROM reinjection
+    # If multiple tiles overlap at a position, the last one wins (higher priority)
+    vram_addresses: dict[tuple[int, int], int] = field(default_factory=dict)
 
     @property
     def entry_count(self) -> int:
@@ -448,6 +451,7 @@ class CaptureToArrangementConverter:
         3. Render each entry relative to group origin
         4. Composite into single image
         5. Split into tile_size x tile_size tiles
+        6. Track VRAM addresses for each grid position (for ROM reinjection)
         """
         if not entries:
             return PaletteGroup(palette_index=palette_idx, entries=[])
@@ -479,14 +483,32 @@ class CaptureToArrangementConverter:
         # Create composite canvas
         composite = Image.new("RGBA", (canvas_width, canvas_height), (0, 0, 0, 0))
 
+        # Track VRAM address for each grid position
+        # Later tiles overwrite earlier ones (higher OAM priority)
+        vram_addresses: dict[tuple[int, int], int] = {}
+
         # Render each entry as indexed grayscale onto canvas
         # Using indexed rendering allows the colorizer to apply palettes on demand
         for entry in entries:
             entry_img = renderer.render_entry_indexed(entry)
             # Position relative to group origin (normalized)
-            x = normalize_x(entry.x) - min_x
-            y = entry.y - min_y
-            composite.paste(entry_img, (x, y), entry_img)
+            entry_x = normalize_x(entry.x) - min_x
+            entry_y = entry.y - min_y
+            composite.paste(entry_img, (entry_x, entry_y), entry_img)
+
+            # Map each tile in this entry to its grid position and VRAM address
+            for tile_data in entry.tiles:
+                # Tile's position on the canvas
+                tile_canvas_x = entry_x + (tile_data.pos_x * tile_size)
+                tile_canvas_y = entry_y + (tile_data.pos_y * tile_size)
+
+                # Convert to grid position
+                grid_col = tile_canvas_x // tile_size
+                grid_row = tile_canvas_y // tile_size
+
+                # Validate grid position is within bounds
+                if 0 <= grid_row < height_tiles and 0 <= grid_col < width_tiles:
+                    vram_addresses[(grid_row, grid_col)] = tile_data.vram_addr
 
         # Split into tiles
         tiles: dict[tuple[int, int], Image.Image] = {}
@@ -506,4 +528,5 @@ class CaptureToArrangementConverter:
             tiles=tiles,
             width_tiles=width_tiles,
             height_tiles=height_tiles,
+            vram_addresses=vram_addresses,
         )

@@ -5,9 +5,12 @@ Flexible sprite arrangement supporting rows, columns, and custom tile groups
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast, override
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from core.mesen_integration.capture_to_arrangement import CaptureArrangementData
@@ -1107,25 +1110,30 @@ class GridArrangementDialog(SplitterDialog):
             first_palette = min(arrangement_data.palettes.keys())
             self.colorizer.set_selected_palette(first_palette)
 
-        # 9. Build status message with ROM attribution info if available
+        # 9. Build ROMMapData for reinjection if attribution data available
+        rom_map_data = None
+        if attribution_map:
+            rom_map_data = self._build_rom_map_from_capture(
+                arrangement_data,
+                attribution_map,
+                path,
+            )
+            if rom_map_data:
+                self._rom_map_data = rom_map_data
+                logger.info(
+                    "Built ROM map from capture: %d tiles with ROM offsets",
+                    len(rom_map_data.tiles),
+                )
+
+        # 10. Build status message
         status_msg = f"Imported {arrangement_data.total_tiles} tiles from {len(dialog.selected_clusters)} sprites"
 
-        if attribution_map:
-            # Find ROM offsets for the captured VRAM tiles
-            rom_offsets: set[int] = set()
-            for entry in capture.entries:
-                for tile in entry.tiles:
-                    offset = attribution_map.get_rom_offset(tile.vram_addr)
-                    if offset is not None:
-                        rom_offsets.add(offset)
-
-            if rom_offsets:
-                # Store for potential reinjection
-                self._rom_attribution_offsets = rom_offsets
-                offset_strs = [f"0x{off:06X}" for off in sorted(rom_offsets)[:3]]
-                if len(rom_offsets) > 3:
-                    offset_strs.append(f"... (+{len(rom_offsets) - 3} more)")
-                status_msg += f" | ROM: {', '.join(offset_strs)}"
+        if rom_map_data:
+            rom_offsets = {t.rom_offset for t in rom_map_data.tiles}
+            offset_strs = [f"0x{off:06X}" for off in sorted(rom_offsets)[:3]]
+            if len(rom_offsets) > 3:
+                offset_strs.append(f"... (+{len(rom_offsets) - 3} more)")
+            status_msg += f" | ROM: {', '.join(offset_strs)}"
 
         self._update_status(status_msg)
 
@@ -1398,6 +1406,86 @@ class GridArrangementDialog(SplitterDialog):
 
         # Refresh display
         self._update_displays()
+
+    def _build_rom_map_from_capture(
+        self,
+        data: CaptureArrangementData,
+        attribution_map: object,
+        source_path: str,
+    ) -> ROMMapData | None:
+        """Build ROMMapData from capture arrangement data + VRAM attribution.
+
+        This allows reinjecting edited tiles back to their original ROM addresses.
+
+        Args:
+            data: CaptureArrangementData with tiles and VRAM addresses
+            attribution_map: VRAMAttributionMap with VRAM → ROM offset lookup
+            source_path: Path to the capture file (for frame name)
+
+        Returns:
+            ROMMapData if any tiles have ROM offsets, None otherwise
+        """
+        from pathlib import Path
+
+        from core.mesen_integration.rom_map_importer import ROMMapData, ROMTile
+
+        # Use same row offset logic as _populate_from_capture_data()
+        current_row = 0
+        rom_tiles: list[ROMTile] = []
+
+        for group in data.groups:
+            # Check each tile position for VRAM → ROM mapping
+            for (tile_row, tile_col), tile_img in group.tiles.items():
+                # Calculate final grid position (same as _populate_from_capture_data)
+                grid_row = current_row + tile_row
+                grid_col = tile_col
+
+                # Get VRAM address for this tile position
+                vram_addr = group.vram_addresses.get((tile_row, tile_col))
+                if vram_addr is None:
+                    continue
+
+                # Convert VRAM → ROM offset using attribution map
+                rom_offset = attribution_map.get_rom_offset(vram_addr)  # type: ignore[union-attr]
+                if rom_offset is None:
+                    continue
+
+                # Convert VRAM byte address to word address (for ROMTile compatibility)
+                vram_word = vram_addr // 2
+
+                rom_tiles.append(
+                    ROMTile(
+                        vram_word=vram_word,
+                        rom_offset=rom_offset,
+                        image=tile_img,
+                        row=grid_row,
+                        col=grid_col,
+                    )
+                )
+
+            # Move down for next group (with 1-row spacing) - same as _populate_from_capture_data
+            current_row += group.height_tiles + 1
+
+        if not rom_tiles:
+            logger.warning("No tiles with ROM mappings found in capture")
+            return None
+
+        # Determine palette index (use first group's palette)
+        palette_idx = data.groups[0].palette_index if data.groups else 0
+
+        # Convert RGB palette to RGBA for ROMMapData
+        palette: list[tuple[int, int, int, int]] | None = None
+        if palette_idx in data.palettes:
+            rgb_palette = data.palettes[palette_idx]
+            palette = [(r, g, b, 0 if i == 0 else 255) for i, (r, g, b) in enumerate(rgb_palette)]
+
+        return ROMMapData(
+            frame_name=Path(source_path).stem,
+            palette_index=palette_idx,
+            vram_base=data.obsel.tile_base_addr,
+            tiles=rom_tiles,
+            palette=palette,
+        )
 
     def _create_composite_from_tiles(self) -> None:
         """Create a composite original_image from the current tiles dictionary."""
