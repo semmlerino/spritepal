@@ -248,6 +248,96 @@ class OverlayLayer(QObject):
         """Check if an overlay image is loaded."""
         return self._image is not None
 
+    def snap_to_tile_grid(self, tile_size: int = 8) -> bool:
+        """Snap the overlay scale so dimensions are multiples of tile_size.
+
+        This ensures pixel-perfect alignment when sampling tiles from the overlay.
+        The scale is adjusted to the nearest value that makes both width and height
+        multiples of tile_size.
+
+        Args:
+            tile_size: Size of tiles in pixels (default 8 for SNES).
+
+        Returns:
+            True if scale was adjusted, False if no image or already aligned.
+        """
+        if self._image is None:
+            return False
+
+        # Current scaled dimensions
+        current_w = round(self._image.width * self._scale)
+        current_h = round(self._image.height * self._scale)
+
+        # Check if already aligned
+        if current_w % tile_size == 0 and current_h % tile_size == 0:
+            return False
+
+        # Find the best scale that makes both dimensions tile-aligned
+        # Try scales that would give aligned width
+        best_scale = self._scale
+        best_diff = float("inf")
+
+        # Generate candidate scales from width alignment
+        for w_tiles in range(1, max(2, current_w // tile_size + 2)):
+            target_w = w_tiles * tile_size
+            candidate_scale = target_w / self._image.width
+
+            # Check if this scale also aligns height
+            scaled_h = round(self._image.height * candidate_scale)
+            if scaled_h % tile_size != 0:
+                # Adjust to nearest tile-aligned height
+                h_tiles = round(scaled_h / tile_size)
+                if h_tiles < 1:
+                    continue
+                # Use the scale that gives this height
+                alt_scale = (h_tiles * tile_size) / self._image.height
+                # Check if width still aligns at this scale
+                alt_w = round(self._image.width * alt_scale)
+                if alt_w % tile_size == 0:
+                    candidate_scale = alt_scale
+
+            # Verify both dimensions are now aligned
+            final_w = round(self._image.width * candidate_scale)
+            final_h = round(self._image.height * candidate_scale)
+            if final_w % tile_size == 0 and final_h % tile_size == 0:
+                diff = abs(candidate_scale - self._scale)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_scale = candidate_scale
+
+        # Apply the best scale found
+        if best_scale != self._scale:
+            self.set_scale(best_scale)
+            return True
+
+        return False
+
+    def get_tile_alignment_info(self, tile_size: int = 8) -> dict[str, object]:
+        """Get information about tile alignment of the current overlay.
+
+        Args:
+            tile_size: Size of tiles in pixels.
+
+        Returns:
+            Dict with alignment status and dimensions.
+        """
+        if self._image is None:
+            return {"has_image": False}
+
+        scaled_w = round(self._image.width * self._scale)
+        scaled_h = round(self._image.height * self._scale)
+
+        return {
+            "has_image": True,
+            "scaled_width": scaled_w,
+            "scaled_height": scaled_h,
+            "width_aligned": scaled_w % tile_size == 0,
+            "height_aligned": scaled_h % tile_size == 0,
+            "fully_aligned": scaled_w % tile_size == 0 and scaled_h % tile_size == 0,
+            "width_remainder": scaled_w % tile_size,
+            "height_remainder": scaled_h % tile_size,
+        }
+
     def _get_scaled_image(self) -> Image.Image | None:
         """Get the pre-scaled image for pixel-perfect sampling.
 

@@ -42,6 +42,7 @@ class OverlayControls(QGroupBox):
     clear_requested = Signal()
     preview_mapping_requested = Signal()
     extract_palette_requested = Signal()
+    snap_to_grid_requested = Signal()
 
     def __init__(self, overlay: OverlayLayer, parent: QWidget | None = None) -> None:
         super().__init__("Overlay Image", parent)
@@ -86,6 +87,14 @@ class OverlayControls(QGroupBox):
             "Use this when you want the sprite to match the overlay exactly."
         )
         layout.addWidget(self.extract_palette_btn)
+
+        # Snap to Grid button (aligns overlay dimensions to tile boundaries)
+        self.snap_to_grid_btn = QPushButton("Snap to Grid")
+        self.snap_to_grid_btn.setToolTip(
+            "Adjust scale so overlay dimensions are multiples of 8 pixels.\n"
+            "This ensures pixel-perfect alignment with tile boundaries."
+        )
+        layout.addWidget(self.snap_to_grid_btn)
 
         # Position controls
         pos_row = QHBoxLayout()
@@ -167,6 +176,7 @@ class OverlayControls(QGroupBox):
         self.clear_btn.clicked.connect(self._on_clear_clicked)
         self.preview_mapping_btn.clicked.connect(self.preview_mapping_requested.emit)
         self.extract_palette_btn.clicked.connect(self.extract_palette_requested.emit)
+        self.snap_to_grid_btn.clicked.connect(self._on_snap_to_grid_clicked)
         self.x_spin.valueChanged.connect(self._on_position_changed)
         self.y_spin.valueChanged.connect(self._on_position_changed)
         self.scale_slider.valueChanged.connect(self._on_scale_slider_changed)
@@ -212,6 +222,12 @@ class OverlayControls(QGroupBox):
     def _on_clear_clicked(self) -> None:
         """Handle clear button click."""
         self._overlay.clear_image()
+
+    def _on_snap_to_grid_clicked(self) -> None:
+        """Handle snap to grid button click."""
+        if self._overlay.snap_to_tile_grid(tile_size=8):
+            # Scale was adjusted - emit signal so dialog can update
+            self.snap_to_grid_requested.emit()
 
     def _on_position_changed(self) -> None:
         """Handle position spinbox changes."""
@@ -305,6 +321,7 @@ class OverlayControls(QGroupBox):
         self.clear_btn.setEnabled(has_image)
         self.preview_mapping_btn.setEnabled(has_image)
         self.extract_palette_btn.setEnabled(has_image)
+        self.snap_to_grid_btn.setEnabled(has_image)
         self.x_spin.setEnabled(has_image)
         self.y_spin.setEnabled(has_image)
         self.scale_slider.setEnabled(has_image)
