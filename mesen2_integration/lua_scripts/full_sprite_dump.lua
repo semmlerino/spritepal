@@ -11,11 +11,12 @@
 local OUTPUT_DIR = os.getenv("OUTPUT_DIR") or "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\"
 local LOG_FILE = OUTPUT_DIR .. "capture_log.txt"
 
--- Memory type references
+-- Memory type references (correct names from Mesen2/Core/Shared/MemoryType.h)
+-- The Lua API exposes enum names with first char lowercased
 local MEM = {
-    oam = emu.memType.snesOam or emu.memType.snesSpriteRam,
-    vram = emu.memType.snesVram or emu.memType.snesVideoRam,
-    cgram = emu.memType.snesCgram or emu.memType.snesCgRam,
+    oam = emu.memType.snesSpriteRam,   -- SnesSpriteRam -> snesSpriteRam
+    vram = emu.memType.snesVideoRam,   -- SnesVideoRam -> snesVideoRam
+    cgram = emu.memType.snesCgRam,     -- SnesCgRam -> snesCgRam
 }
 
 os.execute('mkdir "' .. OUTPUT_DIR:gsub("\\", "\\\\") .. '" 2>NUL')
@@ -420,31 +421,36 @@ local function capture_binary_dumps()
 end
 
 -- ============================================================================
--- Key Bindings
+-- Key Bindings (using emu.isKeyPressed for keyboard detection)
 -- ============================================================================
+local lastF9State = false
+local lastF10State = false
+
 emu.addEventCallback(function()
     frameCount = frameCount + 1
-end, emu.eventType.endFrame)
 
-emu.addEventCallback(function()
-    local input = emu.getInput(0)
+    -- Draw on-screen status
+    emu.drawString(8, 8, "SpritePal Full Dump: F9=JSON, F10=Binary", 0xFFFFFF, 0x80000000)
+    emu.drawString(8, 20, "Frame: " .. frameCount .. (LAST_OBSEL and string.format(" OBSEL:0x%02X", LAST_OBSEL) or " OBSEL:??"), 0xFFFFFF, 0x80000000)
 
-    -- F9 = Full JSON dump
-    if input.custom1 then
+    -- F9 key detection with edge detection (only trigger once per press)
+    local f9Pressed = emu.isKeyPressed("F9")
+    if f9Pressed and not lastF9State then
+        log("F9 pressed at frame " .. frameCount)
+        emu.drawString(8, 32, "CAPTURING JSON...", 0x00FF00, 0x80000000)
         capture_full_json()
     end
+    lastF9State = f9Pressed
 
-    -- F10 = Binary dumps
-    if input.custom2 then
+    -- F10 key detection with edge detection
+    local f10Pressed = emu.isKeyPressed("F10")
+    if f10Pressed and not lastF10State then
+        log("F10 pressed at frame " .. frameCount)
+        emu.drawString(8, 32, "CAPTURING BINARY DUMPS...", 0xFFFF00, 0x80000000)
         capture_binary_dumps()
     end
-end, emu.eventType.inputPolled)
-
--- Register custom keys
-if emu.registerCustomKey then
-    emu.registerCustomKey("Full JSON Dump (F9)", "custom1")
-    emu.registerCustomKey("Binary Dumps (F10)", "custom2")
-end
+    lastF10State = f10Pressed
+end, emu.eventType.endFrame)
 
 log("Ready! Press F9 for full JSON dump, F10 for binary dumps")
 emu.displayMessage("Full Sprite Dump", "F9=JSON dump, F10=Binary dumps")
