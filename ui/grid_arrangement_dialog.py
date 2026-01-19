@@ -1156,11 +1156,22 @@ class GridArrangementDialog(SplitterDialog):
         self._populate_from_capture_data(arrangement_data)
 
         # 8. Set up colorizer with capture palettes for palette toggle
+        # IMPORTANT: Merge with existing palettes instead of replacing them
+        # This preserves palettes loaded from the editor (e.g., user's custom palette)
         if arrangement_data.palettes:
-            self.colorizer.set_palettes(arrangement_data.palettes)
-            # Find the first palette used in the import
-            first_palette = min(arrangement_data.palettes.keys())
-            self.colorizer.set_selected_palette(first_palette)
+            existing_palettes = self.colorizer.get_palettes()
+            if existing_palettes:
+                # Merge: capture palettes fill in gaps, but don't overwrite existing
+                merged = dict(arrangement_data.palettes)  # Start with capture palettes
+                merged.update(existing_palettes)  # Existing palettes take precedence
+                self.colorizer.set_palettes(merged)
+                # Don't change selected palette - user already has one selected
+            else:
+                # No existing palettes - use capture palettes
+                self.colorizer.set_palettes(arrangement_data.palettes)
+                # Select first palette from capture
+                first_palette = min(arrangement_data.palettes.keys())
+                self.colorizer.set_selected_palette(first_palette)
 
         # 9. Build ROMMapData for reinjection if VRAM→ROM mapping available
         rom_map_data = None
@@ -1374,11 +1385,19 @@ class GridArrangementDialog(SplitterDialog):
             self.width_spin.setValue(self.processor.grid_cols)
             self.width_spin.blockSignals(False)
 
-        # Set palette if available
+        # Set palette if available - merge with existing palettes
         if data.palette:
             palette_dict = {data.palette_index: [(r, g, b) for r, g, b, _ in data.palette]}
-            self.colorizer.set_palettes(palette_dict)
-            self.colorizer.set_selected_palette(data.palette_index)
+            existing_palettes = self.colorizer.get_palettes()
+            if existing_palettes:
+                # Merge: existing palettes take precedence
+                merged = dict(palette_dict)
+                merged.update(existing_palettes)
+                self.colorizer.set_palettes(merged)
+                # Don't change selected palette - user already has one selected
+            else:
+                self.colorizer.set_palettes(palette_dict)
+                self.colorizer.set_selected_palette(data.palette_index)
 
         # Refresh display
         self._update_displays()
