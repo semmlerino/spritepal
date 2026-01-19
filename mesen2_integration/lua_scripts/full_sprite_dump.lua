@@ -198,8 +198,8 @@ local function read_full_oam(obsel)
                 table.insert(tile_data_list, {
                     tile_index = tile_idx,
                     vram_addr = byte_addr,
-                    pos_x = tx * 8,
-                    pos_y = ty * 8,
+                    pos_x = tx,  -- Tile index, not pixel offset (renderer multiplies by 8)
+                    pos_y = ty,  -- Tile index, not pixel offset
                     data_hex = bytes_to_hex(tile_bytes),
                 })
             end
