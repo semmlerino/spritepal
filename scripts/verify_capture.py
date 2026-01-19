@@ -9,6 +9,7 @@ Usage:
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
@@ -116,15 +117,15 @@ def main():
     print("=" * 60)
     print("VERIFICATION STEPS:")
     print("=" * 60)
-    print(f"1. In Mesen 2, open Debug → VRAM Viewer")
+    print("1. In Mesen 2, open Debug → VRAM Viewer")
     print(f"2. Navigate to byte address 0x{tile.get('vram_addr', 0):04X}")
-    print(f"3. Compare the 32 bytes shown with data_hex above")
-    print(f"4. If they match: capture is correct")
-    print(f"   If swapped pairs (AB CD → BA DC): byte order bug")
-    print(f"   If completely different: OBSEL/addressing bug")
+    print("3. Compare the 32 bytes shown with data_hex above")
+    print("4. If they match: capture is correct")
+    print("   If swapped pairs (AB CD → BA DC): byte order bug")
+    print("   If completely different: OBSEL/addressing bug")
 
     return 0
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

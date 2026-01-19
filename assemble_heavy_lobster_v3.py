@@ -4,7 +4,9 @@ Better Heavy Lobster assembly based on visual analysis of the blocks.
 """
 
 from pathlib import Path
+
 from PIL import Image
+
 from core.hal_compression import HALCompressor
 from core.tile_renderer import TileRenderer
 

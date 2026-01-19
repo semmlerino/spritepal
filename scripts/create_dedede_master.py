@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Create master tile sheet from all Dedede sprite offsets."""
 import sys
+
 sys.path.insert(0, str(__file__).rsplit('/', 2)[0])  # Add project root
-from core.hal_compression import HALCompressor
-from pathlib import Path
-from PIL import Image
 import hashlib
+from pathlib import Path
+
+from PIL import Image
+
+from core.hal_compression import HALCompressor
+
 
 def main():
     hal = HALCompressor()

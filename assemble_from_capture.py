@@ -9,6 +9,7 @@ then assembles them into a single composite image exactly as they appear in-game
 import argparse
 import json
 from pathlib import Path
+
 from PIL import Image
 
 from core.tile_renderer import TileRenderer
@@ -30,8 +31,6 @@ def render_entry(entry: dict, renderer: TileRenderer, palette: list[int] | None 
 
     width = entry.get("width", 8)
     height = entry.get("height", 8)
-    tiles_x = width // 8
-    tiles_y = height // 8
 
     # Create canvas for this sprite
     canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))

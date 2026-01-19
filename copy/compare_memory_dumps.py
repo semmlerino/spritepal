@@ -40,7 +40,7 @@ def compare_dumps(lua_path: Path, mesen_path: Path, verbose: bool = False) -> tu
 
     # Find first difference
     differences = []
-    for i, (a, b) in enumerate(zip(lua_data, mesen_data)):
+    for i, (a, b) in enumerate(zip(lua_data, mesen_data, strict=True)):
         if a != b:
             differences.append((i, a, b))
             if len(differences) >= 20:  # Cap at 20 differences for brevity

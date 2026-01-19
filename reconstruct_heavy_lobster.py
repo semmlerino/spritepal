@@ -7,7 +7,9 @@ This script assembles the parts using SNES 16-tile row stride.
 """
 
 from pathlib import Path
+
 from PIL import Image
+
 from core.hal_compression import HALCompressor
 from core.tile_renderer import TileRenderer
 
@@ -109,17 +111,17 @@ def main():
     positions = [
         # (block_index, x_offset, y_offset)
         (0, 0, 0),      # Top-left claw
-        (1, 32, 0),     #
+        (1, 32, 0),
         (2, 64, 0),     # Body top
-        (3, 96, 0),     #
+        (3, 96, 0),
         (4, 0, 32),     # Middle-left
-        (5, 32, 32),    #
+        (5, 32, 32),
         (6, 64, 32),    # Body middle
-        (7, 96, 32),    #
+        (7, 96, 32),
         (8, 0, 64),     # Bottom-left
-        (9, 32, 64),    #
+        (9, 32, 64),
         (10, 64, 64),   # Body bottom
-        (11, 96, 64),   #
+        (11, 96, 64),
     ]
 
     for block_idx, x, y in positions:

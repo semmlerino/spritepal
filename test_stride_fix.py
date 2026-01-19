@@ -6,8 +6,10 @@ Shows that 16x16 sprites now correctly read tiles 0,1,16,17 instead of 0,1,2,3.
 """
 
 from pathlib import Path
+
 from core.mesen_integration.click_extractor import OAMEntry
 from core.mesen_integration.sprite_reassembler import SpriteReassembler
+
 
 def test_stride_fix():
     """Test the SNES 16-tile row stride fix with a real ROM offset."""
@@ -50,7 +52,7 @@ def test_stride_fix():
     if img_16x16:
         print(f"  ✓ Rendered {img_16x16.size} sprite")
         img_16x16.save("test_16x16_sprite.png")
-        print(f"  ✓ Saved to test_16x16_sprite.png")
+        print("  ✓ Saved to test_16x16_sprite.png")
     else:
         print("  ✗ Failed to render")
     print()
@@ -70,7 +72,7 @@ def test_stride_fix():
     if img_32x32:
         print(f"  ✓ Rendered {img_32x32.size} sprite")
         img_32x32.save("test_32x32_sprite.png")
-        print(f"  ✓ Saved to test_32x32_sprite.png")
+        print("  ✓ Saved to test_32x32_sprite.png")
     else:
         print("  ✗ Failed to render")
     print()
@@ -88,7 +90,7 @@ def test_stride_fix():
     if img_32x16:
         print(f"  ✓ Rendered {img_32x16.size} sprite")
         img_32x16.save("test_32x16_sprite.png")
-        print(f"  ✓ Saved to test_32x16_sprite.png")
+        print("  ✓ Saved to test_32x16_sprite.png")
     else:
         print("  ✗ Failed to render")
     print()
