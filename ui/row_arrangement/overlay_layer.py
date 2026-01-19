@@ -44,6 +44,9 @@ class OverlayLayer(QObject):
         self._visible: bool = True
         # Default to NEAREST for pixel art - preserves sharp edges
         self._resampling_mode: Image.Resampling = Image.Resampling.NEAREST
+        # Cached pre-scaled image for pixel-perfect sampling
+        self._scaled_image: Image.Image | None = None
+        self._scaled_image_scale: float = 0.0  # Scale at which cache was computed
 
     @property
     def image(self) -> Image.Image | None:
@@ -101,6 +104,9 @@ class OverlayLayer(QObject):
         Returns:
             True if import succeeded, False otherwise.
         """
+        # Invalidate cache before loading new image
+        self._invalidate_scaled_cache()
+
         try:
             image = Image.open(path)
             # Convert to RGBA for consistent handling, preserving alpha channel
@@ -138,6 +144,7 @@ class OverlayLayer(QObject):
 
     def clear_image(self) -> None:
         """Clear the current overlay image."""
+        self._invalidate_scaled_cache()
         self._image = None
         self._image_path = None
         self.image_changed.emit()
@@ -233,11 +240,44 @@ class OverlayLayer(QObject):
         """
         if self._resampling_mode != mode:
             self._resampling_mode = mode
+            # Invalidate cache since resampling affects the scaled result
+            self._invalidate_scaled_cache()
             self.resampling_mode_changed.emit(mode.value)
 
     def has_image(self) -> bool:
         """Check if an overlay image is loaded."""
         return self._image is not None
+
+    def _get_scaled_image(self) -> Image.Image | None:
+        """Get the pre-scaled image for pixel-perfect sampling.
+
+        The image is scaled once and cached. Cache is invalidated when
+        scale, image, or resampling mode changes.
+
+        Returns:
+            Pre-scaled RGBA image, or None if no image loaded.
+        """
+        if self._image is None:
+            return None
+
+        # Check if cache is valid
+        if self._scaled_image is not None and self._scaled_image_scale == self._scale:
+            return self._scaled_image
+
+        # Compute scaled dimensions (rounded to nearest integer)
+        scaled_w = max(1, round(self._image.width * self._scale))
+        scaled_h = max(1, round(self._image.height * self._scale))
+
+        # Scale the image once with the configured resampling mode
+        self._scaled_image = self._image.resize((scaled_w, scaled_h), self._resampling_mode)
+        self._scaled_image_scale = self._scale
+
+        return self._scaled_image
+
+    def _invalidate_scaled_cache(self) -> None:
+        """Invalidate the pre-scaled image cache."""
+        self._scaled_image = None
+        self._scaled_image_scale = 0.0
 
     def get_state(self) -> dict[str, object]:
         """Get the current overlay state for persistence.
@@ -308,6 +348,9 @@ class OverlayLayer(QObject):
         Supports partial overlap: returns a tile-sized RGBA image where
         parts not covered by the overlay are transparent.
 
+        Uses a pre-scaled cached image to ensure pixel-perfect sampling
+        without sub-pixel interpolation artifacts.
+
         Args:
             tile_x: X position of tile on canvas (pixels).
             tile_y: Y position of tile on canvas (pixels).
@@ -317,59 +360,60 @@ class OverlayLayer(QObject):
         Returns:
             RGBA image of the sampled region, or None if no overlap.
         """
-        if self._image is None:
+        # Get pre-scaled image (handles caching)
+        scaled_image = self._get_scaled_image()
+        if scaled_image is None:
             return None
 
         # 1. Define rects in Canvas Space
         tile_rect = (tile_x, tile_y, tile_x + tile_width, tile_y + tile_height)
 
-        # Calculate visual overlay rect
-        overlay_w = self._image.width * self._scale
-        overlay_h = self._image.height * self._scale
-        overlay_rect = (self._x, self._y, self._x + overlay_w, self._y + overlay_h)
+        # The scaled image is at visual size, positioned at (_x, _y)
+        overlay_rect = (
+            self._x,
+            self._y,
+            self._x + scaled_image.width,
+            self._y + scaled_image.height,
+        )
 
-        # 2. Calculate Intersection
+        # 2. Calculate Intersection in canvas space
         ix1 = max(tile_rect[0], overlay_rect[0])
         iy1 = max(tile_rect[1], overlay_rect[1])
         ix2 = min(tile_rect[2], overlay_rect[2])
         iy2 = min(tile_rect[3], overlay_rect[3])
 
-        # Check for non-positive area (no overlap) with epsilon for float precision
-        if ix2 <= ix1 + 1e-6 or iy2 <= iy1 + 1e-6:
+        # Check for non-positive area (no overlap)
+        if ix2 <= ix1 or iy2 <= iy1:
             return None
 
-        # 3. Calculate Source (Image) Rect
-        # Map (ix1, iy1) relative to overlay top-left, then divide by scale
-        src_x = (ix1 - self._x) / self._scale
-        src_y = (iy1 - self._y) / self._scale
-        src_w = (ix2 - ix1) / self._scale
-        src_h = (iy2 - iy1) / self._scale
+        # 3. Calculate Source rect in scaled image coordinates (INTEGER)
+        # Map intersection relative to overlay top-left
+        src_x = round(ix1 - self._x)
+        src_y = round(iy1 - self._y)
+        src_x2 = round(ix2 - self._x)
+        src_y2 = round(iy2 - self._y)
 
-        # 4. Calculate Dest (Tile) Rect
-        # Map (ix1, iy1) relative to tile top-left
-        dst_x = int(ix1 - tile_x)
-        dst_y = int(iy1 - tile_y)
-        dst_w = int(ix2 - ix1)
-        dst_h = int(iy2 - iy1)
+        # Clamp to scaled image bounds
+        src_x = max(0, min(src_x, scaled_image.width))
+        src_y = max(0, min(src_y, scaled_image.height))
+        src_x2 = max(0, min(src_x2, scaled_image.width))
+        src_y2 = max(0, min(src_y2, scaled_image.height))
 
-        # Ensure destination dimensions are at least 1x1
-        if dst_w <= 0 or dst_h <= 0:
+        # Check valid crop region
+        if src_x2 <= src_x or src_y2 <= src_y:
             return None
 
-        # 5. Extract and Scale
-        # Use precise sampling box
-        sampling_box = (src_x, src_y, src_x + src_w, src_y + src_h)
+        # 4. Calculate Dest position in tile
+        dst_x = round(ix1 - tile_x)
+        dst_y = round(iy1 - tile_y)
 
+        # 5. Crop from pre-scaled image (no interpolation!)
         try:
-            # Resize the cropped region to the destination size
-            # Use configured resampling mode (default NEAREST for pixel art)
-            sampled_part = self._image.resize((dst_w, dst_h), self._resampling_mode, box=sampling_box)
+            sampled_part = scaled_image.crop((src_x, src_y, src_x2, src_y2))
         except Exception:
-            # Fallback for extreme edge cases
             return None
 
         # 6. Compose into full tile
-        # Start with fully transparent image
         result = Image.new("RGBA", (tile_width, tile_height), (0, 0, 0, 0))
         result.paste(sampled_part, (dst_x, dst_y))
 
