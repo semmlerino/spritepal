@@ -72,6 +72,8 @@ class CaptureToArrangementConverter:
         filter_garbage_tiles: bool = True,
         garbage_tile_indices: set[int] | None = None,
         tile_size: int = 8,
+        cluster_sprites: bool = True,
+        cluster_distance: int = 32,
     ) -> CaptureArrangementData:
         """
         Convert capture to grid-ready tile data.
@@ -83,6 +85,8 @@ class CaptureToArrangementConverter:
             filter_garbage_tiles: Whether to exclude common garbage tiles
             garbage_tile_indices: Custom garbage tile indices (default: {0x03, 0x04})
             tile_size: Size of output tiles (default 8x8)
+            cluster_sprites: Whether to cluster nearby sprites (prevents HUD mixing)
+            cluster_distance: Max pixel distance to consider sprites as grouped
 
         Returns:
             CaptureArrangementData with tiles ready for grid display
@@ -99,6 +103,10 @@ class CaptureToArrangementConverter:
         if filter_garbage_tiles:
             entries = self._filter_garbage_entries(entries, garbage_tile_indices)
 
+        # Filter off-screen sprites (y=224 is often HUD/off-screen)
+        if cluster_sprites:
+            entries = self._filter_offscreen(entries)
+
         # Group entries by palette
         palette_groups = self._group_by_palette(entries)
 
@@ -108,7 +116,7 @@ class CaptureToArrangementConverter:
         # Create renderer for this capture
         renderer = CaptureRenderer(capture)
 
-        # Process each group
+        # Process each palette group
         groups: list[PaletteGroup] = []
         total_tiles = 0
 
@@ -116,14 +124,29 @@ class CaptureToArrangementConverter:
             if selected_palettes is not None and palette_idx not in selected_palettes:
                 continue
 
-            group = self._render_and_split_group(
-                palette_idx=palette_idx,
-                entries=group_entries,
-                renderer=renderer,
-                tile_size=tile_size,
-            )
-            groups.append(group)
-            total_tiles += len(group.tiles)
+            if cluster_sprites and len(group_entries) > 1:
+                # Cluster sprites by proximity within this palette
+                clusters = self._cluster_by_proximity(group_entries, cluster_distance)
+                for cluster in clusters:
+                    group = self._render_and_split_group(
+                        palette_idx=palette_idx,
+                        entries=cluster,
+                        renderer=renderer,
+                        tile_size=tile_size,
+                    )
+                    if group.tiles:  # Only add non-empty groups
+                        groups.append(group)
+                        total_tiles += len(group.tiles)
+            else:
+                # No clustering - render all entries together
+                group = self._render_and_split_group(
+                    palette_idx=palette_idx,
+                    entries=group_entries,
+                    renderer=renderer,
+                    tile_size=tile_size,
+                )
+                groups.append(group)
+                total_tiles += len(group.tiles)
 
         return CaptureArrangementData(
             source_path=source_path,
@@ -159,6 +182,75 @@ class CaptureToArrangementConverter:
             groups[entry.palette].append(entry)
         return groups
 
+    def _filter_offscreen(self, entries: list[OAMEntry]) -> list[OAMEntry]:
+        """Filter out off-screen sprites (commonly y=224 for HUD elements)."""
+        return [e for e in entries if e.y != 224 and e.y < 200]
+
+    def _cluster_by_proximity(
+        self,
+        entries: list[OAMEntry],
+        distance_threshold: int = 32,
+    ) -> list[list[OAMEntry]]:
+        """
+        Group OAM entries that are spatially close (likely same game object).
+
+        This prevents unrelated sprites (e.g., character + HUD) from being
+        merged into one huge sparse composite.
+
+        Handles SNES screen wrap-around (x can be -256 to 255).
+        """
+        if not entries:
+            return []
+
+        def wrapped_distance(x1: int, x2: int, screen_width: int = 256) -> int:
+            """Calculate distance accounting for screen wrap-around."""
+            # Direct distance
+            direct = abs(x1 - x2)
+            # Wrapped distance (sprite at x=-24 is near x=232 via wrap)
+            wrapped = screen_width - direct
+            return min(direct, wrapped)
+
+        clusters: list[list[OAMEntry]] = []
+        used: set[int] = set()
+
+        for entry in entries:
+            entry_id = id(entry)
+            if entry_id in used:
+                continue
+
+            # Start new cluster
+            cluster = [entry]
+            used.add(entry_id)
+
+            # Find nearby entries (greedy expansion)
+            changed = True
+            while changed:
+                changed = False
+                for other in entries:
+                    other_id = id(other)
+                    if other_id in used:
+                        continue
+
+                    # Check if other is close to ANY entry in current cluster
+                    for cluster_entry in cluster:
+                        cx = cluster_entry.x + cluster_entry.width // 2
+                        cy = cluster_entry.y + cluster_entry.height // 2
+                        ox = other.x + other.width // 2
+                        oy = other.y + other.height // 2
+
+                        dx = wrapped_distance(cx, ox)
+                        dy = abs(cy - oy)
+
+                        if dx < distance_threshold and dy < distance_threshold:
+                            cluster.append(other)
+                            used.add(other_id)
+                            changed = True
+                            break
+
+            clusters.append(cluster)
+
+        return clusters
+
     def _convert_palettes(
         self,
         palettes: dict[int, list[int | list[int]]],
@@ -193,19 +285,28 @@ class CaptureToArrangementConverter:
         """
         Render entries and split into tiles.
 
-        1. Calculate group bounding box
-        2. Render each entry relative to group origin
-        3. Composite into single image
-        4. Split into tile_size x tile_size tiles
+        1. Normalize x positions for SNES screen wrap-around
+        2. Calculate group bounding box
+        3. Render each entry relative to group origin
+        4. Composite into single image
+        5. Split into tile_size x tile_size tiles
         """
         if not entries:
             return PaletteGroup(palette_index=palette_idx, entries=[])
 
-        # Calculate bounding box for all entries in group
-        min_x = min(entry.x for entry in entries)
-        min_y = min(entry.y for entry in entries)
-        max_x = max(entry.x + entry.width for entry in entries)
-        max_y = max(entry.y + entry.height for entry in entries)
+        # Normalize x positions for SNES wrap-around (x can be -256 to 255)
+        # Negative x values are sprites wrapping from right edge
+        def normalize_x(x: int) -> int:
+            return x if x >= 0 else x + 256
+
+        # Calculate bounding box with normalized positions
+        norm_positions = [
+            (normalize_x(e.x), e.y, e.width, e.height) for e in entries
+        ]
+        min_x = min(p[0] for p in norm_positions)
+        min_y = min(p[1] for p in norm_positions)
+        max_x = max(p[0] + p[2] for p in norm_positions)
+        max_y = max(p[1] + p[3] for p in norm_positions)
 
         # Calculate dimensions
         width = max_x - min_x
@@ -220,11 +321,11 @@ class CaptureToArrangementConverter:
         # Create composite canvas
         composite = Image.new("RGBA", (canvas_width, canvas_height), (0, 0, 0, 0))
 
-        # Render each entry onto canvas
+        # Render each entry onto canvas with normalized positions
         for entry in entries:
             entry_img = renderer.render_entry(entry, transparent_bg=True)
-            # Position relative to group origin
-            x = entry.x - min_x
+            # Position relative to group origin (normalized)
+            x = normalize_x(entry.x) - min_x
             y = entry.y - min_y
             composite.paste(entry_img, (x, y), entry_img)
 
