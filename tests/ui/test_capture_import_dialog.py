@@ -6,7 +6,8 @@ Tests the Mesen capture import configuration dialog.
 from __future__ import annotations
 
 import pytest
-from PySide6.QtWidgets import QCheckBox
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QListWidgetItem
 
 from core.mesen_integration.click_extractor import (
     CaptureResult,
@@ -61,7 +62,7 @@ def sample_capture(
 ) -> CaptureResult:
     """Create a sample capture with entries in different palettes."""
     entries = [
-        # Palette 0 - 2 entries
+        # Palette 0 - 2 entries (should cluster together as they're close)
         OAMEntry(
             id=0,
             x=10,
@@ -86,7 +87,7 @@ def sample_capture(
             palette=0,
             tiles=[sample_tile_data],
         ),
-        # Palette 3 - 3 entries
+        # Palette 3 - 3 entries (should cluster together as they're close)
         OAMEntry(
             id=2,
             x=30,
@@ -123,7 +124,7 @@ def sample_capture(
             palette=3,
             tiles=[sample_tile_data],
         ),
-        # Palette 7 - 1 entry
+        # Palette 7 - 1 entry (separate sprite)
         OAMEntry(
             id=5,
             x=50,
@@ -158,40 +159,40 @@ class TestCaptureImportDialog:
         assert dialog is not None
         assert dialog._capture == sample_capture
 
-    def test_shows_palette_checkboxes(self, qtbot, sample_capture: CaptureResult) -> None:
-        """Checkbox shown per palette in capture."""
+    def test_shows_cluster_list(self, qtbot, sample_capture: CaptureResult) -> None:
+        """Cluster list is populated with sprite clusters."""
         dialog = CaptureImportDialog(sample_capture, parent=None)
         qtbot.addWidget(dialog)
 
-        # Should have checkboxes for palettes 0, 3, 7
-        assert len(dialog._palette_checkboxes) == 3
-        assert 0 in dialog._palette_checkboxes
-        assert 3 in dialog._palette_checkboxes
-        assert 7 in dialog._palette_checkboxes
+        # Should have a cluster list with items
+        assert dialog._cluster_list is not None
+        # Clusters depend on proximity - we should have at least one cluster
+        assert dialog._cluster_list.count() > 0
 
-    def test_checkbox_shows_entry_count(self, qtbot, sample_capture: CaptureResult) -> None:
-        """Each checkbox shows (N sprites) count."""
+    def test_cluster_list_shows_dimensions(self, qtbot, sample_capture: CaptureResult) -> None:
+        """Each cluster item shows dimensions and palette info."""
         dialog = CaptureImportDialog(sample_capture, parent=None)
         qtbot.addWidget(dialog)
 
-        # Check labels include counts
-        # Palette 0: 2 sprites, Palette 3: 3 sprites, Palette 7: 1 sprite
-        palette_0_cb = dialog._palette_checkboxes[0]
-        assert "2 sprites" in palette_0_cb.text()
+        # Check first item contains expected info patterns
+        assert dialog._cluster_list is not None
+        first_item = dialog._cluster_list.item(0)
+        assert first_item is not None
+        text = first_item.text()
+        # Should have dimension like "NxN" and "Palette" mentioned
+        assert "x" in text.lower()
+        assert "palette" in text.lower()
 
-        palette_3_cb = dialog._palette_checkboxes[3]
-        assert "3 sprites" in palette_3_cb.text()
-
-        palette_7_cb = dialog._palette_checkboxes[7]
-        assert "1 sprite" in palette_7_cb.text()
-
-    def test_checkboxes_checked_by_default(self, qtbot, sample_capture: CaptureResult) -> None:
-        """All palette checkboxes are checked by default."""
+    def test_first_cluster_selected_by_default(self, qtbot, sample_capture: CaptureResult) -> None:
+        """First cluster is selected by default."""
         dialog = CaptureImportDialog(sample_capture, parent=None)
         qtbot.addWidget(dialog)
 
-        for checkbox in dialog._palette_checkboxes.values():
-            assert checkbox.isChecked()
+        assert dialog._cluster_list is not None
+        if dialog._cluster_list.count() > 0:
+            first_item = dialog._cluster_list.item(0)
+            assert first_item is not None
+            assert first_item.isSelected()
 
     def test_garbage_filter_enabled_by_default(self, qtbot, sample_capture: CaptureResult) -> None:
         """Garbage filter checkbox is checked by default."""
@@ -200,19 +201,18 @@ class TestCaptureImportDialog:
 
         assert dialog._garbage_checkbox.isChecked()
 
-    def test_accept_collects_selected_palettes(self, qtbot, sample_capture: CaptureResult) -> None:
-        """Accept stores selected palette indices."""
+    def test_accept_collects_selected_clusters(self, qtbot, sample_capture: CaptureResult) -> None:
+        """Accept stores selected cluster list and palette indices."""
         dialog = CaptureImportDialog(sample_capture, parent=None)
         qtbot.addWidget(dialog)
 
-        # Uncheck palette 3
-        dialog._palette_checkboxes[3].setChecked(False)
-
-        # Call accept (bypassing dialog exec)
+        # Select all clusters
+        dialog._select_all_clusters()
         dialog.accept()
 
-        # Should only have palettes 0 and 7
-        assert dialog.selected_palettes == {0, 7}
+        # Should have some clusters and their palettes
+        assert len(dialog.selected_clusters) > 0
+        assert len(dialog.selected_palettes) > 0
 
     def test_accept_stores_garbage_filter_setting(self, qtbot, sample_capture: CaptureResult) -> None:
         """Accept stores garbage filter setting."""
@@ -231,37 +231,41 @@ class TestCaptureImportDialog:
 
         assert dialog.filter_garbage_tiles is True
 
-    def test_select_all_checks_all_palettes(self, qtbot, sample_capture: CaptureResult) -> None:
-        """Select All button checks all palette checkboxes."""
+    def test_select_all_selects_all_clusters(self, qtbot, sample_capture: CaptureResult) -> None:
+        """Select All button selects all cluster items."""
         dialog = CaptureImportDialog(sample_capture, parent=None)
         qtbot.addWidget(dialog)
 
-        # First uncheck all
-        for checkbox in dialog._palette_checkboxes.values():
-            checkbox.setChecked(False)
+        # First deselect all
+        dialog._select_no_clusters()
 
         # Click select all
-        dialog._select_all_palettes()
+        dialog._select_all_clusters()
 
-        # All should be checked
-        for checkbox in dialog._palette_checkboxes.values():
-            assert checkbox.isChecked()
+        # All should be selected
+        assert dialog._cluster_list is not None
+        for i in range(dialog._cluster_list.count()):
+            item = dialog._cluster_list.item(i)
+            assert item is not None
+            assert item.isSelected()
 
-    def test_select_none_unchecks_all_palettes(self, qtbot, sample_capture: CaptureResult) -> None:
-        """Select None button unchecks all palette checkboxes."""
+    def test_select_none_deselects_all_clusters(self, qtbot, sample_capture: CaptureResult) -> None:
+        """Select None button deselects all cluster items."""
         dialog = CaptureImportDialog(sample_capture, parent=None)
         qtbot.addWidget(dialog)
 
-        # All are checked by default
-        for checkbox in dialog._palette_checkboxes.values():
-            assert checkbox.isChecked()
+        # First select all
+        dialog._select_all_clusters()
 
         # Click select none
-        dialog._select_no_palettes()
+        dialog._select_no_clusters()
 
-        # All should be unchecked
-        for checkbox in dialog._palette_checkboxes.values():
-            assert not checkbox.isChecked()
+        # None should be selected
+        assert dialog._cluster_list is not None
+        for i in range(dialog._cluster_list.count()):
+            item = dialog._cluster_list.item(i)
+            assert item is not None
+            assert not item.isSelected()
 
     def test_preview_label_exists(self, qtbot, sample_capture: CaptureResult) -> None:
         """Preview label exists in dialog."""
@@ -271,31 +275,31 @@ class TestCaptureImportDialog:
         assert dialog._preview_label is not None
 
     def test_preview_shows_no_selection_message(self, qtbot, sample_capture: CaptureResult) -> None:
-        """Preview shows message when no palettes selected."""
+        """Preview shows message when no clusters selected."""
         dialog = CaptureImportDialog(sample_capture, parent=None)
         qtbot.addWidget(dialog)
 
-        # Deselect all palettes
-        dialog._select_no_palettes()
+        # Deselect all clusters
+        dialog._select_no_clusters()
         dialog._update_preview()
 
-        assert "No palettes selected" in dialog._preview_label.text()
+        assert "select" in dialog._preview_label.text().lower()
 
     def test_info_section_shows_frame(self, qtbot, sample_capture: CaptureResult) -> None:
         """Info section displays frame number."""
         dialog = CaptureImportDialog(sample_capture, parent=None)
         qtbot.addWidget(dialog)
 
-        # Find the info label (should mention frame 100)
-        # This is a bit fragile, but we just need to ensure the info is shown
-        assert dialog.isVisible() or True  # Dialog may not be shown in tests
+        # Dialog was created with frame 100
+        # Just ensure dialog was created successfully
+        assert dialog._capture.frame == 100
 
 
 class TestCaptureImportDialogEdgeCases:
     """Edge case tests for CaptureImportDialog."""
 
-    def test_single_palette_capture(self, qtbot, obsel_config: OBSELConfig, sample_tile_data: TileData) -> None:
-        """Dialog handles capture with single palette."""
+    def test_single_sprite_capture(self, qtbot, obsel_config: OBSELConfig, sample_tile_data: TileData) -> None:
+        """Dialog handles capture with single sprite."""
         entries = [
             OAMEntry(
                 id=0,
@@ -322,9 +326,9 @@ class TestCaptureImportDialogEdgeCases:
         dialog = CaptureImportDialog(capture, parent=None)
         qtbot.addWidget(dialog)
 
-        # Should have exactly one checkbox
-        assert len(dialog._palette_checkboxes) == 1
-        assert 5 in dialog._palette_checkboxes
+        # Should have exactly one cluster
+        assert dialog._cluster_list is not None
+        assert dialog._cluster_list.count() == 1
 
     def test_empty_entries_list(self, qtbot, obsel_config: OBSELConfig) -> None:
         """Dialog handles capture with no entries."""
@@ -340,5 +344,43 @@ class TestCaptureImportDialogEdgeCases:
         dialog = CaptureImportDialog(capture, parent=None)
         qtbot.addWidget(dialog)
 
-        # Should have no checkboxes
-        assert len(dialog._palette_checkboxes) == 0
+        # Should have empty cluster list
+        assert dialog._cluster_list is not None
+        assert dialog._cluster_list.count() == 0
+
+    def test_accept_with_no_selection_returns_empty(
+        self, qtbot, obsel_config: OBSELConfig, sample_tile_data: TileData
+    ) -> None:
+        """Accept with no selection returns empty clusters."""
+        entries = [
+            OAMEntry(
+                id=0,
+                x=0,
+                y=0,
+                tile=0,
+                width=8,
+                height=8,
+                flip_h=False,
+                flip_v=False,
+                palette=5,
+                tiles=[sample_tile_data],
+            ),
+        ]
+        capture = CaptureResult(
+            frame=1,
+            visible_count=1,
+            obsel=obsel_config,
+            entries=entries,
+            palettes={5: [0x000000] * 16},
+            timestamp=0,
+        )
+
+        dialog = CaptureImportDialog(capture, parent=None)
+        qtbot.addWidget(dialog)
+
+        # Deselect all
+        dialog._select_no_clusters()
+        dialog.accept()
+
+        assert len(dialog.selected_clusters) == 0
+        assert len(dialog.selected_palettes) == 0

@@ -11,7 +11,9 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QScrollArea,
+    QListWidget,
+    QListWidgetItem,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
@@ -21,6 +23,7 @@ from ui.components.base.dialog_base import DialogBase
 if TYPE_CHECKING:
     from PIL import Image
 
+    from core.mesen_integration.capture_to_arrangement import SpriteCluster
     from core.mesen_integration.click_extractor import CaptureResult
 
 
@@ -41,18 +44,25 @@ class CaptureImportDialog(DialogBase):
         # Store capture before super().__init__ (DialogBase pattern)
         self._capture = capture
 
+        # Get sprite clusters for selection
+        from core.mesen_integration.capture_to_arrangement import CaptureToArrangementConverter
+        self._converter = CaptureToArrangementConverter()
+        self._clusters = self._converter.get_sprite_clusters(capture)
+
         # Properties set on accept
         self._selected_palettes: set[int] = set()
+        self._selected_clusters: list[SpriteCluster] = []
         self._filter_garbage_tiles: bool = True
 
         # UI components
         self._palette_checkboxes: dict[int, QCheckBox] = {}
+        self._cluster_list: QListWidget | None = None
         self._preview_label: QLabel | None = None
 
         super().__init__(
             parent,
             title="Import Mesen Capture",
-            min_size=(500, 400),
+            min_size=(600, 500),
             with_button_box=True,
         )
 
@@ -66,6 +76,11 @@ class CaptureImportDialog(DialogBase):
     def selected_palettes(self) -> set[int]:
         """Get the selected palette indices."""
         return self._selected_palettes
+
+    @property
+    def selected_clusters(self) -> list[SpriteCluster]:
+        """Get the selected sprite clusters."""
+        return self._selected_clusters
 
     @property
     def filter_garbage_tiles(self) -> bool:
@@ -82,19 +97,25 @@ class CaptureImportDialog(DialogBase):
         info_group = self._create_info_section()
         layout.addWidget(info_group)
 
-        # Palette selection section
-        palette_group = self._create_palette_section()
-        layout.addWidget(palette_group)
+        # Create splitter for cluster list and preview
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # Sprite cluster selection section (left side)
+        cluster_group = self._create_cluster_section()
+        splitter.addWidget(cluster_group)
+
+        # Preview section (right side)
+        preview_group = self._create_preview_section()
+        splitter.addWidget(preview_group)
+
+        # Set initial splitter sizes (60% list, 40% preview)
+        splitter.setSizes([300, 200])
+        layout.addWidget(splitter, stretch=1)
 
         # Options section
         options_group = self._create_options_section()
         layout.addWidget(options_group)
 
-        # Preview section
-        preview_group = self._create_preview_section()
-        layout.addWidget(preview_group)
-
-        layout.addStretch()
         self.set_content_layout(layout)
 
     def _create_info_section(self) -> QGroupBox:
@@ -102,62 +123,61 @@ class CaptureImportDialog(DialogBase):
         group = QGroupBox("Capture Information")
         layout = QVBoxLayout(group)
 
+        # Count palettes used
+        palette_set = {c.palette_index for c in self._clusters}
+
         info_text = (
-            f"Frame: {self._capture.frame}\n"
-            f"Sprite entries: {len(self._capture.entries)}\n"
-            f"OBSEL: 0x{self._capture.obsel.raw:02X}"
+            f"Frame: {self._capture.frame} | "
+            f"OAM entries: {len(self._capture.entries)} | "
+            f"Sprite clusters: {len(self._clusters)} | "
+            f"Palettes: {sorted(palette_set)}"
         )
         info_label = QLabel(info_text)
+        info_label.setWordWrap(True)
         layout.addWidget(info_label)
 
         return group
 
-    def _create_palette_section(self) -> QGroupBox:
-        """Create palette selection section with checkboxes."""
-        group = QGroupBox("Palettes to Import")
+    def _create_cluster_section(self) -> QGroupBox:
+        """Create sprite cluster selection section."""
+        group = QGroupBox("Select Sprites to Import")
         layout = QVBoxLayout(group)
 
         # Instruction
-        instruction = QLabel("Select which sprite palettes to include:")
+        instruction = QLabel("Click a sprite cluster to select it for import:")
         layout.addWidget(instruction)
 
-        # Create scrollable area for palette checkboxes
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setMaximumHeight(150)
+        # Create list widget for clusters
+        self._cluster_list = QListWidget()
+        self._cluster_list.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
 
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout(scroll_widget)
-        scroll_layout.setSpacing(4)
+        # Add clusters to list
+        for cluster in self._clusters:
+            item = QListWidgetItem(
+                f"Sprite {cluster.id}: {cluster.width}x{cluster.height}px "
+                f"at ({cluster.min_x}, {cluster.min_y}) "
+                f"[Palette {cluster.palette_index}, {cluster.entry_count} OAM]"
+            )
+            item.setData(Qt.ItemDataRole.UserRole, cluster.id)
+            self._cluster_list.addItem(item)
 
-        # Group entries by palette and count them
-        palette_counts: dict[int, int] = {}
-        for entry in self._capture.entries:
-            palette_counts[entry.palette] = palette_counts.get(entry.palette, 0) + 1
+        # Select first cluster by default if any exist
+        if self._cluster_list.count() > 0:
+            self._cluster_list.item(0).setSelected(True)
 
-        # Create checkbox for each palette
-        for palette_idx in sorted(palette_counts.keys()):
-            count = palette_counts[palette_idx]
-            checkbox = QCheckBox(f"Palette {palette_idx} ({count} sprites)")
-            checkbox.setChecked(True)  # Default all selected
-            _ = checkbox.stateChanged.connect(self._on_palette_selection_changed)
-            scroll_layout.addWidget(checkbox)
-            self._palette_checkboxes[palette_idx] = checkbox
-
-        scroll_layout.addStretch()
-        scroll.setWidget(scroll_widget)
-        layout.addWidget(scroll)
+        _ = self._cluster_list.itemSelectionChanged.connect(self._on_cluster_selection_changed)
+        layout.addWidget(self._cluster_list)
 
         # Select all/none buttons
         btn_layout = QHBoxLayout()
         from PySide6.QtWidgets import QPushButton
 
         select_all_btn = QPushButton("Select All")
-        _ = select_all_btn.clicked.connect(self._select_all_palettes)
+        _ = select_all_btn.clicked.connect(self._select_all_clusters)
         btn_layout.addWidget(select_all_btn)
 
         select_none_btn = QPushButton("Select None")
-        _ = select_none_btn.clicked.connect(self._select_no_palettes)
+        _ = select_none_btn.clicked.connect(self._select_no_clusters)
         btn_layout.addWidget(select_none_btn)
 
         btn_layout.addStretch()
@@ -192,40 +212,52 @@ class CaptureImportDialog(DialogBase):
 
         return group
 
-    def _on_palette_selection_changed(self) -> None:
-        """Handle palette checkbox state change."""
+    def _on_cluster_selection_changed(self) -> None:
+        """Handle cluster selection change."""
         self._update_preview()
 
-    def _select_all_palettes(self) -> None:
-        """Select all palette checkboxes."""
-        for checkbox in self._palette_checkboxes.values():
-            checkbox.setChecked(True)
+    def _select_all_clusters(self) -> None:
+        """Select all clusters."""
+        if self._cluster_list:
+            self._cluster_list.selectAll()
 
-    def _select_no_palettes(self) -> None:
-        """Deselect all palette checkboxes."""
-        for checkbox in self._palette_checkboxes.values():
-            checkbox.setChecked(False)
+    def _select_no_clusters(self) -> None:
+        """Deselect all clusters."""
+        if self._cluster_list:
+            self._cluster_list.clearSelection()
 
     def _update_preview(self) -> None:
-        """Update the preview image."""
+        """Update the preview image showing selected cluster(s)."""
         if self._preview_label is None:
             return
 
-        # Get selected palettes
-        selected = {idx for idx, cb in self._palette_checkboxes.items() if cb.isChecked()}
-
-        if not selected:
-            self._preview_label.setText("No palettes selected")
+        # Get selected cluster IDs from list
+        if self._cluster_list is None:
+            self._preview_label.setText("No clusters available")
             return
 
-        # Filter entries by selected palettes
-        entries = [e for e in self._capture.entries if e.palette in selected]
+        selected_items = self._cluster_list.selectedItems()
+        if not selected_items:
+            self._preview_label.setText("Select a sprite to preview")
+            return
+
+        selected_ids = {item.data(Qt.ItemDataRole.UserRole) for item in selected_items}
+        selected_clusters = [c for c in self._clusters if c.id in selected_ids]
+
+        if not selected_clusters:
+            self._preview_label.setText("No clusters selected")
+            return
+
+        # Collect all entries from selected clusters
+        entries = []
+        for cluster in selected_clusters:
+            entries.extend(cluster.entries)
 
         if not entries:
-            self._preview_label.setText("No sprites in selected palettes")
+            self._preview_label.setText("No sprites in selection")
             return
 
-        # Render preview using CaptureRenderer
+        # Render preview using CaptureRenderer (colorized for preview)
         try:
             from PIL import Image as PILImage
 
@@ -233,30 +265,41 @@ class CaptureImportDialog(DialogBase):
 
             renderer = CaptureRenderer(self._capture)
 
+            # Normalize x positions for SNES wrap-around
+            def normalize_x(x: int) -> int:
+                return x if x >= 0 else x + 256
+
             # Calculate bounding box for selected entries
-            min_x = min(e.x for e in entries)
-            min_y = min(e.y for e in entries)
-            max_x = max(e.x + e.width for e in entries)
-            max_y = max(e.y + e.height for e in entries)
+            norm_positions = [(normalize_x(e.x), e.y, e.width, e.height) for e in entries]
+            min_x = min(p[0] for p in norm_positions)
+            min_y = min(p[1] for p in norm_positions)
+            max_x = max(p[0] + p[2] for p in norm_positions)
+            max_y = max(p[1] + p[3] for p in norm_positions)
             width = max_x - min_x
             height = max_y - min_y
 
             # Create composite canvas
-            composite = PILImage.new("RGBA", (width, height), (0, 0, 0, 0))
+            composite = PILImage.new("RGBA", (width, height), (64, 64, 64, 255))
 
-            # Render each entry at offset positions
+            # Render each entry at offset positions (colorized for preview)
             for entry in entries:
                 entry_img = renderer.render_entry(entry, transparent_bg=True)
-                x = entry.x - min_x
+                x = normalize_x(entry.x) - min_x
                 y = entry.y - min_y
                 composite.paste(entry_img, (x, y), entry_img)
 
-            # Scale for preview if large
-            max_size = 200
+            # Scale for preview if needed
+            max_size = 180
             if composite.width > max_size or composite.height > max_size:
                 scale = max_size / max(composite.width, composite.height)
-                new_width = int(composite.width * scale)
-                new_height = int(composite.height * scale)
+                new_width = max(1, int(composite.width * scale))
+                new_height = max(1, int(composite.height * scale))
+                composite = composite.resize((new_width, new_height), PILImage.Resampling.NEAREST)
+            elif composite.width < 64 and composite.height < 64:
+                # Scale up small sprites for visibility
+                scale = min(4, 64 // max(composite.width, composite.height))
+                new_width = composite.width * scale
+                new_height = composite.height * scale
                 composite = composite.resize((new_width, new_height), PILImage.Resampling.NEAREST)
 
             # Convert to QPixmap
@@ -284,8 +327,16 @@ class CaptureImportDialog(DialogBase):
     @override
     def accept(self) -> None:
         """Handle dialog accept - store selections and close."""
-        # Collect selected palettes
-        self._selected_palettes = {idx for idx, cb in self._palette_checkboxes.items() if cb.isChecked()}
+        # Collect selected clusters
+        if self._cluster_list:
+            selected_items = self._cluster_list.selectedItems()
+            selected_ids = {item.data(Qt.ItemDataRole.UserRole) for item in selected_items}
+            self._selected_clusters = [c for c in self._clusters if c.id in selected_ids]
+            # Also collect palette indices from selected clusters
+            self._selected_palettes = {c.palette_index for c in self._selected_clusters}
+        else:
+            self._selected_clusters = []
+            self._selected_palettes = set()
 
         # Get garbage filter setting
         self._filter_garbage_tiles = self._garbage_checkbox.isChecked()

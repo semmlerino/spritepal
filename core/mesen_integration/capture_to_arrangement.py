@@ -20,6 +20,34 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class SpriteCluster:
+    """A cluster of spatially-close OAM entries (likely one game object)."""
+
+    id: int
+    entries: list[OAMEntry]
+    palette_index: int
+    min_x: int
+    min_y: int
+    width: int
+    height: int
+
+    @property
+    def entry_count(self) -> int:
+        """Number of OAM entries in this cluster."""
+        return len(self.entries)
+
+    @property
+    def center_x(self) -> int:
+        """Approximate center X coordinate."""
+        return self.min_x + self.width // 2
+
+    @property
+    def center_y(self) -> int:
+        """Approximate center Y coordinate."""
+        return self.min_y + self.height // 2
+
+
+@dataclass
 class PaletteGroup:
     """OAM entries grouped by palette."""
 
@@ -145,6 +173,136 @@ class CaptureToArrangementConverter:
                     renderer=renderer,
                     tile_size=tile_size,
                 )
+                groups.append(group)
+                total_tiles += len(group.tiles)
+
+        return CaptureArrangementData(
+            source_path=source_path,
+            frame=capture.frame,
+            groups=groups,
+            palettes=rgb_palettes,
+            obsel=capture.obsel,
+            total_tiles=total_tiles,
+        )
+
+    def get_sprite_clusters(
+        self,
+        capture: CaptureResult,
+        filter_garbage_tiles: bool = True,
+        garbage_tile_indices: set[int] | None = None,
+        cluster_distance: int = 32,
+    ) -> list[SpriteCluster]:
+        """
+        Get sprite clusters without converting to tiles.
+
+        Use this to display cluster options for user selection before import.
+
+        Args:
+            capture: Mesen capture result to analyze
+            filter_garbage_tiles: Whether to exclude common garbage tiles
+            garbage_tile_indices: Custom garbage tile indices (default: {0x03, 0x04})
+            cluster_distance: Max pixel distance to consider sprites as grouped
+
+        Returns:
+            List of SpriteCluster objects for user selection
+        """
+        if garbage_tile_indices is None:
+            garbage_tile_indices = DEFAULT_GARBAGE_TILES
+
+        # Filter entries
+        entries = capture.entries
+        if filter_garbage_tiles:
+            entries = self._filter_garbage_entries(entries, garbage_tile_indices)
+        entries = self._filter_offscreen(entries)
+
+        # Group by palette then cluster
+        palette_groups = self._group_by_palette(entries)
+
+        clusters: list[SpriteCluster] = []
+        cluster_id = 0
+
+        for palette_idx, group_entries in sorted(palette_groups.items()):
+            if len(group_entries) > 1:
+                # Cluster sprites by proximity within this palette
+                entry_clusters = self._cluster_by_proximity(group_entries, cluster_distance)
+                for entry_cluster in entry_clusters:
+                    cluster = self._create_cluster_info(cluster_id, palette_idx, entry_cluster)
+                    clusters.append(cluster)
+                    cluster_id += 1
+            else:
+                # Single entry is its own cluster
+                cluster = self._create_cluster_info(cluster_id, palette_idx, group_entries)
+                clusters.append(cluster)
+                cluster_id += 1
+
+        return clusters
+
+    def _create_cluster_info(
+        self,
+        cluster_id: int,
+        palette_idx: int,
+        entries: list[OAMEntry],
+    ) -> SpriteCluster:
+        """Create cluster info from entries."""
+        # Normalize x positions for SNES wrap-around
+        def normalize_x(x: int) -> int:
+            return x if x >= 0 else x + 256
+
+        norm_positions = [
+            (normalize_x(e.x), e.y, e.width, e.height) for e in entries
+        ]
+        min_x = min(p[0] for p in norm_positions)
+        min_y = min(p[1] for p in norm_positions)
+        max_x = max(p[0] + p[2] for p in norm_positions)
+        max_y = max(p[1] + p[3] for p in norm_positions)
+
+        return SpriteCluster(
+            id=cluster_id,
+            entries=entries,
+            palette_index=palette_idx,
+            min_x=min_x,
+            min_y=min_y,
+            width=max_x - min_x,
+            height=max_y - min_y,
+        )
+
+    def convert_clusters(
+        self,
+        capture: CaptureResult,
+        clusters: list[SpriteCluster],
+        source_path: str = "",
+        tile_size: int = 8,
+    ) -> CaptureArrangementData:
+        """
+        Convert selected clusters to arrangement data.
+
+        Args:
+            capture: Original capture result
+            clusters: Selected clusters to convert
+            source_path: Path to the capture file
+            tile_size: Size of output tiles
+
+        Returns:
+            CaptureArrangementData with tiles ready for grid display
+        """
+        # Convert palettes to RGB tuples
+        rgb_palettes = self._convert_palettes(capture.palettes)
+
+        # Create renderer for this capture
+        renderer = CaptureRenderer(capture)
+
+        # Process selected clusters
+        groups: list[PaletteGroup] = []
+        total_tiles = 0
+
+        for cluster in clusters:
+            group = self._render_and_split_group(
+                palette_idx=cluster.palette_index,
+                entries=cluster.entries,
+                renderer=renderer,
+                tile_size=tile_size,
+            )
+            if group.tiles:
                 groups.append(group)
                 total_tiles += len(group.tiles)
 
@@ -321,9 +479,10 @@ class CaptureToArrangementConverter:
         # Create composite canvas
         composite = Image.new("RGBA", (canvas_width, canvas_height), (0, 0, 0, 0))
 
-        # Render each entry onto canvas with normalized positions
+        # Render each entry as indexed grayscale onto canvas
+        # Using indexed rendering allows the colorizer to apply palettes on demand
         for entry in entries:
-            entry_img = renderer.render_entry(entry, transparent_bg=True)
+            entry_img = renderer.render_entry_indexed(entry)
             # Position relative to group origin (normalized)
             x = normalize_x(entry.x) - min_x
             y = entry.y - min_y

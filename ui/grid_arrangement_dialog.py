@@ -1037,24 +1037,32 @@ class GridArrangementDialog(SplitterDialog):
         if dialog.exec() != CaptureImportDialog.DialogCode.Accepted:
             return
 
-        # 4. Convert to arrangement data
+        # 4. Check selection
+        if not dialog.selected_clusters:
+            _ = QMessageBox.warning(
+                self,
+                "Import Failed",
+                "No sprites selected for import.",
+            )
+            return
+
+        # 5. Convert selected clusters to arrangement data
         converter = CaptureToArrangementConverter()
-        arrangement_data = converter.convert(
+        arrangement_data = converter.convert_clusters(
             capture,
+            clusters=dialog.selected_clusters,
             source_path=path,
-            selected_palettes=dialog.selected_palettes,
-            filter_garbage_tiles=dialog.filter_garbage_tiles,
         )
 
         if not arrangement_data.has_tiles:
             _ = QMessageBox.warning(
                 self,
                 "Import Failed",
-                "No tiles extracted from capture.\nTry selecting different palettes or disabling garbage filter.",
+                "No tiles extracted from selected sprites.",
             )
             return
 
-        # 5. Confirm if replacing existing arrangement
+        # 6. Confirm if replacing existing arrangement
         if self.arrangement_manager.get_arranged_count() > 0:
             result = QMessageBox.question(
                 self,
@@ -1067,11 +1075,18 @@ class GridArrangementDialog(SplitterDialog):
             self.arrangement_manager.clear()
             self.undo_stack.clear()
 
-        # 6. Populate grid with captured tiles
+        # 7. Populate grid with captured tiles
         self._populate_from_capture_data(arrangement_data)
 
+        # 8. Set up colorizer with capture palettes for palette toggle
+        if arrangement_data.palettes:
+            self.colorizer.set_palettes(arrangement_data.palettes)
+            # Find the first palette used in the import
+            first_palette = min(arrangement_data.palettes.keys())
+            self.colorizer.set_selected_palette(first_palette)
+
         self._update_status(
-            f"Imported {arrangement_data.total_tiles} tiles from {len(arrangement_data.groups)} palette groups"
+            f"Imported {arrangement_data.total_tiles} tiles from {len(dialog.selected_clusters)} sprites"
         )
 
     def _populate_from_capture_data(
