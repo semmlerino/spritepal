@@ -165,6 +165,9 @@ class GridArrangementDialog(SplitterDialog):
         # Persistent overlay item
         self.overlay_item: OverlayGraphicsItem | None = None
 
+        # Saved color mappings from preview panel (cleared on overlay change)
+        self._saved_color_mappings: dict[tuple[int, int, int], int] | None = None
+
         # Step 2: Call parent init (this will call _setup_ui)
         super().__init__(
             parent=parent,
@@ -285,6 +288,7 @@ class GridArrangementDialog(SplitterDialog):
         self.overlay_controls = OverlayControls(self.overlay_layer, overlay_group)
         self.overlay_controls.setContentsMargins(0, 0, 0, 0)
         self.overlay_controls.setTitle("")  # Hide redundant title
+        self.overlay_controls.preview_mapping_requested.connect(self._on_preview_mapping_requested)
         overlay_layout.addWidget(self.overlay_controls)
 
         self.apply_overlay_btn = QPushButton("Apply Overlay to Arranged Tiles", overlay_group)
@@ -1760,6 +1764,84 @@ class GridArrangementDialog(SplitterDialog):
         self._update_displays()
         self._update_status("Mirrored vertically")
 
+    def _on_preview_mapping_requested(self) -> None:
+        """Handle preview mapping button click - show live preview panel."""
+        if not self.overlay_layer.has_image():
+            _ = QMessageBox.warning(
+                self,
+                "No Overlay",
+                "Please import an overlay image first.",
+            )
+            return
+
+        if not self.arrangement_manager.get_arranged_tiles():
+            _ = QMessageBox.warning(
+                self,
+                "No Tiles Placed",
+                "Please arrange some tiles on the canvas first.",
+            )
+            return
+
+        # Get palette (required for mapping preview)
+        if not self.colorizer.is_palette_mode() or not self.colorizer.has_palettes():
+            _ = QMessageBox.warning(
+                self,
+                "No Palette",
+                "Palette mode must be enabled to preview color mappings.\n\nPress 'C' to toggle palette mode.",
+            )
+            return
+
+        palette_idx = self.colorizer.get_selected_palette_index()
+        palettes = self.colorizer.get_palettes()
+        if palette_idx not in palettes:
+            return
+        palette = palettes[palette_idx]
+
+        # Import preview panel
+        from ui.row_arrangement.palette_mapping_preview import PaletteMappingPreviewPanel
+
+        # Create dialog to host the preview panel
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Palette Mapping Preview")
+        dialog.setMinimumSize(700, 600)
+
+        layout = QVBoxLayout(dialog)
+
+        # Create preview panel
+        preview_panel = PaletteMappingPreviewPanel(
+            overlay_layer=self.overlay_layer,
+            grid_mapping=self.arrangement_manager.get_grid_mapping(),
+            tile_width=self.processor.tile_width,
+            tile_height=self.processor.tile_height,
+            palette=palette,
+            parent=dialog,
+        )
+        layout.addWidget(preview_panel)
+
+        # Button row
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+
+        save_btn = QPushButton("Save Mappings")
+        save_btn.setToolTip("Save these mappings for the next Apply operation")
+        button_row.addWidget(save_btn)
+
+        close_btn = QPushButton("Close")
+        button_row.addWidget(close_btn)
+
+        layout.addLayout(button_row)
+
+        # Connect buttons
+        def on_save() -> None:
+            self._saved_color_mappings = preview_panel.get_color_mappings()
+            self._update_status(f"Saved {len(self._saved_color_mappings)} color mappings - will be used on next Apply")
+            dialog.accept()
+
+        save_btn.clicked.connect(on_save)
+        close_btn.clicked.connect(dialog.reject)
+
+        dialog.exec()
+
     def apply_overlay(self) -> None:
         """Apply current overlay to tiles. Public API for testing."""
         self._apply_overlay()
@@ -1805,29 +1887,34 @@ class GridArrangementDialog(SplitterDialog):
             if palette_idx in palettes:
                 palette = palettes[palette_idx]
 
-        # Show color mapping dialog if we have a palette
+        # Get color mappings for palette quantization
         color_mappings: dict[tuple[int, int, int], int] | None = None
         if palette is not None:
-            from ui.dialogs.color_mapping_dialog import (
-                ColorMappingDialog,
-                extract_colors_from_sampled_overlay,
-            )
+            # Use saved mappings if available (from Preview Mapping panel)
+            if self._saved_color_mappings is not None:
+                color_mappings = self._saved_color_mappings
+                self._update_status("Using saved color mappings from preview")
+            else:
+                from ui.dialogs.color_mapping_dialog import (
+                    ColorMappingDialog,
+                    extract_colors_from_sampled_overlay,
+                )
 
-            # Extract colors from the ACTUAL sampled pixels (what will be applied),
-            # not the original overlay image. This ensures color mappings match
-            # even when the overlay is scaled/resampled.
-            unique_colors = extract_colors_from_sampled_overlay(
-                overlay_layer=self.overlay_layer,
-                grid_mapping=self.arrangement_manager.get_grid_mapping(),
-                tile_width=self.processor.tile_width,
-                tile_height=self.processor.tile_height,
-            )
-            if unique_colors:
-                # Show the color mapping dialog
-                mapping_dialog = ColorMappingDialog(unique_colors, palette, self)
-                if mapping_dialog.exec() != QDialog.DialogCode.Accepted:
-                    return  # User cancelled
-                color_mappings = mapping_dialog.color_mappings
+                # Extract colors from the ACTUAL sampled pixels (what will be applied),
+                # not the original overlay image. This ensures color mappings match
+                # even when the overlay is scaled/resampled.
+                unique_colors = extract_colors_from_sampled_overlay(
+                    overlay_layer=self.overlay_layer,
+                    grid_mapping=self.arrangement_manager.get_grid_mapping(),
+                    tile_width=self.processor.tile_width,
+                    tile_height=self.processor.tile_height,
+                )
+                if unique_colors:
+                    # Show the color mapping dialog
+                    mapping_dialog = ColorMappingDialog(unique_colors, palette, self)
+                    if mapping_dialog.exec() != QDialog.DialogCode.Accepted:
+                        return  # User cancelled
+                    color_mappings = mapping_dialog.color_mappings
 
         # Create ApplyOperation
         operation = ApplyOperation(
@@ -1960,6 +2047,10 @@ class GridArrangementDialog(SplitterDialog):
 
     def _on_overlay_changed(self, *_: object) -> None:
         """Handle overlay property changes (position, opacity, visibility, image)."""
+        # Clear saved color mappings since overlay state changed
+        # (position, scale, resampling mode affect sampled colors)
+        self._saved_color_mappings = None
+
         # Update Apply button state based on visibility, image presence, and placed tiles
         if hasattr(self, "apply_overlay_btn"):
             has_overlay = self.overlay_layer.has_image() and self.overlay_layer.visible

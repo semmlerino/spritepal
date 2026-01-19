@@ -35,10 +35,12 @@ class OverlayControls(QGroupBox):
     Signals:
         import_requested: Emitted when user clicks Import button.
         clear_requested: Emitted when user clicks Clear button.
+        preview_mapping_requested: Emitted when user clicks Preview Mapping button.
     """
 
     import_requested = Signal()
     clear_requested = Signal()
+    preview_mapping_requested = Signal()
 
     def __init__(self, overlay: OverlayLayer, parent: QWidget | None = None) -> None:
         super().__init__("Overlay Image", parent)
@@ -68,6 +70,13 @@ class OverlayControls(QGroupBox):
         import_row.addWidget(self.import_btn)
         import_row.addWidget(self.clear_btn)
         layout.addLayout(import_row)
+
+        # Preview Mapping button (shows live palette mapping preview)
+        self.preview_mapping_btn = QPushButton("Preview Mapping...")
+        self.preview_mapping_btn.setToolTip(
+            "Preview how overlay colors will map to the palette.\nAdjust mappings before applying."
+        )
+        layout.addWidget(self.preview_mapping_btn)
 
         # Position controls
         pos_row = QHBoxLayout()
@@ -147,6 +156,7 @@ class OverlayControls(QGroupBox):
         # UI -> Overlay
         self.import_btn.clicked.connect(self._on_import_clicked)
         self.clear_btn.clicked.connect(self._on_clear_clicked)
+        self.preview_mapping_btn.clicked.connect(self.preview_mapping_requested.emit)
         self.x_spin.valueChanged.connect(self._on_position_changed)
         self.y_spin.valueChanged.connect(self._on_position_changed)
         self.scale_slider.valueChanged.connect(self._on_scale_slider_changed)
@@ -283,6 +293,7 @@ class OverlayControls(QGroupBox):
         """Update enabled state based on whether overlay has image."""
         has_image = self._overlay.has_image()
         self.clear_btn.setEnabled(has_image)
+        self.preview_mapping_btn.setEnabled(has_image)
         self.x_spin.setEnabled(has_image)
         self.y_spin.setEnabled(has_image)
         self.scale_slider.setEnabled(has_image)

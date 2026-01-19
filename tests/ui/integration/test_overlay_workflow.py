@@ -319,6 +319,9 @@ class TestPaletteCacheBug:
         dialog.colorizer.clear_cache = tracked_clear_cache  # type: ignore[method-assign]
 
         dialog.overlay_layer.import_image(white_overlay, 16, 16)
+        # Pre-set color mappings to skip the ColorMappingDialog (which would block)
+        # White (255,255,255) maps to palette index 15 (brightest in our grayscale palette)
+        dialog._saved_color_mappings = {(255, 255, 255): 15}
         dialog._apply_overlay()
 
         assert len(clear_cache_called) > 0, (
@@ -540,6 +543,8 @@ class TestDelayedVisualFeedback:
 
         dialog.overlay_layer.import_image(test_overlay_canvas)
         dialog.overlay_layer.set_position(0, 0)
+        # Pre-set color mappings to skip ColorMappingDialog (red overlay -> bright palette)
+        dialog._saved_color_mappings = {(255, 0, 0): 15}  # Red to brightest
         dialog._apply_overlay()
         qtbot.wait(10)
 
