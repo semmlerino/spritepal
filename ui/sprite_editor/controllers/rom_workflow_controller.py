@@ -2461,6 +2461,9 @@ class ROMWorkflowController(QObject):
                     f"{injection_result.message}",
                 )
 
+                # Offer to inject palette as well
+                self._offer_palette_injection(str(output_path))
+
                 # Clear undo history
                 self._editing_controller.clear_undo_history()
 
@@ -2482,6 +2485,134 @@ class ROMWorkflowController(QObject):
     def has_rom_map_data(self) -> bool:
         """Check if ROM map data is available for raw tile injection."""
         return self._current_rom_map_data is not None
+
+
+    def _offer_palette_injection(self, output_path: str) -> None:
+        """Offer to inject palette after successful tile injection.
+
+        Args:
+            output_path: Path to the modified ROM file
+        """
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+
+        # Ask if user wants to inject palette
+        result = QMessageBox.question(
+            self._view,
+            "Inject Palette?",
+            "Would you also like to inject the current palette to the ROM?\n\n"
+            "This requires knowing the ROM offset where the palette is stored.\n"
+            "For King Dedede in Kirby Super Star, this is 0x144037.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        if result != QMessageBox.StandardButton.Yes:
+            return
+
+        # Prompt for palette offset
+        offset_str, ok = QInputDialog.getText(
+            self._view,
+            "Palette ROM Offset",
+            "Enter the ROM offset for the palette (hex):\n\n"
+            "Known offsets:\n"
+            "  • King Dedede palette 7: 0x144037\n"
+            "  • Kirby palettes: 0x467D6 (and others)",
+            text="144037",
+        )
+
+        if not ok or not offset_str.strip():
+            return
+
+        # Parse offset
+        try:
+            offset_str = offset_str.strip()
+            if offset_str.lower().startswith("0x"):
+                offset_str = offset_str[2:]
+            palette_offset = int(offset_str, 16)
+        except ValueError:
+            QMessageBox.warning(
+                self._view,
+                "Invalid Offset",
+                f"'{offset_str}' is not a valid hex value.",
+            )
+            return
+
+        # Get current palette
+        colors = self._editing_controller.get_current_colors()
+        if len(colors) < 16:
+            # Pad to 16 colors
+            colors = colors + [(0, 0, 0)] * (16 - len(colors))
+        elif len(colors) > 16:
+            colors = colors[:16]
+
+        # Perform injection
+        self._inject_palette_to_rom(output_path, palette_offset, colors)
+
+    def _inject_palette_to_rom(
+        self,
+        rom_path: str,
+        palette_offset: int,
+        colors: list[tuple[int, int, int]],
+    ) -> None:
+        """Inject palette data to ROM.
+
+        Args:
+            rom_path: Path to ROM file (will be modified in place)
+            palette_offset: ROM offset where palette should be written
+            colors: List of 16 RGB color tuples
+        """
+        from pathlib import Path
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from core.rom_injector import ROMInjector
+
+        try:
+            if self._message_service:
+                self._message_service.show_message(f"Injecting palette at 0x{palette_offset:X}...")
+
+            # Use the existing ROM (output from tile injection, already modified)
+            # Inject palette in-place
+            rom_injector = ROMInjector()
+            success, message = rom_injector.inject_palette_to_rom(
+                rom_path=rom_path,
+                output_path=rom_path,  # In-place modification
+                palette_offset=palette_offset,
+                colors=colors,
+                create_backup=False,  # Already backed up during tile injection
+                ignore_checksum=True,  # ROM already modified, checksum will be updated
+            )
+
+            if success:
+                if self._message_service:
+                    self._message_service.show_message("Palette injected successfully")
+
+                QMessageBox.information(
+                    self._view,
+                    "Palette Injected",
+                    f"Palette injected successfully!\n\n"
+                    f"Offset: 0x{palette_offset:06X}\n"
+                    f"Colors: {len(colors)}\n"
+                    f"ROM: {Path(rom_path).name}",
+                )
+            else:
+                if self._message_service:
+                    self._message_service.show_message(f"Palette injection failed: {message}")
+
+                QMessageBox.warning(
+                    self._view,
+                    "Palette Injection Failed",
+                    f"Failed to inject palette:\n{message}",
+                )
+
+        except Exception as e:
+            logger.exception("Error during palette injection")
+            if self._message_service:
+                self._message_service.show_message(f"Palette error: {e}")
+            QMessageBox.critical(
+                self._view,
+                "Palette Error",
+                f"An error occurred during palette injection:\n{e}",
+            )
 
     def export_png(self) -> None:
         """Export current sprite as PNG file."""
