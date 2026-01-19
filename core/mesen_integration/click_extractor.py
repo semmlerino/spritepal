@@ -120,7 +120,7 @@ class CaptureResult:
     visible_count: int
     obsel: OBSELConfig
     entries: list[OAMEntry]
-    palettes: dict[int, list[int]]  # palette_index -> list of 16 colors
+    palettes: dict[int, list[int | list[int]]]  # palette_index -> 16 colors (SNES int or RGB triplet)
     timestamp: int = 0
 
     @property
@@ -335,7 +335,7 @@ class MesenCaptureParser:
             entries.append(entry)
 
         # Parse palettes with validation
-        palettes: dict[int, list[int]] = {}
+        palettes: dict[int, list[int | list[int]]] = {}
         palettes_data = data.get("palettes", {})
         for pal_key, colors in palettes_data.items():
             try:

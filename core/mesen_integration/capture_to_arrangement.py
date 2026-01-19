@@ -161,18 +161,25 @@ class CaptureToArrangementConverter:
 
     def _convert_palettes(
         self,
-        palettes: dict[int, list[int]],
+        palettes: dict[int, list[int | list[int]]],
     ) -> dict[int, list[tuple[int, int, int]]]:
-        """Convert palette format from list of RGB ints to list of (R,G,B) tuples."""
+        """Convert palette format to list of (R,G,B) tuples.
+
+        Handles both packed RGB integers and RGB triplets.
+        """
         rgb_palettes: dict[int, list[tuple[int, int, int]]] = {}
         for idx, colors in palettes.items():
             rgb_colors: list[tuple[int, int, int]] = []
             for color in colors:
-                # Colors are stored as RGB integers
-                r = (color >> 16) & 0xFF
-                g = (color >> 8) & 0xFF
-                b = color & 0xFF
-                rgb_colors.append((r, g, b))
+                if isinstance(color, int):
+                    # Colors stored as packed RGB integer (0xRRGGBB)
+                    r = (color >> 16) & 0xFF
+                    g = (color >> 8) & 0xFF
+                    b = color & 0xFF
+                    rgb_colors.append((r, g, b))
+                else:
+                    # Already RGB triplet (list[int]) - convert to tuple
+                    rgb_colors.append((int(color[0]), int(color[1]), int(color[2])))
             rgb_palettes[idx] = rgb_colors
         return rgb_palettes
 
