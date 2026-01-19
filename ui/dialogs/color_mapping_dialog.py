@@ -409,3 +409,82 @@ def extract_colors_from_sampled_overlay(
         color_counts[rgb] = color_counts.get(rgb, 0) + 1
 
     return color_counts
+
+
+def quantize_colors_to_palette(
+    color_counts: dict[tuple[int, int, int], int],
+    max_colors: int = 16,
+) -> list[tuple[int, int, int]]:
+    """Quantize colors to a limited palette.
+
+    Uses PIL's median-cut quantization to reduce colors.
+    Index 0 is reserved for transparency (black).
+
+    Args:
+        color_counts: Dict mapping RGB tuples to pixel counts
+        max_colors: Maximum colors in output palette (default 16 for SNES)
+
+    Returns:
+        List of RGB tuples (max_colors entries, index 0 = transparency)
+    """
+    from PIL import Image
+
+    if not color_counts:
+        # Return empty palette with black at index 0
+        return [(0, 0, 0)] * max_colors
+
+    # Sort colors by frequency
+    sorted_colors = sorted(color_counts.items(), key=lambda x: x[1], reverse=True)
+
+    # If we have few enough colors, use them directly
+    if len(sorted_colors) <= max_colors - 1:  # -1 for transparency
+        palette = [(0, 0, 0)]  # Index 0 = transparent/black
+        for color, _count in sorted_colors:
+            palette.append(color)
+        # Pad with black if needed
+        while len(palette) < max_colors:
+            palette.append((0, 0, 0))
+        return palette
+
+    # Create a small image with all colors weighted by frequency
+    # This gives better quantization results
+    total_pixels = sum(color_counts.values())
+    img_size = min(256, max(16, int(total_pixels**0.5)))  # Reasonable size
+
+    # Build image data
+    pixel_data: list[tuple[int, int, int]] = []
+    for color, count in sorted_colors:
+        # Add each color proportionally to its frequency
+        weight = max(1, int(count * img_size * img_size / total_pixels))
+        pixel_data.extend([color] * weight)
+
+    # Ensure we have enough pixels
+    while len(pixel_data) < img_size * img_size:
+        pixel_data.append(sorted_colors[0][0])  # Pad with most common color
+
+    # Create image and quantize
+    img = Image.new("RGB", (img_size, img_size))
+    img.putdata(pixel_data[: img_size * img_size])
+
+    # Quantize to max_colors - 1 (reserve index 0 for transparency)
+    quantized = img.quantize(colors=max_colors - 1, method=Image.Quantize.MEDIANCUT)
+    raw_palette = quantized.getpalette()
+
+    if raw_palette is None:
+        # Fallback: use most frequent colors
+        palette = [(0, 0, 0)]
+        for color, _count in sorted_colors[: max_colors - 1]:
+            palette.append(color)
+        while len(palette) < max_colors:
+            palette.append((0, 0, 0))
+        return palette
+
+    # Extract palette colors
+    palette = [(0, 0, 0)]  # Index 0 = transparent
+    for i in range(max_colors - 1):
+        r = raw_palette[i * 3]
+        g = raw_palette[i * 3 + 1]
+        b = raw_palette[i * 3 + 2]
+        palette.append((r, g, b))
+
+    return palette

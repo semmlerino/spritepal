@@ -41,6 +41,7 @@ class OverlayControls(QGroupBox):
     import_requested = Signal()
     clear_requested = Signal()
     preview_mapping_requested = Signal()
+    extract_palette_requested = Signal()
 
     def __init__(self, overlay: OverlayLayer, parent: QWidget | None = None) -> None:
         super().__init__("Overlay Image", parent)
@@ -77,6 +78,14 @@ class OverlayControls(QGroupBox):
             "Preview how overlay colors will map to the palette.\nAdjust mappings before applying."
         )
         layout.addWidget(self.preview_mapping_btn)
+
+        # Extract Palette button (creates palette from overlay colors)
+        self.extract_palette_btn = QPushButton("Extract Palette")
+        self.extract_palette_btn.setToolTip(
+            "Create a 16-color palette from overlay colors.\n"
+            "Use this when you want the sprite to match the overlay exactly."
+        )
+        layout.addWidget(self.extract_palette_btn)
 
         # Position controls
         pos_row = QHBoxLayout()
@@ -157,6 +166,7 @@ class OverlayControls(QGroupBox):
         self.import_btn.clicked.connect(self._on_import_clicked)
         self.clear_btn.clicked.connect(self._on_clear_clicked)
         self.preview_mapping_btn.clicked.connect(self.preview_mapping_requested.emit)
+        self.extract_palette_btn.clicked.connect(self.extract_palette_requested.emit)
         self.x_spin.valueChanged.connect(self._on_position_changed)
         self.y_spin.valueChanged.connect(self._on_position_changed)
         self.scale_slider.valueChanged.connect(self._on_scale_slider_changed)
@@ -294,6 +304,7 @@ class OverlayControls(QGroupBox):
         has_image = self._overlay.has_image()
         self.clear_btn.setEnabled(has_image)
         self.preview_mapping_btn.setEnabled(has_image)
+        self.extract_palette_btn.setEnabled(has_image)
         self.x_spin.setEnabled(has_image)
         self.y_spin.setEnabled(has_image)
         self.scale_slider.setEnabled(has_image)

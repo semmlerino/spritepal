@@ -2705,6 +2705,94 @@ class ROMWorkflowController(QObject):
         if self._message_service:
             self._message_service.show_message(f"Loaded project: {project.name}")
 
+        # Save as last project for auto-load on next startup
+        self._save_last_project_path(file_path)
+
+    def _save_last_project_path(self, file_path: str) -> None:
+        """Save the project path as the last loaded project."""
+        from core.app_context import get_app_context
+        from utils.constants import SETTINGS_KEY_LAST_PROJECT_PATH, SETTINGS_NS_ROM_INJECTION
+
+        try:
+            ctx = get_app_context()
+            ctx.application_state_manager.set(SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_PROJECT_PATH, file_path)
+            logger.debug(f"Saved last project path: {file_path}")
+        except Exception:
+            logger.exception("Failed to save last project path")
+
+    def load_last_project(self) -> bool:
+        """Load the last opened .spritepal project if it exists.
+
+        Returns:
+            True if a project was loaded, False otherwise.
+        """
+        from pathlib import Path
+
+        from core.app_context import get_app_context
+        from core.sprite_project import SpriteProject, SpriteProjectError
+        from utils.constants import SETTINGS_KEY_LAST_PROJECT_PATH, SETTINGS_NS_ROM_INJECTION
+
+        try:
+            ctx = get_app_context()
+            last_project = ctx.application_state_manager.get(
+                SETTINGS_NS_ROM_INJECTION, SETTINGS_KEY_LAST_PROJECT_PATH, ""
+            )
+
+            if not last_project or not isinstance(last_project, str):
+                logger.debug("No last project in settings")
+                return False
+
+            project_path = Path(last_project)
+            if not project_path.exists():
+                logger.warning(f"Last project not found on disk: {last_project}")
+                return False
+
+            logger.info(f"Auto-loading last project: {last_project}")
+
+            # Load the project
+            project = SpriteProject.load(project_path)
+
+            # Apply project data (same as load_sprite_project but without dialogs)
+            self.current_tile_data = project.tile_data
+            self.current_width = project.width
+            self.current_height = project.height
+            self.current_sprite_name = project.name
+            self.original_compressed_size = project.original_compressed_size
+            self.current_header_bytes = project.header_bytes
+            self.current_offset = project.original_rom_offset
+
+            # Set compression type
+            try:
+                self.current_compression_type = CompressionType(project.compression_type)
+            except ValueError:
+                self.current_compression_type = CompressionType.HAL
+
+            # Load into editing controller
+            self._load_tile_data_into_editor(project.tile_data, project.width, project.height)
+
+            # Apply palette
+            self._editing_controller.set_palette(project.palette_colors, project.palette_name)
+            self._editing_controller.palette_model.index = project.palette_index
+
+            # Update state
+            self.state = "edit"
+
+            # Enable save project button
+            if self._view and self._view.workspace:
+                self._view.workspace.set_save_project_enabled(True)
+
+            if self._message_service:
+                self._message_service.show_message(f"Restored project: {project.name}")
+
+            return True
+
+        except SpriteProjectError as e:
+            logger.warning(f"Failed to auto-load last project: {e}")
+            return False
+        except Exception:
+            logger.exception("Error loading last project")
+            return False
+
     def _load_tile_data_into_editor(self, tile_data: bytes, width: int, height: int) -> None:
         """Load raw tile data into the editing controller."""
         from core.tile_utils import decode_4bpp_tile

@@ -165,6 +165,7 @@ SETTINGS_KEY_LAST_SPRITE_LOCATION = "last_sprite_location"
 SETTINGS_KEY_LAST_CUSTOM_OFFSET = "last_custom_offset"
 SETTINGS_KEY_FAST_COMPRESSION = "fast_compression"
 SETTINGS_KEY_LAST_INPUT_VRAM = "last_input_vram"  # Used for injection dialog
+SETTINGS_KEY_LAST_PROJECT_PATH = "last_project_path"  # Last loaded .spritepal project
 
 # Data buffer sizes and limits
 BUFFER_SIZE_64KB = 65536  # 64KB absolute maximum for HAL compression

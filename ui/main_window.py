@@ -176,6 +176,9 @@ class MainWindow(QMainWindow):
         # Load last ROM AFTER signals are connected, so Sprite Editor receives rom_loaded
         self.rom_extraction_panel.load_last_rom_deferred()
 
+        # Load last .spritepal project if one was previously opened
+        self._sprite_editor_workspace.rom_workflow_controller.load_last_project()
+
         # Controller will be created on first access via property
         # This breaks the circular dependency: tests can create MainWindow without hanging
 

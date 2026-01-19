@@ -289,6 +289,7 @@ class GridArrangementDialog(SplitterDialog):
         self.overlay_controls.setContentsMargins(0, 0, 0, 0)
         self.overlay_controls.setTitle("")  # Hide redundant title
         self.overlay_controls.preview_mapping_requested.connect(self._on_preview_mapping_requested)
+        self.overlay_controls.extract_palette_requested.connect(self._on_extract_palette_requested)
         overlay_layout.addWidget(self.overlay_controls)
 
         self.apply_overlay_btn = QPushButton("Apply Overlay to Arranged Tiles", overlay_group)
@@ -1841,6 +1842,83 @@ class GridArrangementDialog(SplitterDialog):
         close_btn.clicked.connect(dialog.reject)
 
         dialog.exec()
+
+    def _on_extract_palette_requested(self) -> None:
+        """Extract a 16-color palette from the overlay and apply it."""
+        if not self.overlay_layer.has_image():
+            _ = QMessageBox.warning(
+                self,
+                "No Overlay",
+                "Please import an overlay image first.",
+            )
+            return
+
+        if not self.arrangement_manager.get_arranged_tiles():
+            _ = QMessageBox.warning(
+                self,
+                "No Tiles Placed",
+                "Please arrange some tiles on the canvas first.\n\n"
+                "Colors are extracted from overlay regions that cover placed tiles.",
+            )
+            return
+
+        # Import extraction functions
+        from ui.dialogs.color_mapping_dialog import (
+            extract_colors_from_sampled_overlay,
+            quantize_colors_to_palette,
+        )
+
+        # Extract colors from sampled overlay regions
+        self._update_status("Extracting colors from overlay...")
+        QApplication.processEvents()
+
+        color_counts = extract_colors_from_sampled_overlay(
+            self.overlay_layer,
+            self.arrangement_manager.get_grid_mapping(),
+            self.processor.tile_width,
+            self.processor.tile_height,
+        )
+
+        if not color_counts:
+            _ = QMessageBox.warning(
+                self,
+                "No Colors Found",
+                "No opaque pixels found in overlay regions covering tiles.\n\n"
+                "Make sure the overlay is positioned over placed tiles.",
+            )
+            return
+
+        # Quantize to 16 colors
+        palette = quantize_colors_to_palette(color_counts, max_colors=16)
+        unique_count = len(color_counts)
+
+        # Set as the active palette
+        # Use palette index 0 (or create a new slot)
+        palette_dict = {0: palette}
+        self.colorizer.set_palettes(palette_dict)
+        self.colorizer.set_selected_palette(0)
+
+        # Enable palette mode if not already enabled
+        if not self.colorizer.is_palette_mode():
+            self.colorizer.toggle_palette_mode()
+            self.palette_toggle_btn.setChecked(True)
+
+        # Clear saved color mappings since we have a new palette
+        self._saved_color_mappings = None
+
+        # Update displays to show new palette
+        self._update_displays()
+
+        _ = QMessageBox.information(
+            self,
+            "Palette Extracted",
+            f"Created palette from {unique_count} unique colors.\n\n"
+            f"The palette is now active. You can:\n"
+            f"• Click 'Apply Overlay' to apply with this palette\n"
+            f"• Use 'Preview Mapping' to fine-tune color assignments",
+        )
+
+        self._update_status(f"Extracted palette: {unique_count} colors → 16 palette entries")
 
     def apply_overlay(self) -> None:
         """Apply current overlay to tiles. Public API for testing."""
