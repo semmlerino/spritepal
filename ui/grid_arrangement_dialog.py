@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, cast, override
 
 if TYPE_CHECKING:
     from core.mesen_integration.capture_to_arrangement import CaptureArrangementData
+    from core.mesen_integration.rom_map_importer import ROMMapData
     from ui.sprite_editor.services.arrangement_bridge import ArrangementBridge
 
 from PIL import Image
@@ -85,6 +86,7 @@ class ArrangementResult:
     tiles_per_row: int  # Source grid layout (for byte offset calculation)
     modified_tiles: dict[TilePosition, Image.Image] | None = None
     keep_arrangement: bool = True  # Whether to apply this arrangement as the active layout
+    rom_map_data: ROMMapData | None = None  # ROM offsets for raw tile injection (boss sprites)
 
 
 # GridGraphicsView is now imported from ui.components.visualization
@@ -150,6 +152,9 @@ class GridArrangementDialog(SplitterDialog):
         # Without this, unmodified P-mode tiles would be corrupted when processed
         # as L-mode tiles by _update_tile_data_from_modified_tiles().
         self._actually_modified_positions: set[TilePosition] = set()
+
+        # ROM map data for raw tile injection (boss sprites stored at scattered ROM addresses)
+        self._rom_map_data: ROMMapData | None = None
 
         # Persistent overlay item
         self.overlay_item: OverlayGraphicsItem | None = None
@@ -609,6 +614,13 @@ class GridArrangementDialog(SplitterDialog):
         self.import_capture_btn.setToolTip("Import Mesen 2 sprite capture as editable tiles")
         _ = self.import_capture_btn.clicked.connect(self._import_mesen_capture)
         layout.addWidget(self.import_capture_btn)
+
+        self.import_rom_map_btn = QPushButton("Import ROM Map", self)
+        self.import_rom_map_btn.setToolTip(
+            "Import tiles from ROM using a ROM map JSON (for scattered raw tiles like boss sprites)"
+        )
+        _ = self.import_rom_map_btn.clicked.connect(self._import_rom_map)
+        layout.addWidget(self.import_rom_map_btn)
 
         # Separator
         sep = QFrame()
@@ -1116,6 +1128,180 @@ class GridArrangementDialog(SplitterDialog):
                 status_msg += f" | ROM: {', '.join(offset_strs)}"
 
         self._update_status(status_msg)
+
+    def _import_rom_map(self) -> None:
+        """Import tiles from ROM using a ROM map JSON file.
+
+        This handles scattered raw tiles (like boss sprites) where each tile
+        has its own ROM address, unlike HAL-compressed sprites.
+        """
+        from pathlib import Path
+
+        from PySide6.QtWidgets import QFileDialog
+
+        from core.mesen_integration.rom_map_importer import load_rom_map
+
+        # 1. Select ROM map JSON file
+        default_dir = Path(__file__).parent.parent / "DededeDMP"
+        if not default_dir.exists():
+            default_dir = Path(__file__).parent.parent / "mesen2_exchange"
+        if not default_dir.exists():
+            default_dir = Path.cwd()
+
+        map_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select ROM Map JSON",
+            str(default_dir),
+            "ROM Map Files (*.json);;All Files (*)",
+        )
+        if not map_path:
+            return
+
+        map_path = Path(map_path)
+        map_dir = map_path.parent
+
+        # 2. Select ROM file
+        rom_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select ROM File",
+            str(Path(__file__).parent.parent / "roms"),
+            "SNES ROM (*.sfc *.smc);;All Files (*)",
+        )
+        if not rom_path:
+            return
+
+        # 3. Try to find CGRAM dump for palette (optional)
+        cgram_path = None
+        cgram_candidates = list(map_dir.glob("*CGRAM*.dmp")) + list(map_dir.glob("*cgram*.dmp"))
+        if cgram_candidates:
+            cgram_path = cgram_candidates[0]
+
+        # 4. Load ROM map data
+        rom_map_data = load_rom_map(
+            rom_map_path=map_path,
+            rom_path=rom_path,
+            cgram_path=cgram_path,
+            palette_index=7,  # Default for Dedede
+        )
+
+        if rom_map_data is None:
+            _ = QMessageBox.warning(
+                self,
+                "Import Failed",
+                "Failed to load tiles from ROM map.\nCheck the console for details.",
+            )
+            return
+
+        if not rom_map_data.tiles:
+            _ = QMessageBox.warning(self, "Import Failed", "ROM map contains no tiles")
+            return
+
+        # 5. Confirm if replacing existing arrangement
+        if self.arrangement_manager.get_arranged_count() > 0:
+            result = QMessageBox.question(
+                self,
+                "Replace Arrangement?",
+                "Importing will replace the current arrangement.\nContinue?",
+            )
+            if result != QMessageBox.StandardButton.Yes:
+                return
+            self.arrangement_manager.clear()
+            self.undo_stack.clear()
+
+        # 6. Populate grid with ROM tiles
+        self._populate_from_rom_map(rom_map_data)
+
+        # 7. Store ROM map data for reinjection
+        self._rom_map_data = rom_map_data
+
+        # 8. Update status
+        offset_range = ""
+        if rom_map_data.tiles:
+            min_off = min(t.rom_offset for t in rom_map_data.tiles)
+            max_off = max(t.rom_offset for t in rom_map_data.tiles)
+            offset_range = f" | ROM: 0x{min_off:06X}-0x{max_off:06X}"
+
+        self._update_status(f"Imported {len(rom_map_data.tiles)} tiles from {rom_map_data.frame_name}{offset_range}")
+
+    def _populate_from_rom_map(self, data: ROMMapData) -> None:
+        """Populate arrangement grid with tiles from ROM map.
+
+        Args:
+            data: ROMMapData from rom_map_importer
+        """
+
+        # Clear existing tiles
+        self.tiles.clear()
+
+        # Place tiles at their grid positions
+        for tile in data.tiles:
+            pos = TilePosition(tile.row, tile.col)
+            self.tiles[pos] = tile.image
+
+        # Update processor dimensions
+        self.processor.grid_rows = data.height_tiles
+        self.processor.grid_cols = data.width_tiles
+        self.processor.tiles = self.tiles
+
+        # Mark all as modified for flow back to workflow
+        self._actually_modified_positions.clear()
+        self._actually_modified_positions.update(self.tiles.keys())
+
+        # Recreate arrangement manager
+        old_manager = self.arrangement_manager
+        safe_disconnect(old_manager.arrangement_changed)
+        self.arrangement_manager = GridArrangementManager(
+            self.processor.grid_rows,
+            self.processor.grid_cols,
+        )
+        self.arrangement_manager.arrangement_changed.connect(self._on_arrangement_changed)
+
+        # Add all tiles to manager
+        for pos in self.tiles:
+            _ = self.arrangement_manager.set_item_at(
+                pos.row,
+                pos.col,
+                ArrangementType.TILE,
+                f"{pos.row},{pos.col}",
+            )
+
+        # Create composite image
+        self._create_composite_from_tiles()
+
+        # Reinitialize grid view
+        self.grid_view.set_grid_dimensions(
+            self.processor.grid_rows,
+            self.processor.grid_cols,
+            self.processor.tile_width,
+            self.processor.tile_height,
+        )
+
+        # Update arrangement canvas
+        if hasattr(self, "arrangement_grid"):
+            self.arrangement_grid.set_grid_dimensions(
+                self.processor.grid_rows,
+                self.processor.grid_cols,
+                self.processor.tile_width,
+                self.processor.tile_height,
+            )
+
+        # Update tiles_per_row
+        self.tiles_per_row = self.processor.grid_cols
+
+        # Update width spinner
+        if hasattr(self, "width_spin"):
+            self.width_spin.blockSignals(True)
+            self.width_spin.setValue(self.processor.grid_cols)
+            self.width_spin.blockSignals(False)
+
+        # Set palette if available
+        if data.palette:
+            palette_dict = {data.palette_index: [(r, g, b) for r, g, b, _ in data.palette]}
+            self.colorizer.set_palettes(palette_dict)
+            self.colorizer.set_selected_palette(data.palette_index)
+
+        # Refresh display
+        self._update_displays()
 
     def _populate_from_capture_data(
         self,
@@ -2182,6 +2368,7 @@ class GridArrangementDialog(SplitterDialog):
             tiles_per_row=self.tiles_per_row,
             modified_tiles=modified_tiles,
             keep_arrangement=keep_arrangement,
+            rom_map_data=self._rom_map_data,
         )
 
     @property

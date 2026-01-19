@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from core.arrangement_persistence import ArrangementConfig
     from core.color_quantization import QuantizationResult
     from core.mesen_integration.log_watcher import LogWatcher
+    from core.mesen_integration.rom_map_importer import ROMMapData
     from core.rom_extractor import ROMExtractor
     from core.services.rom_cache import ROMCache
     from core.sprite_library import SpriteLibrary
@@ -121,6 +122,9 @@ class ROMWorkflowController(QObject):
         # Tile arrangement state (for scattered tile layouts)
         self._current_arrangement: ArrangementBridge | None = None
         self._arrangement_config: ArrangementConfig | None = None
+
+        # ROM map data for raw tile injection (boss sprites stored at scattered ROM addresses)
+        self._current_rom_map_data: ROMMapData | None = None
 
         # Flag for auto-opening in editor after preview completes (double-click)
         self._pending_open_in_editor: bool = False
@@ -1546,7 +1550,16 @@ class ROMWorkflowController(QObject):
                         if result.modified_tiles and self._message_service:
                             self._message_service.show_message("Overlay applied. Layout preserved.")
 
-                    # 3. Reload in editor with updated pixels/layout
+                    # 3. Store ROM map data if present (for raw tile injection)
+                    if result.rom_map_data:
+                        self._current_rom_map_data = result.rom_map_data
+                        logger.info(
+                            "ROM map data stored: %d tiles from %s",
+                            len(result.rom_map_data.tiles),
+                            result.rom_map_data.frame_name,
+                        )
+
+                    # 4. Reload in editor with updated pixels/layout
                     self.open_in_editor()
                 elif self._message_service:
                     self._message_service.show_message("No arrangement created")
@@ -1593,7 +1606,7 @@ class ROMWorkflowController(QObject):
             # Resize buffer to accommodate imported tiles
             data_mutable = bytearray(required_bytes)
             # Copy existing data (though for capture import this may not be relevant)
-            data_mutable[:len(self.current_tile_data)] = self.current_tile_data
+            data_mutable[: len(self.current_tile_data)] = self.current_tile_data
             logger.info(f"Resized tile data buffer: {len(self.current_tile_data)} -> {required_bytes} bytes")
             # Update dimensions to match new data
             self.current_width = tiles_per_row * 8
@@ -2306,6 +2319,146 @@ class ROMWorkflowController(QObject):
             from PySide6.QtWidgets import QMessageBox
 
             QMessageBox.critical(self._view, "Error", f"An error occurred during injection: {e}")
+
+    def save_raw_tiles_to_rom(self) -> None:
+        """Inject edited raw tiles back to ROM using ROM map offsets.
+
+        This is used for boss sprites (like King Dedede) that are stored as raw
+        uncompressed 4bpp tiles at scattered ROM addresses, rather than as
+        HAL-compressed contiguous data.
+
+        Requires:
+            - ROM map data from Import ROM Map (stored in _current_rom_map_data)
+            - Modified tiles in the editor
+        """
+        if not self._current_rom_map_data:
+            if self._message_service:
+                self._message_service.show_message("No ROM map data. Use 'Import ROM Map' in arrangement dialog first.")
+            return
+
+        if not self.rom_path:
+            if self._message_service:
+                self._message_service.show_message("No ROM loaded")
+            return
+
+        # Get current edited pixel data
+        data = self._editing_controller.get_image_data()
+        if data is None:
+            if self._message_service:
+                self._message_service.show_message("No image data to save")
+            return
+
+        from pathlib import Path
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from core.mesen_integration.raw_tile_injector import RawTileInjector
+        from core.rom_injector import ROMInjector
+
+        # Split current image into 8x8 tiles
+        rom_map = self._current_rom_map_data
+        tile_size = 8
+
+        # Calculate how many tiles we have
+        height, width = data.shape
+        tiles_wide = width // tile_size
+        tiles_tall = height // tile_size
+
+        # Build mapping: grid position -> tile
+        current_tiles: dict[tuple[int, int], Image.Image] = {}
+        for row in range(tiles_tall):
+            for col in range(tiles_wide):
+                x = col * tile_size
+                y = row * tile_size
+                tile_pixels = data[y : y + tile_size, x : x + tile_size]
+                tile_img = Image.fromarray(tile_pixels, mode="L")
+                current_tiles[(row, col)] = tile_img
+
+        # Find modified tiles by comparing to ROM map originals
+        from core.mesen_integration.rom_map_importer import get_modified_tiles
+
+        modified = get_modified_tiles(rom_map, current_tiles)
+
+        if not modified:
+            if self._message_service:
+                self._message_service.show_message("No tiles modified - nothing to save")
+            return
+
+        # Confirm injection
+        result = QMessageBox.question(
+            self._view,
+            "Save Raw Tiles to ROM",
+            f"Found {len(modified)} modified tiles.\n\n"
+            f"ROM: {Path(self.rom_path).name}\n"
+            f"Frame: {rom_map.frame_name}\n\n"
+            "Proceed with injection?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+
+        if result != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            if self._message_service:
+                self._message_service.show_message(f"Injecting {len(modified)} tiles to ROM...")
+
+            # Generate output path
+            output_path = ROMInjector.get_modified_rom_path(self.rom_path)
+
+            # Perform injection
+            injector = RawTileInjector()
+            injection_result = injector.inject_from_rom_map(
+                rom_path=self.rom_path,
+                output_path=output_path,
+                rom_map={"mappings": [{"vram_word": t.vram_word, "rom_offset": t.rom_offset} for t in rom_map.tiles]},
+                modified_tiles=modified,
+                create_backup=True,
+            )
+
+            if injection_result.success:
+                # Update ROM path to modified version
+                self.rom_path = str(output_path)
+                try:
+                    self._rom_mtime = Path(self.rom_path).stat().st_mtime
+                except OSError:
+                    self._rom_mtime = None
+
+                if self._view:
+                    self._view.set_rom_path(self.rom_path)
+
+                if self._message_service:
+                    self._message_service.show_message(f"Saved {injection_result.tiles_written} tiles")
+
+                QMessageBox.information(
+                    self._view,
+                    "Save Successful",
+                    f"Raw tiles injected successfully!\n\n"
+                    f"Tiles written: {injection_result.tiles_written}\n"
+                    f"Output: {Path(output_path).name}\n\n"
+                    f"{injection_result.message}",
+                )
+
+                # Clear undo history
+                self._editing_controller.clear_undo_history()
+
+            else:
+                if self._message_service:
+                    self._message_service.show_message(f"Injection failed: {injection_result.message}")
+                QMessageBox.critical(
+                    self._view,
+                    "Injection Failed",
+                    f"Failed to inject raw tiles:\n{injection_result.message}",
+                )
+
+        except Exception as e:
+            logger.exception("Error during raw tile injection")
+            if self._message_service:
+                self._message_service.show_message(f"Error: {e}")
+            QMessageBox.critical(self._view, "Error", f"An error occurred during injection: {e}")
+
+    def has_rom_map_data(self) -> bool:
+        """Check if ROM map data is available for raw tile injection."""
+        return self._current_rom_map_data is not None
 
     def export_png(self) -> None:
         """Export current sprite as PNG file."""
