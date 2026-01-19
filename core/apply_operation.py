@@ -72,7 +72,6 @@ class ApplyOperation:
         tile_height: int,
         palette: list[tuple[int, int, int]] | None = None,
         color_mappings: dict[tuple[int, int, int], int] | None = None,
-        direct_sampling: bool = True,
     ) -> None:
         """Initialize the Apply operation.
 
@@ -85,9 +84,6 @@ class ApplyOperation:
             palette: Optional palette for quantization (16 RGB colors).
             color_mappings: Optional custom color mappings (RGB -> palette index).
                 If provided, these mappings override the default nearest-color matching.
-            direct_sampling: If True (default), sample from original image at 1:1 pixels,
-                ignoring visual scale. This preserves full detail for pixel-perfect overlays.
-                If False, use the visual scale (may lose detail if overlay is scaled down).
         """
         self._overlay = overlay
         self._grid_mapping = grid_mapping
@@ -96,7 +92,6 @@ class ApplyOperation:
         self._tile_height = tile_height
         self._palette = palette
         self._color_mappings = color_mappings
-        self._direct_sampling = direct_sampling
 
     def validate(self) -> list[ApplyWarning]:
         """Validate the Apply operation and return warnings.
@@ -119,12 +114,7 @@ class ApplyOperation:
                 tile_x = c * self._tile_width
                 tile_y = r * self._tile_height
 
-                # Use appropriate coverage check based on sampling mode
-                if self._direct_sampling:
-                    covered = self._overlay.covers_tile_direct(tile_x, tile_y, self._tile_width, self._tile_height)
-                else:
-                    covered = self._overlay.covers_tile(tile_x, tile_y, self._tile_width, self._tile_height)
-                if not covered:
+                if not self._overlay.covers_tile(tile_x, tile_y, self._tile_width, self._tile_height):
                     uncovered_tiles.append(TilePosition(row, col))
 
         if uncovered_tiles:
@@ -198,11 +188,8 @@ class ApplyOperation:
             tile_x = c * self._tile_width
             tile_y = r * self._tile_height
 
-            # Sample from overlay - use direct (1:1) sampling by default to preserve detail
-            if self._direct_sampling:
-                region = self._overlay.sample_region_direct(tile_x, tile_y, self._tile_width, self._tile_height)
-            else:
-                region = self._overlay.sample_region(tile_x, tile_y, self._tile_width, self._tile_height)
+            # Sample from overlay
+            region = self._overlay.sample_region(tile_x, tile_y, self._tile_width, self._tile_height)
 
             if region is None:
                 # Tile not covered - skip (warning already generated)
