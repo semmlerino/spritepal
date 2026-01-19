@@ -1569,7 +1569,12 @@ class ROMWorkflowController(QObject):
                             result.rom_map_data.frame_name,
                         )
 
-                    # 4. Reload in editor with updated pixels/layout
+                    # 4. Apply extracted palette if present (from Extract Palette button)
+                    if result.extracted_palette:
+                        self._editing_controller.set_palette(result.extracted_palette, "Extracted from Overlay")
+                        logger.info("Applied extracted palette with %d colors", len(result.extracted_palette))
+
+                    # 5. Reload in editor with updated pixels/layout
                     self.open_in_editor()
                 elif self._message_service:
                     self._message_service.show_message("No arrangement created")

@@ -91,6 +91,7 @@ class ArrangementResult:
     modified_tiles: dict[TilePosition, Image.Image] | None = None
     keep_arrangement: bool = True  # Whether to apply this arrangement as the active layout
     rom_map_data: ROMMapData | None = None  # ROM offsets for raw tile injection (boss sprites)
+    extracted_palette: list[tuple[int, int, int]] | None = None  # Palette from Extract Palette
 
 
 # GridGraphicsView is now imported from ui.components.visualization
@@ -167,6 +168,9 @@ class GridArrangementDialog(SplitterDialog):
 
         # Saved color mappings from preview panel (cleared on overlay change)
         self._saved_color_mappings: dict[tuple[int, int, int], int] | None = None
+
+        # Extracted palette from overlay (for passing back to sprite editor)
+        self._extracted_palette: list[tuple[int, int, int]] | None = None
 
         # Step 2: Call parent init (this will call _setup_ui)
         super().__init__(
@@ -1892,6 +1896,9 @@ class GridArrangementDialog(SplitterDialog):
         palette = quantize_colors_to_palette(color_counts, max_colors=16)
         unique_count = len(color_counts)
 
+        # Store for passing back to sprite editor
+        self._extracted_palette = palette
+
         # Set as the active palette
         # Use palette index 0 (or create a new slot)
         palette_dict = {0: palette}
@@ -2796,6 +2803,7 @@ class GridArrangementDialog(SplitterDialog):
             modified_tiles=modified_tiles,
             keep_arrangement=keep_arrangement,
             rom_map_data=self._rom_map_data,
+            extracted_palette=self._extracted_palette,
         )
 
     @property
