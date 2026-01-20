@@ -250,9 +250,20 @@ class TestArrangementResultModifiedTilesContract:
         dialog.overlay_layer.import_image(small_red_overlay)
         dialog.overlay_layer.set_position(0, 0)
 
+        # Mock ColorMappingDialog to avoid blocking on exec()
+        from unittest.mock import MagicMock
+
+        from PySide6.QtWidgets import QDialog
+
+        mock_mapping_dialog = MagicMock()
+        mock_mapping_dialog.exec.return_value = QDialog.DialogCode.Accepted
+        # Provide a simple color mapping: red (255,0,0) -> palette index 1
+        mock_mapping_dialog.color_mappings = {(255, 0, 0): 1}
+
         with patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes):
             with patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok):
-                dialog._apply_overlay()
+                with patch("ui.dialogs.color_mapping_dialog.ColorMappingDialog", return_value=mock_mapping_dialog):
+                    dialog._apply_overlay()
 
         result = dialog.get_arrangement_result()
         assert result is not None
