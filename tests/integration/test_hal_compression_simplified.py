@@ -79,7 +79,7 @@ class TestHALProcessPoolLifecycle:
 
             # Initialize
             success = pool.initialize(exhal_path, inhal_path, pool_size=2)
-            
+
             assert success
             assert pool.is_initialized
             assert mock_process_class.call_count == 2
@@ -102,7 +102,7 @@ class TestHALProcessPoolLifecycle:
             p1 = Mock()
             p1.pid = 2001
             p1.is_alive.return_value = True
-            
+
             mock_process_class.return_value = p1
 
             # Init & Shutdown
@@ -146,7 +146,7 @@ class TestHALIntegration:
     def test_compressor_uses_pool_when_enabled(self, hal_tools, mock_not_wsl):
         """Verify HALCompressor delegates to pool when initialized."""
         exhal_path, inhal_path = hal_tools
-        
+
         # Initialize pool
         pool = HALProcessPool()
         # We need to mock the internal initialization to avoid spawning real processes
@@ -156,9 +156,9 @@ class TestHALIntegration:
             patch("multiprocessing.Process"),
         ):
             pool.initialize(exhal_path, inhal_path, pool_size=1)
-        
+
         compressor = HALCompressor(exhal_path, inhal_path, use_pool=True)
-        
+
         # Verify status
         status = compressor.pool_status
         assert status["enabled"]
@@ -174,7 +174,7 @@ class TestHALIntegration:
         rom_path.write_bytes(b"\x00" * 0x2000)
 
         # Mock the entire submit_request to simulate successful worker
-        with patch.object(pool, 'submit_request') as mock_submit:
+        with patch.object(pool, "submit_request") as mock_submit:
             # Setup mock result
             mock_result = Mock()
             mock_result.success = True
@@ -183,13 +183,13 @@ class TestHALIntegration:
 
             # Initialize pool mock state
             pool._initialized = True
-            
+
             # Create compressor using this pool
             compressor = HALCompressor(exhal_path, inhal_path, use_pool=True)
-            
+
             # Execute
             data = compressor.decompress_from_rom(str(rom_path), 0x1000)
-            
+
             # Verify
             assert data == b"DECOMPRESSED_DATA"
             mock_submit.assert_called_once()

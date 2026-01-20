@@ -53,11 +53,19 @@ def parse_oam(oam_data: bytes, obsel: int) -> list[dict]:
         width = sizes[2] if size_large else sizes[0]
         height = sizes[3] if size_large else sizes[1]
 
-        entries.append({
-            "id": i, "x": x, "y": y, "tile": tile,
-            "palette": palette, "flip_h": flip_h, "flip_v": flip_v,
-            "width": width, "height": height,
-        })
+        entries.append(
+            {
+                "id": i,
+                "x": x,
+                "y": y,
+                "tile": tile,
+                "palette": palette,
+                "flip_h": flip_h,
+                "flip_v": flip_v,
+                "width": width,
+                "height": height,
+            }
+        )
     return entries
 
 
@@ -94,10 +102,12 @@ def render_tile_4bpp(vram: bytes, addr: int, palette: list, flip_h: bool, flip_v
         for col in range(8):
             x = 7 - col if flip_h else col
             bit = 7 - col
-            pixel = (((bp01_lo >> bit) & 1) |
-                     (((bp01_hi >> bit) & 1) << 1) |
-                     (((bp23_lo >> bit) & 1) << 2) |
-                     (((bp23_hi >> bit) & 1) << 3))
+            pixel = (
+                ((bp01_lo >> bit) & 1)
+                | (((bp01_hi >> bit) & 1) << 1)
+                | (((bp23_lo >> bit) & 1) << 2)
+                | (((bp23_hi >> bit) & 1) << 3)
+            )
             if pixel != 0:
                 color = palette[pixel] if pixel < len(palette) else (255, 0, 255)
                 img.putpixel((x, y), (*color, 255))
@@ -140,10 +150,9 @@ def extract_character(dump_dir: Path, target_palette: int, obsel: int = 0x63) ->
     palettes = parse_cgram(cgram_data)
 
     # Filter to target palette and visible
-    visible = [e for e in entries
-               if e["palette"] == target_palette
-               and e["y"] < 224 and e["y"] != 240
-               and -64 < e["x"] < 300]
+    visible = [
+        e for e in entries if e["palette"] == target_palette and e["y"] < 224 and e["y"] != 240 and -64 < e["x"] < 300
+    ]
 
     if not visible:
         return None

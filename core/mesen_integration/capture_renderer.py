@@ -356,6 +356,11 @@ class CaptureRenderer:
                 # Crop sprite for negative positions
                 crop_x = max(0, -paste_x)
                 crop_y = max(0, -paste_y)
+
+                # Skip if sprite is entirely off-screen (crop would be invalid)
+                if crop_x >= sprite_img.width or crop_y >= sprite_img.height:
+                    continue
+
                 sprite_img = sprite_img.crop(
                     (crop_x, crop_y, sprite_img.width, sprite_img.height)
                 )

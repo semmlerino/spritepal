@@ -14,8 +14,9 @@ def create_dummy_project() -> SpriteProject:
         width=16,
         height=16,
         tile_data=b"\x00" * 128,  # 4 tiles * 32 bytes
-        tile_count=4
+        tile_count=4,
     )
+
 
 def test_save_load_path_with_spaces(tmp_path: Path):
     """Verify handling of paths with spaces."""
@@ -34,12 +35,13 @@ def test_save_load_path_with_spaces(tmp_path: Path):
     assert loaded.name == project.name
     assert loaded.tile_data == project.tile_data
 
+
 def test_save_load_unicode_path(tmp_path: Path):
     """Verify handling of paths with non-ASCII characters."""
     # Setup
-    unicode_dir = tmp_path / "プロジェクト" # "Project" in Japanese
+    unicode_dir = tmp_path / "プロジェクト"  # "Project" in Japanese
     unicode_dir.mkdir()
-    project_path = unicode_dir / "スプライト.spritepal" # "Sprite.spritepal"
+    project_path = unicode_dir / "スプライト.spritepal"  # "Sprite.spritepal"
     project = create_dummy_project()
 
     # Execute Save
@@ -50,6 +52,7 @@ def test_save_load_unicode_path(tmp_path: Path):
     loaded = SpriteProject.load(project_path)
     assert loaded.name == project.name
 
+
 def test_save_to_readonly_directory(tmp_path: Path):
     """Verify graceful failure when saving to read-only directory."""
     # Setup
@@ -59,7 +62,7 @@ def test_save_to_readonly_directory(tmp_path: Path):
     project = create_dummy_project()
 
     # Make directory read-only (r-x) preventing file creation/renaming
-    ro_dir.chmod(0o555) 
+    ro_dir.chmod(0o555)
 
     try:
         with pytest.raises(SpriteProjectError) as exc_info:

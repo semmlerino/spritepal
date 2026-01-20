@@ -614,9 +614,7 @@ class TestROMPaletteWorkflow:
 
             args = mock_editing_controller.load_image.call_args
             assert args[0][1] == new_palette
-            mock_editing_controller.set_palette.assert_called_with(
-                new_palette, ANY, source_type="rom", source_index=8
-            )
+            mock_editing_controller.set_palette.assert_called_with(new_palette, ANY, source_type="rom", source_index=8)
             mock_default.assert_not_called()
 
     def test_open_in_editor_fallback_to_default(self, qtbot):

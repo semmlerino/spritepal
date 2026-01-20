@@ -57,11 +57,18 @@ def parse_oam(oam_data: bytes, obsel: int) -> list[dict]:
         height = sizes[3] if size_large else sizes[1]
 
         if y < 224 and y != 240 and -64 < x < 280:
-            entries.append({
-                "id": i, "x": x, "y": y, "tile": tile,
-                "name_table": name_table, "palette": palette,
-                "width": width, "height": height,
-            })
+            entries.append(
+                {
+                    "id": i,
+                    "x": x,
+                    "y": y,
+                    "tile": tile,
+                    "name_table": name_table,
+                    "palette": palette,
+                    "width": width,
+                    "height": height,
+                }
+            )
     return entries
 
 
@@ -157,7 +164,9 @@ def main():
 
     for entry in entries:
         tiles = extract_sprite_tiles(entry, vram_data, args.obsel)
-        print(f"\nSprite #{entry['id']}: ({entry['x']}, {entry['y']}) tile=0x{entry['tile']:02X} {entry['width']}x{entry['height']}")
+        print(
+            f"\nSprite #{entry['id']}: ({entry['x']}, {entry['y']}) tile=0x{entry['tile']:02X} {entry['width']}x{entry['height']}"
+        )
 
         for vram_addr, tile_data in tiles:
             # Skip empty tiles
@@ -171,7 +180,9 @@ def main():
                 for match in matches[:3]:  # Show top 3 matches
                     rom_offset = match.rom_offset + match.tile_byte_offset
                     rom_offsets[entry["id"]].add(rom_offset)
-                    print(f"  VRAM 0x{vram_addr:04X} -> ROM 0x{match.rom_offset:06X} + tile {match.tile_index} ({match.description})")
+                    print(
+                        f"  VRAM 0x{vram_addr:04X} -> ROM 0x{match.rom_offset:06X} + tile {match.tile_index} ({match.description})"
+                    )
             else:
                 # Fallback: direct ROM search for uncompressed tiles
                 pos = rom_data.find(tile_data)
@@ -193,7 +204,11 @@ def main():
             blocks[block] += 1
         if blocks:
             main_block = max(blocks.items(), key=lambda x: x[1])[0]
-            print(f"  Sprite #{sprite_id} ({entry['width']}x{entry['height']}): main block 0x{main_block:06X}, {len(offsets)} tiles")
+            print(
+                f"  Sprite #{sprite_id} ({entry['width']}x{entry['height']}): main block 0x{main_block:06X}, {len(offsets)} tiles"
+            )
+
+    return 0
 
 
 if __name__ == "__main__":

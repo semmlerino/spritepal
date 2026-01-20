@@ -170,9 +170,7 @@ def render_sprite(
 
             tile_addr = tile_base + (tile_num * 32)  # 32 bytes per 4bpp tile
 
-            tile_img = render_tile_4bpp(
-                vram_data, tile_addr, palette, entry["flip_h"], entry["flip_v"]
-            )
+            tile_img = render_tile_4bpp(vram_data, tile_addr, palette, entry["flip_h"], entry["flip_v"])
 
             # Position within sprite
             px = (tiles_x - 1 - tx) * 8 if entry["flip_h"] else tx * 8
@@ -206,11 +204,7 @@ def render_frame(
     palettes = parse_cgram(cgram_data)
 
     # Filter to visible sprites (on-screen, not at Y=240)
-    visible = [
-        e
-        for e in entries
-        if e["y"] < 224 and e["y"] != 240 and -64 < e["x"] < 256
-    ]
+    visible = [e for e in entries if e["y"] < 224 and e["y"] != 240 and -64 < e["x"] < 256]
 
     # Filter by palette if specified
     if palette_filter is not None:
