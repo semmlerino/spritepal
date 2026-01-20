@@ -6,13 +6,14 @@ from pathlib import Path
 from typing import override
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QMouseEvent, QPainter, QPixmap, QTransform
+from PySide6.QtGui import QKeyEvent, QMouseEvent, QPainter, QPixmap, QTransform
 from PySide6.QtWidgets import (
     QCheckBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QSlider,
     QSpinBox,
     QVBoxLayout,
@@ -304,6 +305,22 @@ class AlignmentDialog(DialogBase):
 
         control_layout.addWidget(position_group)
 
+        # Quick actions
+        actions_group = QGroupBox("Quick Actions")
+        actions_layout = QHBoxLayout(actions_group)
+
+        self._reset_button = QPushButton("Reset")
+        self._reset_button.setToolTip("Reset offset to (0, 0)")
+        self._reset_button.clicked.connect(self._on_reset_clicked)
+        actions_layout.addWidget(self._reset_button)
+
+        self._center_button = QPushButton("Center")
+        self._center_button.setToolTip("Center AI frame over game frame")
+        self._center_button.clicked.connect(self._on_center_clicked)
+        actions_layout.addWidget(self._center_button)
+
+        control_layout.addWidget(actions_group)
+
         # Flip controls
         flip_group = QGroupBox("Flip")
         flip_layout = QVBoxLayout(flip_group)
@@ -338,9 +355,9 @@ class AlignmentDialog(DialogBase):
 
         # Info label
         info_label = QLabel(
-            "Drag the AI frame overlay to adjust position,\n"
-            "or use the controls. AI frame shown at actual\n"
-            "relative size."
+            "Drag overlay or use arrow keys to adjust.\n"
+            "Shift+arrow: 8px nudge.\n"
+            "AI frame shown at actual relative size."
         )
         info_label.setStyleSheet("color: #888; font-size: 11px;")
         info_label.setWordWrap(True)
@@ -366,6 +383,51 @@ class AlignmentDialog(DialogBase):
         self._offset_x_spin.blockSignals(False)
         self._offset_y_spin.blockSignals(False)
         self._emit_alignment_changed()
+
+    def _on_reset_clicked(self) -> None:
+        """Handle Reset button click."""
+        self._offset_x_spin.setValue(0)
+        self._offset_y_spin.setValue(0)
+
+    def _on_center_clicked(self) -> None:
+        """Handle Center button click.
+
+        Calculates offset to center AI frame over game frame based on
+        their respective dimensions.
+        """
+        if self._game_pixmap is None or self._ai_pixmap is None:
+            return
+
+        game_w = self._game_pixmap.width()
+        game_h = self._game_pixmap.height()
+        ai_w = self._ai_pixmap.width()
+        ai_h = self._ai_pixmap.height()
+
+        # Calculate offset to center AI frame within game frame bounds
+        center_x = (game_w - ai_w) // 2
+        center_y = (game_h - ai_h) // 2
+
+        self._offset_x_spin.setValue(center_x)
+        self._offset_y_spin.setValue(center_y)
+
+    @override
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """Handle keyboard input for arrow key nudges."""
+        key = event.key()
+        shift_held = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+        nudge = 8 if shift_held else 1
+
+        if key == Qt.Key.Key_Left:
+            self._offset_x_spin.setValue(self._offset_x_spin.value() - nudge)
+        elif key == Qt.Key.Key_Right:
+            self._offset_x_spin.setValue(self._offset_x_spin.value() + nudge)
+        elif key == Qt.Key.Key_Up:
+            self._offset_y_spin.setValue(self._offset_y_spin.value() - nudge)
+        elif key == Qt.Key.Key_Down:
+            self._offset_y_spin.setValue(self._offset_y_spin.value() + nudge)
+        else:
+            # Pass other keys to parent (for dialog buttons like Enter/Escape)
+            super().keyPressEvent(event)
 
     def _on_offset_changed(self) -> None:
         """Handle offset spinbox value changes."""

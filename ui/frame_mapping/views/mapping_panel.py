@@ -220,3 +220,11 @@ class MappingPanel(QWidget):
         ai_index = self.get_selected_ai_frame_index()
         if ai_index is not None:
             self.adjust_alignment_requested.emit(ai_index)
+
+    def set_map_button_enabled(self, enabled: bool) -> None:
+        """Set the enabled state of the Map Selected button.
+
+        Args:
+            enabled: Whether the button should be enabled
+        """
+        self._map_button.setEnabled(enabled)

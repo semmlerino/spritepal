@@ -6,12 +6,15 @@ import logging
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtGui import QBrush, QColor, QIcon, QPixmap
 from PySide6.QtWidgets import (
+    QCheckBox,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QPushButton,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -25,6 +28,14 @@ logger = logging.getLogger(__name__)
 # Thumbnail size for list items
 THUMBNAIL_SIZE = 64
 
+# Status colors for AI frame mapping status
+STATUS_COLORS = {
+    "unmapped": QColor(180, 180, 180),  # Light gray
+    "mapped": QColor(76, 175, 80),  # Green
+    "edited": QColor(33, 150, 243),  # Blue
+    "injected": QColor(156, 39, 176),  # Purple
+}
+
 
 class FrameBrowserPanel(QWidget):
     """Panel for browsing AI and Game frames.
@@ -36,15 +47,19 @@ class FrameBrowserPanel(QWidget):
     Signals:
         ai_frame_selected: Emitted when an AI frame is selected (index)
         game_frame_selected: Emitted when a game frame is selected (id)
+        map_requested: Emitted when user clicks the Map Selected button
     """
 
     ai_frame_selected = Signal(int)  # AI frame index
     game_frame_selected = Signal(str)  # Game frame ID
+    map_requested = Signal()  # User wants to map selected frames
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._ai_frames: list[AIFrame] = []
         self._game_frames: list[GameFrame] = []
+        self._mapping_status: dict[int, str] = {}  # ai_frame_index -> status
+        self._show_unmapped_only = False
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -58,9 +73,21 @@ class FrameBrowserPanel(QWidget):
         ai_layout = QVBoxLayout(ai_group)
         ai_layout.setContentsMargins(4, 8, 4, 4)
 
+        # Header row with count and filter
+        ai_header = QHBoxLayout()
+        ai_header.setContentsMargins(0, 0, 0, 0)
         self._ai_count_label = QLabel("No frames loaded")
         self._ai_count_label.setStyleSheet("color: #888; font-size: 11px;")
-        ai_layout.addWidget(self._ai_count_label)
+        ai_header.addWidget(self._ai_count_label)
+        ai_header.addStretch()
+
+        self._unmapped_filter = QCheckBox("Unmapped only")
+        self._unmapped_filter.setToolTip("Show only unmapped AI frames")
+        self._unmapped_filter.setStyleSheet("font-size: 11px;")
+        self._unmapped_filter.toggled.connect(self._on_filter_changed)
+        ai_header.addWidget(self._unmapped_filter)
+
+        ai_layout.addLayout(ai_header)
 
         self._ai_list = QListWidget()
         self._ai_list.setIconSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
@@ -71,6 +98,18 @@ class FrameBrowserPanel(QWidget):
         ai_layout.addWidget(self._ai_list)
 
         layout.addWidget(ai_group)
+
+        # Map Selected button (between lists)
+        map_button_layout = QHBoxLayout()
+        map_button_layout.setContentsMargins(0, 0, 0, 0)
+        self._map_button = QPushButton("⬇ Map Selected ⬇")
+        self._map_button.setToolTip("Link the selected AI frame to the selected game frame")
+        self._map_button.setEnabled(False)  # Disabled until both selected
+        self._map_button.clicked.connect(self.map_requested.emit)
+        map_button_layout.addStretch()
+        map_button_layout.addWidget(self._map_button)
+        map_button_layout.addStretch()
+        layout.addLayout(map_button_layout)
 
         # Game Frames section
         game_group = QGroupBox("Game Frames")
@@ -225,3 +264,108 @@ class FrameBrowserPanel(QWidget):
         frame_id = item.data(Qt.ItemDataRole.UserRole)
         if frame_id is not None:
             self.game_frame_selected.emit(frame_id)
+
+    def select_ai_frame(self, index: int) -> None:
+        """Programmatically select an AI frame by index.
+
+        Blocks signals to prevent feedback loops when syncing selection.
+
+        Args:
+            index: The AI frame index to select
+        """
+        self._ai_list.blockSignals(True)
+        try:
+            for row in range(self._ai_list.count()):
+                item = self._ai_list.item(row)
+                if item is not None and item.data(Qt.ItemDataRole.UserRole) == index:  # type: ignore[reportUnnecessaryComparison]
+                    self._ai_list.setCurrentRow(row)
+                    break
+        finally:
+            self._ai_list.blockSignals(False)
+
+    def select_game_frame(self, frame_id: str) -> None:
+        """Programmatically select a game frame by ID.
+
+        Blocks signals to prevent feedback loops when syncing selection.
+
+        Args:
+            frame_id: The game frame ID to select
+        """
+        self._game_list.blockSignals(True)
+        try:
+            for row in range(self._game_list.count()):
+                item = self._game_list.item(row)
+                if item is not None and item.data(Qt.ItemDataRole.UserRole) == frame_id:  # type: ignore[reportUnnecessaryComparison]
+                    self._game_list.setCurrentRow(row)
+                    break
+        finally:
+            self._game_list.blockSignals(False)
+
+    def set_map_button_enabled(self, enabled: bool) -> None:
+        """Set the enabled state of the Map Selected button.
+
+        Args:
+            enabled: Whether the button should be enabled
+        """
+        self._map_button.setEnabled(enabled)
+
+    def _on_filter_changed(self, checked: bool) -> None:
+        """Handle filter checkbox toggle."""
+        self._show_unmapped_only = checked
+        self._refresh_ai_list()
+
+    def set_mapping_status(self, status_map: dict[int, str]) -> None:
+        """Update the mapping status for AI frames.
+
+        Args:
+            status_map: Dictionary mapping AI frame index to status string
+                        (e.g., "unmapped", "mapped", "edited", "injected")
+        """
+        self._mapping_status = status_map
+        self._refresh_ai_list()
+
+    def _refresh_ai_list(self) -> None:
+        """Refresh the AI frames list with current status colors and filter."""
+        self._ai_list.clear()
+
+        visible_count = 0
+        total_count = len(self._ai_frames)
+
+        for frame in self._ai_frames:
+            status = self._mapping_status.get(frame.index, "unmapped")
+
+            # Apply filter
+            if self._show_unmapped_only and status != "unmapped":
+                continue
+
+            visible_count += 1
+
+            item = QListWidgetItem()
+            # Add status indicator to text
+            status_indicator = "●" if status != "unmapped" else "○"
+            item.setText(f"{status_indicator} {frame.path.name}")
+            item.setData(Qt.ItemDataRole.UserRole, frame.index)
+
+            # Apply status color
+            color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
+            item.setForeground(QBrush(color))
+
+            # Load thumbnail if file exists
+            if frame.path.exists():
+                pixmap = QPixmap(str(frame.path))
+                if not pixmap.isNull():
+                    scaled = pixmap.scaled(
+                        THUMBNAIL_SIZE,
+                        THUMBNAIL_SIZE,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    item.setIcon(QIcon(scaled))
+
+            self._ai_list.addItem(item)
+
+        # Update count label
+        if self._show_unmapped_only:
+            self._ai_count_label.setText(f"{visible_count}/{total_count} unmapped")
+        else:
+            self._ai_count_label.setText(f"{total_count} frame{'s' if total_count != 1 else ''}")

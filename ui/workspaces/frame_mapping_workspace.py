@@ -66,6 +66,10 @@ class FrameMappingWorkspace(QWidget):
         self._last_capture_dir: Path | None = None
         self._project_path: Path | None = None
 
+        # Selection tracking for map button state
+        self._selected_ai_index: int | None = None
+        self._selected_game_id: str | None = None
+
         # Create controller
         self._controller = FrameMappingController(self)
 
@@ -183,6 +187,7 @@ class FrameMappingWorkspace(QWidget):
         # Frame browser signals
         self._frame_browser.ai_frame_selected.connect(self._on_ai_frame_selected)
         self._frame_browser.game_frame_selected.connect(self._on_game_frame_selected)
+        self._frame_browser.map_requested.connect(self._on_map_selected)
 
         # Mapping panel signals
         self._mapping_panel.map_selected_requested.connect(self._on_map_selected)
@@ -193,17 +198,25 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_project_changed(self) -> None:
         """Handle project changes."""
+        # Reset selection state
+        self._selected_ai_index = None
+        self._selected_game_id = None
+
         project = self._controller.project
         if project is None:
             self._project_label.setText("")
             self._frame_browser.clear_all()
             self._mapping_panel.set_project(None)
+            self._update_map_button_state()
+            self._refresh_mapping_status()
             return
 
         self._project_label.setText(f"- {project.name}")
         self._frame_browser.set_ai_frames(project.ai_frames)
         self._frame_browser.set_game_frames(project.game_frames)
         self._mapping_panel.set_project(project)
+        self._update_map_button_state()
+        self._refresh_mapping_status()
 
     def _on_ai_frames_loaded(self, count: int) -> None:
         """Handle AI frames loaded."""
@@ -226,6 +239,9 @@ class FrameMappingWorkspace(QWidget):
         if project is None:
             return
 
+        self._selected_ai_index = index
+        self._update_map_button_state()
+
         frame = project.get_ai_frame_by_index(index)
         self._comparison_panel.set_ai_frame(frame)
 
@@ -234,6 +250,9 @@ class FrameMappingWorkspace(QWidget):
         project = self._controller.project
         if project is None:
             return
+
+        self._selected_game_id = frame_id
+        self._update_map_button_state()
 
         frame = project.get_game_frame_by_id(frame_id)
         preview = self._controller.get_game_frame_preview(frame_id)
@@ -249,12 +268,53 @@ class FrameMappingWorkspace(QWidget):
         ai_frame = project.get_ai_frame_by_index(ai_frame_index)
         self._comparison_panel.set_ai_frame(ai_frame)
 
+        # Sync browser selection to match mapping selection
+        self._frame_browser.select_ai_frame(ai_frame_index)
+        self._selected_ai_index = ai_frame_index
+
         # Show game frame if mapped
         mapping = project.get_mapping_for_ai_frame(ai_frame_index)
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
             self._comparison_panel.set_game_frame(game_frame, preview)
+            # Sync browser selection for game frame too
+            self._frame_browser.select_game_frame(mapping.game_frame_id)
+            self._selected_game_id = mapping.game_frame_id
+            # Pass alignment data to comparison panel
+            self._comparison_panel.set_alignment(
+                mapping.offset_x,
+                mapping.offset_y,
+                mapping.flip_h,
+                mapping.flip_v,
+            )
+        else:
+            self._comparison_panel.clear_alignment()
+
+        self._update_map_button_state()
+
+    def _update_map_button_state(self) -> None:
+        """Update the Map Selected button enabled state based on selections."""
+        both_selected = self._selected_ai_index is not None and self._selected_game_id is not None
+        self._mapping_panel.set_map_button_enabled(both_selected)
+        self._frame_browser.set_map_button_enabled(both_selected)
+
+    def _refresh_mapping_status(self) -> None:
+        """Refresh the AI frame mapping status in the browser."""
+        project = self._controller.project
+        if project is None:
+            self._frame_browser.set_mapping_status({})
+            return
+
+        status_map: dict[int, str] = {}
+        for ai_frame in project.ai_frames:
+            mapping = project.get_mapping_for_ai_frame(ai_frame.index)
+            if mapping:
+                status_map[ai_frame.index] = mapping.status
+            else:
+                status_map[ai_frame.index] = "unmapped"
+
+        self._frame_browser.set_mapping_status(status_map)
 
     def _on_map_selected(self) -> None:
         """Handle map selected button click."""
@@ -270,6 +330,7 @@ class FrameMappingWorkspace(QWidget):
             return
 
         self._controller.create_mapping(ai_index, game_id)
+        self._refresh_mapping_status()
 
     def _on_edit_frame(self, ai_frame_index: int) -> None:
         """Handle edit frame request."""
@@ -293,6 +354,7 @@ class FrameMappingWorkspace(QWidget):
     def _on_remove_mapping(self, ai_frame_index: int) -> None:
         """Handle remove mapping request."""
         self._controller.remove_mapping(ai_frame_index)
+        self._refresh_mapping_status()
 
     def _on_adjust_alignment(self, ai_frame_index: int) -> None:
         """Handle adjust alignment request."""
