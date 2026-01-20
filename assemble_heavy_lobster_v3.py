@@ -13,7 +13,10 @@ from core.tile_renderer import TileRenderer
 BYTES_PER_TILE = 32
 SNES_STRIDE = 16
 
-def extract_sprite_block(tiles_data: bytes, base_tile: int, width_tiles: int, height_tiles: int, renderer: TileRenderer) -> Image.Image:
+
+def extract_sprite_block(
+    tiles_data: bytes, base_tile: int, width_tiles: int, height_tiles: int, renderer: TileRenderer
+) -> Image.Image:
     """Extract a sprite block using SNES 16-tile row stride."""
     tile_bytes = bytearray()
     for row in range(height_tiles):
@@ -24,7 +27,7 @@ def extract_sprite_block(tiles_data: bytes, base_tile: int, width_tiles: int, he
             if tile_end <= len(tiles_data):
                 tile_bytes.extend(tiles_data[tile_start:tile_end])
             else:
-                tile_bytes.extend(b'\x00' * BYTES_PER_TILE)
+                tile_bytes.extend(b"\x00" * BYTES_PER_TILE)
     return renderer.render_tiles(bytes(tile_bytes), width_tiles, height_tiles, palette_index=None)
 
 
@@ -90,25 +93,22 @@ def main():
     # (block_index, x, y, flip_h)
     layout = [
         # Top row - claws and head
-        (0, 16, 0, False),    # Left claw top
-        (1, 48, 0, False),    # Left body
-        (2, 80, 0, False),    # Center top
-        (3, 112, 0, False),   # Right body
-        (3, 144, 0, True),    # Right claw top (mirrored)
-
+        (0, 16, 0, False),  # Left claw top
+        (1, 48, 0, False),  # Left body
+        (2, 80, 0, False),  # Center top
+        (3, 112, 0, False),  # Right body
+        (3, 144, 0, True),  # Right claw top (mirrored)
         # Second row - main body
-        (4, 0, 32, False),    # Far left
-        (5, 32, 32, False),   # Left mid
-        (6, 64, 32, False),   # Center
-        (7, 96, 32, False),   # Right mid
-        (7, 128, 32, True),   # Far right (mirrored)
-
+        (4, 0, 32, False),  # Far left
+        (5, 32, 32, False),  # Left mid
+        (6, 64, 32, False),  # Center
+        (7, 96, 32, False),  # Right mid
+        (7, 128, 32, True),  # Far right (mirrored)
         # Third row - lower body
         (8, 16, 64, False),
         (9, 48, 64, False),
         (10, 80, 64, False),
         (11, 112, 64, False),
-
         # Fourth row - legs
         (12, 32, 96, False),
         (13, 64, 96, False),
@@ -136,17 +136,38 @@ def main():
     # Based on the patterns I see, let me try a different arrangement
     block_positions = [
         # First attempt at logical layout
-        (0, 0, 0), (1, 32, 0), (2, 64, 0), (3, 96, 0),
-        (4, 0, 32), (5, 32, 32), (6, 64, 32), (7, 96, 32),
-        (8, 128, 0), (9, 160, 0),
-        (10, 128, 32), (11, 160, 32),
-        (12, 0, 64), (13, 32, 64), (14, 64, 64), (15, 96, 64),
-        (16, 128, 64), (17, 160, 64),
-        (18, 0, 96), (19, 32, 96), (20, 64, 96), (21, 96, 96),
-        (22, 128, 96), (23, 160, 96),
-        (24, 0, 128), (25, 32, 128), (26, 64, 128), (27, 96, 128),
-        (28, 128, 128), (29, 160, 128),
-        (30, 0, 160), (31, 32, 160),
+        (0, 0, 0),
+        (1, 32, 0),
+        (2, 64, 0),
+        (3, 96, 0),
+        (4, 0, 32),
+        (5, 32, 32),
+        (6, 64, 32),
+        (7, 96, 32),
+        (8, 128, 0),
+        (9, 160, 0),
+        (10, 128, 32),
+        (11, 160, 32),
+        (12, 0, 64),
+        (13, 32, 64),
+        (14, 64, 64),
+        (15, 96, 64),
+        (16, 128, 64),
+        (17, 160, 64),
+        (18, 0, 96),
+        (19, 32, 96),
+        (20, 64, 96),
+        (21, 96, 96),
+        (22, 128, 96),
+        (23, 160, 96),
+        (24, 0, 128),
+        (25, 32, 128),
+        (26, 64, 128),
+        (27, 96, 128),
+        (28, 128, 128),
+        (29, 160, 128),
+        (30, 0, 160),
+        (31, 32, 160),
     ]
 
     for block_idx, x, y in block_positions:

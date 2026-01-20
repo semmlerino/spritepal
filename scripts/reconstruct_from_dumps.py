@@ -36,13 +36,14 @@ SIZE_TABLE = {
 @dataclass
 class OAMEntry:
     """Parsed OAM entry."""
+
     id: int
     x: int
     y: int
     tile: int
     name_table: int  # bit 0 of attr - second tile table select
-    palette: int     # bits 1-3 of attr
-    priority: int    # bits 4-5 of attr
+    palette: int  # bits 1-3 of attr
+    priority: int  # bits 4-5 of attr
     flip_h: bool
     flip_v: bool
     size_large: bool
@@ -86,12 +87,22 @@ def parse_oam_dump(oam_data: bytes, obsel: int) -> list[OAMEntry]:
 
         width, height = sizes[2:4] if size_large else sizes[0:2]
 
-        entries.append(OAMEntry(
-            id=i, x=x, y=y, tile=tile,
-            name_table=name_table, palette=palette, priority=priority,
-            flip_h=flip_h, flip_v=flip_v, size_large=size_large,
-            width=width, height=height
-        ))
+        entries.append(
+            OAMEntry(
+                id=i,
+                x=x,
+                y=y,
+                tile=tile,
+                name_table=name_table,
+                palette=palette,
+                priority=priority,
+                flip_h=flip_h,
+                flip_v=flip_v,
+                size_large=size_large,
+                width=width,
+                height=height,
+            )
+        )
 
     return entries
 
@@ -135,10 +146,9 @@ def decode_4bpp_tile(tile_data: bytes) -> list[list[int]]:
 
         for col in range(8):
             bit = 7 - col
-            pixel = ((bp0 >> bit) & 1) | \
-                    (((bp1 >> bit) & 1) << 1) | \
-                    (((bp2 >> bit) & 1) << 2) | \
-                    (((bp3 >> bit) & 1) << 3)
+            pixel = (
+                ((bp0 >> bit) & 1) | (((bp1 >> bit) & 1) << 1) | (((bp2 >> bit) & 1) << 2) | (((bp3 >> bit) & 1) << 3)
+            )
             pixels[row][col] = pixel
 
     return pixels
@@ -182,7 +192,7 @@ def render_sprite(entry: OAMEntry, vram: bytes, palettes: dict, obsel: int) -> I
             vram_addr = get_tile_vram_addr(tile_idx, entry.name_table == 1, obsel)
 
             if vram_addr + 32 <= len(vram):
-                tile_data = vram[vram_addr:vram_addr + 32]
+                tile_data = vram[vram_addr : vram_addr + 32]
                 pixels = decode_4bpp_tile(tile_data)
 
                 # Determine position with flip handling
@@ -265,6 +275,7 @@ def reconstruct_frame(
 
             if show_bounds:
                 from PIL import ImageDraw
+
                 draw = ImageDraw.Draw(canvas)
                 draw.rectangle(
                     [px, py, px + entry.width - 1, py + entry.height - 1],
@@ -275,13 +286,59 @@ def reconstruct_frame(
     return canvas
 
 
+def reconstruct_cropped(
+    oam_entries: list[OAMEntry],
+    vram: bytes,
+    palettes: dict,
+    obsel: int,
+    palette_filter: int | None = None,
+) -> Image.Image | None:
+    """Reconstruct sprites cropped to their bounding box, optionally filtered by palette."""
+    visible = [e for e in oam_entries if is_visible(e)]
+
+    if palette_filter is not None:
+        visible = [e for e in visible if e.palette == palette_filter]
+
+    if not visible:
+        return None
+
+    # Calculate bounding box
+    min_x = min(e.x for e in visible)
+    min_y = min(e.y for e in visible)
+    max_x = max(e.x + e.width for e in visible)
+    max_y = max(e.y + e.height for e in visible)
+
+    # Clamp to screen bounds
+    min_x = max(0, min_x)
+    min_y = max(0, min_y)
+    max_x = min(SNES_WIDTH, max_x)
+    max_y = min(SNES_HEIGHT, max_y)
+
+    canvas = Image.new("RGBA", (max_x - min_x, max_y - min_y), (0, 0, 0, 0))
+
+    # Sort by priority (lower draws first)
+    visible_sorted = sorted(visible, key=lambda e: (e.priority, -e.id), reverse=True)
+
+    for entry in visible_sorted:
+        sprite_img = render_sprite(entry, vram, palettes, obsel)
+        canvas.paste(sprite_img, (entry.x - min_x, entry.y - min_y), sprite_img)
+
+    return canvas
+
+
 def main():
     parser = argparse.ArgumentParser(description="Reconstruct frame from Mesen dumps")
     parser.add_argument("dump_dir", help="Directory containing *_OAM.dmp, *_VRAM.dmp, *_CGRAM.dmp")
     parser.add_argument("--output", "-o", default="reconstructed_frame.png", help="Output PNG path")
-    parser.add_argument("--obsel", type=lambda x: int(x, 0), default=0x62,
-                        help="OBSEL value (default 0x62 = size_select=3, 16x16/32x32)")
+    parser.add_argument(
+        "--obsel",
+        type=lambda x: int(x, 0),
+        default=0x62,
+        help="OBSEL value (default 0x62 = size_select=3, 16x16/32x32)",
+    )
     parser.add_argument("--bounds", action="store_true", help="Draw sprite bounds")
+    parser.add_argument("--palette", type=int, help="Filter to specific palette (0-7)")
+    parser.add_argument("--crop", action="store_true", help="Crop to sprite bounding box")
 
     args = parser.parse_args()
     dump_dir = Path(args.dump_dir)
@@ -320,21 +377,34 @@ def main():
     palettes = parse_cgram_dump(cgram_data)
 
     visible = [e for e in entries if is_visible(e)]
-    print(f"Parsed {len(entries)} OAM entries, {len(visible)} potentially visible")
+    if args.palette is not None:
+        filtered = [e for e in visible if e.palette == args.palette]
+        print(f"Parsed {len(entries)} OAM entries, {len(visible)} visible, {len(filtered)} with palette {args.palette}")
+        visible = filtered
+    else:
+        print(f"Parsed {len(entries)} OAM entries, {len(visible)} potentially visible")
 
     # Show first few visible entries
     print("\nFirst 10 visible entries:")
     for e in visible[:10]:
-        print(f"  #{e.id}: ({e.x}, {e.y}) tile=0x{e.tile:02X} pal={e.palette} "
-              f"size={e.width}x{e.height} flip={e.flip_h},{e.flip_v}")
+        print(
+            f"  #{e.id}: ({e.x}, {e.y}) tile=0x{e.tile:02X} pal={e.palette} "
+            f"size={e.width}x{e.height} flip={e.flip_h},{e.flip_v}"
+        )
 
     # Reconstruct
-    frame = reconstruct_frame(entries, vram_data, palettes, args.obsel, args.bounds)
+    if args.crop or args.palette is not None:
+        frame = reconstruct_cropped(entries, vram_data, palettes, args.obsel, args.palette)
+        if frame is None:
+            print("No sprites to render")
+            return 1
+    else:
+        frame = reconstruct_frame(entries, vram_data, palettes, args.obsel, args.bounds)
 
     # Save
     output_path = Path(args.output)
     frame.save(output_path)
-    print(f"\nSaved: {output_path}")
+    print(f"\nSaved: {output_path} ({frame.width}x{frame.height})")
 
     return 0
 

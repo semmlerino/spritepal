@@ -31,8 +31,7 @@ def test_stride_fix():
     # Test 1: 8x8 sprite (single tile, no stride needed)
     print("Test 1: 8x8 sprite (1 tile)")
     entry_8x8 = OAMEntry(
-        id=0, x=100, y=100, tile=0, width=8, height=8,
-        flip_h=False, flip_v=False, palette=0, rom_offset=offset
+        id=0, x=100, y=100, tile=0, width=8, height=8, flip_h=False, flip_v=False, palette=0, rom_offset=offset
     )
     img_8x8 = reassembler._render_oam_entry(entry_8x8, palette_index=None)
     if img_8x8:
@@ -45,8 +44,7 @@ def test_stride_fix():
     print("Test 2: 16x16 sprite (4 tiles with SNES stride)")
     print("  Expected tile arrangement: 0, 1, 16, 17")
     entry_16x16 = OAMEntry(
-        id=1, x=100, y=100, tile=0, width=16, height=16,
-        flip_h=False, flip_v=False, palette=0, rom_offset=offset
+        id=1, x=100, y=100, tile=0, width=16, height=16, flip_h=False, flip_v=False, palette=0, rom_offset=offset
     )
     img_16x16 = reassembler._render_oam_entry(entry_16x16, palette_index=None)
     if img_16x16:
@@ -65,8 +63,7 @@ def test_stride_fix():
     print("    Row 2: 32, 33, 34, 35")
     print("    Row 3: 48, 49, 50, 51")
     entry_32x32 = OAMEntry(
-        id=2, x=100, y=100, tile=0, width=32, height=32,
-        flip_h=False, flip_v=False, palette=0, rom_offset=offset
+        id=2, x=100, y=100, tile=0, width=32, height=32, flip_h=False, flip_v=False, palette=0, rom_offset=offset
     )
     img_32x32 = reassembler._render_oam_entry(entry_32x32, palette_index=None)
     if img_32x32:
@@ -83,8 +80,7 @@ def test_stride_fix():
     print("    Row 0: 0, 1, 2, 3")
     print("    Row 1: 16, 17, 18, 19")
     entry_32x16 = OAMEntry(
-        id=3, x=100, y=100, tile=0, width=32, height=16,
-        flip_h=False, flip_v=False, palette=0, rom_offset=offset
+        id=3, x=100, y=100, tile=0, width=32, height=16, flip_h=False, flip_v=False, palette=0, rom_offset=offset
     )
     img_32x16 = reassembler._render_oam_entry(entry_32x16, palette_index=None)
     if img_32x16:
@@ -103,6 +99,7 @@ def test_stride_fix():
     print("Before fix: 16x16 would read tiles 0,1,2,3 (wrong)")
     print("After fix:  16x16 reads tiles 0,1,16,17 (correct)")
     print()
+
 
 if __name__ == "__main__":
     test_stride_fix()

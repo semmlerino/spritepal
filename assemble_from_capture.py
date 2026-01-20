@@ -156,8 +156,10 @@ def main():
             h = entry.get("height", 8)
             flip_h = "H" if entry.get("flip_h") else "-"
             flip_v = "V" if entry.get("flip_v") else "-"
-            print(f"  [{entry['id']:3d}] pos=({entry['x']:4d},{entry['y']:3d}) size={w:2d}x{h:2d} "
-                  f"tile={entry['tile']:3d} pal={entry.get('palette', 0)} flip={flip_h}{flip_v}")
+            print(
+                f"  [{entry['id']:3d}] pos=({entry['x']:4d},{entry['y']:3d}) size={w:2d}x{h:2d} "
+                f"tile={entry['tile']:3d} pal={entry.get('palette', 0)} flip={flip_h}{flip_v}"
+            )
         return
 
     # Build filter function
@@ -184,8 +186,10 @@ def main():
         print(f"\nAssembled sprite saved to: {args.output}")
         print(f"  Size: {metadata['size']['width']}x{metadata['size']['height']} pixels")
         print(f"  Entries used: {metadata['placed_entries']}/{metadata['total_entries']}")
-        print(f"  Bounds: ({metadata['bounds']['min_x']}, {metadata['bounds']['min_y']}) to "
-              f"({metadata['bounds']['max_x']}, {metadata['bounds']['max_y']})")
+        print(
+            f"  Bounds: ({metadata['bounds']['min_x']}, {metadata['bounds']['min_y']}) to "
+            f"({metadata['bounds']['max_x']}, {metadata['bounds']['max_y']})"
+        )
     else:
         print("Error: Could not assemble sprite (no valid entries)")
 

@@ -243,6 +243,7 @@ def reconstruct_frame(
 
             if show_bounds:
                 from PIL import ImageDraw
+
                 draw = ImageDraw.Draw(canvas)
                 draw.rectangle(
                     [px, py, px + sprite.width - 1, py + sprite.height - 1],

@@ -90,9 +90,7 @@ def find_matching_pairs(dump_dir: Path) -> list[tuple[Path, Path, str]]:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Compare Lua memory dumps against Mesen2 exports"
-    )
+    parser = argparse.ArgumentParser(description="Compare Lua memory dumps against Mesen2 exports")
     parser.add_argument("lua_dump", nargs="?", help="Path to Lua dump file")
     parser.add_argument("mesen_dump", nargs="?", help="Path to Mesen dump file")
     parser.add_argument("--dir", "-d", help="Directory containing both dump types")

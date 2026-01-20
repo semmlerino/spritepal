@@ -36,13 +36,14 @@ SIZE_TABLE = {
 @dataclass
 class OAMEntry:
     """Parsed OAM entry."""
+
     id: int
     x: int
     y: int
     tile: int
     name_table: int  # bit 0 of attr - second tile table select
-    palette: int     # bits 1-3 of attr
-    priority: int    # bits 4-5 of attr
+    palette: int  # bits 1-3 of attr
+    priority: int  # bits 4-5 of attr
     flip_h: bool
     flip_v: bool
     size_large: bool
@@ -86,12 +87,22 @@ def parse_oam_dump(oam_data: bytes, obsel: int) -> list[OAMEntry]:
 
         width, height = sizes[2:4] if size_large else sizes[0:2]
 
-        entries.append(OAMEntry(
-            id=i, x=x, y=y, tile=tile,
-            name_table=name_table, palette=palette, priority=priority,
-            flip_h=flip_h, flip_v=flip_v, size_large=size_large,
-            width=width, height=height
-        ))
+        entries.append(
+            OAMEntry(
+                id=i,
+                x=x,
+                y=y,
+                tile=tile,
+                name_table=name_table,
+                palette=palette,
+                priority=priority,
+                flip_h=flip_h,
+                flip_v=flip_v,
+                size_large=size_large,
+                width=width,
+                height=height,
+            )
+        )
 
     return entries
 
@@ -135,10 +146,9 @@ def decode_4bpp_tile(tile_data: bytes) -> list[list[int]]:
 
         for col in range(8):
             bit = 7 - col
-            pixel = ((bp0 >> bit) & 1) | \
-                    (((bp1 >> bit) & 1) << 1) | \
-                    (((bp2 >> bit) & 1) << 2) | \
-                    (((bp3 >> bit) & 1) << 3)
+            pixel = (
+                ((bp0 >> bit) & 1) | (((bp1 >> bit) & 1) << 1) | (((bp2 >> bit) & 1) << 2) | (((bp3 >> bit) & 1) << 3)
+            )
             pixels[row][col] = pixel
 
     return pixels
@@ -182,7 +192,7 @@ def render_sprite(entry: OAMEntry, vram: bytes, palettes: dict, obsel: int) -> I
             vram_addr = get_tile_vram_addr(tile_idx, entry.name_table == 1, obsel)
 
             if vram_addr + 32 <= len(vram):
-                tile_data = vram[vram_addr:vram_addr + 32]
+                tile_data = vram[vram_addr : vram_addr + 32]
                 pixels = decode_4bpp_tile(tile_data)
 
                 # Determine position with flip handling
@@ -265,6 +275,7 @@ def reconstruct_frame(
 
             if show_bounds:
                 from PIL import ImageDraw
+
                 draw = ImageDraw.Draw(canvas)
                 draw.rectangle(
                     [px, py, px + entry.width - 1, py + entry.height - 1],
@@ -279,8 +290,12 @@ def main():
     parser = argparse.ArgumentParser(description="Reconstruct frame from Mesen dumps")
     parser.add_argument("dump_dir", help="Directory containing *_OAM.dmp, *_VRAM.dmp, *_CGRAM.dmp")
     parser.add_argument("--output", "-o", default="reconstructed_frame.png", help="Output PNG path")
-    parser.add_argument("--obsel", type=lambda x: int(x, 0), default=0x62,
-                        help="OBSEL value (default 0x62 = size_select=3, 16x16/32x32)")
+    parser.add_argument(
+        "--obsel",
+        type=lambda x: int(x, 0),
+        default=0x62,
+        help="OBSEL value (default 0x62 = size_select=3, 16x16/32x32)",
+    )
     parser.add_argument("--bounds", action="store_true", help="Draw sprite bounds")
 
     args = parser.parse_args()
@@ -325,8 +340,10 @@ def main():
     # Show first few visible entries
     print("\nFirst 10 visible entries:")
     for e in visible[:10]:
-        print(f"  #{e.id}: ({e.x}, {e.y}) tile=0x{e.tile:02X} pal={e.palette} "
-              f"size={e.width}x{e.height} flip={e.flip_h},{e.flip_v}")
+        print(
+            f"  #{e.id}: ({e.x}, {e.y}) tile=0x{e.tile:02X} pal={e.palette} "
+            f"size={e.width}x{e.height} flip={e.flip_h},{e.flip_v}"
+        )
 
     # Reconstruct
     frame = reconstruct_frame(entries, vram_data, palettes, args.obsel, args.bounds)

@@ -275,6 +275,56 @@ uv run python mesen2_integration/batch_sprite_extractor.py sprites.json
 uv run python mesen2_integration/batch_sprite_extractor.py addresses.txt --report my_sprites
 ```
 
+### `scripts/sprite_rom_mapper.py` (NEW)
+Maps sprite tiles from VRAM/OAM dumps to ROM addresses. Useful for **boss sprites** stored as raw 4bpp tiles (not HAL compressed).
+
+**Usage:**
+```bash
+# Map palette 7 sprites (e.g., King Dedede)
+uv run python scripts/sprite_rom_mapper.py \
+    "roms/Kirby Super Star (USA).sfc" \
+    DededeDMP \
+    --palette 7 \
+    --output dedede_map.json
+```
+
+**Output:**
+```
+=== Sprite ROM Map: Dedede_F71 ===
+Palette: 7
+Found: 24/24 tiles
+ROM Addresses:
+  Range: 0x017361 - 0x017941
+  VRAM 0x6600 -> ROM 0x017681
+  ...
+```
+
+### `scripts/sprite_rom_batch.py` (NEW)
+Batch processes multiple dump directories and merges results across animation frames.
+
+**Usage:**
+```bash
+uv run python scripts/sprite_rom_batch.py \
+    "roms/Kirby Super Star (USA).sfc" \
+    DededeDMP \
+    --palette 7 \
+    --output all_frames.json
+```
+
+### `scripts/reconstruct_sprite.py` (NEW)
+Reconstructs a complete sprite image from ROM map + CGRAM/OAM dumps.
+
+**Usage:**
+```bash
+uv run python scripts/reconstruct_sprite.py \
+    DededeDMP/dedede_f71_map.json \
+    "roms/Kirby Super Star (USA).sfc" \
+    --palette 7 \
+    -o dedede.png
+```
+
+**See also:** [docs/sprite_rom_mapping.md](../docs/sprite_rom_mapping.md) for complete documentation.
+
 ## 📊 Known Sprites
 
 See `known_sprites.json` for verified sprite locations:
@@ -468,6 +518,69 @@ See `copy/EXTRACTION_SUMMARY.md` for complete technical reference including:
 - Tile address calculation
 - 4bpp planar format
 - All bugs fixed
+
+---
+
+## 🎨 Sprite Replacement Project Workflow (NEW)
+
+Map AI-generated sprite frames to game animation frames for systematic character replacement.
+
+### Overview
+
+1. **Split AI spritesheet** into individual frames
+2. **Extract game frames** from Mesen dumps (filtered by palette)
+3. **Visual comparison** to map AI frames to game frames
+4. **Edit/inject** each frame using the mapping
+
+### Quick Start
+
+```bash
+# 1. Split your AI spritesheet
+python scripts/split_spritesheet.py spritesheet.png output_dir/
+
+# 2. Organize Mesen dumps by frame
+mkdir dumps/F17987 && cp mesen2_exchange/dump_F17987_*.dmp dumps/F17987/
+
+# 3. Extract character by palette (e.g., palette 7)
+python scripts/reconstruct_from_dumps.py dumps/F17987 --obsel 0x63 --palette 7 -o frame.png
+
+# 4. Trace tiles to ROM addresses
+python scripts/trace_sprites_to_rom.py dumps/F17987 rom.sfc --obsel 0x63 --palette 7
+```
+
+### Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/split_spritesheet.py` | Split sprite sheet into frames (auto background detection) |
+| `scripts/reconstruct_from_dumps.py` | Render dumps with `--palette` and `--crop` filters |
+| `scripts/trace_sprites_to_rom.py` | Trace VRAM tiles to ROM addresses |
+
+### Key Findings: Tile Storage
+
+**HAL-compressed blocks** (indexed in tile_database.json):
+- Kirby: 0x1B0000, Enemies: 0x1A0000, Items: 0x180000
+- Use `ROMTileMatcher.lookup_vram_tile()` to find
+
+**Uncompressed tiles** (not in database):
+- Some enemies stored raw in ROM (e.g., 0x03XXXX range)
+- Use direct ROM search: `rom_data.find(tile_data)`
+
+### Project Structure
+
+```
+M/dedede_project/
+├── project.json        # Frame metadata
+├── frames/             # AI sprite frames (frame_00.png - frame_14.png)
+├── dedede_only/        # Game frames filtered by palette
+├── comparison.png      # Visual mapping grid
+└── dumps/              # Organized Mesen dumps
+```
+
+### Memory File
+
+Progress and technical details saved in Serena memory:
+`sprite_replacement_project_progress.md`
 
 ---
 

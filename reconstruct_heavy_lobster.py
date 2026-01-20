@@ -16,7 +16,10 @@ from core.tile_renderer import TileRenderer
 BYTES_PER_TILE = 32
 SNES_STRIDE = 16  # 16 tiles per row in SNES VRAM
 
-def extract_sprite_block(tiles_data: bytes, base_tile: int, width_tiles: int, height_tiles: int, renderer: TileRenderer) -> Image.Image:
+
+def extract_sprite_block(
+    tiles_data: bytes, base_tile: int, width_tiles: int, height_tiles: int, renderer: TileRenderer
+) -> Image.Image:
     """Extract a sprite block using SNES 16-tile row stride."""
     tile_bytes = bytearray()
 
@@ -29,7 +32,7 @@ def extract_sprite_block(tiles_data: bytes, base_tile: int, width_tiles: int, he
             if tile_end <= len(tiles_data):
                 tile_bytes.extend(tiles_data[tile_start:tile_end])
             else:
-                tile_bytes.extend(b'\x00' * BYTES_PER_TILE)
+                tile_bytes.extend(b"\x00" * BYTES_PER_TILE)
 
     return renderer.render_tiles(bytes(tile_bytes), width_tiles, height_tiles, palette_index=None)
 
@@ -110,17 +113,17 @@ def main():
     # This may need adjustment based on actual sprite layout
     positions = [
         # (block_index, x_offset, y_offset)
-        (0, 0, 0),      # Top-left claw
+        (0, 0, 0),  # Top-left claw
         (1, 32, 0),
-        (2, 64, 0),     # Body top
+        (2, 64, 0),  # Body top
         (3, 96, 0),
-        (4, 0, 32),     # Middle-left
+        (4, 0, 32),  # Middle-left
         (5, 32, 32),
-        (6, 64, 32),    # Body middle
+        (6, 64, 32),  # Body middle
         (7, 96, 32),
-        (8, 0, 64),     # Bottom-left
+        (8, 0, 64),  # Bottom-left
         (9, 32, 64),
-        (10, 64, 64),   # Body bottom
+        (10, 64, 64),  # Body bottom
         (11, 96, 64),
     ]
 

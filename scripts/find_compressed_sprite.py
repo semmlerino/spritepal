@@ -59,7 +59,9 @@ def search_compressed_blocks(
                 pos = decompressed.find(signature)
                 if pos >= 0:
                     matches.append((offset, pos, len(decompressed)))
-                    print(f"\n  FOUND at {offset:#06x}: signature at byte {pos} of {len(decompressed)} decompressed bytes")
+                    print(
+                        f"\n  FOUND at {offset:#06x}: signature at byte {pos} of {len(decompressed)} decompressed bytes"
+                    )
         except Exception:
             pass  # Invalid compressed data, skip
 
@@ -101,7 +103,7 @@ def main():
         print(f"\n=== FOUND {len(matches)} MATCHING OFFSETS ===")
         for offset, pos, size in sorted(matches):
             tile_num = pos // 32  # 32 bytes per 4bpp tile
-            print(f"  {offset:#06x}: signature at tile {tile_num} (byte {pos}) of {size//32} tiles")
+            print(f"  {offset:#06x}: signature at tile {tile_num} (byte {pos}) of {size // 32} tiles")
     else:
         print("\nNo matches found. Try:")
         print("  - Different search range (--start, --end)")
