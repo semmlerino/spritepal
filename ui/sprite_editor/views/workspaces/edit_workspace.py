@@ -415,6 +415,12 @@ class EditWorkspace(QWidget):
             _colors, name = value
             self._palette_panel.add_palette_source(name, source_type, index)
 
+        # Sync currently selected source to UI
+        current_source = controller.get_current_palette_source()
+        if current_source:
+            source_type, palette_index = current_source
+            self._on_palette_source_selected(source_type, palette_index)
+
         # Connect preview panel to controller
         self._preview_panel.controller = controller
         controller.imageChanged.connect(self._preview_panel.update_preview)

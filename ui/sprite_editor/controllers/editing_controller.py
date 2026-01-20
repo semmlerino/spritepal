@@ -4,6 +4,9 @@ Editing controller for the pixel editor functionality.
 Manages the pixel editing workflow, tools, and undo/redo.
 """
 
+from __future__ import annotations
+
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -19,6 +22,8 @@ from ..models import ImageModel, PaletteModel
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
+    from core.managers.application_state_manager import ApplicationStateManager
+
     from ..views.tabs import EditTab
 
 
@@ -87,6 +92,9 @@ class EditingController(QObject):
         # Load available presets (uses lazy palette_loader property)
         self.load_presets()
 
+        # Load last used palette if available
+        self._load_last_palette()
+
     @property
     def palette_loader(self) -> DefaultPaletteLoader:
         """Lazy access to DefaultPaletteLoader via AppContext when available."""
@@ -99,6 +107,16 @@ class EditingController(QObject):
                 # AppContext not initialized, create standalone instance
                 self._palette_loader = DefaultPaletteLoader()
         return self._palette_loader
+
+    @property
+    def state_manager(self) -> "ApplicationStateManager" | None:
+        """Lazy access to ApplicationStateManager via AppContext when available."""
+        try:
+            from core.app_context import get_app_context
+
+            return get_app_context().application_state_manager
+        except RuntimeError:
+            return None
 
     def load_presets(self) -> None:
         """Load all available palette presets from configuration."""
@@ -521,6 +539,66 @@ class EditingController(QObject):
         # Views connect to this signal and update their UI accordingly
         self.paletteSourceSelected.emit(source_type, palette_index)
 
+    def load_palette_from_file(self, file_path: str) -> bool:
+        """Load a palette from a file and select it.
+
+        Args:
+            file_path: Path to the palette file (.pal or .json)
+
+        Returns:
+            True if successful
+        """
+        try:
+            colors = []
+            if file_path.endswith(".json"):
+                import json
+
+                with open(file_path) as f:
+                    data = json.load(f)
+                    # Expecting {"colors": [[r,g,b], ...]}
+                    if "colors" in data:
+                        colors = [tuple(c) for c in data["colors"]]
+            else:
+                # Assume JASC PAL or raw RGB
+                with open(file_path) as f:
+                    lines = f.readlines()
+                    if lines and "JASC-PAL" in lines[0]:
+                        for line in lines[3:]:  # Skip header, version, count
+                            parts = line.strip().split()
+                            if len(parts) >= 3:
+                                colors.append((int(parts[0]), int(parts[1]), int(parts[2])))
+
+            if colors:
+                # Ensure we have at least 16 colors, pad if necessary
+                while len(colors) < 16:
+                    colors.append((0, 0, 0))
+                colors = colors[:16]
+
+                # Register as "file" source and select it
+                # This updates the dropdown via paletteSourceSelected signal
+                filename = Path(file_path).name
+                self.register_palette_source("file", 0, colors, f"Loaded: {filename}")
+                self.set_palette_source("file", 0)
+
+                # Save to settings
+                if self.state_manager:
+                    self.state_manager.set("paths", "last_palette_path", file_path)
+                    self.state_manager.save_session()
+
+                return True
+        except Exception as e:
+            logger.error(f"Failed to load palette from {file_path}: {e}")
+
+        return False
+
+    def _load_last_palette(self) -> None:
+        """Load the last used palette from settings."""
+        if self.state_manager:
+            last_path = str(self.state_manager.get("paths", "last_palette_path", ""))
+            if last_path and Path(last_path).exists():
+                logger.info(f"Auto-loading last used palette: {last_path}")
+                self.load_palette_from_file(last_path)
+
     def handle_load_palette(self) -> None:
         """Handle load palette button click."""
         from PySide6.QtWidgets import QFileDialog, QMessageBox
@@ -539,37 +617,8 @@ class EditingController(QObject):
             if not file_path:
                 return
 
-            colors = []
-            if file_path.endswith(".json"):
-                import json
-
-                with open(file_path) as f:
-                    data = json.load(f)
-                    # Expecting {"colors": [[r,g,b], ...]}
-                    if "colors" in data:
-                        colors = [tuple(c) for c in data["colors"]]
-            else:
-                # Assume JASC PAL or raw RGB
-                # For now, simplistic implementation or rely on a service if available
-                # Let's support JASC-PAL for now as it's common
-                with open(file_path) as f:
-                    lines = f.readlines()
-                    if "JASC-PAL" in lines[0]:
-                        for line in lines[3:]:  # Skip header, version, count
-                            parts = line.strip().split()
-                            if len(parts) >= 3:
-                                colors.append((int(parts[0]), int(parts[1]), int(parts[2])))
-
-            if colors:
-                # Ensure we have at least 16 colors, pad if necessary
-                while len(colors) < 16:
-                    colors.append((0, 0, 0))
-                colors = colors[:16]
-
-                # Register as "file" source and select it
-                # This updates the dropdown via paletteSourceSelected signal
-                self.register_palette_source("file", 0, colors, "Loaded Palette")
-                self.set_palette_source("file", 0)
+            if not self.load_palette_from_file(file_path):
+                QMessageBox.critical(parent, "Error", f"Failed to load palette from {file_path}")
 
         except Exception as e:
             QMessageBox.critical(parent, "Error", f"Failed to load palette: {e}")

@@ -262,6 +262,7 @@ class ApplicationStateManager(BaseManager):
                 "default_dumps_dir": str(Path.home() / "Documents" / "Mesen2" / "Debugger"),
                 "mesen_output_dir": "",  # Mesen2 exchange dir (empty = use project default)
                 "last_used_dir": "",
+                "last_palette_path": "",
                 "last_export_dir": "",
                 "last_import_dir": "",
             },
