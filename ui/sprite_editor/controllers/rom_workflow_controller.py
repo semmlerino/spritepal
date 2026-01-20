@@ -116,6 +116,8 @@ class ROMWorkflowController(QObject):
         self.original_compressed_size: int = 0
         self.available_slack: int = 0
         self.current_compression_type: CompressionType = CompressionType.UNKNOWN
+        # User-selected compression mode for extraction (None = auto-detect)
+        self._user_compression_mode: CompressionType | None = None
         # Header bytes stripped during alignment (prepended back during injection to prevent color shift)
         self.current_header_bytes: bytes = b""
 
@@ -381,6 +383,7 @@ class ROMWorkflowController(QObject):
         self._view.source_bar.offset_changed.connect(self.set_offset)
         self._view.source_bar.action_clicked.connect(self.handle_primary_action)
         self._view.source_bar.browse_rom_requested.connect(self.browse_rom)
+        self._view.source_bar.compression_type_changed.connect(self._on_compression_type_changed)
 
         # Asset browser signals
         self._view.sprite_selected.connect(self._on_sprite_selected)
@@ -2486,7 +2489,6 @@ class ROMWorkflowController(QObject):
         """Check if ROM map data is available for raw tile injection."""
         return self._current_rom_map_data is not None
 
-
     def _offer_palette_injection(self, output_path: str) -> None:
         """Offer to inject palette after successful tile injection.
 
@@ -3026,6 +3028,11 @@ class ROMWorkflowController(QObject):
         # Store header bytes for restoration during injection (prevents color shift bug)
         self.current_header_bytes = header_bytes
 
+        # Sync dropdown to reflect actual compression type used
+        # (uses blockSignals internally to avoid triggering re-extraction)
+        if self._view:
+            self._view.set_compression_type(self.current_compression_type)
+
         # Clear loading state
         self._preview_pending = False
         if (view := self._view) and isValid(view):
@@ -3106,6 +3113,24 @@ class ROMWorkflowController(QObject):
             view.source_bar.set_action_enabled(True)
         if self._message_service:
             self._message_service.show_message(f"Preview error: {error_msg}")
+
+    def _on_compression_type_changed(self, compression_type: CompressionType) -> None:
+        """Handle compression type dropdown change from user.
+
+        Args:
+            compression_type: The user-selected compression type (HAL or RAW).
+        """
+        logger.debug(f"[CONTROLLER] Compression type changed by user: {compression_type}")
+        self._user_compression_mode = compression_type
+
+        # Update the preview coordinator's forced compression type
+        self.preview_coordinator.set_force_compression_type(compression_type)
+
+        # If we have a current offset loaded, trigger re-extraction
+        if self.rom_path and self.current_offset > 0:
+            logger.debug(f"[CONTROLLER] Re-extracting offset 0x{self.current_offset:X} with {compression_type}")
+            # Request full preview (not truncated) to show the effect of the new mode
+            self.preview_coordinator.request_full_preview(self.current_offset)
 
     def _on_validation_changed(self, is_valid: bool, errors: list[str]) -> None:
         """Handle validation state change from editing controller.

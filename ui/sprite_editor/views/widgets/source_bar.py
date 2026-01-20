@@ -8,6 +8,7 @@ import re
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -15,6 +16,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.types import CompressionType
 from ui.styles import get_muted_text_style, get_section_label_style
 from utils.constants import RomMappingType
 
@@ -31,6 +33,7 @@ class SourceBar(QWidget):
     action_clicked = Signal()
     offset_changed = Signal(int)
     browse_rom_requested = Signal()
+    compression_type_changed = Signal(object)  # Emits CompressionType enum value
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -74,6 +77,15 @@ class SourceBar(QWidget):
         self.offset_edit.setFixedWidth(120)
         self.offset_edit.offset_changed.connect(self.offset_changed.emit)
         layout.addWidget(self.offset_edit)
+
+        # Compression type selector
+        self.compression_combo = QComboBox()
+        self.compression_combo.addItem("Compressed (HAL)", CompressionType.HAL)
+        self.compression_combo.addItem("Uncompressed (Raw)", CompressionType.RAW)
+        self.compression_combo.setToolTip("Extraction mode: HAL compressed or raw 4bpp tiles")
+        self.compression_combo.setMinimumWidth(130)
+        self.compression_combo.currentIndexChanged.connect(self._on_compression_changed)
+        layout.addWidget(self.compression_combo)
 
         # Primary Action
         self.action_btn = QPushButton("Open in Editor")
@@ -184,3 +196,32 @@ class SourceBar(QWidget):
             # Remove the modified tag and any leading space
             cleaned = re.sub(r'<span style="color: #FF9800;">\[Modified\]</span>\s*', "", current_text)
             self.info_label.setText(cleaned)
+
+    def _on_compression_changed(self, index: int) -> None:
+        """Handle compression type selection change."""
+        compression_type = self.compression_combo.itemData(index)
+        if compression_type is not None:
+            self.compression_type_changed.emit(compression_type)
+
+    def set_compression_type(self, compression_type: CompressionType) -> None:
+        """Set the compression type dropdown selection.
+
+        Args:
+            compression_type: The compression type to select.
+        """
+        index = self.compression_combo.findData(compression_type)
+        if index >= 0:
+            self.compression_combo.blockSignals(True)
+            self.compression_combo.setCurrentIndex(index)
+            self.compression_combo.blockSignals(False)
+
+    def get_compression_type(self) -> CompressionType:
+        """Get the currently selected compression type.
+
+        Returns:
+            The currently selected CompressionType.
+        """
+        data = self.compression_combo.currentData()
+        if isinstance(data, CompressionType):
+            return data
+        return CompressionType.HAL  # Default fallback

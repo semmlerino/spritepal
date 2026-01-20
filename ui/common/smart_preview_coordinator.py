@@ -20,6 +20,8 @@ from collections.abc import Callable
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, cast
 
+from core.types import CompressionType
+
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
 
@@ -74,6 +76,7 @@ class PendingPreviewRequest:
         callback: Callable[..., object] | None = None,
         *,
         full_decompression: bool = False,
+        force_compression_type: CompressionType | None = None,
     ):
         self.request_id = request_id
         self.offset = offset
@@ -81,6 +84,7 @@ class PendingPreviewRequest:
         self.callback = callback
         self.cancelled = False
         self.full_decompression = full_decompression  # If True, don't truncate at 4KB
+        self.force_compression_type = force_compression_type  # If set, skip auto-detection
 
     def cancel(self) -> None:
         """Mark this request as cancelled."""
@@ -120,6 +124,7 @@ class SmartPreviewCoordinator(QObject):
         self._request_counter = 0
         self._mutex = QMutex()
         self._pending_full_decompression = False  # If True, next request uses full decompression
+        self._force_compression_type: CompressionType | None = None  # User-forced compression mode
 
         # Slider reference (weak to prevent circular references)
         self._slider_ref: weakref.ReferenceType[Any] | None = None  # pyright: ignore[reportExplicitAny] - Weak reference to QSlider
@@ -188,6 +193,27 @@ class SmartPreviewCoordinator(QObject):
             provider: Function that returns (rom_path, rom_extractor) or None
         """
         self._rom_data_provider = provider
+
+    def set_force_compression_type(self, compression_type: CompressionType | None) -> None:
+        """Set forced compression type for preview extraction.
+
+        Args:
+            compression_type: CompressionType.HAL to force HAL decompression,
+                             CompressionType.RAW to force raw extraction,
+                             None for auto-detection (default).
+        """
+        with QMutexLocker(self._mutex):
+            self._force_compression_type = compression_type
+        logger.debug(f"[COORD] Force compression type set to: {compression_type}")
+
+    def get_force_compression_type(self) -> CompressionType | None:
+        """Get the current forced compression type setting.
+
+        Returns:
+            Current forced compression type, or None for auto-detection.
+        """
+        with QMutexLocker(self._mutex):
+            return self._force_compression_type
 
     def invalidate_preview_cache(self, offset: int | None = None) -> None:
         """Invalidate cached preview data for a specific offset.
@@ -504,11 +530,13 @@ class SmartPreviewCoordinator(QObject):
                 offset = self._current_offset
                 request_id = self._request_counter
                 full_decompression = self._pending_full_decompression
+                force_compression_type = self._force_compression_type
                 self._pending_full_decompression = False  # Reset after reading
 
             logger.debug(
                 f"[COORD] Creating preview request: offset=0x{offset:06X}, "
-                f"request_id={request_id}, full_decompression={full_decompression}"
+                f"request_id={request_id}, full_decompression={full_decompression}, "
+                f"force_compression_type={force_compression_type}"
             )
 
             # Create preview request
@@ -517,6 +545,7 @@ class SmartPreviewCoordinator(QObject):
                 offset=offset,
                 rom_path=rom_path,
                 full_decompression=full_decompression,
+                force_compression_type=force_compression_type,
             )
 
             # Submit to worker pool

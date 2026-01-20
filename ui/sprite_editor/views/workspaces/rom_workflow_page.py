@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.types import CompressionType
 from ui.common.spacing_constants import SPACING_STANDARD
 from utils.constants import RomMappingType
 
@@ -48,6 +49,8 @@ class ROMWorkflowPage(QWidget):
     sprite_activated = Signal(int, str)  # offset, source_type
     local_file_selected = Signal(str, str)  # path, name
     local_file_activated = Signal(str, str)  # path, name
+    # Forward signal from source bar
+    compression_type_changed = Signal(object)  # Emits CompressionType enum value
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -63,6 +66,7 @@ class ROMWorkflowPage(QWidget):
         # 1. Source Bar (Top)
         self._source_bar = SourceBar()
         self._source_bar.offset_changed.connect(self.offset_changed.emit)
+        self._source_bar.compression_type_changed.connect(self.compression_type_changed.emit)
         layout.addWidget(self._source_bar)
 
         # 2. Create EditWorkspace in embedded mode (widgets only, no layout)
@@ -289,3 +293,23 @@ class ROMWorkflowPage(QWidget):
         """Hide the palette warning banner."""
         if self._workspace and self._workspace.palette_panel:
             self._workspace.palette_panel.hide_palette_warning()
+
+    # =========================================================================
+    # Compression type methods (delegate to source bar)
+    # =========================================================================
+
+    def set_compression_type(self, compression_type: CompressionType) -> None:
+        """Set the compression type dropdown selection.
+
+        Args:
+            compression_type: The compression type to select.
+        """
+        self._source_bar.set_compression_type(compression_type)
+
+    def get_compression_type(self) -> CompressionType:
+        """Get the currently selected compression type.
+
+        Returns:
+            The currently selected CompressionType.
+        """
+        return self._source_bar.get_compression_type()
