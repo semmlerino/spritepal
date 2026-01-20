@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
+from ui.frame_mapping.dialogs.alignment_dialog import AlignmentDialog
 from ui.frame_mapping.views.comparison_panel import ComparisonPanel
 from ui.frame_mapping.views.frame_browser_panel import FrameBrowserPanel
 from ui.frame_mapping.views.mapping_panel import MappingPanel
@@ -188,6 +189,7 @@ class FrameMappingWorkspace(QWidget):
         self._mapping_panel.edit_frame_requested.connect(self._on_edit_frame)
         self._mapping_panel.remove_mapping_requested.connect(self._on_remove_mapping)
         self._mapping_panel.mapping_selected.connect(self._on_mapping_selected)
+        self._mapping_panel.adjust_alignment_requested.connect(self._on_adjust_alignment)
 
     def _on_project_changed(self) -> None:
         """Handle project changes."""
@@ -291,6 +293,45 @@ class FrameMappingWorkspace(QWidget):
     def _on_remove_mapping(self, ai_frame_index: int) -> None:
         """Handle remove mapping request."""
         self._controller.remove_mapping(ai_frame_index)
+
+    def _on_adjust_alignment(self, ai_frame_index: int) -> None:
+        """Handle adjust alignment request."""
+        project = self._controller.project
+        if project is None:
+            return
+
+        ai_frame = project.get_ai_frame_by_index(ai_frame_index)
+        if ai_frame is None:
+            return
+
+        mapping = project.get_mapping_for_ai_frame(ai_frame_index)
+        if mapping is None:
+            return
+
+        game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
+        if game_frame is None:
+            return
+
+        # Get game frame preview pixmap
+        game_pixmap = self._controller.get_game_frame_preview(mapping.game_frame_id)
+
+        # Open alignment dialog with current values
+        dialog = AlignmentDialog(
+            game_frame_pixmap=game_pixmap,
+            ai_frame_path=ai_frame.path,
+            initial_offset_x=mapping.offset_x,
+            initial_offset_y=mapping.offset_y,
+            initial_flip_h=mapping.flip_h,
+            initial_flip_v=mapping.flip_v,
+            parent=self,
+        )
+
+        if dialog.exec():
+            # User accepted - save alignment
+            offset_x, offset_y, flip_h, flip_v = dialog.get_alignment()
+            self._controller.update_mapping_alignment(ai_frame_index, offset_x, offset_y, flip_h, flip_v)
+            if self._message_service:
+                self._message_service.show_message(f"Alignment updated: offset=({offset_x}, {offset_y})")
 
     def _on_load_ai_frames(self) -> None:
         """Handle load AI frames button click."""

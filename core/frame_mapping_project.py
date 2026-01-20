@@ -236,6 +236,36 @@ class FrameMappingProject:
         self.mappings.append(mapping)
         return mapping
 
+    def update_mapping_alignment(
+        self,
+        ai_frame_index: int,
+        offset_x: int,
+        offset_y: int,
+        flip_h: bool,
+        flip_v: bool,
+    ) -> bool:
+        """Update alignment for a mapping.
+
+        Args:
+            ai_frame_index: Index of the AI frame
+            offset_x: X offset for alignment
+            offset_y: Y offset for alignment
+            flip_h: Horizontal flip state
+            flip_v: Vertical flip state
+
+        Returns:
+            True if mapping was updated, False if no mapping exists
+        """
+        mapping = self.get_mapping_for_ai_frame(ai_frame_index)
+        if mapping is None:
+            return False
+
+        mapping.offset_x = offset_x
+        mapping.offset_y = offset_y
+        mapping.flip_h = flip_h
+        mapping.flip_v = flip_v
+        return True
+
     def remove_mapping_for_ai_frame(self, ai_frame_index: int) -> bool:
         """Remove mapping for an AI frame.
 

@@ -45,12 +45,14 @@ class MappingPanel(QWidget):
         edit_frame_requested: Emitted when user clicks Edit Frame (mapping index)
         mapping_selected: Emitted when a mapping row is selected (ai_frame_index)
         remove_mapping_requested: Emitted when user requests to remove a mapping
+        adjust_alignment_requested: Emitted when user clicks Adjust Alignment (ai_frame_index)
     """
 
     map_selected_requested = Signal()
     edit_frame_requested = Signal(int)  # AI frame index
     mapping_selected = Signal(int)  # AI frame index
     remove_mapping_requested = Signal(int)  # AI frame index
+    adjust_alignment_requested = Signal(int)  # AI frame index
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -102,6 +104,12 @@ class MappingPanel(QWidget):
         self._edit_button.setEnabled(False)
         self._edit_button.clicked.connect(self._on_edit_clicked)
         button_layout.addWidget(self._edit_button)
+
+        self._align_button = QPushButton("Adjust Alignment")
+        self._align_button.setToolTip("Adjust position/flip of AI frame relative to game frame")
+        self._align_button.setEnabled(False)
+        self._align_button.clicked.connect(self._on_align_clicked)
+        button_layout.addWidget(self._align_button)
 
         self._remove_button = QPushButton("Remove")
         self._remove_button.setToolTip("Remove the selected mapping")
@@ -180,6 +188,7 @@ class MappingPanel(QWidget):
         ai_index = self.get_selected_ai_frame_index()
         if ai_index is None:
             self._edit_button.setEnabled(False)
+            self._align_button.setEnabled(False)
             self._remove_button.setEnabled(False)
             return
 
@@ -190,6 +199,7 @@ class MappingPanel(QWidget):
             has_mapping = mapping is not None
 
         self._edit_button.setEnabled(has_mapping)
+        self._align_button.setEnabled(has_mapping)
         self._remove_button.setEnabled(has_mapping)
         self.mapping_selected.emit(ai_index)
 
@@ -204,3 +214,9 @@ class MappingPanel(QWidget):
         ai_index = self.get_selected_ai_frame_index()
         if ai_index is not None:
             self.remove_mapping_requested.emit(ai_index)
+
+    def _on_align_clicked(self) -> None:
+        """Handle adjust alignment button click."""
+        ai_index = self.get_selected_ai_frame_index()
+        if ai_index is not None:
+            self.adjust_alignment_requested.emit(ai_index)

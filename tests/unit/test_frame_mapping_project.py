@@ -1,6 +1,6 @@
 """Unit tests for core.frame_mapping_project module."""
 
-import pytest
+from pathlib import Path
 
 from core.frame_mapping_project import FrameMapping, GameFrame
 
@@ -135,3 +135,96 @@ class TestGameFrame:
         """GameFrame preserves ROM offsets."""
         frame = GameFrame(id="G002", rom_offsets=[0x1B0000, 0x282000])
         assert frame.rom_offsets == [0x1B0000, 0x282000]
+
+
+class TestFrameMappingProjectAlignment:
+    """Tests for FrameMappingProject alignment update functionality."""
+
+    def test_update_mapping_alignment_success(self) -> None:
+        """update_mapping_alignment updates existing mapping."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.create_mapping(ai_frame_index=0, game_frame_id="G001")
+
+        result = project.update_mapping_alignment(
+            ai_frame_index=0,
+            offset_x=10,
+            offset_y=-5,
+            flip_h=True,
+            flip_v=False,
+        )
+
+        assert result is True
+        mapping = project.get_mapping_for_ai_frame(0)
+        assert mapping is not None
+        assert mapping.offset_x == 10
+        assert mapping.offset_y == -5
+        assert mapping.flip_h is True
+        assert mapping.flip_v is False
+
+    def test_update_mapping_alignment_no_mapping(self) -> None:
+        """update_mapping_alignment returns False when no mapping exists."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+
+        result = project.update_mapping_alignment(
+            ai_frame_index=0,
+            offset_x=10,
+            offset_y=-5,
+            flip_h=True,
+            flip_v=False,
+        )
+
+        assert result is False
+
+    def test_update_mapping_alignment_preserves_other_fields(self) -> None:
+        """update_mapping_alignment preserves other mapping fields."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        mapping = project.create_mapping(ai_frame_index=0, game_frame_id="G001")
+        mapping.status = "edited"
+
+        project.update_mapping_alignment(
+            ai_frame_index=0,
+            offset_x=5,
+            offset_y=5,
+            flip_h=False,
+            flip_v=True,
+        )
+
+        mapping = project.get_mapping_for_ai_frame(0)
+        assert mapping is not None
+        assert mapping.game_frame_id == "G001"
+        assert mapping.status == "edited"
+
+    def test_alignment_persists_through_save_load(self, tmp_path: Path) -> None:
+        """Alignment values survive save/load cycle."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        # Create project with alignment
+        project = FrameMappingProject(name="test")
+        project.create_mapping(ai_frame_index=0, game_frame_id="G001")
+        project.update_mapping_alignment(
+            ai_frame_index=0,
+            offset_x=15,
+            offset_y=-10,
+            flip_h=True,
+            flip_v=True,
+        )
+
+        # Save
+        save_path = tmp_path / "test.spritepal-mapping.json"
+        project.save(save_path)
+
+        # Load
+        loaded = FrameMappingProject.load(save_path)
+
+        mapping = loaded.get_mapping_for_ai_frame(0)
+        assert mapping is not None
+        assert mapping.offset_x == 15
+        assert mapping.offset_y == -10
+        assert mapping.flip_h is True
+        assert mapping.flip_v is True

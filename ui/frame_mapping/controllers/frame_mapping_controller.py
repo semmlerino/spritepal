@@ -342,6 +342,42 @@ class FrameMappingController(QObject):
             return True
         return False
 
+    def update_mapping_alignment(
+        self,
+        ai_frame_index: int,
+        offset_x: int,
+        offset_y: int,
+        flip_h: bool,
+        flip_v: bool,
+    ) -> bool:
+        """Update alignment for a mapping.
+
+        Args:
+            ai_frame_index: Index of the AI frame
+            offset_x: X offset for alignment
+            offset_y: Y offset for alignment
+            flip_h: Horizontal flip state
+            flip_v: Vertical flip state
+
+        Returns:
+            True if alignment was updated
+        """
+        if self._project is None:
+            return False
+
+        if self._project.update_mapping_alignment(ai_frame_index, offset_x, offset_y, flip_h, flip_v):
+            self.project_changed.emit()
+            logger.info(
+                "Updated alignment for AI frame %d: offset=(%d, %d), flip=(%s, %s)",
+                ai_frame_index,
+                offset_x,
+                offset_y,
+                flip_h,
+                flip_v,
+            )
+            return True
+        return False
+
     def get_game_frame_preview(self, frame_id: str) -> QPixmap | None:
         """Get the rendered preview pixmap for a game frame.
 
