@@ -221,6 +221,9 @@ class SpriteSelectionDialog(DialogBase):
             should_show = selected_palette in (-1, entry.palette)
             item.setHidden(not should_show)
 
+        # Update preview to reflect current selections
+        self._update_preview()
+
     def _on_selection_changed(self, _item: QListWidgetItem) -> None:
         """Handle sprite selection change."""
         self._update_preview()

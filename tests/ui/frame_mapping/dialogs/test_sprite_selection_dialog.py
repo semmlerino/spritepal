@@ -381,6 +381,40 @@ class TestPreviewUpdate:
             # Text should indicate selection needed
             assert "Select" in dialog._preview_label.text()
 
+    def test_preview_updates_on_filter_change(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
+        """Preview should update when palette filter changes."""
+        dialog = SpriteSelectionDialog(sample_capture)
+        qtbot.addWidget(dialog)
+
+        assert dialog._preview_label is not None
+        assert dialog._palette_filter is not None
+
+        # Track _update_preview calls
+        update_calls: list[str] = []
+        original_update = dialog._update_preview
+
+        def tracking_update() -> None:
+            update_calls.append("called")
+            original_update()
+
+        dialog._update_preview = tracking_update  # type: ignore[method-assign]
+
+        # Clear tracking from init
+        update_calls.clear()
+
+        # Change filter to specific palette
+        dialog._palette_filter.setCurrentIndex(1)  # Palette 0
+
+        # Verify preview was updated
+        assert len(update_calls) == 1
+
+        # Change filter again
+        update_calls.clear()
+        dialog._palette_filter.setCurrentIndex(2)  # Palette 3
+
+        # Verify preview was updated again
+        assert len(update_calls) == 1
+
 
 class TestListItemFormat:
     """Tests for list item display format."""
