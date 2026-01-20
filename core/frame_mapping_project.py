@@ -89,12 +89,22 @@ class FrameMapping:
     game_frame_id: str
     status: str = "mapped"  # "unmapped", "mapped", "edited", "injected"
 
+    # Alignment for overlay (AI frame relative to game frame)
+    offset_x: int = 0
+    offset_y: int = 0
+    flip_h: bool = False
+    flip_v: bool = False
+
     def to_dict(self) -> dict[str, object]:
         """Serialize to dictionary for JSON storage."""
         return {
             "ai_frame_index": self.ai_frame_index,
             "game_frame_id": self.game_frame_id,
             "status": self.status,
+            "offset_x": self.offset_x,
+            "offset_y": self.offset_y,
+            "flip_h": self.flip_h,
+            "flip_v": self.flip_v,
         }
 
     @classmethod
@@ -104,6 +114,10 @@ class FrameMapping:
             ai_frame_index=cast(int, data["ai_frame_index"]),
             game_frame_id=cast(str, data["game_frame_id"]),
             status=cast(str, data.get("status", "mapped")),
+            offset_x=cast(int, data.get("offset_x", 0)),
+            offset_y=cast(int, data.get("offset_y", 0)),
+            flip_h=cast(bool, data.get("flip_h", False)),
+            flip_v=cast(bool, data.get("flip_v", False)),
         )
 
 
