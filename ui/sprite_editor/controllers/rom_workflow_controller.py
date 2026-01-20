@@ -3127,8 +3127,12 @@ class ROMWorkflowController(QObject):
         self.preview_coordinator.set_force_compression_type(compression_type)
 
         # If we have a current offset loaded, trigger re-extraction
-        if self.rom_path and self.current_offset > 0:
+        if self.rom_path and self.current_offset >= 0:
             logger.debug(f"[CONTROLLER] Re-extracting offset 0x{self.current_offset:X} with {compression_type}")
+            if self.state == "edit":
+                # Reopen the editor with freshly extracted data for the new mode.
+                self.set_offset(self.current_offset, auto_open=True, source_type=self._current_source_type)
+                return
             # Request full preview (not truncated) to show the effect of the new mode
             self.preview_coordinator.request_full_preview(self.current_offset)
 

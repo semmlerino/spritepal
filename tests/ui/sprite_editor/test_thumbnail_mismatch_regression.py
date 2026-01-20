@@ -4,6 +4,8 @@ import pytest
 
 from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
 
+pytestmark = [pytest.mark.parallel_unsafe]
+
 
 def test_thumbnail_generation_uses_stale_data():
     """

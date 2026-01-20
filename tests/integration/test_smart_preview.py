@@ -217,6 +217,9 @@ class TestCachePoisoningPrevention:
         test_tile_data_b = b"\xbb" * 32  # Data for offset B
         background_request_id = -1001  # Negative = background preload
 
+        # Manually populate request context since we're skipping the request flow
+        coordinator._request_contexts[background_request_id] = (None, False)
+
         coordinator._on_worker_preview_ready(
             request_id=background_request_id,
             tile_data=test_tile_data_b,
@@ -232,8 +235,9 @@ class TestCachePoisoningPrevention:
 
         # KEY ASSERTIONS:
         # 1. Cache should contain data under key for offset_b, not offset_a
-        cache_key_b = coordinator._cache.make_key(str(test_rom_path), offset_b)
-        cache_key_a = coordinator._cache.make_key(str(test_rom_path), offset_a)
+        # MUST use same context as coordinator: auto|preview (None, False)
+        cache_key_b = coordinator._make_cache_key(str(test_rom_path), offset_b, None, False)
+        cache_key_a = coordinator._make_cache_key(str(test_rom_path), offset_a, None, False)
 
         cached_data_b = coordinator._cache.get(cache_key_b)
         cached_data_a = coordinator._cache.get(cache_key_a)
@@ -283,6 +287,9 @@ class TestCachePoisoningPrevention:
         test_tile_data = b"\xaa" * 32
         user_request_id = 1  # Positive = user request
 
+        # Manually populate request context
+        coordinator._request_contexts[user_request_id] = (None, False)
+
         coordinator._on_worker_preview_ready(
             request_id=user_request_id,
             tile_data=test_tile_data,
@@ -297,7 +304,8 @@ class TestCachePoisoningPrevention:
         )
 
         # Cache should contain data under offset_a
-        cache_key = coordinator._cache.make_key(str(test_rom_path), offset_a)
+        # MUST use same context as coordinator: auto|preview (None, False)
+        cache_key = coordinator._make_cache_key(str(test_rom_path), offset_a, None, False)
         cached_data = coordinator._cache.get(cache_key)
 
         assert cached_data is not None, "User request should be cached"

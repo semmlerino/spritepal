@@ -125,6 +125,7 @@ class SmartPreviewCoordinator(QObject):
         self._mutex = QMutex()
         self._pending_full_decompression = False  # If True, next request uses full decompression
         self._force_compression_type: CompressionType | None = None  # User-forced compression mode
+        self._request_contexts: dict[int, tuple[CompressionType | None, bool]] = {}
 
         # Slider reference (weak to prevent circular references)
         self._slider_ref: weakref.ReferenceType[Any] | None = None  # pyright: ignore[reportExplicitAny] - Weak reference to QSlider
@@ -215,6 +216,17 @@ class SmartPreviewCoordinator(QObject):
         with QMutexLocker(self._mutex):
             return self._force_compression_type
 
+    def _build_cache_context(self, compression_type: CompressionType | None, full_decompression: bool) -> str:
+        compression_label = compression_type.value if isinstance(compression_type, CompressionType) else "auto"
+        full_label = "full" if full_decompression else "preview"
+        return f"{compression_label}|{full_label}"
+
+    def _make_cache_key(
+        self, rom_path: str, offset: int, compression_type: CompressionType | None, full_decompression: bool
+    ) -> str:
+        cache_context = self._build_cache_context(compression_type, full_decompression)
+        return self._cache.make_key(rom_path, offset, cache_context)
+
     def invalidate_preview_cache(self, offset: int | None = None) -> None:
         """Invalidate cached preview data for a specific offset.
 
@@ -233,9 +245,14 @@ class SmartPreviewCoordinator(QObject):
             return
 
         target_offset = self._current_offset if offset is None else offset
-        cache_key = self._cache.make_key(rom_path, target_offset)
-        removed = self._cache.remove(cache_key)
-        if removed:
+        removed_any = False
+        for compression_type in (None, CompressionType.HAL, CompressionType.RAW):
+            for full_decompression in (False, True):
+                cache_key = self._make_cache_key(rom_path, target_offset, compression_type, full_decompression)
+                removed_any = self._cache.remove(cache_key) or removed_any
+        legacy_key = self._cache.make_key(rom_path, target_offset)
+        removed_any = self._cache.remove(legacy_key) or removed_any
+        if removed_any:
             logger.debug(f"Invalidated preview cache for 0x{target_offset:06X}")
 
     def request_preview(self, offset: int) -> None:
@@ -312,7 +329,9 @@ class SmartPreviewCoordinator(QObject):
                 provider_result = self._rom_data_provider()
                 if provider_result:
                     rom_path, _ = provider_result
-                    cache_key = self._cache.make_key(rom_path, offset)
+                    with QMutexLocker(self._mutex):
+                        force_compression_type = self._force_compression_type
+                    cache_key = self._make_cache_key(rom_path, offset, force_compression_type, False)
                     if self._cache.get(cache_key):
                         logger.debug(f"[PRELOAD] Already cached: 0x{offset:06X}")
                         return
@@ -337,6 +356,8 @@ class SmartPreviewCoordinator(QObject):
             # Use a separate request ID counter space (negative) to differentiate preloads
             with QMutexLocker(self._mutex):
                 request_id = -(self._request_counter + 1000)  # Negative IDs for preloads
+                force_compression_type = self._force_compression_type
+                self._request_contexts[request_id] = (force_compression_type, False)
 
             logger.debug(f"[PRELOAD] Creating background request: offset=0x{offset:06X}")
 
@@ -345,6 +366,7 @@ class SmartPreviewCoordinator(QObject):
                 request_id=request_id,
                 offset=offset,
                 rom_path=rom_path,
+                force_compression_type=force_compression_type,
             )
             self._worker_pool.submit_request(request, extractor)
 
@@ -442,8 +464,10 @@ class SmartPreviewCoordinator(QObject):
 
             with QMutexLocker(self._mutex):
                 offset = self._current_offset
+                full_decompression = self._pending_full_decompression
+                force_compression_type = self._force_compression_type
 
-            cache_key = self._cache.make_key(rom_path, offset)
+            cache_key = self._make_cache_key(rom_path, offset, force_compression_type, full_decompression)
             cached_data = self._cache.get(cache_key)
 
             # cached_data is never None, but might be empty (b"", 0, 0, None, 0, 0, -1, True, b"")
@@ -470,6 +494,9 @@ class SmartPreviewCoordinator(QObject):
                     logger.debug(
                         f"Cache hit for 0x{offset:06X}: {len(tile_data)} bytes (hal: {hal_succeeded}, header: {len(header_bytes)})"
                     )
+                    if full_decompression:
+                        with QMutexLocker(self._mutex):
+                            self._pending_full_decompression = False
                     # Emit both signals: preview_cached for statistics, preview_ready for data consumers
                     self.preview_cached.emit(
                         tile_data,
@@ -532,6 +559,7 @@ class SmartPreviewCoordinator(QObject):
                 full_decompression = self._pending_full_decompression
                 force_compression_type = self._force_compression_type
                 self._pending_full_decompression = False  # Reset after reading
+                self._request_contexts[request_id] = (force_compression_type, full_decompression)
 
             logger.debug(
                 f"[COORD] Creating preview request: offset=0x{offset:06X}, "
@@ -584,8 +612,10 @@ class SmartPreviewCoordinator(QObject):
         # bypass the staleness check - they're always valid for caching purposes.
         with QMutexLocker(self._mutex):
             if request_id >= 0 and request_id < self._request_counter:
+                self._request_contexts.pop(request_id, None)
                 logger.debug(f"[COORD] Ignoring stale request {request_id} (current={self._request_counter})")
                 return
+            request_context = self._request_contexts.pop(request_id, None)
 
         # Cache the result if data is valid
         if self._rom_data_provider and _validate_tile_data(tile_data):
@@ -606,6 +636,7 @@ class SmartPreviewCoordinator(QObject):
                     )
                     return
                 rom_path, _ = provider_result
+                cache_compression_type, cache_full_decompression = request_context or (None, False)
                 preview_data = (
                     tile_data,
                     width,
@@ -621,7 +652,12 @@ class SmartPreviewCoordinator(QObject):
                 # Save to memory cache
                 # NOTE: Use actual_offset (the offset the worker processed), not
                 # self._current_offset (which may have changed during background preloads)
-                cache_key = self._cache.make_key(rom_path, actual_offset)
+                cache_key = self._make_cache_key(
+                    rom_path,
+                    actual_offset,
+                    cache_compression_type,
+                    cache_full_decompression,
+                )
                 self._cache.put(cache_key, preview_data)
                 logger.debug(
                     f"Cached preview for 0x{actual_offset:06X}: {len(tile_data)} bytes "
@@ -647,6 +683,7 @@ class SmartPreviewCoordinator(QObject):
         """Handle preview error from worker."""
         # Check if this is still relevant
         with QMutexLocker(self._mutex):
+            self._request_contexts.pop(request_id, None)
             if request_id < self._request_counter - 1:
                 return
 
@@ -686,6 +723,7 @@ class SmartPreviewCoordinator(QObject):
         # Clear cache
         if self._cache:
             self._cache.clear()
+        self._request_contexts.clear()
 
         # Clear references
         self._slider_ref = None
