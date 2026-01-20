@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import override
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPainter, QPixmap, QTransform
+from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtGui import QMouseEvent, QPainter, QPixmap, QTransform
 from PySide6.QtWidgets import (
     QCheckBox,
     QFormLayout,
@@ -28,7 +28,15 @@ DISPLAY_SCALE = 4
 
 
 class OverlayCanvas(QWidget):
-    """Canvas widget that displays game frame with AI frame overlaid."""
+    """Canvas widget that displays game frame with AI frame overlaid.
+
+    Supports drag-to-adjust: click and drag the AI frame overlay to adjust its position.
+
+    Signals:
+        offset_changed: Emitted when offset changes via drag (offset_x, offset_y)
+    """
+
+    offset_changed = Signal(int, int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -39,8 +47,17 @@ class OverlayCanvas(QWidget):
         self._flip_h = False
         self._flip_v = False
         self._opacity = 0.5
+
+        # Drag state
+        self._dragging = False
+        self._drag_start: QPoint | None = None
+        self._drag_start_offset_x = 0
+        self._drag_start_offset_y = 0
+
         self.setMinimumSize(CANVAS_SIZE, CANVAS_SIZE)
         self.setStyleSheet("background-color: #1a1a1a;")
+        self.setMouseTracking(True)
+        self.setCursor(Qt.CursorShape.OpenHandCursor)
 
     def set_game_frame(self, pixmap: QPixmap | None) -> None:
         """Set the game frame (background)."""
@@ -68,6 +85,43 @@ class OverlayCanvas(QWidget):
         """Set the opacity for the AI frame overlay (0.0 to 1.0)."""
         self._opacity = max(0.0, min(1.0, opacity))
         self.update()
+
+    @override
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        """Start dragging on left mouse button press."""
+        if event.button() == Qt.MouseButton.LeftButton and self._ai_pixmap is not None:
+            self._dragging = True
+            self._drag_start = event.pos()
+            self._drag_start_offset_x = self._offset_x
+            self._drag_start_offset_y = self._offset_y
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+
+    @override
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Update offset while dragging."""
+        if self._dragging and self._drag_start is not None:
+            delta = event.pos() - self._drag_start
+            # Convert screen pixels to sprite pixels
+            new_offset_x = self._drag_start_offset_x + delta.x() // DISPLAY_SCALE
+            new_offset_y = self._drag_start_offset_y + delta.y() // DISPLAY_SCALE
+
+            # Clamp to reasonable range
+            new_offset_x = max(-128, min(128, new_offset_x))
+            new_offset_y = max(-128, min(128, new_offset_y))
+
+            if new_offset_x != self._offset_x or new_offset_y != self._offset_y:
+                self._offset_x = new_offset_x
+                self._offset_y = new_offset_y
+                self.offset_changed.emit(self._offset_x, self._offset_y)
+                self.update()
+
+    @override
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        """Stop dragging on mouse button release."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._dragging = False
+            self._drag_start = None
+            self.setCursor(Qt.CursorShape.OpenHandCursor)
 
     @override
     def paintEvent(self, event: object) -> None:
@@ -116,6 +170,7 @@ class OverlayCanvas(QWidget):
             painter.drawPixmap(x_start, y_start, scaled_game)
 
         # Draw AI frame (overlay with offset and flip)
+        # AI frame is rendered at its natural relative size to show size differences
         if self._ai_pixmap is not None:
             ai_pixmap = self._ai_pixmap
 
@@ -125,9 +180,12 @@ class OverlayCanvas(QWidget):
                 transform.scale(-1 if self._flip_h else 1, -1 if self._flip_v else 1)
                 ai_pixmap = ai_pixmap.transformed(transform)
 
+            # Scale AI frame at its natural size (not forced to match game frame)
+            ai_scaled_width = ai_pixmap.width() * DISPLAY_SCALE
+            ai_scaled_height = ai_pixmap.height() * DISPLAY_SCALE
             scaled_ai = ai_pixmap.scaled(
-                scaled_width,
-                scaled_height,
+                ai_scaled_width,
+                ai_scaled_height,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.FastTransformation,
             )
@@ -280,7 +338,9 @@ class AlignmentDialog(DialogBase):
 
         # Info label
         info_label = QLabel(
-            "Adjust the position and flip state of the AI frame\nto align with the game frame for replacement."
+            "Drag the AI frame overlay to adjust position,\n"
+            "or use the controls. AI frame shown at actual\n"
+            "relative size."
         )
         info_label.setStyleSheet("color: #888; font-size: 11px;")
         info_label.setWordWrap(True)
@@ -292,6 +352,20 @@ class AlignmentDialog(DialogBase):
         # Apply initial values to canvas
         self._canvas.set_offset(self._initial_offset_x, self._initial_offset_y)
         self._canvas.set_flip(self._initial_flip_h, self._initial_flip_v)
+
+        # Connect canvas drag signal to update spinboxes
+        self._canvas.offset_changed.connect(self._on_canvas_offset_changed)
+
+    def _on_canvas_offset_changed(self, x: int, y: int) -> None:
+        """Handle offset changes from canvas drag."""
+        # Block signals to prevent feedback loop
+        self._offset_x_spin.blockSignals(True)
+        self._offset_y_spin.blockSignals(True)
+        self._offset_x_spin.setValue(x)
+        self._offset_y_spin.setValue(y)
+        self._offset_x_spin.blockSignals(False)
+        self._offset_y_spin.blockSignals(False)
+        self._emit_alignment_changed()
 
     def _on_offset_changed(self) -> None:
         """Handle offset spinbox value changes."""
