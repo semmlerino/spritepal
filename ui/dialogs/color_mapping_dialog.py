@@ -30,6 +30,27 @@ def _color_distance_sq(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> in
     return (c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2 + (c1[2] - c2[2]) ** 2
 
 
+def snap_to_snes_color(color: tuple[int, int, int]) -> tuple[int, int, int]:
+    """Snap an RGB color to the nearest SNES-valid color.
+
+    SNES uses BGR555 (5 bits per channel), so valid RGB888 values
+    must be multiples of 8: 0, 8, 16, ..., 240, 248.
+
+    Args:
+        color: RGB tuple with 8-bit values (0-255)
+
+    Returns:
+        RGB tuple snapped to nearest SNES-valid values
+    """
+
+    def snap_component(val: int) -> int:
+        # Round to nearest multiple of 8, clamped to 0-248
+        snapped = round(val / 8) * 8
+        return max(0, min(248, snapped))
+
+    return (snap_component(color[0]), snap_component(color[1]), snap_component(color[2]))
+
+
 def _find_nearest_palette_index(
     color: tuple[int, int, int],
     palette: list[tuple[int, int, int]],
@@ -414,6 +435,8 @@ def extract_colors_from_sampled_overlay(
 def quantize_colors_to_palette(
     color_counts: dict[tuple[int, int, int], int],
     max_colors: int = 16,
+    *,
+    snap_to_snes: bool = True,
 ) -> list[tuple[int, int, int]]:
     """Quantize colors to a limited palette.
 
@@ -423,6 +446,7 @@ def quantize_colors_to_palette(
     Args:
         color_counts: Dict mapping RGB tuples to pixel counts
         max_colors: Maximum colors in output palette (default 16 for SNES)
+        snap_to_snes: If True, snap colors to SNES-valid values (multiples of 8)
 
     Returns:
         List of RGB tuples (max_colors entries, index 0 = transparency)
@@ -433,12 +457,21 @@ def quantize_colors_to_palette(
         # Return empty palette with black at index 0
         return [(0, 0, 0)] * max_colors
 
+    # Optionally snap input colors to SNES-valid values first
+    # This merges similar colors that would map to the same SNES color
+    if snap_to_snes:
+        snapped_counts: dict[tuple[int, int, int], int] = {}
+        for color, count in color_counts.items():
+            snapped = snap_to_snes_color(color)
+            snapped_counts[snapped] = snapped_counts.get(snapped, 0) + count
+        color_counts = snapped_counts
+
     # Sort colors by frequency
     sorted_colors = sorted(color_counts.items(), key=lambda x: x[1], reverse=True)
 
     # If we have few enough colors, use them directly
     if len(sorted_colors) <= max_colors - 1:  # -1 for transparency
-        palette = [(0, 0, 0)]  # Index 0 = transparent/black
+        palette: list[tuple[int, int, int]] = [(0, 0, 0)]  # Index 0 = transparent/black
         for color, _count in sorted_colors:
             palette.append(color)
         # Pad with black if needed
@@ -471,7 +504,7 @@ def quantize_colors_to_palette(
     raw_palette = quantized.getpalette()
 
     if raw_palette is None:
-        # Fallback: use most frequent colors
+        # Fallback: use most frequent colors (already snapped if snap_to_snes)
         palette = [(0, 0, 0)]
         for color, _count in sorted_colors[: max_colors - 1]:
             palette.append(color)
@@ -479,12 +512,16 @@ def quantize_colors_to_palette(
             palette.append((0, 0, 0))
         return palette
 
-    # Extract palette colors
+    # Extract palette colors from quantization result
     palette = [(0, 0, 0)]  # Index 0 = transparent
     for i in range(max_colors - 1):
         r = raw_palette[i * 3]
         g = raw_palette[i * 3 + 1]
         b = raw_palette[i * 3 + 2]
-        palette.append((r, g, b))
+        color = (r, g, b)
+        # Snap quantized colors to SNES-valid values
+        if snap_to_snes:
+            color = snap_to_snes_color(color)
+        palette.append(color)
 
     return palette

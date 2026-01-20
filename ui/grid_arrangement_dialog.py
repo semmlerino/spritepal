@@ -1916,16 +1916,26 @@ class GridArrangementDialog(SplitterDialog):
         # Update displays to show new palette
         self._update_displays()
 
+        # Count how many colors were merged by SNES snapping
+        from ui.dialogs.color_mapping_dialog import snap_to_snes_color
+
+        snapped_colors = {snap_to_snes_color(c) for c in color_counts}
+        colors_merged = unique_count - len(snapped_colors)
+
+        snap_note = ""
+        if colors_merged > 0:
+            snap_note = f"\n\n(Note: {colors_merged} similar colors were merged to SNES-valid values)"
+
         _ = QMessageBox.information(
             self,
             "Palette Extracted",
-            f"Created palette from {unique_count} unique colors.\n\n"
+            f"Created palette from {unique_count} unique colors → {len(snapped_colors)} SNES colors.{snap_note}\n\n"
             f"The palette is now active. You can:\n"
             f"• Click 'Apply Overlay' to apply with this palette\n"
             f"• Use 'Preview Mapping' to fine-tune color assignments",
         )
 
-        self._update_status(f"Extracted palette: {unique_count} colors → 16 palette entries")
+        self._update_status(f"Extracted palette: {unique_count} colors → {len(snapped_colors)} SNES colors")
 
     def apply_overlay(self) -> None:
         """Apply current overlay to tiles. Public API for testing."""
