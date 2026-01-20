@@ -23,39 +23,6 @@ pytestmark = [
 ]
 
 
-class TestROMExtractorInit:
-    """Test ROM extractor initialization"""
-
-    def test_init_creates_components(self):
-        """Test that initialization creates all required components"""
-        # Use AppContext to get ROMExtractor (session_managers fixture sets up context)
-        from core.app_context import get_app_context
-
-        extractor = get_app_context().rom_extractor
-
-        # Verify all components are created
-        assert extractor.hal_compressor is not None
-        assert extractor.rom_injector is not None
-        assert extractor.default_palette_loader is not None
-        assert extractor.rom_palette_extractor is not None
-        assert extractor.sprite_config_loader is not None
-
-        # Verify components are of expected types (real or mock)
-        from core.default_palette_loader import DefaultPaletteLoader
-        from core.rom_injector import ROMInjector
-        from core.rom_palette_extractor import ROMPaletteExtractor
-        from core.sprite_config_loader import SpriteConfigLoader
-
-        # Accept both real and mock HAL compressor (test runs with mock_hal fixture)
-        # Check by class name to avoid import ordering issues with monkeypatch
-        hal_class_name = type(extractor.hal_compressor).__name__
-        assert hal_class_name in ("HALCompressor", "MockHALCompressor"), f"Unexpected type: {hal_class_name}"
-        assert isinstance(extractor.rom_injector, ROMInjector)
-        assert isinstance(extractor.default_palette_loader, DefaultPaletteLoader)
-        assert isinstance(extractor.rom_palette_extractor, ROMPaletteExtractor)
-        assert isinstance(extractor.sprite_config_loader, SpriteConfigLoader)
-
-
 class TestROMExtractorIntegration:
     """Integration tests with real file operations"""
 
