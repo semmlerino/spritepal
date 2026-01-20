@@ -317,7 +317,7 @@ class FrameMappingWorkspace(QWidget):
         if file_path:
             path = Path(file_path)
             self._last_capture_dir = path.parent
-            self._controller.import_mesen_capture(path)
+            self._controller.import_mesen_capture(path, parent=self)
 
     def _on_import_capture_dir(self) -> None:
         """Handle import capture directory button click."""
@@ -330,7 +330,7 @@ class FrameMappingWorkspace(QWidget):
         if directory:
             path = Path(directory)
             self._last_capture_dir = path
-            count = self._controller.import_capture_directory(path)
+            count = self._controller.import_capture_directory(path, parent=self)
             if self._message_service and count > 0:
                 self._message_service.show_message(f"Imported {count} captures")
 

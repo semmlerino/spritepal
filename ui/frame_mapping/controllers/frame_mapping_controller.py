@@ -157,14 +157,18 @@ class FrameMappingController(QObject):
         logger.info("Loaded %d AI frames from %s", len(frames), directory)
         return len(frames)
 
-    def import_mesen_capture(self, capture_path: Path) -> GameFrame | None:
+    def import_mesen_capture(self, capture_path: Path, parent: QObject | None = None) -> GameFrame | None:
         """Import a game frame from a Mesen 2 capture file.
+
+        Shows a sprite selection dialog to let the user choose which OAM entries
+        to include in the import.
 
         Args:
             capture_path: Path to capture JSON file
+            parent: Parent widget for the selection dialog
 
         Returns:
-            The created GameFrame, or None on error
+            The created GameFrame, or None on error/cancel
         """
         if self._project is None:
             self.new_project()
@@ -178,16 +182,47 @@ class FrameMappingController(QObject):
                 self.error_occurred.emit(f"No sprite entries in capture: {capture_path}")
                 return None
 
+            # Show sprite selection dialog
+            from PySide6.QtWidgets import QDialog, QWidget
+
+            from ui.frame_mapping.dialogs.sprite_selection_dialog import (
+                SpriteSelectionDialog,
+            )
+
+            parent_widget = parent if isinstance(parent, QWidget) else None
+            dialog = SpriteSelectionDialog(capture_result, parent=parent_widget)
+
+            if dialog.exec() != QDialog.DialogCode.Accepted:
+                # User cancelled
+                return None
+
+            selected_entries = dialog.selected_entries
+            if not selected_entries:
+                self.error_occurred.emit("No sprites selected")
+                return None
+
+            # Create filtered CaptureResult with only selected entries
+            from core.mesen_integration.click_extractor import CaptureResult
+
+            filtered_capture = CaptureResult(
+                frame=capture_result.frame,
+                visible_count=len(selected_entries),
+                obsel=capture_result.obsel,
+                entries=selected_entries,
+                palettes=capture_result.palettes,
+                timestamp=capture_result.timestamp,
+            )
+
             # Generate frame ID from filename or ROM offsets
             frame_id = capture_path.stem
             if frame_id.startswith("sprite_capture_"):
                 frame_id = frame_id.replace("sprite_capture_", "")
 
-            # Get unique ROM offsets
-            rom_offsets = capture_result.unique_rom_offsets
+            # Get unique ROM offsets from selected entries only
+            rom_offsets = filtered_capture.unique_rom_offsets
 
-            # Render preview - create a new renderer for each capture
-            renderer = CaptureRenderer(capture_result)
+            # Render preview using filtered capture
+            renderer = CaptureRenderer(filtered_capture)
             preview_img = renderer.render_composite()
 
             # Convert PIL Image to QPixmap
@@ -202,7 +237,7 @@ class FrameMappingController(QObject):
             self._game_frame_previews[frame_id] = pixmap
 
             # Create game frame
-            bbox = capture_result.bounding_box
+            bbox = filtered_capture.bounding_box
             frame = GameFrame(
                 id=frame_id,
                 rom_offsets=rom_offsets,
@@ -215,7 +250,13 @@ class FrameMappingController(QObject):
             self._project.game_frames.append(frame)  # type: ignore[union-attr]
             self.game_frame_added.emit(frame_id)
             self.project_changed.emit()
-            logger.info("Imported game frame %s from %s", frame_id, capture_path)
+            logger.info(
+                "Imported game frame %s from %s (%d of %d entries selected)",
+                frame_id,
+                capture_path,
+                len(selected_entries),
+                len(capture_result.entries),
+            )
             return frame
 
         except Exception as e:
@@ -223,11 +264,14 @@ class FrameMappingController(QObject):
             self.error_occurred.emit(f"Failed to import capture: {e}")
             return None
 
-    def import_capture_directory(self, directory: Path) -> int:
+    def import_capture_directory(self, directory: Path, parent: QObject | None = None) -> int:
         """Import all captures from a directory.
+
+        Shows a sprite selection dialog for each capture file.
 
         Args:
             directory: Directory containing capture JSON files
+            parent: Parent widget for selection dialogs
 
         Returns:
             Number of captures imported
@@ -242,7 +286,7 @@ class FrameMappingController(QObject):
 
         imported = 0
         for json_path in json_files:
-            if self.import_mesen_capture(json_path):
+            if self.import_mesen_capture(json_path, parent):
                 imported += 1
 
         logger.info("Imported %d captures from %s", imported, directory)
