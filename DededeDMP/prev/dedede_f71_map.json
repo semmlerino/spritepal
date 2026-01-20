@@ -1,0 +1,184 @@
+{
+  "frame_name": "Dedede_F71",
+  "palette": 7,
+  "vram_base": 24576,
+  "oam_tiles": [
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123
+  ],
+  "found_count": 24,
+  "total_tiles": 24,
+  "rom_range": {
+    "min": 95073,
+    "max": 96577
+  },
+  "mappings": [
+    {
+      "vram_word": 26224,
+      "vram_byte": 52448,
+      "rom_offset": 95073,
+      "rom_hex": "0x017361"
+    },
+    {
+      "vram_word": 26240,
+      "vram_byte": 52480,
+      "rom_offset": 95105,
+      "rom_hex": "0x017381"
+    },
+    {
+      "vram_word": 26256,
+      "vram_byte": 52512,
+      "rom_offset": 95137,
+      "rom_hex": "0x0173A1"
+    },
+    {
+      "vram_word": 26272,
+      "vram_byte": 52544,
+      "rom_offset": 95169,
+      "rom_hex": "0x0173C1"
+    },
+    {
+      "vram_word": 26288,
+      "vram_byte": 52576,
+      "rom_offset": 95201,
+      "rom_hex": "0x0173E1"
+    },
+    {
+      "vram_word": 26480,
+      "vram_byte": 52960,
+      "rom_offset": 95585,
+      "rom_hex": "0x017561"
+    },
+    {
+      "vram_word": 26496,
+      "vram_byte": 52992,
+      "rom_offset": 95617,
+      "rom_hex": "0x017581"
+    },
+    {
+      "vram_word": 26512,
+      "vram_byte": 53024,
+      "rom_offset": 95649,
+      "rom_hex": "0x0175A1"
+    },
+    {
+      "vram_word": 26528,
+      "vram_byte": 53056,
+      "rom_offset": 95681,
+      "rom_hex": "0x0175C1"
+    },
+    {
+      "vram_word": 26544,
+      "vram_byte": 53088,
+      "rom_offset": 95713,
+      "rom_hex": "0x0175E1"
+    },
+    {
+      "vram_word": 26112,
+      "vram_byte": 52224,
+      "rom_offset": 95873,
+      "rom_hex": "0x017681"
+    },
+    {
+      "vram_word": 26128,
+      "vram_byte": 52256,
+      "rom_offset": 95905,
+      "rom_hex": "0x0176A1"
+    },
+    {
+      "vram_word": 26144,
+      "vram_byte": 52288,
+      "rom_offset": 95937,
+      "rom_hex": "0x0176C1"
+    },
+    {
+      "vram_word": 26160,
+      "vram_byte": 52320,
+      "rom_offset": 95969,
+      "rom_hex": "0x0176E1"
+    },
+    {
+      "vram_word": 26176,
+      "vram_byte": 52352,
+      "rom_offset": 96001,
+      "rom_hex": "0x017701"
+    },
+    {
+      "vram_word": 26192,
+      "vram_byte": 52384,
+      "rom_offset": 96033,
+      "rom_hex": "0x017721"
+    },
+    {
+      "vram_word": 26208,
+      "vram_byte": 52416,
+      "rom_offset": 96065,
+      "rom_hex": "0x017741"
+    },
+    {
+      "vram_word": 26368,
+      "vram_byte": 52736,
+      "rom_offset": 96385,
+      "rom_hex": "0x017881"
+    },
+    {
+      "vram_word": 26384,
+      "vram_byte": 52768,
+      "rom_offset": 96417,
+      "rom_hex": "0x0178A1"
+    },
+    {
+      "vram_word": 26400,
+      "vram_byte": 52800,
+      "rom_offset": 96449,
+      "rom_hex": "0x0178C1"
+    },
+    {
+      "vram_word": 26416,
+      "vram_byte": 52832,
+      "rom_offset": 96481,
+      "rom_hex": "0x0178E1"
+    },
+    {
+      "vram_word": 26432,
+      "vram_byte": 52864,
+      "rom_offset": 96513,
+      "rom_hex": "0x017901"
+    },
+    {
+      "vram_word": 26448,
+      "vram_byte": 52896,
+      "rom_offset": 96545,
+      "rom_hex": "0x017921"
+    },
+    {
+      "vram_word": 26464,
+      "vram_byte": 52928,
+      "rom_offset": 96577,
+      "rom_hex": "0x017941"
+    }
+  ],
+  "not_found": []
+}
