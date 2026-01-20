@@ -89,6 +89,9 @@ class EditingController(QObject):
         # Lazy palette loader (defer initialization to property access)
         self._palette_loader: DefaultPaletteLoader | None = None
 
+        # Track whether we already attempted to load the last palette
+        self._last_palette_loaded = False
+
         # Load available presets (uses lazy palette_loader property)
         self.load_presets()
 
@@ -134,6 +137,7 @@ class EditingController(QObject):
         """Set the edit tab view."""
         self._view = view
         view.set_controller(self)
+        self._load_last_palette()
 
     def has_image(self) -> bool:
         """Check if an image is loaded (always true - model has default data)."""
@@ -593,11 +597,26 @@ class EditingController(QObject):
 
     def _load_last_palette(self) -> None:
         """Load the last used palette from settings."""
-        if self.state_manager:
-            last_path = str(self.state_manager.get("paths", "last_palette_path", ""))
-            if last_path and Path(last_path).exists():
-                logger.info(f"Auto-loading last used palette: {last_path}")
-                self.load_palette_from_file(last_path)
+        if self._last_palette_loaded:
+            return
+
+        state_manager = self.state_manager
+        if not state_manager:
+            return
+
+        last_path = str(state_manager.get("paths", "last_palette_path", ""))
+        if not last_path:
+            self._last_palette_loaded = True
+            return
+
+        if not Path(last_path).exists():
+            logger.warning("Last palette path does not exist: %s", last_path)
+            self._last_palette_loaded = True
+            return
+
+        logger.info("Auto-loading last used palette: %s", last_path)
+        if self.load_palette_from_file(last_path):
+            self._last_palette_loaded = True
 
     def handle_load_palette(self) -> None:
         """Handle load palette button click."""
