@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QRadioButton,
     QSizePolicy,
     QSlider,
@@ -324,8 +325,8 @@ class ComparisonPanel(QWidget):
 
         self._mode_group = QButtonGroup(self)
         self._side_by_side_radio = QRadioButton("Side-by-Side")
-        self._side_by_side_radio.setChecked(True)
         self._overlay_radio = QRadioButton("Overlay")
+        self._overlay_radio.setChecked(True)  # Default to overlay per UX spec
         self._mode_group.addButton(self._side_by_side_radio, 0)
         self._mode_group.addButton(self._overlay_radio, 1)
         mode_layout.addWidget(self._side_by_side_radio)
@@ -373,30 +374,42 @@ class ComparisonPanel(QWidget):
         canvas_container.addStretch()
         overlay_layout.addLayout(canvas_container, 1)
 
-        # Opacity slider
-        opacity_layout = QHBoxLayout()
-        opacity_layout.setContentsMargins(0, 0, 0, 0)
-        opacity_layout.addStretch()
+        # Opacity slider and alignment button
+        controls_layout = QHBoxLayout()
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.addStretch()
+
         opacity_label = QLabel("AI Opacity:")
         opacity_label.setStyleSheet("font-size: 11px;")
-        opacity_layout.addWidget(opacity_label)
+        controls_layout.addWidget(opacity_label)
 
         self._opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self._opacity_slider.setRange(0, 100)
         self._opacity_slider.setValue(50)
         self._opacity_slider.setMaximumWidth(150)
         self._opacity_slider.valueChanged.connect(self._on_opacity_changed)
-        opacity_layout.addWidget(self._opacity_slider)
+        controls_layout.addWidget(self._opacity_slider)
 
         self._opacity_value_label = QLabel("50%")
         self._opacity_value_label.setStyleSheet("font-size: 11px;")
         self._opacity_value_label.setMinimumWidth(35)
-        opacity_layout.addWidget(self._opacity_value_label)
-        opacity_layout.addStretch()
+        controls_layout.addWidget(self._opacity_value_label)
 
-        overlay_layout.addLayout(opacity_layout)
+        # Adjust Alignment button
+        self._adjust_alignment_button = QPushButton("Adjust Alignment")
+        self._adjust_alignment_button.setToolTip("Click to adjust AI frame position (or double-click canvas)")
+        self._adjust_alignment_button.setStyleSheet("font-size: 11px;")
+        self._adjust_alignment_button.clicked.connect(self.alignment_edit_requested.emit)
+        controls_layout.addWidget(self._adjust_alignment_button)
+
+        controls_layout.addStretch()
+
+        overlay_layout.addLayout(controls_layout)
 
         self._stack.addWidget(overlay_widget)
+
+        # Set initial view to overlay (index 1)
+        self._stack.setCurrentIndex(1)
 
         # Connect mode toggle
         self._mode_group.idToggled.connect(self._on_mode_changed)
@@ -536,6 +549,10 @@ class ComparisonPanel(QWidget):
         self._overlay_canvas.set_offset(offset_x, offset_y)
         self._overlay_canvas.set_flip(flip_h, flip_v)
         self._update_alignment_label()
+
+    def switch_to_overlay_mode(self) -> None:
+        """Switch the comparison panel to overlay view mode programmatically."""
+        self._overlay_radio.setChecked(True)
 
     def clear_alignment(self) -> None:
         """Clear alignment values (reset to defaults)."""

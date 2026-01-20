@@ -323,6 +323,19 @@ class FrameMappingController(QObject):
         logger.info("Created mapping: AI frame %d -> Game frame %s", ai_frame_index, game_frame_id)
         return True
 
+    def get_existing_link_for_game_frame(self, game_frame_id: str) -> int | None:
+        """Get the AI frame index currently linked to a game frame.
+
+        Args:
+            game_frame_id: ID of the game frame to check
+
+        Returns:
+            AI frame index if game frame is linked, None otherwise
+        """
+        if self._project is None:
+            return None
+        return self._project.get_ai_frame_linked_to_game_frame(game_frame_id)
+
     def remove_mapping(self, ai_frame_index: int) -> bool:
         """Remove a mapping for an AI frame.
 

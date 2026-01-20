@@ -199,6 +199,20 @@ class FrameMappingProject:
                 return mapping
         return None
 
+    def get_ai_frame_linked_to_game_frame(self, game_frame_id: str) -> int | None:
+        """Get the AI frame index linked to a specific game frame.
+
+        Args:
+            game_frame_id: ID of the game frame
+
+        Returns:
+            AI frame index if game frame is linked, None otherwise
+        """
+        mapping = self.get_mapping_for_game_frame(game_frame_id)
+        if mapping is not None:
+            return mapping.ai_frame_index
+        return None
+
     def get_ai_frame_by_index(self, index: int) -> AIFrame | None:
         """Get AI frame by index."""
         for frame in self.ai_frames:
@@ -217,6 +231,7 @@ class FrameMappingProject:
         """Create a new mapping between an AI frame and a game frame.
 
         If a mapping already exists for the AI frame, it is updated.
+        If a mapping already exists for the game frame, it is removed (1:1 enforcement).
 
         Args:
             ai_frame_index: Index of the AI frame
@@ -227,6 +242,9 @@ class FrameMappingProject:
         """
         # Remove existing mapping for this AI frame if any
         self.mappings = [m for m in self.mappings if m.ai_frame_index != ai_frame_index]
+
+        # Remove existing mapping for this game frame if any (enforce 1:1)
+        self.mappings = [m for m in self.mappings if m.game_frame_id != game_frame_id]
 
         mapping = FrameMapping(
             ai_frame_index=ai_frame_index,
