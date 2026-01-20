@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPainter, QPixmap, QTransform
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -141,7 +141,14 @@ class InlineOverlayCanvas(QWidget):
 
     Shows game frame with AI frame overlaid. Unlike the alignment dialog's
     OverlayCanvas, this is read-only and doesn't support dragging.
+
+    Double-clicking emits alignment_edit_requested when both frames are loaded.
+
+    Signals:
+        alignment_edit_requested: Emitted when user double-clicks to edit alignment
     """
+
+    alignment_edit_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -182,6 +189,13 @@ class InlineOverlayCanvas(QWidget):
         """Set the opacity for the AI frame overlay (0.0 to 1.0)."""
         self._opacity = max(0.0, min(1.0, opacity))
         self.update()
+
+    @override
+    def mouseDoubleClickEvent(self, event: object) -> None:
+        """Handle double-click to request alignment edit."""
+        # Only emit if we have both frames loaded
+        if self._game_pixmap is not None and self._ai_pixmap is not None:
+            self.alignment_edit_requested.emit()
 
     @override
     def paintEvent(self, event: object) -> None:
@@ -274,7 +288,12 @@ class ComparisonPanel(QWidget):
 
     When a mapping is selected with alignment data, the overlay shows the
     adjusted position and flip state.
+
+    Signals:
+        alignment_edit_requested: Emitted when user double-clicks overlay to edit alignment
     """
+
+    alignment_edit_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -345,10 +364,11 @@ class ComparisonPanel(QWidget):
         overlay_layout.setContentsMargins(0, 0, 0, 0)
         overlay_layout.setSpacing(4)
 
-        # Overlay canvas (centered)
+        # Overlay canvas (centered, double-click to edit alignment)
         canvas_container = QHBoxLayout()
         canvas_container.addStretch()
         self._overlay_canvas = InlineOverlayCanvas()
+        self._overlay_canvas.alignment_edit_requested.connect(self.alignment_edit_requested.emit)
         canvas_container.addWidget(self._overlay_canvas)
         canvas_container.addStretch()
         overlay_layout.addLayout(canvas_container, 1)
@@ -520,6 +540,14 @@ class ComparisonPanel(QWidget):
     def clear_alignment(self) -> None:
         """Clear alignment values (reset to defaults)."""
         self.set_alignment(0, 0, False, False)
+
+    def clear_game_frame(self) -> None:
+        """Clear just the game frame preview (for unmapped AI frame selection)."""
+        self._game_preview.clear()
+        self._current_game_frame = None
+        self._game_pixmap = None
+        self.clear_alignment()
+        self._sync_overlay_canvas()
 
     def clear(self) -> None:
         """Clear both previews and alignment."""

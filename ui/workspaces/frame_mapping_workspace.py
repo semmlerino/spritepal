@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -189,12 +190,14 @@ class FrameMappingWorkspace(QWidget):
         self._frame_browser.game_frame_selected.connect(self._on_game_frame_selected)
         self._frame_browser.map_requested.connect(self._on_map_selected)
 
-        # Mapping panel signals
-        self._mapping_panel.map_selected_requested.connect(self._on_map_selected)
+        # Mapping panel signals (Map Selected button consolidated to Frame Browser)
         self._mapping_panel.edit_frame_requested.connect(self._on_edit_frame)
         self._mapping_panel.remove_mapping_requested.connect(self._on_remove_mapping)
         self._mapping_panel.mapping_selected.connect(self._on_mapping_selected)
         self._mapping_panel.adjust_alignment_requested.connect(self._on_adjust_alignment)
+
+        # Comparison panel signals (double-click overlay to edit alignment)
+        self._comparison_panel.alignment_edit_requested.connect(self._on_comparison_alignment_edit_requested)
 
     def _on_project_changed(self) -> None:
         """Handle project changes."""
@@ -234,7 +237,11 @@ class FrameMappingWorkspace(QWidget):
         QMessageBox.warning(self, "Error", message)
 
     def _on_ai_frame_selected(self, index: int) -> None:
-        """Handle AI frame selection."""
+        """Handle AI frame selection.
+
+        If the selected AI frame has a mapping, auto-select the mapped game frame
+        in the browser and update the comparison panel with alignment.
+        """
         project = self._controller.project
         if project is None:
             return
@@ -244,6 +251,23 @@ class FrameMappingWorkspace(QWidget):
 
         frame = project.get_ai_frame_by_index(index)
         self._comparison_panel.set_ai_frame(frame)
+
+        # Auto-sync: if this AI frame has a mapping, select the game frame
+        mapping = project.get_mapping_for_ai_frame(index)
+        if mapping:
+            game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
+            preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
+            self._comparison_panel.set_game_frame(game_frame, preview)
+            self._frame_browser.select_game_frame(mapping.game_frame_id)
+            self._selected_game_id = mapping.game_frame_id
+            self._comparison_panel.set_alignment(mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v)
+        else:
+            # Unmapped: clear game frame selection and preview
+            self._comparison_panel.clear_game_frame()
+            self._frame_browser.clear_game_selection()
+            self._selected_game_id = None
+
+        self._update_map_button_state()
 
     def _on_game_frame_selected(self, frame_id: str) -> None:
         """Handle game frame selection."""
@@ -296,7 +320,6 @@ class FrameMappingWorkspace(QWidget):
     def _update_map_button_state(self) -> None:
         """Update the Map Selected button enabled state based on selections."""
         both_selected = self._selected_ai_index is not None and self._selected_game_id is not None
-        self._mapping_panel.set_map_button_enabled(both_selected)
         self._frame_browser.set_map_button_enabled(both_selected)
 
     def _refresh_mapping_status(self) -> None:
@@ -317,7 +340,12 @@ class FrameMappingWorkspace(QWidget):
         self._frame_browser.set_mapping_status(status_map)
 
     def _on_map_selected(self) -> None:
-        """Handle map selected button click."""
+        """Handle map selected button click.
+
+        After creating the mapping:
+        1. Auto-centers the AI frame within the game frame
+        2. Auto-advances to the next unmapped AI frame
+        """
         ai_index = self._frame_browser.get_selected_ai_frame_index()
         game_id = self._frame_browser.get_selected_game_frame_id()
 
@@ -329,8 +357,60 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(self, "Map Frames", "Please select a game frame first.")
             return
 
+        project = self._controller.project
+        if project is None:
+            return
+
+        # Create the mapping
         self._controller.create_mapping(ai_index, game_id)
+
+        # Auto-center: calculate centered alignment
+        ai_frame = project.get_ai_frame_by_index(ai_index)
+        game_preview = self._controller.get_game_frame_preview(game_id)
+        if ai_frame and ai_frame.path.exists() and game_preview:
+            ai_pixmap = QPixmap(str(ai_frame.path))
+            if not ai_pixmap.isNull():
+                center_x = (game_preview.width() - ai_pixmap.width()) // 2
+                center_y = (game_preview.height() - ai_pixmap.height()) // 2
+                self._controller.update_mapping_alignment(ai_index, center_x, center_y, False, False)
+
         self._refresh_mapping_status()
+
+        # Auto-advance: select next unmapped AI frame
+        next_unmapped = self._find_next_unmapped_ai_frame(ai_index)
+        if next_unmapped is not None:
+            self._frame_browser.select_ai_frame(next_unmapped)
+            # Manually trigger selection handler since blockSignals is used
+            self._on_ai_frame_selected(next_unmapped)
+
+    def _find_next_unmapped_ai_frame(self, current_index: int) -> int | None:
+        """Find the next unmapped AI frame after the given index.
+
+        Searches forward from current_index, then wraps to beginning.
+
+        Args:
+            current_index: The current AI frame index
+
+        Returns:
+            Index of next unmapped AI frame, or None if all are mapped
+        """
+        project = self._controller.project
+        if project is None:
+            return None
+
+        ai_frames = project.ai_frames
+        total = len(ai_frames)
+        if total == 0:
+            return None
+
+        # Search forward from current index + 1
+        for i in range(1, total):
+            check_index = (current_index + i) % total
+            mapping = project.get_mapping_for_ai_frame(check_index)
+            if mapping is None:
+                return check_index
+
+        return None
 
     def _on_edit_frame(self, ai_frame_index: int) -> None:
         """Handle edit frame request."""
@@ -394,6 +474,17 @@ class FrameMappingWorkspace(QWidget):
             self._controller.update_mapping_alignment(ai_frame_index, offset_x, offset_y, flip_h, flip_v)
             if self._message_service:
                 self._message_service.show_message(f"Alignment updated: offset=({offset_x}, {offset_y})")
+
+    def _on_comparison_alignment_edit_requested(self) -> None:
+        """Handle double-click on overlay canvas to edit alignment.
+
+        Uses the currently selected AI frame if it has a mapping.
+        """
+        if self._selected_ai_index is None:
+            return
+
+        # Delegate to the existing alignment handler
+        self._on_adjust_alignment(self._selected_ai_index)
 
     def _on_load_ai_frames(self) -> None:
         """Handle load AI frames button click."""

@@ -41,14 +41,12 @@ class MappingPanel(QWidget):
     with status indicators and actions.
 
     Signals:
-        map_selected_requested: Emitted when user clicks Map Selected
         edit_frame_requested: Emitted when user clicks Edit Frame (mapping index)
         mapping_selected: Emitted when a mapping row is selected (ai_frame_index)
         remove_mapping_requested: Emitted when user requests to remove a mapping
         adjust_alignment_requested: Emitted when user clicks Adjust Alignment (ai_frame_index)
     """
 
-    map_selected_requested = Signal()
     edit_frame_requested = Signal(int)  # AI frame index
     mapping_selected = Signal(int)  # AI frame index
     remove_mapping_requested = Signal(int)  # AI frame index
@@ -71,8 +69,8 @@ class MappingPanel(QWidget):
         table_layout.setContentsMargins(4, 8, 4, 4)
 
         self._table = QTableWidget()
-        self._table.setColumnCount(3)
-        self._table.setHorizontalHeaderLabels(["AI Frame", "Game Frame", "Status"])
+        self._table.setColumnCount(5)
+        self._table.setHorizontalHeaderLabels(["AI Frame", "Game Frame", "Offset", "Flip", "Status"])
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -84,20 +82,17 @@ class MappingPanel(QWidget):
             header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
             header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
             header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
 
         self._table.itemSelectionChanged.connect(self._on_selection_changed)
         table_layout.addWidget(self._table)
 
         layout.addWidget(table_group, 1)
 
-        # Action buttons
+        # Action buttons (Map Selected button removed - use the one in Frame Browser)
         button_layout = QHBoxLayout()
         button_layout.setSpacing(4)
-
-        self._map_button = QPushButton("Map Selected")
-        self._map_button.setToolTip("Link the selected AI frame to the selected game frame")
-        self._map_button.clicked.connect(self.map_selected_requested.emit)
-        button_layout.addWidget(self._map_button)
 
         self._edit_button = QPushButton("Edit Frame")
         self._edit_button.setToolTip("Open the mapped AI frame in the sprite editor")
@@ -156,16 +151,35 @@ class MappingPanel(QWidget):
             if mapping:
                 game_item = QTableWidgetItem(mapping.game_frame_id)
                 status = mapping.status
+
+                # Offset column: show "(x, y)" or "—" if default
+                if mapping.offset_x != 0 or mapping.offset_y != 0:
+                    offset_item = QTableWidgetItem(f"({mapping.offset_x}, {mapping.offset_y})")
+                else:
+                    offset_item = QTableWidgetItem("—")
+
+                # Flip column: show "H", "V", "HV", or "—"
+                flip_parts = []
+                if mapping.flip_h:
+                    flip_parts.append("H")
+                if mapping.flip_v:
+                    flip_parts.append("V")
+                flip_item = QTableWidgetItem("".join(flip_parts) if flip_parts else "—")
             else:
-                game_item = QTableWidgetItem("-")
+                game_item = QTableWidgetItem("—")
                 status = "unmapped"
+                offset_item = QTableWidgetItem("—")
+                flip_item = QTableWidgetItem("—")
+
             self._table.setItem(row, 1, game_item)
+            self._table.setItem(row, 2, offset_item)
+            self._table.setItem(row, 3, flip_item)
 
             # Status column with color
             status_item = QTableWidgetItem(status.capitalize())
             color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
             status_item.setForeground(QBrush(color))
-            self._table.setItem(row, 2, status_item)
+            self._table.setItem(row, 4, status_item)
 
         # Update status summary
         mapped = self._project.mapped_count
@@ -220,11 +234,3 @@ class MappingPanel(QWidget):
         ai_index = self.get_selected_ai_frame_index()
         if ai_index is not None:
             self.adjust_alignment_requested.emit(ai_index)
-
-    def set_map_button_enabled(self, enabled: bool) -> None:
-        """Set the enabled state of the Map Selected button.
-
-        Args:
-            enabled: Whether the button should be enabled
-        """
-        self._map_button.setEnabled(enabled)

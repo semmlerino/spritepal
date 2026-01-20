@@ -301,6 +301,19 @@ class FrameBrowserPanel(QWidget):
         finally:
             self._game_list.blockSignals(False)
 
+    def clear_game_selection(self) -> None:
+        """Clear the game frame selection without emitting signals.
+
+        Useful when an unmapped AI frame is selected to indicate no
+        corresponding game frame.
+        """
+        self._game_list.blockSignals(True)
+        try:
+            self._game_list.clearSelection()
+            self._game_list.setCurrentRow(-1)
+        finally:
+            self._game_list.blockSignals(False)
+
     def set_map_button_enabled(self, enabled: bool) -> None:
         """Set the enabled state of the Map Selected button.
 
