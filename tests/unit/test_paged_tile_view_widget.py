@@ -19,6 +19,8 @@ from ui.widgets.paged_tile_view import (
 )
 from ui.workers.paged_tile_view_worker import BYTES_PER_TILE
 
+pytestmark = [pytest.mark.unit, pytest.mark.parallel_unsafe]
+
 
 class TestTileGridGraphicsView:
     """Test the TileGridGraphicsView implementation."""

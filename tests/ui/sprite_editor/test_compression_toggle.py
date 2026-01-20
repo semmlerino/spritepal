@@ -6,6 +6,7 @@ and raw (uncompressed) extraction modes.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
@@ -152,6 +153,54 @@ class TestSmartPreviewCoordinatorCompressionType:
         finally:
             coordinator.cleanup()
 
+    def test_cache_key_respects_force_compression_type(self, tmp_path: Path) -> None:
+        """Verify cache lookups include the forced compression type."""
+        from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
+
+        coordinator = SmartPreviewCoordinator()
+        rom_path = tmp_path / "test_rom.sfc"
+        rom_path.write_bytes(b"\x00")
+
+        try:
+            coordinator.set_rom_data_provider(lambda: (str(rom_path), object()))
+            offset = 0x1000
+            preview_data = (b"\x01", 8, 8, "sprite", 0, 0, offset, True, b"")
+            cache_key = coordinator._cache.make_key(str(rom_path), offset, "hal|preview")
+            coordinator._cache.put(cache_key, preview_data)
+
+            coordinator._current_offset = offset
+            coordinator.set_force_compression_type(CompressionType.HAL)
+            assert coordinator._try_show_cached_preview() is True
+
+            coordinator.set_force_compression_type(CompressionType.RAW)
+            assert coordinator._try_show_cached_preview() is False
+        finally:
+            coordinator.cleanup()
+
+    def test_full_preview_cache_hit_resets_pending_flag(self, tmp_path: Path) -> None:
+        """Verify full preview cache hits clear the pending full flag."""
+        from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
+
+        coordinator = SmartPreviewCoordinator()
+        rom_path = tmp_path / "test_rom.sfc"
+        rom_path.write_bytes(b"\x00")
+
+        try:
+            coordinator.set_rom_data_provider(lambda: (str(rom_path), object()))
+            offset = 0x2000
+            preview_data = (b"\x02", 8, 8, "sprite", 0, 0, offset, True, b"")
+            cache_key = coordinator._cache.make_key(str(rom_path), offset, "auto|full")
+            coordinator._cache.put(cache_key, preview_data)
+
+            coordinator._current_offset = offset
+            coordinator._pending_full_decompression = True
+            coordinator.set_force_compression_type(None)
+
+            assert coordinator._try_show_cached_preview() is True
+            assert coordinator._pending_full_decompression is False
+        finally:
+            coordinator.cleanup()
+
 
 # =============================================================================
 # PendingPreviewRequest Tests
@@ -291,6 +340,37 @@ class TestROMWorkflowControllerCompressionToggle:
 
         # Verify re-extraction was triggered
         controller.preview_coordinator.request_full_preview.assert_called_once_with(0x1000)
+
+    def test_compression_change_reopens_editor_when_editing(self, app_context: MagicMock) -> None:
+        """Verify compression toggle reopens the editor when already editing."""
+        from ui.sprite_editor.controllers.rom_workflow_controller import (
+            ROMWorkflowController,
+        )
+
+        # Create mock editing controller
+        mock_editing = MagicMock()
+
+        # Create controller
+        controller = ROMWorkflowController(parent=None, editing_controller=mock_editing)
+
+        # Simulate edit state with a loaded offset
+        controller.state = "edit"
+        controller.rom_path = "/path/to/rom.sfc"
+        controller.current_offset = 0x1000
+        controller._current_source_type = "rom"
+
+        # Mock set_offset to avoid UI side effects
+        controller.set_offset = MagicMock()
+
+        # Simulate compression type change
+        controller._on_compression_type_changed(CompressionType.RAW)
+
+        # Verify we reopen editor via set_offset
+        controller.set_offset.assert_called_once_with(
+            0x1000,
+            auto_open=True,
+            source_type="rom",
+        )
 
     def test_preview_ready_syncs_dropdown(self, app_context: MagicMock) -> None:
         """Verify _on_preview_ready syncs the compression dropdown."""

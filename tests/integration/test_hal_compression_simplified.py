@@ -23,7 +23,15 @@ from utils.constants import HAL_POOL_SHUTDOWN_TIMEOUT
 pytestmark = [
     pytest.mark.headless,
     pytest.mark.integration,
+    pytest.mark.parallel_unsafe,
 ]
+
+
+@pytest.fixture
+def mock_not_wsl():
+    """Mock _is_wsl_environment to return False."""
+    with patch("core.hal_compression._is_wsl_environment", return_value=False):
+        yield
 
 
 @pytest.fixture
@@ -135,7 +143,7 @@ class TestHALProcessPoolLifecycle:
 class TestHALIntegration:
     """Integration tests for HALCompressor using the pool."""
 
-    def test_compressor_uses_pool_when_enabled(self, hal_tools):
+    def test_compressor_uses_pool_when_enabled(self, hal_tools, mock_not_wsl):
         """Verify HALCompressor delegates to pool when initialized."""
         exhal_path, inhal_path = hal_tools
         
@@ -156,10 +164,14 @@ class TestHALIntegration:
         assert status["enabled"]
         assert status["initialized"]
 
-    def test_decompress_request_flow(self, hal_tools):
+    def test_decompress_request_flow(self, hal_tools, tmp_path, mock_not_wsl):
         """Test end-to-end request submission (mocked execution)."""
         exhal_path, inhal_path = hal_tools
         pool = HALProcessPool()
+
+        # Create a dummy ROM file to satisfy stat() check
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(b"\x00" * 0x2000)
 
         # Mock the entire submit_request to simulate successful worker
         with patch.object(pool, 'submit_request') as mock_submit:
@@ -176,7 +188,7 @@ class TestHALIntegration:
             compressor = HALCompressor(exhal_path, inhal_path, use_pool=True)
             
             # Execute
-            data = compressor.decompress_from_rom("test.sfc", 0x1000)
+            data = compressor.decompress_from_rom(str(rom_path), 0x1000)
             
             # Verify
             assert data == b"DECOMPRESSED_DATA"

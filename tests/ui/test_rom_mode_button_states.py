@@ -90,6 +90,9 @@ def test_ready_for_inject_hidden_in_rom_mode(qtbot):
         def get_palette_sources(self):
             return {}
 
+        def get_current_palette_source(self):
+            return None
+
     controller = MockController()
     page.workspace.set_controller(controller)
 

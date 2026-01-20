@@ -348,7 +348,7 @@ class TestPaletteSourceSync:
 
         combo = selector.findChild(QComboBox)
         item_texts = [combo.itemText(i) for i in range(combo.count())]
-        assert "Loaded Palette" in item_texts, f"Expected 'Loaded Palette' in {item_texts}"
+        assert any("Loaded:" in text for text in item_texts), f"Expected 'Loaded:' in {item_texts}"
 
 
 # =============================================================================

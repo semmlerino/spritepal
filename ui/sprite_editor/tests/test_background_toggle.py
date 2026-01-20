@@ -5,6 +5,7 @@ Unit tests for the background toggle feature in the sprite editor.
 
 from __future__ import annotations
 
+import pytest
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
@@ -18,6 +19,8 @@ from ui.sprite_editor.views.workspaces.edit_workspace import EditWorkspace
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
+
+pytestmark = [pytest.mark.parallel_unsafe]
 
 
 class TestBackgroundToggle:

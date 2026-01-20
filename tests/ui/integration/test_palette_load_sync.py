@@ -33,7 +33,10 @@ def canvas_with_controller(qtbot: QtBot):
     from ui.sprite_editor.controllers.editing_controller import EditingController
     from ui.sprite_editor.views.widgets.pixel_canvas import PixelCanvas
 
-    controller = EditingController()
+    # Prevent auto-loading last palette from settings to avoid state pollution
+    with patch("ui.sprite_editor.controllers.editing_controller.EditingController._load_last_palette"):
+        controller = EditingController()
+    
     canvas = PixelCanvas(controller)
     qtbot.addWidget(canvas)
 
@@ -61,6 +64,7 @@ def red_palette_json(tmp_path: Path) -> Path:
     return palette_file
 
 
+@pytest.mark.parallel_unsafe
 class TestCanvasPaletteLoadSync:
     """Verify PixelCanvas updates colors when palette is loaded."""
 

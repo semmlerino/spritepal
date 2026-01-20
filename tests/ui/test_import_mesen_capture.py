@@ -322,7 +322,11 @@ class TestImportMesenCapture:
                             mock_converter_instance.convert_clusters.return_value = sample_arrangement_data
                             mock_converter.return_value = mock_converter_instance
 
-                            dialog._import_mesen_capture()
+                            with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question:
+                                from PySide6.QtWidgets import QMessageBox
+
+                                mock_question.return_value = QMessageBox.StandardButton.No
+                                dialog._import_mesen_capture()
 
             # Status should have been updated
             mock_status.assert_called()
@@ -425,7 +429,11 @@ class TestImportMesenCaptureEdgeCases:
                         mock_converter.return_value = mock_converter_instance
 
                         with patch("PySide6.QtWidgets.QMessageBox.warning") as mock_warning:
-                            dialog._import_mesen_capture()
+                            with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question:
+                                from PySide6.QtWidgets import QMessageBox
+
+                                mock_question.return_value = QMessageBox.StandardButton.No
+                                dialog._import_mesen_capture()
 
                             # Should warn about no tiles
                             mock_warning.assert_called_once()
