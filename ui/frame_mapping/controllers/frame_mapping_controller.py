@@ -381,13 +381,61 @@ class FrameMappingController(QObject):
     def get_game_frame_preview(self, frame_id: str) -> QPixmap | None:
         """Get the rendered preview pixmap for a game frame.
 
+        If the preview is not cached but the capture file exists, attempts to
+        regenerate the preview from the capture file.
+
         Args:
             frame_id: Game frame ID
 
         Returns:
             QPixmap preview or None if not available
         """
-        return self._game_frame_previews.get(frame_id)
+        # Return cached preview if available
+        if frame_id in self._game_frame_previews:
+            return self._game_frame_previews[frame_id]
+
+        # Try to regenerate from capture file
+        if self._project is None:
+            return None
+
+        game_frame = self._project.get_game_frame_by_id(frame_id)
+        if game_frame is None or game_frame.capture_path is None:
+            return None
+
+        capture_path = game_frame.capture_path
+        if not capture_path.exists():
+            logger.warning("Capture file not found for game frame %s: %s", frame_id, capture_path)
+            return None
+
+        try:
+            # Re-parse and render the capture
+            parser = MesenCaptureParser()
+            capture_result = parser.parse_file(capture_path)
+
+            if not capture_result.has_entries:
+                return None
+
+            renderer = CaptureRenderer(capture_result)
+            preview_img = renderer.render_composite()
+
+            # Convert PIL Image to QPixmap
+            from io import BytesIO
+
+            buffer = BytesIO()
+            preview_img.save(buffer, format="PNG")
+            buffer.seek(0)
+            qimg = QImage()
+            qimg.loadFromData(buffer.read())
+            pixmap = QPixmap.fromImage(qimg)
+
+            # Cache for future use
+            self._game_frame_previews[frame_id] = pixmap
+            logger.debug("Regenerated preview for game frame %s from capture file", frame_id)
+            return pixmap
+
+        except Exception as e:
+            logger.warning("Failed to regenerate preview for game frame %s: %s", frame_id, e)
+            return None
 
     def get_ai_frames(self) -> list[AIFrame]:
         """Get all AI frames from the current project."""
