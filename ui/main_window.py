@@ -73,7 +73,7 @@ from ui.rom_extraction_panel import ROMExtractionPanel
 from ui.sprite_editor.views.widgets.offset_line_edit import OffsetLineEdit
 from ui.styles import get_muted_text_style
 from ui.styles.components import get_action_zone_style
-from ui.workspaces import SpriteEditorWorkspace
+from ui.workspaces import FrameMappingWorkspace, SpriteEditorWorkspace
 from ui.zoomable_preview import PreviewPanel
 from utils.file_validator import FileValidator
 from utils.logging_config import get_logger
@@ -86,6 +86,7 @@ class WorkspaceMode(IntEnum):
 
     EXTRACTION = 0  # ROM/VRAM extraction workspace
     SPRITE_EDITOR = 1  # Sprite editor workspace
+    FRAME_MAPPING = 2  # Frame mapping workspace
 
 
 # Layout constants for consistent sizing and spacing
@@ -334,6 +335,14 @@ class MainWindow(QMainWindow):
 
         self.center_stack.addWidget(self._sprite_editor_workspace)
         self.sprite_edit_tab = self._sprite_editor_workspace
+
+        # Frame Mapping Workspace (index 2)
+        # message_service is None here; injected in _setup_managers() after status_bar_manager exists
+        self._frame_mapping_workspace = FrameMappingWorkspace(
+            parent=self,
+            message_service=None,
+        )
+        self.center_stack.addWidget(self._frame_mapping_workspace)
 
     def _on_extraction_tab_changed(self, index: int) -> None:
         """Handle extraction tab changes."""
@@ -630,7 +639,7 @@ class MainWindow(QMainWindow):
         """Switch to a specific workspace and optionally a tab within it.
 
         Args:
-            workspace_mode: WorkspaceMode.EXTRACTION or WorkspaceMode.SPRITE_EDITOR
+            workspace_mode: WorkspaceMode.EXTRACTION, SPRITE_EDITOR, or FRAME_MAPPING
             tab_index: Optional tab index within the workspace
         """
         if workspace_mode == WorkspaceMode.EXTRACTION:
@@ -653,6 +662,11 @@ class MainWindow(QMainWindow):
             current_offset = self._sprite_editor_workspace.rom_workflow_controller.current_offset
             if current_offset > 0:
                 self.toolbar_offset_edit.set_offset(current_offset)
+        elif workspace_mode == WorkspaceMode.FRAME_MAPPING:
+            # Frame Mapping Mode
+            self.center_stack.setCurrentIndex(2)  # Frame Mapping
+            self.left_dock.hide()
+            self._update_undo_redo_state(False, False)  # Disable undo
 
         if tab_index is not None and workspace_mode == WorkspaceMode.EXTRACTION:
             # Switch tab within extraction panel
@@ -703,9 +717,10 @@ class MainWindow(QMainWindow):
         self.status_bar_manager = StatusBarManager(
             self.status_bar, settings_manager=self.settings_manager, rom_cache=self.rom_cache
         )
-        # Now that status_bar_manager exists, inject it into the sprite editor workspace
-        # (which was created earlier in _create_workspaces with message_service=None)
+        # Now that status_bar_manager exists, inject it into the workspaces
+        # (which were created earlier in _create_workspaces with message_service=None)
         self._sprite_editor_workspace.set_message_service(self.status_bar_manager)
+        self._frame_mapping_workspace.set_message_service(self.status_bar_manager)
 
         self.output_settings_manager = OutputSettingsManager(self, self)
 
@@ -1392,6 +1407,24 @@ class MainWindow(QMainWindow):
             clear_cache_action.triggered.connect(self.clear_all_caches)
             tools_menu.addAction(clear_cache_action)
 
+        # View menu
+        view_menu = menubar.addMenu("View")
+        if view_menu:
+            extraction_action = QAction("Extraction", self)
+            extraction_action.setShortcut("Ctrl+1")
+            extraction_action.triggered.connect(lambda: self.switch_to_workspace(WorkspaceMode.EXTRACTION))
+            view_menu.addAction(extraction_action)
+
+            sprite_editor_action = QAction("Sprite Editor", self)
+            sprite_editor_action.setShortcut("Ctrl+2")
+            sprite_editor_action.triggered.connect(lambda: self.switch_to_workspace(WorkspaceMode.SPRITE_EDITOR))
+            view_menu.addAction(sprite_editor_action)
+
+            frame_mapping_action = QAction("Frame Mapping", self)
+            frame_mapping_action.setShortcut("Ctrl+3")
+            frame_mapping_action.triggered.connect(lambda: self.switch_to_workspace(WorkspaceMode.FRAME_MAPPING))
+            view_menu.addAction(frame_mapping_action)
+
         # Help menu
         help_menu = menubar.addMenu("Help")
         if help_menu:
@@ -1765,6 +1798,7 @@ class MainWindow(QMainWindow):
             self.rom_extraction_panel,
             self.extraction_panel,
             self.sprite_edit_tab,
+            self._frame_mapping_workspace,
         ]
         for panel in panels:
             cleanup_fn = getattr(panel, "cleanup", None)
