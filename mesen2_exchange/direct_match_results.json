@@ -1,0 +1,23 @@
+{
+  "summary": {
+    "total_tiles": 25,
+    "matched_tiles": 1,
+    "match_rate": "4.0%",
+    "unique_rom_offsets": 1
+  },
+  "matches": [
+    {
+      "frame": 1500,
+      "sprite_id": 5,
+      "tile_index": 0,
+      "vram_addr": "0x0000",
+      "rom_offset": "0x0E0000",
+      "rom_tile_index": 241,
+      "rom_description": "Title/fonts",
+      "flip_variant": ""
+    }
+  ],
+  "unique_offsets": [
+    "0x0E0000"
+  ]
+}

@@ -1,0 +1,263 @@
+{
+  "name": "spritesheet",
+  "spritesheet": {
+    "path": "/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal/M/spritesheet.png",
+    "background_color": [
+      91,
+      148,
+      95
+    ],
+    "dimensions": [
+      687,
+      1024
+    ],
+    "frames": [
+      {
+        "id": "frame_00",
+        "index": 0,
+        "bounds": [
+          56,
+          44,
+          105,
+          141
+        ],
+        "extracted_path": "frames/frame_00.png",
+        "size": [
+          109,
+          145
+        ]
+      },
+      {
+        "id": "frame_01",
+        "index": 1,
+        "bounds": [
+          204,
+          46,
+          104,
+          147
+        ],
+        "extracted_path": "frames/frame_01.png",
+        "size": [
+          108,
+          151
+        ]
+      },
+      {
+        "id": "frame_02",
+        "index": 2,
+        "bounds": [
+          359,
+          48,
+          105,
+          150
+        ],
+        "extracted_path": "frames/frame_02.png",
+        "size": [
+          109,
+          154
+        ]
+      },
+      {
+        "id": "frame_03",
+        "index": 3,
+        "bounds": [
+          37,
+          237,
+          123,
+          147
+        ],
+        "extracted_path": "frames/frame_03.png",
+        "size": [
+          127,
+          151
+        ]
+      },
+      {
+        "id": "frame_04",
+        "index": 4,
+        "bounds": [
+          378,
+          239,
+          109,
+          152
+        ],
+        "extracted_path": "frames/frame_04.png",
+        "size": [
+          113,
+          156
+        ]
+      },
+      {
+        "id": "frame_05",
+        "index": 5,
+        "bounds": [
+          215,
+          240,
+          103,
+          149
+        ],
+        "extracted_path": "frames/frame_05.png",
+        "size": [
+          107,
+          153
+        ]
+      },
+      {
+        "id": "frame_06",
+        "index": 6,
+        "bounds": [
+          24,
+          440,
+          162,
+          185
+        ],
+        "extracted_path": "frames/frame_06.png",
+        "size": [
+          166,
+          189
+        ]
+      },
+      {
+        "id": "frame_07",
+        "index": 7,
+        "bounds": [
+          485,
+          464,
+          106,
+          145
+        ],
+        "extracted_path": "frames/frame_07.png",
+        "size": [
+          110,
+          149
+        ]
+      },
+      {
+        "id": "frame_08",
+        "index": 8,
+        "bounds": [
+          241,
+          469,
+          172,
+          162
+        ],
+        "extracted_path": "frames/frame_08.png",
+        "size": [
+          176,
+          166
+        ]
+      },
+      {
+        "id": "frame_09",
+        "index": 9,
+        "bounds": [
+          266,
+          667,
+          137,
+          157
+        ],
+        "extracted_path": "frames/frame_09.png",
+        "size": [
+          141,
+          161
+        ]
+      },
+      {
+        "id": "frame_10",
+        "index": 10,
+        "bounds": [
+          477,
+          673,
+          114,
+          116
+        ],
+        "extracted_path": "frames/frame_10.png",
+        "size": [
+          118,
+          120
+        ]
+      },
+      {
+        "id": "frame_11",
+        "index": 11,
+        "bounds": [
+          59,
+          680,
+          137,
+          122
+        ],
+        "extracted_path": "frames/frame_11.png",
+        "size": [
+          141,
+          126
+        ]
+      },
+      {
+        "id": "frame_12",
+        "index": 12,
+        "bounds": [
+          459,
+          850,
+          159,
+          133
+        ],
+        "extracted_path": "frames/frame_12.png",
+        "size": [
+          163,
+          137
+        ]
+      },
+      {
+        "id": "frame_13",
+        "index": 13,
+        "bounds": [
+          53,
+          851,
+          130,
+          138
+        ],
+        "extracted_path": "frames/frame_13.png",
+        "size": [
+          134,
+          142
+        ]
+      },
+      {
+        "id": "frame_14",
+        "index": 14,
+        "bounds": [
+          241,
+          909,
+          128,
+          70
+        ],
+        "extracted_path": "frames/frame_14.png",
+        "size": [
+          132,
+          74
+        ]
+      },
+      {
+        "id": "frame_15",
+        "index": 15,
+        "bounds": [
+          622,
+          959,
+          39,
+          39
+        ],
+        "extracted_path": "frames/frame_15.png",
+        "size": [
+          43,
+          43
+        ]
+      }
+    ]
+  },
+  "mappings": [],
+  "palette": null,
+  "metadata": {
+    "created_at": "2026-01-20T00:22:07.307175",
+    "frame_count": 16
+  }
+}

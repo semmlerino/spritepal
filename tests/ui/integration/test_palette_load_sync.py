@@ -33,10 +33,13 @@ def canvas_with_controller(qtbot: QtBot):
     from ui.sprite_editor.controllers.editing_controller import EditingController
     from ui.sprite_editor.views.widgets.pixel_canvas import PixelCanvas
 
-    # Prevent auto-loading last palette from settings to avoid state pollution
-    with patch("ui.sprite_editor.controllers.editing_controller.EditingController._load_last_palette"):
+    # Prevent auto-loading last palette from settings to avoid state pollution.
+    # We mock the 'state_manager' property (a @property, not a method) to return None.
+    # This is safe because properties are simple Python descriptors, not Qt signals.
+    # DO NOT patch QObject methods directly - it causes segfaults due to Qt/PySide6 internals.
+    with patch.object(EditingController, "state_manager", new_callable=lambda: property(lambda self: None)):
         controller = EditingController()
-    
+
     canvas = PixelCanvas(controller)
     qtbot.addWidget(canvas)
 

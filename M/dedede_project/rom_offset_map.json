@@ -1,0 +1,49 @@
+{
+  "character": "Palette 7 Enemy (Hammer)",
+  "storage_type": "uncompressed",
+  "rom_regions": {
+    "0x017000": {
+      "description": "Animation set 1",
+      "frames": ["Dedede_F71", "F176", "F18228", "F18266", "F297"]
+    },
+    "0x035000": {
+      "description": "Animation set 2",
+      "frames": ["F17987", "F18339"]
+    },
+    "0x038000": {
+      "description": "Animation set 3",
+      "frames": ["F18036", "F18100"]
+    },
+    "0x14F000": {
+      "description": "Intro/special",
+      "frames": ["F214"]
+    },
+    "0x280000-0x281000": {
+      "description": "Additional animations",
+      "frames": ["F18158", "F18390"]
+    },
+    "0x282000": {
+      "description": "Shared/common tiles",
+      "frames": ["Nearly all frames"]
+    }
+  },
+  "frame_details": {
+    "Dedede_F71": {"rom_blocks": ["0x017000", "0x282000"], "sprite_count": 6},
+    "F176": {"rom_blocks": ["0x017000", "0x282000"], "sprite_count": 8},
+    "F17987": {"rom_blocks": ["0x035000", "0x282000"], "sprite_count": 6},
+    "F18036": {"rom_blocks": ["0x038000", "0x282000"], "sprite_count": 8},
+    "F18100": {"rom_blocks": ["0x038000", "0x282000"], "sprite_count": 12},
+    "F18158": {"rom_blocks": ["0x280000", "0x282000"], "sprite_count": 11},
+    "F18228": {"rom_blocks": ["0x017000", "0x282000"], "sprite_count": 8},
+    "F18266": {"rom_blocks": ["0x017000", "0x282000"], "sprite_count": 8},
+    "F18339": {"rom_blocks": ["0x035000", "0x282000"], "sprite_count": 9},
+    "F18390": {"rom_blocks": ["0x281000", "0x282000"], "sprite_count": 18},
+    "F214": {"rom_blocks": ["0x14F000", "0x282000"], "sprite_count": 14},
+    "F297": {"rom_blocks": ["0x017000", "0x282000"], "sprite_count": 8}
+  },
+  "notes": [
+    "All tiles are uncompressed (not HAL-compressed)",
+    "0x282000 appears to contain shared tiles used by most frames",
+    "Each animation frame pulls from 2 regions: frame-specific + 0x282000 shared"
+  ]
+}

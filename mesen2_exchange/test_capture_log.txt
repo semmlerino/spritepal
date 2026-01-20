@@ -1,0 +1,10 @@
+16:38:08 PRG ROM size validated: 0x400000 bytes (4096 KB)
+16:38:08 Script start: target=700 capture_frames=nil capture_count=0 capture_first=nil savestate=nil preloaded=false frame_event=endFrame master_clock_fallback=0 master_clock_fps=nil master_clock_max_seconds=nil debug_capture=0 door_up=nil-nil dump_vram=true max_frames=nil
+16:38:08 Registered frame callback: endFrame
+16:38:12 Capturing frame 700 (suffix=)
+16:38:12 Capture complete; stopping
+16:38:15 PRG ROM size validated: 0x400000 bytes (4096 KB)
+16:38:15 Script start: target=700 capture_frames=nil capture_count=0 capture_first=nil savestate=nil preloaded=false frame_event=endFrame master_clock_fallback=0 master_clock_fps=nil master_clock_max_seconds=nil debug_capture=0 door_up=nil-nil dump_vram=true max_frames=nil
+16:38:15 Registered frame callback: endFrame
+16:38:18 Capturing frame 700 (suffix=)
+16:38:18 Capture complete; stopping

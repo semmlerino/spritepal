@@ -1,0 +1,341 @@
+11:00:15 SpritePal capture script loaded
+11:00:15 Script running, press C or Start+Select to capture sprites
+11:01:08 C key pressed at frame 109
+11:01:08 F9 pressed - capturing sprites at frame 109
+11:01:08 Captured 12 visible sprites to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768730468.json
+11:18:51 SpritePal capture script loaded
+11:18:51 Script running, press C or Start+Select to capture sprites
+11:19:39 C key pressed at frame 54
+11:19:39 F9 pressed - capturing sprites at frame 54
+11:19:39 Captured 12 visible + 116 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768731579.json
+11:49:03 C key pressed at frame 762
+11:49:03 F9 pressed - capturing sprites at frame 762
+11:49:03 Captured 6 visible + 122 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768733343.json
+11:49:13 C key pressed at frame 915
+11:49:13 F9 pressed - capturing sprites at frame 915
+11:49:13 Captured 18 visible + 110 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768733353.json
+11:51:32 C key pressed at frame 1153
+11:51:32 F9 pressed - capturing sprites at frame 1153
+11:51:32 Captured 14 visible + 114 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768733492.json
+12:11:45 C key pressed at frame 1163
+12:11:45 F9 pressed - capturing sprites at frame 1163
+12:11:45 Captured 14 visible + 114 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768734705.json
+12:13:11 C key pressed at frame 1974
+12:13:11 F9 pressed - capturing sprites at frame 1974
+12:13:11 Captured 12 visible + 116 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768734791.json
+21:35:06 SpritePal capture script loaded
+21:35:06 Script running, press C or Start+Select to capture sprites
+21:35:41 C key pressed at frame 2
+21:35:41 F9 pressed - capturing sprites at frame 2
+21:35:41 Captured 76 visible + 52 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768768541.json
+22:19:53 SpritePal capture script loaded
+22:19:53 Script running, press C or Start+Select to capture sprites
+22:20:45 C key pressed at frame 71
+22:20:45 F9 pressed - capturing sprites at frame 71
+22:20:46 Captured 12 visible + 116 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768771245.json
+22:54:04 C key pressed at frame 435
+22:54:04 F9 pressed - capturing sprites at frame 435
+22:54:04 Captured 12 visible + 116 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768773244.json
+23:28:17 SpritePal capture script loaded
+23:28:17 Script running, press C or Start+Select to capture sprites
+23:29:23 C key pressed at frame 9
+23:29:23 F9 pressed - capturing sprites at frame 9
+23:29:23 Captured 12 visible + 116 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768775363.json
+23:55:14 SpritePal capture script loaded
+23:55:14 Script running, press C or Start+Select to capture sprites
+23:56:36 C key pressed at frame 2
+23:56:36 F9 pressed - capturing sprites at frame 2
+23:56:36 Captured 12 visible + 116 off-screen sprites (total 128) to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\sprite_capture_1768776996.json
+11:09:56 SpritePal capture script loaded
+11:09:56 OBSEL latch installed (captures writes to $2101).
+11:09:56 Script running, press C or Start+Select to capture sprites, D to dump memory
+11:10:04 SpritePal capture script loaded
+11:10:04 OBSEL latch installed (captures writes to $2101).
+11:10:04 Script running, press C or Start+Select to capture sprites, D to dump memory
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:06 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:08 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:09 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+11:10:10 OBSEL written: 0x03
+13:45:07 [FULL_DUMP] Full sprite dump script loaded
+13:45:07 [FULL_DUMP] OBSEL latch installed
+13:45:07 [FULL_DUMP] Ready! Press F9 for full JSON dump, F10 for binary dumps
+13:45:46 [FULL_DUMP] F9 pressed at frame 163
+13:45:46 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=163)
+13:45:46 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768826746.json (128 entries, 19 visible)
+13:45:46 [FULL_DUMP] F10 pressed at frame 214
+13:45:46 [FULL_DUMP] Capturing binary dumps (frame=214)
+13:45:46 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F214_OAM.dmp
+13:45:46 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F214_VRAM.dmp
+13:45:46 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F214_CGRAM.dmp
+13:45:46 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F214_OBSEL.txt
+13:54:53 [FULL_DUMP] Full sprite dump script loaded
+13:54:53 [FULL_DUMP] OBSEL latch installed
+13:54:53 [FULL_DUMP] Ready! Press F9 for full JSON dump, F10 for binary dumps
+13:54:56 [FULL_DUMP] F9 pressed at frame 146
+13:54:56 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=146)
+13:54:56 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768827296.json (128 entries, 14 visible)
+13:54:56 [FULL_DUMP] F10 pressed at frame 176
+13:54:56 [FULL_DUMP] Capturing binary dumps (frame=176)
+13:54:56 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F176_OAM.dmp
+13:54:56 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F176_VRAM.dmp
+13:54:56 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F176_CGRAM.dmp
+13:54:56 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F176_OBSEL.txt
+23:15:38 [FULL_DUMP] Full sprite dump script loaded
+23:15:38 [FULL_DUMP] OBSEL latch installed
+23:15:38 [FULL_DUMP] Ready! Press F9 for full JSON dump, F10 for binary dumps
+23:16:07 [FULL_DUMP] F9 pressed at frame 297
+23:16:07 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=297)
+23:16:07 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768860967.json (128 entries, 14 visible)
+23:16:07 [FULL_DUMP] F10 pressed at frame 297
+23:16:07 [FULL_DUMP] Capturing binary dumps (frame=297)
+23:16:07 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F297_OAM.dmp
+23:16:07 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F297_VRAM.dmp
+23:16:07 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F297_CGRAM.dmp
+23:16:07 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F297_OBSEL.txt
+23:16:33 [FULL_DUMP] F9 pressed at frame 312
+23:16:33 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=312)
+23:16:33 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768860993.json (128 entries, 20 visible)
+00:19:20 [FULL_DUMP] F10 pressed at frame 17987
+00:19:20 [FULL_DUMP] Capturing binary dumps (frame=17987)
+00:19:20 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F17987_OAM.dmp
+00:19:20 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F17987_VRAM.dmp
+00:19:20 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F17987_CGRAM.dmp
+00:19:20 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F17987_OBSEL.txt
+00:19:20 [FULL_DUMP] F9 pressed at frame 17990
+00:19:20 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=17990)
+00:19:20 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768864760.json (128 entries, 15 visible)
+00:19:21 [FULL_DUMP] F10 pressed at frame 18036
+00:19:21 [FULL_DUMP] Capturing binary dumps (frame=18036)
+00:19:21 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18036_OAM.dmp
+00:19:21 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18036_VRAM.dmp
+00:19:21 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18036_CGRAM.dmp
+00:19:21 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18036_OBSEL.txt
+00:19:21 [FULL_DUMP] F9 pressed at frame 18038
+00:19:21 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=18038)
+00:19:21 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768864761.json (128 entries, 22 visible)
+00:19:22 [FULL_DUMP] F10 pressed at frame 18100
+00:19:22 [FULL_DUMP] Capturing binary dumps (frame=18100)
+00:19:22 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18100_OAM.dmp
+00:19:22 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18100_VRAM.dmp
+00:19:22 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18100_CGRAM.dmp
+00:19:22 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18100_OBSEL.txt
+00:19:22 [FULL_DUMP] F9 pressed at frame 18101
+00:19:22 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=18101)
+00:19:22 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768864762.json (128 entries, 18 visible)
+00:19:23 [FULL_DUMP] F10 pressed at frame 18158
+00:19:23 [FULL_DUMP] Capturing binary dumps (frame=18158)
+00:19:23 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18158_OAM.dmp
+00:19:23 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18158_VRAM.dmp
+00:19:23 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18158_CGRAM.dmp
+00:19:23 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18158_OBSEL.txt
+00:19:23 [FULL_DUMP] F9 pressed at frame 18182
+00:19:23 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=18182)
+00:19:23 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768864763.json (128 entries, 18 visible)
+00:19:24 [FULL_DUMP] F10 pressed at frame 18228
+00:19:24 [FULL_DUMP] Capturing binary dumps (frame=18228)
+00:19:24 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18228_OAM.dmp
+00:19:24 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18228_VRAM.dmp
+00:19:24 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18228_CGRAM.dmp
+00:19:24 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18228_OBSEL.txt
+00:19:24 [FULL_DUMP] F9 pressed at frame 18243
+00:19:24 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=18243)
+00:19:24 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768864764.json (128 entries, 14 visible)
+00:19:25 [FULL_DUMP] F10 pressed at frame 18266
+00:19:25 [FULL_DUMP] Capturing binary dumps (frame=18266)
+00:19:25 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18266_OAM.dmp
+00:19:25 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18266_VRAM.dmp
+00:19:25 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18266_CGRAM.dmp
+00:19:25 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18266_OBSEL.txt
+00:19:26 [FULL_DUMP] F10 pressed at frame 18339
+00:19:26 [FULL_DUMP] Capturing binary dumps (frame=18339)
+00:19:26 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18339_OAM.dmp
+00:19:26 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18339_VRAM.dmp
+00:19:26 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18339_CGRAM.dmp
+00:19:26 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18339_OBSEL.txt
+00:19:26 [FULL_DUMP] F9 pressed at frame 18340
+00:19:26 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=18340)
+00:19:26 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768864766.json (128 entries, 22 visible)
+00:19:27 [FULL_DUMP] F10 pressed at frame 18390
+00:19:27 [FULL_DUMP] Capturing binary dumps (frame=18390)
+00:19:27 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18390_OAM.dmp
+00:19:27 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18390_VRAM.dmp
+00:19:27 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18390_CGRAM.dmp
+00:19:27 [FULL_DUMP] Saved C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\dump_F18390_OBSEL.txt
+00:19:27 [FULL_DUMP] F9 pressed at frame 18395
+00:19:27 [FULL_DUMP] Capturing full dump (OBSEL=0x03, frame=18395)
+00:19:27 [FULL_DUMP] Saved full dump to C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_exchange\full_dump_1768864767.json (128 entries, 30 visible)

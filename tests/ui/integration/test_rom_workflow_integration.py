@@ -40,6 +40,9 @@ class MockPreviewCoordinator(QObject):
 def mock_editing_controller():
     ctrl = Mock()
     ctrl.has_unsaved_changes.return_value = False
+    # Must return None (not Mock) for subscript safety in open_in_editor
+    ctrl.get_current_palette_source.return_value = None
+    ctrl.get_palette_sources.return_value = {}
     return ctrl
 
 

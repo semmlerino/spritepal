@@ -7,12 +7,13 @@ from core.mesen_integration.log_watcher import CapturedOffset
 from ui.main_window import MainWindow, WorkspaceMode
 
 
-def test_mesen_captures_synced_on_workspace_switch(qtbot):
+def test_mesen_captures_synced_on_workspace_switch(qtbot, app_context):
     """
     Test that Mesen captures are synchronized from LogWatcher
     to the Asset Browser when switching to the Sprite Editor workspace.
     """
     # 1. Setup: Create real MainWindow with mocked dependencies
+    # Note: app_context is required because MainWindow._setup_managers() calls get_app_context()
     mock_settings = MagicMock()
     mock_rom_cache = MagicMock()
     mock_session = MagicMock()

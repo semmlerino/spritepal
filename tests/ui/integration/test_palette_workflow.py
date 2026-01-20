@@ -196,6 +196,50 @@ class TestPaletteDuplication:
 
 
 # =============================================================================
+# PALETTE PERSISTENCE TESTS
+# =============================================================================
+
+
+class TestPalettePersistence:
+    """Tests for preserving user-loaded palettes across offset changes."""
+
+    def test_file_palette_persists_across_open_in_editor(self, qtbot):
+        """Verify that a loaded file palette is used even when ROM palettes are available."""
+        file_palette = [(255, 0, 0)] * 16
+        rom_palette = [(0, 255, 0)] * 16
+
+        editing_controller = MagicMock()
+        editing_controller.get_current_palette_source.return_value = ("file", 0)
+        editing_controller.get_palette_sources.return_value = {
+            ("file", 0): (file_palette, "Loaded Palette"),
+        }
+
+        controller = ROMWorkflowController(parent=None, editing_controller=editing_controller)
+        controller.rom_path = "test.sfc"
+        controller.current_offset = 0x123456
+        controller.current_tile_offset = 0x123456
+        controller.current_tile_data = b"\x00" * 32
+        controller.current_width = 8
+        controller.current_height = 8
+        controller.current_sprite_name = "test_sprite"
+
+        mock_extractor = MagicMock()
+        mock_extractor.read_rom_header.return_value = MagicMock()
+        mock_extractor._find_game_configuration.return_value = {"configs": {}}
+        mock_extractor.get_palette_config_from_sprite_config.return_value = (0x100, [8])
+        mock_extractor.extract_palette_range.return_value = {8: rom_palette}
+        controller.rom_extractor = mock_extractor
+
+        controller.open_in_editor()
+
+        _, palette_arg = editing_controller.load_image.call_args[0]
+        assert palette_arg == file_palette
+        assert not any(
+            call_args.args == ("rom", 8) for call_args in editing_controller.set_palette_source.call_args_list
+        )
+
+
+# =============================================================================
 # PALETTE INTEGRATION TESTS
 # Source: test_palette_integration.py
 # =============================================================================

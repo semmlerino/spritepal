@@ -1,0 +1,26 @@
+{
+  "frame": 1303,
+  "sprites": [
+    {"oam_id": 0, "x": 154, "y": 110, "width": 16, "height": 16, "tile": 64, "palette": 1, "vram_addr": 2048},
+    {"oam_id": 1, "x": 175, "y": 98, "width": 16, "height": 16, "tile": 64, "palette": 1, "vram_addr": 2048},
+    {"oam_id": 2, "x": 191, "y": 78, "width": 16, "height": 16, "tile": 64, "palette": 1, "vram_addr": 2048},
+    {"oam_id": 3, "x": 147, "y": 114, "width": 8, "height": 8, "tile": 11, "palette": 1, "vram_addr": 352},
+    {"oam_id": 4, "x": 139, "y": 114, "width": 8, "height": 8, "tile": 27, "palette": 1, "vram_addr": 864},
+    {"oam_id": 5, "x": 134, "y": 113, "width": 8, "height": 8, "tile": 13, "palette": 0, "vram_addr": 416},
+    {"oam_id": 6, "x": 142, "y": 105, "width": 8, "height": 8, "tile": 29, "palette": 0, "vram_addr": 928},
+    {"oam_id": 7, "x": 134, "y": 105, "width": 8, "height": 8, "tile": 28, "palette": 0, "vram_addr": 896},
+    {"oam_id": 8, "x": 134, "y": 97, "width": 8, "height": 8, "tile": 12, "palette": 0, "vram_addr": 384},
+    {"oam_id": 9, "x": 118, "y": 97, "width": 16, "height": 16, "tile": 14, "palette": 0, "vram_addr": 448},
+    {"oam_id": 10, "x": 142, "y": 114, "width": 8, "height": 8, "tile": 20, "palette": 0, "vram_addr": 640},
+    {"oam_id": 11, "x": 130, "y": 129, "width": 8, "height": 8, "tile": 5, "palette": 0, "vram_addr": 160},
+    {"oam_id": 12, "x": 134, "y": 121, "width": 8, "height": 8, "tile": 19, "palette": 0, "vram_addr": 608},
+    {"oam_id": 13, "x": 126, "y": 121, "width": 8, "height": 8, "tile": 4, "palette": 0, "vram_addr": 128},
+    {"oam_id": 14, "x": 118, "y": 121, "width": 8, "height": 8, "tile": 3, "palette": 0, "vram_addr": 96},
+    {"oam_id": 15, "x": 134, "y": 113, "width": 8, "height": 8, "tile": 18, "palette": 0, "vram_addr": 576},
+    {"oam_id": 16, "x": 134, "y": 105, "width": 8, "height": 8, "tile": 2, "palette": 0, "vram_addr": 64},
+    {"oam_id": 17, "x": 118, "y": 105, "width": 16, "height": 16, "tile": 0, "palette": 0, "vram_addr": 0}
+  ],
+  "active_indices": [
+    {"idx": 6, "ptr": "E9:3AEB", "last_frame": 1299, "sessions": 3}
+  ]
+}

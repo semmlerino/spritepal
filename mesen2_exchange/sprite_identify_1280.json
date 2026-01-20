@@ -1,0 +1,14 @@
+{
+  "frame": 1280,
+  "sprites": [
+    {"oam_id": 0, "x": 102, "y": 120, "width": 8, "height": 8, "tile": 222, "palette": 1, "vram_addr": 15296},
+    {"oam_id": 1, "x": 109, "y": 113, "width": 8, "height": 8, "tile": 222, "palette": 1, "vram_addr": 15296},
+    {"oam_id": 2, "x": 109, "y": 120, "width": 8, "height": 8, "tile": 222, "palette": 1, "vram_addr": 15296},
+    {"oam_id": 3, "x": 102, "y": 113, "width": 8, "height": 8, "tile": 222, "palette": 1, "vram_addr": 15296},
+    {"oam_id": 4, "x": 131, "y": 125, "width": 8, "height": 8, "tile": 16, "palette": 0, "vram_addr": 512},
+    {"oam_id": 5, "x": 131, "y": 117, "width": 8, "height": 8, "tile": 0, "palette": 0, "vram_addr": 0},
+    {"oam_id": 6, "x": 116, "y": 117, "width": 16, "height": 16, "tile": 0, "palette": 0, "vram_addr": 0}
+  ],
+  "active_indices": [
+  ]
+}
