@@ -1294,6 +1294,15 @@ class ROMWorkflowController(QObject):
                 library_palette_source = lib_sprite.palette_source
                 logger.info(f"[OPEN] Found library palette association for 0x{self.current_offset:06X}")
 
+        # Preserve user-loaded palette file across offset changes
+        preferred_file_palette: tuple[list[tuple[int, int, int]], str, int] | None = None
+        current_source = self._editing_controller.get_current_palette_source()
+        if current_source and current_source[0] == "file":
+            sources = self._editing_controller.get_palette_sources()
+            if current_source in sources:
+                colors, name = sources[current_source]
+                preferred_file_palette = (colors, name, current_source[1])
+
         if self.rom_extractor and self.rom_path:
             try:
                 # 1. Get header to identify game
@@ -1347,6 +1356,12 @@ class ROMWorkflowController(QObject):
             except Exception as e:
                 logger.warning(f"Failed to extract ROM palettes: {e}")
 
+        use_file_palette = preferred_file_palette is not None and not library_palette_colors
+        if use_file_palette:
+            palette = preferred_file_palette[0]
+            if self._view:
+                self._view.hide_palette_warning()
+
         # Fallback to default SNES-style palette
         if palette is None:
             palette = get_default_snes_palette()
@@ -1365,6 +1380,15 @@ class ROMWorkflowController(QObject):
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self._editing_controller.load_image(image_array, palette)
 
+        if use_file_palette:
+            colors, name, index = preferred_file_palette
+            self._editing_controller.set_palette(
+                colors,
+                name or "Loaded Palette",
+                source_type="file",
+                source_index=index,
+            )
+
         # Apply library palette override if available
         if library_palette_colors:
             self._editing_controller.set_palette(library_palette_colors, library_palette_name)
@@ -1378,7 +1402,7 @@ class ROMWorkflowController(QObject):
                 self._editing_controller.set_palette_source(source_type, source_idx)
                 logger.info(f"[OPEN] Applied library palette: {source_type} {source_idx}")
         # Auto-select the palette source in dropdown if we detected one and no library override
-        elif detected_palette_index and all_palettes:
+        elif detected_palette_index and all_palettes and not use_file_palette:
             self._editing_controller.set_palette_source("rom", detected_palette_index)
             if self._message_service:
                 palette_count = len(all_palettes)
