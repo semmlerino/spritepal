@@ -17,6 +17,7 @@ Each class contains source attribution in its docstring.
 
 from __future__ import annotations
 
+import json
 from unittest.mock import ANY, MagicMock, patch
 
 import numpy as np
@@ -237,6 +238,74 @@ class TestPalettePersistence:
         assert not any(
             call_args.args == ("rom", 8) for call_args in editing_controller.set_palette_source.call_args_list
         )
+
+    def test_existing_palette_used_when_rom_palette_missing(self, qtbot):
+        """Verify current palette is reused if ROM palette config is missing."""
+        file_palette = [(255, 0, 0)] * 16
+
+        editing_controller = MagicMock()
+        editing_controller.get_current_palette_source.return_value = ("file", 0)
+        editing_controller.get_palette_sources.return_value = {
+            ("file", 0): (file_palette, "Loaded Palette"),
+        }
+
+        controller = ROMWorkflowController(parent=None, editing_controller=editing_controller)
+        controller.rom_path = "test.sfc"
+        controller.current_offset = 0x123456
+        controller.current_tile_offset = 0x123456
+        controller.current_tile_data = b"\x00" * 32
+        controller.current_width = 8
+        controller.current_height = 8
+        controller.current_sprite_name = "manual_0x123456"
+
+        mock_extractor = MagicMock()
+        mock_extractor.read_rom_header.return_value = MagicMock()
+        mock_extractor._find_game_configuration.return_value = {"configs": {}}
+        mock_extractor.get_palette_config_from_sprite_config.return_value = (None, None)
+        controller.rom_extractor = mock_extractor
+
+        controller.open_in_editor()
+
+        _, palette_arg = editing_controller.load_image.call_args[0]
+        assert palette_arg == file_palette
+
+    def test_open_in_editor_loads_last_palette_when_missing(self, qtbot, app_context, tmp_path):
+        """Verify last palette is loaded if no current source is set."""
+        palette_file = tmp_path / "last_palette.pal.json"
+        palette_file.write_text(json.dumps({"name": "Last Palette", "colors": [[255, 0, 0]] * 16}))
+
+        state_manager = app_context.application_state_manager
+        state_manager.set("paths", "last_palette_path", str(palette_file))
+        state_manager.save_settings()
+
+        with patch("core.app_context.get_app_context", return_value=app_context):
+            editing_controller = EditingController()
+
+        editing_controller._current_palette_source = None
+        editing_controller._palette_sources.clear()
+        editing_controller._last_palette_loaded = False
+
+        controller = ROMWorkflowController(parent=None, editing_controller=editing_controller)
+        controller.rom_path = "test.sfc"
+        controller.current_offset = 0x123456
+        controller.current_tile_offset = 0x123456
+        controller.current_tile_data = b"\x00" * 32
+        controller.current_width = 8
+        controller.current_height = 8
+        controller.current_sprite_name = "test_sprite"
+
+        mock_extractor = MagicMock()
+        mock_extractor.read_rom_header.return_value = MagicMock()
+        mock_extractor._find_game_configuration.return_value = {"configs": {}}
+        mock_extractor.get_palette_config_from_sprite_config.return_value = (0x100, [8])
+        mock_extractor.extract_palette_range.return_value = {8: [(0, 255, 0)] * 16}
+        controller.rom_extractor = mock_extractor
+
+        controller.open_in_editor()
+
+        assert editing_controller.get_current_palette_source() == ("file", 0)
+        colors = editing_controller.get_current_colors()
+        assert colors[0] == (255, 0, 0)
 
 
 # =============================================================================
@@ -506,6 +575,48 @@ class TestROMPaletteWorkflow:
             args = mock_editing_controller.load_image.call_args
             assert args[0][1] == expected_palette_10
 
+            mock_default.assert_not_called()
+
+    def test_open_in_editor_refreshes_rom_palette_colors(self, qtbot):
+        """Verify that preferred ROM palettes use newly extracted colors."""
+        mock_editing_controller = MagicMock()
+        mock_rom_extractor = MagicMock()
+
+        controller = ROMWorkflowController(
+            parent=None, editing_controller=mock_editing_controller, rom_extractor=mock_rom_extractor
+        )
+
+        controller.current_tile_data = b"\x00" * 32
+        controller.current_tile_offset = 0  # Must match current_offset (defaults to 0)
+        controller.current_width = 8
+        controller.current_height = 8
+        controller.current_sprite_name = "test_sprite"
+        controller.rom_path = "test.sfc"
+
+        old_palette = [(1, 1, 1)] * 16
+        old_palette[0] = (255, 0, 0)
+        new_palette = [(2, 2, 2)] * 16
+        new_palette[0] = (0, 255, 0)
+
+        mock_editing_controller.get_current_palette_source.return_value = ("rom", 8)
+        mock_editing_controller.get_palette_sources.return_value = {("rom", 8): (old_palette, "ROM Palette 8")}
+
+        mock_rom_extractor.read_rom_header.return_value = MagicMock()
+        mock_rom_extractor._find_game_configuration.return_value = {"palettes": True}
+        mock_rom_extractor.get_palette_config_from_sprite_config.return_value = (0x1000, [8])
+        mock_rom_extractor.extract_palette_range.return_value = {8: new_palette}
+        mock_rom_extractor.get_palette_descriptions_from_config.return_value = {}
+
+        with patch("ui.sprite_editor.get_default_snes_palette") as mock_default:
+            mock_default.return_value = [(0, 0, 0)] * 16
+
+            controller.open_in_editor()
+
+            args = mock_editing_controller.load_image.call_args
+            assert args[0][1] == new_palette
+            mock_editing_controller.set_palette.assert_called_with(
+                new_palette, ANY, source_type="rom", source_index=8
+            )
             mock_default.assert_not_called()
 
     def test_open_in_editor_fallback_to_default(self, qtbot):

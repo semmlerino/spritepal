@@ -139,6 +139,10 @@ class EditingController(QObject):
         view.set_controller(self)
         self._load_last_palette()
 
+    def ensure_last_palette_loaded(self) -> None:
+        """Ensure the last used palette has been loaded at least once."""
+        self._load_last_palette()
+
     def has_image(self) -> bool:
         """Check if an image is loaded (always true - model has default data)."""
         return True

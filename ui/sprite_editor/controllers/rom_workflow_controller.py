@@ -1194,6 +1194,112 @@ class ROMWorkflowController(QObject):
             else:
                 self.save_to_rom()
 
+    def _get_preferred_palette_source(
+        self,
+    ) -> tuple[str, int, list[tuple[int, int, int]], str] | None:
+        """Get the current palette source data from the editor."""
+        current_source = self._editing_controller.get_current_palette_source()
+        if not current_source:
+            return None
+        if current_source == ("default", 0):
+            from ui.sprite_editor import get_default_snes_palette
+
+            return ("default", 0, get_default_snes_palette(), "Default SNES")
+        sources = self._editing_controller.get_palette_sources()
+        if current_source not in sources:
+            return None
+        colors, name = sources[current_source]
+        return (current_source[0], current_source[1], colors, name)
+
+    def _refresh_preferred_rom_palette(
+        self,
+        preferred_source: tuple[str, int, list[tuple[int, int, int]], str] | None,
+        all_palettes: dict[int, list[tuple[int, int, int]]],
+    ) -> tuple[str, int, list[tuple[int, int, int]], str] | None:
+        """Refresh preferred ROM palette colors using newly extracted palettes."""
+        if not preferred_source or preferred_source[0] != "rom":
+            return preferred_source
+        if not all_palettes:
+            return preferred_source
+
+        source_type, source_index, _colors, name = preferred_source
+        if source_index not in all_palettes:
+            return None
+
+        sources = self._editing_controller.get_palette_sources()
+        if (source_type, source_index) in sources:
+            _, name = sources[(source_type, source_index)]
+
+        return (source_type, source_index, all_palettes[source_index], name)
+
+    def _load_rom_palettes_for_open(
+        self,
+    ) -> tuple[dict[int, list[tuple[int, int, int]]], int | None, list[tuple[int, int, int]] | None]:
+        """Extract ROM palettes and register them for selection."""
+        all_palettes: dict[int, list[tuple[int, int, int]]] = {}
+        detected_palette_index: int | None = None
+        rom_palette: list[tuple[int, int, int]] | None = None
+
+        if self.rom_extractor and self.rom_path:
+            try:
+                header = self.rom_extractor.read_rom_header(self.rom_path)
+                game_config = self.rom_extractor._find_game_configuration(header)
+
+                if game_config and self.current_sprite_name:
+                    from typing import cast
+
+                    palette_offset, palette_indices = self.rom_extractor.get_palette_config_from_sprite_config(
+                        cast(dict[str, object], game_config),
+                        self.current_sprite_name,
+                    )
+
+                    if palette_offset is not None:
+                        all_palettes = self.rom_extractor.extract_palette_range(self.rom_path, palette_offset, 8, 15)
+
+                        descriptions = self.rom_extractor.get_palette_descriptions_from_config(
+                            cast(dict[str, object], game_config)
+                        )
+
+                        if all_palettes:
+                            self._editing_controller.register_rom_palettes(
+                                all_palettes,
+                                active_indices=None,  # TODO: Get from OAM analysis when available
+                                descriptions=descriptions,
+                            )
+                            logger.info(f"Registered {len(all_palettes)} ROM palettes as sources")
+
+                        if palette_indices:
+                            detected_palette_index = palette_indices[0]
+                        elif all_palettes:
+                            detected_palette_index = min(all_palettes.keys())
+
+                        if detected_palette_index and detected_palette_index in all_palettes:
+                            rom_palette = all_palettes[detected_palette_index]
+                            logger.info(
+                                f"Auto-selected ROM palette {detected_palette_index} for {self.current_sprite_name}"
+                            )
+
+            except Exception as e:
+                logger.warning(f"Failed to extract ROM palettes: {e}")
+
+        return all_palettes, detected_palette_index, rom_palette
+
+    def _select_palette_for_open(
+        self,
+        *,
+        library_palette_colors: list[tuple[int, int, int]] | None,
+        preferred_source: tuple[str, int, list[tuple[int, int, int]], str] | None,
+        rom_palette: list[tuple[int, int, int]] | None,
+    ) -> list[tuple[int, int, int]] | None:
+        """Resolve the palette to use when opening the editor."""
+        if library_palette_colors:
+            return library_palette_colors
+        if preferred_source:
+            return preferred_source[2]
+        if rom_palette:
+            return rom_palette
+        return None
+
     def open_in_editor(self) -> None:
         """Load the current preview into the pixel editor."""
         logger.debug(
@@ -1212,11 +1318,6 @@ class ROMWorkflowController(QObject):
             logger.info("[OPEN] Opening raw sprite (no HAL compression)")
             if self._message_service:
                 self._message_service.show_message("Opening raw sprite (will be injected without compression)")
-
-        # Clear previous ROM palette sources and warnings before loading new sprite
-        if self._view:
-            self._view.clear_rom_palette_sources()
-            self._view.hide_palette_warning()
 
         # Check for saved arrangement if none currently loaded
         if self._current_arrangement is None:
@@ -1271,11 +1372,14 @@ class ROMWorkflowController(QObject):
                 logger.warning("Failed to apply arrangement transformation: %s", e)
                 self._clear_arrangement()
 
-        # Try to extract all ROM palettes if possible
-        palette: list[tuple[int, int, int]] | None = None
-        all_palettes: dict[int, list[tuple[int, int, int]]] = {}
-        detected_palette_index: int | None = None
-        palette_offset: int | None = None
+        # Ensure last palette is loaded before selecting defaults
+        self._editing_controller.ensure_last_palette_loaded()
+        preferred_source = self._get_preferred_palette_source()
+
+        # Clear previous ROM palette sources and warnings before loading new sprite
+        if self._view:
+            self._view.clear_rom_palette_sources()
+            self._view.hide_palette_warning()
 
         # Clear existing ROM palettes before registering new ones to prevent accumulation
         self._editing_controller.clear_palette_sources("rom")
@@ -1294,79 +1398,21 @@ class ROMWorkflowController(QObject):
                 library_palette_source = lib_sprite.palette_source
                 logger.info(f"[OPEN] Found library palette association for 0x{self.current_offset:06X}")
 
-        # Preserve user-loaded palette file across offset changes
-        preferred_file_palette: tuple[list[tuple[int, int, int]], str, int] | None = None
-        current_source = self._editing_controller.get_current_palette_source()
-        if current_source and current_source[0] == "file":
-            sources = self._editing_controller.get_palette_sources()
-            if current_source in sources:
-                colors, name = sources[current_source]
-                preferred_file_palette = (colors, name, current_source[1])
+        all_palettes, detected_palette_index, rom_palette = self._load_rom_palettes_for_open()
+        preferred_source = self._refresh_preferred_rom_palette(preferred_source, all_palettes)
 
-        if self.rom_extractor and self.rom_path:
-            try:
-                # 1. Get header to identify game
-                header = self.rom_extractor.read_rom_header(self.rom_path)
+        palette = self._select_palette_for_open(
+            library_palette_colors=library_palette_colors,
+            preferred_source=preferred_source,
+            rom_palette=rom_palette,
+        )
 
-                # 2. Get game config
-                game_config = self.rom_extractor._find_game_configuration(header)
-
-                if game_config and self.current_sprite_name:
-                    from typing import cast
-
-                    # 3. Get palette config for this sprite
-                    palette_offset, palette_indices = self.rom_extractor.get_palette_config_from_sprite_config(
-                        cast(dict[str, object], game_config),
-                        self.current_sprite_name,
-                    )
-
-                    # 4. Extract ALL sprite palettes (8-15) if we have an offset
-                    if palette_offset is not None:
-                        all_palettes = self.rom_extractor.extract_palette_range(self.rom_path, palette_offset, 8, 15)
-
-                        # Get semantic descriptions for palettes (if available in config)
-                        descriptions = self.rom_extractor.get_palette_descriptions_from_config(
-                            cast(dict[str, object], game_config)
-                        )
-
-                        # Register all palettes as switchable sources with descriptions
-                        if all_palettes:
-                            self._editing_controller.register_rom_palettes(
-                                all_palettes,
-                                active_indices=None,  # TODO: Get from OAM analysis when available
-                                descriptions=descriptions,
-                            )
-                            logger.info(f"Registered {len(all_palettes)} ROM palettes as sources")
-
-                        # Determine which palette to use initially
-                        if palette_indices:
-                            # Use first available from config
-                            detected_palette_index = palette_indices[0]
-                        elif all_palettes:
-                            # Fall back to first available (usually 8)
-                            detected_palette_index = min(all_palettes.keys())
-
-                        # Get the actual palette colors
-                        if detected_palette_index and detected_palette_index in all_palettes:
-                            palette = all_palettes[detected_palette_index]
-                            logger.info(
-                                f"Auto-selected ROM palette {detected_palette_index} for {self.current_sprite_name}"
-                            )
-
-            except Exception as e:
-                logger.warning(f"Failed to extract ROM palettes: {e}")
-
-        use_file_palette = preferred_file_palette is not None and not library_palette_colors
-        if use_file_palette and preferred_file_palette is not None:
-            palette = preferred_file_palette[0]
-            if self._view:
-                self._view.hide_palette_warning()
-
-        # Fallback to default SNES-style palette
+        used_default = False
         if palette is None:
             palette = get_default_snes_palette()
+            used_default = True
+        if used_default:
             logger.debug("Using default SNES palette")
-            # Show warning banner and status message for fallback
             if self._view:
                 self._view.show_palette_warning(
                     "Using default palette. ROM palette configuration not available for this offset."
@@ -1374,35 +1420,31 @@ class ROMWorkflowController(QObject):
             if self._message_service and self.current_sprite_name.startswith("manual_0x"):
                 self._message_service.show_message("Using default palette (ROM palette not available for this offset)")
         elif self._view:
-            # Hide any previous warning when we have proper palette
             self._view.hide_palette_warning()
 
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self._editing_controller.load_image(image_array, palette)
 
-        if use_file_palette and preferred_file_palette is not None:
-            colors, name, index = preferred_file_palette
-            self._editing_controller.set_palette(
-                colors,
-                name or "Loaded Palette",
-                source_type="file",
-                source_index=index,
-            )
-
-        # Apply library palette override if available
+        # Apply palette source preference after load_image clears source tracking
         if library_palette_colors:
             self._editing_controller.set_palette(library_palette_colors, library_palette_name)
             if library_palette_source:
                 source_type, source_idx = library_palette_source
-                # Ensure custom file palettes are re-registered so they appear in dropdown
                 if source_type == "file":
                     self._editing_controller.register_palette_source(
                         "file", source_idx, library_palette_colors, library_palette_name or "Loaded Palette"
                     )
                 self._editing_controller.set_palette_source(source_type, source_idx)
                 logger.info(f"[OPEN] Applied library palette: {source_type} {source_idx}")
-        # Auto-select the palette source in dropdown if we detected one and no library override
-        elif detected_palette_index and all_palettes and not use_file_palette:
+        elif preferred_source:
+            source_type, source_index, colors, name = preferred_source
+            self._editing_controller.set_palette(
+                colors,
+                name or "Loaded Palette",
+                source_type=source_type,
+                source_index=source_index,
+            )
+        elif detected_palette_index and all_palettes:
             self._editing_controller.set_palette_source("rom", detected_palette_index)
             if self._message_service:
                 palette_count = len(all_palettes)

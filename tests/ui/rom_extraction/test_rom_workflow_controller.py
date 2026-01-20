@@ -45,7 +45,8 @@ class TestROMWorkflowControllerRegression:
             log_watcher=mock_log_watcher,
             sprite_library=mock_sprite_library,
         )
-        return ctrl
+        yield ctrl
+        ctrl.cleanup()
 
     @patch("core.rom_validator.ROMValidator.validate_rom_file")
     @patch("core.rom_validator.ROMValidator.validate_rom_header")
@@ -131,7 +132,8 @@ class TestThumbnailRequeueOnAlignment:
         )
         ctrl.set_view(mock_view)
         ctrl.current_offset = 0x1000
-        return ctrl
+        yield ctrl
+        ctrl.cleanup()
 
     def test_preview_calls_update_sprite_offset_on_alignment(
         self,
