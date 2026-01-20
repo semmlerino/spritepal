@@ -102,9 +102,7 @@ def find_sprite_bounds(
 
 def detect_background_color(img: Image.Image) -> tuple[int, int, int]:
     """Detect background color by sampling corners."""
-    if img.mode == "RGBA":
-        img = img.convert("RGB")
-    elif img.mode != "RGB":
+    if img.mode == "RGBA" or img.mode != "RGB":
         img = img.convert("RGB")
 
     pixels = img.load()

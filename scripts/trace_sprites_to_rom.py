@@ -144,7 +144,7 @@ def main():
     else:
         print(f"Initializing tile matcher with {rom_path}...")
         matcher = ROMTileMatcher(str(rom_path))
-        print(f"Building tile database...")
+        print("Building tile database...")
         matcher.build_database()
         matcher.save_database(db_path)
         print(f"Saved database to {db_path}")

@@ -1,8 +1,11 @@
 import os
 import stat
-import pytest
 from pathlib import Path
+
+import pytest
+
 from core.sprite_project import SpriteProject, SpriteProjectError
+
 
 def create_dummy_project() -> SpriteProject:
     """Helper to create a minimal valid project."""

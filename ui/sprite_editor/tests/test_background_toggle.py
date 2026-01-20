@@ -5,10 +5,10 @@ Unit tests for the background toggle feature in the sprite editor.
 
 from __future__ import annotations
 
-import pytest
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
+import pytest
 from PySide6.QtCore import QCoreApplication, Qt
 from PySide6.QtGui import QColor
 

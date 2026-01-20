@@ -112,7 +112,7 @@ class EditingController(QObject):
         return self._palette_loader
 
     @property
-    def state_manager(self) -> "ApplicationStateManager" | None:
+    def state_manager(self) -> ApplicationStateManager | None:
         """Lazy access to ApplicationStateManager via AppContext when available."""
         try:
             from core.app_context import get_app_context
@@ -133,7 +133,7 @@ class EditingController(QObject):
                 # Use "preset" as source type and loop index as unique ID
                 self.register_palette_source("preset", i, rgb_colors, name)
 
-    def set_view(self, view: "EditTab") -> None:
+    def set_view(self, view: EditTab) -> None:
         """Set the edit tab view."""
         self._view = view
         view.set_controller(self)

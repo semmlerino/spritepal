@@ -1357,7 +1357,7 @@ class ROMWorkflowController(QObject):
                 logger.warning(f"Failed to extract ROM palettes: {e}")
 
         use_file_palette = preferred_file_palette is not None and not library_palette_colors
-        if use_file_palette:
+        if use_file_palette and preferred_file_palette is not None:
             palette = preferred_file_palette[0]
             if self._view:
                 self._view.hide_palette_warning()
@@ -1380,7 +1380,7 @@ class ROMWorkflowController(QObject):
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self._editing_controller.load_image(image_array, palette)
 
-        if use_file_palette:
+        if use_file_palette and preferred_file_palette is not None:
             colors, name, index = preferred_file_palette
             self._editing_controller.set_palette(
                 colors,

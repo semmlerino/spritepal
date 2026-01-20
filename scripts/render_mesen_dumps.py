@@ -283,7 +283,7 @@ def main() -> None:
             img.save(out_file)
             print(f"  Saved: {out_file} ({img.width}x{img.height})")
         else:
-            print(f"  No visible sprites" + (f" with palette {args.palette}" if args.palette else ""))
+            print("  No visible sprites" + (f" with palette {args.palette}" if args.palette else ""))
 
 
 if __name__ == "__main__":
