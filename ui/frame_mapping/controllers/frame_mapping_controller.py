@@ -221,9 +221,9 @@ class FrameMappingController(QObject):
             # Get unique ROM offsets from selected entries only
             rom_offsets = filtered_capture.unique_rom_offsets
 
-            # Render preview using filtered capture
+            # Render preview using filtered capture (cropped to bounding box)
             renderer = CaptureRenderer(filtered_capture)
-            preview_img = renderer.render_composite()
+            preview_img = renderer.render_selection()
 
             # Convert PIL Image to QPixmap
             from io import BytesIO
@@ -429,7 +429,7 @@ class FrameMappingController(QObject):
                 return None
 
             renderer = CaptureRenderer(capture_result)
-            preview_img = renderer.render_composite()
+            preview_img = renderer.render_selection()
 
             # Convert PIL Image to QPixmap
             from io import BytesIO

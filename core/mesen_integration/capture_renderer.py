@@ -373,6 +373,44 @@ class CaptureRenderer:
 
         return canvas
 
+    def render_selection(
+        self,
+        transparent_bg: bool = True,
+    ) -> Image.Image:
+        """
+        Render all sprites in the capture composited relative to their bounding box.
+
+        Args:
+            transparent_bg: If True, use transparent background (RGBA)
+
+        Returns:
+            PIL Image with all sprites composited relative to their bounding box
+        """
+        bbox = self.capture.bounding_box
+        if bbox.width <= 0 or bbox.height <= 0:
+            return Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+
+        if transparent_bg:
+            canvas = Image.new("RGBA", (bbox.width, bbox.height), (0, 0, 0, 0))
+        else:
+            canvas = Image.new("RGB", (bbox.width, bbox.height), (0, 0, 0))
+
+        # Sort by priority (lower priority drawn first = behind)
+        sorted_entries = sorted(self.capture.entries, key=lambda e: e.priority)
+
+        for entry in sorted_entries:
+            sprite_img = self.render_entry(entry, transparent_bg=True)
+
+            # Position relative to bbox origin
+            paste_x = entry.x - bbox.x
+            paste_y = entry.y - bbox.y
+
+            # Since bbox is calculated from these entries, paste_x/y should be >= 0
+            # and within canvas bounds.
+            canvas.paste(sprite_img, (paste_x, paste_y), sprite_img)
+
+        return canvas
+
 
 def render_capture_to_files(
     json_path: str | Path,
