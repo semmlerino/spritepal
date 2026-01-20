@@ -1608,7 +1608,7 @@ class ROMWorkflowController(QObject):
         from core.tile_utils import encode_4bpp_tile
 
         # Calculate required buffer size from modified tiles
-        if modified_tiles:
+        if modified_tiles and len(modified_tiles) > 0:
             max_row = max(pos.row for pos in modified_tiles)
             required_tiles = (max_row + 1) * tiles_per_row
             required_bytes = required_tiles * 32
