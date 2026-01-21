@@ -105,6 +105,8 @@ uv run basedpyright core ui utils  # Type check
 uv run pytest                    # Run all tests
 ```
 
+**Note:** If `uv` is not in PATH, use `~/.local/bin/uv run` as fallback (e.g., `~/.local/bin/uv run ruff check .`).
+
 **No silent behavior changes:** If a change affects threading, signals, IO, persistence, or settings → add/adjust tests.
 
 ### Definition of Done
