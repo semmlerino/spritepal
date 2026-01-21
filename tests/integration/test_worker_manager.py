@@ -8,7 +8,6 @@ This refactored version demonstrates:
 - No mocking of Qt components
 """
 
-import subprocess
 import time
 from unittest.mock import Mock
 
@@ -383,123 +382,10 @@ class TestWorkerCancellationStability:
 
     Migrated from test_phase1_stability_fixes.py - validates Phase 1 stability fixes
     for worker cancellation patterns.
+
+    Note: Static analysis tests (test_no_terminate_calls_in_codebase,
+    test_worker_manager_safe_patterns) have been moved to scripts/lint_safety.py.
     """
-
-    def test_no_terminate_calls_in_codebase(self):
-        """Verify that no production code uses the dangerous QThread.terminate() method."""
-        # This test ensures we never regress to using terminate()
-
-        # Search for any terminate() calls in production code only
-        # Exclude virtual environments, test files, and external dependencies
-        result = subprocess.run(
-            [
-                "grep",
-                "-r",
-                r"\.terminate()",
-                ".",
-                "--include=*.py",
-                "--exclude-dir=.venv",
-                "--exclude-dir=venv",
-                "--exclude-dir=__pycache__",
-                "--exclude-dir=.git",
-                "--exclude-dir=node_modules",
-            ],
-            check=False,
-            cwd="/mnt/c/CustomScripts/KirbyMax/workshop/exhal-master/spritepal",
-            capture_output=True,
-            text=True,
-        )
-
-        # Filter out test files, comments, and documentation
-        lines = result.stdout.split("\n") if result.stdout else []
-        problematic_lines = []
-
-        for line in lines:
-            if not line.strip():
-                continue
-
-            # Skip test files
-            if "/test" in line or "test_" in line:
-                continue
-
-            # Skip comment lines and documentation
-            content = line.split(":", 1)[-1] if ":" in line else line
-            content = content.strip()
-            if content.startswith(("#", '"""', "'''")):
-                continue
-
-            # Skip lines that are clearly documentation/comments
-            if "CRITICAL:" in content or "which can corrupt" in content or "Never uses" in content or "# " in content:
-                continue
-
-            # Skip external dependencies and virtual environments
-            if "/.venv/" in line or "/venv/" in line or "/site-packages/" in line:
-                continue
-
-            # Skip hal_compression.py - it uses multiprocessing.Process.terminate()
-            # which is safe and expected for process pool management
-            if "hal_compression.py" in line:
-                continue
-
-            problematic_lines.append(line)
-
-        assert not problematic_lines, "Found dangerous terminate() calls in production code:\n" + "\n".join(
-            problematic_lines
-        )
-
-    def test_worker_manager_safe_patterns(self):
-        """Test WorkerManager follows safe cancellation patterns in code."""
-        # Import and inspect WorkerManager methods
-        import inspect
-
-        # Get all methods from WorkerManager
-        methods = inspect.getmembers(WorkerManager, predicate=inspect.ismethod)
-        static_methods = inspect.getmembers(WorkerManager, predicate=inspect.isfunction)
-        all_methods = methods + static_methods
-
-        # Check each method for safe patterns
-        for name, method in all_methods:
-            if name.startswith("_"):
-                continue  # Skip private methods
-
-            source = inspect.getsource(method)
-
-            # Remove comments and docstrings to check only actual code
-            source_lines = source.split("\n")
-            code_lines = []
-            in_docstring = False
-
-            for line in source_lines:
-                stripped = line.strip()
-
-                # Skip docstring lines
-                if '"""' in stripped or "'''" in stripped:
-                    in_docstring = not in_docstring
-                    continue
-                if in_docstring:
-                    continue
-
-                # Skip comment lines
-                if stripped.startswith("#"):
-                    continue
-
-                code_lines.append(line)
-
-            actual_code = "\n".join(code_lines)
-
-            # Verify no actual terminate() calls in code (only in comments/docs)
-            assert "terminate()" not in actual_code, f"Method {name} contains actual terminate() call in code"
-
-            # Verify safe patterns are used in methods that should have them
-            if "cleanup" in name.lower() or "cancel" in name.lower():
-                # Either direct use of patterns OR delegation to cleanup_worker is valid
-                has_safe_pattern = (
-                    "requestInterruption" in actual_code
-                    or "cancel()" in actual_code
-                    or "quit()" in actual_code
-                    or "cleanup_worker" in actual_code  # Delegates to safe cleanup method
-                )
-                assert has_safe_pattern, f"Method {name} should use safe cancellation patterns"
 
     def test_worker_manager_timeout_handling(self):
         """Test WorkerManager timeout handling logic."""

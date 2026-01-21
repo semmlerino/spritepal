@@ -182,153 +182,12 @@ class TestInjectionManagerInitialization:
 
 
 class TestInjectionManagerParameterValidation:
-    """TDD tests for parameter validation with real file I/O.
+    """Tests for unique injection-specific parameter validation.
 
-    These tests replace FileValidator mocking with real file operations
-    to test actual validation logic and edge cases.
-    Uses app_context fixture for per-test isolation (parallel-safe).
+    Note: Generic validation tests (valid params, missing params, invalid mode,
+    nonexistent files) have been consolidated into test_core_operations_manager.py.
+    This class retains only tests for unique injection-specific validation behavior.
     """
-
-    def test_validate_vram_injection_params_valid_real_files(
-        self, temp_files_with_real_content, app_context: AppContext
-    ):
-        """TDD: Validation should succeed with real valid files.
-
-        RED: Validation should pass for properly formatted files
-        GREEN: Real FileValidator should validate actual file content
-        REFACTOR: No mocking - tests real validation logic
-        """
-        manager = app_context.core_operations_manager
-
-        params = {
-            "mode": "vram",
-            "sprite_path": temp_files_with_real_content["sprite_path"],
-            "input_vram": temp_files_with_real_content["vram_path"],
-            "output_vram": str(Path(temp_files_with_real_content["output_dir"]) / "output.vram"),
-            "offset": 0x8000,
-        }
-
-        # No mocks - test real validation with actual files
-        # This catches real file format issues that mocks would miss
-        try:
-            manager.validate_injection_params(params)
-            # If validation passes, verify the real files exist and are valid
-            assert Path(params["sprite_path"]).exists()
-            assert Path(params["input_vram"]).exists()
-
-            # Verify real file content is reasonable
-            sprite_path = Path(params["sprite_path"])
-            assert sprite_path.suffix == ".png"
-            assert sprite_path.stat().st_size > 0
-
-            vram_path = Path(params["input_vram"])
-            assert vram_path.stat().st_size > 1024  # Reasonable VRAM size
-
-        except ValidationError:
-            # If validation fails, it's testing real validation logic
-            # This is acceptable as it shows real edge cases
-            pass
-
-    def test_validate_rom_injection_params_valid_real_files(
-        self, temp_files_with_real_content, app_context: AppContext
-    ):
-        """TDD: ROM validation should work with real ROM file structure.
-
-        Tests real ROM file validation including header checks, size validation,
-        and format verification that mocks cannot test.
-        """
-        manager = app_context.core_operations_manager
-
-        params = {
-            "mode": "rom",
-            "sprite_path": temp_files_with_real_content["sprite_path"],
-            "input_rom": temp_files_with_real_content["rom_path"],
-            "output_rom": str(Path(temp_files_with_real_content["output_dir"]) / "output.sfc"),
-            "offset": 0x8000,
-            "fast_compression": True,
-        }
-
-        # Test real ROM validation without mocks
-        try:
-            manager.validate_injection_params(params)
-
-            # If validation succeeds, verify real ROM file structure
-            rom_path = Path(params["input_rom"])
-            assert rom_path.exists()
-            assert rom_path.suffix == ".sfc"
-
-            # Check ROM file has reasonable size (at least 1MB)
-            assert rom_path.stat().st_size >= 0x100000
-
-            # Verify ROM header structure (tests real ROM validation)
-            with rom_path.open("rb") as f:
-                f.seek(0x7FC0)  # ROM title location
-                header = f.read(32)
-                assert len(header) == 32
-
-        except ValidationError as e:
-            # Real validation may catch issues mocks wouldn't
-            # Document what real validation found
-            assert "validation" in str(e).lower()
-
-    def test_validate_missing_required_params_parameter_logic(self, app_context):
-        """TDD: Parameter validation should catch missing required fields.
-
-        Tests parameter structure validation independent of file operations.
-        """
-        manager = app_context.core_operations_manager
-
-        params = {
-            "mode": "vram",
-            # Missing sprite_path, input_vram, output_vram, offset
-        }
-
-        # Test parameter validation logic - no files involved
-        with pytest.raises(ValidationError, match="Missing required parameters"):
-            manager.validate_injection_params(params)
-
-    def test_validate_invalid_mode_parameter_validation(self, app_context, temp_files_with_real_content):
-        """TDD: Mode validation should reject invalid modes before file validation.
-
-        Tests parameter validation logic independent of file operations.
-        """
-        manager = app_context.core_operations_manager
-
-        params = {
-            "mode": "invalid_mode",
-            "sprite_path": temp_files_with_real_content["sprite_path"],
-            "offset": 0x8000,
-        }
-
-        # Test mode validation with real files (should fail on mode, not files)
-        with pytest.raises(ValidationError, match="Invalid injection mode"):
-            manager.validate_injection_params(params)
-
-        # Verify the sprite file is actually valid
-        assert Path(params["sprite_path"]).exists()
-
-    def test_validate_nonexistent_sprite_file_real_filesystem(self, app_context):
-        """TDD: Validation should fail for missing sprite files with real filesystem.
-
-        Tests actual file existence validation without mocking filesystem operations.
-        """
-        manager = app_context.core_operations_manager
-
-        params = {
-            "mode": "vram",
-            "sprite_path": "/nonexistent/sprite.png",
-            "input_vram": "/fake/input.vram",
-            "output_vram": "/fake/output.vram",
-            "offset": 0x8000,
-        }
-
-        # Test real filesystem validation - no mocks
-        with pytest.raises(ValidationError, match="(sprite.*does not exist|file does not exist)"):
-            manager.validate_injection_params(params)
-
-        # Verify the files actually don't exist
-        assert not Path(params["sprite_path"]).exists()
-        assert not Path(params["input_vram"]).exists()
 
     def test_validate_negative_offset_real_validation(self, app_context, temp_files_with_real_content):
         """TDD: Validation should reject negative offsets with real files.
@@ -425,28 +284,11 @@ class TestInjectionManagerWorkflows:
     """Test injection workflow methods.
 
     Uses isolated_managers fixture via module-level pytestmark (parallel-safe).
+
+    Note: Stub tests (test_start_vram_injection_success, test_start_rom_injection_success,
+    test_start_injection_validation_error) were removed as CoreOpsManager tests provide
+    equivalent workflow coverage.
     """
-
-    def test_start_vram_injection_success(self, app_context, temp_files_with_real_content):
-        """TDD: Start a successful VRAM injection workflow.
-
-        Tests manager integration with workers and real state.
-        """
-        pass
-
-    def test_start_rom_injection_success(self, app_context, temp_files_with_real_content):
-        """TDD: Start a successful ROM injection workflow.
-
-        Tests manager integration with ROM injection logic.
-        """
-        pass
-
-    def test_start_injection_validation_error(self, app_context):
-        """TDD: Start injection fails when validation fails.
-
-        Tests error handling in the manager workflow.
-        """
-        pass
 
     def test_start_injection_replaces_existing_worker(self, app_context, temp_files_with_real_content, tmp_path):
         """TDD: Starting a new injection should replace any active worker.

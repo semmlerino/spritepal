@@ -481,155 +481,12 @@ class TestExtractionManager:
         manager.cleanup()  # Should not raise
 
 
-class TestExtractionParameterValidation:
-    """Parametrized validation tests following UNIFIED_TESTING_GUIDE patterns.
-
-    These tests use @pytest.mark.parametrize for comprehensive coverage of:
-    - ROM offset validation across various ranges
-    - Error path testing with expected exception types
-    - Input validation edge cases
-    """
-
-    @pytest.fixture
-    def mgr(self, isolated_managers):
-        """Create ExtractionManager instance with proper DI setup."""
-        from core.app_context import get_app_context
-
-        return get_app_context().core_operations_manager
-
-    @pytest.fixture
-    def valid_rom_file(self, tmp_path):
-        """Create a valid ROM file for testing."""
-        rom_file = tmp_path / "test.sfc"
-        rom_data = b"\x00" * 0x400000  # 4MB ROM
-        rom_file.write_bytes(rom_data)
-        return str(rom_file)
-
-    # ── ROM Offset Validation Tests ─────────────────────────────────────────────
-
-    @pytest.mark.parametrize(
-        "offset,should_pass",
-        [
-            (0, True),  # Zero offset is valid (start of ROM)
-            (0x1, True),  # Near start of ROM (valid)
-            (0x1000, True),  # Typical sprite offset
-            (0x200000, True),  # Standard sprite bank
-            (0x280000, True),  # Large sprite bank
-            (0x3FFFF0, True),  # Near end of 4MB ROM (valid if within bounds)
-        ],
-    )
-    def test_rom_offset_validation_valid_offsets(self, mgr, valid_rom_file, tmp_path, offset, should_pass):
-        """Test ROM extraction accepts valid offsets."""
-        params = {"rom_path": valid_rom_file, "offset": offset, "output_base": str(tmp_path / "output")}
-        if should_pass:
-            # Should not raise
-            result = mgr.validate_extraction_params(params)
-            assert result is True
-
-    @pytest.mark.parametrize(
-        "offset,error_match",
-        [
-            (-1, "offset must be >= 0"),  # Negative offset
-            (-0x1000, "offset must be >= 0"),  # Larger negative offset
-        ],
-    )
-    def test_rom_offset_validation_negative_offsets(self, mgr, valid_rom_file, tmp_path, offset, error_match):
-        """Test ROM extraction rejects negative offsets."""
-        params = {"rom_path": valid_rom_file, "offset": offset, "output_base": str(tmp_path / "output")}
-        with pytest.raises(ValidationError, match=error_match):
-            mgr.validate_extraction_params(params)
-
-    @pytest.mark.parametrize(
-        "offset_value,error_match",
-        [
-            ("not_an_int", "Invalid type for 'offset'"),
-            (3.14, "Invalid type for 'offset'"),
-            # Note: None is caught as "missing" before type check (explicit None check)
-            ([0x1000], "Invalid type for 'offset'"),
-            ({"value": 0x1000}, "Invalid type for 'offset'"),
-        ],
-    )
-    def test_rom_offset_validation_invalid_types(self, mgr, valid_rom_file, tmp_path, offset_value, error_match):
-        """Test ROM extraction rejects non-integer offsets."""
-        params = {"rom_path": valid_rom_file, "offset": offset_value, "output_base": str(tmp_path / "output")}
-        with pytest.raises(ValidationError, match=error_match):
-            mgr.validate_extraction_params(params)
-
-    # ── Required Parameter Validation Tests ─────────────────────────────────────
-
-    @pytest.mark.parametrize(
-        "missing_param,error_match",
-        [
-            ("rom_path", "Must provide either vram_path or rom_path"),
-            ("offset", "Missing required parameters"),
-            ("output_base", "Missing required parameters|Output name is required"),
-        ],
-    )
-    def test_rom_extraction_missing_required_params(self, mgr, valid_rom_file, tmp_path, missing_param, error_match):
-        """Test ROM extraction requires all mandatory parameters."""
-        params = {"rom_path": valid_rom_file, "offset": 0x1000, "output_base": str(tmp_path / "output")}
-        del params[missing_param]
-        with pytest.raises(ValidationError, match=error_match):
-            mgr.validate_extraction_params(params)
-
-    @pytest.mark.parametrize(
-        "output_base_value,error_match",
-        [
-            # Note: empty string is caught as "missing" before checking emptiness
-            ("   ", "Output name is required"),
-            (None, "Missing required parameters"),
-        ],
-    )
-    def test_output_base_validation(self, mgr, valid_rom_file, tmp_path, output_base_value, error_match):
-        """Test output_base must be non-empty."""
-        params = {
-            "rom_path": valid_rom_file,
-            "offset": 0x1000,
-        }
-        if output_base_value is not None:
-            params["output_base"] = output_base_value
-        with pytest.raises(ValidationError, match=error_match):
-            mgr.validate_extraction_params(params)
-
-    # ── VRAM Extraction Parameter Tests ─────────────────────────────────────────
-
-    @pytest.mark.parametrize(
-        "grayscale_mode,cgram_required",
-        [
-            (True, False),  # Grayscale mode doesn't need CGRAM
-            (False, True),  # Full color mode requires CGRAM
-        ],
-    )
-    def test_vram_cgram_requirement(self, mgr, tmp_path, grayscale_mode, cgram_required):
-        """Test CGRAM file requirement based on extraction mode."""
-        vram_file = tmp_path / "test.vram"
-        vram_file.write_bytes(b"\x00" * 0x10000)
-
-        params = {
-            "vram_path": str(vram_file),
-            "output_base": str(tmp_path / "output"),
-            "grayscale_mode": grayscale_mode,
-        }
-
-        if cgram_required:
-            # Should fail without CGRAM in full color mode
-            with pytest.raises(ValidationError, match="CGRAM file is required"):
-                mgr.validate_extraction_params(params)
-        else:
-            # Should pass in grayscale mode without CGRAM
-            result = mgr.validate_extraction_params(params)
-            assert result is True
-
-
 class TestExtractionErrorPaths:
-    """Structured error path tests following UNIFIED_TESTING_GUIDE pattern.
+    """Structured error path tests for unique extraction behaviors.
 
-    Tests are organized by error category:
-    - Invalid input errors (via validate_extraction_params)
-    - Parameter validation errors
-
-    Note: Uses the adapter interface returned by ManagerRegistry.
-    For low-level manager testing, use manager_context or app_context fixtures.
+    Note: Generic validation tests (nonexistent files, missing params) have been
+    consolidated into test_core_operations_manager.py. This class retains only
+    tests for unique extraction-specific error handling behavior.
     """
 
     @pytest.fixture
@@ -638,18 +495,6 @@ class TestExtractionErrorPaths:
         from core.app_context import get_app_context
 
         return get_app_context().core_operations_manager
-
-    # ── Invalid Input Validation Errors ─────────────────────────────────────────
-
-    def test_validate_rom_extraction_nonexistent_file_raises(self, mgr, tmp_path):
-        """ROM extraction params with nonexistent file should raise ValidationError."""
-        params = {
-            "rom_path": "/nonexistent/path/rom.sfc",
-            "offset": 0x1000,
-            "output_base": str(tmp_path / "output"),
-        }
-        with pytest.raises(ValidationError, match="does not exist|not found|No such file"):
-            mgr.validate_extraction_params(params)
 
     def test_validate_vram_extraction_defers_file_existence_check(self, mgr, tmp_path):
         """VRAM validation defers file existence check to extraction time.
@@ -666,12 +511,3 @@ class TestExtractionErrorPaths:
         # Validation passes - file existence is checked at extraction time, not validation time
         result = mgr.validate_extraction_params(params)
         assert result is True
-
-    def test_validate_params_missing_extraction_type_raises(self, mgr, tmp_path):
-        """Params without rom_path or vram_path should raise ValidationError."""
-        params = {
-            "offset": 0x1000,
-            "output_base": str(tmp_path / "output"),
-        }
-        with pytest.raises(ValidationError, match="Must provide either vram_path or rom_path"):
-            mgr.validate_extraction_params(params)
