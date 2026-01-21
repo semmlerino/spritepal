@@ -2,6 +2,21 @@
 
 Provides a dedicated workspace for mapping AI-generated sprite frames
 to game animation frames captured from Mesen 2.
+
+Four-zone layout:
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Toolbar: [Load AI Frames] [Import Capture] [Import Dir] [Load] [Save] [Inject] │
+├────────────────┬─────────────────────────────┬─────────────────────────────┤
+│                │                             │                             │
+│  AI FRAMES     │     ALIGNMENT CANVAS        │   CAPTURES LIBRARY          │
+│  (Left Pane)   │     (Center Top)            │   (Right Pane)              │
+│                │                             │                             │
+├────────────────┼─────────────────────────────┤                             │
+│                │                             │                             │
+│                │   MAPPINGS DRAWER           │                             │
+│                │   (Center Bottom)           │                             │
+│                │                             │                             │
+└────────────────┴─────────────────────────────┴─────────────────────────────┘
 """
 
 from __future__ import annotations
@@ -26,10 +41,10 @@ from PySide6.QtWidgets import (
 )
 
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
-from ui.frame_mapping.dialogs.alignment_dialog import AlignmentDialog
 from ui.frame_mapping.dialogs.replace_link_dialog import confirm_replace_link
-from ui.frame_mapping.views.comparison_panel import ComparisonPanel
-from ui.frame_mapping.views.frame_browser_panel import FrameBrowserPanel
+from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
+from ui.frame_mapping.views.alignment_canvas import AlignmentCanvas
+from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
 
 if TYPE_CHECKING:
@@ -40,15 +55,6 @@ logger = logging.getLogger(__name__)
 
 class FrameMappingWorkspace(QWidget):
     """Main workspace for frame mapping functionality.
-
-    Layout:
-        +-----------------------------------------------------------+
-        | Toolbar: [Load AI] [Import Capture] [Import Dir] | [Save] |
-        +-------------------+-------------------+-------------------+
-        | Frame Browser     | Comparison Panel  | Mapping Panel     |
-        | - AI Frames       | [Game] | [AI]     | Table + Actions   |
-        | - Game Frames     |                   |                   |
-        +-------------------+-------------------+-------------------+
 
     Signals:
         edit_in_sprite_editor_requested: Request to edit a frame (ai_frame_path, rom_offsets)
@@ -68,7 +74,7 @@ class FrameMappingWorkspace(QWidget):
         self._last_capture_dir: Path | None = None
         self._project_path: Path | None = None
 
-        # Selection tracking for map button state
+        # Selection tracking
         self._selected_ai_index: int | None = None
         self._selected_game_id: str | None = None
 
@@ -81,7 +87,7 @@ class FrameMappingWorkspace(QWidget):
         self._setup_ui()
         self._connect_signals()
 
-        logger.debug("FrameMappingWorkspace initialized")
+        logger.debug("FrameMappingWorkspace initialized with 4-zone layout")
 
     def set_message_service(self, service: StatusBarManager | None) -> None:
         """Set the message service for status updates."""
@@ -97,26 +103,39 @@ class FrameMappingWorkspace(QWidget):
         header = self._create_header()
         layout.addWidget(header)
 
-        # Main content with three-panel splitter
-        self._splitter = QSplitter(Qt.Orientation.Horizontal)
-        self._splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        # Main content: 4-zone layout using nested splitters
+        # Horizontal splitter: [Left Pane | Center Column | Right Pane]
+        self._main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._main_splitter.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        # Left panel: Frame Browser
-        self._frame_browser = FrameBrowserPanel()
-        self._splitter.addWidget(self._frame_browser)
+        # Left Pane: AI Frames
+        self._ai_frames_pane = AIFramesPane()
+        self._main_splitter.addWidget(self._ai_frames_pane)
 
-        # Center panel: Comparison
-        self._comparison_panel = ComparisonPanel()
-        self._splitter.addWidget(self._comparison_panel)
+        # Center Column: Vertical splitter [Canvas | Drawer]
+        self._center_splitter = QSplitter(Qt.Orientation.Vertical)
 
-        # Right panel: Mapping
+        # Center Top: Alignment Canvas
+        self._alignment_canvas = AlignmentCanvas()
+        self._center_splitter.addWidget(self._alignment_canvas)
+
+        # Center Bottom: Mappings Drawer
         self._mapping_panel = MappingPanel()
-        self._splitter.addWidget(self._mapping_panel)
+        self._center_splitter.addWidget(self._mapping_panel)
 
-        # Set initial splitter sizes (roughly 1:2:1 ratio)
-        self._splitter.setSizes([250, 500, 250])
+        # Set center splitter proportions (roughly 1:1)
+        self._center_splitter.setSizes([400, 300])
 
-        layout.addWidget(self._splitter, 1)
+        self._main_splitter.addWidget(self._center_splitter)
+
+        # Right Pane: Captures Library
+        self._captures_pane = CapturesLibraryPane()
+        self._main_splitter.addWidget(self._captures_pane)
+
+        # Set main splitter sizes (roughly 1:2:1 ratio)
+        self._main_splitter.setSizes([220, 560, 220])
+
+        layout.addWidget(self._main_splitter, 1)
 
     def _create_header(self) -> QWidget:
         """Create the header widget with title and toolbar."""
@@ -160,7 +179,7 @@ class FrameMappingWorkspace(QWidget):
         self._import_capture_btn.clicked.connect(self._on_import_capture)
         toolbar.addWidget(self._import_capture_btn)
 
-        self._import_dir_btn = QPushButton("Import Capture Directory")
+        self._import_dir_btn = QPushButton("Import Directory")
         self._import_dir_btn.setToolTip("Import all captures from a directory")
         self._import_dir_btn.clicked.connect(self._on_import_capture_dir)
         toolbar.addWidget(self._import_dir_btn)
@@ -177,6 +196,14 @@ class FrameMappingWorkspace(QWidget):
         self._save_btn.clicked.connect(self._on_save_project)
         toolbar.addWidget(self._save_btn)
 
+        toolbar.addSeparator()
+
+        self._inject_btn = QPushButton("Inject All")
+        self._inject_btn.setToolTip("Inject all mapped frames into ROM")
+        self._inject_btn.clicked.connect(self._on_inject_all)
+        self._inject_btn.setStyleSheet("background-color: #2c5d2c; font-weight: bold;")
+        toolbar.addWidget(self._inject_btn)
+
         layout.addWidget(toolbar)
 
         return header
@@ -187,29 +214,39 @@ class FrameMappingWorkspace(QWidget):
         self._controller.project_changed.connect(self._on_project_changed)
         self._controller.ai_frames_loaded.connect(self._on_ai_frames_loaded)
         self._controller.game_frame_added.connect(self._on_game_frame_added)
+        self._controller.mapping_injected.connect(self._on_mapping_injected)
         self._controller.error_occurred.connect(self._on_error)
 
-        # Frame browser signals
-        self._frame_browser.ai_frame_selected.connect(self._on_ai_frame_selected)
-        self._frame_browser.game_frame_selected.connect(self._on_game_frame_selected)
-        self._frame_browser.map_requested.connect(self._on_map_selected)
-        self._frame_browser.auto_advance_changed.connect(self._on_auto_advance_changed)
+        # AI Frames Pane signals
+        self._ai_frames_pane.ai_frame_selected.connect(self._on_ai_frame_selected)
+        self._ai_frames_pane.map_requested.connect(self._on_map_selected)
+        self._ai_frames_pane.auto_advance_changed.connect(self._on_auto_advance_changed)
+        self._ai_frames_pane.edit_in_sprite_editor_requested.connect(self._on_edit_frame)
+        self._ai_frames_pane.remove_from_project_requested.connect(self._on_remove_ai_frame)
 
-        # Mapping panel signals (Map Selected button consolidated to Frame Browser)
+        # Captures Library Pane signals
+        self._captures_pane.game_frame_selected.connect(self._on_game_frame_selected)
+        self._captures_pane.edit_in_sprite_editor_requested.connect(self._on_edit_game_frame)
+        self._captures_pane.delete_capture_requested.connect(self._on_delete_capture)
+        self._captures_pane.show_details_requested.connect(self._on_show_capture_details)
+
+        # Mapping Panel (Drawer) signals
+        self._mapping_panel.mapping_selected.connect(self._on_mapping_selected)
         self._mapping_panel.edit_frame_requested.connect(self._on_edit_frame)
         self._mapping_panel.remove_mapping_requested.connect(self._on_remove_mapping)
-        self._mapping_panel.mapping_selected.connect(self._on_mapping_selected)
         self._mapping_panel.adjust_alignment_requested.connect(self._on_adjust_alignment)
+        self._mapping_panel.drop_game_frame_requested.connect(self._on_drop_game_frame)
+        self._mapping_panel.inject_mapping_requested.connect(self._on_inject_single)
 
-        # Comparison panel signals (double-click overlay to edit alignment)
-        self._comparison_panel.alignment_edit_requested.connect(self._on_comparison_alignment_edit_requested)
+        # Alignment Canvas signals
+        self._alignment_canvas.alignment_changed.connect(self._on_alignment_changed)
+
+    # -------------------------------------------------------------------------
+    # Event Handlers
+    # -------------------------------------------------------------------------
 
     def _on_auto_advance_changed(self, enabled: bool) -> None:
-        """Handle auto-advance toggle change.
-
-        Args:
-            enabled: New auto-advance state
-        """
+        """Handle auto-advance toggle change."""
         self._auto_advance_enabled = enabled
         logger.debug("Auto-advance %s", "enabled" if enabled else "disabled")
 
@@ -217,25 +254,24 @@ class FrameMappingWorkspace(QWidget):
         """Handle project changes."""
         project = self._controller.project
         if project is None:
-            # Only reset selection state when project is cleared
             self._selected_ai_index = None
             self._selected_game_id = None
             self._project_label.setText("")
-            self._frame_browser.clear_all()
+            self._ai_frames_pane.clear()
+            self._captures_pane.clear()
             self._mapping_panel.set_project(None)
+            self._alignment_canvas.clear()
             self._update_map_button_state()
-            self._refresh_mapping_status()
-            self._refresh_game_frame_link_status()
             return
 
-        # Preserve selection when project still exists (e.g., after mapping operations)
         self._project_label.setText(f"- {project.name}")
-        self._frame_browser.set_ai_frames(project.ai_frames)
-        self._frame_browser.set_game_frames(project.game_frames)
+        self._ai_frames_pane.set_ai_frames(project.ai_frames)
+        self._captures_pane.set_game_frames(project.game_frames)
         self._mapping_panel.set_project(project)
         self._update_map_button_state()
         self._refresh_mapping_status()
         self._refresh_game_frame_link_status()
+        self._update_mapping_panel_previews()
 
     def _on_ai_frames_loaded(self, count: int) -> None:
         """Handle AI frames loaded."""
@@ -253,10 +289,9 @@ class FrameMappingWorkspace(QWidget):
         QMessageBox.warning(self, "Error", message)
 
     def _on_ai_frame_selected(self, index: int) -> None:
-        """Handle AI frame selection.
+        """Handle AI frame selection in left pane.
 
-        If the selected AI frame has a mapping, auto-select the mapped game frame
-        in the browser and update the comparison panel with alignment.
+        Syncs with drawer and canvas. If mapped, shows alignment.
         """
         project = self._controller.project
         if project is None:
@@ -265,31 +300,35 @@ class FrameMappingWorkspace(QWidget):
         self._selected_ai_index = index
         self._update_map_button_state()
 
-        frame = project.get_ai_frame_by_index(index)
-        self._comparison_panel.set_ai_frame(frame)
+        # Sync drawer selection
+        self._mapping_panel.select_row_by_ai_index(index)
 
-        # Auto-sync: if this AI frame has a mapping, select the game frame
+        # Load AI frame into canvas
+        frame = project.get_ai_frame_by_index(index)
+        self._alignment_canvas.set_ai_frame(frame)
+
+        # Check for mapping
         mapping = project.get_mapping_for_ai_frame(index)
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
-            self._comparison_panel.set_game_frame(game_frame, preview)
-            self._frame_browser.select_game_frame(mapping.game_frame_id)
+            self._alignment_canvas.set_game_frame(game_frame, preview)
+            self._alignment_canvas.set_alignment(mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v)
+            # Sync captures selection
+            self._captures_pane.select_frame(mapping.game_frame_id)
             self._selected_game_id = mapping.game_frame_id
-            self._comparison_panel.set_alignment(mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v)
         else:
-            # Unmapped: clear game frame selection and preview
-            self._comparison_panel.clear_game_frame()
-            self._frame_browser.clear_game_selection()
+            self._alignment_canvas.set_game_frame(None)
+            self._alignment_canvas.clear_alignment()
+            self._captures_pane.clear_selection()
             self._selected_game_id = None
 
         self._update_map_button_state()
 
     def _on_game_frame_selected(self, frame_id: str) -> None:
-        """Handle game frame selection.
+        """Handle game frame selection in captures library.
 
-        When a game frame is selected and an AI frame is already selected,
-        directly attempts to create the link (pairing-first behavior).
+        If an AI frame is selected, attempts to create a link (pairing-first).
         """
         project = self._controller.project
         if project is None:
@@ -298,196 +337,95 @@ class FrameMappingWorkspace(QWidget):
         self._selected_game_id = frame_id
         self._update_map_button_state()
 
-        frame = project.get_game_frame_by_id(frame_id)
-        preview = self._controller.get_game_frame_preview(frame_id)
-        self._comparison_panel.set_game_frame(frame, preview)
-
-        # Direct linking: if AI frame is selected, attempt to link immediately
+        # Show preview in canvas if AI frame is selected
         if self._selected_ai_index is not None:
+            game_frame = project.get_game_frame_by_id(frame_id)
+            preview = self._controller.get_game_frame_preview(frame_id)
+            self._alignment_canvas.set_game_frame(game_frame, preview)
+
+            # Direct linking: attempt to link immediately
             self._attempt_link(self._selected_ai_index, frame_id)
 
-    def _attempt_link(self, ai_index: int, game_frame_id: str) -> None:
-        """Attempt to link an AI frame to a game frame.
+    def _on_mapping_selected(self, ai_frame_index: int) -> None:
+        """Handle mapping row selection in drawer.
 
-        Handles:
-        - Checking if game frame is already linked
-        - Showing replace confirmation if needed
-        - Creating the mapping
-        - Auto-centering alignment
-        - Switching to overlay mode
-        - Optional auto-advance
-
-        Args:
-            ai_index: Index of the AI frame to link
-            game_frame_id: ID of the game frame to link to
+        Syncs with AI frames pane and canvas.
         """
         project = self._controller.project
         if project is None:
             return
 
-        # Check if game frame is already linked to a different AI frame
-        existing_link = self._controller.get_existing_link_for_game_frame(game_frame_id)
-        if existing_link is not None and existing_link != ai_index:
-            # Get names for the confirmation dialog
-            existing_ai = project.get_ai_frame_by_index(existing_link)
-            new_ai = project.get_ai_frame_by_index(ai_index)
-            existing_name = existing_ai.path.name if existing_ai else f"AI Frame {existing_link}"
-            new_name = new_ai.path.name if new_ai else f"AI Frame {ai_index}"
-
-            if not confirm_replace_link(self, game_frame_id, existing_name, new_name):
-                return  # User cancelled
-
-        # Create the mapping
-        self._controller.create_mapping(ai_index, game_frame_id)
-
-        # Auto-center: calculate centered alignment
-        ai_frame = project.get_ai_frame_by_index(ai_index)
-        game_preview = self._controller.get_game_frame_preview(game_frame_id)
-        if ai_frame and ai_frame.path.exists() and game_preview:
-            ai_pixmap = QPixmap(str(ai_frame.path))
-            if not ai_pixmap.isNull():
-                center_x = (game_preview.width() - ai_pixmap.width()) // 2
-                center_y = (game_preview.height() - ai_pixmap.height()) // 2
-                self._controller.update_mapping_alignment(ai_index, center_x, center_y, False, False)
-
-        self._refresh_mapping_status()
-        self._refresh_game_frame_link_status()
-
-        # Switch to overlay mode for visual feedback
-        self._comparison_panel.switch_to_overlay_mode()
-
-        # Show status message
-        if self._message_service:
-            ai_name = ai_frame.path.name if ai_frame else f"AI Frame {ai_index}"
-            self._message_service.show_message(f"Linked '{ai_name}' to '{game_frame_id}'", 3000)
-
-        # Auto-advance if enabled
-        if self._auto_advance_enabled:
-            next_unmapped = self._find_next_unmapped_ai_frame(ai_index)
-            if next_unmapped is not None:
-                self._frame_browser.select_ai_frame(next_unmapped)
-                self._on_ai_frame_selected(next_unmapped)
-
-    def _on_mapping_selected(self, ai_frame_index: int) -> None:
-        """Handle mapping row selection."""
-        project = self._controller.project
-        if project is None:
-            return
-
-        # Show AI frame in comparison
-        ai_frame = project.get_ai_frame_by_index(ai_frame_index)
-        self._comparison_panel.set_ai_frame(ai_frame)
-
-        # Sync browser selection to match mapping selection
-        self._frame_browser.select_ai_frame(ai_frame_index)
+        # Sync AI frames pane
+        self._ai_frames_pane.select_frame(ai_frame_index)
         self._selected_ai_index = ai_frame_index
 
-        # Show game frame if mapped
+        # Load into canvas
+        ai_frame = project.get_ai_frame_by_index(ai_frame_index)
+        self._alignment_canvas.set_ai_frame(ai_frame)
+
+        # Load game frame if mapped
         mapping = project.get_mapping_for_ai_frame(ai_frame_index)
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
-            self._comparison_panel.set_game_frame(game_frame, preview)
-            # Sync browser selection for game frame too
-            self._frame_browser.select_game_frame(mapping.game_frame_id)
+            self._alignment_canvas.set_game_frame(game_frame, preview)
+            self._alignment_canvas.set_alignment(mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v)
+            # Sync captures selection
+            self._captures_pane.select_frame(mapping.game_frame_id)
             self._selected_game_id = mapping.game_frame_id
-            # Pass alignment data to comparison panel
-            self._comparison_panel.set_alignment(
-                mapping.offset_x,
-                mapping.offset_y,
-                mapping.flip_h,
-                mapping.flip_v,
-            )
         else:
-            self._comparison_panel.clear_alignment()
+            self._alignment_canvas.set_game_frame(None)
+            self._alignment_canvas.clear_alignment()
 
         self._update_map_button_state()
 
-    def _update_map_button_state(self) -> None:
-        """Update the Map Selected button enabled state based on selections."""
-        both_selected = self._selected_ai_index is not None and self._selected_game_id is not None
-        self._frame_browser.set_map_button_enabled(both_selected)
-
-    def _refresh_mapping_status(self) -> None:
-        """Refresh the AI frame mapping status in the browser."""
-        project = self._controller.project
-        if project is None:
-            self._frame_browser.set_mapping_status({})
-            return
-
-        status_map: dict[int, str] = {}
-        for ai_frame in project.ai_frames:
-            mapping = project.get_mapping_for_ai_frame(ai_frame.index)
-            if mapping:
-                status_map[ai_frame.index] = mapping.status
-            else:
-                status_map[ai_frame.index] = "unmapped"
-
-        self._frame_browser.set_mapping_status(status_map)
-
-    def _refresh_game_frame_link_status(self) -> None:
-        """Refresh the game frame link status in the browser."""
-        project = self._controller.project
-        if project is None:
-            self._frame_browser.set_game_frame_link_status({})
-            return
-
-        link_status: dict[str, int | None] = {}
-        for game_frame in project.game_frames:
-            linked_ai = project.get_ai_frame_linked_to_game_frame(game_frame.id)
-            link_status[game_frame.id] = linked_ai
-
-        self._frame_browser.set_game_frame_link_status(link_status)
-
     def _on_map_selected(self) -> None:
-        """Handle map selected button click.
-
-        Uses the same _attempt_link flow as direct clicking for consistency.
-        """
-        ai_index = self._frame_browser.get_selected_ai_frame_index()
-        game_id = self._frame_browser.get_selected_game_frame_id()
-
-        if ai_index is None:
+        """Handle map button click in AI frames pane."""
+        if self._selected_ai_index is None:
             QMessageBox.information(self, "Map Frames", "Please select an AI frame first.")
             return
 
-        if game_id is None:
+        if self._selected_game_id is None:
             QMessageBox.information(self, "Map Frames", "Please select a game frame first.")
             return
 
-        self._attempt_link(ai_index, game_id)
+        self._attempt_link(self._selected_ai_index, self._selected_game_id)
 
-    def _find_next_unmapped_ai_frame(self, current_index: int) -> int | None:
-        """Find the next unmapped AI frame after the given index.
+    def _on_drop_game_frame(self, ai_index: int, game_frame_id: str) -> None:
+        """Handle game frame dropped onto drawer row."""
+        self._attempt_link(ai_index, game_frame_id)
 
-        Searches forward from current_index, then wraps to beginning.
+    def _on_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool) -> None:
+        """Handle alignment change from canvas (auto-save)."""
+        if self._selected_ai_index is None:
+            return
 
-        Args:
-            current_index: The current AI frame index
-
-        Returns:
-            Index of next unmapped AI frame, or None if all are mapped
-        """
         project = self._controller.project
         if project is None:
-            return None
+            return
 
-        ai_frames = project.ai_frames
-        total = len(ai_frames)
-        if total == 0:
-            return None
+        mapping = project.get_mapping_for_ai_frame(self._selected_ai_index)
+        if mapping is None:
+            return
 
-        # Search forward from current index + 1
-        for i in range(1, total):
-            check_index = (current_index + i) % total
-            mapping = project.get_mapping_for_ai_frame(check_index)
-            if mapping is None:
-                return check_index
+        # Update alignment in controller
+        self._controller.update_mapping_alignment(self._selected_ai_index, x, y, flip_h, flip_v)
+        self._mapping_panel.refresh()
 
-        return None
+    def _on_adjust_alignment(self, ai_frame_index: int) -> None:
+        """Handle adjust alignment request - focus the canvas."""
+        # Select the row first
+        self._ai_frames_pane.select_frame(ai_frame_index)
+        self._on_ai_frame_selected(ai_frame_index)
+
+        # Focus the canvas for keyboard input
+        self._alignment_canvas.focus_canvas()
+
+        if self._message_service:
+            self._message_service.show_message("Use arrow keys to adjust alignment")
 
     def _on_edit_frame(self, ai_frame_index: int) -> None:
-        """Handle edit frame request."""
+        """Handle edit AI frame request."""
         project = self._controller.project
         if project is None:
             return
@@ -505,60 +443,302 @@ class FrameMappingWorkspace(QWidget):
 
         self.edit_in_sprite_editor_requested.emit(ai_frame.path, rom_offsets)
 
-    def _on_remove_mapping(self, ai_frame_index: int) -> None:
-        """Handle remove mapping request."""
-        self._controller.remove_mapping(ai_frame_index)
-        self._refresh_mapping_status()
-
-    def _on_adjust_alignment(self, ai_frame_index: int) -> None:
-        """Handle adjust alignment request."""
+    def _on_edit_game_frame(self, frame_id: str) -> None:
+        """Handle edit game frame request from captures library."""
         project = self._controller.project
         if project is None:
             return
 
-        ai_frame = project.get_ai_frame_by_index(ai_frame_index)
-        if ai_frame is None:
-            return
-
-        mapping = project.get_mapping_for_ai_frame(ai_frame_index)
-        if mapping is None:
-            return
-
-        game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
+        game_frame = project.get_game_frame_by_id(frame_id)
         if game_frame is None:
             return
 
-        # Get game frame preview pixmap
-        game_pixmap = self._controller.get_game_frame_preview(mapping.game_frame_id)
+        # Find if there's a linked AI frame
+        linked_ai = project.get_ai_frame_linked_to_game_frame(frame_id)
+        if linked_ai is not None:
+            ai_frame = project.get_ai_frame_by_index(linked_ai)
+            if ai_frame:
+                self.edit_in_sprite_editor_requested.emit(ai_frame.path, game_frame.rom_offsets)
+                return
 
-        # Open alignment dialog with current values
-        dialog = AlignmentDialog(
-            game_frame_pixmap=game_pixmap,
-            ai_frame_path=ai_frame.path,
-            initial_offset_x=mapping.offset_x,
-            initial_offset_y=mapping.offset_y,
-            initial_flip_h=mapping.flip_h,
-            initial_flip_v=mapping.flip_v,
-            parent=self,
-        )
+        # No linked AI frame - emit with empty path (will need handling in main window)
+        if self._message_service:
+            self._message_service.show_message("No AI frame linked to this capture", 3000)
 
-        if dialog.exec():
-            # User accepted - save alignment
-            offset_x, offset_y, flip_h, flip_v = dialog.get_alignment()
-            self._controller.update_mapping_alignment(ai_frame_index, offset_x, offset_y, flip_h, flip_v)
-            if self._message_service:
-                self._message_service.show_message(f"Alignment updated: offset=({offset_x}, {offset_y})")
-
-    def _on_comparison_alignment_edit_requested(self) -> None:
-        """Handle double-click on overlay canvas to edit alignment.
-
-        Uses the currently selected AI frame if it has a mapping.
-        """
-        if self._selected_ai_index is None:
+    def _on_delete_capture(self, frame_id: str) -> None:
+        """Handle delete capture request."""
+        project = self._controller.project
+        if project is None:
             return
 
-        # Delegate to the existing alignment handler
-        self._on_adjust_alignment(self._selected_ai_index)
+        # Check if linked
+        linked_ai = project.get_ai_frame_linked_to_game_frame(frame_id)
+        if linked_ai is not None:
+            reply = QMessageBox.question(
+                self,
+                "Delete Capture",
+                f"This capture is linked to AI frame #{linked_ai}.\n"
+                "Deleting will also remove the mapping.\n\n"
+                "Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+            # Remove the mapping first
+            self._controller.remove_mapping(linked_ai)
+
+        # Remove the game frame (not implemented in controller yet)
+        # For now, just show a message
+        if self._message_service:
+            self._message_service.show_message(f"Delete capture {frame_id} (not implemented)")
+
+    def _on_show_capture_details(self, frame_id: str) -> None:
+        """Handle show details request for capture."""
+        project = self._controller.project
+        if project is None:
+            return
+
+        game_frame = project.get_game_frame_by_id(frame_id)
+        if game_frame is None:
+            return
+
+        # Build details text
+        details = [f"ID: {game_frame.id}"]
+        if game_frame.capture_path:
+            details.append(f"Source: {game_frame.capture_path.name}")
+        if game_frame.rom_offsets:
+            offset_str = ", ".join(f"0x{o:06X}" for o in game_frame.rom_offsets)
+            details.append(f"ROM Offsets: {offset_str}")
+        if game_frame.width and game_frame.height:
+            details.append(f"Size: {game_frame.width}x{game_frame.height}")
+
+        QMessageBox.information(self, "Capture Details", "\n".join(details))
+
+    def _on_remove_ai_frame(self, index: int) -> None:
+        """Handle remove AI frame from project request."""
+        # Not implemented - would need controller support
+        if self._message_service:
+            self._message_service.show_message("Remove AI frame (not implemented)")
+
+    def _on_remove_mapping(self, ai_frame_index: int) -> None:
+        """Handle remove mapping request."""
+        self._controller.remove_mapping(ai_frame_index)
+        self._refresh_mapping_status()
+        self._refresh_game_frame_link_status()
+        self._alignment_canvas.clear_alignment()
+        self._captures_pane.clear_selection()
+
+    def _on_inject_single(self, ai_frame_index: int) -> None:
+        """Handle inject single mapping request."""
+        project = self._controller.project
+        if project and not project.get_mapping_for_ai_frame(ai_frame_index):
+            QMessageBox.information(self, "Inject Frame", "Selected frame is not mapped.")
+            return
+
+        # Ask for ROM path
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Target ROM",
+            "",
+            "SNES ROM (*.sfc *.smc);;All Files (*)",
+        )
+        if not file_path:
+            return
+
+        rom_path = Path(file_path)
+
+        reply = QMessageBox.question(
+            self,
+            "Confirm Injection",
+            f"Inject AI Frame {ai_frame_index} into:\n{rom_path.name}\n\nThis will modify the ROM file.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self._controller.inject_mapping(ai_frame_index, rom_path)
+
+    def _on_inject_all(self) -> None:
+        """Handle inject all mapped frames request."""
+        project = self._controller.project
+        if project is None or project.mapped_count == 0:
+            QMessageBox.information(self, "Inject All", "No mapped frames to inject.")
+            return
+
+        # Ask for ROM path
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Target ROM",
+            "",
+            "SNES ROM (*.sfc *.smc);;All Files (*)",
+        )
+        if not file_path:
+            return
+
+        rom_path = Path(file_path)
+
+        reply = QMessageBox.question(
+            self,
+            "Confirm Injection",
+            f"Inject {project.mapped_count} mapped frames into:\n{rom_path.name}\n\nThis will modify the ROM file.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Inject all mapped frames
+        success_count = 0
+        for ai_frame in project.ai_frames:
+            mapping = project.get_mapping_for_ai_frame(ai_frame.index)
+            if mapping:
+                if self._controller.inject_mapping(ai_frame.index, rom_path):
+                    success_count += 1
+
+        if self._message_service:
+            self._message_service.show_message(f"Injected {success_count}/{project.mapped_count} frames")
+
+    def _on_mapping_injected(self, ai_index: int, message: str) -> None:
+        """Handle successful injection signal."""
+        if self._message_service:
+            self._message_service.show_message(f"Injection successful for frame {ai_index}")
+
+        self._refresh_mapping_status()
+        QMessageBox.information(self, "Injection Successful", message)
+
+    # -------------------------------------------------------------------------
+    # Helper Methods
+    # -------------------------------------------------------------------------
+
+    def _attempt_link(self, ai_index: int, game_frame_id: str) -> None:
+        """Attempt to link an AI frame to a game frame.
+
+        Handles existing link confirmation and auto-advance.
+        """
+        project = self._controller.project
+        if project is None:
+            return
+
+        # Check if game frame is already linked to a different AI frame
+        existing_link = self._controller.get_existing_link_for_game_frame(game_frame_id)
+        if existing_link is not None and existing_link != ai_index:
+            existing_ai = project.get_ai_frame_by_index(existing_link)
+            new_ai = project.get_ai_frame_by_index(ai_index)
+            existing_name = existing_ai.path.name if existing_ai else f"AI Frame {existing_link}"
+            new_name = new_ai.path.name if new_ai else f"AI Frame {ai_index}"
+
+            if not confirm_replace_link(self, game_frame_id, existing_name, new_name):
+                return
+
+        # Create the mapping
+        self._controller.create_mapping(ai_index, game_frame_id)
+
+        # Auto-center alignment
+        ai_frame = project.get_ai_frame_by_index(ai_index)
+        game_preview = self._controller.get_game_frame_preview(game_frame_id)
+        if ai_frame and ai_frame.path.exists() and game_preview:
+            ai_pixmap = QPixmap(str(ai_frame.path))
+            if not ai_pixmap.isNull():
+                center_x = (game_preview.width() - ai_pixmap.width()) // 2
+                center_y = (game_preview.height() - ai_pixmap.height()) // 2
+                self._controller.update_mapping_alignment(ai_index, center_x, center_y, False, False)
+
+        self._refresh_mapping_status()
+        self._refresh_game_frame_link_status()
+        self._update_mapping_panel_previews()
+
+        # Update canvas with alignment
+        mapping = project.get_mapping_for_ai_frame(ai_index)
+        if mapping:
+            self._alignment_canvas.set_alignment(mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v)
+
+        if self._message_service:
+            ai_name = ai_frame.path.name if ai_frame else f"AI Frame {ai_index}"
+            self._message_service.show_message(f"Linked '{ai_name}' to '{game_frame_id}'", 3000)
+
+        # Auto-advance if enabled
+        if self._auto_advance_enabled:
+            next_unmapped = self._find_next_unmapped_ai_frame(ai_index)
+            if next_unmapped is not None:
+                self._ai_frames_pane.select_frame(next_unmapped)
+                self._on_ai_frame_selected(next_unmapped)
+
+    def _find_next_unmapped_ai_frame(self, current_index: int) -> int | None:
+        """Find the next unmapped AI frame after the given index."""
+        project = self._controller.project
+        if project is None:
+            return None
+
+        ai_frames = project.ai_frames
+        total = len(ai_frames)
+        if total == 0:
+            return None
+
+        for i in range(1, total):
+            check_index = (current_index + i) % total
+            mapping = project.get_mapping_for_ai_frame(check_index)
+            if mapping is None:
+                return check_index
+
+        return None
+
+    def _update_map_button_state(self) -> None:
+        """Update the Map Selected button enabled state."""
+        both_selected = self._selected_ai_index is not None and self._selected_game_id is not None
+        self._ai_frames_pane.set_map_button_enabled(both_selected)
+
+    def _refresh_mapping_status(self) -> None:
+        """Refresh the AI frame mapping status indicators."""
+        project = self._controller.project
+        if project is None:
+            self._ai_frames_pane.set_mapping_status({})
+            return
+
+        status_map: dict[int, str] = {}
+        for ai_frame in project.ai_frames:
+            mapping = project.get_mapping_for_ai_frame(ai_frame.index)
+            if mapping:
+                status_map[ai_frame.index] = mapping.status
+            else:
+                status_map[ai_frame.index] = "unmapped"
+
+        self._ai_frames_pane.set_mapping_status(status_map)
+        self._mapping_panel.refresh()
+
+    def _refresh_game_frame_link_status(self) -> None:
+        """Refresh the game frame link status indicators."""
+        project = self._controller.project
+        if project is None:
+            self._captures_pane.set_link_status({})
+            return
+
+        link_status: dict[str, int | None] = {}
+        for game_frame in project.game_frames:
+            linked_ai = project.get_ai_frame_linked_to_game_frame(game_frame.id)
+            link_status[game_frame.id] = linked_ai
+
+        self._captures_pane.set_link_status(link_status)
+
+    def _update_mapping_panel_previews(self) -> None:
+        """Update the mapping panel with game frame preview pixmaps."""
+        project = self._controller.project
+        if project is None:
+            return
+
+        previews: dict[str, QPixmap] = {}
+        for game_frame in project.game_frames:
+            preview = self._controller.get_game_frame_preview(game_frame.id)
+            if preview:
+                previews[game_frame.id] = preview
+
+        self._mapping_panel.set_game_frame_previews(previews)
+        self._mapping_panel.refresh()
+
+    # -------------------------------------------------------------------------
+    # File Operations
+    # -------------------------------------------------------------------------
 
     def _on_load_ai_frames(self) -> None:
         """Handle load AI frames button click."""
@@ -622,10 +802,8 @@ class FrameMappingWorkspace(QWidget):
             return
 
         if self._project_path:
-            # Save to existing path
             self._controller.save_project(self._project_path)
         else:
-            # Save as new file
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save Frame Mapping Project",
@@ -636,6 +814,10 @@ class FrameMappingWorkspace(QWidget):
                 path = Path(file_path)
                 if self._controller.save_project(path):
                     self._project_path = path
+
+    # -------------------------------------------------------------------------
+    # Properties
+    # -------------------------------------------------------------------------
 
     @property
     def controller(self) -> FrameMappingController:
