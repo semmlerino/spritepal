@@ -40,6 +40,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.app_context import get_app_context
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.dialogs.replace_link_dialog import confirm_replace_link
 from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
@@ -86,6 +87,9 @@ class FrameMappingWorkspace(QWidget):
 
         self._setup_ui()
         self._connect_signals()
+
+        # Auto-load last project if available
+        self._auto_load_last_project()
 
         logger.debug("FrameMappingWorkspace initialized with 4-zone layout")
 
@@ -797,6 +801,7 @@ class FrameMappingWorkspace(QWidget):
             path = Path(file_path)
             if self._controller.load_project(path):
                 self._project_path = path
+                self._set_last_project_path(path)
 
     def _on_save_project(self) -> None:
         """Handle save project button click."""
@@ -817,6 +822,34 @@ class FrameMappingWorkspace(QWidget):
                 path = Path(file_path)
                 if self._controller.save_project(path):
                     self._project_path = path
+                    self._set_last_project_path(path)
+
+    # -------------------------------------------------------------------------
+    # Project Persistence
+    # -------------------------------------------------------------------------
+
+    def _auto_load_last_project(self) -> None:
+        """Auto-load the last used project on startup."""
+        last_path = self._get_last_project_path()
+        if last_path and last_path.exists():
+            logger.info("Auto-loading last project: %s", last_path)
+            if self._controller.load_project(last_path):
+                self._project_path = last_path
+            else:
+                logger.warning("Failed to auto-load last project")
+
+    def _get_last_project_path(self) -> Path | None:
+        """Get the last used project path from settings."""
+        ctx = get_app_context()
+        path_str = ctx.application_state_manager.get("frame_mapping", "last_project_path")
+        if path_str and isinstance(path_str, str):
+            return Path(path_str)
+        return None
+
+    def _set_last_project_path(self, path: Path) -> None:
+        """Save the last used project path to settings."""
+        ctx = get_app_context()
+        ctx.application_state_manager.set("frame_mapping", "last_project_path", str(path))
 
     # -------------------------------------------------------------------------
     # Properties
