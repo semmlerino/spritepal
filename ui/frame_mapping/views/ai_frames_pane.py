@@ -301,7 +301,7 @@ class AIFramesPane(QWidget):
             if current_selection is not None:
                 for row in range(self._list.count()):
                     item = self._list.item(row)
-                    if item is not None and item.data(Qt.ItemDataRole.UserRole) == current_selection:
+                    if item and item.data(Qt.ItemDataRole.UserRole) == current_selection:
                         self._list.setCurrentRow(row)
                         self._list.scrollToItem(item)
                         selection_restored = True

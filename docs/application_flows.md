@@ -493,6 +493,211 @@ ROMWorkflowController.revert_to_original()
 
 ---
 
+## 8. Frame Mapping Workflow
+
+The Frame Mapping workspace enables mapping AI-generated sprite frames to game animation frames for sprite replacement.
+
+### 8.1 Frame Mapping UI Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Toolbar: [Load AI Frames] [Import Capture] [Import Dir] [Load] [Save] [Inject] │
+├────────────────┬─────────────────────────────┬─────────────────────────────┤
+│                │                             │                             │
+│  AI FRAMES     │     WORKBENCH CANVAS        │   CAPTURES LIBRARY          │
+│  (Left Pane)   │     (Center Top)            │   (Right Pane)              │
+│                │                             │                             │
+├────────────────┼─────────────────────────────┤                             │
+│                │                             │                             │
+│                │   MAPPINGS DRAWER           │                             │
+│                │   (Center Bottom)           │                             │
+│                │                             │                             │
+└────────────────┴─────────────────────────────┴─────────────────────────────┘
+```
+
+### 8.2 Frame Pairing Flow
+
+```
+User clicks "Load AI Frames"
+         │
+         ▼
+┌────────────────────────────┐
+│ QFileDialog                │  Select directory with PNG frames
+└────────────────────────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│ FrameMappingController     │  ui/frame_mapping/controllers/
+│ load_ai_frames(dir_path)   │
+│ • Scans for PNG files      │
+│ • Creates AIFrame objects  │
+│ • Emits ai_frames_loaded   │
+└────────────────────────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│ AIFramesPane               │  ui/frame_mapping/views/
+│ _on_ai_frames_loaded()     │
+│ • Populates list widget    │
+│ • Generates thumbnails     │
+└────────────────────────────┘
+         │
+         ▼
+User clicks "Import Capture"
+         │
+         ▼
+┌────────────────────────────┐
+│ SpriteSelectionDialog      │  ui/frame_mapping/dialogs/
+│ • Parse capture JSON       │
+│ • Group contiguous tiles   │
+│ • Show sprite thumbnails   │
+└────────────────────────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│ FrameMappingController     │
+│ import_capture()           │
+│ • Creates GameFrame        │
+│ • Emits game_frame_added   │
+└────────────────────────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│ CapturesLibraryPane        │  ui/frame_mapping/views/
+│ _on_game_frame_added()     │
+│ • Adds to library list     │
+│ • Shows ROM offset info    │
+└────────────────────────────┘
+```
+
+### 8.3 Mapping Creation Flow
+
+```
+User selects AI frame (left pane)
+         │
+         ▼
+AIFramesPane.selection_changed.emit(ai_index)
+         │
+         ▼
+User selects game frame (right pane)
+         │
+         ▼
+CapturesLibraryPane.frame_selected.emit(game_id)
+         │
+         ▼
+┌────────────────────────────┐
+│ FrameMappingWorkspace      │
+│ _on_selection_ready()      │
+│ • Validates both selected  │
+│ • Checks for existing link │
+└────────────────────────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│ FrameMappingController     │
+│ create_mapping(ai, game)   │
+│ • Creates FrameMapping     │
+│ • Emits mapping_created    │
+└────────────────────────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│ WorkbenchCanvas            │  ui/frame_mapping/views/
+│ display_mapping()          │
+│ • Shows both sprites       │
+│ • Enables alignment        │
+└────────────────────────────┘
+```
+
+### 8.4 Alignment and Preview Flow
+
+```
+User adjusts alignment in WorkbenchCanvas
+         │
+         ├── Drag sprite → update x_offset, y_offset
+         │
+         ├── Zoom controls → scale view (Ctrl+scroll or buttons)
+         │
+         ├── Pan → drag canvas background
+         │
+         └── Toggle "In-Game Preview" → composite sprite view
+                    │
+                    ▼
+           ┌────────────────────────────┐
+           │ WorkbenchCanvas            │
+           │ _render_composite()        │
+           │ • Overlay AI frame on game │
+           │ • Apply alignment offsets  │
+           └────────────────────────────┘
+```
+
+### 8.5 Injection Flow
+
+```
+User clicks "Inject" button
+         │
+         ▼
+┌────────────────────────────┐
+│ FrameMappingController     │
+│ inject_mapping()           │
+│ • Gets AI frame image      │
+│ • Gets game frame metadata │
+│ • Gets alignment offsets   │
+└────────────────────────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│ ROMInjector                │  core/rom_injector.py
+│ inject_sprite()            │
+│ • Tile-aware injection     │
+│ • HAL compression          │
+│ • Write to ROM at offset   │
+└────────────────────────────┘
+         │
+         ▼
+┌────────────────────────────┐
+│ FrameMappingController     │
+│ mapping_injected.emit()    │
+│ • Update modified ROM path │
+│ • Show success message     │
+└────────────────────────────┘
+```
+
+### 8.6 Project Persistence
+
+Frame mapping projects are saved as JSON:
+
+```json
+{
+  "name": "Kirby Upscale Project",
+  "ai_frames": [
+    {"index": 0, "path": "frames/frame_001.png"}
+  ],
+  "game_frames": [
+    {"id": "capture_001", "capture_path": "captures/kirby_walk.json", "rom_offsets": [123456]}
+  ],
+  "mappings": [
+    {"ai_index": 0, "game_id": "capture_001", "x_offset": 2, "y_offset": -1}
+  ]
+}
+```
+
+**Auto-load:** Last project is automatically loaded on startup if available.
+
+### 8.7 Signal Connection Map
+
+| Signal | Source | Handler | Purpose |
+|--------|--------|---------|---------|
+| `ai_frames_loaded` | Controller | AIFramesPane | Populate frame list |
+| `game_frame_added` | Controller | CapturesLibraryPane | Add to library |
+| `selection_changed` | AIFramesPane | Workspace | Track AI selection |
+| `frame_selected` | CapturesLibraryPane | Workspace | Track game selection |
+| `mapping_created` | Controller | MappingPanel | Show paired frame |
+| `mapping_injected` | Controller | Workspace | Update ROM path |
+| `rom_path_changed` | SpriteEditor | Workspace | Sync ROM for injection |
+
+---
+
 ## Quick Reference
 
 | Task | Primary File | Key Method |
@@ -508,7 +713,9 @@ ROMWorkflowController.revert_to_original()
 | Extraction readiness | `core/services/extraction_readiness_service.py` | `check_vram_readiness()`, `check_rom_extraction_readiness()` |
 | Sprite Editor embedding | `ui/sprite_edit_tab.py` | `SpriteEditTab.jump_to_offset()` |
 | Mesen2 offset handling | `ui/rom_extraction_panel.py` | `ROMExtractionPanel._on_mesen2_offset_activated()` |
+| Frame mapping | `ui/frame_mapping/controllers/` | `FrameMappingController.create_mapping()` |
+| Frame injection | `core/rom_injector.py` | `ROMInjector.inject_sprite()` |
 
 ---
 
-*Last updated: January 12, 2026 (Added Revert to Original Workflow section)*
+*Last updated: January 21, 2026 (Added Frame Mapping Workflow section)*

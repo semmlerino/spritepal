@@ -7,10 +7,12 @@ A PySide6-based sprite extraction and editing tool for SNES ROM hacking.
 - **Extract sprites** from SNES ROMs with HAL compression support
 - **Edit sprites** directly in embedded editor with full Extract→Edit→Inject workflow
 - **Inject modified sprites** back into ROMs with compression
+- **Frame Mapping Workspace**: Map AI-generated sprite frames to game animation frames captured from Mesen 2
 - **Modern IDE-like UI**: Dock-based layout (QDockWidget) for flexible workspace management
 - **Mesen 2 integration**: Click on sprites in emulator to find ROM offset automatically
+- **Workbench Canvas**: Interactive sprite alignment with zoom, pan, and in-game preview
 - **Multi-threaded thumbnail** generation for fast browsing
-- **Keyboard shortcuts** for tab navigation (Ctrl+1/2/3) and quick capture access (F6)
+- **Keyboard shortcuts** for tab navigation (Ctrl+1/2/3/4) and quick capture access (F6)
 - **WCAG 2.1 compliant** keyboard navigation
 - **Session persistence** saves window state, file paths, and recent captures
 - **Segmented UI controls**: Improved mode switching using `SegmentedToggle` widgets
@@ -26,6 +28,7 @@ A PySide6-based sprite extraction and editing tool for SNES ROM hacking.
 | **Ctrl+1** | Switch to ROM Extraction tab |
 | **Ctrl+2** | Switch to VRAM Extraction tab |
 | **Ctrl+3** | Switch to Sprite Editor tab |
+| **Ctrl+4** | Switch to Frame Mapping tab |
 | **F6** | Jump to last Mesen2 capture in Sprite Editor |
 
 ## Quick Start
@@ -139,10 +142,46 @@ SpritePal includes an embedded sprite editor as the 3rd tab in the main window. 
 
 For details on Mesen 2 integration, see [mesen2_integration/README.md](mesen2_integration/README.md).
 
+## Frame Mapping Workspace
+
+The Frame Mapping workspace (4th tab) helps map AI-generated sprite frames to game animation frames:
+
+**4-Zone Layout:**
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Toolbar: [Load AI Frames] [Import Capture] [Import Dir] [Load] [Save] [Inject] │
+├────────────────┬─────────────────────────────┬─────────────────────────────┤
+│                │                             │                             │
+│  AI FRAMES     │     WORKBENCH CANVAS        │   CAPTURES LIBRARY          │
+│  (Left Pane)   │     (Center Top)            │   (Right Pane)              │
+│                │                             │                             │
+├────────────────┼─────────────────────────────┤                             │
+│                │                             │                             │
+│                │   MAPPINGS DRAWER           │                             │
+│                │   (Center Bottom)           │                             │
+│                │                             │                             │
+└────────────────┴─────────────────────────────┴─────────────────────────────┘
+```
+
+**Workflow:**
+1. Load AI-generated sprite frames (PNG files)
+2. Import game captures from Mesen 2
+3. Pair frames by selecting one from each side
+4. Align sprites using the Workbench Canvas with zoom/pan controls
+5. Toggle in-game preview to see composite result
+6. Inject paired frames directly to ROM
+
+**Features:**
+- **Contiguous tile grouping** for multi-tile sprites
+- **In-game preview toggle** to see final sprite appearance
+- **Zoom and pan** for precise alignment
+- **ROM offset tracking** for direct injection
+- **Auto-load last project** on startup
+
 ## License
 
 MIT
 
 ---
 
-*Last updated: January 12, 2026 (Added Toggleable Backgrounds, Revert to Original, Per-Category Logging, and UI Integration Tests)*
+*Last updated: January 21, 2026 (Added Frame Mapping Workspace, Workbench Canvas with zoom/pan, in-game preview toggle)*

@@ -1,6 +1,6 @@
 # SpritePal Development Guidelines
 
-**Last updated: January 12, 2026 — Recent updates: Bug-first TDD workflow (mandatory), Revert to Original button, per-category logging control, UI integration tests (100+)** | See [Table of Contents](#table-of-contents) below
+**Last updated: January 21, 2026 — Recent updates: Frame Mapping Workspace (4-zone UI), Workbench Canvas with zoom/pan, in-game preview toggle, contiguous tile grouping** | See [Table of Contents](#table-of-contents) below
 
 ---
 
@@ -362,6 +362,10 @@ Per-category logging control accessible via **Settings → Logging tab**. Suppor
 |----------------|----------|
 | **Managers** | `core/managers/core_operations_manager.py`, `core/managers/application_state_manager.py` |
 | **Sprite Editor** | `ui/sprite_editor/` (Extract/Edit/Inject workflow) |
+| **Frame Mapping** | `ui/frame_mapping/` — AI-to-game frame mapping workspace |
+| **Frame Mapping Controller** | `ui/frame_mapping/controllers/frame_mapping_controller.py` — frame pairing, injection |
+| **Workbench Canvas** | `ui/frame_mapping/views/workbench_canvas.py` — zoom/pan, in-game preview, alignment |
+| **Frame Mapping Project** | `core/frame_mapping_project.py` — AIFrame, GameFrame, FrameMapping data classes |
 | **AppContext** | `core/app_context.py` — use `get_app_context()` to access managers; provides lazy-initialized shared services (HALCompressor, SpriteConfigLoader, DefaultPaletteLoader) |
 | **Settings UI** | `ui/dialogs/settings_dialog.py` — includes logging control tab for per-category logging |
 | **Logging config** | `utils/logging_config.py` — logging setup and category control API |
@@ -382,9 +386,15 @@ spritepal/
 ├── core/                  # Business logic (no UI)
 │   ├── managers/          # AppContext, state, operations
 │   ├── mesen_integration/ # ROM offset discovery
+│   ├── frame_mapping_project.py  # Frame mapping data model
 │   └── *.py
 ├── ui/                    # Qt components
 │   ├── sprite_editor/     # Unified editor (Extract → Edit → Inject)
+│   ├── frame_mapping/     # AI-to-game frame mapping (4-zone workspace)
+│   │   ├── controllers/   # FrameMappingController
+│   │   ├── views/         # AIFramesPane, CapturesLibraryPane, WorkbenchCanvas
+│   │   └── dialogs/       # SpriteSelectionDialog
+│   ├── workspaces/        # FrameMappingWorkspace
 │   ├── components/        # Reusable widgets
 │   ├── dialogs/           # Dialog windows
 │   ├── workers/           # Background threads

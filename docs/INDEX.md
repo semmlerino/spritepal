@@ -6,17 +6,25 @@ This is the central entry point for all SpritePal documentation.
 
 | Document | Purpose |
 |----------|---------|
-| [README.md](../README.md) | Project overview, installation, quick start |
+| [README.md](../README.md) | Project overview, installation, quick start, **Frame Mapping** |
 | [CLAUDE.md](../CLAUDE.md) | Development workflow, tooling, testing quick reference |
 
 ## Core Documentation
 
 | Document | Purpose |
 |----------|---------|
-| [architecture.md](architecture.md) | Layer structure, import rules, DI, dialogs, singletons, **Mesen integration** |
-| [application_flows.md](application_flows.md) | Initialization, extraction, injection, error flows |
+| [architecture.md](architecture.md) | Layer structure, import rules, DI, dialogs, singletons, **Mesen integration**, **Frame Mapping** |
+| [application_flows.md](application_flows.md) | Initialization, extraction, injection, error flows, **Frame Mapping workflow** |
 | [testing_guide.md](testing_guide.md) | Comprehensive testing patterns, Qt signals, threading |
 | [configuration_guide.md](configuration_guide.md) | Settings and configuration system |
+
+## Frame Mapping Workspace
+
+| Document | Purpose |
+|----------|---------|
+| [README.md → Frame Mapping](../README.md#frame-mapping-workspace) | 4-zone UI layout, workflow, features |
+| [architecture.md → Frame Mapping](architecture.md#frame-mapping-subsystem) | Frame Mapping architecture and data flow |
+| [application_flows.md → Frame Mapping](application_flows.md#8-frame-mapping-workflow) | Frame pairing and injection workflow |
 
 ## Mesen 2 Integration
 
@@ -59,6 +67,8 @@ This is the central entry point for all SpritePal documentation.
 | Understand Mesen integration | [architecture.md](architecture.md) → Mesen Integration Subsystem |
 | Run Mesen2 capture pipeline | [docs/mesen2/01_BUILD_SPECIFIC_CONTRACT.md](mesen2/01_BUILD_SPECIFIC_CONTRACT.md) → Runbook |
 | Use embedded Sprite Editor | [application_flows.md](application_flows.md) → Section 5 (Sprite Editor Tab) |
+| Map AI frames to game frames | [README.md](../README.md) → Frame Mapping Workspace |
+| Frame alignment and injection | [application_flows.md](application_flows.md) → Section 8 (Frame Mapping) |
 | Keyboard shortcuts | [README.md](../README.md) → Keyboard Shortcuts |
 
 ### Key Commands
@@ -86,4 +96,4 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
 ---
 
-*Last updated: January 12, 2026 (Documentation consolidation: Added logging, UI integration tests, Revert to Original, toggleable backgrounds)*
+*Last updated: January 21, 2026 (Added Frame Mapping Workspace documentation and quick reference)*
