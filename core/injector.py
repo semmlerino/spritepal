@@ -140,9 +140,19 @@ class SpriteInjector:
         with Image.open(png_path) as img:
             width, height = img.size
 
+            # Auto-pad to nearest multiple of 8 if needed (for composite sprites)
             if width % 8 != 0 or height % 8 != 0:
-                logger.error(f"Invalid image dimensions: {width}x{height} (must be multiples of 8)")
-                raise ValueError(f"Image dimensions must be multiples of 8. Found {width}x{height}.")
+                padded_width = ((width + 7) // 8) * 8
+                padded_height = ((height + 7) // 8) * 8
+                logger.info(
+                    f"Padding image from {width}x{height} to {padded_width}x{padded_height} "
+                    f"(tile-aligned)"
+                )
+                # Create padded image with transparent background (index 0)
+                padded = Image.new(img.mode, (padded_width, padded_height), 0)
+                padded.paste(img, (0, 0))
+                img = padded
+                width, height = padded_width, padded_height
 
             # Handle different image modes - convert to NumPy array directly
             if img.mode == "L":
