@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 MIME_TYPE_GAME_FRAME = "application/x-spritepal-game-frame"
 
 # Thumbnail size for table cells
-THUMBNAIL_SIZE = 32
+THUMBNAIL_SIZE = 64
 
 # Status colors
 STATUS_COLORS = {
