@@ -587,15 +587,22 @@ class FrameMappingController(QObject):
             # Paste aligned AI image onto canvas
             canvas.paste(ai_img, (mapping.offset_x, mapping.offset_y), ai_img)
 
-            # Apply Mask: Use original sprite's alpha channel
-            # This ensures we only inject pixels where the original sprite had pixels
-            # (Isolate overlapping data)
+            # Apply Mask: Use original sprite's alpha channel to clip to silhouette.
+            # This ensures we only inject pixels where the original sprite had pixels.
+            # Key behavior for partial coverage:
+            # - Where original is opaque AND AI frame covers → AI frame pixels
+            # - Where original is opaque AND AI frame doesn't cover → transparent (index 0)
+            # - Where original is transparent → transparent (unchanged)
+            # This is the correct behavior: uncovered areas become transparent, not filled
+            # with original pixels.
             mask = original_sprite_img.split()[3]  # Get alpha channel
             masked_canvas = Image.new("RGBA", (canvas_width, canvas_height), (0, 0, 0, 0))
             masked_canvas.paste(canvas, (0, 0), mask)
 
             # At this point, `masked_canvas` contains the aligned AI pixels,
             # but strictly clipped to the shape of the original sprite.
+            # Areas where AI frame didn't cover remain transparent (RGBA 0,0,0,0),
+            # which will be quantized to palette index 0 (transparency) during injection.
 
         except Exception as e:
             logger.exception("Failed to prepare masked image")

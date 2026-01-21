@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "name": "Untitled",
+  "ai_frames_dir": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames",
+  "ai_frames": [
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_00.png",
+      "index": 0,
+      "width": 109,
+      "height": 145
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_01.png",
+      "index": 1,
+      "width": 108,
+      "height": 151
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_02.png",
+      "index": 2,
+      "width": 109,
+      "height": 154
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_03.png",
+      "index": 3,
+      "width": 127,
+      "height": 151
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_04.png",
+      "index": 4,
+      "width": 113,
+      "height": 156
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_05.png",
+      "index": 5,
+      "width": 107,
+      "height": 153
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_06.png",
+      "index": 6,
+      "width": 166,
+      "height": 189
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_07.png",
+      "index": 7,
+      "width": 110,
+      "height": 149
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_08.png",
+      "index": 8,
+      "width": 176,
+      "height": 166
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_09.png",
+      "index": 9,
+      "width": 141,
+      "height": 161
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_10.png",
+      "index": 10,
+      "width": 118,
+      "height": 120
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_11.png",
+      "index": 11,
+      "width": 141,
+      "height": 126
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_12.png",
+      "index": 12,
+      "width": 163,
+      "height": 137
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_13.png",
+      "index": 13,
+      "width": 134,
+      "height": 142
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_14.png",
+      "index": 14,
+      "width": 132,
+      "height": 74
+    },
+    {
+      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\spritesheet.png",
+      "index": 15,
+      "width": 687,
+      "height": 1024
+    }
+  ],
+  "game_frames": [
+    {
+      "id": "full_dump_1768864767",
+      "rom_offsets": [],
+      "capture_path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\full_dump_1768864767.json",
+      "palette_index": 0,
+      "width": 82,
+      "height": 151
+    }
+  ],
+  "mappings": [
+    {
+      "ai_frame_index": 0,
+      "game_frame_id": "full_dump_1768864767",
+      "status": "mapped",
+      "offset_x": -14,
+      "offset_y": 3,
+      "flip_h": false,
+      "flip_v": false
+    }
+  ]
+}

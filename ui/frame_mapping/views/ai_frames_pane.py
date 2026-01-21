@@ -245,50 +245,70 @@ class AIFramesPane(QWidget):
 
     def _refresh_list(self) -> None:
         """Refresh the list with current filter and search."""
-        self._list.clear()
+        current_selection = self.get_selected_index()
+        selection_restored = False
 
-        visible_count = 0
-        total_count = len(self._ai_frames)
+        self._list.blockSignals(True)
+        try:
+            self._list.clear()
 
-        for frame in self._ai_frames:
-            status = self._mapping_status.get(frame.index, "unmapped")
+            visible_count = 0
+            total_count = len(self._ai_frames)
 
-            # Apply unmapped filter
-            if self._show_unmapped_only and status != "unmapped":
-                continue
+            for frame in self._ai_frames:
+                status = self._mapping_status.get(frame.index, "unmapped")
 
-            # Apply search filter
-            if self._search_text and self._search_text not in frame.path.name.lower():
-                continue
+                # Apply unmapped filter
+                if self._show_unmapped_only and status != "unmapped":
+                    continue
 
-            visible_count += 1
+                # Apply search filter
+                if self._search_text and self._search_text not in frame.path.name.lower():
+                    continue
 
-            item = QListWidgetItem()
-            # Add status indicator to text
-            status_indicator = "●" if status != "unmapped" else "○"
-            item.setText(f"{status_indicator} {frame.path.name}")
-            item.setData(Qt.ItemDataRole.UserRole, frame.index)
+                visible_count += 1
 
-            # Apply status color
-            color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
-            item.setForeground(QBrush(color))
+                item = QListWidgetItem()
+                # Add status indicator to text
+                status_indicator = "●" if status != "unmapped" else "○"
+                item.setText(f"{status_indicator} {frame.path.name}")
+                item.setData(Qt.ItemDataRole.UserRole, frame.index)
 
-            # Load thumbnail if file exists
-            if frame.path.exists():
-                pixmap = QPixmap(str(frame.path))
-                if not pixmap.isNull():
-                    scaled = pixmap.scaled(
-                        THUMBNAIL_SIZE,
-                        THUMBNAIL_SIZE,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                    item.setIcon(QIcon(scaled))
+                # Apply status color
+                color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
+                item.setForeground(QBrush(color))
 
-            self._list.addItem(item)
+                # Load thumbnail if file exists
+                if frame.path.exists():
+                    pixmap = QPixmap(str(frame.path))
+                    if not pixmap.isNull():
+                        scaled = pixmap.scaled(
+                            THUMBNAIL_SIZE,
+                            THUMBNAIL_SIZE,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation,
+                        )
+                        item.setIcon(QIcon(scaled))
 
-        # Update count label
-        if self._show_unmapped_only or self._search_text:
-            self._count_label.setText(f"{visible_count}/{total_count}")
-        else:
-            self._count_label.setText(f"{total_count} frame{'s' if total_count != 1 else ''}")
+                self._list.addItem(item)
+
+            # Update count label
+            if self._show_unmapped_only or self._search_text:
+                self._count_label.setText(f"{visible_count}/{total_count}")
+            else:
+                self._count_label.setText(f"{total_count} frame{'s' if total_count != 1 else ''}")
+
+            if current_selection is not None:
+                for row in range(self._list.count()):
+                    item = self._list.item(row)
+                    if item is not None and item.data(Qt.ItemDataRole.UserRole) == current_selection:
+                        self._list.setCurrentRow(row)
+                        self._list.scrollToItem(item)
+                        selection_restored = True
+                        break
+
+            if not selection_restored:
+                self._list.setCurrentRow(-1)
+                self._list.clearSelection()
+        finally:
+            self._list.blockSignals(False)

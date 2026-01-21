@@ -50,6 +50,7 @@ from ui.frame_mapping.views.workbench_items import (
     AIFrameItem,
     GameFrameItem,
     GridOverlayItem,
+    PreviewItem,
     TileOverlayItem,
 )
 
@@ -64,6 +65,8 @@ DISPLAY_SCALE = 2
 CANVAS_SIZE = 300
 # Debounce delay for tile touch calculation (ms)
 TILE_CALC_DEBOUNCE_MS = 100
+# Debounce delay for preview generation (ms)
+PREVIEW_DEBOUNCE_MS = 150
 
 
 class WorkbenchGraphicsView(QGraphicsView):
@@ -141,6 +144,12 @@ class WorkbenchCanvas(QWidget):
         self._tile_calc_timer.setSingleShot(True)
         self._tile_calc_timer.timeout.connect(self._update_tile_touch_status)
 
+        # Preview generation debounce timer
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.timeout.connect(self._generate_preview)
+        self._preview_enabled = False
+
         self._tile_sampling_service = TileSamplingService()
 
         self._setup_ui()
@@ -173,11 +182,13 @@ class WorkbenchCanvas(QWidget):
 
         # Create scene items
         self._game_frame_item = GameFrameItem()
+        self._preview_item = PreviewItem()
         self._tile_overlay_item = TileOverlayItem()
         self._ai_frame_item = AIFrameItem()
         self._grid_overlay_item = GridOverlayItem()
 
         self._scene.addItem(self._game_frame_item)
+        self._scene.addItem(self._preview_item)
         self._scene.addItem(self._tile_overlay_item)
         self._scene.addItem(self._ai_frame_item)
         self._scene.addItem(self._grid_overlay_item)
@@ -257,6 +268,12 @@ class WorkbenchCanvas(QWidget):
         self._grid_checkbox.setStyleSheet("font-size: 11px;")
         controls2.addWidget(self._grid_checkbox)
 
+        # Preview toggle
+        self._preview_checkbox = QCheckBox("Preview")
+        self._preview_checkbox.setStyleSheet("font-size: 11px;")
+        self._preview_checkbox.setToolTip("Show in-game preview (quantized, clipped to silhouette)")
+        controls2.addWidget(self._preview_checkbox)
+
         controls2.addStretch()
 
         # Auto-align button
@@ -293,6 +310,7 @@ class WorkbenchCanvas(QWidget):
         self._flip_v_checkbox.toggled.connect(self._on_flip_changed)
         self._tile_overlay_checkbox.toggled.connect(self._on_tile_overlay_toggled)
         self._grid_checkbox.toggled.connect(self._on_grid_toggled)
+        self._preview_checkbox.toggled.connect(self._on_preview_toggled)
         self._auto_align_btn.clicked.connect(self._on_auto_align)
         self._apply_btn.clicked.connect(self.apply_requested.emit)
 
@@ -610,6 +628,7 @@ class WorkbenchCanvas(QWidget):
         flip_h = self._flip_h_checkbox.isChecked()
         flip_v = self._flip_v_checkbox.isChecked()
         self._ai_frame_item.set_flip(flip_h, flip_v)
+        self._schedule_preview_update()
         self._emit_alignment_changed()
 
     def _on_tile_overlay_toggled(self, checked: bool) -> None:
@@ -619,6 +638,155 @@ class WorkbenchCanvas(QWidget):
     def _on_grid_toggled(self, checked: bool) -> None:
         """Handle grid toggle."""
         self._grid_overlay_item.set_grid_visible(checked)
+
+    def _on_preview_toggled(self, checked: bool) -> None:
+        """Handle preview toggle.
+
+        When enabled, shows a preview of how the final sprite will look
+        after injection (quantized to palette, clipped to silhouette).
+        """
+        self._preview_enabled = checked
+        if checked:
+            self._schedule_preview_update()
+        else:
+            self._preview_item.setVisible(False)
+
+    def _schedule_preview_update(self) -> None:
+        """Schedule a debounced preview generation."""
+        if not self._preview_enabled:
+            return
+        self._preview_timer.start(PREVIEW_DEBOUNCE_MS)
+
+    def _generate_preview(self) -> None:
+        """Generate the in-game preview image.
+
+        Creates a composite image showing:
+        1. AI frame at current alignment (offset, flip, scale)
+        2. Clipped to original sprite silhouette
+        3. Optionally quantized to SNES palette
+        """
+        if not self._preview_enabled:
+            self._preview_item.setVisible(False)
+            return
+
+        if self._ai_image is None or self._capture_result is None or self._game_pixmap is None:
+            self._preview_item.setVisible(False)
+            return
+
+        try:
+            # Get current alignment values
+            offset = self._ai_frame_item.pos()
+            offset_x = int(offset.x() / DISPLAY_SCALE)
+            offset_y = int(offset.y() / DISPLAY_SCALE)
+            flip_h = self._flip_h_checkbox.isChecked()
+            flip_v = self._flip_v_checkbox.isChecked()
+            scale = self._ai_frame_item.scale_factor()
+
+            # Create a copy of the AI image and apply transforms
+            ai_img = self._ai_image.copy()
+
+            # Apply scale if not 1.0
+            if abs(scale - 1.0) > 0.01:
+                new_w = max(1, int(ai_img.width * scale))
+                new_h = max(1, int(ai_img.height * scale))
+                ai_img = ai_img.resize((new_w, new_h), Image.Resampling.NEAREST)
+
+            # Apply flips
+            if flip_h:
+                ai_img = ai_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            if flip_v:
+                ai_img = ai_img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+
+            # Get original sprite dimensions from capture
+            bbox = self._capture_result.bounding_box
+            canvas_w = bbox.width
+            canvas_h = bbox.height
+
+            # Create canvas and paste aligned AI image
+            canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+            canvas.paste(ai_img, (offset_x, offset_y), ai_img)
+
+            # Render original sprite to get silhouette mask
+            from core.mesen_integration.capture_renderer import CaptureRenderer
+
+            renderer = CaptureRenderer(self._capture_result)
+            original_sprite = renderer.render_selection()
+
+            # Apply silhouette clipping
+            mask = original_sprite.split()[3]  # Alpha channel
+            preview_img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+            preview_img.paste(canvas, (0, 0), mask)
+
+            # Optionally quantize to palette (if palette available)
+            palette: list[tuple[int, int, int]] | None = None
+            if self._capture_result.palettes:
+                # Use first available palette
+                raw_palette = next(iter(self._capture_result.palettes.values()))
+                # Convert to RGB tuples - colors can be SNES int or RGB list
+                palette = []
+                for c in raw_palette:
+                    if isinstance(c, (list, tuple)) and len(c) >= 3:
+                        palette.append((int(c[0]), int(c[1]), int(c[2])))
+                    elif isinstance(c, int):
+                        # SNES BGR555 format - convert to RGB
+                        r = (c & 0x1F) << 3
+                        g = ((c >> 5) & 0x1F) << 3
+                        b = ((c >> 10) & 0x1F) << 3
+                        palette.append((r, g, b))
+                    else:
+                        palette.append((0, 0, 0))  # Fallback
+
+            if palette:
+                # Quantize to palette colors
+                self._tile_sampling_service.set_palette(palette)
+                quantized = self._tile_sampling_service.quantize_to_palette(preview_img)
+                if quantized:
+                    # Convert quantized grayscale back to RGB using palette
+                    final_img = Image.new("RGBA", preview_img.size, (0, 0, 0, 0))
+                    qpixels = quantized.load()
+                    fpixels = final_img.load()
+                    if qpixels is not None and fpixels is not None:
+                        for y in range(preview_img.height):
+                            for x in range(preview_img.width):
+                                # For grayscale 'L' mode, pixel is int
+                                raw_pixel = qpixels[x, y]
+                                pixel_val = raw_pixel if isinstance(raw_pixel, int) else 0
+                                # Convert back from 4bpp format
+                                idx = pixel_val // 16
+                                if idx == 0:
+                                    # Transparent
+                                    fpixels[x, y] = (0, 0, 0, 0)
+                                elif idx < len(palette):
+                                    r, g, b = palette[idx]
+                                    fpixels[x, y] = (r, g, b, 255)
+                    preview_img = final_img
+
+            # Convert PIL image to QPixmap
+            from PySide6.QtGui import QImage
+
+            data = preview_img.tobytes("raw", "RGBA")
+            qimage = QImage(
+                data,
+                preview_img.width,
+                preview_img.height,
+                preview_img.width * 4,
+                QImage.Format.Format_RGBA8888,
+            )
+
+            # Scale for display
+            scaled_pixmap = QPixmap.fromImage(qimage).scaled(
+                preview_img.width * DISPLAY_SCALE,
+                preview_img.height * DISPLAY_SCALE,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.FastTransformation,
+            )
+
+            self._preview_item.setPixmap(scaled_pixmap)
+            self._preview_item.setVisible(True)
+
+        except Exception:
+            logger.exception("Failed to generate preview")
+            self._preview_item.setVisible(False)
 
     def _on_auto_align(self) -> None:
         """Handle auto-align button click."""
@@ -662,6 +830,9 @@ class WorkbenchCanvas(QWidget):
 
         # Schedule tile touch update
         self._schedule_tile_touch_update()
+
+        # Schedule preview update if enabled
+        self._schedule_preview_update()
 
         # Emit signal
         self._emit_alignment_changed()

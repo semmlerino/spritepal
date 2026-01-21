@@ -469,3 +469,20 @@ class GameFrameItem(QGraphicsPixmapItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
         # Draw behind other items
         self.setZValue(-10)
+
+
+class PreviewItem(QGraphicsPixmapItem):
+    """In-game preview overlay showing the final composited sprite.
+
+    Displays the quantized, clipped preview of how the sprite will look
+    when injected into the ROM. Overlays the game frame when preview mode
+    is enabled.
+    """
+
+    def __init__(self, parent: QGraphicsItem | None = None) -> None:
+        super().__init__(parent)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+        # Draw on top of game frame but below AI frame overlay
+        self.setZValue(-5)
+        self.setVisible(False)  # Hidden by default

@@ -188,91 +188,104 @@ class MappingPanel(QWidget):
 
     def refresh(self) -> None:
         """Refresh the mapping table from the current project."""
-        self._table.setRowCount(0)
+        # Store current selection before clearing
+        current_selection = self.get_selected_ai_frame_index()
 
-        if self._project is None:
-            self._status_label.setText("No project")
-            return
+        # Block signals during rebuild to prevent spurious selection events
+        self._table.blockSignals(True)
+        try:
+            self._table.setRowCount(0)
 
-        # Show all AI frames with their mapping status
-        for ai_frame in self._project.ai_frames:
-            row = self._table.rowCount()
-            self._table.insertRow(row)
+            if self._project is None:
+                self._status_label.setText("No project")
+                return
 
-            # # column (row number)
-            num_item = QTableWidgetItem(str(ai_frame.index + 1))
-            num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._table.setItem(row, 0, num_item)
+            # Show all AI frames with their mapping status
+            for ai_frame in self._project.ai_frames:
+                row = self._table.rowCount()
+                self._table.insertRow(row)
 
-            # AI Frame column with thumbnail
-            ai_item = QTableWidgetItem(ai_frame.path.name)
-            ai_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
-            # Load thumbnail
-            if ai_frame.path.exists():
-                pixmap = QPixmap(str(ai_frame.path))
-                if not pixmap.isNull():
-                    scaled = pixmap.scaled(
-                        THUMBNAIL_SIZE,
-                        THUMBNAIL_SIZE,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                    ai_item.setIcon(QIcon(scaled))
-            self._table.setItem(row, 1, ai_item)
+                # # column (row number)
+                num_item = QTableWidgetItem(str(ai_frame.index + 1))
+                num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._table.setItem(row, 0, num_item)
 
-            # Game Frame column
-            mapping = self._project.get_mapping_for_ai_frame(ai_frame.index)
-            if mapping:
-                game_item = QTableWidgetItem(mapping.game_frame_id)
-                status = mapping.status
+                # AI Frame column with thumbnail
+                ai_item = QTableWidgetItem(ai_frame.path.name)
+                ai_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
+                # Load thumbnail
+                if ai_frame.path.exists():
+                    pixmap = QPixmap(str(ai_frame.path))
+                    if not pixmap.isNull():
+                        scaled = pixmap.scaled(
+                            THUMBNAIL_SIZE,
+                            THUMBNAIL_SIZE,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation,
+                        )
+                        ai_item.setIcon(QIcon(scaled))
+                self._table.setItem(row, 1, ai_item)
 
-                # Load game frame thumbnail
-                if mapping.game_frame_id in self._game_frame_previews:
-                    pixmap = self._game_frame_previews[mapping.game_frame_id]
-                    scaled = pixmap.scaled(
-                        THUMBNAIL_SIZE,
-                        THUMBNAIL_SIZE,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                    game_item.setIcon(QIcon(scaled))
+                # Game Frame column
+                mapping = self._project.get_mapping_for_ai_frame(ai_frame.index)
+                if mapping:
+                    game_item = QTableWidgetItem(mapping.game_frame_id)
+                    status = mapping.status
 
-                # Offset column
-                if mapping.offset_x != 0 or mapping.offset_y != 0:
-                    offset_item = QTableWidgetItem(f"({mapping.offset_x}, {mapping.offset_y})")
+                    # Load game frame thumbnail
+                    if mapping.game_frame_id in self._game_frame_previews:
+                        pixmap = self._game_frame_previews[mapping.game_frame_id]
+                        scaled = pixmap.scaled(
+                            THUMBNAIL_SIZE,
+                            THUMBNAIL_SIZE,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation,
+                        )
+                        game_item.setIcon(QIcon(scaled))
+
+                    # Offset column
+                    if mapping.offset_x != 0 or mapping.offset_y != 0:
+                        offset_item = QTableWidgetItem(f"({mapping.offset_x}, {mapping.offset_y})")
+                    else:
+                        offset_item = QTableWidgetItem("—")
+
+                    # Flip column
+                    flip_parts = []
+                    if mapping.flip_h:
+                        flip_parts.append("H")
+                    if mapping.flip_v:
+                        flip_parts.append("V")
+                    flip_item = QTableWidgetItem("".join(flip_parts) if flip_parts else "—")
                 else:
+                    game_item = QTableWidgetItem("—")
+                    status = "unmapped"
                     offset_item = QTableWidgetItem("—")
+                    flip_item = QTableWidgetItem("—")
 
-                # Flip column
-                flip_parts = []
-                if mapping.flip_h:
-                    flip_parts.append("H")
-                if mapping.flip_v:
-                    flip_parts.append("V")
-                flip_item = QTableWidgetItem("".join(flip_parts) if flip_parts else "—")
-            else:
-                game_item = QTableWidgetItem("—")
-                status = "unmapped"
-                offset_item = QTableWidgetItem("—")
-                flip_item = QTableWidgetItem("—")
+                self._table.setItem(row, 2, game_item)
+                offset_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._table.setItem(row, 3, offset_item)
+                flip_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._table.setItem(row, 4, flip_item)
 
-            self._table.setItem(row, 2, game_item)
-            offset_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._table.setItem(row, 3, offset_item)
-            flip_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._table.setItem(row, 4, flip_item)
+                # Status column with color and indicator
+                status_indicator = "●" if status != "unmapped" else "○"
+                status_item = QTableWidgetItem(f"{status_indicator} {status.capitalize()}")
+                color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
+                status_item.setForeground(QBrush(color))
+                self._table.setItem(row, 5, status_item)
 
-            # Status column with color and indicator
-            status_indicator = "●" if status != "unmapped" else "○"
-            status_item = QTableWidgetItem(f"{status_indicator} {status.capitalize()}")
-            color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
-            status_item.setForeground(QBrush(color))
-            self._table.setItem(row, 5, status_item)
+            # Update status summary
+            mapped = self._project.mapped_count
+            total = self._project.total_ai_frames
+            self._status_label.setText(f"{mapped}/{total} mapped")
 
-        # Update status summary
-        mapped = self._project.mapped_count
-        total = self._project.total_ai_frames
-        self._status_label.setText(f"{mapped}/{total} mapped")
+        finally:
+            self._table.blockSignals(False)
+
+        # Restore selection (outside try/finally so signals fire normally if needed)
+        if current_selection is not None:
+            self.select_row_by_ai_index(current_selection)
 
     def get_selected_ai_frame_index(self) -> int | None:
         """Get the AI frame index of the selected mapping row."""
