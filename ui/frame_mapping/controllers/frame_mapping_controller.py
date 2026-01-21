@@ -609,6 +609,7 @@ class FrameMappingController(QObject):
         output_path: Path | None = None,
         create_backup: bool = True,
         debug: bool = False,
+        force_raw: bool = False,
     ) -> bool:
         """Inject a mapped frame into the ROM using tile-aware masking.
 
@@ -629,6 +630,7 @@ class FrameMappingController(QObject):
             output_path: Path for the output ROM (default: same as input)
             create_backup: Whether to create a backup before injection
             debug: Enable debug mode (saves intermediate images to /tmp/inject_debug/)
+            force_raw: Force RAW (uncompressed) injection for all tiles, skip HAL compression
 
         Returns:
             True if injection was successful
@@ -667,14 +669,30 @@ class FrameMappingController(QObject):
             self.error_occurred.emit(f"Capture file missing (required for masking): {game_frame.capture_path}")
             return False
 
-        # Debug mode setup - can also be enabled via environment variable
-        debug = debug or os.environ.get("SPRITEPAL_INJECT_DEBUG", "").lower() in ("1", "true", "yes")
+        # Debug mode setup - enable via environment variable SPRITEPAL_INJECT_DEBUG=true
+        # TODO: Remove these lines after debugging complete
+        _debug_override = os.environ.get("SPRITEPAL_INJECT_DEBUG", "").lower() == "true"
+        debug = debug or _debug_override
+        force_raw = force_raw or _debug_override  # Force RAW injection to avoid HAL corruption
         debug_dir: Path | None = None
+        debug_log_handler: logging.FileHandler | None = None
+        original_log_level: int | None = None
         if debug:
             debug_dir = Path(tempfile.gettempdir()) / "inject_debug"
             debug_dir.mkdir(exist_ok=True)
+            # Add file handler to capture all debug output
+            debug_log_path = debug_dir / "inject_debug.log"
+            debug_log_handler = logging.FileHandler(debug_log_path, mode="w")
+            debug_log_handler.setLevel(logging.DEBUG)
+            debug_log_handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
+            # Temporarily set logger level to DEBUG to ensure messages reach the handler
+            original_log_level = logger.level
+            logger.setLevel(logging.DEBUG)
+            logger.addHandler(debug_log_handler)
             logger.info("=== INJECTION DEBUG MODE ===")
             logger.info("Debug output directory: %s", debug_dir)
+            logger.info("Debug log file: %s", debug_log_path)
+            logger.info("Force RAW mode: %s", force_raw)
             logger.info("AI frame: %s (index %d)", ai_frame.path.name, ai_frame_index)
             logger.info("Game frame: %s", game_frame.id)
             logger.info("ROM offsets: %s", [f"0x{o:X}" for o in game_frame.rom_offsets])
@@ -903,22 +921,35 @@ class FrameMappingController(QObject):
 
                 # Query original ROM data to find how many tiles are actually stored here
                 # This prevents injecting more tiles than the original compressed block contains
-                try:
-                    _, original_data, _ = injector.find_compressed_sprite(rom_data, rom_offset)
-                    original_tile_count = len(original_data) // 32  # 32 bytes per 4bpp tile
-                    if original_tile_count == 0:
-                        logger.warning(
-                            "ROM offset 0x%X: Original data has no complete tiles, skipping",
-                            rom_offset,
-                        )
-                        continue
-                except Exception as e:
-                    logger.warning(
-                        "ROM offset 0x%X: Could not decompress original data (%s), skipping",
+                # For RAW (uncompressed) tiles, HAL decompression will fail - that's expected
+                is_raw_tile = force_raw  # Force RAW if requested
+                if force_raw:
+                    original_tile_count = captured_tile_count
+                    logger.info(
+                        "ROM offset 0x%X: Using forced RAW mode",
                         rom_offset,
-                        e,
                     )
-                    continue
+                else:
+                    try:
+                        _, original_data, _ = injector.find_compressed_sprite(rom_data, rom_offset)
+                        original_tile_count = len(original_data) // 32  # 32 bytes per 4bpp tile
+                        if original_tile_count == 0:
+                            # HAL decompression succeeded but no tiles - treat as RAW
+                            is_raw_tile = True
+                            original_tile_count = captured_tile_count
+                            logger.info(
+                                "ROM offset 0x%X: HAL returned no tiles, treating as RAW (1 tile)",
+                                rom_offset,
+                            )
+                    except Exception as e:
+                        # HAL decompression failed - this is expected for RAW tiles
+                        is_raw_tile = True
+                        original_tile_count = captured_tile_count  # For RAW, inject all captured tiles
+                        logger.info(
+                            "ROM offset 0x%X: HAL decompression failed (%s), treating as RAW tile",
+                            rom_offset,
+                            e,
+                        )
 
                 # Limit to original tile count - only inject as many tiles as the ROM slot holds
                 if captured_tile_count > original_tile_count:
@@ -1042,23 +1073,13 @@ class FrameMappingController(QObject):
                     chunk_path = Path(tmp.name)
                     chunk_img.save(chunk_path, "PNG")
 
-                # Inject this chunk - try HAL first, fall back to RAW if decompression fails
-                result, message = injector.inject_sprite_to_rom(
-                    sprite_path=str(chunk_path),
-                    rom_path=str(rom_path) if first_injection else current_rom_path,
-                    output_path=current_rom_path,
-                    sprite_offset=rom_offset,
-                    fast_compression=True,
-                    create_backup=create_backup and first_injection,  # Only backup once
-                    ignore_checksum=True,
-                    force=False,
-                    compression_type=CompressionType.HAL,
-                )
-
-                # If HAL failed due to decompression, try RAW (uncompressed) injection
-                if not result and "decompress" in message.lower():
+                # Inject this chunk
+                # Use RAW directly if we already know it's uncompressed, otherwise try HAL first
+                compression_used = "RAW" if is_raw_tile else "HAL"
+                if is_raw_tile:
+                    # Direct RAW injection for uncompressed tiles
                     logger.info(
-                        "ROM offset 0x%X: HAL decompression failed, retrying as RAW (uncompressed)",
+                        "ROM offset 0x%X: Injecting as RAW (uncompressed) tile",
                         rom_offset,
                     )
                     result, message = injector.inject_sprite_to_rom(
@@ -1066,18 +1087,69 @@ class FrameMappingController(QObject):
                         rom_path=str(rom_path) if first_injection else current_rom_path,
                         output_path=current_rom_path,
                         sprite_offset=rom_offset,
-                        fast_compression=False,  # Not applicable for RAW
+                        fast_compression=False,
                         create_backup=create_backup and first_injection,
                         ignore_checksum=True,
                         force=False,
                         compression_type=CompressionType.RAW,
                     )
+                else:
+                    # Try HAL compression first
+                    result, message = injector.inject_sprite_to_rom(
+                        sprite_path=str(chunk_path),
+                        rom_path=str(rom_path) if first_injection else current_rom_path,
+                        output_path=current_rom_path,
+                        sprite_offset=rom_offset,
+                        fast_compression=True,
+                        create_backup=create_backup and first_injection,
+                        ignore_checksum=True,
+                        force=False,
+                        compression_type=CompressionType.HAL,
+                    )
+
+                    # If HAL failed (decompression error OR data too large), try RAW
+                    if not result and ("decompress" in message.lower() or "too large" in message.lower()):
+                        compression_used = "RAW"
+                        logger.info(
+                            "ROM offset 0x%X: HAL failed (%s), retrying as RAW",
+                            rom_offset,
+                            "size" if "too large" in message.lower() else "decompress",
+                        )
+                        result, message = injector.inject_sprite_to_rom(
+                            sprite_path=str(chunk_path),
+                            rom_path=str(rom_path) if first_injection else current_rom_path,
+                            output_path=current_rom_path,
+                            sprite_offset=rom_offset,
+                            fast_compression=False,
+                            create_backup=create_backup and first_injection,
+                            ignore_checksum=True,
+                            force=False,
+                            compression_type=CompressionType.RAW,
+                        )
 
                 # Cleanup temp file
                 chunk_path.unlink()
 
                 if result:
-                    messages.append(f"Offset 0x{rom_offset:X}: Success ({tile_count} tiles)")
+                    # Debug: Verify bytes written to ROM
+                    if debug:
+                        try:
+                            written_rom = Path(current_rom_path).read_bytes()
+                            # For RAW, offset is direct; for HAL, need to account for header
+                            smc_header = 512 if len(written_rom) % 0x8000 == 512 else 0
+                            check_offset = rom_offset + smc_header
+                            written_bytes = written_rom[check_offset : check_offset + 32]
+                            logger.info(
+                                "ROM 0x%X [%s]: wrote %d tiles, first 32 bytes: %s",
+                                rom_offset,
+                                compression_used,
+                                tile_count,
+                                written_bytes.hex(),
+                            )
+                        except Exception as e:
+                            logger.warning("Could not verify ROM bytes: %s", e)
+
+                    messages.append(f"Offset 0x{rom_offset:X}: Success ({tile_count} tiles, {compression_used})")
                     first_injection = False
                     success = True
                 else:
@@ -1112,5 +1184,14 @@ class FrameMappingController(QObject):
             logger.exception("Injection process failed")
             self.error_occurred.emit(f"Injection process failed: {e}")
             success = False
+        finally:
+            # Clean up debug log handler
+            if debug_log_handler is not None:
+                debug_log_handler.flush()
+                debug_log_handler.close()
+                logger.removeHandler(debug_log_handler)
+            # Restore original log level
+            if original_log_level is not None:
+                logger.setLevel(original_log_level)
 
         return success

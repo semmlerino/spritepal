@@ -337,6 +337,7 @@ def test_something(app_context):  # Fixture provides this
 | `SPRITEPAL_EXHAL_PATH` | Path to real exhal binary | System PATH |
 | `SPRITEPAL_INHAL_PATH` | Path to real inhal binary | System PATH |
 | `SPRITEPAL_LEAK_MODE` | Override leak detection | `fail` (CI), `warn` (local) |
+| `SPRITEPAL_INJECT_DEBUG` | Enable injection debug mode (saves images to temp) | `false` |
 | `QT_QPA_PLATFORM` | Qt display platform | `offscreen` (pytest default) |
 
 ### Test Resources

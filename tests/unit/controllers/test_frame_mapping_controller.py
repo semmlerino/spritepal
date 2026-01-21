@@ -293,6 +293,312 @@ class TestInjectMappingEntryFiltering:
         )
 
 
+def create_flipped_capture(
+    entry_id: int,
+    flip_h: bool,
+    flip_v: bool,
+    width: int = 16,
+    height: int = 16,
+) -> dict:
+    """Create a capture with a single entry that has flip flags set.
+
+    Creates a 16x16 sprite (2x2 tiles) to test position mirroring.
+
+    The tile layout for a 16x16 sprite:
+    - tile (0,0) is top-left
+    - tile (1,0) is top-right
+    - tile (0,1) is bottom-left
+    - tile (1,1) is bottom-right
+
+    When flip_h=True, CaptureRenderer mirrors positions:
+    - tile at pos_x=0 should appear at x=entry.x + (width - 0 - 8) = entry.x + 8
+    - tile at pos_x=1 should appear at x=entry.x + (width - 8 - 8) = entry.x + 0
+    """
+    rom_offset = 0x100000
+    tiles = []
+    tile_idx = 0
+
+    # Generate solid tile data (all pixels = palette index 1, opaque)
+    # 4bpp SNES tile: 32 bytes per tile, interleaved bitplanes
+    # For simplicity, fill with 0xFF which makes all pixels use a non-zero index
+    solid_tile_hex = "FF" * 32
+
+    for ty in range(height // 8):
+        for tx in range(width // 8):
+            tiles.append(
+                {
+                    "tile_index": tile_idx,
+                    "vram_addr": 0x1000 + tile_idx * 0x20,
+                    "pos_x": tx,
+                    "pos_y": ty,
+                    "data_hex": solid_tile_hex,
+                    "rom_offset": rom_offset,
+                    "tile_index_in_block": tile_idx,
+                }
+            )
+            tile_idx += 1
+
+    return {
+        "frame": 1,
+        "obsel": {},
+        "entries": [
+            {
+                "id": entry_id,
+                "x": 100,  # Entry position on screen
+                "y": 100,
+                "tile": 0,
+                "width": width,
+                "height": height,
+                "palette": 7,
+                "rom_offset": rom_offset,
+                "flip_h": flip_h,
+                "flip_v": flip_v,
+                "tiles": tiles,
+            }
+        ],
+        # Palette with distinct colors at each index
+        "palettes": {
+            7: [
+                [0, 0, 0],  # 0: transparent (black)
+                [255, 255, 255],  # 1: white
+                [255, 0, 0],  # 2: red
+                [0, 255, 0],  # 3: green
+                [0, 0, 255],  # 4: blue
+                [255, 255, 0],  # 5: yellow
+                [255, 0, 255],  # 6: magenta
+                [0, 255, 255],  # 7: cyan
+                [128, 128, 128],  # 8-15: gray variations
+                [64, 64, 64],
+                [192, 192, 192],
+                [32, 32, 32],
+                [96, 96, 96],
+                [160, 160, 160],
+                [224, 224, 224],
+                [48, 48, 48],
+            ]
+        },
+    }
+
+
+class TestInjectMappingFlipHandling:
+    """Tests that inject_mapping correctly handles entry-level flips.
+
+    Bug: Tile position calculation ignores entry flip_h/flip_v flags.
+    CaptureRenderer correctly mirrors tile positions for flipped entries,
+    but inject_mapping extracts tiles from wrong positions.
+
+    Additionally, extracted tile data must be counter-flipped because:
+    - CaptureRenderer renders tiles in "screen appearance" (flipped)
+    - ROM stores tiles in unflipped form (SNES hardware applies flip at display)
+    - Injecting screen-appearance data = SNES applies flip again = double-flipped = wrong
+    """
+
+    def test_tile_positions_mirror_when_flip_h(self, tmp_path: Path, qtbot) -> None:
+        """With flip_h=True, tile at pos_x=0 should appear at right edge.
+
+        For a 16x16 sprite with flip_h=True:
+        - Tile at (pos_x=0, pos_y=0) should be at screen position (entry.x + 8, entry.y)
+        - Tile at (pos_x=1, pos_y=0) should be at screen position (entry.x + 0, entry.y)
+
+        To verify correct behavior:
+        - Create AI frame with distinct colors in each quadrant
+        - After injection, check that tile 0 (pos_x=0, vram_addr=0x1000) contains
+          the RIGHT side of the AI frame (because flip_h mirrors positions)
+
+        BUG: Currently calculates screen_x = entry.x + pos_x * 8, ignoring flip.
+        """
+        capture_data = create_flipped_capture(entry_id=1, flip_h=True, flip_v=False)
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create AI frame with distinct quadrants:
+        # Top-left=RED, Top-right=GREEN, Bottom-left=BLUE, Bottom-right=YELLOW
+        ai_frame_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+        for y in range(16):
+            for x in range(16):
+                if x < 8 and y < 8:
+                    ai_img.putpixel((x, y), (255, 0, 0, 255))  # Top-left: RED
+                elif x >= 8 and y < 8:
+                    ai_img.putpixel((x, y), (0, 255, 0, 255))  # Top-right: GREEN
+                elif x < 8 and y >= 8:
+                    ai_img.putpixel((x, y), (0, 0, 255, 255))  # Bottom-left: BLUE
+                else:
+                    ai_img.putpixel((x, y), (255, 255, 0, 255))  # Bottom-right: YELLOW
+        ai_img.save(ai_frame_path)
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[0x100000],
+                selected_entry_ids=[1],
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Track tiles pasted to chunk image (in grid order = tile_index order)
+        pasted_tiles: list[Image.Image] = []
+        original_paste = Image.Image.paste
+
+        def track_paste(self, im, box=None, mask=None):
+            """Track tiles pasted to chunk image."""
+            if isinstance(im, Image.Image) and im.size == (8, 8):
+                pasted_tiles.append(im.copy())
+            return original_paste(self, im, box, mask)
+
+        with (
+            patch.object(Image.Image, "paste", track_paste),
+            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+        ):
+            mock_injector = MagicMock()
+            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 128, 128)
+            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
+            mock_injector_class.return_value = mock_injector
+
+            rom_path = tmp_path / "test.sfc"
+            rom_path.write_bytes(b"\x00" * 0x200000)
+            (tmp_path / "out.sfc").write_bytes(b"\x00" * 0x200000)
+
+            controller.inject_mapping(0, rom_path)
+
+        # Find tiles pasted during chunk assembly (after the AI paste and mask paste)
+        # The chunk paste happens AFTER render_selection paste operations
+        # We expect 4 tiles for a 16x16 sprite
+        assert len(pasted_tiles) >= 4, f"Expected at least 4 tile pastes, got {len(pasted_tiles)}"
+
+        # The first tile (tile_index_in_block=0, pos_x=0, pos_y=0) should contain
+        # pixels from the RIGHT side of canvas (because flip_h mirrors positions)
+        # With flip_h: pos_x=0 → screen x = width - 0 - 8 = 8 → should get GREEN quadrant
+        #
+        # BUG: Without flip-aware position, pos_x=0 → screen x = 0 → gets RED quadrant
+        first_tile = pasted_tiles[-4]  # First of the 4 chunk tiles
+        center_pixel = first_tile.getpixel((4, 4))
+
+        # Check if it's GREEN (correct) or RED (buggy)
+        # Green = high G channel, Red = high R channel
+        if len(center_pixel) >= 3:
+            is_green = center_pixel[1] > center_pixel[0] and center_pixel[1] > center_pixel[2]
+        else:
+            # Palette mode - convert to RGB
+            first_tile_rgb = first_tile.convert("RGBA")
+            center_pixel = first_tile_rgb.getpixel((4, 4))
+            is_green = center_pixel[1] > center_pixel[0] and center_pixel[1] > center_pixel[2]
+
+        assert is_green, (
+            f"With flip_h=True, tile at pos_x=0 should extract from canvas x=8 (green quadrant), "
+            f"but center pixel was {center_pixel}. Position calculation ignores flip_h."
+        )
+
+    def test_tile_data_counter_flipped_for_flip_h(self, tmp_path: Path, qtbot) -> None:
+        """Extracted tiles must be counter-flipped before ROM injection.
+
+        When flip_h=True:
+        - CaptureRenderer renders tiles horizontally flipped (screen appearance)
+        - We extract from screen appearance (flipped)
+        - Before injection, we must flip back (counter-flip)
+        - SNES will re-apply flip_h at display time → correct result
+
+        BUG: Currently injects screen-appearance data without counter-flip.
+        SNES applies flip_h again → double-flipped → incorrect.
+        """
+        capture_data = create_flipped_capture(entry_id=1, flip_h=True, flip_v=False, width=8, height=8)
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create AI frame with distinct left/right halves (to detect flipping)
+        ai_frame_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+        # Left half: red, Right half: blue
+        for y in range(8):
+            for x in range(4):
+                ai_img.putpixel((x, y), (255, 0, 0, 255))  # Red on left
+            for x in range(4, 8):
+                ai_img.putpixel((x, y), (0, 0, 255, 255))  # Blue on right
+        ai_img.save(ai_frame_path)
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[0x100000],
+                selected_entry_ids=[1],
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Track the final tile image that gets saved (just before quantization/save)
+        saved_tile_images: list[Image.Image] = []
+        original_save = Image.Image.save
+
+        def track_save(self, path, *args, **kwargs):
+            """Capture images being saved (tile chunks for injection)."""
+            saved_tile_images.append(self.copy())
+            return original_save(self, path, *args, **kwargs)
+
+        with (
+            patch.object(Image.Image, "save", track_save),
+            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+        ):
+            mock_injector = MagicMock()
+            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
+            mock_injector_class.return_value = mock_injector
+
+            rom_path = tmp_path / "test.sfc"
+            rom_path.write_bytes(b"\x00" * 0x200000)
+            (tmp_path / "out.sfc").write_bytes(b"\x00" * 0x200000)
+
+            controller.inject_mapping(0, rom_path)
+
+        # Find the chunk image (should be 8x8 for single tile)
+        chunk_images = [img for img in saved_tile_images if img.size == (8, 8)]
+
+        assert len(chunk_images) >= 1, f"Expected tile chunk image, got {len(saved_tile_images)} saves"
+
+        # Check the saved tile's left edge color
+        # If counter-flip applied correctly:
+        #   - AI image has red on left, blue on right
+        #   - Counter-flip for flip_h → blue on left, red on right in ROM
+        #   - SNES applies flip_h → red on left (matches AI image) ✓
+        #
+        # If bug exists (no counter-flip):
+        #   - ROM stores red on left (screen appearance, already flipped by renderer)
+        #   - SNES applies flip_h → blue on left (wrong!)
+        chunk = chunk_images[0]
+
+        # Convert to RGBA if in palette mode
+        if chunk.mode != "RGBA":
+            chunk = chunk.convert("RGBA")
+
+        # Sample left edge to check color
+        left_pixel = chunk.getpixel((0, 4))  # Middle of left edge
+
+        # With counter-flip applied, left edge should be BLUE (not red)
+        # Blue = (0, 0, 255, 255) or close to it after any processing
+        is_blue = left_pixel[2] > left_pixel[0]  # Blue channel > Red channel
+
+        assert is_blue, (
+            f"With flip_h=True, tile data should be counter-flipped before injection. "
+            f"Left edge should be blue (counter-flipped), but got {left_pixel}. "
+            f"Tile data not counter-flipped for flip_h."
+        )
+
+
 class TestInjectMappingScale:
     """Tests that inject_mapping applies scale transform to AI image.
 
