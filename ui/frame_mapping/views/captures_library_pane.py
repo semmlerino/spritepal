@@ -60,6 +60,7 @@ class CapturesLibraryPane(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._game_frames: list[GameFrame] = []
+        self._game_frame_previews: dict[str, QPixmap] = {}  # game_frame_id -> preview pixmap
         self._link_status: dict[str, int | None] = {}  # game_frame_id -> ai_index or None
         self._show_unlinked_only = False
         self._search_text: str = ""
@@ -141,6 +142,15 @@ class CapturesLibraryPane(QWidget):
         self._link_status = link_status
         self._refresh_list()
 
+    def set_game_frame_previews(self, previews: dict[str, QPixmap]) -> None:
+        """Set the preview pixmaps for game frames.
+
+        Args:
+            previews: Mapping of game_frame_id -> preview QPixmap
+        """
+        self._game_frame_previews = previews
+        self._refresh_list()
+
     def get_selected_id(self) -> str | None:
         """Get the currently selected game frame ID."""
         current = self._list.currentItem()
@@ -179,6 +189,7 @@ class CapturesLibraryPane(QWidget):
     def clear(self) -> None:
         """Clear all game frames."""
         self._game_frames = []
+        self._game_frame_previews = {}
         self._link_status = {}
         self._list.clear()
         self._count_label.setText("No captures")
@@ -295,19 +306,17 @@ class CapturesLibraryPane(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, frame.id)
             item.setForeground(QBrush(color))
 
-            # Load thumbnail from capture preview if available
-            if frame.capture_path and frame.capture_path.exists():
-                preview_path = frame.capture_path.with_suffix(".png")
-                if preview_path.exists():
-                    pixmap = QPixmap(str(preview_path))
-                    if not pixmap.isNull():
-                        scaled = pixmap.scaled(
-                            THUMBNAIL_SIZE,
-                            THUMBNAIL_SIZE,
-                            Qt.AspectRatioMode.KeepAspectRatio,
-                            Qt.TransformationMode.SmoothTransformation,
-                        )
-                        item.setIcon(QIcon(scaled))
+            # Use in-memory preview if available
+            if frame.id in self._game_frame_previews:
+                pixmap = self._game_frame_previews[frame.id]
+                if not pixmap.isNull():
+                    scaled = pixmap.scaled(
+                        THUMBNAIL_SIZE,
+                        THUMBNAIL_SIZE,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    item.setIcon(QIcon(scaled))
 
             self._list.addItem(item)
 

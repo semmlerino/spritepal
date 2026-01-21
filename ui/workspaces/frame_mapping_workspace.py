@@ -736,6 +736,9 @@ class FrameMappingWorkspace(QWidget):
         self._mapping_panel.set_game_frame_previews(previews)
         self._mapping_panel.refresh()
 
+        # Also update captures pane with previews for thumbnails
+        self._captures_pane.set_game_frame_previews(previews)
+
     # -------------------------------------------------------------------------
     # File Operations
     # -------------------------------------------------------------------------
