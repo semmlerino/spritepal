@@ -1842,7 +1842,7 @@ class GridArrangementDialog(SplitterDialog):
             self._update_status(f"Saved {len(self._saved_color_mappings)} color mappings - will be used on next Apply")
             dialog.accept()
 
-        save_btn.clicked.connect(on_save)
+        save_btn.clicked.connect(lambda: on_save())
         close_btn.clicked.connect(dialog.reject)
 
         dialog.exec()

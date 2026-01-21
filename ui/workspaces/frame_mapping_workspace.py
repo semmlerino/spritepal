@@ -191,36 +191,36 @@ class FrameMappingWorkspace(QWidget):
 
         self._load_ai_btn = QPushButton("Load AI Frames")
         self._load_ai_btn.setToolTip("Load AI-generated frames from a directory")
-        self._load_ai_btn.clicked.connect(self._on_load_ai_frames)
+        self._load_ai_btn.clicked.connect(lambda: self._on_load_ai_frames())
         toolbar.addWidget(self._load_ai_btn)
 
         self._import_capture_btn = QPushButton("Import Capture")
         self._import_capture_btn.setToolTip("Import a single Mesen 2 capture file")
-        self._import_capture_btn.clicked.connect(self._on_import_capture)
+        self._import_capture_btn.clicked.connect(lambda: self._on_import_capture())
         toolbar.addWidget(self._import_capture_btn)
 
         self._import_dir_btn = QPushButton("Import Directory")
         self._import_dir_btn.setToolTip("Import all captures from a directory")
-        self._import_dir_btn.clicked.connect(self._on_import_capture_dir)
+        self._import_dir_btn.clicked.connect(lambda: self._on_import_capture_dir())
         toolbar.addWidget(self._import_dir_btn)
 
         toolbar.addSeparator()
 
         self._load_btn = QPushButton("Load")
         self._load_btn.setToolTip("Load a frame mapping project")
-        self._load_btn.clicked.connect(self._on_load_project)
+        self._load_btn.clicked.connect(lambda: self._on_load_project())
         toolbar.addWidget(self._load_btn)
 
         self._save_btn = QPushButton("Save")
         self._save_btn.setToolTip("Save the current project")
-        self._save_btn.clicked.connect(self._on_save_project)
+        self._save_btn.clicked.connect(lambda: self._on_save_project())
         toolbar.addWidget(self._save_btn)
 
         toolbar.addSeparator()
 
         self._inject_btn = QPushButton("Inject All")
         self._inject_btn.setToolTip("Inject all mapped frames into ROM")
-        self._inject_btn.clicked.connect(self._on_inject_all)
+        self._inject_btn.clicked.connect(lambda: self._on_inject_all())
         self._inject_btn.setStyleSheet("background-color: #2c5d2c; font-weight: bold;")
         toolbar.addWidget(self._inject_btn)
 
@@ -856,9 +856,9 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(self, "Save Project", "No project to save.")
             return
 
-        if self._project_path:
-            self._controller.save_project(self._project_path)
-        else:
+        path_to_save = self._project_path
+
+        if not path_to_save:
             file_path, _ = QFileDialog.getSaveFileName(
                 self,
                 "Save Frame Mapping Project",
@@ -866,10 +866,14 @@ class FrameMappingWorkspace(QWidget):
                 "Frame Mapping Projects (*.spritepal-mapping.json);;All Files (*)",
             )
             if file_path:
-                path = Path(file_path)
-                if self._controller.save_project(path):
-                    self._project_path = path
-                    self._set_last_project_path(path)
+                path_to_save = Path(file_path)
+
+        if path_to_save:
+            if self._controller.save_project(path_to_save):
+                self._project_path = path_to_save
+                self._set_last_project_path(path_to_save)
+                if self._message_service:
+                    self._message_service.show_message(f"Project saved to {path_to_save.name}")
 
     # -------------------------------------------------------------------------
     # Project Persistence
