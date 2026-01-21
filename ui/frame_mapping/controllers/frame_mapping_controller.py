@@ -25,6 +25,7 @@ from core.mesen_integration.click_extractor import (
     MesenCaptureParser,
     OAMEntry,
 )
+from core.palette_utils import quantize_to_palette, snes_palette_to_rgb
 from core.rom_injector import ROMInjector
 from core.types import CompressionType
 
@@ -712,6 +713,25 @@ class FrameMappingController(QObject):
 
                 # Crop the relevant part for this ROM offset
                 chunk_img = masked_canvas.crop((crop_x, crop_y, crop_x + crop_w, crop_y + crop_h))
+
+                # Quantize to game palette for proper color mapping
+                # Entries sharing a ROM offset typically share a palette - use the first entry's palette
+                palette_index = entries[0].palette
+                snes_palette = capture_result.palettes.get(palette_index, [])
+                if snes_palette:
+                    palette_rgb = snes_palette_to_rgb(snes_palette)
+                    chunk_img = quantize_to_palette(chunk_img, palette_rgb)
+                    logger.debug(
+                        "Quantized chunk for offset 0x%X to palette %d (%d colors)",
+                        rom_offset,
+                        palette_index,
+                        len(palette_rgb),
+                    )
+                else:
+                    logger.warning(
+                        "No palette data found for palette index %d, using grayscale fallback",
+                        palette_index,
+                    )
 
                 # Save chunk to temp file
                 with tempfile.NamedTemporaryFile(suffix=f"_{rom_offset:X}.png", delete=False) as tmp:

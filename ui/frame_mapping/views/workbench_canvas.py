@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.frame_mapping_project import AIFrame, GameFrame
+from core.palette_utils import quantize_to_palette, snes_palette_to_rgb
 from core.services.tile_sampling_service import (
     TileSamplingService,
     calculate_auto_alignment,
@@ -798,6 +799,18 @@ class WorkbenchCanvas(QWidget):
             original_mask = original_sprite.split()[3]  # Alpha channel
             clipped_ai = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
             clipped_ai.paste(ai_canvas, (0, 0), original_mask)
+
+            # Quantize to game palette for accurate color preview
+            # Use the first entry's palette (entries typically share palettes)
+            if self._capture_result.entries and self._capture_result.palettes:
+                first_entry = self._capture_result.entries[0]
+                snes_palette = self._capture_result.palettes.get(first_entry.palette, [])
+                if snes_palette:
+                    palette_rgb = snes_palette_to_rgb(snes_palette)
+                    # Quantize to indexed palette
+                    indexed_ai = quantize_to_palette(clipped_ai, palette_rgb)
+                    # Convert back to RGBA for compositing (palette index 0 = transparent)
+                    clipped_ai = indexed_ai.convert("RGBA")
 
             # Composite: original sprite with AI frame on top
             # The AI frame replaces original pixels where it has content
