@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import re
 import shutil
 import tempfile
@@ -666,7 +667,8 @@ class FrameMappingController(QObject):
             self.error_occurred.emit(f"Capture file missing (required for masking): {game_frame.capture_path}")
             return False
 
-        # Debug mode setup
+        # Debug mode setup - can also be enabled via environment variable
+        debug = debug or os.environ.get("SPRITEPAL_INJECT_DEBUG", "").lower() in ("1", "true", "yes")
         debug_dir: Path | None = None
         if debug:
             debug_dir = Path(tempfile.gettempdir()) / "inject_debug"
