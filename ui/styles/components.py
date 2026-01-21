@@ -1327,7 +1327,6 @@ def get_segmented_button_style(position: str = "middle", checked: bool = False) 
     QPushButton:hover {{
         background-color: {hover_bg};
         border-color: {COLORS["border_focus"]};
-        z-index: 1;
     }}
     QPushButton:checked {{
         background-color: {COLORS["primary"]};

@@ -316,7 +316,8 @@ class FrameMappingWorkspace(QWidget):
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
-            self._alignment_canvas.set_game_frame(game_frame, preview)
+            capture_result = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
+            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result)
             self._alignment_canvas.set_alignment(
                 mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
             )
@@ -347,7 +348,8 @@ class FrameMappingWorkspace(QWidget):
         if self._selected_ai_index is not None:
             game_frame = project.get_game_frame_by_id(frame_id)
             preview = self._controller.get_game_frame_preview(frame_id)
-            self._alignment_canvas.set_game_frame(game_frame, preview)
+            capture_result = self._controller.get_capture_result_for_game_frame(frame_id)
+            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result)
 
             # Direct linking: attempt to link immediately
             self._attempt_link(self._selected_ai_index, frame_id)
@@ -374,7 +376,8 @@ class FrameMappingWorkspace(QWidget):
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
-            self._alignment_canvas.set_game_frame(game_frame, preview)
+            capture_result = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
+            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result)
             self._alignment_canvas.set_alignment(
                 mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
             )

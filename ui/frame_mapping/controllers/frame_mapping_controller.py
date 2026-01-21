@@ -20,7 +20,11 @@ if TYPE_CHECKING:
 
 from core.frame_mapping_project import AIFrame, FrameMappingProject, GameFrame
 from core.mesen_integration.capture_renderer import CaptureRenderer
-from core.mesen_integration.click_extractor import MesenCaptureParser, OAMEntry
+from core.mesen_integration.click_extractor import (
+    CaptureResult,
+    MesenCaptureParser,
+    OAMEntry,
+)
 from core.rom_injector import ROMInjector
 from core.types import CompressionType
 
@@ -456,6 +460,43 @@ class FrameMappingController(QObject):
 
         except Exception as e:
             logger.warning("Failed to regenerate preview for game frame %s: %s", frame_id, e)
+            return None
+
+    def get_capture_result_for_game_frame(self, frame_id: str) -> CaptureResult | None:
+        """Get the CaptureResult for a game frame.
+
+        Parses the capture file associated with the game frame and returns
+        the CaptureResult needed for preview generation.
+
+        Args:
+            frame_id: Game frame ID
+
+        Returns:
+            CaptureResult or None if not available
+        """
+        if self._project is None:
+            return None
+
+        game_frame = self._project.get_game_frame_by_id(frame_id)
+        if game_frame is None or game_frame.capture_path is None:
+            return None
+
+        capture_path = game_frame.capture_path
+        if not capture_path.exists():
+            logger.warning("Capture file not found for game frame %s: %s", frame_id, capture_path)
+            return None
+
+        try:
+            parser = MesenCaptureParser()
+            capture_result = parser.parse_file(capture_path)
+
+            if not capture_result.has_entries:
+                return None
+
+            return capture_result
+
+        except Exception as e:
+            logger.warning("Failed to get capture result for game frame %s: %s", frame_id, e)
             return None
 
     def get_ai_frames(self) -> list[AIFrame]:

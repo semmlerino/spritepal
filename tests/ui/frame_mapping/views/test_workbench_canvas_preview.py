@@ -65,6 +65,22 @@ class TestPreviewToggle:
 
         assert not canvas._preview_item.isVisible()
 
+    def test_preview_enabled_hides_ai_frame(self, qtbot: QtBot) -> None:
+        """Enabling preview should hide the AI frame item."""
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+
+        # AI frame should be visible by default
+        assert canvas._ai_frame_item.isVisible()
+
+        # Enable preview - AI frame should be hidden
+        canvas._preview_checkbox.setChecked(True)
+        assert not canvas._ai_frame_item.isVisible()
+
+        # Disable preview - AI frame should be visible again
+        canvas._preview_checkbox.setChecked(False)
+        assert canvas._ai_frame_item.isVisible()
+
 
 class TestPreviewGeneration:
     """Tests for preview generation logic."""
