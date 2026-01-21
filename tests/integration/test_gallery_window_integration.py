@@ -1,12 +1,15 @@
 """
-Integration tests for DetachedGalleryWindow.
+DetachedGalleryWindow component integration testing.
 
-These tests focus on end-to-end workflows that would catch bugs like:
+These tests focus on the window component itself: lifecycle, edge cases, and memory management:
 - ROM loading and scanning failures
 - Worker lifecycle management issues
 - Memory leaks with large sprite sets
 - Thread leaks from improper cleanup
 - Virtual scrolling performance problems
+
+Note: For comprehensive end-to-end UI workflows including user interactions and state transitions,
+see tests/integration/test_ui_workflow_coordination.py.
 """
 
 from __future__ import annotations

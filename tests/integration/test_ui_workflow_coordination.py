@@ -1,12 +1,18 @@
 """
-UI Workflow Coordination Tests.
+End-to-end UI workflow and user interaction testing.
 
-Tests UI state machine transitions and coordination with mocked workers.
+Tests comprehensive user workflows and interaction patterns:
+- Complete ROM workflows with signal tracking
+- Keyboard navigation (I, S, arrow keys, fullscreen mode)
+- Rapid ROM switching and performance
+- UI responsiveness during processing
+- Error recovery workflows
+
+Tests UI state machine transitions with mocked workers to isolate workflow logic.
 Verifies proper state management, signal handling, and component interactions.
 
-Note: These tests use mock workers, so they don't catch actual threading or
-worker lifecycle bugs. For tests with real workers, see:
-- tests/integration/test_sprite_gallery_integration.py
+Note: These tests use mock workers for workflow isolation. For component-level testing
+with real workers, see tests/integration/test_gallery_window_integration.py.
 """
 
 from __future__ import annotations
