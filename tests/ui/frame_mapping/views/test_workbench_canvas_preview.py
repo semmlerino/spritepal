@@ -154,13 +154,9 @@ class TestPreviewWithMockData:
         canvas._preview_enabled = True
 
         # Mock the CaptureRenderer to return a simple image
-        with patch(
-            "core.mesen_integration.capture_renderer.CaptureRenderer"
-        ) as mock_renderer_cls:
+        with patch("core.mesen_integration.capture_renderer.CaptureRenderer") as mock_renderer_cls:
             mock_renderer = MagicMock()
-            mock_renderer.render_selection.return_value = Image.new(
-                "RGBA", (32, 32), (0, 255, 0, 255)
-            )
+            mock_renderer.render_selection.return_value = Image.new("RGBA", (32, 32), (0, 255, 0, 255))
             mock_renderer_cls.return_value = mock_renderer
 
             canvas._generate_preview()
@@ -192,13 +188,9 @@ class TestPreviewWithMockData:
 
         canvas._preview_enabled = True
 
-        with patch(
-            "core.mesen_integration.capture_renderer.CaptureRenderer"
-        ) as mock_renderer_cls:
+        with patch("core.mesen_integration.capture_renderer.CaptureRenderer") as mock_renderer_cls:
             mock_renderer = MagicMock()
-            mock_renderer.render_selection.return_value = Image.new(
-                "RGBA", (32, 32), (0, 255, 0, 255)
-            )
+            mock_renderer.render_selection.return_value = Image.new("RGBA", (32, 32), (0, 255, 0, 255))
             mock_renderer_cls.return_value = mock_renderer
 
             canvas._generate_preview()

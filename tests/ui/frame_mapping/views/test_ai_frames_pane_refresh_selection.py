@@ -50,7 +50,7 @@ class TestRefreshPreservesSelection:
         signal_emissions: list[int] = []
         pane.ai_frame_selected.connect(lambda idx: signal_emissions.append(idx))
 
-        status_map = {i: "mapped" for i in range(5)}
+        status_map = dict.fromkeys(range(5), "mapped")
         pane.set_mapping_status(status_map)
 
         assert pane.get_selected_index() == 2

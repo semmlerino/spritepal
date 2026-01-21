@@ -144,10 +144,7 @@ class SpriteInjector:
             if width % 8 != 0 or height % 8 != 0:
                 padded_width = ((width + 7) // 8) * 8
                 padded_height = ((height + 7) // 8) * 8
-                logger.info(
-                    f"Padding image from {width}x{height} to {padded_width}x{padded_height} "
-                    f"(tile-aligned)"
-                )
+                logger.info(f"Padding image from {width}x{height} to {padded_width}x{padded_height} (tile-aligned)")
                 # Create padded image with transparent background (index 0)
                 padded = Image.new(img.mode, (padded_width, padded_height), 0)
                 padded.paste(img, (0, 0))

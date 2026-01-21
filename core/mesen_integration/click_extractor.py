@@ -52,6 +52,7 @@ class TileData:
     pos_x: int  # Position within sprite (0, 1, 2...)
     pos_y: int
     data_hex: str  # 64 hex chars = 32 bytes of 4bpp tile data
+    rom_offset: int | None = None  # ROM file offset from VRAM attribution
 
     @property
     def data_bytes(self) -> bytes:
@@ -181,6 +182,9 @@ class MesenCaptureParser:
         """
         Parse a sprite_capture.json file.
 
+        Also looks for vram_attribution.json alongside the capture to enrich
+        tiles with ROM offsets from sprite_rom_finder.lua's attribution tracking.
+
         Args:
             json_path: Path to the JSON file
 
@@ -200,7 +204,12 @@ class MesenCaptureParser:
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in capture file: {e}") from e
 
-        return self._parse_capture_data(data)
+        result = self._parse_capture_data(data)
+
+        # Try to enrich tiles with ROM offsets from VRAM attribution
+        self._enrich_with_vram_attribution(result, path)
+
+        return result
 
     def parse_string(self, json_string: str) -> CaptureResult:
         """
@@ -270,12 +279,23 @@ class MesenCaptureParser:
                         f"out of range [0x{MIN_VRAM_ADDR:04X}, 0x{MAX_VRAM_ADDR:04X}]"
                     )
 
+                # Parse tile ROM offset if present in JSON
+                tile_rom_offset_raw = tile_data.get("rom_offset")
+                if tile_rom_offset_raw is not None:
+                    try:
+                        tile_rom_offset: int | None = int(tile_rom_offset_raw)
+                    except (TypeError, ValueError):
+                        tile_rom_offset = None
+                else:
+                    tile_rom_offset = None
+
                 tile = TileData(
                     tile_index=tile_data.get("tile_index", 0),
                     vram_addr=vram_addr,
                     pos_x=tile_data.get("pos_x", 0),
                     pos_y=tile_data.get("pos_y", 0),
                     data_hex=data_hex,
+                    rom_offset=tile_rom_offset,
                 )
                 tiles.append(tile)
 
@@ -358,3 +378,62 @@ class MesenCaptureParser:
         logger.info(f"Parsed capture: {result.visible_count} visible sprites, {len(palettes)} palettes")
 
         return result
+
+    def _enrich_with_vram_attribution(self, result: CaptureResult, capture_path: Path) -> None:
+        """Enrich tiles with ROM offsets from VRAM attribution map.
+
+        Looks for vram_attribution.json exported by sprite_rom_finder.lua (E key)
+        and uses it to fill in rom_offset for each tile based on vram_addr.
+
+        Args:
+            result: The parsed CaptureResult to enrich
+            capture_path: Path to the capture file (used to find attribution file)
+        """
+        from core.mesen_integration.vram_attribution import (
+            find_attribution_file,
+            load_vram_attribution,
+        )
+
+        # Find attribution file
+        attr_path = find_attribution_file(capture_path)
+        if attr_path is None:
+            logger.debug("No VRAM attribution file found for %s", capture_path)
+            return
+
+        # Load attribution map
+        attr_map = load_vram_attribution(attr_path)
+        if attr_map is None:
+            logger.warning("Failed to load VRAM attribution from %s", attr_path)
+            return
+
+        # Enrich each tile with its ROM offset
+        tiles_enriched = 0
+        tiles_total = 0
+        for entry in result.entries:
+            for tile in entry.tiles:
+                tiles_total += 1
+                if tile.rom_offset is not None:
+                    # Already has offset (from capture JSON)
+                    tiles_enriched += 1
+                    continue
+
+                # Look up ROM offset from attribution map
+                rom_offset = attr_map.get_rom_offset(tile.vram_addr)
+                if rom_offset is not None:
+                    tile.rom_offset = rom_offset
+                    tiles_enriched += 1
+
+            # Also update entry-level rom_offset if not set
+            # Use the first tile's ROM offset as the entry's offset
+            if entry.rom_offset is None and entry.tiles:
+                first_tile_offset = entry.tiles[0].rom_offset
+                if first_tile_offset is not None:
+                    entry.rom_offset = first_tile_offset
+
+        if tiles_total > 0:
+            logger.info(
+                "VRAM attribution: enriched %d/%d tiles with ROM offsets from %s",
+                tiles_enriched,
+                tiles_total,
+                attr_path.name,
+            )

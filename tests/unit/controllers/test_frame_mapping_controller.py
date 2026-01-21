@@ -52,9 +52,7 @@ def create_test_capture(entry_ids: list[int]) -> dict:
 class TestGetCaptureResultFiltering:
     """Tests for get_capture_result_for_game_frame entry ID filtering."""
 
-    def test_returns_all_entries_when_no_selected_ids(
-        self, tmp_path: Path, qtbot
-    ) -> None:
+    def test_returns_all_entries_when_no_selected_ids(self, tmp_path: Path, qtbot) -> None:
         """Without selected_entry_ids, returns all entries."""
         # Create capture file with 5 entries
         capture_data = create_test_capture([0, 1, 2, 3, 4])

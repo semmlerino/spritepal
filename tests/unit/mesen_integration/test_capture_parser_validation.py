@@ -274,5 +274,161 @@ class TestTileCountValidation:
         assert "got 2" in caplog.text
 
 
+class TestVRAMAttributionEnrichment:
+    """Test VRAM attribution enrichment during capture parsing."""
+
+    def test_tiles_enriched_with_rom_offset_from_attribution(self, parser, tmp_path):
+        """Verify tiles get rom_offset from vram_attribution.json."""
+        # Create capture file
+        capture_data = {
+            "frame": 1,
+            "obsel": {},
+            "entries": [
+                {
+                    "id": 0,
+                    "x": 100,
+                    "y": 100,
+                    "tile": 0,
+                    "width": 8,
+                    "height": 8,
+                    "palette": 0,
+                    "tiles": [{"tile_index": 0, "vram_addr": 0x2000, "pos_x": 0, "pos_y": 0, "data_hex": "00" * 32}],
+                }
+            ],
+            "palettes": {},
+        }
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create attribution file with ROM offset for vram_word 0x1000 (byte addr 0x2000)
+        attr_data = {
+            "export_frame": 100,
+            "export_time": "2026-01-21 12:00:00",
+            "entries": [{"vram_word": 0x1000, "vram_byte": 0x2000, "idx": 5, "ptr": 0xE96553, "file_offset": 0x3C6EF1}],
+        }
+        (tmp_path / "vram_attribution.json").write_text(json.dumps(attr_data))
+
+        # Parse capture - should auto-enrich from attribution
+        result = parser.parse_file(capture_path)
+
+        # Tile should have rom_offset from attribution
+        assert result.entries[0].tiles[0].rom_offset == 0x3C6EF1
+
+    def test_entry_rom_offset_set_from_first_tile(self, parser, tmp_path):
+        """Verify OAM entry's rom_offset is set from first tile if not present."""
+        capture_data = {
+            "frame": 1,
+            "obsel": {},
+            "entries": [
+                {
+                    "id": 0,
+                    "x": 100,
+                    "y": 100,
+                    "tile": 0,
+                    "width": 16,
+                    "height": 8,
+                    "palette": 0,
+                    "tiles": [
+                        {"tile_index": 0, "vram_addr": 0x2000, "pos_x": 0, "pos_y": 0, "data_hex": "00" * 32},
+                        {"tile_index": 1, "vram_addr": 0x2020, "pos_x": 1, "pos_y": 0, "data_hex": "00" * 32},
+                    ],
+                }
+            ],
+            "palettes": {},
+        }
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Attribution for first tile only
+        attr_data = {
+            "export_frame": 100,
+            "export_time": "2026-01-21 12:00:00",
+            "entries": [{"vram_word": 0x1000, "vram_byte": 0x2000, "file_offset": 0x123456}],
+        }
+        (tmp_path / "vram_attribution.json").write_text(json.dumps(attr_data))
+
+        result = parser.parse_file(capture_path)
+
+        # Entry rom_offset should be set from first tile
+        assert result.entries[0].rom_offset == 0x123456
+        assert result.entries[0].tiles[0].rom_offset == 0x123456
+        # Second tile has no attribution
+        assert result.entries[0].tiles[1].rom_offset is None
+
+    def test_no_attribution_file_no_enrichment(self, parser, tmp_path):
+        """Verify parsing works without attribution file."""
+        capture_data = {
+            "frame": 1,
+            "obsel": {},
+            "entries": [
+                {
+                    "id": 0,
+                    "x": 100,
+                    "y": 100,
+                    "tile": 0,
+                    "width": 8,
+                    "height": 8,
+                    "palette": 0,
+                    "tiles": [{"tile_index": 0, "vram_addr": 0x2000, "pos_x": 0, "pos_y": 0, "data_hex": "00" * 32}],
+                }
+            ],
+            "palettes": {},
+        }
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # No attribution file - should still parse successfully
+        result = parser.parse_file(capture_path)
+
+        assert len(result.entries) == 1
+        assert result.entries[0].tiles[0].rom_offset is None
+
+    def test_existing_rom_offset_preserved(self, parser, tmp_path):
+        """Verify rom_offset from JSON is not overwritten by attribution."""
+        capture_data = {
+            "frame": 1,
+            "obsel": {},
+            "entries": [
+                {
+                    "id": 0,
+                    "x": 100,
+                    "y": 100,
+                    "tile": 0,
+                    "width": 8,
+                    "height": 8,
+                    "palette": 0,
+                    "rom_offset": 0xABCDEF,  # Entry-level offset from JSON
+                    "tiles": [
+                        {
+                            "tile_index": 0,
+                            "vram_addr": 0x2000,
+                            "pos_x": 0,
+                            "pos_y": 0,
+                            "data_hex": "00" * 32,
+                            "rom_offset": 0xFEDCBA,
+                        }
+                    ],
+                }
+            ],
+            "palettes": {},
+        }
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Attribution with different offset
+        attr_data = {
+            "export_frame": 100,
+            "export_time": "2026-01-21 12:00:00",
+            "entries": [{"vram_word": 0x1000, "vram_byte": 0x2000, "file_offset": 0x111111}],
+        }
+        (tmp_path / "vram_attribution.json").write_text(json.dumps(attr_data))
+
+        result = parser.parse_file(capture_path)
+
+        # Original values should be preserved
+        assert result.entries[0].rom_offset == 0xABCDEF
+        assert result.entries[0].tiles[0].rom_offset == 0xFEDCBA
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
