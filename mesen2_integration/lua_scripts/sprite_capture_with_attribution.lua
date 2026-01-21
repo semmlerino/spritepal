@@ -277,17 +277,36 @@ end
 
 --------------------------------------------------------------------------------
 -- VRAM Attribution Write
+-- For direct ROM transfers: each tile gets its own sequential ROM offset
+-- For staged (compressed) transfers: all tiles share the base offset, but we track tile_index
+-- A 4bpp tile = 16 VRAM words = 32 ROM bytes
 --------------------------------------------------------------------------------
+local VRAM_WORDS_PER_TILE = 16  -- 16 VRAM words (32 bytes) per 4bpp tile
+local ROM_BYTES_PER_TILE = 32
+
 local function write_vram_attribution(entry, idx, ptr, file_off)
+    local is_direct = (entry.attrib_mode == "direct_rom" or entry.attrib_mode == "direct_lorom")
     local words = entry.vram_words
+
     if words then
-        for _, w in ipairs(words) do
+        -- vram_words is indexed by position in DMA transfer (1-based)
+        for i, w in ipairs(words) do
             local existing = vram_owner_map[w]
             if not (existing and existing.attrib_mode == "direct_rom" and entry.attrib_mode ~= "direct_rom") then
+                local tile_index = math.floor((i - 1) / VRAM_WORDS_PER_TILE)
+                local tile_rom_offset
+                if is_direct and file_off then
+                    -- Direct ROM: sequential offsets for each tile
+                    tile_rom_offset = file_off + tile_index * ROM_BYTES_PER_TILE
+                else
+                    -- Staged/compressed: all tiles share the compressed block offset
+                    tile_rom_offset = file_off
+                end
                 vram_owner_map[w] = {
                     idx = idx,
                     ptr = ptr,
-                    file_offset = file_off,
+                    file_offset = tile_rom_offset,
+                    tile_index_in_block = tile_index,  -- Position within the block
                     owner_frame = frame_count,
                     dma_frame = entry.frame,
                     attrib_mode = entry.attrib_mode,
@@ -297,18 +316,29 @@ local function write_vram_attribution(entry, idx, ptr, file_off)
         return
     end
 
+    -- Fallback path using vram_start/vram_end range
+    local word_index = 0
     for w = entry.vram_start, entry.vram_end - 1 do
         local existing = vram_owner_map[w]
         if not (existing and existing.attrib_mode == "direct_rom" and entry.attrib_mode ~= "direct_rom") then
+            local tile_index = math.floor(word_index / VRAM_WORDS_PER_TILE)
+            local tile_rom_offset
+            if is_direct and file_off then
+                tile_rom_offset = file_off + tile_index * ROM_BYTES_PER_TILE
+            else
+                tile_rom_offset = file_off
+            end
             vram_owner_map[w] = {
                 idx = idx,
                 ptr = ptr,
-                file_offset = file_off,
+                file_offset = tile_rom_offset,
+                tile_index_in_block = tile_index,
                 owner_frame = frame_count,
                 dma_frame = entry.frame,
                 attrib_mode = entry.attrib_mode,
             }
         end
+        word_index = word_index + 1
     end
 end
 
@@ -682,13 +712,14 @@ local function bgr555_to_rgb(bgr555)
     return {r, g, b}
 end
 
--- Get ROM offset for a VRAM word address from attribution map
+-- Get ROM attribution info for a VRAM word address
+-- Returns: rom_offset, tile_index_in_block (or nil, nil if not found)
 local function get_rom_offset_for_vram(vram_word)
     local owner = vram_owner_map[vram_word]
     if owner and owner.file_offset then
-        return owner.file_offset
+        return owner.file_offset, owner.tile_index_in_block
     end
-    return nil
+    return nil, nil
 end
 
 --------------------------------------------------------------------------------
@@ -765,8 +796,8 @@ local function read_full_oam_with_attribution(obsel)
                     tile_bytes[b + 1] = emu.read(byte_addr + b, MEM.vram)
                 end
 
-                -- Look up ROM offset from attribution map
-                local rom_offset = get_rom_offset_for_vram(word_addr)
+                -- Look up ROM offset and tile index from attribution map
+                local rom_offset, tile_index_in_block = get_rom_offset_for_vram(word_addr)
 
                 -- Track first tile's offset for entry-level attribution
                 if ty == 0 and tx == 0 and rom_offset then
@@ -779,7 +810,8 @@ local function read_full_oam_with_attribution(obsel)
                     pos_x = tx,
                     pos_y = ty,
                     data_hex = bytes_to_hex(tile_bytes),
-                    rom_offset = rom_offset,  -- KEY: Include ROM offset per tile
+                    rom_offset = rom_offset,  -- ROM offset for this tile
+                    tile_index_in_block = tile_index_in_block,  -- Position within compressed block
                 })
             end
         end
@@ -969,6 +1001,9 @@ local function capture_full_json()
             f:write(string.format('          "pos_y": %d,\n', t.pos_y))
             if t.rom_offset then
                 f:write(string.format('          "rom_offset": %d,\n', t.rom_offset))
+            end
+            if t.tile_index_in_block then
+                f:write(string.format('          "tile_index_in_block": %d,\n', t.tile_index_in_block))
             end
             f:write(string.format('          "data_hex": "%s"\n', t.data_hex))
             if j < #e.tiles then

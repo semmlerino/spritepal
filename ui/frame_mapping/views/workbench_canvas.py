@@ -807,10 +807,15 @@ class WorkbenchCanvas(QWidget):
                 snes_palette = self._capture_result.palettes.get(first_entry.palette, [])
                 if snes_palette:
                     palette_rgb = snes_palette_to_rgb(snes_palette)
+                    # Save original alpha before quantization
+                    original_alpha = clipped_ai.split()[3]
                     # Quantize to indexed palette
                     indexed_ai = quantize_to_palette(clipped_ai, palette_rgb)
-                    # Convert back to RGBA for compositing (palette index 0 = transparent)
-                    clipped_ai = indexed_ai.convert("RGBA")
+                    # Convert back to RGBA for compositing
+                    quantized_rgba = indexed_ai.convert("RGBA")
+                    # Restore original alpha (SNES index 0 = transparent, but palette[0] has a color)
+                    quantized_rgba.putalpha(original_alpha)
+                    clipped_ai = quantized_rgba
 
             # Composite: original sprite with AI frame on top
             # The AI frame replaces original pixels where it has content

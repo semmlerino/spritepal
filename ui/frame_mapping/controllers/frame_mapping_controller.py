@@ -7,6 +7,9 @@ between the view panels.
 from __future__ import annotations
 
 import logging
+import math
+import re
+import shutil
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -23,7 +26,6 @@ from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import (
     CaptureResult,
     MesenCaptureParser,
-    OAMEntry,
 )
 from core.palette_utils import quantize_to_palette, snes_palette_to_rgb
 from core.rom_injector import ROMInjector
@@ -536,6 +538,69 @@ class FrameMappingController(QObject):
             return []
         return self._project.game_frames
 
+    def create_injection_copy(self, rom_path: Path) -> Path | None:
+        """Create a numbered copy of the ROM for injection (public API).
+
+        Use this to pre-create a copy for batch injection operations.
+
+        Args:
+            rom_path: Path to the source ROM
+
+        Returns:
+            Path to the created copy, or None if creation failed
+        """
+        return self._create_injection_copy(rom_path, None)
+
+    def _create_injection_copy(
+        self,
+        rom_path: Path,
+        output_path: Path | None = None,
+    ) -> Path | None:
+        """Create a numbered copy of the ROM for injection.
+
+        Creates a copy with a numbered suffix to avoid overwriting the original
+        or conflicting with existing files.
+
+        Args:
+            rom_path: Path to the source ROM
+            output_path: Optional explicit output path (if provided, uses its directory)
+
+        Returns:
+            Path to the created copy, or None if creation failed
+        """
+        # Determine output directory
+        if output_path:
+            output_dir = output_path.parent
+            base_name = output_path.stem
+            extension = output_path.suffix
+        else:
+            output_dir = rom_path.parent
+            base_name = rom_path.stem
+            extension = rom_path.suffix
+
+        # Remove existing suffixes to get clean base name
+        base_name = base_name.removesuffix("_modified")
+        # Remove existing _injected_N suffix if present
+        base_name = re.sub(r"_injected_\d+$", "", base_name)
+
+        # Find next available number
+        counter = 1
+        while True:
+            new_name = f"{base_name}_injected_{counter}{extension}"
+            new_path = output_dir / new_name
+            if not new_path.exists():
+                break
+            counter += 1
+
+        # Copy the ROM
+        try:
+            shutil.copy2(rom_path, new_path)
+            logger.info("Created injection ROM copy: %s", new_path)
+            return new_path
+        except OSError as e:
+            logger.exception("Failed to create ROM copy: %s", e)
+            return None
+
     def inject_mapping(
         self,
         ai_frame_index: int,
@@ -680,43 +745,158 @@ class FrameMappingController(QObject):
         success = False
         messages = []
 
-        # We need to track the current ROM path as we update it
-        current_rom_path = str(output_path) if output_path else str(rom_path)
+        # Determine injection target:
+        # - If output_path is provided and exists, use it directly (for batch injection)
+        # - Otherwise, create a new numbered copy of the source ROM
+        if output_path and output_path.exists():
+            injection_rom_path = output_path
+            logger.info("Using existing output ROM: %s", injection_rom_path)
+        else:
+            injection_rom_path = self._create_injection_copy(rom_path, output_path)
+            if injection_rom_path is None:
+                self.error_occurred.emit("Failed to create ROM copy for injection")
+                return False
+            logger.info("Created injection ROM copy: %s", injection_rom_path)
+
+        current_rom_path = str(injection_rom_path)
         first_injection = True
 
         try:
-            # Group entries by ROM offset
-            offset_groups: dict[int, list[OAMEntry]] = {}
-            for entry in relevant_entries:
-                if entry.rom_offset is not None:
-                    if entry.rom_offset not in offset_groups:
-                        offset_groups[entry.rom_offset] = []
-                    offset_groups[entry.rom_offset].append(entry)
+            # Group by individual tile ROM offsets (not entry-level offsets)
+            # Each tile within an entry may have a different ROM offset
+            # Key: rom_offset -> dict of vram_addr -> (screen_x, screen_y, palette, tile_index_in_block)
+            tile_groups: dict[int, dict[int, tuple[int, int, int, int | None]]] = {}
 
-            # Get bounding box of the whole selection to map local coords
             bbox = filtered_capture.bounding_box
 
-            for rom_offset, entries in offset_groups.items():
-                # Determine the bounding box of JUST this group of tiles
-                # This helps us crop the relevant part of the masked_canvas
-                min_x = min(e.x for e in entries)
-                min_y = min(e.y for e in entries)
-                max_x = max(e.x + e.width for e in entries)
-                max_y = max(e.y + e.height for e in entries)
+            for entry in relevant_entries:
+                for tile in entry.tiles:
+                    if tile.rom_offset is None:
+                        continue
 
-                # Calculate crop coordinates relative to the full `masked_canvas`
-                # masked_canvas (0,0) corresponds to bbox.x, bbox.y
-                crop_x = min_x - bbox.x
-                crop_y = min_y - bbox.y
-                crop_w = max_x - min_x
-                crop_h = max_y - min_y
+                    # Calculate screen position for this 8x8 tile
+                    # tile.pos_x/pos_y are tile indices within the entry (0, 1, 2...)
+                    screen_x = entry.x + tile.pos_x * 8
+                    screen_y = entry.y + tile.pos_y * 8
 
-                # Crop the relevant part for this ROM offset
-                chunk_img = masked_canvas.crop((crop_x, crop_y, crop_x + crop_w, crop_y + crop_h))
+                    if tile.rom_offset not in tile_groups:
+                        tile_groups[tile.rom_offset] = {}
+
+                    # Use vram_addr as unique key - same vram_addr means same tile data
+                    # This handles cases where the same tile is displayed multiple times
+                    if tile.vram_addr not in tile_groups[tile.rom_offset]:
+                        tile_groups[tile.rom_offset][tile.vram_addr] = (
+                            screen_x,
+                            screen_y,
+                            entry.palette,
+                            tile.tile_index_in_block,  # Position within compressed block
+                        )
+
+            logger.debug(
+                "Tile-level grouping: %d unique ROM offsets from %d entries",
+                len(tile_groups),
+                len(relevant_entries),
+            )
+
+            # Read ROM data once for querying original tile counts
+            rom_data = rom_path.read_bytes()
+
+            for rom_offset, vram_tiles in tile_groups.items():
+                # Sort tiles by tile_index_in_block when available (proper ROM order),
+                # otherwise fall back to vram_addr order
+                def tile_sort_key(
+                    vram_addr: int,
+                    tiles: dict[int, tuple[int, int, int, int | None]] = vram_tiles,
+                ) -> tuple[int, int]:
+                    _, _, _, tile_idx = tiles[vram_addr]
+                    # Use tile_index_in_block if available, otherwise use vram_addr
+                    # tile_idx goes first to sort by block position, vram_addr as tiebreaker
+                    if tile_idx is not None:
+                        return (tile_idx, vram_addr)
+                    return (vram_addr, 0)
+
+                sorted_vram_addrs = sorted(vram_tiles.keys(), key=tile_sort_key)
+                captured_tile_count = len(sorted_vram_addrs)
+
+                if captured_tile_count == 0:
+                    continue
+
+                # Query original ROM data to find how many tiles are actually stored here
+                # This prevents injecting more tiles than the original compressed block contains
+                try:
+                    _, original_data, _ = injector.find_compressed_sprite(rom_data, rom_offset)
+                    original_tile_count = len(original_data) // 32  # 32 bytes per 4bpp tile
+                    if original_tile_count == 0:
+                        logger.warning(
+                            "ROM offset 0x%X: Original data has no complete tiles, skipping",
+                            rom_offset,
+                        )
+                        continue
+                except Exception as e:
+                    logger.warning(
+                        "ROM offset 0x%X: Could not decompress original data (%s), skipping",
+                        rom_offset,
+                        e,
+                    )
+                    continue
+
+                # Limit to original tile count - only inject as many tiles as the ROM slot holds
+                if captured_tile_count > original_tile_count:
+                    logger.info(
+                        "ROM offset 0x%X: Capture has %d tiles but ROM only has %d, limiting injection",
+                        rom_offset,
+                        captured_tile_count,
+                        original_tile_count,
+                    )
+                    sorted_vram_addrs = sorted_vram_addrs[:original_tile_count]
+
+                tile_count = len(sorted_vram_addrs)
+
+                # Determine grid layout for the tiles
+                # Try to make a square-ish grid, preferring wider layouts
+                grid_width = math.ceil(math.sqrt(tile_count))
+                grid_height = math.ceil(tile_count / grid_width)
+
+                logger.debug(
+                    "ROM offset 0x%X: injecting %d tiles (of %d captured), grid %dx%d",
+                    rom_offset,
+                    tile_count,
+                    captured_tile_count,
+                    grid_width,
+                    grid_height,
+                )
+
+                # Create output image for this ROM offset's tiles
+                chunk_img = Image.new(
+                    "RGBA",
+                    (grid_width * 8, grid_height * 8),
+                    (0, 0, 0, 0),
+                )
+
+                # Get palette from first tile's entry
+                first_tile_info = vram_tiles[sorted_vram_addrs[0]]
+                palette_index = first_tile_info[2]
+
+                # Extract each 8x8 tile from the masked canvas and place in grid
+                for idx, vram_addr in enumerate(sorted_vram_addrs):
+                    screen_x, screen_y, _, _ = vram_tiles[vram_addr]
+
+                    # Convert screen coords to masked_canvas coords
+                    canvas_x = screen_x - bbox.x
+                    canvas_y = screen_y - bbox.y
+
+                    # Extract 8x8 tile from masked canvas
+                    tile_img = masked_canvas.crop(
+                        (canvas_x, canvas_y, canvas_x + 8, canvas_y + 8)
+                    )
+
+                    # Calculate position in output grid
+                    grid_x = (idx % grid_width) * 8
+                    grid_y = (idx // grid_width) * 8
+
+                    chunk_img.paste(tile_img, (grid_x, grid_y))
 
                 # Quantize to game palette for proper color mapping
-                # Entries sharing a ROM offset typically share a palette - use the first entry's palette
-                palette_index = entries[0].palette
                 snes_palette = capture_result.palettes.get(palette_index, [])
                 if snes_palette:
                     palette_rgb = snes_palette_to_rgb(snes_palette)
@@ -738,7 +918,7 @@ class FrameMappingController(QObject):
                     chunk_path = Path(tmp.name)
                     chunk_img.save(chunk_path, "PNG")
 
-                # Inject this chunk
+                # Inject this chunk - try HAL first, fall back to RAW if decompression fails
                 result, message = injector.inject_sprite_to_rom(
                     sprite_path=str(chunk_path),
                     rom_path=str(rom_path) if first_injection else current_rom_path,
@@ -751,11 +931,29 @@ class FrameMappingController(QObject):
                     compression_type=CompressionType.HAL,
                 )
 
+                # If HAL failed due to decompression, try RAW (uncompressed) injection
+                if not result and "decompress" in message.lower():
+                    logger.info(
+                        "ROM offset 0x%X: HAL decompression failed, retrying as RAW (uncompressed)",
+                        rom_offset,
+                    )
+                    result, message = injector.inject_sprite_to_rom(
+                        sprite_path=str(chunk_path),
+                        rom_path=str(rom_path) if first_injection else current_rom_path,
+                        output_path=current_rom_path,
+                        sprite_offset=rom_offset,
+                        fast_compression=False,  # Not applicable for RAW
+                        create_backup=create_backup and first_injection,
+                        ignore_checksum=True,
+                        force=False,
+                        compression_type=CompressionType.RAW,
+                    )
+
                 # Cleanup temp file
                 chunk_path.unlink()
 
                 if result:
-                    messages.append(f"Offset 0x{rom_offset:X}: Success")
+                    messages.append(f"Offset 0x{rom_offset:X}: Success ({tile_count} tiles)")
                     first_injection = False
                     success = True
                 else:

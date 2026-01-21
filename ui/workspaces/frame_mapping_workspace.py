@@ -572,25 +572,26 @@ class FrameMappingWorkspace(QWidget):
             )
             return
 
-        # Generate modified ROM path if not already created
-        from core.rom_injector import ROMInjector
-
-        if self._modified_rom_path is None:
-            self._modified_rom_path = Path(ROMInjector.get_modified_rom_path(str(self._rom_path)))
-
-        target_rom = self._modified_rom_path
+        # Check that source ROM exists
+        if not self._rom_path.exists():
+            QMessageBox.warning(
+                self,
+                "Inject Frame",
+                f"ROM file not found: {self._rom_path}\n\nPlease reload the ROM in Sprite Editor.",
+            )
+            return
 
         reply = QMessageBox.question(
             self,
             "Confirm Injection",
-            f"Inject AI Frame {ai_frame_index} into:\n{target_rom.name}\n\n"
-            f"Original ROM ({self._rom_path.name}) will not be modified.",
+            f"Inject AI Frame {ai_frame_index}?\n\n"
+            f"A new copy of {self._rom_path.name} will be created for injection.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            self._controller.inject_mapping(ai_frame_index, target_rom)
+            self._controller.inject_mapping(ai_frame_index, self._rom_path)
 
     def _on_inject_all(self) -> None:
         """Handle inject all mapped frames request."""
@@ -608,19 +609,20 @@ class FrameMappingWorkspace(QWidget):
             )
             return
 
-        # Generate modified ROM path if not already created
-        from core.rom_injector import ROMInjector
-
-        if self._modified_rom_path is None:
-            self._modified_rom_path = Path(ROMInjector.get_modified_rom_path(str(self._rom_path)))
-
-        target_rom = self._modified_rom_path
+        # Check that source ROM exists
+        if not self._rom_path.exists():
+            QMessageBox.warning(
+                self,
+                "Inject All",
+                f"ROM file not found: {self._rom_path}\n\nPlease reload the ROM in Sprite Editor.",
+            )
+            return
 
         reply = QMessageBox.question(
             self,
             "Confirm Injection",
-            f"Inject {project.mapped_count} mapped frames into:\n{target_rom.name}\n\n"
-            f"Original ROM ({self._rom_path.name}) will not be modified.",
+            f"Inject {project.mapped_count} mapped frames?\n\n"
+            f"A new copy of {self._rom_path.name} will be created for injection.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -628,16 +630,29 @@ class FrameMappingWorkspace(QWidget):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        # Inject all mapped frames
+        # Create a single copy for all injections
+        target_rom = self._controller.create_injection_copy(self._rom_path)
+        if target_rom is None:
+            QMessageBox.critical(
+                self, "Inject All", "Failed to create ROM copy for injection."
+            )
+            return
+
+        # Inject all mapped frames into the same copy
         success_count = 0
         for ai_frame in project.ai_frames:
             mapping = project.get_mapping_for_ai_frame(ai_frame.index)
             if mapping:
-                if self._controller.inject_mapping(ai_frame.index, target_rom):
+                # Pass the created copy as output_path to avoid creating new copies
+                if self._controller.inject_mapping(
+                    ai_frame.index, self._rom_path, output_path=target_rom
+                ):
                     success_count += 1
 
         if self._message_service:
-            self._message_service.show_message(f"Injected {success_count}/{project.mapped_count} frames")
+            self._message_service.show_message(
+                f"Injected {success_count}/{project.mapped_count} frames into {target_rom.name}"
+            )
 
     def _on_mapping_injected(self, ai_index: int, message: str) -> None:
         """Handle successful injection signal."""

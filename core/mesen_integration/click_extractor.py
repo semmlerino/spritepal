@@ -53,6 +53,7 @@ class TileData:
     pos_y: int
     data_hex: str  # 64 hex chars = 32 bytes of 4bpp tile data
     rom_offset: int | None = None  # ROM file offset from VRAM attribution
+    tile_index_in_block: int | None = None  # Position within compressed ROM block
 
     @property
     def data_bytes(self) -> bytes:
@@ -289,6 +290,16 @@ class MesenCaptureParser:
                 else:
                     tile_rom_offset = None
 
+                # Parse tile index within block if present
+                tile_idx_in_block_raw = tile_data.get("tile_index_in_block")
+                if tile_idx_in_block_raw is not None:
+                    try:
+                        tile_idx_in_block: int | None = int(tile_idx_in_block_raw)
+                    except (TypeError, ValueError):
+                        tile_idx_in_block = None
+                else:
+                    tile_idx_in_block = None
+
                 tile = TileData(
                     tile_index=tile_data.get("tile_index", 0),
                     vram_addr=vram_addr,
@@ -296,6 +307,7 @@ class MesenCaptureParser:
                     pos_y=tile_data.get("pos_y", 0),
                     data_hex=data_hex,
                     rom_offset=tile_rom_offset,
+                    tile_index_in_block=tile_idx_in_block,
                 )
                 tiles.append(tile)
 
