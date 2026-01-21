@@ -236,6 +236,7 @@ class FrameMappingWorkspace(QWidget):
         self._controller.game_frame_added.connect(self._on_game_frame_added)
         self._controller.mapping_injected.connect(self._on_mapping_injected)
         self._controller.error_occurred.connect(self._on_error)
+        self._controller.status_update.connect(self._on_status_update)
 
         # AI Frames Pane signals
         self._ai_frames_pane.ai_frame_selected.connect(self._on_ai_frame_selected)
@@ -307,6 +308,12 @@ class FrameMappingWorkspace(QWidget):
         """Handle error from controller."""
         logger.error("Frame mapping error: %s", message)
         QMessageBox.warning(self, "Error", message)
+
+    def _on_status_update(self, message: str) -> None:
+        """Handle status update from controller."""
+        logger.info("Frame mapping status: %s", message)
+        if self._message_service:
+            self._message_service.show_message(message, 5000)
 
     def _on_ai_frame_selected(self, index: int) -> None:
         """Handle AI frame selection in left pane.

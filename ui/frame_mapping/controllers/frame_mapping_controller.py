@@ -56,6 +56,7 @@ class FrameMappingController(QObject):
     mapping_removed = Signal(int)  # ai_index
     mapping_injected = Signal(int, str)  # ai_index, message
     error_occurred = Signal(str)  # error message
+    status_update = Signal(str)  # status message for UI feedback
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -826,17 +827,22 @@ class FrameMappingController(QObject):
             # The Mesen Lua script attributes ROM offsets to VRAM tiles during capture,
             # but if VRAM is overwritten later, the offsets become stale.
             # This searches the ROM to find the correct offset for each tile.
+            self.status_update.emit("Verifying ROM tile attribution...")
             corrections = self._find_correct_rom_offsets(
                 filtered_capture,
                 rom_path,
                 game_frame.selected_entry_ids,
             )
 
-            # Count corrections for logging
+            # Count corrections for logging and UI feedback
             stale_count = sum(1 for old, new in corrections.items() if old != new and new is not None)
             unfound_count = sum(1 for new in corrections.values() if new is None)
+            total_offsets = len(corrections)
 
             if stale_count > 0:
+                self.status_update.emit(
+                    f"ROM attribution: {stale_count} stale offsets corrected, {unfound_count} not found"
+                )
                 logger.info(
                     "ROM attribution: %d offsets corrected, %d not found in ROM",
                     stale_count,
@@ -844,11 +850,15 @@ class FrameMappingController(QObject):
                 )
 
             if unfound_count > 0 and unfound_count == len(corrections):
+                self.status_update.emit(f"ERROR: 0/{total_offsets} tiles found in ROM")
                 self.error_occurred.emit(
                     "Could not find any tiles in ROM. The sprite data may use an "
                     "unknown compression format or the ROM may be modified."
                 )
                 return False
+
+            if stale_count == 0 and unfound_count == 0 and total_offsets > 0:
+                self.status_update.emit(f"ROM attribution verified: {total_offsets} tiles matched")
 
             # Apply corrections to tiles before processing
             for entry in relevant_entries:
