@@ -183,11 +183,9 @@ class WorkbenchCanvas(QWidget):
     Signals:
         alignment_changed: Emitted when alignment values change.
             Args: (offset_x: int, offset_y: int, flip_h: bool, flip_v: bool, scale: float)
-        apply_requested: Emitted when user clicks Apply button.
     """
 
     alignment_changed = Signal(int, int, bool, bool, float)  # offset_x, offset_y, flip_h, flip_v, scale
-    apply_requested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -344,13 +342,6 @@ class WorkbenchCanvas(QWidget):
         self._auto_align_btn.setToolTip("Center AI frame over game frame based on bounding boxes")
         controls2.addWidget(self._auto_align_btn)
 
-        # Apply button
-        self._apply_btn = QPushButton("Apply")
-        self._apply_btn.setStyleSheet("font-size: 11px; font-weight: bold;")
-        self._apply_btn.setMaximumWidth(60)
-        self._apply_btn.setToolTip("Apply mapping to tiles")
-        controls2.addWidget(self._apply_btn)
-
         layout.addLayout(controls2)
 
         # Set initial enabled state
@@ -373,7 +364,6 @@ class WorkbenchCanvas(QWidget):
         self._grid_checkbox.toggled.connect(self._on_grid_toggled)
         self._preview_checkbox.toggled.connect(self._on_preview_toggled)
         self._auto_align_btn.clicked.connect(self._on_auto_align)
-        self._apply_btn.clicked.connect(self.apply_requested.emit)
 
         # AI frame item signals
         self._ai_frame_item.transform_changed.connect(self._on_ai_frame_transform_changed)
@@ -586,7 +576,6 @@ class WorkbenchCanvas(QWidget):
         self._tile_overlay_checkbox.setEnabled(enabled)
         self._grid_checkbox.setEnabled(enabled)
         self._auto_align_btn.setEnabled(enabled)
-        self._apply_btn.setEnabled(enabled)
 
     def _update_status(self) -> None:
         """Update the status label."""

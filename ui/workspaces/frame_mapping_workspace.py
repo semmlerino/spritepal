@@ -584,8 +584,7 @@ class FrameMappingWorkspace(QWidget):
         reply = QMessageBox.question(
             self,
             "Confirm Injection",
-            f"Inject AI Frame {ai_frame_index}?\n\n"
-            f"A new copy of {self._rom_path.name} will be created for injection.",
+            f"Inject AI Frame {ai_frame_index}?\n\nA new copy of {self._rom_path.name} will be created for injection.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -633,9 +632,7 @@ class FrameMappingWorkspace(QWidget):
         # Create a single copy for all injections
         target_rom = self._controller.create_injection_copy(self._rom_path)
         if target_rom is None:
-            QMessageBox.critical(
-                self, "Inject All", "Failed to create ROM copy for injection."
-            )
+            QMessageBox.critical(self, "Inject All", "Failed to create ROM copy for injection.")
             return
 
         # Inject all mapped frames into the same copy
@@ -644,9 +641,7 @@ class FrameMappingWorkspace(QWidget):
             mapping = project.get_mapping_for_ai_frame(ai_frame.index)
             if mapping:
                 # Pass the created copy as output_path to avoid creating new copies
-                if self._controller.inject_mapping(
-                    ai_frame.index, self._rom_path, output_path=target_rom
-                ):
+                if self._controller.inject_mapping(ai_frame.index, self._rom_path, output_path=target_rom):
                     success_count += 1
 
         if self._message_service:

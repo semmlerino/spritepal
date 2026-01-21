@@ -675,6 +675,12 @@ class FrameMappingController(QObject):
             if mapping.flip_v:
                 ai_img = ai_img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
+            # Apply scale if not 1.0 (matching preview behavior in workbench_canvas)
+            if abs(mapping.scale - 1.0) > 0.01:
+                new_w = max(1, int(ai_img.width * mapping.scale))
+                new_h = max(1, int(ai_img.height * mapping.scale))
+                ai_img = ai_img.resize((new_w, new_h), Image.Resampling.NEAREST)
+
             # Re-parse capture to get tile layout and render original mask
             parser = MesenCaptureParser()
             capture_result = parser.parse_file(game_frame.capture_path)
@@ -682,12 +688,16 @@ class FrameMappingController(QObject):
             # Render the FULL original frame to use as a mask
             # We need to filter the capture to ONLY the entries relevant to this GameFrame
             # (The GameFrame might have been imported from a subset of a larger capture)
-            # However, GameFrame logic in import_mesen_capture filters the capture *result*
-            # effectively by creating a new one? No, it creates a filtered CaptureResult in memory
-            # but doesn't save it to disk. It reads the original full file here.
-            # We must filter again based on the ROM offsets associated with the GameFrame.
+            # Filter by selected_entry_ids if available (user's explicit selection during import),
+            # otherwise fall back to rom_offsets for legacy projects.
 
-            relevant_entries = [e for e in capture_result.entries if e.rom_offset in game_frame.rom_offsets]
+            if game_frame.selected_entry_ids:
+                # Use explicit entry selection (preferred - more precise)
+                selected_ids = set(game_frame.selected_entry_ids)
+                relevant_entries = [e for e in capture_result.entries if e.id in selected_ids]
+            else:
+                # Legacy fallback: filter by ROM offset (may include unintended entries)
+                relevant_entries = [e for e in capture_result.entries if e.rom_offset in game_frame.rom_offsets]
 
             if not relevant_entries:
                 self.error_occurred.emit("No entries in capture match the GameFrame's ROM offsets.")
@@ -886,9 +896,7 @@ class FrameMappingController(QObject):
                     canvas_y = screen_y - bbox.y
 
                     # Extract 8x8 tile from masked canvas
-                    tile_img = masked_canvas.crop(
-                        (canvas_x, canvas_y, canvas_x + 8, canvas_y + 8)
-                    )
+                    tile_img = masked_canvas.crop((canvas_x, canvas_y, canvas_x + 8, canvas_y + 8))
 
                     # Calculate position in output grid
                     grid_x = (idx % grid_width) * 8
