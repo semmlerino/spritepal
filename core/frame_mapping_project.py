@@ -94,6 +94,7 @@ class FrameMapping:
     offset_y: int = 0
     flip_h: bool = False
     flip_v: bool = False
+    scale: float = 1.0  # Uniform scale factor (0.1 - 10.0)
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to dictionary for JSON storage."""
@@ -105,6 +106,7 @@ class FrameMapping:
             "offset_y": self.offset_y,
             "flip_h": self.flip_h,
             "flip_v": self.flip_v,
+            "scale": self.scale,
         }
 
     @classmethod
@@ -118,6 +120,7 @@ class FrameMapping:
             offset_y=cast(int, data.get("offset_y", 0)),
             flip_h=cast(bool, data.get("flip_h", False)),
             flip_v=cast(bool, data.get("flip_v", False)),
+            scale=float(cast(int | float, data.get("scale", 1.0))),
         )
 
 
@@ -261,6 +264,7 @@ class FrameMappingProject:
         offset_y: int,
         flip_h: bool,
         flip_v: bool,
+        scale: float = 1.0,
     ) -> bool:
         """Update alignment for a mapping.
 
@@ -270,6 +274,7 @@ class FrameMappingProject:
             offset_y: Y offset for alignment
             flip_h: Horizontal flip state
             flip_v: Vertical flip state
+            scale: Scale factor (0.1 - 10.0)
 
         Returns:
             True if mapping was updated, False if no mapping exists
@@ -282,6 +287,7 @@ class FrameMappingProject:
         mapping.offset_y = offset_y
         mapping.flip_h = flip_h
         mapping.flip_v = flip_v
+        mapping.scale = max(0.1, min(10.0, scale))
         return True
 
     def remove_mapping_for_ai_frame(self, ai_frame_index: int) -> bool:

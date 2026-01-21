@@ -39,6 +39,12 @@ from core.services.preview_generator import (
     create_vram_preview_request,
 )
 from core.services.rom_cache import ROMCache
+from core.services.tile_sampling_service import (
+    TileCoord,
+    TileSampleResult,
+    TileSamplingService,
+    calculate_auto_alignment,
+)
 from core.services.worker_lifecycle import WorkerManager
 
 __all__ = [
@@ -48,7 +54,11 @@ __all__ = [
     "PreviewRequest",
     "PreviewResult",
     "ROMCache",
+    "TileCoord",
+    "TileSampleResult",
+    "TileSamplingService",
     "WorkerManager",
+    "calculate_auto_alignment",
     "create_rom_preview_request",
     "create_vram_preview_request",
     "find_suggested_input_vram",

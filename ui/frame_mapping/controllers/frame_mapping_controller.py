@@ -367,6 +367,7 @@ class FrameMappingController(QObject):
         offset_y: int,
         flip_h: bool,
         flip_v: bool,
+        scale: float = 1.0,
     ) -> bool:
         """Update alignment for a mapping.
 
@@ -376,6 +377,7 @@ class FrameMappingController(QObject):
             offset_y: Y offset for alignment
             flip_h: Horizontal flip state
             flip_v: Vertical flip state
+            scale: Scale factor (0.1 - 10.0)
 
         Returns:
             True if alignment was updated
@@ -383,15 +385,16 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        if self._project.update_mapping_alignment(ai_frame_index, offset_x, offset_y, flip_h, flip_v):
+        if self._project.update_mapping_alignment(ai_frame_index, offset_x, offset_y, flip_h, flip_v, scale):
             self.project_changed.emit()
             logger.info(
-                "Updated alignment for AI frame %d: offset=(%d, %d), flip=(%s, %s)",
+                "Updated alignment for AI frame %d: offset=(%d, %d), flip=(%s, %s), scale=%.2f",
                 ai_frame_index,
                 offset_x,
                 offset_y,
                 flip_h,
                 flip_v,
+                scale,
             )
             return True
         return False

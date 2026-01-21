@@ -44,9 +44,9 @@ from core.app_context import get_app_context
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.dialogs.replace_link_dialog import confirm_replace_link
 from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
-from ui.frame_mapping.views.alignment_canvas import AlignmentCanvas
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
+from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 
 if TYPE_CHECKING:
     from ui.managers.status_bar_manager import StatusBarManager
@@ -119,8 +119,8 @@ class FrameMappingWorkspace(QWidget):
         # Center Column: Vertical splitter [Canvas | Drawer]
         self._center_splitter = QSplitter(Qt.Orientation.Vertical)
 
-        # Center Top: Alignment Canvas
-        self._alignment_canvas = AlignmentCanvas()
+        # Center Top: Workbench Canvas (interactive alignment)
+        self._alignment_canvas = WorkbenchCanvas()
         self._center_splitter.addWidget(self._alignment_canvas)
 
         # Center Bottom: Mappings Drawer
@@ -317,7 +317,9 @@ class FrameMappingWorkspace(QWidget):
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
             self._alignment_canvas.set_game_frame(game_frame, preview)
-            self._alignment_canvas.set_alignment(mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v)
+            self._alignment_canvas.set_alignment(
+                mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
+            )
             # Sync captures selection
             self._captures_pane.select_frame(mapping.game_frame_id)
             self._selected_game_id = mapping.game_frame_id
@@ -373,7 +375,9 @@ class FrameMappingWorkspace(QWidget):
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
             self._alignment_canvas.set_game_frame(game_frame, preview)
-            self._alignment_canvas.set_alignment(mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v)
+            self._alignment_canvas.set_alignment(
+                mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
+            )
             # Sync captures selection
             self._captures_pane.select_frame(mapping.game_frame_id)
             self._selected_game_id = mapping.game_frame_id
@@ -399,7 +403,7 @@ class FrameMappingWorkspace(QWidget):
         """Handle game frame dropped onto drawer row."""
         self._attempt_link(ai_index, game_frame_id)
 
-    def _on_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool) -> None:
+    def _on_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
         """Handle alignment change from canvas (auto-save)."""
         if self._selected_ai_index is None:
             return
@@ -412,8 +416,8 @@ class FrameMappingWorkspace(QWidget):
         if mapping is None:
             return
 
-        # Update alignment in controller
-        self._controller.update_mapping_alignment(self._selected_ai_index, x, y, flip_h, flip_v)
+        # Update alignment in controller (includes scale)
+        self._controller.update_mapping_alignment(self._selected_ai_index, x, y, flip_h, flip_v, scale)
         self._mapping_panel.refresh()
 
     def _on_adjust_alignment(self, ai_frame_index: int) -> None:
@@ -656,7 +660,9 @@ class FrameMappingWorkspace(QWidget):
         # Update canvas with alignment
         mapping = project.get_mapping_for_ai_frame(ai_index)
         if mapping:
-            self._alignment_canvas.set_alignment(mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v)
+            self._alignment_canvas.set_alignment(
+                mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
+            )
 
         if self._message_service:
             ai_name = ai_frame.path.name if ai_frame else f"AI Frame {ai_index}"
