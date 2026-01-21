@@ -10,7 +10,7 @@ These tests cover:
 
 Related tests:
 - tests/fixtures/hal_fixtures.py - HAL fixture definitions
-- tests/integration/test_hal_compression_simplified.py - Basic HAL tests
+- tests/integration/test_hal_process_pool.py - Basic HAL process pool tests
 
 Note: These tests use the MockHALProcessPool to simulate failure scenarios
 without requiring actual HAL binaries or spawning real processes.
