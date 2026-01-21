@@ -669,7 +669,7 @@ class FrameMappingController(QObject):
         # Debug mode setup
         debug_dir: Path | None = None
         if debug:
-            debug_dir = Path("/tmp/inject_debug")
+            debug_dir = Path(tempfile.gettempdir()) / "inject_debug"
             debug_dir.mkdir(exist_ok=True)
             logger.info("=== INJECTION DEBUG MODE ===")
             logger.info("Debug output directory: %s", debug_dir)
