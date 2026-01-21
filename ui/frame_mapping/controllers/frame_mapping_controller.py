@@ -31,8 +31,9 @@ from core.mesen_integration.click_extractor import (
 from core.palette_utils import quantize_to_palette, snes_palette_to_rgb
 from core.rom_injector import ROMInjector
 from core.types import CompressionType
+from utils.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class FrameMappingController(QObject):
@@ -636,13 +637,21 @@ class FrameMappingController(QObject):
         Returns:
             True if injection was successful
         """
+        logger.info(
+            "inject_mapping() called: ai_frame_index=%d, rom_path=%s",
+            ai_frame_index,
+            rom_path,
+        )
+
         if self._project is None:
+            logger.warning("inject_mapping: No project loaded")
             self.error_occurred.emit("No project loaded")
             return False
 
         # 1. Retrieve Mapping and Frames
         mapping = self._project.get_mapping_for_ai_frame(ai_frame_index)
         if mapping is None:
+            logger.warning("inject_mapping: AI frame %d is not mapped", ai_frame_index)
             self.error_occurred.emit(f"AI frame {ai_frame_index} is not mapped")
             return False
 
@@ -650,23 +659,35 @@ class FrameMappingController(QObject):
         game_frame = self._project.get_game_frame_by_id(mapping.game_frame_id)
 
         if ai_frame is None or game_frame is None:
+            logger.warning("inject_mapping: Invalid mapping - missing frame reference")
             self.error_occurred.emit("Invalid mapping: missing frame reference")
             return False
 
+        logger.info(
+            "inject_mapping: AI frame '%s' -> Game frame '%s' (offsets: %s)",
+            ai_frame.path.name,
+            game_frame.id,
+            [f"0x{o:X}" for o in game_frame.rom_offsets],
+        )
+
         # 2. Validate Data
         if not game_frame.rom_offsets:
+            logger.warning("inject_mapping: Game frame %s has no ROM offsets", game_frame.id)
             self.error_occurred.emit(f"Game frame {game_frame.id} has no ROM offsets associated")
             return False
 
         if not ai_frame.path.exists():
+            logger.warning("inject_mapping: AI frame file not found: %s", ai_frame.path)
             self.error_occurred.emit(f"AI frame file not found: {ai_frame.path}")
             return False
 
         if not rom_path.exists():
+            logger.warning("inject_mapping: ROM file not found: %s", rom_path)
             self.error_occurred.emit(f"ROM file not found: {rom_path}")
             return False
 
         if not game_frame.capture_path or not game_frame.capture_path.exists():
+            logger.warning("inject_mapping: Capture file missing: %s", game_frame.capture_path)
             self.error_occurred.emit(f"Capture file missing (required for masking): {game_frame.capture_path}")
             return False
 
