@@ -55,6 +55,7 @@ class GameFrame:
     palette_index: int = 0
     width: int = 0
     height: int = 0
+    selected_entry_ids: list[int] = field(default_factory=list)  # OAM entry IDs selected during import
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to dictionary for JSON storage."""
@@ -65,6 +66,7 @@ class GameFrame:
             "palette_index": self.palette_index,
             "width": self.width,
             "height": self.height,
+            "selected_entry_ids": self.selected_entry_ids,
         }
 
     @classmethod
@@ -78,6 +80,7 @@ class GameFrame:
             palette_index=cast(int, data.get("palette_index", 0)),
             width=cast(int, data.get("width", 0)),
             height=cast(int, data.get("height", 0)),
+            selected_entry_ids=cast(list[int], data.get("selected_entry_ids", [])),
         )
 
 

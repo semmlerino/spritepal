@@ -245,7 +245,7 @@ class FrameMappingController(QObject):
             pixmap = QPixmap.fromImage(qimg)
             self._game_frame_previews[frame_id] = pixmap
 
-            # Create game frame
+            # Create game frame with selected entry IDs for filtering on retrieval
             bbox = filtered_capture.bounding_box
             frame = GameFrame(
                 id=frame_id,
@@ -254,6 +254,7 @@ class FrameMappingController(QObject):
                 palette_index=0,  # Could extract from capture
                 width=bbox.width,
                 height=bbox.height,
+                selected_entry_ids=[entry.id for entry in selected_entries],
             )
 
             self._project.game_frames.append(frame)  # type: ignore[union-attr]
@@ -466,7 +467,8 @@ class FrameMappingController(QObject):
         """Get the CaptureResult for a game frame.
 
         Parses the capture file associated with the game frame and returns
-        the CaptureResult needed for preview generation.
+        the CaptureResult needed for preview generation. If the game frame
+        has stored selected entry IDs, only those entries are returned.
 
         Args:
             frame_id: Game frame ID
@@ -492,6 +494,28 @@ class FrameMappingController(QObject):
 
             if not capture_result.has_entries:
                 return None
+
+            # Apply selection filter if stored (preserves import-time selection)
+            if game_frame.selected_entry_ids:
+                selected_ids = set(game_frame.selected_entry_ids)
+                filtered_entries = [entry for entry in capture_result.entries if entry.id in selected_ids]
+                # Create filtered CaptureResult with only selected entries
+                capture_result = CaptureResult(
+                    frame=capture_result.frame,
+                    visible_count=len(filtered_entries),
+                    obsel=capture_result.obsel,
+                    entries=filtered_entries,
+                    palettes=capture_result.palettes,
+                    timestamp=capture_result.timestamp,
+                )
+
+                if not capture_result.has_entries:
+                    logger.warning(
+                        "No entries matched stored selection for game frame %s (IDs: %s)",
+                        frame_id,
+                        game_frame.selected_entry_ids,
+                    )
+                    return None
 
             return capture_result
 

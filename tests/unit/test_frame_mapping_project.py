@@ -136,6 +136,54 @@ class TestGameFrame:
         frame = GameFrame(id="G002", rom_offsets=[0x1B0000, 0x282000])
         assert frame.rom_offsets == [0x1B0000, 0x282000]
 
+    def test_game_frame_selected_entry_ids_default(self) -> None:
+        """GameFrame has empty selected_entry_ids by default."""
+        frame = GameFrame(id="G001")
+        assert frame.selected_entry_ids == []
+
+    def test_game_frame_selected_entry_ids_explicit(self) -> None:
+        """GameFrame accepts explicit selected_entry_ids."""
+        frame = GameFrame(id="G001", selected_entry_ids=[1, 3, 5, 7])
+        assert frame.selected_entry_ids == [1, 3, 5, 7]
+
+    def test_game_frame_selected_entry_ids_roundtrip(self) -> None:
+        """selected_entry_ids survives to_dict/from_dict cycle."""
+        frame = GameFrame(
+            id="G001",
+            rom_offsets=[0x1B0000],
+            capture_path=Path("/tmp/capture.json"),
+            palette_index=7,
+            width=32,
+            height=48,
+            selected_entry_ids=[2, 5, 8, 12],
+        )
+        data = frame.to_dict()
+        restored = GameFrame.from_dict(data)
+        assert restored.selected_entry_ids == [2, 5, 8, 12]
+
+    def test_game_frame_backward_compatibility(self) -> None:
+        """Old project files without selected_entry_ids load correctly."""
+        old_data: dict[str, object] = {
+            "id": "G001",
+            "rom_offsets": [0x1B0000],
+            "capture_path": "/tmp/capture.json",
+            "palette_index": 7,
+            "width": 32,
+            "height": 48,
+            # No selected_entry_ids - simulating old format
+        }
+        frame = GameFrame.from_dict(old_data)
+        assert frame.selected_entry_ids == []  # Default to empty
+
+    def test_game_frame_to_dict_includes_selected_entry_ids(self) -> None:
+        """to_dict() includes selected_entry_ids field."""
+        frame = GameFrame(
+            id="G001",
+            selected_entry_ids=[1, 2, 3],
+        )
+        data = frame.to_dict()
+        assert data["selected_entry_ids"] == [1, 2, 3]
+
 
 class TestFrameMappingProjectAlignment:
     """Tests for FrameMappingProject alignment update functionality."""
