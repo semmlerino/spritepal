@@ -453,9 +453,20 @@ class TestInjectMappingFlipHandling:
                 pasted_tiles.append(im.copy())
             return original_paste(self, im, box, mask)
 
+        # Mock ROM offset correction to return identity mapping (no correction needed)
+        # This test focuses on flip handling, not ROM offset correction
+        def mock_find_correct_offsets(capture_result, rom_path, selected_entry_ids):
+            offsets = {}
+            for entry in capture_result.entries:
+                for tile in entry.tiles:
+                    if tile.rom_offset is not None:
+                        offsets[tile.rom_offset] = tile.rom_offset
+            return offsets
+
         with (
             patch.object(Image.Image, "paste", track_paste),
             patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch.object(controller, "_find_correct_rom_offsets", side_effect=mock_find_correct_offsets),
             patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
@@ -549,9 +560,20 @@ class TestInjectMappingFlipHandling:
             saved_tile_images.append(self.copy())
             return original_save(self, path, *args, **kwargs)
 
+        # Mock ROM offset correction to return identity mapping (no correction needed)
+        # This test focuses on flip handling, not ROM offset correction
+        def mock_find_correct_offsets(capture_result, rom_path, selected_entry_ids):
+            offsets = {}
+            for entry in capture_result.entries:
+                for tile in entry.tiles:
+                    if tile.rom_offset is not None:
+                        offsets[tile.rom_offset] = tile.rom_offset
+            return offsets
+
         with (
             patch.object(Image.Image, "save", track_save),
             patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch.object(controller, "_find_correct_rom_offsets", side_effect=mock_find_correct_offsets),
             patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
@@ -695,4 +717,356 @@ class TestInjectMappingScale:
         assert not has_unscaled_ai_image, (
             f"AI image should be scaled to 8x8 (50% of 16x16), "
             f"but found unscaled image in pastes: {all_paste_sizes} (scale not applied)"
+        )
+
+
+def create_capture_with_tile_data(
+    entry_id: int,
+    rom_offset: int,
+    tile_data_hex: str,
+) -> dict:
+    """Create a capture with specific tile data for ROM offset correction tests.
+
+    Args:
+        entry_id: Entry ID
+        rom_offset: ROM offset to attribute to the tile
+        tile_data_hex: 64 hex chars (32 bytes) of tile data
+    """
+    return {
+        "frame": 1,
+        "obsel": {},
+        "entries": [
+            {
+                "id": entry_id,
+                "x": 100,
+                "y": 100,
+                "tile": 0,
+                "width": 8,
+                "height": 8,
+                "palette": 7,
+                "rom_offset": rom_offset,
+                "tiles": [
+                    {
+                        "tile_index": 0,
+                        "vram_addr": 0x1000,
+                        "pos_x": 0,
+                        "pos_y": 0,
+                        "data_hex": tile_data_hex,
+                        "rom_offset": rom_offset,
+                        "tile_index_in_block": 0,
+                    }
+                ],
+            }
+        ],
+        "palettes": {7: [[0, 0, 0]] * 16},
+    }
+
+
+class TestRomOffsetCorrection:
+    """Tests for automatic ROM offset correction of stale VRAM attribution."""
+
+    def test_corrects_stale_offset_for_raw_tile(self, tmp_path: Path, qtbot) -> None:
+        """Stale offset should be corrected by finding tile in ROM via raw search."""
+        # Create a distinctive 32-byte tile pattern
+        tile_data = bytes(range(32))
+        tile_hex = tile_data.hex()
+
+        # Create capture with WRONG rom_offset (stale attribution)
+        stale_offset = 0x100000  # Wrong location
+        correct_offset = 0x50000  # Actual location in ROM
+
+        capture_data = create_capture_with_tile_data(
+            entry_id=1,
+            rom_offset=stale_offset,
+            tile_data_hex=tile_hex,
+        )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create ROM with tile at the CORRECT offset
+        rom_data = bytearray(0x200000)
+        rom_data[correct_offset : correct_offset + 32] = tile_data
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(bytes(rom_data))
+
+        # Create AI frame
+        ai_frame_path = tmp_path / "ai_frame.png"
+        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
+
+        # Set up project
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[stale_offset],
+                selected_entry_ids=[1],
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Track which offset is used for injection
+        injected_offsets: list[int] = []
+
+        with (
+            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+        ):
+            mock_injector = MagicMock()
+            mock_injector.find_compressed_sprite.side_effect = Exception("Not HAL compressed")
+            mock_injector.inject_sprite_to_rom.side_effect = (
+                lambda sprite_path, rom_path, output_path, sprite_offset, **kw: (
+                    injected_offsets.append(sprite_offset),
+                    (True, "Success"),
+                )[-1]
+            )
+            mock_injector_class.return_value = mock_injector
+
+            (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
+            controller.inject_mapping(0, rom_path)
+
+        # Should have corrected to the actual offset where tile exists
+        assert len(injected_offsets) == 1, f"Expected 1 injection, got {len(injected_offsets)}"
+        assert injected_offsets[0] == correct_offset, (
+            f"Expected injection at corrected offset 0x{correct_offset:X}, "
+            f"but got 0x{injected_offsets[0]:X} (stale offset not corrected)"
+        )
+
+    def test_uses_original_offset_when_tile_found_at_attributed_location(self, tmp_path: Path, qtbot) -> None:
+        """When tile is found at the attributed offset, no correction needed."""
+        # Create a distinctive tile pattern
+        tile_data = bytes([0xAB, 0xCD] * 16)
+        tile_hex = tile_data.hex()
+
+        # ROM offset is CORRECT
+        correct_offset = 0x80000
+
+        capture_data = create_capture_with_tile_data(
+            entry_id=1,
+            rom_offset=correct_offset,
+            tile_data_hex=tile_hex,
+        )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create ROM with tile at the attributed offset (correct)
+        rom_data = bytearray(0x200000)
+        rom_data[correct_offset : correct_offset + 32] = tile_data
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(bytes(rom_data))
+
+        # Create AI frame
+        ai_frame_path = tmp_path / "ai_frame.png"
+        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
+
+        # Set up project
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[correct_offset],
+                selected_entry_ids=[1],
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Track which offset is used for injection
+        injected_offsets: list[int] = []
+
+        with (
+            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+        ):
+            mock_injector = MagicMock()
+            mock_injector.find_compressed_sprite.side_effect = Exception("Not HAL compressed")
+            mock_injector.inject_sprite_to_rom.side_effect = (
+                lambda sprite_path, rom_path, output_path, sprite_offset, **kw: (
+                    injected_offsets.append(sprite_offset),
+                    (True, "Success"),
+                )[-1]
+            )
+            mock_injector_class.return_value = mock_injector
+
+            (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
+            controller.inject_mapping(0, rom_path)
+
+        # Should use original offset since tile is found there
+        assert len(injected_offsets) == 1
+        assert injected_offsets[0] == correct_offset, (
+            f"Expected injection at original offset 0x{correct_offset:X}, but got 0x{injected_offsets[0]:X}"
+        )
+
+    def test_emits_error_when_no_tiles_found_in_rom(self, tmp_path: Path, qtbot) -> None:
+        """Should emit error when tiles can't be found anywhere in ROM."""
+        # Create tile data that won't exist in ROM
+        tile_data = bytes([0xDE, 0xAD, 0xBE, 0xEF] * 8)
+        tile_hex = tile_data.hex()
+
+        capture_data = create_capture_with_tile_data(
+            entry_id=1,
+            rom_offset=0x100000,
+            tile_data_hex=tile_hex,
+        )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create ROM without the tile data (all zeros)
+        rom_data = bytes(0x200000)
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(rom_data)
+
+        # Create AI frame
+        ai_frame_path = tmp_path / "ai_frame.png"
+        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
+
+        # Set up project
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[0x100000],
+                selected_entry_ids=[1],
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Track error signals
+        errors: list[str] = []
+        controller.error_occurred.connect(errors.append)
+
+        with (
+            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+        ):
+            mock_injector = MagicMock()
+            mock_injector_class.return_value = mock_injector
+
+            (tmp_path / "out.sfc").write_bytes(rom_data)
+            result = controller.inject_mapping(0, rom_path)
+
+        # Should have failed with error
+        assert result is False, "Expected injection to fail when no tiles found"
+        assert len(errors) == 1, f"Expected 1 error, got {len(errors)}"
+        assert "Could not find any tiles in ROM" in errors[0]
+
+    def test_logs_correction_statistics(self, tmp_path: Path, qtbot, caplog) -> None:
+        """Should log statistics about corrected offsets."""
+        import logging
+
+        # Create two tiles with different offsets
+        tile1_data = bytes([0x11] * 32)
+        tile2_data = bytes([0x22] * 32)
+
+        # Stale offsets in capture
+        stale_offset1 = 0x100000
+        stale_offset2 = 0x100100
+
+        # Correct offsets in ROM
+        correct_offset1 = 0x50000
+        correct_offset2 = 0x50100
+
+        capture_data = {
+            "frame": 1,
+            "obsel": {},
+            "entries": [
+                {
+                    "id": 1,
+                    "x": 100,
+                    "y": 100,
+                    "tile": 0,
+                    "width": 16,
+                    "height": 8,
+                    "palette": 7,
+                    "rom_offset": stale_offset1,
+                    "tiles": [
+                        {
+                            "tile_index": 0,
+                            "vram_addr": 0x1000,
+                            "pos_x": 0,
+                            "pos_y": 0,
+                            "data_hex": tile1_data.hex(),
+                            "rom_offset": stale_offset1,
+                            "tile_index_in_block": 0,
+                        },
+                        {
+                            "tile_index": 1,
+                            "vram_addr": 0x1020,
+                            "pos_x": 1,
+                            "pos_y": 0,
+                            "data_hex": tile2_data.hex(),
+                            "rom_offset": stale_offset2,
+                            "tile_index_in_block": 1,
+                        },
+                    ],
+                }
+            ],
+            "palettes": {7: [[0, 0, 0]] * 16},
+        }
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create ROM with tiles at correct offsets
+        rom_data = bytearray(0x200000)
+        rom_data[correct_offset1 : correct_offset1 + 32] = tile1_data
+        rom_data[correct_offset2 : correct_offset2 + 32] = tile2_data
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(bytes(rom_data))
+
+        # Create AI frame
+        ai_frame_path = tmp_path / "ai_frame.png"
+        Image.new("RGBA", (16, 8), (255, 0, 0, 255)).save(ai_frame_path)
+
+        # Set up project
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[stale_offset1, stale_offset2],
+                selected_entry_ids=[1],
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        with (
+            caplog.at_level(logging.INFO),
+            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+        ):
+            mock_injector = MagicMock()
+            mock_injector.find_compressed_sprite.side_effect = Exception("Not HAL")
+            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
+            mock_injector_class.return_value = mock_injector
+
+            (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
+            controller.inject_mapping(0, rom_path)
+
+        # Check that correction statistics were logged
+        log_messages = [r.message for r in caplog.records]
+        correction_logs = [m for m in log_messages if "offset" in m.lower() and "correct" in m.lower()]
+
+        assert any("2 offsets corrected" in m for m in correction_logs), (
+            f"Expected log message about 2 corrected offsets, got: {correction_logs}"
         )

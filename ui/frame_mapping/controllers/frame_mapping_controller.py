@@ -822,6 +822,48 @@ class FrameMappingController(QObject):
         first_injection = True
 
         try:
+            # Verify and correct ROM attribution for stale offsets
+            # The Mesen Lua script attributes ROM offsets to VRAM tiles during capture,
+            # but if VRAM is overwritten later, the offsets become stale.
+            # This searches the ROM to find the correct offset for each tile.
+            corrections = self._find_correct_rom_offsets(
+                filtered_capture,
+                rom_path,
+                game_frame.selected_entry_ids,
+            )
+
+            # Count corrections for logging
+            stale_count = sum(1 for old, new in corrections.items() if old != new and new is not None)
+            unfound_count = sum(1 for new in corrections.values() if new is None)
+
+            if stale_count > 0:
+                logger.info(
+                    "ROM attribution: %d offsets corrected, %d not found in ROM",
+                    stale_count,
+                    unfound_count,
+                )
+
+            if unfound_count > 0 and unfound_count == len(corrections):
+                self.error_occurred.emit(
+                    "Could not find any tiles in ROM. The sprite data may use an "
+                    "unknown compression format or the ROM may be modified."
+                )
+                return False
+
+            # Apply corrections to tiles before processing
+            for entry in relevant_entries:
+                for tile in entry.tiles:
+                    if tile.rom_offset is not None and tile.rom_offset in corrections:
+                        corrected = corrections[tile.rom_offset]
+                        if corrected is not None and corrected != tile.rom_offset:
+                            if debug:
+                                logger.info(
+                                    "Correcting tile rom_offset: 0x%X → 0x%X",
+                                    tile.rom_offset,
+                                    corrected,
+                                )
+                            tile.rom_offset = corrected
+
             # Group by individual tile ROM offsets (not entry-level offsets)
             # Each tile within an entry may have a different ROM offset
             # Key: rom_offset -> dict of vram_addr -> (screen_x, screen_y, palette, tile_index_in_block, flip_h, flip_v)
@@ -1195,3 +1237,115 @@ class FrameMappingController(QObject):
                 logger.setLevel(original_log_level)
 
         return success
+
+    def _find_correct_rom_offsets(
+        self,
+        capture_result: CaptureResult,
+        rom_path: Path,
+        selected_entry_ids: list[int] | None = None,
+    ) -> dict[int, int | None]:
+        """Find correct ROM offsets for tiles with stale attribution.
+
+        Uses ROMTileMatcher to search the ROM for each tile's VRAM data.
+        This handles the case where VRAM was overwritten after the Lua script
+        recorded the ROM offset, making the attribution stale.
+
+        Args:
+            capture_result: Parsed capture with tile data
+            rom_path: Path to ROM file
+            selected_entry_ids: If provided, only process these entries
+
+        Returns:
+            Dict mapping original rom_offset → corrected rom_offset (or None if not found)
+        """
+        from core.mesen_integration.rom_tile_matcher import ROMTileMatcher
+
+        corrections: dict[int, int | None] = {}
+
+        # Initialize matcher with known sprite offsets
+        matcher = ROMTileMatcher(str(rom_path))
+        matcher.build_database()  # Indexes known HAL blocks
+
+        # Read ROM data for raw tile search fallback
+        rom_data = rom_path.read_bytes()
+
+        # Track statistics
+        total_tiles = 0
+        matched_tiles = 0
+        raw_matched = 0
+
+        # Process each tile
+        for entry in capture_result.entries:
+            if selected_entry_ids and entry.id not in selected_entry_ids:
+                continue
+            for tile in entry.tiles:
+                if tile.rom_offset is None:
+                    continue
+
+                # Skip if we've already processed this offset
+                if tile.rom_offset in corrections:
+                    continue
+
+                total_tiles += 1
+
+                # Search for this tile in ROM using ROMTileMatcher
+                matches = matcher.lookup_vram_tile(tile.data_bytes)
+
+                if matches:
+                    # Use best match (first result, sorted by ROM offset)
+                    best_match = matches[0]
+                    corrections[tile.rom_offset] = best_match.rom_offset
+                    matched_tiles += 1
+                    if best_match.rom_offset != tile.rom_offset:
+                        logger.debug(
+                            "Tile at 0x%X corrected to 0x%X (matched via HAL index)",
+                            tile.rom_offset,
+                            best_match.rom_offset,
+                        )
+                else:
+                    # Try raw tile search as fallback
+                    raw_offset = self._search_raw_tile(rom_data, tile.data_bytes)
+                    corrections[tile.rom_offset] = raw_offset
+                    if raw_offset is not None:
+                        raw_matched += 1
+                        if raw_offset != tile.rom_offset:
+                            logger.debug(
+                                "Tile at 0x%X corrected to 0x%X (matched via raw search)",
+                                tile.rom_offset,
+                                raw_offset,
+                            )
+                    else:
+                        logger.debug(
+                            "Tile at 0x%X not found in ROM (VRAM data: %s...)",
+                            tile.rom_offset,
+                            tile.data_hex[:16],
+                        )
+
+        logger.info(
+            "ROM offset correction: %d tiles processed, %d HAL matches, %d raw matches, %d not found",
+            total_tiles,
+            matched_tiles,
+            raw_matched,
+            total_tiles - matched_tiles - raw_matched,
+        )
+
+        return corrections
+
+    def _search_raw_tile(self, rom_data: bytes, tile_data: bytes) -> int | None:
+        """Search ROM for exact 32-byte tile match.
+
+        This is a fallback for tiles that aren't in HAL-compressed blocks.
+        Raw (uncompressed) tiles can be found by direct byte matching.
+
+        Args:
+            rom_data: Full ROM file contents
+            tile_data: 32 bytes of SNES 4bpp tile data
+
+        Returns:
+            ROM offset where tile was found, or None if not found
+        """
+        if len(tile_data) != 32:
+            return None
+
+        offset = rom_data.find(tile_data)
+        return offset if offset >= 0 else None
