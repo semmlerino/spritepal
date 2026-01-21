@@ -607,6 +607,7 @@ class FrameMappingController(QObject):
         rom_path: Path,
         output_path: Path | None = None,
         create_backup: bool = True,
+        debug: bool = False,
     ) -> bool:
         """Inject a mapped frame into the ROM using tile-aware masking.
 
@@ -626,6 +627,7 @@ class FrameMappingController(QObject):
             rom_path: Path to the input ROM
             output_path: Path for the output ROM (default: same as input)
             create_backup: Whether to create a backup before injection
+            debug: Enable debug mode (saves intermediate images to /tmp/inject_debug/)
 
         Returns:
             True if injection was successful
@@ -663,6 +665,17 @@ class FrameMappingController(QObject):
         if not game_frame.capture_path or not game_frame.capture_path.exists():
             self.error_occurred.emit(f"Capture file missing (required for masking): {game_frame.capture_path}")
             return False
+
+        # Debug mode setup
+        debug_dir: Path | None = None
+        if debug:
+            debug_dir = Path("/tmp/inject_debug")
+            debug_dir.mkdir(exist_ok=True)
+            logger.info("=== INJECTION DEBUG MODE ===")
+            logger.info("Debug output directory: %s", debug_dir)
+            logger.info("AI frame: %s (index %d)", ai_frame.path.name, ai_frame_index)
+            logger.info("Game frame: %s", game_frame.id)
+            logger.info("ROM offsets: %s", [f"0x{o:X}" for o in game_frame.rom_offsets])
 
         # 3. Load and Prepare Images
         try:
@@ -740,6 +753,23 @@ class FrameMappingController(QObject):
             masked_canvas = Image.new("RGBA", (canvas_width, canvas_height), (0, 0, 0, 0))
             masked_canvas.paste(canvas, (0, 0), mask)
 
+            # Debug: Save intermediate images
+            if debug and debug_dir:
+                original_sprite_img.save(debug_dir / "original_sprite_mask.png")
+                canvas.save(debug_dir / "aligned_ai_frame.png")
+                masked_canvas.save(debug_dir / "masked_canvas.png")
+                logger.info("Saved debug images: original_sprite_mask.png, aligned_ai_frame.png, masked_canvas.png")
+                logger.info(
+                    "Canvas size: %dx%d, AI alignment: offset=(%d,%d) flip_h=%s flip_v=%s scale=%.2f",
+                    canvas_width,
+                    canvas_height,
+                    mapping.offset_x,
+                    mapping.offset_y,
+                    mapping.flip_h,
+                    mapping.flip_v,
+                    mapping.scale,
+                )
+
             # At this point, `masked_canvas` contains the aligned AI pixels,
             # but strictly clipped to the shape of the original sprite.
             # Areas where AI frame didn't cover remain transparent (RGBA 0,0,0,0),
@@ -774,20 +804,56 @@ class FrameMappingController(QObject):
         try:
             # Group by individual tile ROM offsets (not entry-level offsets)
             # Each tile within an entry may have a different ROM offset
-            # Key: rom_offset -> dict of vram_addr -> (screen_x, screen_y, palette, tile_index_in_block)
-            tile_groups: dict[int, dict[int, tuple[int, int, int, int | None]]] = {}
+            # Key: rom_offset -> dict of vram_addr -> (screen_x, screen_y, palette, tile_index_in_block, flip_h, flip_v)
+            tile_groups: dict[int, dict[int, tuple[int, int, int, int | None, bool, bool]]] = {}
 
             bbox = filtered_capture.bounding_box
+
+            if debug:
+                logger.info(
+                    "Bounding box: x=%d, y=%d, w=%d, h=%d",
+                    bbox.x,
+                    bbox.y,
+                    bbox.width,
+                    bbox.height,
+                )
+                logger.info("Processing %d relevant entries", len(relevant_entries))
 
             for entry in relevant_entries:
                 for tile in entry.tiles:
                     if tile.rom_offset is None:
                         continue
 
-                    # Calculate screen position for this 8x8 tile
+                    # Calculate tile's local position within entry
                     # tile.pos_x/pos_y are tile indices within the entry (0, 1, 2...)
-                    screen_x = entry.x + tile.pos_x * 8
-                    screen_y = entry.y + tile.pos_y * 8
+                    local_x = tile.pos_x * 8
+                    local_y = tile.pos_y * 8
+
+                    # Apply entry-level flips to get correct screen position
+                    # This mirrors CaptureRenderer._render_tile() logic
+                    if entry.flip_h:
+                        local_x = entry.width - local_x - 8
+                    if entry.flip_v:
+                        local_y = entry.height - local_y - 8
+
+                    # Convert to screen position
+                    screen_x = entry.x + local_x
+                    screen_y = entry.y + local_y
+
+                    if debug:
+                        logger.info(
+                            "  Entry %d tile (%d,%d): local=(%d,%d) screen=(%d,%d) flip_h=%s rom=0x%X vram=0x%X",
+                            entry.id,
+                            tile.pos_x,
+                            tile.pos_y,
+                            local_x,
+                            local_y,
+                            screen_x,
+                            screen_y,
+                            entry.flip_h,
+                            tile.rom_offset,
+                            tile.vram_addr,
+                        )
 
                     if tile.rom_offset not in tile_groups:
                         tile_groups[tile.rom_offset] = {}
@@ -800,6 +866,8 @@ class FrameMappingController(QObject):
                             screen_y,
                             entry.palette,
                             tile.tile_index_in_block,  # Position within compressed block
+                            entry.flip_h,  # Track flip for counter-flipping during extraction
+                            entry.flip_v,
                         )
 
             logger.debug(
@@ -816,9 +884,9 @@ class FrameMappingController(QObject):
                 # otherwise fall back to vram_addr order
                 def tile_sort_key(
                     vram_addr: int,
-                    tiles: dict[int, tuple[int, int, int, int | None]] = vram_tiles,
+                    tiles: dict[int, tuple[int, int, int, int | None, bool, bool]] = vram_tiles,
                 ) -> tuple[int, int]:
-                    _, _, _, tile_idx = tiles[vram_addr]
+                    _, _, _, tile_idx, _, _ = tiles[vram_addr]
                     # Use tile_index_in_block if available, otherwise use vram_addr
                     # tile_idx goes first to sort by block position, vram_addr as tiebreaker
                     if tile_idx is not None:
@@ -889,7 +957,7 @@ class FrameMappingController(QObject):
 
                 # Extract each 8x8 tile from the masked canvas and place in grid
                 for idx, vram_addr in enumerate(sorted_vram_addrs):
-                    screen_x, screen_y, _, _ = vram_tiles[vram_addr]
+                    screen_x, screen_y, _, _, flip_h, flip_v = vram_tiles[vram_addr]
 
                     # Convert screen coords to masked_canvas coords
                     canvas_x = screen_x - bbox.x
@@ -898,11 +966,53 @@ class FrameMappingController(QObject):
                     # Extract 8x8 tile from masked canvas
                     tile_img = masked_canvas.crop((canvas_x, canvas_y, canvas_x + 8, canvas_y + 8))
 
+                    # Debug: Save tile before counter-flip
+                    if debug and debug_dir:
+                        before_flip = tile_img.copy()
+                        before_flip.save(debug_dir / f"tile_0x{rom_offset:X}_v{vram_addr:X}_before.png")
+
+                    # Counter-flip: undo screen-appearance flip so ROM stores correct data.
+                    # The masked_canvas contains pixels in "screen appearance" (flipped by CaptureRenderer).
+                    # ROM stores tiles in their unflipped form - SNES hardware applies flip_h/flip_v at display time.
+                    # If we inject screen-appearance data, SNES will apply flip again → double-flipped = wrong.
+                    # Solution: counter-flip before injection so SNES flip produces correct result.
+                    if flip_h:
+                        tile_img = tile_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                    if flip_v:
+                        tile_img = tile_img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+
+                    # Debug: Save tile after counter-flip
+                    if debug and debug_dir:
+                        tile_img.save(debug_dir / f"tile_0x{rom_offset:X}_v{vram_addr:X}_after.png")
+
                     # Calculate position in output grid
                     grid_x = (idx % grid_width) * 8
                     grid_y = (idx // grid_width) * 8
 
+                    # Debug: Log extraction details
+                    if debug:
+                        logger.info(
+                            "  Extracted vram=0x%X: canvas=(%d,%d) flip_h=%s → grid=(%d,%d)",
+                            vram_addr,
+                            canvas_x,
+                            canvas_y,
+                            flip_h,
+                            grid_x,
+                            grid_y,
+                        )
+
                     chunk_img.paste(tile_img, (grid_x, grid_y))
+
+                # Debug: Save chunk before quantization
+                if debug and debug_dir:
+                    chunk_img.save(debug_dir / f"chunk_0x{rom_offset:X}_pre_quant.png")
+                    logger.info(
+                        "ROM offset 0x%X: saved chunk (%dx%d) with %d tiles",
+                        rom_offset,
+                        chunk_img.width,
+                        chunk_img.height,
+                        tile_count,
+                    )
 
                 # Quantize to game palette for proper color mapping
                 snes_palette = capture_result.palettes.get(palette_index, [])
@@ -920,6 +1030,10 @@ class FrameMappingController(QObject):
                         "No palette data found for palette index %d, using grayscale fallback",
                         palette_index,
                     )
+
+                # Debug: Save chunk after quantization
+                if debug and debug_dir:
+                    chunk_img.save(debug_dir / f"chunk_0x{rom_offset:X}_post_quant.png")
 
                 # Save chunk to temp file
                 with tempfile.NamedTemporaryFile(suffix=f"_{rom_offset:X}.png", delete=False) as tmp:
@@ -978,9 +1092,18 @@ class FrameMappingController(QObject):
                     except Exception:
                         logger.warning("Failed to auto-save project after injection")
 
+                # Debug: Final summary
+                if debug and debug_dir:
+                    logger.info("=== INJECTION DEBUG COMPLETE ===")
+                    logger.info("Debug output saved to: %s", debug_dir)
+                    logger.info("Injection results:\n%s", "\n".join(messages))
+
                 self.mapping_injected.emit(ai_frame_index, "\n".join(messages))
                 self.project_changed.emit()
             else:
+                if debug:
+                    logger.info("=== INJECTION DEBUG FAILED ===")
+                    logger.info("Failure messages:\n%s", "\n".join(messages))
                 self.error_occurred.emit(f"Injection failed:\n{'\n'.join(messages)}")
 
         except Exception as e:
