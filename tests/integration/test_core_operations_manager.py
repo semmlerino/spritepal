@@ -179,6 +179,21 @@ class TestExtractionValidation:
             manager.validate_extraction_params(params)
 
 
+    def test_validate_extraction_params_accepts_sprite_offset(self, manager, tmp_path):
+        """validate_extraction_params should accept 'sprite_offset' (backward compatibility)."""
+        rom_file = tmp_path / "test.sfc"
+        rom_file.write_bytes(b"\x00" * 0x100000)
+
+        params = {
+            "rom_path": str(rom_file),
+            "sprite_offset": 0x1000,  # Valid offset within ROM bounds
+            "output_base": "test_output",
+        }
+
+        # Should not raise - validates that sprite_offset is accepted
+        assert manager.validate_extraction_params(params) is True
+
+
 class TestInjectionValidation:
     """Tests for injection parameter validation."""
 

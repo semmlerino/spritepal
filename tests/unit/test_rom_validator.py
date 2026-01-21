@@ -9,8 +9,15 @@ import struct
 import pytest
 
 from core.rom_validator import ROMHeader, ROMValidator
+from utils.constants import (
+    ROM_CHECKSUM_COMPLEMENT_MASK,
+    ROM_HEADER_OFFSET_EXHIROM,
+    ROM_HEADER_OFFSET_HIROM,
+    ROM_HEADER_OFFSET_LOROM,
+    ROM_TYPE_SA1_MAX,
+    ROM_TYPE_SA1_MIN,
+)
 from utils.rom_exceptions import (
-    # Systematic pytest markers applied based on test content analysis
     InvalidROMError,
     ROMChecksumError,
     ROMHeaderError,
@@ -22,6 +29,63 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.no_manager_setup,
 ]
+
+
+def create_valid_snes_header(
+    title: str = "TEST ROM",
+    rom_type: int = 0x00,
+    checksum: int = 0x1234,
+) -> bytes:
+    """Create a valid SNES ROM header (32 bytes)."""
+    header = bytearray(32)
+    # Title (21 bytes, padded with spaces)
+    title_bytes = title.encode("ascii")[:21].ljust(21, b" ")
+    header[0:21] = title_bytes
+    # ROM type at offset 21
+    header[21] = rom_type
+    # ROM size at offset 23 (0x0C = 4MB)
+    header[23] = 0x0C
+    # Checksum complement at offset 28-29
+    complement = checksum ^ ROM_CHECKSUM_COMPLEMENT_MASK
+    struct.pack_into("<H", header, 28, complement)
+    # Checksum at offset 30-31
+    struct.pack_into("<H", header, 30, checksum)
+    return bytes(header)
+
+
+def create_rom_with_header(
+    header_offset: int,
+    title: str = "TEST ROM",
+    rom_type: int = 0x00,
+    smc_header: bool = False,
+    total_size: int = 0x100000,  # 1MB default
+) -> bytes:
+    """Create a ROM file with header at specified offset.
+
+    Args:
+        header_offset: Where the SNES header should be placed (relative to ROM start)
+        title: ROM title
+        rom_type: ROM type byte (for SA-1 detection, etc.)
+        smc_header: If True, prepends 512-byte SMC header and total_size includes it
+        total_size: Total size including SMC header if present
+    """
+    # If SMC header requested, account for it
+    if smc_header:
+        # SMC header is 512 bytes prepended to the ROM
+        smc_data = bytearray(512)
+        rom_size = total_size - 512
+        rom = bytearray(rom_size)
+    else:
+        smc_data = bytearray()
+        rom = bytearray(total_size)
+
+    header = create_valid_snes_header(title, rom_type)
+
+    # Place SNES header at the specified offset within the ROM data (not including SMC)
+    if header_offset + 32 <= len(rom):
+        rom[header_offset : header_offset + 32] = header
+
+    return bytes(smc_data) + bytes(rom)
 
 
 def create_valid_rom_header(
@@ -396,3 +460,140 @@ class TestROMValidator:
         header, smc_offset = ROMValidator.validate_rom_for_injection(str(rom_path), sprite_offset)
 
         assert smc_offset == 512  # SMC header detected
+
+
+# ============================================================================
+# ROM Variant Tests (Migrated from audit fixes)
+# ============================================================================
+
+
+class TestROMHeaderVariants:
+    """Tests for header detection edge cases."""
+
+    def test_lorom_header_detection(self, tmp_path):
+        """Standard LoROM header at 0x7FC0."""
+        rom_path = tmp_path / "lorom.sfc"
+        rom_data = create_rom_with_header(ROM_HEADER_OFFSET_LOROM, title="LOROM TEST")
+        rom_path.write_bytes(rom_data)
+
+        header, smc_offset = ROMValidator.validate_rom_header(str(rom_path))
+
+        assert header.title.strip() == "LOROM TEST"
+        assert smc_offset == 0
+        assert header.rom_type_offset == ROM_HEADER_OFFSET_LOROM
+
+    def test_hirom_header_detection(self, tmp_path):
+        """HiROM header at 0xFFC0."""
+        rom_path = tmp_path / "hirom.sfc"
+        rom_data = create_rom_with_header(ROM_HEADER_OFFSET_HIROM, title="HIROM TEST")
+        rom_path.write_bytes(rom_data)
+
+        header, smc_offset = ROMValidator.validate_rom_header(str(rom_path))
+
+        assert header.title.strip() == "HIROM TEST"
+        assert smc_offset == 0
+        assert header.rom_type_offset == ROM_HEADER_OFFSET_HIROM
+
+    def test_exhirom_header_detection(self, tmp_path):
+        """ExHiROM header at 0x40FFC0 for large ROMs."""
+        rom_path = tmp_path / "exhirom.sfc"
+        # Need >4MB ROM for ExHiROM check
+        rom_data = create_rom_with_header(
+            ROM_HEADER_OFFSET_EXHIROM,
+            title="EXHIROM TEST",
+            total_size=0x500000,  # 5MB
+        )
+        rom_path.write_bytes(rom_data)
+
+        header, smc_offset = ROMValidator.validate_rom_header(str(rom_path))
+
+        assert header.title.strip() == "EXHIROM TEST"
+        assert header.rom_type_offset == ROM_HEADER_OFFSET_EXHIROM
+
+    def test_sa1_chip_detection(self, tmp_path, caplog):
+        """SA-1 chip games (like Kirby Super Star) are detected."""
+        rom_path = tmp_path / "sa1.sfc"
+        rom_data = create_rom_with_header(
+            ROM_HEADER_OFFSET_LOROM,
+            title="KIRBY SUPER STAR",
+            rom_type=ROM_TYPE_SA1_MIN,  # SA-1 chip indicator
+        )
+        rom_path.write_bytes(rom_data)
+
+        header, _ = ROMValidator.validate_rom_header(str(rom_path))
+
+        assert header.title.strip() == "KIRBY SUPER STAR"
+        assert ROM_TYPE_SA1_MIN <= header.rom_type <= ROM_TYPE_SA1_MAX
+        # Check that SA-1 was logged
+        assert any("[SA-1]" in r.message for r in caplog.records)
+
+    def test_smc_header_stripped(self, tmp_path):
+        """512-byte SMC header correctly removed."""
+        rom_path = tmp_path / "smc.sfc"
+
+        # Create ROM with SMC header - total size must be (ROM size + 512) where
+        # (ROM size + 512) % 1024 == 512 to trigger SMC detection
+        # Use 1MB + 512 = 1049088 bytes total
+        rom_data = create_rom_with_header(
+            ROM_HEADER_OFFSET_LOROM,
+            title="SMC TEST",
+            smc_header=True,
+            total_size=0x100000 + 512,  # 1MB ROM + 512 byte SMC header
+        )
+
+        rom_path.write_bytes(rom_data)
+
+        header, smc_offset = ROMValidator.validate_rom_header(str(rom_path))
+
+        assert header.title.strip() == "SMC TEST"
+        assert smc_offset == 512
+
+
+class TestSMCHeaderValidation:
+    """SMC header content validation."""
+
+    def test_valid_smc_header_passes(self, tmp_path):
+        """Valid SMC header with mostly zeros passes validation."""
+        rom_path = tmp_path / "valid_smc.sfc"
+
+        # Create ROM with SMC header - total size triggers SMC detection
+        rom_data = create_rom_with_header(
+            ROM_HEADER_OFFSET_LOROM,
+            title="VALID SMC",
+            smc_header=True,
+            total_size=0x100000 + 512,  # 1MB ROM + 512 byte SMC header
+        )
+
+        rom_path.write_bytes(rom_data)
+
+        # Should not raise or warn about invalid SMC
+        header, smc_offset = ROMValidator.validate_rom_header(str(rom_path))
+        assert smc_offset == 512
+        assert header.title.strip() == "VALID SMC"
+
+    def test_invalid_smc_header_warned(self, tmp_path, caplog):
+        """Non-standard SMC header triggers warning."""
+        rom_path = tmp_path / "bad_smc.sfc"
+
+        # Create base ROM data without SMC header
+        rom_size = 0x100000  # 1MB
+        rom_data = bytearray(rom_size)
+
+        # Place valid SNES header at LoROM offset within ROM data
+        header = create_valid_snes_header("BAD SMC TEST")
+        rom_data[ROM_HEADER_OFFSET_LOROM : ROM_HEADER_OFFSET_LOROM + 32] = header
+
+        # Create SMC header with lots of non-zero bytes (suspicious)
+        # This should trigger the content validation warning
+        bad_smc = bytes(range(256)) + bytes(range(256))  # 512 bytes, all non-zero
+
+        # Combine: bad SMC header + ROM data
+        # Total size = 512 + 1MB = triggers SMC detection
+        full_data = bad_smc + bytes(rom_data)
+        rom_path.write_bytes(full_data)
+
+        # Should log warning about suspicious SMC header but still find ROM header
+        header_result, smc_offset = ROMValidator.validate_rom_header(str(rom_path))
+
+        assert smc_offset == 512
+        assert any("content validation failed" in r.message.lower() for r in caplog.records)

@@ -36,8 +36,88 @@ import pytest
 
 from core.hal_parser import HALParser
 
-if TYPE_CHECKING:
-    from collections.abc import Generator
+# =============================================================================
+# Validation and Security Tests
+# =============================================================================
+
+
+class TestConservativeFallback:
+    """Tests for fallback heuristic improvements."""
+
+    def test_fallback_uses_64_byte_threshold(self):
+        """Verify fallback requires 64 consecutive bytes, not 32."""
+        # Create data filled with non-uniform bytes (cycling 1-254)
+        # to avoid false positives on 0x00 or 0xFF runs
+        rom_data = bytearray(0x2000)
+        for i in range(len(rom_data)):
+            rom_data[i] = (i % 254) + 1  # Values 1-254 cycling
+
+        # Place 32-byte 0xFF run at offset 0x100 - should be skipped (not 64 bytes)
+        rom_data[0x100:0x120] = b"\xff" * 32
+
+        # Place 32-byte 0x00 run at offset 0x200 - should be skipped (not 64 bytes)
+        rom_data[0x200:0x220] = b"\x00" * 32
+
+        # Place 64-byte 0xFF run at offset 0x500 - should trigger termination
+        rom_data[0x500:0x540] = b"\xff" * 64
+
+        # HALParser.estimate_compressed_size_conservative is a static method
+        size = HALParser.estimate_compressed_size_conservative(bytes(rom_data), 0)
+
+        # Should find the 64-byte run at 0x500
+        # Note: the function scans from offset 64 (padding_threshold)
+        assert size == 0x500, f"Expected 0x500 but got 0x{size:X}"
+
+    def test_fallback_default_is_8kb(self):
+        """Verify fallback default is 8KB when no padding found."""
+        # Create data with no padding patterns
+        rom_data = bytes(range(256)) * 64  # 16KB of non-uniform data
+
+        # HALParser.estimate_compressed_size_conservative is a static method
+        size = HALParser.estimate_compressed_size_conservative(rom_data, 0)
+
+        # Default should be 8KB (0x2000)
+        assert size == 0x2000
+
+
+@pytest.mark.xdist_group("serial")
+class TestCompressionRatioValidation:
+    """Tests for compression ratio validation."""
+
+    def test_low_ratio_warning_logged(self, caplog):
+        """Check that unusually low compression ratios trigger rejection."""
+        from unittest.mock import patch
+
+        from core.hal_compression import HALCompressor
+        from core.rom_injector import ROMInjector
+
+        # Explicitly set level for spritepal logger to ensure DEBUG messages are captured
+        # even if setup_logging was called earlier in the same worker process.
+        caplog.set_level("DEBUG", logger="spritepal")
+
+        injector = ROMInjector()
+
+        # Mock the decompressor to return a large block of data
+        # and the parser to return a very small compressed size
+        # This creates an impossible compression ratio (< 1%)
+        with patch.object(HALCompressor, "decompress_from_rom") as mock_decomp:
+            mock_decomp.return_value = b"\x00" * 10000
+
+            # Mock HALParser.parse_compressed_size (static method on HALParser)
+            with patch.object(HALParser, "parse_compressed_size") as mock_parse:
+                mock_parse.return_value = 100  # 100 bytes compressed -> 10000 bytes uncompressed (1% ratio)
+
+                # ROM data must be large enough
+                rom_data = b"\x00" * 0x10000
+
+                compressed_size, data, slack = injector.find_compressed_sprite(rom_data, 0)
+
+                # Should be rejected (returns 0, b"", 0)
+                assert compressed_size == 0
+                assert data == b""
+
+        # Check for rejection due to invalid compression ratio (case-insensitive match)
+        assert any("rejected" in r.message.lower() and "compression ratio" in r.message.lower() for r in caplog.records)
 
 
 # =============================================================================
