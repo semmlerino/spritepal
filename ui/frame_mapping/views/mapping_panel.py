@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QPoint, Qt, Signal
+from PySide6.QtCore import QPoint, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragMoveEvent, QDropEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -102,6 +102,7 @@ class MappingPanel(QWidget):
         self._table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._table.setIconSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
 
         # Enable drag-drop
         self._table.setAcceptDrops(True)
