@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QListWidgetItem
+from PySide6.QtWidgets import QTreeWidgetItem
 
 from core.mesen_integration.click_extractor import (
     CaptureResult,
@@ -155,6 +155,114 @@ def sample_capture(
     )
 
 
+@pytest.fixture
+def clusterable_capture(
+    obsel_config: OBSELConfig,
+    sample_tile_data: TileData,
+    sample_palettes: dict[int, list[int]],
+) -> CaptureResult:
+    """Create a capture with 2 distinct spatial clusters on the same palette.
+
+    Cluster A: 3 tiles close together (player character)
+    Cluster B: 2 tiles close together (enemy far away)
+    """
+    entries = [
+        # Cluster A - player at (50-90, 60-100) - 3 tiles
+        OAMEntry(
+            id=0,
+            x=50,
+            y=60,
+            tile=10,
+            width=32,
+            height=32,
+            flip_h=False,
+            flip_v=False,
+            palette=0,
+            priority=2,
+            tiles=[sample_tile_data],
+        ),
+        OAMEntry(
+            id=1,
+            x=82,
+            y=60,
+            tile=11,
+            width=8,
+            height=8,
+            flip_h=False,
+            flip_v=False,
+            palette=0,
+            priority=2,
+            tiles=[sample_tile_data],
+        ),
+        OAMEntry(
+            id=2,
+            x=58,
+            y=92,
+            tile=12,
+            width=16,
+            height=16,
+            flip_h=False,
+            flip_v=False,
+            palette=0,
+            priority=2,
+            tiles=[sample_tile_data],
+        ),
+        # Cluster B - enemy far away at (180-210, 140-180) - 2 tiles
+        OAMEntry(
+            id=3,
+            x=180,
+            y=140,
+            tile=20,
+            width=16,
+            height=16,
+            flip_h=False,
+            flip_v=False,
+            palette=0,
+            priority=2,
+            tiles=[sample_tile_data],
+        ),
+        OAMEntry(
+            id=4,
+            x=196,
+            y=156,
+            tile=21,
+            width=16,
+            height=16,
+            flip_h=False,
+            flip_v=False,
+            palette=0,
+            priority=2,
+            tiles=[sample_tile_data],
+        ),
+    ]
+
+    return CaptureResult(
+        frame=1,
+        visible_count=len(entries),
+        obsel=obsel_config,
+        entries=entries,
+        palettes=sample_palettes,
+        timestamp=0,
+    )
+
+
+def _count_top_level_items(dialog: SpriteSelectionDialog) -> int:
+    """Count top-level items in the tree."""
+    assert dialog._sprite_tree is not None
+    return dialog._sprite_tree.topLevelItemCount()
+
+
+def _get_top_level_item(dialog: SpriteSelectionDialog, index: int) -> QTreeWidgetItem | None:
+    """Get a top-level item by index."""
+    assert dialog._sprite_tree is not None
+    return dialog._sprite_tree.topLevelItem(index)
+
+
+def _count_checked_entries(dialog: SpriteSelectionDialog) -> int:
+    """Count checked entry items (not groups) in the tree."""
+    return len(dialog._get_selected_ids())
+
+
 class TestSpriteSelectionDialogBasics:
     """Basic dialog functionality tests."""
 
@@ -190,24 +298,21 @@ class TestSpriteSelectionDialogBasics:
         info_text = dialog._info_label.text()
         assert "Frame 2" in info_text
 
-    def test_sprite_list_has_correct_item_count(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
-        """Sprite list should have one item per OAM entry."""
+    def test_sprite_tree_has_correct_item_count(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
+        """Sprite tree should have one item per OAM entry in ungrouped mode."""
         dialog = SpriteSelectionDialog(sample_capture)
         qtbot.addWidget(dialog)
 
-        assert dialog._sprite_list is not None
-        assert dialog._sprite_list.count() == 6
+        # In ungrouped mode (All Palettes), should have 6 top-level items
+        assert _count_top_level_items(dialog) == 6
 
     def test_all_sprites_selected_by_default(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
         """All sprites should be selected when dialog opens."""
         dialog = SpriteSelectionDialog(sample_capture)
         qtbot.addWidget(dialog)
 
-        assert dialog._sprite_list is not None
-        for i in range(dialog._sprite_list.count()):
-            item = dialog._sprite_list.item(i)
-            assert item is not None
-            assert item.checkState() == Qt.CheckState.Checked
+        # All 6 entries should be checked
+        assert _count_checked_entries(dialog) == 6
 
 
 class TestSpriteSelectionButtons:
@@ -221,11 +326,7 @@ class TestSpriteSelectionButtons:
         # Click Select None
         dialog._select_no_sprites()
 
-        assert dialog._sprite_list is not None
-        for i in range(dialog._sprite_list.count()):
-            item = dialog._sprite_list.item(i)
-            assert item is not None
-            assert item.checkState() == Qt.CheckState.Unchecked
+        assert _count_checked_entries(dialog) == 0
 
     def test_select_all_selects_all(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
         """Select All button selects all entries."""
@@ -238,11 +339,7 @@ class TestSpriteSelectionButtons:
         # Then select all
         dialog._select_all_sprites()
 
-        assert dialog._sprite_list is not None
-        for i in range(dialog._sprite_list.count()):
-            item = dialog._sprite_list.item(i)
-            assert item is not None
-            assert item.checkState() == Qt.CheckState.Checked
+        assert _count_checked_entries(dialog) == 6
 
 
 class TestPaletteFilter:
@@ -257,26 +354,21 @@ class TestPaletteFilter:
         # Should have: All, Palette 0, Palette 3, Palette 7
         assert dialog._palette_filter.count() == 4
 
-    def test_palette_filter_hides_non_matching(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
-        """Filtering by palette hides non-matching entries."""
+    def test_palette_filter_shows_only_matching_entries(
+        self, qtbot: pytest.fixture, sample_capture: CaptureResult
+    ) -> None:
+        """Filtering by palette shows only matching entries."""
         dialog = SpriteSelectionDialog(sample_capture)
         qtbot.addWidget(dialog)
 
         assert dialog._palette_filter is not None
-        assert dialog._sprite_list is not None
 
         # Select "Palette 3" (index 2 in combo: All=0, Pal0=1, Pal3=2, Pal7=3)
         dialog._palette_filter.setCurrentIndex(2)
 
-        # Count visible items
-        visible_count = 0
-        for i in range(dialog._sprite_list.count()):
-            item = dialog._sprite_list.item(i)
-            if item is not None and not item.isHidden():
-                visible_count += 1
-
         # Should show only palette 3 entries (IDs 2, 3, 4 = 3 entries)
-        assert visible_count == 3
+        # In grouped mode, might be 1 group or 3 individual items depending on clustering
+        assert _count_checked_entries(dialog) == 3
 
     def test_palette_filter_all_shows_all(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
         """Selecting 'All Palettes' shows all entries."""
@@ -284,7 +376,6 @@ class TestPaletteFilter:
         qtbot.addWidget(dialog)
 
         assert dialog._palette_filter is not None
-        assert dialog._sprite_list is not None
 
         # First filter to Palette 3
         dialog._palette_filter.setCurrentIndex(2)
@@ -292,14 +383,8 @@ class TestPaletteFilter:
         # Then select All
         dialog._palette_filter.setCurrentIndex(0)
 
-        # All should be visible
-        visible_count = 0
-        for i in range(dialog._sprite_list.count()):
-            item = dialog._sprite_list.item(i)
-            if item is not None and not item.isHidden():
-                visible_count += 1
-
-        assert visible_count == 6
+        # All 6 entries should be selected again
+        assert _count_checked_entries(dialog) == 6
 
 
 class TestSelectedEntries:
@@ -337,14 +422,16 @@ class TestSelectedEntries:
         # Deselect all first
         dialog._select_no_sprites()
 
-        # Manually check items 2 and 3 (Palette 3 entries)
-        assert dialog._sprite_list is not None
-        item2 = dialog._sprite_list.item(2)
-        item3 = dialog._sprite_list.item(3)
-        assert item2 is not None
-        assert item3 is not None
-        item2.setCheckState(Qt.CheckState.Checked)
-        item3.setCheckState(Qt.CheckState.Checked)
+        # Manually check items 2 and 3 (need to find them in the tree)
+        assert dialog._sprite_tree is not None
+        for i in range(dialog._sprite_tree.topLevelItemCount()):
+            item = dialog._sprite_tree.topLevelItem(i)
+            if item is not None:
+                from ui.frame_mapping.dialogs.sprite_selection_dialog import ROLE_ENTRY_ID
+
+                entry_id = item.data(0, ROLE_ENTRY_ID)
+                if entry_id in (2, 3):
+                    item.setCheckState(0, Qt.CheckState.Checked)
 
         dialog.accept()
 
@@ -405,60 +492,224 @@ class TestPreviewUpdate:
         # Change filter to specific palette
         dialog._palette_filter.setCurrentIndex(1)  # Palette 0
 
-        # Verify preview was updated
-        assert len(update_calls) == 1
+        # Verify preview was updated (via _select_all_sprites after filter change)
+        assert len(update_calls) >= 1
 
         # Change filter again
         update_calls.clear()
         dialog._palette_filter.setCurrentIndex(2)  # Palette 3
 
         # Verify preview was updated again
-        assert len(update_calls) == 1
+        assert len(update_calls) >= 1
 
 
-class TestListItemFormat:
-    """Tests for list item display format."""
+class TestTreeItemFormat:
+    """Tests for tree item display format."""
 
     def test_item_shows_sprite_dimensions(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
-        """List items should show sprite dimensions."""
+        """Tree items should show sprite dimensions."""
         dialog = SpriteSelectionDialog(sample_capture)
         qtbot.addWidget(dialog)
 
-        assert dialog._sprite_list is not None
         # First entry is 32x32
-        item = dialog._sprite_list.item(0)
+        item = _get_top_level_item(dialog, 0)
         assert item is not None
-        assert "32x32" in item.text()
+        assert "32x32" in item.text(0)
 
     def test_item_shows_position(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
-        """List items should show sprite position."""
+        """Tree items should show sprite position."""
         dialog = SpriteSelectionDialog(sample_capture)
         qtbot.addWidget(dialog)
 
-        assert dialog._sprite_list is not None
         # First entry is at (80, 60)
-        item = dialog._sprite_list.item(0)
+        item = _get_top_level_item(dialog, 0)
         assert item is not None
-        assert "@(80,60)" in item.text()
+        assert "@(80,60)" in item.text(0)
 
     def test_item_shows_palette(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
-        """List items should show palette number."""
+        """Tree items should show palette number."""
         dialog = SpriteSelectionDialog(sample_capture)
         qtbot.addWidget(dialog)
 
-        assert dialog._sprite_list is not None
         # First entry uses palette 0
-        item = dialog._sprite_list.item(0)
+        item = _get_top_level_item(dialog, 0)
         assert item is not None
-        assert "Pal 0" in item.text()
+        assert "Pal 0" in item.text(0)
 
     def test_item_shows_priority(self, qtbot: pytest.fixture, sample_capture: CaptureResult) -> None:
-        """List items should show priority."""
+        """Tree items should show priority."""
         dialog = SpriteSelectionDialog(sample_capture)
         qtbot.addWidget(dialog)
 
-        assert dialog._sprite_list is not None
         # First entry has priority 2
-        item = dialog._sprite_list.item(0)
+        item = _get_top_level_item(dialog, 0)
         assert item is not None
-        assert "P2" in item.text()
+        assert "P2" in item.text(0)
+
+
+class TestTileGrouping:
+    """Tests for spatial clustering / tile grouping behavior."""
+
+    def test_ungrouped_when_all_palettes_selected(
+        self, qtbot: pytest.fixture, clusterable_capture: CaptureResult
+    ) -> None:
+        """When 'All Palettes' is selected, entries are shown ungrouped."""
+        dialog = SpriteSelectionDialog(clusterable_capture)
+        qtbot.addWidget(dialog)
+
+        # All Palettes mode - should have 5 individual items
+        assert _count_top_level_items(dialog) == 5
+
+        # All should be flat entries (no children)
+        for i in range(5):
+            item = _get_top_level_item(dialog, i)
+            assert item is not None
+            assert item.childCount() == 0
+
+    def test_grouped_when_specific_palette_selected(
+        self, qtbot: pytest.fixture, clusterable_capture: CaptureResult
+    ) -> None:
+        """When a specific palette is selected, entries are grouped by proximity."""
+        dialog = SpriteSelectionDialog(clusterable_capture)
+        qtbot.addWidget(dialog)
+
+        assert dialog._palette_filter is not None
+        # Select "Palette 0" (index 1)
+        dialog._palette_filter.setCurrentIndex(1)
+
+        # Should have 2 clusters (groups) since entries are spatially separated
+        top_level_count = _count_top_level_items(dialog)
+        assert top_level_count == 2, f"Expected 2 clusters, got {top_level_count}"
+
+        # Verify both are groups with children
+        for i in range(2):
+            item = _get_top_level_item(dialog, i)
+            assert item is not None
+            assert item.childCount() > 0, f"Group {i} should have children"
+
+    def test_group_selection_propagates_to_children(
+        self, qtbot: pytest.fixture, clusterable_capture: CaptureResult
+    ) -> None:
+        """Checking a group item should check all its children."""
+        dialog = SpriteSelectionDialog(clusterable_capture)
+        qtbot.addWidget(dialog)
+
+        assert dialog._palette_filter is not None
+        # Select "Palette 0" to enter grouped mode
+        dialog._palette_filter.setCurrentIndex(1)
+
+        # First deselect all
+        dialog._select_no_sprites()
+        assert _count_checked_entries(dialog) == 0
+
+        # Check just the first group
+        first_group = _get_top_level_item(dialog, 0)
+        assert first_group is not None
+        first_group.setCheckState(0, Qt.CheckState.Checked)
+
+        # All children should now be checked - get their count
+        child_count = first_group.childCount()
+        assert child_count > 0
+
+        # Verify selected IDs matches child count
+        selected = dialog._get_selected_ids()
+        assert len(selected) == child_count
+
+    def test_group_unchecking_propagates_to_children(
+        self, qtbot: pytest.fixture, clusterable_capture: CaptureResult
+    ) -> None:
+        """Unchecking a group item should uncheck all its children."""
+        dialog = SpriteSelectionDialog(clusterable_capture)
+        qtbot.addWidget(dialog)
+
+        assert dialog._palette_filter is not None
+        # Select "Palette 0" to enter grouped mode (all selected by default)
+        dialog._palette_filter.setCurrentIndex(1)
+
+        # Initially all 5 should be selected
+        assert _count_checked_entries(dialog) == 5
+
+        # Uncheck the first group
+        first_group = _get_top_level_item(dialog, 0)
+        assert first_group is not None
+        first_group.setCheckState(0, Qt.CheckState.Unchecked)
+
+        # Should have fewer selected now
+        selected = dialog._get_selected_ids()
+        assert len(selected) < 5
+
+    def test_selected_entries_returns_list_of_oam_entries(
+        self, qtbot: pytest.fixture, clusterable_capture: CaptureResult
+    ) -> None:
+        """selected_entries should return list[OAMEntry] regardless of grouping mode."""
+        dialog = SpriteSelectionDialog(clusterable_capture)
+        qtbot.addWidget(dialog)
+
+        assert dialog._palette_filter is not None
+        # Select "Palette 0" to enter grouped mode
+        dialog._palette_filter.setCurrentIndex(1)
+
+        dialog.accept()
+
+        # Should return actual OAMEntry objects
+        assert len(dialog.selected_entries) == 5
+        for entry in dialog.selected_entries:
+            assert hasattr(entry, "id")
+            assert hasattr(entry, "x")
+            assert hasattr(entry, "y")
+            assert hasattr(entry, "palette")
+
+    def test_group_label_shows_bounds_info(self, qtbot: pytest.fixture, clusterable_capture: CaptureResult) -> None:
+        """Group items should show bounding box info in their label."""
+        dialog = SpriteSelectionDialog(clusterable_capture)
+        qtbot.addWidget(dialog)
+
+        assert dialog._palette_filter is not None
+        # Select "Palette 0" to enter grouped mode
+        dialog._palette_filter.setCurrentIndex(1)
+
+        # Check first group label
+        first_group = _get_top_level_item(dialog, 0)
+        assert first_group is not None
+        label = first_group.text(0)
+
+        # Should contain group name and tile count
+        assert "Group" in label
+        assert "tiles" in label
+        # Should contain position range (e.g., "@ (50-90, 60-108)")
+        assert "@" in label
+
+    def test_groups_are_expanded_by_default(self, qtbot: pytest.fixture, clusterable_capture: CaptureResult) -> None:
+        """Groups should be expanded by default so users see contents."""
+        dialog = SpriteSelectionDialog(clusterable_capture)
+        qtbot.addWidget(dialog)
+
+        assert dialog._palette_filter is not None
+        # Select "Palette 0" to enter grouped mode
+        dialog._palette_filter.setCurrentIndex(1)
+
+        # Check both groups are expanded
+        for i in range(2):
+            item = _get_top_level_item(dialog, i)
+            assert item is not None
+            if item.childCount() > 0:
+                assert item.isExpanded(), f"Group {i} should be expanded by default"
+
+    def test_single_entry_cluster_shown_as_flat_item(
+        self, qtbot: pytest.fixture, sample_capture: CaptureResult
+    ) -> None:
+        """A cluster with only 1 entry should be shown as a flat item, not a group."""
+        dialog = SpriteSelectionDialog(sample_capture)
+        qtbot.addWidget(dialog)
+
+        assert dialog._palette_filter is not None
+        # Select "Palette 7" which has only 1 entry
+        dialog._palette_filter.setCurrentIndex(3)
+
+        # Should have 1 item
+        assert _count_top_level_items(dialog) == 1
+
+        # It should be a flat item (no children)
+        item = _get_top_level_item(dialog, 0)
+        assert item is not None
+        assert item.childCount() == 0

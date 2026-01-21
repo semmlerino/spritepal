@@ -11,10 +11,10 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QPushButton,
     QSplitter,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -24,7 +24,14 @@ from ui.components.base.dialog_base import DialogBase
 if TYPE_CHECKING:
     from PIL import Image
 
+    from core.mesen_integration.capture_to_arrangement import SpriteCluster
     from core.mesen_integration.click_extractor import CaptureResult, OAMEntry
+
+
+# Data role constants for tree items
+ROLE_ENTRY_ID = Qt.ItemDataRole.UserRole
+ROLE_CLUSTER_ID = Qt.ItemDataRole.UserRole + 1
+ROLE_IS_GROUP = Qt.ItemDataRole.UserRole + 2
 
 
 class SpriteSelectionDialog(DialogBase):
@@ -46,10 +53,13 @@ class SpriteSelectionDialog(DialogBase):
         self._selected_entries: list[OAMEntry] = []
 
         # UI components (initialized later)
-        self._sprite_list: QListWidget | None = None
+        self._sprite_tree: QTreeWidget | None = None
         self._preview_label: QLabel | None = None
         self._palette_filter: QComboBox | None = None
         self._info_label: QLabel | None = None
+
+        # Clustering state
+        self._clusters: list[SpriteCluster] = []
 
         super().__init__(
             parent,
@@ -141,16 +151,16 @@ class SpriteSelectionDialog(DialogBase):
         filter_layout.addStretch()
         layout.addLayout(filter_layout)
 
-        # Create list widget with checkboxes
-        self._sprite_list = QListWidget()
+        # Create tree widget with checkboxes
+        self._sprite_tree = QTreeWidget()
+        self._sprite_tree.setHeaderHidden(True)
+        self._sprite_tree.setColumnCount(1)
 
-        # Add all entries
-        for entry in self._capture.entries:
-            item = self._create_list_item(entry)
-            self._sprite_list.addItem(item)
+        # Initial population (ungrouped - "All Palettes" is selected)
+        self._populate_tree_ungrouped()
 
-        _ = self._sprite_list.itemChanged.connect(self._on_selection_changed)
-        layout.addWidget(self._sprite_list)
+        _ = self._sprite_tree.itemChanged.connect(self._on_item_changed)
+        layout.addWidget(self._sprite_tree)
 
         # Selection buttons
         btn_layout = QHBoxLayout()
@@ -168,23 +178,111 @@ class SpriteSelectionDialog(DialogBase):
 
         return group
 
-    def _create_list_item(self, entry: OAMEntry) -> QListWidgetItem:
-        """Create a list item for an OAM entry.
+    def _populate_tree_ungrouped(self) -> None:
+        """Populate tree with individual entries (All Palettes mode)."""
+        if self._sprite_tree is None:
+            return
+
+        self._sprite_tree.blockSignals(True)
+        self._sprite_tree.clear()
+        self._clusters = []
+
+        # Add all entries as top-level items
+        for entry in self._capture.entries:
+            item = self._create_entry_item(entry, is_child=False)
+            self._sprite_tree.addTopLevelItem(item)
+
+        self._sprite_tree.blockSignals(False)
+
+    def _populate_tree_grouped(self, palette_index: int) -> None:
+        """Populate tree with clusters for specific palette.
+
+        Args:
+            palette_index: Palette index to filter and cluster by
+        """
+        if self._sprite_tree is None:
+            return
+
+        from core.mesen_integration.capture_to_arrangement import (
+            CaptureToArrangementConverter,
+        )
+
+        self._sprite_tree.blockSignals(True)
+        self._sprite_tree.clear()
+
+        # Get clusters for this palette
+        converter = CaptureToArrangementConverter()
+        all_clusters = converter.get_sprite_clusters(
+            self._capture,
+            filter_garbage_tiles=False,  # Don't filter - user should see all
+        )
+
+        # Filter to only clusters matching the palette
+        self._clusters = [c for c in all_clusters if c.palette_index == palette_index]
+
+        # Create items for each cluster
+        for cluster in self._clusters:
+            if cluster.entry_count == 1:
+                # Single entry - show as flat item
+                item = self._create_entry_item(cluster.entries[0], is_child=False)
+                item.setData(0, ROLE_CLUSTER_ID, cluster.id)
+                self._sprite_tree.addTopLevelItem(item)
+            else:
+                # Multiple entries - create group item with children
+                group_item = self._create_group_item(cluster)
+                self._sprite_tree.addTopLevelItem(group_item)
+                group_item.setExpanded(True)
+
+        self._sprite_tree.blockSignals(False)
+
+    def _create_group_item(self, cluster: SpriteCluster) -> QTreeWidgetItem:
+        """Create expandable group item for a cluster.
+
+        Args:
+            cluster: Sprite cluster to create group for
+
+        Returns:
+            QTreeWidgetItem configured as tri-state parent
+        """
+        # Format: "Group A: N tiles @ (minX-maxX, minY-maxY)"
+        # Convert cluster ID to letter (0=A, 1=B, etc.)
+        letter = chr(ord("A") + (cluster.id % 26))
+        max_x = cluster.min_x + cluster.width
+        max_y = cluster.min_y + cluster.height
+        text = f"Group {letter}: {cluster.entry_count} tiles @ ({cluster.min_x}-{max_x}, {cluster.min_y}-{max_y})"
+
+        item = QTreeWidgetItem([text])
+        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsAutoTristate)
+        item.setCheckState(0, Qt.CheckState.Unchecked)
+        item.setData(0, ROLE_CLUSTER_ID, cluster.id)
+        item.setData(0, ROLE_IS_GROUP, True)
+
+        # Add child items for each entry
+        for entry in cluster.entries:
+            child_item = self._create_entry_item(entry, is_child=True)
+            item.addChild(child_item)
+
+        return item
+
+    def _create_entry_item(self, entry: OAMEntry, is_child: bool = False) -> QTreeWidgetItem:
+        """Create a tree item for an OAM entry.
 
         Args:
             entry: OAM entry to create item for
+            is_child: Whether this is a child of a group item
 
         Returns:
-            Configured QListWidgetItem
+            Configured QTreeWidgetItem
         """
         # Format: "#ID: WxH @(X,Y) Pal P, Pri N"
         text = (
             f"#{entry.id}: {entry.width}x{entry.height} @({entry.x},{entry.y}) Pal {entry.palette}, P{entry.priority}"
         )
-        item = QListWidgetItem(text)
+        item = QTreeWidgetItem([text])
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-        item.setCheckState(Qt.CheckState.Unchecked)
-        item.setData(Qt.ItemDataRole.UserRole, entry.id)
+        item.setCheckState(0, Qt.CheckState.Unchecked)
+        item.setData(0, ROLE_ENTRY_ID, entry.id)
+        item.setData(0, ROLE_IS_GROUP, False)
         return item
 
     def _create_preview_section(self) -> QGroupBox:
@@ -202,61 +300,60 @@ class SpriteSelectionDialog(DialogBase):
 
     def _on_filter_changed(self, _index: int) -> None:
         """Handle palette filter change."""
-        if self._sprite_list is None or self._palette_filter is None:
+        if self._sprite_tree is None or self._palette_filter is None:
             return
 
         selected_palette = self._palette_filter.currentData()
 
-        # Show/hide items based on filter
-        for i in range(self._sprite_list.count()):
-            item = self._sprite_list.item(i)
-            # item is always valid for indices in range(count())
-            assert item is not None  # for type checker
-            entry_id = item.data(Qt.ItemDataRole.UserRole)
-            entry = self._get_entry_by_id(entry_id)
-            if entry is None:
-                continue
+        if selected_palette == -1:
+            # "All Palettes" - show ungrouped flat list
+            self._populate_tree_ungrouped()
+        else:
+            # Specific palette - show grouped by spatial proximity
+            self._populate_tree_grouped(selected_palette)
 
-            # Show all if "All Palettes" selected, otherwise filter by palette
-            should_show = selected_palette in (-1, entry.palette)
-            item.setHidden(not should_show)
+        # Auto-select all items after repopulating
+        self._select_all_sprites()
 
-        # Update preview to reflect current selections
-        self._update_preview()
+    def _on_item_changed(self, item: QTreeWidgetItem, _column: int) -> None:
+        """Handle tree item check state change.
 
-    def _on_selection_changed(self, _item: QListWidgetItem) -> None:
-        """Handle sprite selection change."""
+        For group items with ItemIsAutoTristate, Qt handles propagation automatically.
+        """
         self._update_preview()
 
     def _select_all_sprites(self) -> None:
         """Select all visible sprites."""
-        if self._sprite_list is None:
+        if self._sprite_tree is None:
             return
 
         # Block signals to avoid multiple preview updates
-        self._sprite_list.blockSignals(True)
-        for i in range(self._sprite_list.count()):
-            item = self._sprite_list.item(i)
-            assert item is not None  # for type checker
-            if not item.isHidden():
-                item.setCheckState(Qt.CheckState.Checked)
-        self._sprite_list.blockSignals(False)
+        self._sprite_tree.blockSignals(True)
 
+        # Iterate all top-level items
+        for i in range(self._sprite_tree.topLevelItemCount()):
+            item = self._sprite_tree.topLevelItem(i)
+            if item is not None:
+                item.setCheckState(0, Qt.CheckState.Checked)
+
+        self._sprite_tree.blockSignals(False)
         self._update_preview()
 
     def _select_no_sprites(self) -> None:
         """Deselect all sprites."""
-        if self._sprite_list is None:
+        if self._sprite_tree is None:
             return
 
         # Block signals to avoid multiple preview updates
-        self._sprite_list.blockSignals(True)
-        for i in range(self._sprite_list.count()):
-            item = self._sprite_list.item(i)
-            assert item is not None  # for type checker
-            item.setCheckState(Qt.CheckState.Unchecked)
-        self._sprite_list.blockSignals(False)
+        self._sprite_tree.blockSignals(True)
 
+        # Iterate all top-level items
+        for i in range(self._sprite_tree.topLevelItemCount()):
+            item = self._sprite_tree.topLevelItem(i)
+            if item is not None:
+                item.setCheckState(0, Qt.CheckState.Unchecked)
+
+        self._sprite_tree.blockSignals(False)
         self._update_preview()
 
     def _get_entry_by_id(self, entry_id: int) -> OAMEntry | None:
@@ -276,20 +373,40 @@ class SpriteSelectionDialog(DialogBase):
     def _get_selected_ids(self) -> set[int]:
         """Get IDs of all checked entries.
 
+        Traverses tree structure, collecting entry IDs from both top-level
+        items and children of group items.
+
         Returns:
             Set of selected entry IDs
         """
-        if self._sprite_list is None:
+        if self._sprite_tree is None:
             return set()
 
         selected_ids: set[int] = set()
-        for i in range(self._sprite_list.count()):
-            item = self._sprite_list.item(i)
-            assert item is not None  # for type checker
-            if item.checkState() == Qt.CheckState.Checked:
-                entry_id = item.data(Qt.ItemDataRole.UserRole)
+
+        def collect_from_item(item: QTreeWidgetItem) -> None:
+            """Recursively collect checked entry IDs."""
+            is_group = item.data(0, ROLE_IS_GROUP)
+
+            if is_group:
+                # Group item - collect from children
+                for i in range(item.childCount()):
+                    child = item.child(i)
+                    # child() can return None despite stubs saying otherwise
+                    if child is not None:  # pyright: ignore[reportUnnecessaryComparison]
+                        collect_from_item(child)
+            # Entry item - check if selected
+            elif item.checkState(0) == Qt.CheckState.Checked:
+                entry_id = item.data(0, ROLE_ENTRY_ID)
                 if entry_id is not None:
                     selected_ids.add(entry_id)
+
+        # Traverse all top-level items
+        for i in range(self._sprite_tree.topLevelItemCount()):
+            item = self._sprite_tree.topLevelItem(i)
+            if item is not None:
+                collect_from_item(item)
+
         return selected_ids
 
     def _update_preview(self) -> None:
