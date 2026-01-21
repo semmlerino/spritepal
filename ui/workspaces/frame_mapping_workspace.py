@@ -75,6 +75,10 @@ class FrameMappingWorkspace(QWidget):
         self._last_capture_dir: Path | None = None
         self._project_path: Path | None = None
 
+        # ROM tracking for injection (synced from sprite editor)
+        self._rom_path: Path | None = None
+        self._modified_rom_path: Path | None = None
+
         # Selection tracking
         self._selected_ai_index: int | None = None
         self._selected_game_id: str | None = None
@@ -96,6 +100,18 @@ class FrameMappingWorkspace(QWidget):
     def set_message_service(self, service: StatusBarManager | None) -> None:
         """Set the message service for status updates."""
         self._message_service = service
+
+    def set_rom_path(self, rom_path: Path | None) -> None:
+        """Set ROM path for injection.
+
+        Called when switching from sprite editor workspace.
+        Resets the modified ROM path since a new original ROM is being used.
+
+        Args:
+            rom_path: Path to the ROM file, or None to clear.
+        """
+        self._rom_path = rom_path
+        self._modified_rom_path = None
 
     def _setup_ui(self) -> None:
         """Setup the UI layout."""
@@ -547,28 +563,34 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(self, "Inject Frame", "Selected frame is not mapped.")
             return
 
-        # Ask for ROM path
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Target ROM",
-            "",
-            "SNES ROM (*.sfc *.smc);;All Files (*)",
-        )
-        if not file_path:
+        # Use tracked ROM path (synced from sprite editor)
+        if self._rom_path is None:
+            QMessageBox.information(
+                self,
+                "Inject Frame",
+                "Load a ROM in Sprite Editor first.\n\nThe Frame Mapping workspace uses the ROM from Sprite Editor.",
+            )
             return
 
-        rom_path = Path(file_path)
+        # Generate modified ROM path if not already created
+        from core.rom_injector import ROMInjector
+
+        if self._modified_rom_path is None:
+            self._modified_rom_path = Path(ROMInjector.get_modified_rom_path(str(self._rom_path)))
+
+        target_rom = self._modified_rom_path
 
         reply = QMessageBox.question(
             self,
             "Confirm Injection",
-            f"Inject AI Frame {ai_frame_index} into:\n{rom_path.name}\n\nThis will modify the ROM file.",
+            f"Inject AI Frame {ai_frame_index} into:\n{target_rom.name}\n\n"
+            f"Original ROM ({self._rom_path.name}) will not be modified.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            self._controller.inject_mapping(ai_frame_index, rom_path)
+            self._controller.inject_mapping(ai_frame_index, target_rom)
 
     def _on_inject_all(self) -> None:
         """Handle inject all mapped frames request."""
@@ -577,22 +599,28 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(self, "Inject All", "No mapped frames to inject.")
             return
 
-        # Ask for ROM path
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Target ROM",
-            "",
-            "SNES ROM (*.sfc *.smc);;All Files (*)",
-        )
-        if not file_path:
+        # Use tracked ROM path (synced from sprite editor)
+        if self._rom_path is None:
+            QMessageBox.information(
+                self,
+                "Inject All",
+                "Load a ROM in Sprite Editor first.\n\nThe Frame Mapping workspace uses the ROM from Sprite Editor.",
+            )
             return
 
-        rom_path = Path(file_path)
+        # Generate modified ROM path if not already created
+        from core.rom_injector import ROMInjector
+
+        if self._modified_rom_path is None:
+            self._modified_rom_path = Path(ROMInjector.get_modified_rom_path(str(self._rom_path)))
+
+        target_rom = self._modified_rom_path
 
         reply = QMessageBox.question(
             self,
             "Confirm Injection",
-            f"Inject {project.mapped_count} mapped frames into:\n{rom_path.name}\n\nThis will modify the ROM file.",
+            f"Inject {project.mapped_count} mapped frames into:\n{target_rom.name}\n\n"
+            f"Original ROM ({self._rom_path.name}) will not be modified.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -605,7 +633,7 @@ class FrameMappingWorkspace(QWidget):
         for ai_frame in project.ai_frames:
             mapping = project.get_mapping_for_ai_frame(ai_frame.index)
             if mapping:
-                if self._controller.inject_mapping(ai_frame.index, rom_path):
+                if self._controller.inject_mapping(ai_frame.index, target_rom):
                     success_count += 1
 
         if self._message_service:

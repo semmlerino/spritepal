@@ -134,7 +134,6 @@ class AIFrameItem(QGraphicsObject):
     - Drag to translate (update offset_x, offset_y)
     - Corner handles for uniform scaling from center
     - Keyboard nudge (arrow keys)
-    - Ctrl+MouseWheel for scale increment
 
     Signals:
         transform_changed: Emitted when position or scale changes.
@@ -262,21 +261,6 @@ class AIFrameItem(QGraphicsObject):
         elif change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
             self.show_handles(bool(value))
         return super().itemChange(change, value)
-
-    @override
-    def wheelEvent(self, event: object) -> None:
-        """Handle mouse wheel for scaling (with Ctrl)."""
-        from PySide6.QtWidgets import QGraphicsSceneWheelEvent
-
-        if isinstance(event, QGraphicsSceneWheelEvent):
-            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                delta = event.delta()
-                scale_change = 0.1 if delta > 0 else -0.1
-                new_scale = self._scale_factor + scale_change
-                self.set_scale_factor(new_scale)
-                event.accept()
-            else:
-                event.ignore()
 
     @override
     def keyPressEvent(self, event: object) -> None:

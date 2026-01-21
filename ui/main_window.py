@@ -668,6 +668,11 @@ class MainWindow(QMainWindow):
             self.left_dock.hide()
             self._update_undo_redo_state(False, False)  # Disable undo
 
+            # Sync ROM path from sprite editor to frame mapping
+            rom_path = self._sprite_editor_workspace.rom_workflow_controller.rom_path
+            if rom_path:
+                self._frame_mapping_workspace.set_rom_path(Path(rom_path))
+
         if tab_index is not None and workspace_mode == WorkspaceMode.EXTRACTION:
             # Switch tab within extraction panel
             self.extraction_tabs.setCurrentIndex(tab_index)

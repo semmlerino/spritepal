@@ -7,6 +7,7 @@ to game frames with interactive manipulation:
 - Corner handles for uniform scaling
 - Keyboard nudge (arrow keys, Shift for 8px steps)
 - Ctrl+MouseWheel for view zoom
+- Middle mouse drag for view pan
 - Tile overlay showing OAM tile boundaries
 - Auto-alignment based on bounding boxes
 
@@ -26,8 +27,8 @@ import logging
 from typing import TYPE_CHECKING, override
 
 from PIL import Image
-from PySide6.QtCore import QRect, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor, QPainter, QPixmap, QWheelEvent
+from PySide6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, Signal
+from PySide6.QtGui import QBrush, QColor, QMouseEvent, QPainter, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -70,7 +71,12 @@ PREVIEW_DEBOUNCE_MS = 150
 
 
 class WorkbenchGraphicsView(QGraphicsView):
-    """Custom QGraphicsView with checkerboard background and zoom support."""
+    """Custom QGraphicsView with checkerboard background, zoom, and pan support.
+
+    Interactions:
+    - Ctrl+MouseWheel: Zoom view (0.25x to 4x)
+    - Middle mouse drag: Pan view
+    """
 
     def __init__(self, scene: QGraphicsScene, parent: QWidget | None = None) -> None:
         super().__init__(scene, parent)
@@ -82,6 +88,10 @@ class WorkbenchGraphicsView(QGraphicsView):
         self.setBackgroundBrush(QBrush(QColor(26, 26, 26)))
         self.setMinimumSize(CANVAS_SIZE, CANVAS_SIZE)
         self.setStyleSheet("border: 1px solid #444;")
+
+        # Pan state for middle mouse button
+        self._is_panning = False
+        self._pan_start: QPointF | None = None
 
     @override
     def drawBackground(self, painter: QPainter, rect: QRectF | QRect) -> None:
@@ -117,13 +127,47 @@ class WorkbenchGraphicsView(QGraphicsView):
             current_scale = self.transform().m11()
 
             # Clamp zoom: 0.25x to 4x
-            if (zoom_factor > 1 and current_scale < 4.0) or (
-                zoom_factor < 1 and current_scale > 0.25
-            ):
+            if (zoom_factor > 1 and current_scale < 4.0) or (zoom_factor < 1 and current_scale > 0.25):
                 self.scale(zoom_factor, zoom_factor)
             event.accept()
         else:
             super().wheelEvent(event)
+
+    @override
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        """Handle mouse press for middle button pan."""
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self._is_panning = True
+            self._pan_start = event.position()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    @override
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        """Handle mouse move for panning."""
+        if self._is_panning and self._pan_start is not None:
+            delta = event.position() - self._pan_start
+            self._pan_start = event.position()
+
+            # Translate the view
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - int(delta.x()))
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - int(delta.y()))
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    @override
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        """Handle mouse release to end panning."""
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self._is_panning = False
+            self._pan_start = None
+            self.unsetCursor()
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
 
 
 class WorkbenchCanvas(QWidget):
