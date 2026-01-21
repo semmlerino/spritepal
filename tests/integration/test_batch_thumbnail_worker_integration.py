@@ -136,14 +136,17 @@ class WorkerThreadWrapper:
 
 @pytest.fixture
 def test_rom_file(tmp_path) -> str:
-    """Create a test ROM file with some sprite data."""
+    """Create a 1MB test ROM with tile patterns at standard offsets.
+
+    Adds tile-like patterns (10 tiles each) at 0x10000, 0x20000, 0x30000.
+    Pattern matches what tests expect for sprite thumbnail generation.
+    """
     rom_path = tmp_path / "test_sprites.sfc"
-    # Create ROM with some recognizable patterns
     rom_data = bytearray(1024 * 1024)  # 1MB ROM
 
-    # Add some tile-like data at various offsets
+    # Add tile patterns at standard sprite offsets
     for offset in [0x10000, 0x20000, 0x30000]:
-        for i in range(32 * 10):  # 10 tiles worth of data
+        for i in range(32 * 10):  # 10 tiles * 32 bytes/tile
             if offset + i < len(rom_data):
                 rom_data[offset + i] = (i + offset) % 256
 

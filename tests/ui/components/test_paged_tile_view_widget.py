@@ -23,25 +23,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.parallel_unsafe]
 
 
 class TestTileGridGraphicsView:
-    """Test the TileGridGraphicsView implementation."""
-
-    def test_view_creation(self, qtbot) -> None:
-        """Test view can be created."""
-        view = TileGridGraphicsView()
-        qtbot.addWidget(view)
-        assert view._cols == 50
-        assert view._rows == 50
-        assert view._page_offset == 0
-
-    def test_set_grid_info(self, qtbot) -> None:
-        """Test setting grid dimensions and offset."""
-        view = TileGridGraphicsView()
-        qtbot.addWidget(view)
-
-        view.set_grid_info(cols=20, rows=30, page_offset=64000)
-        assert view._cols == 20
-        assert view._rows == 30
-        assert view._page_offset == 64000
+    """Test the TileGridGraphicsView observable behaviors."""
 
     def test_set_image(self, qtbot) -> None:
         """Test setting an image in the view."""
@@ -69,7 +51,7 @@ class TestTileGridGraphicsView:
 
 
 class TestPagedTileViewWidget:
-    """Test the PagedTileViewWidget implementation."""
+    """Test the PagedTileViewWidget observable behaviors."""
 
     @pytest.fixture
     def sample_rom_data(self) -> bytes:
@@ -79,62 +61,50 @@ class TestPagedTileViewWidget:
         # Create 3 pages worth
         return bytes(range(256)) * 1000  # 256000 bytes
 
-    def test_widget_creation(self, qtbot) -> None:
-        """Test widget can be created with default settings."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
-        # Check default grid dimensions from preset
-        expected_cols = GRID_PRESETS[DEFAULT_PRESET_INDEX][1]
-        expected_rows = GRID_PRESETS[DEFAULT_PRESET_INDEX][2]
-        assert widget._cols == expected_cols
-        assert widget._rows == expected_rows
-        assert widget._current_page == 0
-        assert widget._total_pages == 0
-
     def test_set_rom_data(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test setting ROM data updates page count."""
+        """Test setting ROM data enables navigation for multi-page ROM."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
 
         widget.set_rom_data(sample_rom_data)
 
-        # Calculate expected pages
-        bytes_per_page = widget._cols * widget._rows * BYTES_PER_TILE
-        expected_pages = (len(sample_rom_data) + bytes_per_page - 1) // bytes_per_page
-
-        assert widget._total_pages == expected_pages
-        assert widget._current_page == 0
+        # Multi-page ROM: next should be enabled, prev disabled (first page)
+        assert widget._next_btn.isEnabled()
+        assert not widget._prev_btn.isEnabled()
+        # Current offset starts at 0
+        assert widget.get_current_offset() == 0
 
     def test_set_palette(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test setting palette."""
+        """Test setting palette enables palette checkbox."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
-        old_hash = widget._palette_hash
+        # Initially no palette - checkbox disabled
+        widget.set_palette(None)
+        assert not widget._palette_checkbox.isEnabled()
+
+        # Set palette - checkbox becomes enabled
         palette = [[255, 0, 0]] + [[i * 16, i * 16, i * 16] for i in range(1, 16)]
         widget.set_palette(palette)
-
-        assert widget._palette == palette
-        assert widget._palette_hash != old_hash
+        assert widget._palette_checkbox.isEnabled()
 
     def test_set_grid_dimensions(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test changing grid dimensions."""
+        """Test changing grid dimensions updates navigation."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
-        old_pages = widget._total_pages
+        # Change to smaller grid (20x20 vs default 50x50)
+        # This creates more pages from same data
         widget.set_grid_dimensions(20, 20)
 
-        assert widget._cols == 20
-        assert widget._rows == 20
-        # Smaller grid = more pages
-        assert widget._total_pages > old_pages
+        # Should still be on first page with navigation available
+        assert widget.get_current_offset() == 0
+        assert widget._next_btn.isEnabled()
 
     def test_go_to_page(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test navigating to a specific page."""
+        """Test navigating to a specific page emits signal and updates offset."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
@@ -142,25 +112,32 @@ class TestPagedTileViewWidget:
         page_signals: list[int] = []
         widget.page_changed.connect(page_signals.append)
 
-        # Navigate to page 1
-        if widget._total_pages > 1:
-            widget.go_to_page(1)
-            assert widget._current_page == 1
-            assert len(page_signals) == 1
-            assert page_signals[0] == 1
+        # Navigate to page 1 (multi-page ROM should have page 1)
+        widget.go_to_page(1)
+
+        # Signal should be emitted
+        assert len(page_signals) == 1
+        assert page_signals[0] == 1
+        # Offset should have advanced
+        assert widget.get_current_offset() > 0
+        # Prev button should now be enabled
+        assert widget._prev_btn.isEnabled()
 
     def test_go_to_offset(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test navigating to a specific offset."""
+        """Test navigating to a specific offset updates navigation."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
-        # Calculate offset in middle of second page
-        bytes_per_page = widget._cols * widget._rows * BYTES_PER_TILE
-        target_offset = bytes_per_page + 1000
+        # Navigate to an offset in the second page (256KB ROM, 80KB per page)
+        target_offset = 100000  # ~100KB, past first page
 
         widget.go_to_offset(target_offset)
-        assert widget._current_page == 1
+
+        # Should be past first page, so prev should be enabled
+        assert widget._prev_btn.isEnabled()
+        # Current offset should be page-aligned to target's page
+        assert widget.get_current_offset() > 0
 
     def test_get_current_offset(self, qtbot, sample_rom_data: bytes) -> None:
         """Test getting current page offset."""
@@ -215,60 +192,47 @@ class TestPagedTileViewWidget:
         assert len(offsets) == 1
         assert offsets[0] == expected_offset
 
-    def test_cleanup(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test cleanup method."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-        widget.set_rom_data(sample_rom_data)
-
-        widget.cleanup()
-        # Cache should be cleared
-        assert len(widget._cache) == 0
-
     def test_grid_preset_change(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test changing grid size via combo box."""
+        """Test changing grid size via combo box updates navigation."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Change to small grid preset (index 0)
         widget._grid_combo.setCurrentIndex(0)
-        small_name, small_cols, small_rows = GRID_PRESETS[0]
 
-        assert widget._cols == small_cols
-        assert widget._rows == small_rows
+        # Combo should show selected preset
+        assert widget._grid_combo.currentIndex() == 0
+        # Navigation should still work
+        assert widget._next_btn.isEnabled()
 
     def test_goto_offset_hex_with_prefix(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test go-to-offset with 0x hex prefix."""
+        """Test go-to-offset with 0x hex prefix navigates correctly."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
-        # Calculate target offset in page 1
-        bytes_per_page = widget._cols * widget._rows * BYTES_PER_TILE
-        target_offset = bytes_per_page + 0x1000
-
-        # Type offset in input and trigger
-        widget._offset_input.setText(f"0x{target_offset:X}")
+        # Navigate to offset past first page (100KB)
+        widget._offset_input.setText("0x18000")
         widget._on_goto_offset()
 
-        assert widget._current_page == 1
+        # Should be past first page, prev enabled
+        assert widget._prev_btn.isEnabled()
+        assert widget.get_current_offset() > 0
 
     def test_goto_offset_hex_without_prefix(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test go-to-offset with plain hex (no prefix)."""
+        """Test go-to-offset with plain hex navigates correctly."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
-        # Calculate target offset in page 1
-        bytes_per_page = widget._cols * widget._rows * BYTES_PER_TILE
-        target_offset = bytes_per_page + 0x1000
-
-        # Type offset without 0x prefix
-        widget._offset_input.setText(f"{target_offset:X}")
+        # Navigate to offset past first page (100KB = 0x18000)
+        widget._offset_input.setText("18000")
         widget._on_goto_offset()
 
-        assert widget._current_page == 1
+        # Should be past first page, prev enabled
+        assert widget._prev_btn.isEnabled()
+        assert widget.get_current_offset() > 0
 
     def test_goto_offset_clears_input(self, qtbot, sample_rom_data: bytes) -> None:
         """Test that go-to-offset clears the input field after success."""

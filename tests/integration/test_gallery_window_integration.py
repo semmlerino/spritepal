@@ -42,10 +42,9 @@ SIGNALS_TO_DISCONNECT = [
 
 @pytest.fixture
 def test_rom_file(tmp_path) -> str:
-    """Create a test ROM file."""
+    """Create a minimal 1MB test ROM file for gallery window tests."""
     rom_path = tmp_path / "test_rom.sfc"
-    # Create a minimal ROM file
-    rom_data = b"SNES" + b"\x00" * (1024 * 1024 - 4)  # 1MB ROM
+    rom_data = b"SNES" + b"\x00" * (1024 * 1024 - 4)
     rom_path.write_bytes(rom_data)
     return str(rom_path)
 

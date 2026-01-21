@@ -45,12 +45,19 @@ ROM_SIZES = {
 }
 
 
-def _create_snes_header(data: bytearray, is_lorom: bool = True) -> None:
+def _create_snes_header(
+    data: bytearray,
+    is_lorom: bool = True,
+    title: str = "TEST ROM DATA",
+    checksum: int = 0x0000,
+) -> None:
     """Add a valid SNES internal header to ROM data.
 
     Args:
         data: Mutable bytearray to modify in-place
         is_lorom: If True, use LoROM header offset (0x7FC0), else HiROM (0xFFC0)
+        title: ROM title (max 21 chars, padded with spaces)
+        checksum: 16-bit checksum value
     """
     header_offset = 0x7FC0 if is_lorom else 0xFFC0
 
@@ -58,8 +65,8 @@ def _create_snes_header(data: bytearray, is_lorom: bool = True) -> None:
         return  # ROM too small for header
 
     # Game title (21 bytes, ASCII padded with spaces)
-    title = b"TEST ROM DATA        "[:21]
-    data[header_offset : header_offset + 21] = title
+    title_bytes = title.encode("ascii")[:21].ljust(21, b" ")
+    data[header_offset : header_offset + 21] = title_bytes
 
     # Map mode (byte 21): 0x20 = LoROM, 0x21 = HiROM
     data[header_offset + 21] = 0x20 if is_lorom else 0x21
@@ -85,8 +92,9 @@ def _create_snes_header(data: bytearray, is_lorom: bool = True) -> None:
     data[header_offset + 27] = 0x00
 
     # Checksum complement and checksum (bytes 28-31)
-    # Simple placeholder values
-    data[header_offset + 28 : header_offset + 32] = b"\xff\xff\x00\x00"
+    complement = 0xFFFF ^ checksum
+    data[header_offset + 28 : header_offset + 30] = complement.to_bytes(2, "little")
+    data[header_offset + 30 : header_offset + 32] = checksum.to_bytes(2, "little")
 
 
 def _add_sprite_patterns(data: bytearray, offsets: list[int] | None = None) -> None:
@@ -149,6 +157,7 @@ def test_rom_file(tmp_path: Path) -> Callable[..., str]:
             path = test_rom_file()  # Default 1MB
             path = test_rom_file(size="small")  # 13KB
             path = test_rom_file(size="large", with_header=True, with_sprites=True)
+            path = test_rom_file(with_header=True, title="KIRBY SUPER STAR", checksum=0x1234)
     """
     _counter = [0]  # Mutable counter for unique filenames
 
@@ -157,6 +166,8 @@ def test_rom_file(tmp_path: Path) -> Callable[..., str]:
         with_header: bool = False,
         with_sprites: bool = False,
         filename: str | None = None,
+        title: str = "TEST ROM DATA",
+        checksum: int = 0x0000,
     ) -> str:
         """Create a test ROM file.
 
@@ -166,6 +177,8 @@ def test_rom_file(tmp_path: Path) -> Callable[..., str]:
             with_header: If True, add SNES internal header
             with_sprites: If True, add sprite/tile patterns
             filename: Custom filename (default: test_N.sfc)
+            title: ROM title for header (max 21 chars, default "TEST ROM DATA")
+            checksum: ROM checksum for header (16-bit, default 0x0000)
 
         Returns:
             Path to the created ROM file as a string
@@ -188,7 +201,7 @@ def test_rom_file(tmp_path: Path) -> Callable[..., str]:
         _add_incrementing_pattern(rom_data)
 
         if with_header and rom_size >= 0x8000:
-            _create_snes_header(rom_data)
+            _create_snes_header(rom_data, title=title, checksum=checksum)
 
         if with_sprites and rom_size >= 0x40000:
             _add_sprite_patterns(rom_data)

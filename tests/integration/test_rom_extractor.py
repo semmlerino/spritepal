@@ -20,44 +20,6 @@ from utils.constants import BYTES_PER_TILE, TILE_HEIGHT, TILE_WIDTH
 DEFAULT_TILES_PER_ROW = 16
 
 
-def create_test_rom_with_header(
-    title: str,
-    checksum: int,
-    rom_size: int = 64 * 1024,
-    smc_header: bool = False,
-) -> bytes:
-    """Create test ROM with valid SNES header at 0x7FC0 (LoROM).
-
-    Args:
-        title: ROM title (max 21 chars)
-        checksum: 16-bit checksum value
-        rom_size: Total ROM size in bytes (default 64KB)
-        smc_header: If True, prepend 512-byte SMC header
-
-    Returns:
-        ROM data bytes with valid header structure
-    """
-    # Create ROM data
-    rom_data = bytearray(rom_size)
-
-    # Add SNES header at 0x7FC0 (LoROM standard)
-    header_offset = 0x7FC0
-    title_bytes = title.encode("ascii")[:21].ljust(21, b" ")
-    rom_data[header_offset : header_offset + 21] = title_bytes
-    rom_data[header_offset + 21] = 0x20  # ROM type (LoROM)
-    rom_data[header_offset + 22] = 0x09  # ROM size code
-    rom_data[header_offset + 23] = 0x00  # SRAM size
-
-    # Add checksum and complement (checksum ^ complement = 0xFFFF)
-    complement = 0xFFFF ^ checksum
-    rom_data[header_offset + 28 : header_offset + 30] = complement.to_bytes(2, "little")
-    rom_data[header_offset + 30 : header_offset + 32] = checksum.to_bytes(2, "little")
-
-    if smc_header:
-        return bytes(512) + bytes(rom_data)
-    return bytes(rom_data)
-
-
 def verify_png_output(
     png_path: Path,
     *,
@@ -309,19 +271,18 @@ class TestROMExtractorMainExtraction:
     and palette extraction by validating actual output files.
     """
 
-    def test_extract_sprite_from_rom_basic_success(self, app_context, tmp_path):
+    def test_extract_sprite_from_rom_basic_success(self, app_context, tmp_path, test_rom_file):
         """Test successful sprite extraction with real components.
 
         Uses real ROM header parsing, file I/O, and PNG conversion.
         Only mocks the HAL decompression step (tested separately).
         """
         # Create real ROM with proper header
-        rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(
-            create_test_rom_with_header(
-                title="TEST ROM",
-                checksum=0x1234,
-            )
+        rom_path = test_rom_file(
+            with_header=True,
+            title="TEST ROM",
+            checksum=0x1234,
+            filename="test.sfc",
         )
         output_base = tmp_path / "extracted_sprite"
 
@@ -354,15 +315,14 @@ class TestROMExtractorMainExtraction:
         assert extraction_info["default_palettes_used"] is False
         assert extraction_info["palette_count"] == 0
 
-    def test_extract_sprite_from_rom_with_rom_palettes(self, app_context, tmp_path):
+    def test_extract_sprite_from_rom_with_rom_palettes(self, app_context, tmp_path, test_rom_file):
         """Test sprite extraction with ROM palette extraction."""
         # Create ROM with Kirby header (known game)
-        rom_path = tmp_path / "kirby.sfc"
-        rom_path.write_bytes(
-            create_test_rom_with_header(
-                title="KIRBY SUPER STAR",
-                checksum=0x5678,
-            )
+        rom_path = test_rom_file(
+            with_header=True,
+            title="KIRBY SUPER STAR",
+            checksum=0x5678,
+            filename="kirby.sfc",
         )
         output_base = tmp_path / "sprite_with_palettes"
 
@@ -416,15 +376,14 @@ class TestROMExtractorMainExtraction:
         assert extraction_info["default_palettes_used"] is False
         assert extraction_info["palette_count"] == 3
 
-    def test_extract_sprite_from_rom_with_default_palettes(self, app_context, tmp_path):
+    def test_extract_sprite_from_rom_with_default_palettes(self, app_context, tmp_path, test_rom_file):
         """Test sprite extraction with default palette fallback."""
         # Create ROM with unknown title (no sprite config)
-        rom_path = tmp_path / "unknown.sfc"
-        rom_path.write_bytes(
-            create_test_rom_with_header(
-                title="UNKNOWN GAME",
-                checksum=0x9ABC,
-            )
+        rom_path = test_rom_file(
+            with_header=True,
+            title="UNKNOWN GAME",
+            checksum=0x9ABC,
+            filename="unknown.sfc",
         )
         output_base = tmp_path / "sprite_with_defaults"
 
@@ -468,15 +427,14 @@ class TestROMExtractorMainExtraction:
         assert extraction_info["default_palettes_used"] is True
         assert extraction_info["palette_count"] == 1
 
-    def test_extract_sprite_from_rom_no_sprite_name(self, app_context, tmp_path):
+    def test_extract_sprite_from_rom_no_sprite_name(self, app_context, tmp_path, test_rom_file):
         """Test sprite extraction without sprite name (no palette extraction)."""
         # Create simple ROM
-        rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(
-            create_test_rom_with_header(
-                title="TEST ROM",
-                checksum=0xDEF0,
-            )
+        rom_path = test_rom_file(
+            with_header=True,
+            title="TEST ROM",
+            checksum=0xDEF0,
+            filename="test_no_name.sfc",
         )
         output_base = tmp_path / "sprite_no_name"
 
@@ -509,14 +467,13 @@ class TestROMExtractorMainExtraction:
         assert extraction_info["rom_palettes_used"] is False
         assert extraction_info["default_palettes_used"] is False
 
-    def test_extract_sprite_from_rom_hal_compression_error(self, app_context, tmp_path):
+    def test_extract_sprite_from_rom_hal_compression_error(self, app_context, tmp_path, test_rom_file):
         """Test handling of HAL compression errors."""
-        rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(
-            create_test_rom_with_header(
-                title="TEST ROM",
-                checksum=0x1234,
-            )
+        rom_path = test_rom_file(
+            with_header=True,
+            title="TEST ROM",
+            checksum=0x1234,
+            filename="test_hal_error.sfc",
         )
         output_base = tmp_path / "failed_sprite"
 
@@ -533,14 +490,13 @@ class TestROMExtractorMainExtraction:
 
             assert "Failed to decompress sprite" in str(exc_info.value)
 
-    def test_extract_sprite_from_rom_generic_error(self, app_context, tmp_path):
+    def test_extract_sprite_from_rom_generic_error(self, app_context, tmp_path, test_rom_file):
         """Test handling of generic errors."""
-        rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(
-            create_test_rom_with_header(
-                title="TEST ROM",
-                checksum=0x1234,
-            )
+        rom_path = test_rom_file(
+            with_header=True,
+            title="TEST ROM",
+            checksum=0x1234,
+            filename="test_generic_error.sfc",
         )
         output_base = tmp_path / "error_sprite"
 
