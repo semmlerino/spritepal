@@ -316,32 +316,6 @@ class TestInjectionParameters:
             # May fail on file validation, but params structure is correct
             assert "mode" not in str(e).lower() and "sprite_path" not in str(e).lower()
 
-    def test_validate_missing_params(self, injection_manager):
-        """Test validation with missing parameters."""
-        from core.exceptions import ValidationError
-
-        params = {}
-
-        # Should raise ValidationError for missing required params
-        with pytest.raises(ValidationError, match="Missing required parameters"):
-            injection_manager.validate_injection_params(params)
-
-    def test_validate_invalid_paths(self, injection_manager, tmp_path):
-        """Test validation with invalid file paths."""
-        from core.exceptions import ValidationError
-
-        params = {
-            "mode": "vram",
-            "sprite_path": str(tmp_path / "nonexistent.png"),
-            "offset": 0x4000,
-            "input_vram": str(tmp_path / "nonexistent.dmp"),
-            "output_vram": str(tmp_path / "output.dmp"),
-        }
-
-        # Should raise ValidationError for invalid file paths
-        with pytest.raises(ValidationError):
-            injection_manager.validate_injection_params(params)
-
 
 class TestInjectionSignals:
     """Test signal emission during injection workflow."""

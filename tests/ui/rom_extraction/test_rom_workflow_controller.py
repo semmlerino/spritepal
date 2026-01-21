@@ -1,5 +1,13 @@
 """
 Tests for ROMWorkflowController logic and regression fixes.
+
+Tests the controller that coordinates ROM extraction workflow in the UI,
+including capture handling, offset synchronization, and edit mode state.
+
+Related tests:
+- tests/ui/sprite_editor/test_rom_workflow_state.py - Workflow state tests
+- tests/ui/integration/test_rom_workflow_integration.py - Full UI integration
+- tests/ui/integration/test_mesen_capture_offset_handling.py - Offset coordination
 """
 
 from __future__ import annotations

@@ -2,6 +2,11 @@
 Unit tests for rom_tile_matcher module.
 
 Tests tile matching logic, flip transforms, lookups, and persistence.
+ROMTileMatcher bridges Mesen captures to ROM sprite locations.
+
+Related tests:
+- tests/integration/test_rom_cache.py - Cache integration
+- tests/ui/integration/test_mesen_capture_offset_handling.py - Offset handling
 """
 
 from __future__ import annotations

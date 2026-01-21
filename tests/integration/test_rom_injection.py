@@ -1,5 +1,12 @@
 """
-Tests for ROM injection functionality and regression fixes.
+Integration tests for ROM injection functionality.
+
+Tests the core ROMInjector class with real file operations.
+
+Related tests:
+- tests/integration/test_rom_injection_settings.py - Settings persistence
+- tests/integration/test_injection_manager.py - Manager-level injection API
+- tests/integration/test_injection_workflow_integration.py - End-to-end workflow
 """
 
 from __future__ import annotations

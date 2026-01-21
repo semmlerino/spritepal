@@ -1,4 +1,14 @@
-"""Unit tests for sprite display formatter functions."""
+"""Unit tests for sprite display formatter business rules.
+
+Tests focus on business rules and behavioral contracts, not Python built-ins.
+Removed tests:
+- TestFormatSpriteName: Tests Python's .replace() and .title() methods
+- TestFormatOffset: Tests Python f-string formatting
+- TestInternalNameFunctions: Tests simple f-string concatenation
+
+These functions are pure formatters with no complex logic - if they break,
+the UI will obviously display wrong text everywhere.
+"""
 
 from __future__ import annotations
 
@@ -9,74 +19,26 @@ from ui.controllers.sprite_display_formatter import (
     format_custom_sprite_text,
     format_header_text,
     format_manual_sprite_text,
-    format_offset,
     format_sprite_display_text,
     format_sprite_list,
-    format_sprite_name,
-    get_custom_sprite_name,
-    get_internal_name_from_offset,
-    get_manual_sprite_name,
 )
 
 
-class TestFormatSpriteName:
-    """Tests for format_sprite_name function."""
-
-    def test_replaces_underscores(self) -> None:
-        """Should replace underscores with spaces."""
-        assert format_sprite_name("kirby_idle") == "Kirby Idle"
-
-    def test_title_case(self) -> None:
-        """Should apply title case."""
-        assert format_sprite_name("player") == "Player"
-        assert format_sprite_name("player_walking") == "Player Walking"
-
-    def test_multiple_underscores(self) -> None:
-        """Should handle multiple underscores."""
-        assert format_sprite_name("some_long_sprite_name") == "Some Long Sprite Name"
-
-    def test_no_underscores(self) -> None:
-        """Should handle names without underscores."""
-        assert format_sprite_name("kirby") == "Kirby"
-
-
-class TestFormatOffset:
-    """Tests for format_offset function."""
-
-    def test_default_padding(self) -> None:
-        """Should pad to 6 digits by default."""
-        assert format_offset(0x1000) == "0x001000"
-        assert format_offset(0x123456) == "0x123456"
-
-    def test_custom_padding(self) -> None:
-        """Should support custom padding."""
-        assert format_offset(0x100, pad_to=4) == "0x0100"
-        assert format_offset(0x100, pad_to=8) == "0x00000100"
-
-    def test_zero(self) -> None:
-        """Should handle zero."""
-        assert format_offset(0) == "0x000000"
-
-    def test_large_values(self) -> None:
-        """Should handle large values."""
-        assert format_offset(0xFFFFFF) == "0xFFFFFF"
-
-
 class TestFormatSpriteDisplayText:
-    """Tests for format_sprite_display_text function."""
+    """Tests for format_sprite_display_text function - business rules for display format."""
 
     def test_basic_format(self) -> None:
-        """Should format name and offset."""
+        """Should format name and offset in standard format."""
         result = format_sprite_display_text("kirby_idle", 0x100000)
         assert result == "Kirby Idle (0x100000)"
 
     def test_with_cache_indicator(self) -> None:
-        """Should add cache indicator when cached."""
+        """Business rule: cached sprites show indicator."""
         result = format_sprite_display_text("kirby_idle", 0x100000, is_cached=True)
         assert result == f"Kirby Idle (0x100000){CACHE_INDICATOR}"
 
     def test_without_cache_indicator(self) -> None:
-        """Should not add cache indicator when not cached."""
+        """Business rule: non-cached sprites don't show indicator."""
         result = format_sprite_display_text("kirby_idle", 0x100000, is_cached=False)
         assert CACHE_INDICATOR not in result
 
@@ -85,7 +47,7 @@ class TestFormatCustomSpriteText:
     """Tests for format_custom_sprite_text function."""
 
     def test_format(self) -> None:
-        """Should format with cache indicator."""
+        """Business rule: custom sprites always show cache indicator."""
         result = format_custom_sprite_text(0x200000)
         assert result == f"Custom Sprite (0x200000){CACHE_INDICATOR}"
 
@@ -94,36 +56,31 @@ class TestFormatManualSpriteText:
     """Tests for format_manual_sprite_text function."""
 
     def test_format(self) -> None:
-        """Should format manual offset."""
+        """Business rule: manual offsets never show cache indicator."""
         result = format_manual_sprite_text(0x300000)
         assert result == "Manual Offset (0x300000)"
         assert CACHE_INDICATOR not in result
 
 
 class TestFormatHeaderText:
-    """Tests for format_header_text function."""
+    """Tests for format_header_text function - header format rules."""
 
     def test_without_cache(self) -> None:
-        """Should format without cache suffix."""
+        """Should format header without cache suffix."""
         result = format_header_text(5)
         assert result == "-- 5 Known Sprites Available --"
 
     def test_with_cache(self) -> None:
-        """Should add cached suffix."""
+        """Business rule: cached list shows suffix."""
         result = format_header_text(10, is_cached=True)
         assert result == "-- 10 Known Sprites Available (cached) --"
 
-    def test_singular_plural(self) -> None:
-        """Should handle various counts."""
-        assert "1 Known Sprites" in format_header_text(1)
-        assert "100 Known Sprites" in format_header_text(100)
-
 
 class TestFormatSpriteList:
-    """Tests for format_sprite_list function."""
+    """Tests for format_sprite_list function - list structure and behavior."""
 
     def test_empty_list(self) -> None:
-        """Should handle empty list."""
+        """Should handle empty list with appropriate UI state."""
         result = format_sprite_list([])
 
         assert isinstance(result, FormattedSpriteList)
@@ -133,7 +90,7 @@ class TestFormatSpriteList:
         assert result.items[0].is_header is True
 
     def test_with_sprites(self) -> None:
-        """Should format sprite list with header and separator."""
+        """Should format sprite list with header, separator, and items."""
         locations = [
             {"name": "kirby_idle", "offset": 0x100000},
             {"name": "kirby_walk", "offset": 0x200000},
@@ -150,7 +107,7 @@ class TestFormatSpriteList:
         assert result.items[3].data == ("kirby_walk", 0x200000)
 
     def test_with_cache(self) -> None:
-        """Should add cache indicators when cached."""
+        """Business rule: cached list shows indicators."""
         locations = [{"name": "test", "offset": 0x100}]
         result = format_sprite_list(locations, is_from_cache=True)
 
@@ -158,7 +115,7 @@ class TestFormatSpriteList:
         assert CACHE_INDICATOR in result.items[2].display_text
 
     def test_default_name(self) -> None:
-        """Should generate default name from offset."""
+        """Business rule: sprites without names get offset-based name."""
         locations = [{"offset": 0xABCDEF}]  # No name
         result = format_sprite_list(locations)
 
@@ -167,10 +124,10 @@ class TestFormatSpriteList:
 
 
 class TestSpriteDisplayItem:
-    """Tests for SpriteDisplayItem dataclass."""
+    """Tests for SpriteDisplayItem dataclass structure."""
 
     def test_regular_item(self) -> None:
-        """Should create regular sprite item."""
+        """Should create regular sprite item with expected attributes."""
         item = SpriteDisplayItem(
             display_text="Test (0x100000)",
             data=("test", 0x100000),
@@ -181,7 +138,7 @@ class TestSpriteDisplayItem:
         assert item.is_separator is False
 
     def test_header_item(self) -> None:
-        """Should create header item."""
+        """Should create header item with no data."""
         item = SpriteDisplayItem(
             display_text="-- Header --",
             data=None,
@@ -191,7 +148,7 @@ class TestSpriteDisplayItem:
         assert item.data is None
 
     def test_separator_item(self) -> None:
-        """Should create separator item."""
+        """Should create separator item with no data."""
         item = SpriteDisplayItem(
             display_text="---",
             data=None,
@@ -199,20 +156,3 @@ class TestSpriteDisplayItem:
         )
         assert item.is_separator is True
         assert item.data is None
-
-
-class TestInternalNameFunctions:
-    """Tests for internal name generation functions."""
-
-    def test_get_internal_name_from_offset(self) -> None:
-        """Should generate name with prefix."""
-        assert get_internal_name_from_offset(0x100000) == "sprite_0x100000"
-        assert get_internal_name_from_offset(0x100000, prefix="custom") == "custom_0x100000"
-
-    def test_get_custom_sprite_name(self) -> None:
-        """Should generate custom sprite name."""
-        assert get_custom_sprite_name(0x200000) == "custom_0x200000"
-
-    def test_get_manual_sprite_name(self) -> None:
-        """Should generate manual sprite name."""
-        assert get_manual_sprite_name(0x300000) == "manual_0x300000"

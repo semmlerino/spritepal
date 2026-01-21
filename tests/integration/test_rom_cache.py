@@ -1,4 +1,12 @@
-"""Comprehensive tests for ROM cache functionality."""
+"""Comprehensive tests for ROM cache functionality.
+
+Tests the ROMCache service for caching sprite locations and extraction results.
+Includes 38 tests covering cache operations, persistence, invalidation, and edge cases.
+
+Related tests:
+- tests/integration/test_rom_extractor.py - Extraction tests (uses cache)
+- tests/unit/mesen_integration/test_rom_tile_matcher.py - Tile matching (uses cache)
+"""
 
 from __future__ import annotations
 

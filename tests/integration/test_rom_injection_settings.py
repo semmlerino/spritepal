@@ -1,7 +1,12 @@
 """
-Tests for ROM injection settings persistence
+Tests for ROM injection settings persistence.
 
+Tests state persistence for injection dialog settings (last ROM path, offsets, options).
 This file creates ApplicationStateManager instances directly for testing with isolated sessions.
+
+Related tests:
+- tests/integration/test_rom_injection.py - Core injection functionality
+- tests/integration/test_injection_manager.py - Manager-level injection API
 """
 
 from __future__ import annotations
