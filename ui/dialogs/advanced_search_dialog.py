@@ -7,7 +7,6 @@ Provides multiple search modes, filters, history, and visual search capabilities
 from __future__ import annotations
 
 import json
-import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -56,8 +55,9 @@ from ui.dialogs.similarity_results_dialog import show_similarity_results
 from ui.styles.theme import COLORS
 from ui.workers.advanced_search_worker import AdvancedSearchWorker
 from utils.constants import MAX_SPRITE_SIZE
+from utils.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # SearchFilter is imported from ui.components.filters.search_filters_widget
 

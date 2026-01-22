@@ -12,7 +12,6 @@ this workspace uses a QStackedWidget for clean mode switching.
 
 from __future__ import annotations
 
-import logging
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -35,6 +34,7 @@ from ui.sprite_editor.controllers import (
 from ui.sprite_editor.controllers.rom_workflow_controller import ROMWorkflowController
 from ui.sprite_editor.views.workspaces import ROMWorkflowPage, VRAMEditorPage
 from ui.widgets.segmented_toggle import SegmentedToggle
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from core.sprite_library import SpriteLibrary
     from ui.managers.status_bar_manager import StatusBarManager
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SpriteEditorWorkspace(QWidget):

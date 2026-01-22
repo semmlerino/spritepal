@@ -6,11 +6,12 @@ Handles extraction of sprites from VRAM and palette application.
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
+
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     import numpy as np
@@ -30,7 +31,7 @@ from utils.constants import (
 
 from .oam_palette_mapper import OAMPaletteMapper
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SpriteRenderer:

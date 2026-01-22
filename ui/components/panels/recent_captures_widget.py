@@ -7,7 +7,6 @@ allowing users to quickly jump to discovered sprites without manual copy-paste.
 
 from __future__ import annotations
 
-import logging
 from typing import override
 
 from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QPoint, QRect, QSize, Qt, Signal
@@ -31,8 +30,9 @@ from ui.common.spacing_constants import SPACING_SMALL, SPACING_TINY
 from ui.common.widget_helpers import create_styled_label
 from ui.styles import get_panel_style
 from ui.styles.theme import COLORS
+from utils.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CaptureThumbnailDelegate(QStyledItemDelegate):

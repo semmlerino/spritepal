@@ -12,10 +12,11 @@ Supports two view modes:
 from __future__ import annotations
 
 import json
-import logging
 from enum import Enum, auto
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, override
+
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.rom_injector import ROMInjector
@@ -73,7 +74,7 @@ from ui.workers.paged_tile_view_worker import (
     _compute_palette_hash,
 )
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Grid preset configurations for RAW mode: (name, cols, rows)
 GRID_PRESETS_RAW: list[tuple[str, int, int]] = [

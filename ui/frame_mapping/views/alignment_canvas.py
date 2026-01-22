@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import Qt, Signal
@@ -17,10 +16,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from utils.logging_config import get_logger
+
 if TYPE_CHECKING:
     from core.frame_mapping_project import AIFrame, GameFrame
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Canvas display constants
 CANVAS_SIZE = 320

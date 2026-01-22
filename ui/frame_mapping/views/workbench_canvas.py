@@ -23,7 +23,6 @@ Scene Structure:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, override
 
 from PIL import Image
@@ -55,11 +54,12 @@ from ui.frame_mapping.views.workbench_items import (
     PreviewItem,
     TileOverlayItem,
 )
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.mesen_integration.click_extractor import CaptureResult
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Display scale for the canvas (2x)
 DISPLAY_SCALE = 2

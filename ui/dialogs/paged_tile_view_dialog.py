@@ -7,11 +7,12 @@ launched from the Manual Offset Dialog.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QDialogButtonBox, QPushButton, QVBoxLayout, QWidget
+
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QCloseEvent
@@ -27,7 +28,7 @@ from ui.widgets.paged_tile_view import PagedTileViewWidget
 USER_PALETTES_CATEGORY = "tile_grid_browser"
 USER_PALETTES_KEY = "user_palettes"
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Default dialog size
 DEFAULT_WIDTH = 900

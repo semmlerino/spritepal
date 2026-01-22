@@ -7,13 +7,12 @@ when scanning ROM for HAL-compressed sprites.
 
 from __future__ import annotations
 
-import logging
-
 from PySide6.QtGui import QImage
 
 from core.services.lru_cache import BaseLRUCache
+from utils.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _qimage_byte_size(image: QImage) -> int:

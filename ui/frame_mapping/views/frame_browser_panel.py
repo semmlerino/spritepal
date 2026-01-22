@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSize, Qt, Signal
@@ -21,10 +20,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from utils.logging_config import get_logger
+
 if TYPE_CHECKING:
     from core.frame_mapping_project import AIFrame, GameFrame
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Thumbnail size for list items
 THUMBNAIL_SIZE = 64

@@ -4,15 +4,15 @@ VRAM file operations service.
 Handles reading, writing, and injecting data into VRAM dump files.
 """
 
-import logging
 from pathlib import Path
 
 from utils.constants import (
     TILE_DATA_MAX_SIZE,
     VRAM_SIZE_ABSOLUTE_MAX,
 )
+from utils.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class VRAMService:

@@ -4,18 +4,18 @@ Worker thread for sprite extraction operations.
 Handles background extraction of sprites from VRAM dumps.
 """
 
-import logging
 from pathlib import Path
 from typing import override
 
 from PySide6.QtCore import QObject, Signal
 
 from core.palette_manager import PaletteManager
+from utils.logging_config import get_logger
 
 from ..services.sprite_renderer import SpriteRenderer
 from .base_worker import BaseWorker
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ExtractWorker(BaseWorker):

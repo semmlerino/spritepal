@@ -4,7 +4,6 @@ Status bar management for MainWindow
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QStatusBar, QWidget
@@ -12,13 +11,14 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QStatusBar, QWidget
 from ui.common.spacing_constants import SPACING_TINY
 from ui.styles import get_muted_text_style
 from ui.styles.theme import COLORS
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.services.rom_cache import ROMCache
 
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class StatusBarManager:

@@ -4,7 +4,6 @@ Image conversion service.
 Handles PNG to SNES tile data conversion and validation.
 """
 
-import logging
 from collections.abc import Iterable
 from typing import cast
 
@@ -16,8 +15,9 @@ from utils.constants import (
     TILE_HEIGHT,
     TILE_WIDTH,
 )
+from utils.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ImageConverter:

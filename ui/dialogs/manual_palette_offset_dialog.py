@@ -7,8 +7,6 @@ where automatic palette detection is not available.
 
 from __future__ import annotations
 
-import logging
-
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QDialog,
@@ -22,7 +20,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ManualPaletteOffsetDialog(QDialog):

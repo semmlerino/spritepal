@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
@@ -22,10 +21,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from utils.logging_config import get_logger
+
 if TYPE_CHECKING:
     from core.frame_mapping_project import AIFrame, GameFrame
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Preview display size
 PREVIEW_SIZE = 256

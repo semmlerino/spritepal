@@ -4,12 +4,13 @@ Base worker class for threaded operations.
 Provides common functionality for all worker threads.
 """
 
-import logging
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class BaseWorker(QThread):

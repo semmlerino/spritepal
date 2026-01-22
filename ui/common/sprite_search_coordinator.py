@@ -5,7 +5,6 @@ Handles sprite search and ROM scanning operations with worker management.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, Signal
@@ -25,12 +24,13 @@ from PySide6.QtWidgets import (
 from ui.common import WorkerManager
 from ui.rom_extraction.workers import SpriteSearchWorker
 from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
     from core.services.rom_cache import ROMCache
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SpriteSearchCoordinator(QObject):

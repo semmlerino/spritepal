@@ -7,7 +7,6 @@ import/export, and filtering capabilities.
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
 
@@ -35,11 +34,12 @@ from core.types import SpritePreset, WidgetParent
 from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 from ui.common.spacing_constants import SPACING_COMPACT_MEDIUM
 from ui.components.base import DialogBase
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.configuration_service import ConfigurationService
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AddEditPresetDialog(DialogBase):

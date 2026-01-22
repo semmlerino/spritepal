@@ -6,7 +6,6 @@ Renders large tile grids without blocking the UI thread.
 
 from __future__ import annotations
 
-import logging
 from typing import override
 
 from PySide6.QtCore import QObject, Signal
@@ -15,8 +14,9 @@ from PySide6.QtGui import QImage
 from core.services.image_utils import pil_to_qimage
 from core.tile_renderer import TileRenderer
 from core.workers.base import BaseWorker, handle_worker_errors
+from utils.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Constants for 4bpp SNES tiles
 BYTES_PER_TILE = 32

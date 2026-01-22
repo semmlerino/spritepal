@@ -7,10 +7,11 @@ and local files with thumbnail previews and context menu actions.
 
 from __future__ import annotations
 
-import logging
 from typing import override
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from PySide6.QtCore import QModelIndex, QPersistentModelIndex, QPoint, QRect, QSize, Qt, Signal
 from PySide6.QtGui import (

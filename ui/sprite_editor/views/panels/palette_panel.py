@@ -5,8 +5,6 @@ Displays the color palette and handles color selection.
 Integrates with PaletteSourceSelector for palette source management.
 """
 
-import logging
-
 from PySide6.QtCore import QSignalBlocker, Signal
 from PySide6.QtWidgets import (
     QFrame,
@@ -18,9 +16,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from utils.logging_config import get_logger
+
 from ..widgets import ColorPaletteWidget, PaletteSourceSelector
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DismissibleWarningBanner(QFrame):

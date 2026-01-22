@@ -5,13 +5,14 @@ Handles bookmark storage, menu management, and navigation requests.
 
 from __future__ import annotations
 
-import logging
 from functools import partial
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QInputDialog, QMenu, QWidget
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class BookmarkManager(QObject):

@@ -5,7 +5,6 @@ Contains Nearby Sprites and Bookmarks panels in a collapsible layout.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QTimer, Signal
@@ -25,12 +24,13 @@ from PySide6.QtWidgets import (
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.common.spacing_constants import SPACING_SMALL
 from ui.styles.theme import COLORS
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
     from ui.dialogs.services.bookmark_manager import BookmarkManager
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Constants for Nearby panel
 NEARBY_DELTAS_CORE = [-128, -64, -32, 32, 64, 128]

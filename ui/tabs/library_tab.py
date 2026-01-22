@@ -7,7 +7,6 @@ filtering, and management capabilities.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QPoint, Qt, Signal
@@ -29,11 +28,12 @@ from ui.common.spacing_constants import SPACING_SMALL
 from ui.common.widget_helpers import create_styled_label
 from ui.styles import get_panel_style
 from ui.styles.theme import COLORS
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.sprite_library import LibrarySprite, SpriteLibrary
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class LibraryTab(QWidget):

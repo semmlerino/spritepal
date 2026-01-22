@@ -6,7 +6,6 @@ Manages sprite asset browsing, persistence, and thumbnail coordination.
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -14,13 +13,14 @@ from PySide6.QtCore import QObject, QSettings, Signal
 from PySide6.QtGui import QImage, QPixmap
 
 from core.mesen_integration.log_watcher import CapturedOffset
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from ui.workers.batch_thumbnail_worker import BatchThumbnailWorker
 
     from ..views.widgets.sprite_asset_browser import SpriteAssetBrowser
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AssetBrowserController(QObject):

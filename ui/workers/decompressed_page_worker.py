@@ -7,7 +7,6 @@ raw compressed bytes. Failed decompressions show placeholder images.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QObject, Qt, Signal
@@ -17,11 +16,12 @@ from core.services.image_utils import pil_to_qimage
 from core.tile_renderer import TileRenderer
 from core.workers.base import BaseWorker, handle_worker_errors
 from ui.workers.paged_tile_view_worker import _compute_palette_hash
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.rom_injector import ROMInjector
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Constants for sprite thumbnail rendering
 CELL_SIZE = 256  # Size of each cell in pixels (larger for better sprite visibility)

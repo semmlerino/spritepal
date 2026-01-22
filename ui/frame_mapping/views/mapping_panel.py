@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal
@@ -21,10 +20,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from utils.logging_config import get_logger
+
 if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # MIME type for drag-drop (must match captures_library_pane.py)
 MIME_TYPE_GAME_FRAME = "application/x-spritepal-game-frame"

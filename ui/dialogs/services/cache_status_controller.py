@@ -5,7 +5,6 @@ Handles cache statistics tracking, status display, and cache management.
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -13,11 +12,13 @@ from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMenu, QMessageBox, QWidget
 
+from utils.logging_config import get_logger
+
 if TYPE_CHECKING:
     from core.services.rom_cache import ROMCache
     from ui.common.collapsible_group_box import CollapsibleGroupBox
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class CacheStatusController(QObject):

@@ -11,7 +11,6 @@ sprite alignment canvas:
 
 from __future__ import annotations
 
-import logging
 from typing import override
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
@@ -25,7 +24,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # Scale handle size in pixels
 HANDLE_SIZE = 12

@@ -5,12 +5,13 @@ Flexible sprite arrangement supporting rows, columns, and custom tile groups
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast, override
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from core.mesen_integration.capture_to_arrangement import CaptureArrangementData

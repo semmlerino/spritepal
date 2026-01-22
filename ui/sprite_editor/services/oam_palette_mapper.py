@@ -4,7 +4,6 @@ OAM (Object Attribute Memory) parser for SNES sprite palette mapping.
 Extracts sprite-to-palette assignments from OAM dumps.
 """
 
-import logging
 from typing import TypedDict
 
 from utils.constants import (
@@ -17,8 +16,9 @@ from utils.constants import (
     OAM_HIGH_TABLE_OFFSET,
     OAM_SIZE,
 )
+from utils.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class SpriteEntry(TypedDict):

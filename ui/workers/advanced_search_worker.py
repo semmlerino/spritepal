@@ -7,7 +7,6 @@ capabilities in a background thread.
 
 from __future__ import annotations
 
-import logging
 import mmap
 import re
 from pathlib import Path
@@ -20,11 +19,12 @@ from core.parallel_sprite_finder import ParallelSpriteFinder, SearchResult
 from core.visual_similarity_search import VisualSimilarityEngine
 from core.workers.base import BaseWorker, handle_worker_errors
 from utils.constants import MAX_SPRITE_SIZE, MIN_SPRITE_SIZE
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from ui.components.filters.search_filters_widget import SearchFilter
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AdvancedSearchWorker(BaseWorker):
