@@ -408,6 +408,52 @@ class MappingPanel(QWidget):
         finally:
             self._table.blockSignals(False)
 
+    def update_row_alignment(
+        self,
+        ai_index: int,
+        offset_x: int,
+        offset_y: int,
+        flip_h: bool,
+        flip_v: bool,
+    ) -> None:
+        """Update only the alignment columns for a specific row.
+
+        This is more efficient than full refresh() and preserves checkbox state
+        during interactive alignment adjustments (dragging, arrow keys).
+
+        Args:
+            ai_index: AI frame index to update
+            offset_x: New X offset
+            offset_y: New Y offset
+            flip_h: Horizontal flip state
+            flip_v: Vertical flip state
+        """
+        # Find the row for this AI frame
+        for row in range(self._table.rowCount()):
+            ai_item = self._table.item(row, 2)  # AI Frame column
+            if ai_item is not None and ai_item.data(Qt.ItemDataRole.UserRole) == ai_index:
+                # Update Offset column (4)
+                if offset_x != 0 or offset_y != 0:
+                    offset_text = f"({offset_x}, {offset_y})"
+                else:
+                    offset_text = "—"
+                offset_item = self._table.item(row, 4)
+                if offset_item is not None:
+                    offset_item.setText(offset_text)
+
+                # Update Flip column (5)
+                flip_parts = []
+                if flip_h:
+                    flip_parts.append("H")
+                if flip_v:
+                    flip_parts.append("V")
+                flip_text = "".join(flip_parts) if flip_parts else "—"
+                flip_item = self._table.item(row, 5)
+                if flip_item is not None:
+                    flip_item.setText(flip_text)
+
+                break
+
     def clear_selection(self) -> None:
         """Clear the current table selection.
 

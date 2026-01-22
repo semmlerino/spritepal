@@ -215,6 +215,7 @@ class WorkbenchCanvas(QWidget):
 
         self._tile_sampling_service = TileSamplingService()
         self._multi_palette_warning_label: QLabel | None = None
+        self._stale_entries_warning_label: QLabel | None = None
 
         self._setup_ui()
         self._connect_signals()
@@ -246,6 +247,16 @@ class WorkbenchCanvas(QWidget):
         )
         self._multi_palette_warning_label.setVisible(False)
         layout.addWidget(self._multi_palette_warning_label)
+
+        # Stale entries warning banner (entry IDs in capture don't match game frame selection)
+        self._stale_entries_warning_label = QLabel(
+            "⚠ Entry IDs mismatch. Injection may use different tiles than preview."
+        )
+        self._stale_entries_warning_label.setStyleSheet(
+            "background-color: #F8D7DA; color: #721C24; padding: 6px 8px; border-radius: 4px; font-size: 11px;"
+        )
+        self._stale_entries_warning_label.setVisible(False)
+        layout.addWidget(self._stale_entries_warning_label)
 
         # Graphics scene and view
         self._scene = QGraphicsScene(self)
@@ -402,6 +413,7 @@ class WorkbenchCanvas(QWidget):
         frame: GameFrame | None,
         preview_pixmap: QPixmap | None = None,
         capture_result: CaptureResult | None = None,
+        used_fallback: bool = False,
     ) -> None:
         """Set the game frame (background).
 
@@ -409,9 +421,14 @@ class WorkbenchCanvas(QWidget):
             frame: GameFrame to display, or None to clear.
             preview_pixmap: Optional pre-rendered preview pixmap.
             capture_result: Optional CaptureResult for tile overlay.
+            used_fallback: Whether fallback entry IDs were used (stale selection).
         """
         self._current_game_frame = frame
         self._capture_result = capture_result
+
+        # Show stale entries warning if fallback was used
+        if self._stale_entries_warning_label:
+            self._stale_entries_warning_label.setVisible(used_fallback)
 
         if frame is None:
             self._game_pixmap = None

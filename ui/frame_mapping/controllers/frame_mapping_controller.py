@@ -517,7 +517,7 @@ class FrameMappingController(QObject):
                 return cached_pixmap
 
         # Try to regenerate from capture file (with filtering applied)
-        capture_result = self.get_capture_result_for_game_frame(frame_id)
+        capture_result, _ = self.get_capture_result_for_game_frame(frame_id)
         if capture_result is None or not capture_result.has_entries:
             return None
 
@@ -541,7 +541,7 @@ class FrameMappingController(QObject):
             logger.warning("Failed to regenerate preview for game frame %s: %s", frame_id, e)
             return None
 
-    def get_capture_result_for_game_frame(self, frame_id: str) -> CaptureResult | None:
+    def get_capture_result_for_game_frame(self, frame_id: str) -> tuple[CaptureResult | None, bool]:
         """Get the CaptureResult for a game frame.
 
         Parses the capture file associated with the game frame and returns
@@ -556,26 +556,29 @@ class FrameMappingController(QObject):
             frame_id: Game frame ID
 
         Returns:
-            CaptureResult or None if not available
+            Tuple of (CaptureResult or None, used_fallback flag).
+            used_fallback is True if the stored entry IDs were stale and
+            rom_offset filtering was used instead.
         """
         if self._project is None:
-            return None
+            return (None, False)
 
         game_frame = self._project.get_game_frame_by_id(frame_id)
         if game_frame is None or game_frame.capture_path is None:
-            return None
+            return (None, False)
 
         capture_path = game_frame.capture_path
         if not capture_path.exists():
             logger.warning("Capture file not found for game frame %s: %s", frame_id, capture_path)
-            return None
+            return (None, False)
 
         try:
             parser = MesenCaptureParser()
             capture_result = parser.parse_file(capture_path)
+            used_fallback = False
 
             if not capture_result.has_entries:
-                return None
+                return (None, False)
 
             # Apply selection filter if stored (preserves import-time selection)
             if game_frame.selected_entry_ids:
@@ -590,6 +593,7 @@ class FrameMappingController(QObject):
                         capture_path,
                     )
                     self.stale_entries_warning.emit(frame_id)
+                    used_fallback = True
                     # Fallback to rom_offset filtering (mirrors inject_mapping behavior)
                     filtered_entries = [
                         entry for entry in capture_result.entries if entry.rom_offset in game_frame.rom_offsets
@@ -615,11 +619,11 @@ class FrameMappingController(QObject):
                         timestamp=capture_result.timestamp,
                     )
 
-            return capture_result
+            return (capture_result, used_fallback)
 
         except Exception as e:
             logger.warning("Failed to get capture result for game frame %s: %s", frame_id, e)
-            return None
+            return (None, False)
 
     def get_ai_frames(self) -> list[AIFrame]:
         """Get all AI frames from the current project."""
@@ -720,6 +724,127 @@ class FrameMappingController(QObject):
         except OSError as e:
             logger.exception("Failed to create ROM copy: %s", e)
             return None
+
+    def _create_staging_copy(self, source_path: Path) -> Path | None:
+        """Create a staging copy of the ROM for atomic injection.
+
+        Creates a temporary copy that will be written to during injection.
+        On success, it can be atomically renamed to the target. On failure,
+        it is deleted and the original ROM remains unchanged.
+
+        Args:
+            source_path: Path to the source ROM to copy
+
+        Returns:
+            Path to the staging file, or None if creation failed
+        """
+        try:
+            # Create staging file in same directory for atomic rename
+            staging_path = source_path.with_suffix(source_path.suffix + ".staging")
+            shutil.copy2(source_path, staging_path)
+            logger.info("Created staging ROM copy: %s", staging_path)
+            return staging_path
+        except OSError as e:
+            logger.exception("Failed to create staging ROM copy: %s", e)
+            return None
+
+    def _commit_staging(self, staging_path: Path, target_path: Path) -> bool:
+        """Commit staging file by atomically replacing target.
+
+        Args:
+            staging_path: Path to the staging file
+            target_path: Path to the target file to replace
+
+        Returns:
+            True if commit succeeded, False otherwise
+        """
+        try:
+            # Atomic rename (on same filesystem)
+            staging_path.replace(target_path)
+            logger.info("Committed staging file to: %s", target_path)
+            return True
+        except OSError as e:
+            logger.exception("Failed to commit staging file: %s", e)
+            return False
+
+    def _rollback_staging(self, staging_path: Path | None) -> None:
+        """Delete staging file on injection failure.
+
+        Args:
+            staging_path: Path to the staging file, or None if not created
+        """
+        if staging_path is not None and staging_path.exists():
+            try:
+                staging_path.unlink()
+                logger.info("Rolled back staging file: %s", staging_path)
+            except OSError as e:
+                logger.warning("Failed to delete staging file %s: %s", staging_path, e)
+
+    def _detect_raw_slot_size(
+        self,
+        rom_data: bytes,
+        file_offset: int,
+        max_tiles: int = 256,
+    ) -> int | None:
+        """Detect the size of a RAW (uncompressed) sprite slot in ROM.
+
+        Scans from the offset, counting 32-byte tiles (8x8 4bpp) until hitting
+        a padding boundary (block of all 0x00 or 0xFF bytes).
+
+        This prevents overwriting adjacent ROM data when the captured sprite
+        has more tiles than the original slot can hold.
+
+        Args:
+            rom_data: Full ROM data bytes
+            file_offset: Starting file offset (accounting for SMC header)
+            max_tiles: Maximum tiles to scan before giving up
+
+        Returns:
+            Number of tiles in the slot, or None if no boundary detected
+        """
+        # Account for SMC header (512 bytes if present)
+        smc_header = 512 if len(rom_data) % 0x8000 == 512 else 0
+        actual_offset = file_offset + smc_header
+
+        # Validate offset is within ROM
+        if actual_offset < 0 or actual_offset >= len(rom_data):
+            logger.warning(
+                "_detect_raw_slot_size: offset 0x%X out of bounds (ROM size: 0x%X)",
+                file_offset,
+                len(rom_data),
+            )
+            return None
+
+        tile_size = 32  # 8x8 4bpp tile = 32 bytes
+
+        for tile_index in range(max_tiles):
+            tile_start = actual_offset + (tile_index * tile_size)
+            tile_end = tile_start + tile_size
+
+            # Stop if we would read past end of ROM
+            if tile_end > len(rom_data):
+                break
+
+            tile_data = rom_data[tile_start:tile_end]
+
+            # Check for padding boundary (all 0x00 or all 0xFF)
+            if all(b == 0x00 for b in tile_data) or all(b == 0xFF for b in tile_data):
+                # Found boundary - return count of tiles before it
+                logger.debug(
+                    "_detect_raw_slot_size: offset 0x%X boundary at tile %d (0x%X)",
+                    file_offset,
+                    tile_index,
+                    tile_start - smc_header,
+                )
+                return tile_index if tile_index > 0 else None
+
+        # No boundary found within max_tiles
+        logger.debug(
+            "_detect_raw_slot_size: offset 0x%X no boundary found within %d tiles",
+            file_offset,
+            max_tiles,
+        )
+        return None
 
     def inject_mapping(
         self,
@@ -964,17 +1089,30 @@ class FrameMappingController(QObject):
         # - Otherwise, create a new numbered copy of the source ROM
         # Track whether we're reusing an existing ROM (vs freshly created) for preserve_existing logic
         using_existing_output = output_path is not None and output_path.exists()
-        if using_existing_output:
+        injection_rom_path: Path
+        if using_existing_output and output_path is not None:
             injection_rom_path = output_path
             logger.info("Using existing output ROM: %s", injection_rom_path)
         else:
-            injection_rom_path = self._create_injection_copy(rom_path, output_path)
-            if injection_rom_path is None:
+            created_path = self._create_injection_copy(rom_path, output_path)
+            if created_path is None:
                 self.error_occurred.emit("Failed to create ROM copy for injection")
                 return False
+            injection_rom_path = created_path
             logger.info("Created injection ROM copy: %s", injection_rom_path)
 
-        current_rom_path = str(injection_rom_path)
+        # Create staging copy for atomic injection
+        # All writes go to staging; on success we commit (atomic rename), on failure we rollback (delete)
+        staging_path = self._create_staging_copy(injection_rom_path)
+        if staging_path is None:
+            self.error_occurred.emit("Failed to create staging file for injection")
+            # Clean up injection copy if we created it
+            if not using_existing_output:
+                injection_rom_path.unlink(missing_ok=True)
+            return False
+        staging_committed = False
+
+        current_rom_path = str(staging_path)
         # Tracks whether this is the first tile group within THIS frame injection.
         # Reset per inject_mapping() call - not per batch. Used for:
         # - Deciding whether to create backup (only on first tile group)
@@ -1120,12 +1258,23 @@ class FrameMappingController(QObject):
                 is_raw_tile = force_raw or stored_compression == "raw"
 
                 if is_raw_tile:
-                    # RAW: inject all captured tiles
-                    original_tile_count = captured_tile_count
-                    logger.info(
-                        "ROM offset 0x%X: Using RAW compression",
-                        rom_offset,
-                    )
+                    # RAW: detect slot boundary to prevent overwriting adjacent data
+                    detected_slot_size = self._detect_raw_slot_size(rom_data, rom_offset)
+                    if detected_slot_size is not None:
+                        original_tile_count = detected_slot_size
+                        logger.info(
+                            "ROM offset 0x%X: Using RAW compression (detected slot: %d tiles)",
+                            rom_offset,
+                            detected_slot_size,
+                        )
+                    else:
+                        # No boundary detected - fall back to captured count
+                        original_tile_count = captured_tile_count
+                        logger.info(
+                            "ROM offset 0x%X: Using RAW compression (no boundary, using captured: %d tiles)",
+                            rom_offset,
+                            captured_tile_count,
+                        )
                 else:
                     # HAL: query tile count from compressed block to avoid over-injection
                     try:
@@ -1381,6 +1530,13 @@ class FrameMappingController(QObject):
 
             # Update mapping status
             if success:
+                # Commit staging file (atomic rename to target)
+                if not self._commit_staging(staging_path, injection_rom_path):
+                    self.error_occurred.emit("Failed to commit staged injection to ROM")
+                    self._rollback_staging(staging_path)
+                    return False
+                staging_committed = True
+
                 mapping.status = "injected"
                 # Emit signal for workspace to handle save with correct project path
                 self.save_requested.emit()
@@ -1394,6 +1550,8 @@ class FrameMappingController(QObject):
                 self.mapping_injected.emit(ai_frame_index, "\n".join(messages))
                 self.project_changed.emit()
             else:
+                # Rollback staging on failure - original ROM unchanged
+                self._rollback_staging(staging_path)
                 if debug:
                     logger.info("=== INJECTION DEBUG FAILED ===")
                     logger.info("Failure messages:\n%s", "\n".join(messages))
@@ -1402,6 +1560,8 @@ class FrameMappingController(QObject):
         except Exception as e:
             logger.exception("Injection process failed")
             self.error_occurred.emit(f"Injection process failed: {e}")
+            # Rollback staging on exception
+            self._rollback_staging(staging_path)
             success = False
         finally:
             # Clean up debug log handler
@@ -1412,5 +1572,8 @@ class FrameMappingController(QObject):
             # Restore original log level
             if original_log_level is not None:
                 logger.setLevel(original_log_level)
+            # Safety net: ensure staging is cleaned up if not committed
+            if not staging_committed:
+                self._rollback_staging(staging_path)
 
         return success

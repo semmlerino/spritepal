@@ -410,8 +410,8 @@ class FrameMappingWorkspace(QWidget):
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
-            capture_result = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
-            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result)
+            capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
+            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
             self._alignment_canvas.set_alignment(
                 mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
             )
@@ -452,8 +452,8 @@ class FrameMappingWorkspace(QWidget):
         if self._selected_ai_index is not None:
             game_frame = project.get_game_frame_by_id(frame_id)
             preview = self._controller.get_game_frame_preview(frame_id)
-            capture_result = self._controller.get_capture_result_for_game_frame(frame_id)
-            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result)
+            capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
+            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
 
     def _on_mapping_selected(self, ai_frame_index: int) -> None:
         """Handle mapping row selection in drawer.
@@ -480,8 +480,8 @@ class FrameMappingWorkspace(QWidget):
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
-            capture_result = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
-            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result)
+            capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
+            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
             self._alignment_canvas.set_alignment(
                 mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
             )
@@ -525,7 +525,8 @@ class FrameMappingWorkspace(QWidget):
 
         # Update alignment in controller (includes scale)
         self._controller.update_mapping_alignment(self._selected_ai_index, x, y, flip_h, flip_v, scale)
-        self._mapping_panel.refresh()
+        # Use targeted row update instead of full refresh to preserve checkbox state
+        self._mapping_panel.update_row_alignment(self._selected_ai_index, x, y, flip_h, flip_v)
 
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.
@@ -993,7 +994,7 @@ class FrameMappingWorkspace(QWidget):
 
         # Auto-align using bounding box alignment (center AI content over game content)
         if ai_frame and ai_frame.path.exists():
-            capture_result = self._controller.get_capture_result_for_game_frame(game_frame_id)
+            capture_result, _used_fallback = self._controller.get_capture_result_for_game_frame(game_frame_id)
             if capture_result and capture_result.has_entries:
                 try:
                     ai_pil = Image.open(ai_frame.path).convert("RGBA")
