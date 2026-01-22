@@ -896,6 +896,8 @@ class WorkbenchCanvas(QWidget):
             self._ai_frame_item.scale_factor(),
         )
         self._emit_alignment_changed()
+        # Update scene rect and center view on aligned frames
+        self._update_scene_for_alignment()
 
     def _on_ai_frame_transform_changed(self, offset_x: int, offset_y: int, scale: float) -> None:
         """Handle transform change from AI frame item."""
@@ -928,3 +930,29 @@ class WorkbenchCanvas(QWidget):
         """Emit alignment_changed signal with current values."""
         offset_x, offset_y, flip_h, flip_v, scale = self.get_alignment()
         self.alignment_changed.emit(offset_x, offset_y, flip_h, flip_v, scale)
+
+    def _update_scene_for_alignment(self) -> None:
+        """Update scene rect and fit view to show both frames after alignment.
+
+        After auto-align repositions the AI frame (potentially to large negative
+        coordinates), the view must be adjusted to show both frames. Simple
+        centerOn() doesn't work reliably when scroll bars are hidden.
+        """
+        # Get the combined bounding rect of both frames
+        game_rect = self._game_frame_item.sceneBoundingRect()
+        ai_rect = self._ai_frame_item.sceneBoundingRect()
+
+        # Skip if either rect is invalid (empty or null)
+        if game_rect.isEmpty() and ai_rect.isEmpty():
+            return
+
+        # Union of both rects plus padding
+        combined = game_rect.united(ai_rect)
+        padded = combined.adjusted(-50, -50, 50, 50)
+
+        # Update scene rect to include both frames
+        self._view.setSceneRect(padded)
+
+        # Use fitInView to ensure the combined rect is visible
+        # KeepAspectRatio prevents distortion
+        self._view.fitInView(padded, Qt.AspectRatioMode.KeepAspectRatio)
