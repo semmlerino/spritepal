@@ -303,13 +303,13 @@ class FrameMappingWorkspace(QWidget):
         self._captures_pane.delete_capture_requested.connect(self._on_delete_capture)
         self._captures_pane.show_details_requested.connect(self._on_show_capture_details)
 
-        # Mapping Panel (Drawer) signals
-        self._mapping_panel.mapping_selected.connect(self._on_mapping_selected)
-        self._mapping_panel.edit_frame_requested.connect(self._on_edit_frame)
-        self._mapping_panel.remove_mapping_requested.connect(self._on_remove_mapping)
-        self._mapping_panel.adjust_alignment_requested.connect(self._on_adjust_alignment)
-        self._mapping_panel.drop_game_frame_requested.connect(self._on_drop_game_frame)
-        self._mapping_panel.inject_mapping_requested.connect(self._on_inject_single)
+        # Mapping Panel (Drawer) signals - using ID-based signals for stability
+        self._mapping_panel.mapping_selected_by_id.connect(self._on_mapping_selected)
+        self._mapping_panel.edit_frame_requested_by_id.connect(self._on_edit_frame)
+        self._mapping_panel.remove_mapping_requested_by_id.connect(self._on_remove_mapping)
+        self._mapping_panel.adjust_alignment_requested_by_id.connect(self._on_adjust_alignment)
+        self._mapping_panel.drop_game_frame_requested_by_id.connect(self._on_drop_game_frame)
+        self._mapping_panel.inject_mapping_requested_by_id.connect(self._on_inject_single)
         self._mapping_panel.inject_selected_requested.connect(self._on_inject_selected)
 
         # Alignment Canvas signals
@@ -471,28 +471,35 @@ class FrameMappingWorkspace(QWidget):
             capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
 
-    def _on_mapping_selected(self, ai_frame_index: int) -> None:
+    def _on_mapping_selected(self, ai_frame_id: str) -> None:
         """Handle mapping row selection in drawer.
 
         Syncs with AI frames pane and canvas.
+
+        Args:
+            ai_frame_id: AI frame ID (filename)
         """
         project = self._controller.project
         if project is None:
             return
 
-        # Sync AI frames pane
+        # Get AI frame by ID and derive index for legacy components
+        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
+        if ai_frame is None:
+            return
+
+        ai_frame_index = ai_frame.index
+
+        # Sync AI frames pane (still uses index)
         self._ai_frames_pane.select_frame(ai_frame_index)
         self._selected_ai_index = ai_frame_index
+        self._selected_ai_frame_id = ai_frame_id
 
         # Load into canvas
-        ai_frame = project.get_ai_frame_by_index(ai_frame_index)
-        if ai_frame:
-            # Track by ID for stability across reloads
-            self._selected_ai_frame_id = ai_frame.id
         self._alignment_canvas.set_ai_frame(ai_frame)
 
-        # Load game frame if mapped (use index-based lookup)
-        mapping = project.get_mapping_for_ai_frame_index(ai_frame_index)
+        # Load game frame if mapped (use ID-based lookup)
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
@@ -524,9 +531,22 @@ class FrameMappingWorkspace(QWidget):
 
         self._attempt_link(self._selected_ai_index, self._selected_game_id)
 
-    def _on_drop_game_frame(self, ai_index: int, game_frame_id: str) -> None:
-        """Handle game frame dropped onto drawer row."""
-        self._attempt_link(ai_index, game_frame_id)
+    def _on_drop_game_frame(self, ai_frame_id: str, game_frame_id: str) -> None:
+        """Handle game frame dropped onto drawer row.
+
+        Args:
+            ai_frame_id: AI frame ID (filename)
+            game_frame_id: Game frame ID
+        """
+        project = self._controller.project
+        if project is None:
+            return
+
+        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
+        if ai_frame is None:
+            return
+
+        self._attempt_link(ai_frame.index, game_frame_id)
 
     def _on_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
         """Handle alignment change from canvas (auto-save)."""
@@ -558,8 +578,22 @@ class FrameMappingWorkspace(QWidget):
         # Route through controller for proper signal emission and auto-save
         self._controller.update_game_frame_compression(self._selected_game_id, compression_type)
 
-    def _on_adjust_alignment(self, ai_frame_index: int) -> None:
-        """Handle adjust alignment request - focus the canvas."""
+    def _on_adjust_alignment(self, ai_frame_id: str) -> None:
+        """Handle adjust alignment request - focus the canvas.
+
+        Args:
+            ai_frame_id: AI frame ID (filename)
+        """
+        project = self._controller.project
+        if project is None:
+            return
+
+        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
+        if ai_frame is None:
+            return
+
+        ai_frame_index = ai_frame.index
+
         # Select the row first
         self._ai_frames_pane.select_frame(ai_frame_index)
         self._on_ai_frame_selected(ai_frame_index)
@@ -570,17 +604,21 @@ class FrameMappingWorkspace(QWidget):
         if self._message_service:
             self._message_service.show_message("Use arrow keys to adjust alignment")
 
-    def _on_edit_frame(self, ai_frame_index: int) -> None:
-        """Handle edit AI frame request."""
+    def _on_edit_frame(self, ai_frame_id: str) -> None:
+        """Handle edit AI frame request.
+
+        Args:
+            ai_frame_id: AI frame ID (filename)
+        """
         project = self._controller.project
         if project is None:
             return
 
-        ai_frame = project.get_ai_frame_by_index(ai_frame_index)
+        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
         if ai_frame is None:
             return
 
-        mapping = project.get_mapping_for_ai_frame_index(ai_frame_index)
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         rom_offsets: list[int] = []
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
@@ -672,9 +710,13 @@ class FrameMappingWorkspace(QWidget):
         if self._message_service:
             self._message_service.show_message("Remove AI frame (not implemented)")
 
-    def _on_remove_mapping(self, ai_frame_index: int) -> None:
-        """Handle remove mapping request."""
-        self._controller.remove_mapping(ai_frame_index)
+    def _on_remove_mapping(self, ai_frame_id: str) -> None:
+        """Handle remove mapping request.
+
+        Args:
+            ai_frame_id: AI frame ID (filename)
+        """
+        self._controller.remove_mapping_by_id(ai_frame_id)
         self._refresh_mapping_status()
         self._refresh_game_frame_link_status()
         self._alignment_canvas.clear_alignment()
@@ -685,10 +727,23 @@ class FrameMappingWorkspace(QWidget):
         self._selected_game_id = None
         self._update_map_button_state()
 
-    def _on_inject_single(self, ai_frame_index: int) -> None:
-        """Handle inject single mapping request."""
+    def _on_inject_single(self, ai_frame_id: str) -> None:
+        """Handle inject single mapping request.
+
+        Args:
+            ai_frame_id: AI frame ID (filename)
+        """
         project = self._controller.project
-        if project and not project.get_mapping_for_ai_frame_index(ai_frame_index):
+        if project is None:
+            return
+
+        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
+        if ai_frame is None:
+            return
+
+        ai_frame_index = ai_frame.index
+
+        if not project.get_mapping_for_ai_frame(ai_frame_id):
             QMessageBox.information(self, "Inject Frame", "Selected frame is not mapped.")
             return
 
@@ -707,7 +762,7 @@ class FrameMappingWorkspace(QWidget):
             reply = QMessageBox.question(
                 self,
                 "Confirm Injection",
-                f"Inject AI Frame {ai_frame_index}?\n\nReusing existing ROM: {target_rom.name}",
+                f"Inject AI Frame '{ai_frame_id}'?\n\nReusing existing ROM: {target_rom.name}",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -715,7 +770,7 @@ class FrameMappingWorkspace(QWidget):
             reply = QMessageBox.question(
                 self,
                 "Confirm Injection",
-                f"Inject AI Frame {ai_frame_index}?\n\nA new copy of {rom_path.name} will be created for injection.",
+                f"Inject AI Frame '{ai_frame_id}'?\n\nA new copy of {rom_path.name} will be created for injection.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -737,6 +792,7 @@ class FrameMappingWorkspace(QWidget):
                 return
 
         # Try injection with strict entry validation (no fallback)
+        # inject_mapping still uses index internally
         success = self._controller.inject_mapping(ai_frame_index, rom_path, output_path=target_rom)
 
         # If injection failed due to stale entries, offer to retry with fallback

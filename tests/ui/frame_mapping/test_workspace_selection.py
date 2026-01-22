@@ -107,14 +107,18 @@ class TestUnmappedRowClearsGameSelection:
         workspace._mapping_panel.set_project(project)
         workspace._ai_frames_pane.set_ai_frames(project.ai_frames)
 
+        # Get AI frame IDs (method now uses ID-based signals)
+        frame_0_id = project.ai_frames[0].id  # "frame_000.png"
+        frame_1_id = project.ai_frames[1].id  # "frame_001.png"
+
         # Step 1: Select mapped row 0 -> should set _selected_game_id
-        workspace._on_mapping_selected(0)
+        workspace._on_mapping_selected(frame_0_id)
         assert workspace._selected_game_id == "game_frame_a", (
             "Expected _selected_game_id to be 'game_frame_a' after selecting mapped row 0"
         )
 
         # Step 2: Select unmapped row 1 -> should CLEAR _selected_game_id
-        workspace._on_mapping_selected(1)
+        workspace._on_mapping_selected(frame_1_id)
         assert workspace._selected_game_id is None, (
             "BUG: _selected_game_id should be None after selecting unmapped row, "
             f"but was {workspace._selected_game_id!r}. "
@@ -143,12 +147,16 @@ class TestUnmappedRowClearsGameSelection:
         workspace._mapping_panel.set_project(project)
         workspace._ai_frames_pane.set_ai_frames(project.ai_frames)
 
+        # Get AI frame IDs (method now uses ID-based signals)
+        frame_0_id = project.ai_frames[0].id  # "frame_000.png"
+        frame_1_id = project.ai_frames[1].id  # "frame_001.png"
+
         # Select mapped row 0 to set _selected_game_id
-        workspace._on_mapping_selected(0)
+        workspace._on_mapping_selected(frame_0_id)
         assert workspace._selected_game_id == "game_frame_a"
 
         # Select unmapped row 1
-        workspace._on_mapping_selected(1)
+        workspace._on_mapping_selected(frame_1_id)
 
         # Map Selected should NOT be able to link (no game frame selected)
         # Verify by checking the state that _on_map_selected uses

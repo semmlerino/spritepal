@@ -440,6 +440,29 @@ class FrameMappingController(QObject):
             return True
         return False
 
+    def remove_mapping_by_id(self, ai_frame_id: str) -> bool:
+        """Remove a mapping for an AI frame using ID.
+
+        Args:
+            ai_frame_id: AI frame ID (filename)
+
+        Returns:
+            True if a mapping was removed
+        """
+        if self._project is None:
+            return False
+
+        if self._project.remove_mapping_for_ai_frame(ai_frame_id):
+            # Emit index-based signal for backwards compatibility
+            ai_frame = self._project.get_ai_frame_by_id(ai_frame_id)
+            if ai_frame:
+                self.mapping_removed.emit(ai_frame.index)
+            self.project_changed.emit()
+            self.save_requested.emit()
+            logger.info("Removed mapping for AI frame %s", ai_frame_id)
+            return True
+        return False
+
     def update_mapping_alignment(
         self,
         ai_frame_index: int,

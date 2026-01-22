@@ -71,6 +71,7 @@ class MappingPanel(QWidget):
     edit_frame_requested_by_id = Signal(str)  # AI frame ID
     remove_mapping_requested_by_id = Signal(str)  # AI frame ID
     adjust_alignment_requested_by_id = Signal(str)  # AI frame ID
+    drop_game_frame_requested_by_id = Signal(str, str)  # AI frame ID, game frame ID
     inject_mapping_requested_by_id = Signal(str)  # AI frame ID
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -647,11 +648,13 @@ class MappingPanel(QWidget):
 
         row = item.row()
         ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
+        checkbox_item = self._table.item(row, 0)  # Checkbox column has ID
         if ai_item is None:
             event.ignore()
             return
 
         ai_index = ai_item.data(Qt.ItemDataRole.UserRole)
+        ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1) if checkbox_item else None
         if ai_index is None:
             event.ignore()
             return
@@ -662,8 +665,10 @@ class MappingPanel(QWidget):
             raw_data.tobytes().decode("utf-8") if isinstance(raw_data, memoryview) else raw_data.decode("utf-8")
         )
 
-        # Emit signal for workspace to handle (including confirmation dialog)
+        # Emit both index-based (legacy) and ID-based (preferred) signals
         self.drop_game_frame_requested.emit(ai_index, game_frame_id)
+        if ai_frame_id is not None:
+            self.drop_game_frame_requested_by_id.emit(ai_frame_id, game_frame_id)
         event.acceptProposedAction()
 
     def _set_row_highlight(self, row: int, highlighted: bool) -> None:
