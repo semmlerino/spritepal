@@ -34,10 +34,15 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Mark all tests in this directory as requiring external tools."""
+    """Mark tests in this directory as requiring external tools."""
     run_mesen2 = config.getoption("--run-mesen2")
+    mesen2_dir = Path(__file__).parent
 
     for item in items:
+        # Only apply to tests in this directory
+        if not Path(item.fspath).is_relative_to(mesen2_dir):
+            continue
+
         # Always mark as external_tools
         item.add_marker(pytest.mark.external_tools)
 

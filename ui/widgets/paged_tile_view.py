@@ -206,6 +206,14 @@ class TileGridGraphicsView(QGraphicsView):
         self._pixmap_item = None
         self._highlight_rect = None
 
+    def has_image(self) -> bool:
+        """Return True if an image is currently displayed."""
+        return self._pixmap_item is not None
+
+    def get_highlight_offset(self) -> int | None:
+        """Return the current highlight offset, or None if no highlight."""
+        return self._highlight_offset
+
     def set_highlight(self, offset: int | None) -> None:
         """
         Set or clear the highlight at a specific ROM offset.
@@ -690,6 +698,14 @@ class PagedTileViewWidget(QWidget):
     def get_current_page(self) -> int:
         """Get the current page number."""
         return self._current_page
+
+    def can_go_next(self) -> bool:
+        """Return True if navigation to next page is possible."""
+        return len(self._rom_data) > 0 and self._current_page < self._total_pages - 1
+
+    def can_go_prev(self) -> bool:
+        """Return True if navigation to previous page is possible."""
+        return len(self._rom_data) > 0 and self._current_page > 0
 
     @property
     def _bytes_per_cell(self) -> int:

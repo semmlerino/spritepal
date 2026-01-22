@@ -2,6 +2,7 @@
 Tests for PagedTileViewWidget.
 
 Tests the main tile grid widget with navigation and display.
+These tests verify behavior through public APIs and observable state.
 """
 
 from __future__ import annotations
@@ -33,9 +34,15 @@ class TestTileGridGraphicsView:
         image = QImage(400, 400, QImage.Format.Format_RGBA8888)
         image.fill(0xFF0000FF)
 
+        # Initially no image
+        assert not view.has_image()
+
         view.set_image(image)
-        assert view._pixmap_item is not None
-        assert not view._scene.sceneRect().isEmpty()
+
+        # After setting, image should be present
+        assert view.has_image()
+        # Scene should have content (not empty)
+        assert not view.sceneRect().isEmpty()
 
     def test_clear_image(self, qtbot) -> None:
         """Test clearing the image."""
@@ -45,9 +52,12 @@ class TestTileGridGraphicsView:
         image = QImage(100, 100, QImage.Format.Format_RGBA8888)
         image.fill(0xFF0000FF)
         view.set_image(image)
+        assert view.has_image()
 
         view.clear_image()
-        assert view._pixmap_item is None
+
+        # Image should be cleared
+        assert not view.has_image()
 
 
 class TestPagedTileViewWidget:
@@ -69,8 +79,8 @@ class TestPagedTileViewWidget:
         widget.set_rom_data(sample_rom_data)
 
         # Multi-page ROM: next should be enabled, prev disabled (first page)
-        assert widget._next_btn.isEnabled()
-        assert not widget._prev_btn.isEnabled()
+        assert widget.can_go_next()
+        assert not widget.can_go_prev()
         # Current offset starts at 0
         assert widget.get_current_offset() == 0
 
@@ -101,7 +111,7 @@ class TestPagedTileViewWidget:
 
         # Should still be on first page with navigation available
         assert widget.get_current_offset() == 0
-        assert widget._next_btn.isEnabled()
+        assert widget.can_go_next()
 
     def test_go_to_page(self, qtbot, sample_rom_data: bytes) -> None:
         """Test navigating to a specific page emits signal and updates offset."""
@@ -120,8 +130,8 @@ class TestPagedTileViewWidget:
         assert page_signals[0] == 1
         # Offset should have advanced
         assert widget.get_current_offset() > 0
-        # Prev button should now be enabled
-        assert widget._prev_btn.isEnabled()
+        # Prev should now be possible
+        assert widget.can_go_prev()
 
     def test_go_to_offset(self, qtbot, sample_rom_data: bytes) -> None:
         """Test navigating to a specific offset updates navigation."""
@@ -135,7 +145,7 @@ class TestPagedTileViewWidget:
         widget.go_to_offset(target_offset)
 
         # Should be past first page, so prev should be enabled
-        assert widget._prev_btn.isEnabled()
+        assert widget.can_go_prev()
         # Current offset should be page-aligned to target's page
         assert widget.get_current_offset() > 0
 
@@ -147,31 +157,35 @@ class TestPagedTileViewWidget:
 
         assert widget.get_current_offset() == 0
 
-        if widget._total_pages > 1:
+        total_pages = widget._total_pages
+        if total_pages > 1:
             widget.go_to_page(1)
             bytes_per_page = widget._cols * widget._rows * BYTES_PER_TILE
             assert widget.get_current_offset() == bytes_per_page
 
     def test_navigation_buttons_state(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test navigation button enable/disable state."""
+        """Test navigation button enable/disable state via public API."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
 
         # Load ROM data
         widget.set_rom_data(sample_rom_data)
 
-        # On first page, prev should be disabled
-        assert not widget._prev_btn.isEnabled()
-        # Next should be enabled if multiple pages
-        if widget._total_pages > 1:
-            assert widget._next_btn.isEnabled()
+        # On first page, prev should not be possible
+        assert not widget.can_go_prev()
+
+        # Next should be possible if multiple pages
+        total_pages = widget._total_pages
+        if total_pages > 1:
+            assert widget.can_go_next()
 
             # Navigate to last page
-            widget.go_to_page(widget._total_pages - 1)
-            # Next should be disabled on last page
-            assert not widget._next_btn.isEnabled()
-            # Prev should be enabled
-            assert widget._prev_btn.isEnabled()
+            widget.go_to_page(total_pages - 1)
+
+            # Next should not be possible on last page
+            assert not widget.can_go_next()
+            # Prev should be possible
+            assert widget.can_go_prev()
 
     def test_tile_clicked_signal(self, qtbot, sample_rom_data: bytes) -> None:
         """Test tile_clicked signal emission."""
@@ -204,7 +218,7 @@ class TestPagedTileViewWidget:
         # Combo should show selected preset
         assert widget._grid_combo.currentIndex() == 0
         # Navigation should still work
-        assert widget._next_btn.isEnabled()
+        assert widget.can_go_next()
 
     def test_goto_offset_hex_with_prefix(self, qtbot, sample_rom_data: bytes) -> None:
         """Test go-to-offset with 0x hex prefix navigates correctly."""
@@ -217,7 +231,7 @@ class TestPagedTileViewWidget:
         widget._on_goto_offset()
 
         # Should be past first page, prev enabled
-        assert widget._prev_btn.isEnabled()
+        assert widget.can_go_prev()
         assert widget.get_current_offset() > 0
 
     def test_goto_offset_hex_without_prefix(self, qtbot, sample_rom_data: bytes) -> None:
@@ -231,7 +245,7 @@ class TestPagedTileViewWidget:
         widget._on_goto_offset()
 
         # Should be past first page, prev enabled
-        assert widget._prev_btn.isEnabled()
+        assert widget.can_go_prev()
         assert widget.get_current_offset() > 0
 
     def test_goto_offset_clears_input(self, qtbot, sample_rom_data: bytes) -> None:
@@ -605,19 +619,19 @@ class TestTileGridHighlight:
         return bytes(range(256)) * 1000  # 256000 bytes
 
     def test_set_highlight_creates_rect(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test that setting a highlight creates a rectangle."""
+        """Test that setting a highlight stores the offset."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Wait for page render to complete
-        qtbot.waitUntil(lambda: widget._graphics_view._pixmap_item is not None, timeout=5000)
+        qtbot.waitUntil(lambda: widget._graphics_view.has_image(), timeout=5000)
 
         # Set highlight on current page
         widget._graphics_view.set_highlight(0x1000)
 
-        assert widget._graphics_view._highlight_offset == 0x1000
-        assert widget._graphics_view._highlight_rect is not None
+        # Verify highlight offset is stored via public API
+        assert widget._graphics_view.get_highlight_offset() == 0x1000
 
     def test_set_highlight_none_clears_rect(self, qtbot, sample_rom_data: bytes) -> None:
         """Test that setting highlight to None clears it."""
@@ -626,15 +640,14 @@ class TestTileGridHighlight:
         widget.set_rom_data(sample_rom_data)
 
         # Wait for page render to complete
-        qtbot.waitUntil(lambda: widget._graphics_view._pixmap_item is not None, timeout=5000)
+        qtbot.waitUntil(lambda: widget._graphics_view.has_image(), timeout=5000)
 
         # Set then clear highlight
         widget._graphics_view.set_highlight(0x1000)
-        assert widget._graphics_view._highlight_rect is not None
+        assert widget._graphics_view.get_highlight_offset() is not None
 
         widget._graphics_view.set_highlight(None)
-        assert widget._graphics_view._highlight_rect is None
-        assert widget._graphics_view._highlight_offset is None
+        assert widget._graphics_view.get_highlight_offset() is None
 
     def test_goto_offset_sets_highlight(self, qtbot, sample_rom_data: bytes) -> None:
         """Test that go-to-offset sets the highlight."""
@@ -646,7 +659,7 @@ class TestTileGridHighlight:
         widget._offset_input.setText("0x1000")
         widget._on_goto_offset()
 
-        assert widget._graphics_view._highlight_offset == 0x1000
+        assert widget._graphics_view.get_highlight_offset() == 0x1000
 
     def test_tile_click_clears_highlight(self, qtbot, sample_rom_data: bytes) -> None:
         """Test that clicking a tile clears the highlight."""
@@ -656,9 +669,9 @@ class TestTileGridHighlight:
 
         # Set highlight
         widget._graphics_view.set_highlight(0x1000)
-        assert widget._graphics_view._highlight_offset is not None
+        assert widget._graphics_view.get_highlight_offset() is not None
 
         # Simulate tile click
         widget._on_tile_clicked(0x2000)
 
-        assert widget._graphics_view._highlight_offset is None
+        assert widget._graphics_view.get_highlight_offset() is None

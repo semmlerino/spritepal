@@ -1,8 +1,35 @@
-"""Tests for ROM workflow state transitions."""
+"""Tests for ROM workflow state transitions.
+
+These tests verify controller behavior through observable effects (signals, view state)
+rather than accessing private attributes or calling private methods directly.
+"""
 
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+
+
+def _create_preview_emitter(coordinator):
+    """Create a helper function that emits the preview_ready signal.
+
+    This replaces direct calls to controller._on_preview_ready() with
+    signal emission, which is how the real system communicates.
+    """
+
+    def emit_preview(offset: int) -> None:
+        coordinator.preview_ready.emit(
+            b"\x00" * 64,  # tile_data
+            8,  # width
+            8,  # height
+            "test_sprite",  # sprite_name
+            32,  # compressed_size
+            0,  # slack_size
+            offset,  # actual_offset
+            True,  # hal_succeeded
+            b"",  # header_bytes
+        )
+
+    return emit_preview
 
 
 class TestROMWorkflowStateTransitions:
@@ -39,18 +66,12 @@ class TestROMWorkflowStateTransitions:
         controller.rom_path = str(dummy_rom)
         controller.rom_size = 0x10000
 
-        # Mock preview to complete immediately
+        # Create signal-based preview emitter
+        emit_preview = _create_preview_emitter(controller.preview_coordinator)
+
+        # Mock preview coordinator to emit signal when preview is requested
         def fake_preview(offset: int) -> None:
-            controller._on_preview_ready(
-                tile_data=b"\x00" * 64,
-                width=8,
-                height=8,
-                sprite_name="test_sprite",
-                compressed_size=32,
-                slack_size=0,
-                actual_offset=offset,
-                hal_succeeded=True,
-            )
+            emit_preview(offset)
 
         monkeypatch.setattr(
             controller.preview_coordinator,
@@ -107,20 +128,10 @@ class TestROMWorkflowStateTransitions:
         controller.rom_path = str(dummy_rom)
         controller.rom_size = 0x10000
 
-        # Mock preview
-        def fake_preview(offset: int) -> None:
-            controller._on_preview_ready(
-                tile_data=b"\x00" * 64,
-                width=8,
-                height=8,
-                sprite_name="test_sprite",
-                compressed_size=32,
-                slack_size=0,
-                actual_offset=offset,
-                hal_succeeded=True,
-            )
+        # Create signal-based preview emitter
+        emit_preview = _create_preview_emitter(controller.preview_coordinator)
 
-        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", fake_preview)
+        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", emit_preview)
 
         # Set initial offset
         controller.set_offset(0x1000)
@@ -263,13 +274,18 @@ class TestSourceTypePreservation:
 
     REGRESSION: Source type (ROM/Mesen/Library) was being lost when activating
     sprites, causing category confusion when multiple sources have the same offset.
+
+    These tests verify behavior through signals and observable view state rather
+    than accessing private controller attributes.
     """
 
     def test_sprite_activated_preserves_source_type_mesen(self, qtbot, tmp_path, monkeypatch):
         """Source type 'mesen' should be preserved when sprite is activated.
 
         Bug: _on_sprite_activated received source_type but didn't pass it to
-        set_offset(), causing _current_source_type to not be updated.
+        set_offset(), causing source type to not be updated.
+
+        We verify this by checking that view.set_offset receives the correct source_type.
         """
         from ui.sprite_editor.controllers.editing_controller import EditingController
         from ui.sprite_editor.controllers.rom_workflow_controller import (
@@ -289,33 +305,36 @@ class TestSourceTypePreservation:
         controller.rom_path = str(dummy_rom)
         controller.rom_size = 0x10000
 
-        # Mock preview to complete immediately
-        def fake_preview(offset: int) -> None:
-            controller._on_preview_ready(
-                tile_data=b"\x00" * 64,
-                width=8,
-                height=8,
-                sprite_name="test_sprite",
-                compressed_size=32,
-                slack_size=0,
-                actual_offset=offset,
-                hal_succeeded=True,
-            )
+        # Create signal-based preview emitter
+        emit_preview = _create_preview_emitter(controller.preview_coordinator)
 
-        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", fake_preview)
-        monkeypatch.setattr(controller.preview_coordinator, "request_full_preview", fake_preview)
+        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", emit_preview)
+        monkeypatch.setattr(controller.preview_coordinator, "request_full_preview", emit_preview)
 
         # Initial state with ROM source type
         controller.set_offset(0x1000, source_type="rom")
-        assert controller._current_source_type == "rom"
 
-        # Activate sprite from Mesen category (simulating double-click)
-        controller._on_sprite_activated(0x2000, "mesen")
+        # Track view.set_offset calls to verify source_type is passed correctly
+        set_offset_calls: list[tuple[int, str | None]] = []
+        original_set_offset = view.set_offset
 
-        # Source type should be updated to 'mesen'
-        assert controller._current_source_type == "mesen", (
-            f"Source type should be 'mesen' but was '{controller._current_source_type}'"
-        )
+        def tracking_set_offset(offset: int, source_type: str | None = None) -> None:
+            set_offset_calls.append((offset, source_type))
+            original_set_offset(offset, source_type)
+
+        monkeypatch.setattr(view, "set_offset", tracking_set_offset)
+
+        # Clear call tracking from initial setup
+        set_offset_calls.clear()
+
+        # Emit sprite_activated signal (simulating double-click in asset browser)
+        view.sprite_activated.emit(0x2000, "mesen")
+
+        # Verify that view.set_offset was called with source_type="mesen"
+        assert len(set_offset_calls) > 0, "view.set_offset should have been called"
+        last_offset, last_source_type = set_offset_calls[-1]
+        assert last_offset == 0x2000, f"Expected offset 0x2000, got 0x{last_offset:06X}"
+        assert last_source_type == "mesen", f"Source type should be 'mesen' but was '{last_source_type}'"
 
     def test_sprite_activated_preserves_source_type_library(self, qtbot, tmp_path, monkeypatch):
         """Source type 'library' should be preserved when sprite is activated."""
@@ -337,28 +356,29 @@ class TestSourceTypePreservation:
         controller.rom_path = str(dummy_rom)
         controller.rom_size = 0x10000
 
-        # Mock preview
-        def fake_preview(offset: int) -> None:
-            controller._on_preview_ready(
-                tile_data=b"\x00" * 64,
-                width=8,
-                height=8,
-                sprite_name="test_sprite",
-                compressed_size=32,
-                slack_size=0,
-                actual_offset=offset,
-                hal_succeeded=True,
-            )
+        # Create signal-based preview emitter
+        emit_preview = _create_preview_emitter(controller.preview_coordinator)
 
-        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", fake_preview)
-        monkeypatch.setattr(controller.preview_coordinator, "request_full_preview", fake_preview)
+        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", emit_preview)
+        monkeypatch.setattr(controller.preview_coordinator, "request_full_preview", emit_preview)
 
-        # Activate sprite from Library category
-        controller._on_sprite_activated(0x3000, "library")
+        # Track view.set_offset calls
+        set_offset_calls: list[tuple[int, str | None]] = []
+        original_set_offset = view.set_offset
 
-        assert controller._current_source_type == "library", (
-            f"Source type should be 'library' but was '{controller._current_source_type}'"
-        )
+        def tracking_set_offset(offset: int, source_type: str | None = None) -> None:
+            set_offset_calls.append((offset, source_type))
+            original_set_offset(offset, source_type)
+
+        monkeypatch.setattr(view, "set_offset", tracking_set_offset)
+
+        # Emit sprite_activated signal from Library category
+        view.sprite_activated.emit(0x3000, "library")
+
+        # Verify source_type was passed correctly
+        assert len(set_offset_calls) > 0, "view.set_offset should have been called"
+        last_offset, last_source_type = set_offset_calls[-1]
+        assert last_source_type == "library", f"Source type should be 'library' but was '{last_source_type}'"
 
     def test_sprite_activated_with_same_offset_preserves_source_type(self, qtbot, tmp_path, monkeypatch):
         """Source type should be preserved even when same offset is already loaded.
@@ -383,32 +403,34 @@ class TestSourceTypePreservation:
         controller.rom_path = str(dummy_rom)
         controller.rom_size = 0x10000
 
-        # Mock preview
-        def fake_preview(offset: int) -> None:
-            controller._on_preview_ready(
-                tile_data=b"\x00" * 64,
-                width=8,
-                height=8,
-                sprite_name="test_sprite",
-                compressed_size=32,
-                slack_size=0,
-                actual_offset=offset,
-                hal_succeeded=True,
-            )
+        # Create signal-based preview emitter
+        emit_preview = _create_preview_emitter(controller.preview_coordinator)
 
-        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", fake_preview)
-        monkeypatch.setattr(controller.preview_coordinator, "request_full_preview", fake_preview)
+        monkeypatch.setattr(controller.preview_coordinator, "request_manual_preview", emit_preview)
+        monkeypatch.setattr(controller.preview_coordinator, "request_full_preview", emit_preview)
 
         # Load offset from ROM source
         controller.set_offset(0x4000, source_type="rom")
         controller.current_tile_offset = 0x4000  # Simulate tile data being available
         controller.current_tile_data = b"\x00" * 64
-        assert controller._current_source_type == "rom"
 
-        # Activate SAME offset from Mesen source (different category, same offset)
-        controller._on_sprite_activated(0x4000, "mesen")
+        # Track view.set_offset calls
+        set_offset_calls: list[tuple[int, str | None]] = []
+        original_set_offset = view.set_offset
+
+        def tracking_set_offset(offset: int, source_type: str | None = None) -> None:
+            set_offset_calls.append((offset, source_type))
+            original_set_offset(offset, source_type)
+
+        monkeypatch.setattr(view, "set_offset", tracking_set_offset)
+
+        # Emit sprite_activated signal with SAME offset but different source (Mesen)
+        view.sprite_activated.emit(0x4000, "mesen")
 
         # Even though offset is same, source type should update to mesen
-        assert controller._current_source_type == "mesen", (
-            f"Source type should update to 'mesen' even for same offset, but was '{controller._current_source_type}'"
+        # The view.set_offset should be called with source_type="mesen"
+        assert len(set_offset_calls) > 0, "view.set_offset should have been called"
+        last_offset, last_source_type = set_offset_calls[-1]
+        assert last_source_type == "mesen", (
+            f"Source type should update to 'mesen' even for same offset, but was '{last_source_type}'"
         )
