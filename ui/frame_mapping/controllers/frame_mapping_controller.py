@@ -55,6 +55,7 @@ class FrameMappingController(QObject):
     project_changed = Signal()
     ai_frames_loaded = Signal(int)  # count
     game_frame_added = Signal(str)  # game frame ID
+    game_frame_removed = Signal(str)  # game frame ID
     mapping_created = Signal(int, str)  # ai_index, game_id
     mapping_removed = Signal(int)  # ai_index
     mapping_injected = Signal(int, str)  # ai_index, message
@@ -195,9 +196,12 @@ class FrameMappingController(QObject):
         self._project.ai_frames = frames  # type: ignore[union-attr]
         self._project.ai_frames_dir = directory  # type: ignore[union-attr]
 
-        # Bug #3 fix: Prune orphaned mappings that reference non-existent AI frame indices
-        valid_indices = {f.index for f in frames}
-        orphaned = [m for m in self._project.mappings if m.ai_frame_index not in valid_indices]  # type: ignore[union-attr]
+        # Rebuild indices after replacing ai_frames
+        self._project._invalidate_ai_frame_index()  # type: ignore[union-attr]
+
+        # Bug #3 fix: Prune orphaned mappings that reference non-existent AI frame IDs
+        valid_ids = {f.id for f in frames}
+        orphaned = [m for m in self._project.mappings if m.ai_frame_id not in valid_ids]  # type: ignore[union-attr]
         if orphaned:
             logger.info(
                 "Pruning %d orphaned mappings after AI frames reload",
@@ -206,8 +210,9 @@ class FrameMappingController(QObject):
             self._project.mappings = [  # type: ignore[union-attr]
                 m
                 for m in self._project.mappings  # type: ignore[union-attr]
-                if m.ai_frame_index in valid_indices
+                if m.ai_frame_id in valid_ids
             ]
+            self._project._invalidate_mapping_index()  # type: ignore[union-attr]
 
         self.ai_frames_loaded.emit(len(frames))
         self.project_changed.emit()
@@ -380,10 +385,13 @@ class FrameMappingController(QObject):
             self.error_occurred.emit(f"Game frame {game_frame_id} not found")
             return False
 
-        self._project.create_mapping(ai_frame_index, game_frame_id)
+        # Use ID-based mapping (stable across reloads)
+        self._project.create_mapping(ai_frame.id, game_frame_id)
         self.mapping_created.emit(ai_frame_index, game_frame_id)
         self.project_changed.emit()
-        logger.info("Created mapping: AI frame %d -> Game frame %s", ai_frame_index, game_frame_id)
+        logger.info(
+            "Created mapping: AI frame %s (idx %d) -> Game frame %s", ai_frame.id, ai_frame_index, game_frame_id
+        )
         return True
 
     def get_existing_link_for_game_frame(self, game_frame_id: str) -> int | None:
@@ -397,7 +405,7 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return None
-        return self._project.get_ai_frame_linked_to_game_frame(game_frame_id)
+        return self._project.get_ai_frame_index_linked_to_game_frame(game_frame_id)
 
     def remove_mapping(self, ai_frame_index: int) -> bool:
         """Remove a mapping for an AI frame.
@@ -411,7 +419,7 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        if self._project.remove_mapping_for_ai_frame(ai_frame_index):
+        if self._project.remove_mapping_for_ai_frame_index(ai_frame_index):
             self.mapping_removed.emit(ai_frame_index)
             self.project_changed.emit()
             logger.info("Removed mapping for AI frame %d", ai_frame_index)
@@ -443,7 +451,7 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        if self._project.update_mapping_alignment(ai_frame_index, offset_x, offset_y, flip_h, flip_v, scale):
+        if self._project.update_mapping_alignment_by_index(ai_frame_index, offset_x, offset_y, flip_h, flip_v, scale):
             self.project_changed.emit()
             logger.info(
                 "Updated alignment for AI frame %d: offset=(%d, %d), flip=(%s, %s), scale=%.2f",
@@ -601,6 +609,31 @@ class FrameMappingController(QObject):
             return []
         return self._project.game_frames
 
+    def remove_game_frame(self, frame_id: str) -> bool:
+        """Remove a game frame from the project.
+
+        Also removes any associated mapping and clears the preview cache.
+
+        Args:
+            frame_id: ID of the game frame to remove.
+
+        Returns:
+            True if the frame was found and removed.
+        """
+        if self._project is None:
+            return False
+
+        # Clear preview cache for this frame
+        if frame_id in self._game_frame_previews:
+            del self._game_frame_previews[frame_id]
+
+        if self._project.remove_game_frame(frame_id):
+            self.game_frame_removed.emit(frame_id)
+            self.project_changed.emit()
+            logger.info("Removed game frame %s", frame_id)
+            return True
+        return False
+
     def create_injection_copy(self, rom_path: Path) -> Path | None:
         """Create a numbered copy of the ROM for injection (public API).
 
@@ -709,7 +742,7 @@ class FrameMappingController(QObject):
             return False
 
         # 1. Retrieve Mapping and Frames
-        mapping = self._project.get_mapping_for_ai_frame(ai_frame_index)
+        mapping = self._project.get_mapping_for_ai_frame_index(ai_frame_index)
         if mapping is None:
             logger.warning("inject_mapping: AI frame %d is not mapped", ai_frame_index)
             self.error_occurred.emit(f"AI frame {ai_frame_index} is not mapped")

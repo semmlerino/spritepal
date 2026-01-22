@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from core.frame_mapping_project import FrameMapping, GameFrame
+from core.frame_mapping_project import AIFrame, FrameMapping, GameFrame
 
 
 class TestFrameMappingAlignment:
@@ -10,7 +10,7 @@ class TestFrameMappingAlignment:
 
     def test_frame_mapping_alignment_fields_default(self) -> None:
         """FrameMapping has default alignment values."""
-        mapping = FrameMapping(ai_frame_index=0, game_frame_id="F001")
+        mapping = FrameMapping(ai_frame_id="frame_001.png", game_frame_id="F001")
         assert mapping.offset_x == 0
         assert mapping.offset_y == 0
         assert mapping.flip_h is False
@@ -19,7 +19,7 @@ class TestFrameMappingAlignment:
     def test_frame_mapping_alignment_explicit_values(self) -> None:
         """FrameMapping accepts explicit alignment values."""
         mapping = FrameMapping(
-            ai_frame_index=1,
+            ai_frame_id="frame_002.png",
             game_frame_id="F002",
             offset_x=-5,
             offset_y=10,
@@ -34,7 +34,7 @@ class TestFrameMappingAlignment:
     def test_frame_mapping_alignment_roundtrip(self) -> None:
         """Alignment fields survive to_dict/from_dict cycle."""
         mapping = FrameMapping(
-            ai_frame_index=0,
+            ai_frame_id="frame_001.png",
             game_frame_id="F001",
             offset_x=-5,
             offset_y=10,
@@ -48,15 +48,21 @@ class TestFrameMappingAlignment:
         assert restored.flip_h is True
         assert restored.flip_v is False
 
-    def test_frame_mapping_backward_compatibility(self) -> None:
-        """Old project files without alignment fields load correctly."""
+    def test_frame_mapping_v1_migration(self) -> None:
+        """V1 project files with ai_frame_index load via migration."""
+        # Create AI frames for migration lookup
+        ai_frames = [
+            AIFrame(path=Path("/tmp/frame_001.png"), index=0),
+            AIFrame(path=Path("/tmp/frame_002.png"), index=1),
+        ]
+
         old_data: dict[str, object] = {
-            "ai_frame_index": 0,
+            "ai_frame_index": 0,  # V1 format
             "game_frame_id": "F001",
             "status": "mapped",
-            # No alignment fields - simulating old format
         }
-        mapping = FrameMapping.from_dict(old_data)
+        mapping = FrameMapping.from_dict(old_data, ai_frames=ai_frames)
+        assert mapping.ai_frame_id == "frame_001.png"  # Migrated from index
         assert mapping.offset_x == 0
         assert mapping.offset_y == 0
         assert mapping.flip_h is False
@@ -65,7 +71,7 @@ class TestFrameMappingAlignment:
     def test_frame_mapping_to_dict_includes_alignment(self) -> None:
         """to_dict() includes all alignment fields."""
         mapping = FrameMapping(
-            ai_frame_index=2,
+            ai_frame_id="frame_003.png",
             game_frame_id="F003",
             status="edited",
             offset_x=15,
@@ -82,7 +88,7 @@ class TestFrameMappingAlignment:
     def test_frame_mapping_partial_alignment_backward_compat(self) -> None:
         """Handles case where only some alignment fields are present."""
         partial_data: dict[str, object] = {
-            "ai_frame_index": 0,
+            "ai_frame_id": "frame_001.png",
             "game_frame_id": "F001",
             "status": "mapped",
             "offset_x": 5,
@@ -100,12 +106,12 @@ class TestFrameMappingBasic:
 
     def test_frame_mapping_status_default(self) -> None:
         """FrameMapping status defaults to 'mapped'."""
-        mapping = FrameMapping(ai_frame_index=0, game_frame_id="F001")
+        mapping = FrameMapping(ai_frame_id="frame_001.png", game_frame_id="F001")
         assert mapping.status == "mapped"
 
     def test_frame_mapping_status_roundtrip(self) -> None:
         """Status field survives serialization."""
-        mapping = FrameMapping(ai_frame_index=1, game_frame_id="F002", status="injected")
+        mapping = FrameMapping(ai_frame_id="frame_002.png", game_frame_id="F002", status="injected")
         data = mapping.to_dict()
         restored = FrameMapping.from_dict(data)
         assert restored.status == "injected"
@@ -113,12 +119,29 @@ class TestFrameMappingBasic:
     def test_frame_mapping_missing_status_backward_compat(self) -> None:
         """Missing status defaults to 'mapped'."""
         old_data: dict[str, object] = {
-            "ai_frame_index": 0,
+            "ai_frame_id": "frame_001.png",
             "game_frame_id": "F001",
             # No status field
         }
         mapping = FrameMapping.from_dict(old_data)
         assert mapping.status == "mapped"
+
+
+class TestAIFrame:
+    """Tests for AIFrame dataclass."""
+
+    def test_ai_frame_id_property(self) -> None:
+        """AIFrame.id returns the filename."""
+        frame = AIFrame(path=Path("/tmp/my_sprite/frame_001.png"), index=0)
+        assert frame.id == "frame_001.png"
+
+    def test_ai_frame_id_different_paths(self) -> None:
+        """AIFrame.id works with various path formats."""
+        frame1 = AIFrame(path=Path("frame.png"), index=0)
+        assert frame1.id == "frame.png"
+
+        frame2 = AIFrame(path=Path("/a/b/c/d/sprite.png"), index=1)
+        assert frame2.id == "sprite.png"
 
 
 class TestGameFrame:
@@ -193,10 +216,10 @@ class TestFrameMappingProjectAlignment:
         from core.frame_mapping_project import FrameMappingProject
 
         project = FrameMappingProject(name="test")
-        project.create_mapping(ai_frame_index=0, game_frame_id="G001")
+        project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
 
         result = project.update_mapping_alignment(
-            ai_frame_index=0,
+            ai_frame_id="frame_001.png",
             offset_x=10,
             offset_y=-5,
             flip_h=True,
@@ -204,7 +227,7 @@ class TestFrameMappingProjectAlignment:
         )
 
         assert result is True
-        mapping = project.get_mapping_for_ai_frame(0)
+        mapping = project.get_mapping_for_ai_frame("frame_001.png")
         assert mapping is not None
         assert mapping.offset_x == 10
         assert mapping.offset_y == -5
@@ -218,7 +241,7 @@ class TestFrameMappingProjectAlignment:
         project = FrameMappingProject(name="test")
 
         result = project.update_mapping_alignment(
-            ai_frame_index=0,
+            ai_frame_id="frame_001.png",
             offset_x=10,
             offset_y=-5,
             flip_h=True,
@@ -232,18 +255,18 @@ class TestFrameMappingProjectAlignment:
         from core.frame_mapping_project import FrameMappingProject
 
         project = FrameMappingProject(name="test")
-        mapping = project.create_mapping(ai_frame_index=0, game_frame_id="G001")
+        mapping = project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
         mapping.status = "edited"
 
         project.update_mapping_alignment(
-            ai_frame_index=0,
+            ai_frame_id="frame_001.png",
             offset_x=5,
             offset_y=5,
             flip_h=False,
             flip_v=True,
         )
 
-        mapping = project.get_mapping_for_ai_frame(0)
+        mapping = project.get_mapping_for_ai_frame("frame_001.png")
         assert mapping is not None
         assert mapping.game_frame_id == "G001"
         assert mapping.status == "edited"
@@ -252,11 +275,15 @@ class TestFrameMappingProjectAlignment:
         """Alignment values survive save/load cycle."""
         from core.frame_mapping_project import FrameMappingProject
 
-        # Create project with alignment
+        # Create project with AI frame and game frame
         project = FrameMappingProject(name="test")
-        project.create_mapping(ai_frame_index=0, game_frame_id="G001")
+        project.ai_frames = [AIFrame(path=Path("/tmp/frame_001.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
+
+        project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
         project.update_mapping_alignment(
-            ai_frame_index=0,
+            ai_frame_id="frame_001.png",
             offset_x=15,
             offset_y=-10,
             flip_h=True,
@@ -270,9 +297,262 @@ class TestFrameMappingProjectAlignment:
         # Load
         loaded = FrameMappingProject.load(save_path)
 
-        mapping = loaded.get_mapping_for_ai_frame(0)
+        mapping = loaded.get_mapping_for_ai_frame("frame_001.png")
         assert mapping is not None
         assert mapping.offset_x == 15
         assert mapping.offset_y == -10
         assert mapping.flip_h is True
         assert mapping.flip_v is True
+
+
+class TestFrameMappingProjectStableIDs:
+    """Tests for stable AI frame ID feature (Issue #1 fix)."""
+
+    def test_mapping_uses_ai_frame_id(self) -> None:
+        """Mappings use stable ai_frame_id, not position-dependent index."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.create_mapping(ai_frame_id="my_sprite.png", game_frame_id="G001")
+
+        mapping = project.get_mapping_for_ai_frame("my_sprite.png")
+        assert mapping is not None
+        assert mapping.ai_frame_id == "my_sprite.png"
+
+    def test_mapping_survives_frame_reorder(self, tmp_path: Path) -> None:
+        """Mappings survive AI frame reload/reorder."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        # Create project with AI frames in order A, B, C and a game frame
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("/tmp/a.png"), index=0),
+            AIFrame(path=Path("/tmp/b.png"), index=1),
+            AIFrame(path=Path("/tmp/c.png"), index=2),
+        ]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
+
+        # Create mapping for "b.png" at index 1
+        project.create_mapping(ai_frame_id="b.png", game_frame_id="G001")
+
+        # Save
+        save_path = tmp_path / "test.spritepal-mapping.json"
+        project.save(save_path)
+
+        # Modify saved project to simulate different frame order on load
+        # (Normally this would happen because files on disk got renamed/reordered)
+        import json
+
+        with open(save_path) as f:
+            data = json.load(f)
+
+        # Change AI frame order to C, A, B (index of "b.png" is now 2)
+        data["ai_frames"] = [
+            {"path": "/tmp/c.png", "index": 0, "width": 0, "height": 0},
+            {"path": "/tmp/a.png", "index": 1, "width": 0, "height": 0},
+            {"path": "/tmp/b.png", "index": 2, "width": 0, "height": 0},
+        ]
+        with open(save_path, "w") as f:
+            json.dump(data, f)
+
+        # Load
+        loaded = FrameMappingProject.load(save_path)
+
+        # Mapping should still reference "b.png" by ID, not index
+        mapping = loaded.get_mapping_for_ai_frame("b.png")
+        assert mapping is not None
+        assert mapping.ai_frame_id == "b.png"
+        assert mapping.game_frame_id == "G001"
+
+    def test_v1_project_migrates_to_v2(self, tmp_path: Path) -> None:
+        """V1 projects with ai_frame_index are migrated to V2 on load."""
+        import json
+
+        from core.frame_mapping_project import FrameMappingProject
+
+        # Create a V1 project file manually
+        v1_data = {
+            "version": 1,
+            "name": "legacy_project",
+            "ai_frames_dir": None,
+            "ai_frames": [
+                {"path": "/tmp/frame_001.png", "index": 0, "width": 32, "height": 32},
+                {"path": "/tmp/frame_002.png", "index": 1, "width": 32, "height": 32},
+            ],
+            "game_frames": [
+                {"id": "G001", "rom_offsets": [], "capture_path": None},
+            ],
+            "mappings": [
+                {
+                    "ai_frame_index": 1,  # V1 format - should migrate to ai_frame_id
+                    "game_frame_id": "G001",
+                    "status": "mapped",
+                    "offset_x": 5,
+                    "offset_y": -3,
+                    "flip_h": True,
+                    "flip_v": False,
+                    "scale": 1.0,
+                }
+            ],
+        }
+
+        save_path = tmp_path / "legacy.spritepal-mapping.json"
+        with open(save_path, "w") as f:
+            json.dump(v1_data, f)
+
+        # Load - should migrate
+        project = FrameMappingProject.load(save_path)
+
+        # Mapping should now use ai_frame_id
+        assert len(project.mappings) == 1
+        mapping = project.mappings[0]
+        assert mapping.ai_frame_id == "frame_002.png"  # Migrated from index 1
+        assert mapping.offset_x == 5
+        assert mapping.offset_y == -3
+        assert mapping.flip_h is True
+
+
+class TestFrameMappingProjectAtomicSave:
+    """Tests for atomic save functionality (Issue #3 fix)."""
+
+    def test_save_creates_valid_json(self, tmp_path: Path) -> None:
+        """Save creates a valid JSON file."""
+        import json
+
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        save_path = tmp_path / "test.spritepal-mapping.json"
+        project.save(save_path)
+
+        # Should be valid JSON
+        with open(save_path) as f:
+            data = json.load(f)
+
+        assert data["name"] == "test"
+        assert data["version"] == 2
+
+    def test_save_uses_v2_format(self, tmp_path: Path) -> None:
+        """Save uses version 2 format with ai_frame_id."""
+        import json
+
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.create_mapping(ai_frame_id="sprite.png", game_frame_id="G001")
+
+        save_path = tmp_path / "test.spritepal-mapping.json"
+        project.save(save_path)
+
+        with open(save_path) as f:
+            data = json.load(f)
+
+        assert data["version"] == 2
+        assert len(data["mappings"]) == 1
+        assert data["mappings"][0]["ai_frame_id"] == "sprite.png"
+        assert "ai_frame_index" not in data["mappings"][0]
+
+
+class TestFrameMappingProjectVersionValidation:
+    """Tests for version validation (Issue #4 fix)."""
+
+    def test_load_rejects_unsupported_version(self, tmp_path: Path) -> None:
+        """Load rejects project files with unsupported versions."""
+        import json
+
+        import pytest
+
+        from core.frame_mapping_project import FrameMappingProject
+
+        # Create a project file with unsupported version
+        bad_data = {
+            "version": 99,  # Unsupported
+            "name": "test",
+            "ai_frames": [],
+            "game_frames": [],
+            "mappings": [],
+        }
+
+        save_path = tmp_path / "bad.spritepal-mapping.json"
+        with open(save_path, "w") as f:
+            json.dump(bad_data, f)
+
+        with pytest.raises(ValueError, match="Unsupported project version"):
+            FrameMappingProject.load(save_path)
+
+
+class TestFrameMappingProjectPerformance:
+    """Tests for O(1) lookup optimization (Issue #5 fix)."""
+
+    def test_mapping_lookup_is_fast(self) -> None:
+        """Mapping lookup uses O(1) index."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+
+        # Create many mappings
+        for i in range(100):
+            project.create_mapping(ai_frame_id=f"frame_{i:04d}.png", game_frame_id=f"G{i:04d}")
+
+        # Lookups should use the index (O(1) not O(n))
+        mapping = project.get_mapping_for_ai_frame("frame_0050.png")
+        assert mapping is not None
+        assert mapping.game_frame_id == "G0050"
+
+        mapping = project.get_mapping_for_game_frame("G0099")
+        assert mapping is not None
+        assert mapping.ai_frame_id == "frame_0099.png"
+
+
+class TestRemoveGameFrame:
+    """Tests for removing game frames from project."""
+
+    def test_remove_game_frame_basic(self) -> None:
+        """Remove a game frame from project."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        game_frame = GameFrame(id="G001", rom_offsets=[0x1000])
+        project.game_frames.append(game_frame)
+
+        assert len(project.game_frames) == 1
+        assert project.get_game_frame_by_id("G001") is not None
+
+        # Remove the game frame
+        result = project.remove_game_frame("G001")
+
+        assert result is True
+        assert len(project.game_frames) == 0
+        assert project.get_game_frame_by_id("G001") is None
+
+    def test_remove_game_frame_nonexistent(self) -> None:
+        """Remove nonexistent game frame returns False."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+
+        result = project.remove_game_frame("NONEXISTENT")
+
+        assert result is False
+
+    def test_remove_game_frame_also_removes_mapping(self) -> None:
+        """Removing a game frame also removes its mapping."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        ai_frame = AIFrame(path=Path("frame_001.png"), index=0)
+        game_frame = GameFrame(id="G001", rom_offsets=[0x1000])
+        project.ai_frames.append(ai_frame)
+        project.game_frames.append(game_frame)
+        project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
+
+        assert project.get_mapping_for_game_frame("G001") is not None
+        assert project.get_mapping_for_ai_frame("frame_001.png") is not None
+
+        # Remove the game frame
+        project.remove_game_frame("G001")
+
+        # Mapping should also be gone
+        assert project.get_mapping_for_game_frame("G001") is None
+        assert project.get_mapping_for_ai_frame("frame_001.png") is None
