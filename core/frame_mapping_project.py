@@ -86,6 +86,7 @@ class GameFrame:
     width: int = 0
     height: int = 0
     selected_entry_ids: list[int] = field(default_factory=list)  # OAM entry IDs selected during import
+    compression_types: dict[int, str] = field(default_factory=dict)  # ROM offset -> "hal" | "raw"
 
     def to_dict(self, base_path: Path | None = None) -> dict[str, object]:
         """Serialize to dictionary for JSON storage.
@@ -102,6 +103,9 @@ class GameFrame:
                 except ValueError:
                     pass
 
+        # Convert int keys to strings for JSON serialization
+        compression_types_str = {str(k): v for k, v in self.compression_types.items()}
+
         return {
             "id": self.id,
             "rom_offsets": self.rom_offsets,
@@ -110,6 +114,7 @@ class GameFrame:
             "width": self.width,
             "height": self.height,
             "selected_entry_ids": self.selected_entry_ids,
+            "compression_types": compression_types_str,
         }
 
     @classmethod
@@ -126,6 +131,10 @@ class GameFrame:
         if base_path and capture_path and not capture_path.is_absolute():
             capture_path = base_path / capture_path
 
+        # Convert string keys back to ints for compression_types
+        compression_types_raw = cast(dict[str, str], data.get("compression_types", {}))
+        compression_types = {int(k): v for k, v in compression_types_raw.items()}
+
         return cls(
             id=cast(str, data["id"]),
             rom_offsets=cast(list[int], data.get("rom_offsets", [])),
@@ -134,6 +143,7 @@ class GameFrame:
             width=cast(int, data.get("width", 0)),
             height=cast(int, data.get("height", 0)),
             selected_entry_ids=cast(list[int], data.get("selected_entry_ids", [])),
+            compression_types=compression_types,
         )
 
 

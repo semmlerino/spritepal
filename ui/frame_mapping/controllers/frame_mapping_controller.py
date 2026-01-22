@@ -1071,9 +1071,10 @@ class FrameMappingController(QObject):
                 if captured_tile_count == 0:
                     continue
 
-                # Query original ROM data to find how many tiles are actually stored here
-                # This prevents injecting more tiles than the original compressed block contains
-                # For RAW (uncompressed) tiles, HAL decompression will fail - that's expected
+                # Determine compression type for this ROM offset
+                # Check stored compression type first (detected during previous injection or import)
+                stored_compression = game_frame.compression_types.get(rom_offset)
+
                 is_raw_tile = force_raw  # Force RAW if requested
                 if force_raw:
                     original_tile_count = captured_tile_count
@@ -1081,7 +1082,28 @@ class FrameMappingController(QObject):
                         "ROM offset 0x%X: Using forced RAW mode",
                         rom_offset,
                     )
+                elif stored_compression:
+                    # Use stored compression type (detected on previous injection)
+                    is_raw_tile = stored_compression == "raw"
+                    if is_raw_tile:
+                        original_tile_count = captured_tile_count
+                    else:
+                        # Still need to query tile count for HAL
+                        try:
+                            _, original_data, _ = injector.find_compressed_sprite(rom_data, rom_offset)
+                            original_tile_count = len(original_data) // 32
+                        except Exception:
+                            original_tile_count = captured_tile_count
+                    logger.info(
+                        "ROM offset 0x%X: Using stored compression type: %s",
+                        rom_offset,
+                        stored_compression,
+                    )
                 else:
+                    # No stored type - detect and store for future injections
+                    # Query original ROM data to find how many tiles are actually stored here
+                    # This prevents injecting more tiles than the original compressed block contains
+                    # For RAW (uncompressed) tiles, HAL decompression will fail - that's expected
                     try:
                         _, original_data, _ = injector.find_compressed_sprite(rom_data, rom_offset)
                         original_tile_count = len(original_data) // 32  # 32 bytes per 4bpp tile
@@ -1089,16 +1111,26 @@ class FrameMappingController(QObject):
                             # HAL decompression succeeded but no tiles - treat as RAW
                             is_raw_tile = True
                             original_tile_count = captured_tile_count
+                            game_frame.compression_types[rom_offset] = "raw"
                             logger.info(
-                                "ROM offset 0x%X: HAL returned no tiles, treating as RAW (1 tile)",
+                                "ROM offset 0x%X: HAL returned no tiles, detected as RAW (stored)",
                                 rom_offset,
+                            )
+                        else:
+                            # HAL decompression succeeded with tiles - this is HAL compressed
+                            game_frame.compression_types[rom_offset] = "hal"
+                            logger.info(
+                                "ROM offset 0x%X: Detected as HAL compressed (%d tiles, stored)",
+                                rom_offset,
+                                original_tile_count,
                             )
                     except Exception as e:
                         # HAL decompression failed - this is expected for RAW tiles
                         is_raw_tile = True
                         original_tile_count = captured_tile_count  # For RAW, inject all captured tiles
+                        game_frame.compression_types[rom_offset] = "raw"
                         logger.info(
-                            "ROM offset 0x%X: HAL decompression failed (%s), treating as RAW tile",
+                            "ROM offset 0x%X: HAL decompression failed (%s), detected as RAW (stored)",
                             rom_offset,
                             e,
                         )

@@ -207,6 +207,56 @@ class TestGameFrame:
         data = frame.to_dict()
         assert data["selected_entry_ids"] == [1, 2, 3]
 
+    def test_game_frame_compression_types_default(self) -> None:
+        """GameFrame has empty compression_types by default."""
+        frame = GameFrame(id="G001")
+        assert frame.compression_types == {}
+
+    def test_game_frame_compression_types_explicit(self) -> None:
+        """GameFrame accepts explicit compression_types."""
+        frame = GameFrame(
+            id="G001",
+            compression_types={0x35000: "raw", 0x36000: "hal"},
+        )
+        assert frame.compression_types == {0x35000: "raw", 0x36000: "hal"}
+
+    def test_game_frame_compression_types_roundtrip(self) -> None:
+        """compression_types survives to_dict/from_dict cycle with int keys."""
+        frame = GameFrame(
+            id="G001",
+            rom_offsets=[0x35000, 0x36000],
+            capture_path=Path("/tmp/capture.json"),
+            compression_types={0x35000: "raw", 0x36000: "hal"},
+        )
+        data = frame.to_dict()
+        # JSON serializes int keys as strings
+        assert data["compression_types"] == {"217088": "raw", "221184": "hal"}
+
+        restored = GameFrame.from_dict(data)
+        # Keys should be converted back to ints
+        assert restored.compression_types == {0x35000: "raw", 0x36000: "hal"}
+
+    def test_game_frame_compression_types_backward_compatibility(self) -> None:
+        """Old project files without compression_types load correctly."""
+        old_data: dict[str, object] = {
+            "id": "G001",
+            "rom_offsets": [0x1B0000],
+            "capture_path": "/tmp/capture.json",
+            # No compression_types - simulating old format
+        }
+        frame = GameFrame.from_dict(old_data)
+        assert frame.compression_types == {}  # Default to empty
+
+    def test_game_frame_to_dict_includes_compression_types(self) -> None:
+        """to_dict() includes compression_types field."""
+        frame = GameFrame(
+            id="G001",
+            compression_types={0x50000: "raw"},
+        )
+        data = frame.to_dict()
+        assert "compression_types" in data
+        assert data["compression_types"] == {"327680": "raw"}
+
 
 class TestFrameMappingProjectAlignment:
     """Tests for FrameMappingProject alignment update functionality."""
