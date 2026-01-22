@@ -588,8 +588,8 @@ class FrameMappingProject:
         mapping.flip_v = flip_v
         mapping.scale = max(0.1, min(10.0, scale))
 
-        # Transition to "edited" unless already injected or explicitly disabled
-        if set_edited and mapping.status != "injected":
+        # Phase 5 fix: Transition to "edited" when alignment changes (removed guard)
+        if set_edited:
             mapping.status = "edited"
 
         return True

@@ -852,6 +852,17 @@ class FrameMappingController(QObject):
             if game_frame.selected_entry_ids:
                 selected_ids = set(game_frame.selected_entry_ids)
                 relevant_entries = [e for e in capture_result.entries if e.id in selected_ids]
+
+                # Fallback if stored IDs are stale (mirrors preview at line 601)
+                if not relevant_entries:
+                    logger.warning(
+                        "Stored entry IDs %s not found in capture %s. Using rom_offset fallback.",
+                        game_frame.selected_entry_ids,
+                        game_frame.capture_path,
+                    )
+                    self.stale_entries_warning.emit(game_frame.id)
+                    # Fallback to rom_offset filtering
+                    relevant_entries = [e for e in capture_result.entries if e.rom_offset in game_frame.rom_offsets]
             else:
                 relevant_entries = [e for e in capture_result.entries if e.rom_offset in game_frame.rom_offsets]
 

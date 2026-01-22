@@ -146,8 +146,10 @@ class AIFramesPane(QWidget):
         Args:
             frames: List of AIFrame objects
         """
+        # Only emit signal if frame list actually changed (new objects, different length, etc.)
+        is_frame_list_change = frames is not self._ai_frames or len(frames) != len(self._ai_frames)
         self._ai_frames = frames
-        self._refresh_list()
+        self._refresh_list(is_frame_list_change=is_frame_list_change)
         logger.debug("Loaded %d AI frames into pane", len(frames))
 
     def set_mapping_status(self, status_map: dict[int, str]) -> None:
@@ -157,7 +159,7 @@ class AIFramesPane(QWidget):
             status_map: Dictionary mapping AI frame index to status string
         """
         self._mapping_status = status_map
-        self._refresh_list()
+        self._refresh_list(is_frame_list_change=False)
 
     def get_selected_index(self) -> int | None:
         """Get the currently selected AI frame index."""
@@ -209,6 +211,8 @@ class AIFramesPane(QWidget):
     def _on_selection_changed(self, row: int) -> None:
         """Handle AI frame selection change."""
         if row < 0:
+            # Phase 4 fix: Notify listeners of cleared selection
+            self.ai_frame_selected.emit(-1)
             return
         item = self._list.item(row)
         if item is None:  # type: ignore[reportUnnecessaryComparison]
@@ -244,8 +248,14 @@ class AIFramesPane(QWidget):
 
         menu.exec(self._list.mapToGlobal(pos))
 
-    def _refresh_list(self) -> None:
-        """Refresh the list with current filter and search."""
+    def _refresh_list(self, is_frame_list_change: bool = False) -> None:
+        """Refresh the list with current filter and search.
+
+        Args:
+            is_frame_list_change: If True (set_ai_frames), emit signal when selection
+                is restored to notify workspace. If False (set_mapping_status), suppress
+                signal to avoid spurious updates during status-only changes.
+        """
         current_selection = self.get_selected_index()
         selection_restored = False
 
@@ -314,7 +324,9 @@ class AIFramesPane(QWidget):
         finally:
             self._list.blockSignals(False)
 
-        # Bug #1 fix: If there was a selection and it's now gone (filtered out),
-        # explicitly notify listeners that selection was cleared
-        if current_selection is not None and not selection_restored:
+        # Phase 2 fix: Notify listeners if selection was silently restored during frame list change
+        if is_frame_list_change and selection_restored and current_selection is not None:
+            self.ai_frame_selected.emit(current_selection)
+        # Bug #1 fix: Always emit -1 when selection was lost (filter/search/reload)
+        elif current_selection is not None and not selection_restored:
             self.ai_frame_selected.emit(-1)

@@ -413,6 +413,9 @@ class FrameMappingWorkspace(QWidget):
         # Guard against invalid selections
         if not frame_id:
             self._selected_game_id = None
+            # Phase 3a fix: Clear canvas state
+            self._alignment_canvas.set_game_frame(None)
+            self._alignment_canvas.clear_alignment()
             self._update_map_button_state()
             return
 
@@ -571,6 +574,13 @@ class FrameMappingWorkspace(QWidget):
 
         # Remove the game frame (also removes any associated mapping)
         if self._controller.remove_game_frame(frame_id):
+            # Phase 3b fix: Clear selection if deleted frame was selected
+            if self._selected_game_id == frame_id:
+                self._selected_game_id = None
+                self._alignment_canvas.set_game_frame(None)
+                self._alignment_canvas.clear_alignment()
+                self._update_map_button_state()
+
             if self._message_service:
                 self._message_service.show_message(f"Deleted capture: {frame_id}")
 
@@ -608,7 +618,12 @@ class FrameMappingWorkspace(QWidget):
         self._refresh_mapping_status()
         self._refresh_game_frame_link_status()
         self._alignment_canvas.clear_alignment()
+        # Phase 3c fix: Clear game frame from canvas and update map button
+        self._alignment_canvas.set_game_frame(None)
         self._captures_pane.clear_selection()
+        # Phase 3c fix: Clear selected game ID and update Map button
+        self._selected_game_id = None
+        self._update_map_button_state()
 
     def _on_inject_single(self, ai_frame_index: int) -> None:
         """Handle inject single mapping request."""

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 def create_ai_frames(tmp_path: Path, num_frames: int = 5) -> list[AIFrame]:
     """Create a list of AIFrame objects with minimal PNG files."""
     ai_frames_dir = tmp_path / "ai_frames"
-    ai_frames_dir.mkdir()
+    ai_frames_dir.mkdir(parents=True, exist_ok=True)
 
     frames: list[AIFrame] = []
     for i in range(num_frames):
@@ -152,3 +152,71 @@ class TestFilterClearsSelectionSignal:
         # Selection should be preserved and no signal emitted
         assert pane.get_selected_index() == 0
         assert signal_emissions == []
+
+
+class TestProjectReloadSignaling:
+    """Tests for Phase 2 bug: silent selection restoration after project reload.
+
+    Bug: When project is reloaded (set_ai_frames called with new frame list),
+    selection that was preserved should emit signal to notify listeners (like canvas).
+    Currently blocks signals, restores silently, then unblocks - workspace never knows
+    selection was restored, leaving canvas showing stale data.
+    """
+
+    def test_project_reload_with_selection_emits_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Reloading project with same selection should emit signal to sync canvas."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        # Initial project with 5 frames
+        frames_v1 = create_ai_frames(tmp_path / "v1", num_frames=5)
+        pane.set_ai_frames(frames_v1)
+        pane.select_frame(2)
+
+        # Set up signal listener
+        signal_emissions: list[int] = []
+        pane.ai_frame_selected.connect(lambda idx: signal_emissions.append(idx))
+
+        # Reload project with new frames (e.g., from disk)
+        # The frames are different objects but represent the same logical frames
+        frames_v2 = create_ai_frames(tmp_path / "v2", num_frames=5)
+
+        # Before fix: Selection is restored silently, no signal
+        # After fix: Signal emitted to notify workspace canvas to update
+        pane.set_ai_frames(frames_v2)
+
+        # Selection should still be at frame 2
+        assert pane.get_selected_index() == 2
+
+        # BUG: signal_emissions is empty - workspace never syncs canvas
+        # FIX: Should have [2] - workspace can update canvas to new project
+        assert signal_emissions == [2], (
+            f"Expected signal emission [2] after project reload with preserved selection, "
+            f"got {signal_emissions}. Canvas would show stale data from old project."
+        )
+
+    def test_project_reload_without_selection_emits_clear_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Reloading project that loses selection should emit -1 signal."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        # Initial project with 5 frames
+        frames_v1 = create_ai_frames(tmp_path / "v1", num_frames=5)
+        pane.set_ai_frames(frames_v1)
+        pane.select_frame(2)
+
+        # Set up signal listener
+        signal_emissions: list[int] = []
+        pane.ai_frame_selected.connect(lambda idx: signal_emissions.append(idx))
+
+        # Reload with fewer frames (selected frame no longer exists)
+        frames_v2 = create_ai_frames(tmp_path / "v2", num_frames=2)  # Only 2 frames now
+        pane.set_ai_frames(frames_v2)
+
+        # Selection should be cleared
+        assert pane.get_selected_index() is None
+
+        # Should emit -1 to notify workspace to clear mapping panel
+        assert signal_emissions == [-1], (
+            f"Expected deselection signal [-1] when reload loses selection, got {signal_emissions}"
+        )
