@@ -25,20 +25,41 @@ class AIFrame:
     width: int = 0
     height: int = 0
 
-    def to_dict(self) -> dict[str, object]:
-        """Serialize to dictionary for JSON storage."""
+    def to_dict(self, base_path: Path | None = None) -> dict[str, object]:
+        """Serialize to dictionary for JSON storage.
+
+        Args:
+            base_path: Optional base directory to make path relative to.
+        """
+        path_str = str(self.path)
+        if base_path and self.path.is_absolute():
+            try:
+                path_str = str(self.path.relative_to(base_path))
+            except ValueError:
+                # Not under base_path, keep absolute
+                pass
+
         return {
-            "path": str(self.path),
+            "path": path_str,
             "index": self.index,
             "width": self.width,
             "height": self.height,
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, object]) -> AIFrame:
-        """Deserialize from dictionary."""
+    def from_dict(cls, data: dict[str, object], base_path: Path | None = None) -> AIFrame:
+        """Deserialize from dictionary.
+
+        Args:
+            data: Dictionary data.
+            base_path: Optional base directory to resolve relative paths against.
+        """
+        path = Path(cast(str, data["path"]))
+        if base_path and not path.is_absolute():
+            path = base_path / path
+
         return cls(
-            path=Path(cast(str, data["path"])),
+            path=path,
             index=cast(int, data["index"]),
             width=cast(int, data.get("width", 0)),
             height=cast(int, data.get("height", 0)),
@@ -57,12 +78,25 @@ class GameFrame:
     height: int = 0
     selected_entry_ids: list[int] = field(default_factory=list)  # OAM entry IDs selected during import
 
-    def to_dict(self) -> dict[str, object]:
-        """Serialize to dictionary for JSON storage."""
+    def to_dict(self, base_path: Path | None = None) -> dict[str, object]:
+        """Serialize to dictionary for JSON storage.
+
+        Args:
+            base_path: Optional base directory to make path relative to.
+        """
+        capture_path_str = None
+        if self.capture_path:
+            capture_path_str = str(self.capture_path)
+            if base_path and self.capture_path.is_absolute():
+                try:
+                    capture_path_str = str(self.capture_path.relative_to(base_path))
+                except ValueError:
+                    pass
+
         return {
             "id": self.id,
             "rom_offsets": self.rom_offsets,
-            "capture_path": str(self.capture_path) if self.capture_path else None,
+            "capture_path": capture_path_str,
             "palette_index": self.palette_index,
             "width": self.width,
             "height": self.height,
@@ -70,13 +104,23 @@ class GameFrame:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, object]) -> GameFrame:
-        """Deserialize from dictionary."""
-        capture_path = data.get("capture_path")
+    def from_dict(cls, data: dict[str, object], base_path: Path | None = None) -> GameFrame:
+        """Deserialize from dictionary.
+
+        Args:
+            data: Dictionary data.
+            base_path: Optional base directory to resolve relative paths against.
+        """
+        capture_path_raw = data.get("capture_path")
+        capture_path = Path(cast(str, capture_path_raw)) if capture_path_raw else None
+
+        if base_path and capture_path and not capture_path.is_absolute():
+            capture_path = base_path / capture_path
+
         return cls(
             id=cast(str, data["id"]),
             rom_offsets=cast(list[int], data.get("rom_offsets", [])),
-            capture_path=Path(cast(str, capture_path)) if capture_path else None,
+            capture_path=capture_path,
             palette_index=cast(int, data.get("palette_index", 0)),
             width=cast(int, data.get("width", 0)),
             height=cast(int, data.get("height", 0)),
@@ -149,12 +193,23 @@ class FrameMappingProject:
         Args:
             path: Destination file path (should end in .spritepal-mapping.json)
         """
+        base_path = path.parent
+        
+        ai_frames_dir_str = None
+        if self.ai_frames_dir:
+            ai_frames_dir_str = str(self.ai_frames_dir)
+            if self.ai_frames_dir.is_absolute():
+                try:
+                    ai_frames_dir_str = str(self.ai_frames_dir.relative_to(base_path))
+                except ValueError:
+                    pass
+
         data = {
             "version": 1,
             "name": self.name,
-            "ai_frames_dir": str(self.ai_frames_dir) if self.ai_frames_dir else None,
-            "ai_frames": [f.to_dict() for f in self.ai_frames],
-            "game_frames": [f.to_dict() for f in self.game_frames],
+            "ai_frames_dir": ai_frames_dir_str,
+            "ai_frames": [f.to_dict(base_path) for f in self.ai_frames],
+            "game_frames": [f.to_dict(base_path) for f in self.game_frames],
             "mappings": [m.to_dict() for m in self.mappings],
         }
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -177,15 +232,20 @@ class FrameMappingProject:
             json.JSONDecodeError: If file is not valid JSON
             KeyError: If required fields are missing
         """
+        base_path = path.parent
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
-        ai_frames_dir = data.get("ai_frames_dir")
+        ai_frames_dir_raw = data.get("ai_frames_dir")
+        ai_frames_dir = Path(ai_frames_dir_raw) if ai_frames_dir_raw else None
+        if ai_frames_dir and not ai_frames_dir.is_absolute():
+            ai_frames_dir = base_path / ai_frames_dir
+
         project = cls(
             name=data["name"],
-            ai_frames_dir=Path(ai_frames_dir) if ai_frames_dir else None,
-            ai_frames=[AIFrame.from_dict(f) for f in data.get("ai_frames", [])],
-            game_frames=[GameFrame.from_dict(f) for f in data.get("game_frames", [])],
+            ai_frames_dir=ai_frames_dir,
+            ai_frames=[AIFrame.from_dict(f, base_path) for f in data.get("ai_frames", [])],
+            game_frames=[GameFrame.from_dict(f, base_path) for f in data.get("game_frames", [])],
             mappings=[FrameMapping.from_dict(m) for m in data.get("mappings", [])],
         )
         logger.info("Loaded frame mapping project from %s", path)

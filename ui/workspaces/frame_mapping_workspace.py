@@ -110,8 +110,35 @@ class FrameMappingWorkspace(QWidget):
         Args:
             rom_path: Path to the ROM file, or None to clear.
         """
-        self._rom_path = rom_path
-        self._modified_rom_path = None
+        if rom_path != self._rom_path:
+            logger.info("FrameMapping ROM path updated: %s", rom_path)
+            self._rom_path = rom_path
+            self._modified_rom_path = None
+
+    def _validate_rom_path(self) -> bool:
+        """Validate that the current ROM path is valid and exists.
+        
+        Returns:
+            True if valid, False otherwise.
+        """
+        if self._rom_path is None:
+            QMessageBox.information(
+                self,
+                "Injection Requirement",
+                "No ROM loaded.\n\nPlease load a ROM in the Sprite Editor workspace first.",
+            )
+            return False
+
+        if not self._rom_path.exists():
+            QMessageBox.warning(
+                self,
+                "ROM Not Found",
+                f"The ROM file from Sprite Editor no longer exists:\n{self._rom_path}\n\n"
+                "Please reload the ROM in the Sprite Editor workspace.",
+            )
+            return False
+            
+        return True
 
     def _setup_ui(self) -> None:
         """Setup the UI layout."""
@@ -573,34 +600,22 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(self, "Inject Frame", "Selected frame is not mapped.")
             return
 
-        # Use tracked ROM path (synced from sprite editor)
-        if self._rom_path is None:
-            QMessageBox.information(
-                self,
-                "Inject Frame",
-                "Load a ROM in Sprite Editor first.\n\nThe Frame Mapping workspace uses the ROM from Sprite Editor.",
-            )
+        if not self._validate_rom_path():
             return
-
-        # Check that source ROM exists
-        if not self._rom_path.exists():
-            QMessageBox.warning(
-                self,
-                "Inject Frame",
-                f"ROM file not found: {self._rom_path}\n\nPlease reload the ROM in Sprite Editor.",
-            )
-            return
+            
+        # At this point self._rom_path is guaranteed not None and exists
+        rom_path = cast(Path, self._rom_path)
 
         reply = QMessageBox.question(
             self,
             "Confirm Injection",
-            f"Inject AI Frame {ai_frame_index}?\n\nA new copy of {self._rom_path.name} will be created for injection.",
+            f"Inject AI Frame {ai_frame_index}?\n\nA new copy of {rom_path.name} will be created for injection.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            self._controller.inject_mapping(ai_frame_index, self._rom_path)
+            self._controller.inject_mapping(ai_frame_index, rom_path)
 
     def _on_inject_all(self) -> None:
         """Handle inject all mapped frames request."""
@@ -609,29 +624,17 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(self, "Inject All", "No mapped frames to inject.")
             return
 
-        # Use tracked ROM path (synced from sprite editor)
-        if self._rom_path is None:
-            QMessageBox.information(
-                self,
-                "Inject All",
-                "Load a ROM in Sprite Editor first.\n\nThe Frame Mapping workspace uses the ROM from Sprite Editor.",
-            )
+        if not self._validate_rom_path():
             return
 
-        # Check that source ROM exists
-        if not self._rom_path.exists():
-            QMessageBox.warning(
-                self,
-                "Inject All",
-                f"ROM file not found: {self._rom_path}\n\nPlease reload the ROM in Sprite Editor.",
-            )
-            return
+        # At this point self._rom_path is guaranteed not None and exists
+        rom_path = cast(Path, self._rom_path)
 
         reply = QMessageBox.question(
             self,
             "Confirm Injection",
             f"Inject {project.mapped_count} mapped frames?\n\n"
-            f"A new copy of {self._rom_path.name} will be created for injection.",
+            f"A new copy of {rom_path.name} will be created for injection.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -640,7 +643,7 @@ class FrameMappingWorkspace(QWidget):
             return
 
         # Create a single copy for all injections
-        target_rom = self._controller.create_injection_copy(self._rom_path)
+        target_rom = self._controller.create_injection_copy(rom_path)
         if target_rom is None:
             QMessageBox.critical(self, "Inject All", "Failed to create ROM copy for injection.")
             return
@@ -651,7 +654,7 @@ class FrameMappingWorkspace(QWidget):
             mapping = project.get_mapping_for_ai_frame(ai_frame.index)
             if mapping:
                 # Pass the created copy as output_path to avoid creating new copies
-                if self._controller.inject_mapping(ai_frame.index, self._rom_path, output_path=target_rom):
+                if self._controller.inject_mapping(ai_frame.index, rom_path, output_path=target_rom):
                     success_count += 1
 
         if self._message_service:

@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 FORMAT_VERSION = "1.2"  # Added grid_mapping
 
 
+# Module-level cache for ROM hashes to avoid redundant I/O
+_ROM_HASH_CACHE: dict[str, str] = {}
+
+
 @dataclass
 class ArrangementConfig:
     """Persisted arrangement configuration.
@@ -65,7 +69,7 @@ class ArrangementConfig:
 
     @staticmethod
     def compute_rom_hash(rom_path: str) -> str:
-        """Compute SHA256 hash of ROM file.
+        """Compute SHA256 hash of ROM file with caching.
 
         Args:
             rom_path: Path to ROM file
@@ -73,11 +77,21 @@ class ArrangementConfig:
         Returns:
             Hex-encoded SHA256 hash
         """
+        abs_path = str(Path(rom_path).absolute())
+        if abs_path in _ROM_HASH_CACHE:
+            return _ROM_HASH_CACHE[abs_path]
+
         hasher = hashlib.sha256()
-        with open(rom_path, "rb") as f:
-            for chunk in iter(lambda: f.read(65536), b""):
-                hasher.update(chunk)
-        return hasher.hexdigest()
+        try:
+            with open(rom_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    hasher.update(chunk)
+            hash_val = hasher.hexdigest()
+            _ROM_HASH_CACHE[abs_path] = hash_val
+            return hash_val
+        except OSError as e:
+            logger.error("Failed to compute ROM hash for %s: %s", rom_path, e)
+            return ""
 
     @staticmethod
     def exists_for(rom_path: str, offset: int) -> bool:
@@ -101,6 +115,20 @@ class ArrangementConfig:
         Returns:
             Path where file was saved
         """
+        if path is None:
+            msg = "Path must be provided"
+            raise ValueError(msg)
+
+        base_path = path.parent
+        overlay_path_str = self.overlay_path
+        if overlay_path_str:
+            overlay_p = Path(overlay_path_str)
+            if overlay_p.is_absolute():
+                try:
+                    overlay_path_str = str(overlay_p.relative_to(base_path))
+                except ValueError:
+                    pass
+
         self.last_modified = datetime.now(UTC)
         data = {
             "format_version": FORMAT_VERSION,
@@ -116,7 +144,7 @@ class ArrangementConfig:
             # Grid mapping
             "grid_mapping": self.grid_mapping,
             # Overlay state
-            "overlay_path": self.overlay_path,
+            "overlay_path": overlay_path_str,
             "overlay_x": self.overlay_x,
             "overlay_y": self.overlay_y,
             "overlay_scale": self.overlay_scale,
@@ -126,10 +154,6 @@ class ArrangementConfig:
             "created_at": self.created_at.isoformat(),
             "last_modified": self.last_modified.isoformat(),
         }
-
-        if path is None:
-            msg = "Path must be provided or rom_path must be set"
-            raise ValueError(msg)
 
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         logger.info("Saved arrangement to %s", path)
@@ -151,6 +175,7 @@ class ArrangementConfig:
             KeyError: If required fields are missing
         """
         data = json.loads(path.read_text(encoding="utf-8"))
+        base_path = path.parent
 
         # Validate format version (warn but allow older versions)
         version = data.get("format_version", "0.0")
@@ -160,6 +185,12 @@ class ArrangementConfig:
                 FORMAT_VERSION,
                 version,
             )
+
+        overlay_path = data.get("overlay_path")
+        if overlay_path:
+            overlay_p = Path(overlay_path)
+            if not overlay_p.is_absolute():
+                overlay_path = str(base_path / overlay_p)
 
         return cls(
             rom_hash=data["rom_hash"],
@@ -173,7 +204,7 @@ class ArrangementConfig:
             # Grid mapping (v1.2+, defaults to empty for older files)
             grid_mapping=data.get("grid_mapping", {}),
             # Overlay state (v1.1+, defaults for older files)
-            overlay_path=data.get("overlay_path"),
+            overlay_path=overlay_path,
             overlay_x=data.get("overlay_x", 0),
             overlay_y=data.get("overlay_y", 0),
             overlay_scale=data.get("overlay_scale", 1.0),

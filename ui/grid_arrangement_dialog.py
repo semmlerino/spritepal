@@ -1053,12 +1053,16 @@ class GridArrangementDialog(SplitterDialog):
             return
 
         # 2. Parse capture
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             parser = MesenCaptureParser()
             capture = parser.parse_file(path)
         except Exception as e:
+            QApplication.restoreOverrideCursor()
             _ = QMessageBox.warning(self, "Import Failed", f"Failed to parse capture:\n{e}")
             return
+        finally:
+            QApplication.restoreOverrideCursor()
 
         if not capture.entries:
             _ = QMessageBox.warning(self, "Import Failed", "Capture contains no sprite entries")
@@ -1101,6 +1105,7 @@ class GridArrangementDialog(SplitterDialog):
                     )
 
             if rom_path_to_use:
+                QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
                 try:
                     with open(rom_path_to_use, "rb") as f:
                         rom_data = f.read()
@@ -1118,6 +1123,8 @@ class GridArrangementDialog(SplitterDialog):
                         )
                 except OSError as e:
                     _ = QMessageBox.warning(self, "ROM Read Error", f"Failed to read ROM: {e}")
+                finally:
+                    QApplication.restoreOverrideCursor()
 
         # 3. Show import options dialog
         dialog = CaptureImportDialog(capture, self)
@@ -1278,12 +1285,16 @@ class GridArrangementDialog(SplitterDialog):
             cgram_path = cgram_candidates[0]
 
         # 4. Load ROM map data
-        rom_map_data = load_rom_map(
-            rom_map_path=map_path,
-            rom_path=rom_path,
-            cgram_path=cgram_path,
-            palette_index=7,  # Default for Dedede
-        )
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            rom_map_data = load_rom_map(
+                rom_map_path=map_path,
+                rom_path=rom_path,
+                cgram_path=cgram_path,
+                palette_index=7,  # Default for Dedede
+            )
+        finally:
+            QApplication.restoreOverrideCursor()
 
         if rom_map_data is None:
             _ = QMessageBox.warning(
@@ -2032,7 +2043,11 @@ class GridArrangementDialog(SplitterDialog):
                 return  # User cancelled
 
         # Execute Apply operation
-        result = operation.execute(force=True)
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            result = operation.execute(force=True)
+        finally:
+            QApplication.restoreOverrideCursor()
 
         if not result.success:
             _ = QMessageBox.critical(
