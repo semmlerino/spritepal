@@ -848,6 +848,7 @@ class FrameMappingController(QObject):
             # The Mesen Lua script attributes ROM offsets to VRAM tiles during capture,
             # but if VRAM is overwritten later, the offsets become stale.
             # This searches the ROM to find the correct offset for each tile.
+            logger.info("Emitting status_update signal: 'Verifying ROM tile attribution...'")
             self.status_update.emit("Verifying ROM tile attribution...")
             corrections = self._find_correct_rom_offsets(
                 filtered_capture,

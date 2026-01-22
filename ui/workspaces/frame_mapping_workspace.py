@@ -21,7 +21,6 @@ Four-zone layout:
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -47,11 +46,12 @@ from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from ui.managers.status_bar_manager import StatusBarManager
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class FrameMappingWorkspace(QWidget):
@@ -311,9 +311,12 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_status_update(self, message: str) -> None:
         """Handle status update from controller."""
-        logger.info("Frame mapping status: %s", message)
+        logger.info("Frame mapping status received: %s", message)
         if self._message_service:
+            logger.debug("Showing message via status bar: %s", message)
             self._message_service.show_message(message, 5000)
+        else:
+            logger.warning("No message service set - status update not shown in UI")
 
     def _on_ai_frame_selected(self, index: int) -> None:
         """Handle AI frame selection in left pane.
