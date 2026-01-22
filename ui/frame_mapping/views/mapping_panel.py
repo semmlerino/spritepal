@@ -226,7 +226,7 @@ class MappingPanel(QWidget):
                 self._table.setItem(row, 1, ai_item)
 
                 # Game Frame column
-                mapping = self._project.get_mapping_for_ai_frame(ai_frame.index)
+                mapping = self._project.get_mapping_for_ai_frame_index(ai_frame.index)
                 if mapping:
                     game_item = QTableWidgetItem(mapping.game_frame_id)
                     status = mapping.status
@@ -329,7 +329,7 @@ class MappingPanel(QWidget):
         # Check if there's a mapping for this frame
         has_mapping = False
         if self._project:
-            mapping = self._project.get_mapping_for_ai_frame(ai_index)
+            mapping = self._project.get_mapping_for_ai_frame_index(ai_index)
             has_mapping = mapping is not None
 
         self._edit_button.setEnabled(True)  # Can always edit AI frame
@@ -379,7 +379,7 @@ class MappingPanel(QWidget):
 
         has_mapping = False
         if self._project:
-            mapping = self._project.get_mapping_for_ai_frame(ai_index)
+            mapping = self._project.get_mapping_for_ai_frame_index(ai_index)
             has_mapping = mapping is not None
 
         menu = QMenu(self)

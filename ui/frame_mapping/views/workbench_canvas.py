@@ -834,8 +834,10 @@ class WorkbenchCanvas(QWidget):
             return
 
         # Convert from display scale to actual coordinates
-        actual_x = offset_x // DISPLAY_SCALE
-        actual_y = offset_y // DISPLAY_SCALE
+        # Use int() for truncation toward zero (not floor division)
+        # This ensures consistent behavior for negative offsets
+        actual_x = int(offset_x / DISPLAY_SCALE)
+        actual_y = int(offset_y / DISPLAY_SCALE)
 
         # Update UI
         self._offset_label.setText(f"Offset: ({actual_x}, {actual_y})")

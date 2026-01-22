@@ -243,12 +243,13 @@ class TestInjectMappingEntryFiltering:
         )
         project.mappings.append(
             FrameMapping(
-                ai_frame_index=0,
+                ai_frame_id="ai_frame.png",  # Must match AIFrame path filename
                 game_frame_id="F001",
                 offset_x=0,
                 offset_y=0,
             )
         )
+        project._invalidate_mapping_index()
 
         controller = FrameMappingController()
         controller._project = project
@@ -439,7 +440,8 @@ class TestInjectMappingFlipHandling:
                 selected_entry_ids=[1],
             )
         )
-        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
 
         controller = FrameMappingController()
         controller._project = project
@@ -553,7 +555,8 @@ class TestInjectMappingFlipHandling:
                 selected_entry_ids=[1],
             )
         )
-        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
 
         controller = FrameMappingController()
         controller._project = project
@@ -671,13 +674,14 @@ class TestInjectMappingScale:
         )
         project.mappings.append(
             FrameMapping(
-                ai_frame_index=0,
+                ai_frame_id="frame_001.png",
                 game_frame_id="F001",
                 offset_x=0,
                 offset_y=0,
                 scale=0.5,  # Scale to 50% (16x16 -> 8x8)
             )
         )
+        project._invalidate_mapping_index()
 
         controller = FrameMappingController()
         controller._project = project
@@ -818,7 +822,8 @@ class TestRomOffsetCorrection:
                 selected_entry_ids=[1],
             )
         )
-        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
 
         controller = FrameMappingController()
         controller._project = project
@@ -889,7 +894,8 @@ class TestRomOffsetCorrection:
                 selected_entry_ids=[1],
             )
         )
-        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
 
         controller = FrameMappingController()
         controller._project = project
@@ -955,7 +961,8 @@ class TestRomOffsetCorrection:
                 selected_entry_ids=[1],
             )
         )
-        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
 
         controller = FrameMappingController()
         controller._project = project
@@ -1058,7 +1065,8 @@ class TestRomOffsetCorrection:
                 selected_entry_ids=[1],
             )
         )
-        project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="F001", offset_x=0, offset_y=0))
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
 
         controller = FrameMappingController()
         controller._project = project
@@ -1309,15 +1317,16 @@ class TestAIFramesLoadingPrunesMappings:
         controller = FrameMappingController()
         controller.load_ai_frames_from_directory(ai_dir)
 
-        # Create mappings for frames 0, 2, and 4
+        # Create mappings for frames 0, 2, and 4 (using filenames as IDs)
         controller._project.game_frames.append(GameFrame(id="G1", rom_offsets=[0x1000]))
         controller._project.game_frames.append(GameFrame(id="G2", rom_offsets=[0x2000]))
         controller._project.game_frames.append(GameFrame(id="G3", rom_offsets=[0x3000]))
-        controller._project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="G1"))
-        controller._project.mappings.append(FrameMapping(ai_frame_index=2, game_frame_id="G2"))
-        controller._project.mappings.append(FrameMapping(ai_frame_index=4, game_frame_id="G3"))
+        controller._project.mappings.append(FrameMapping(ai_frame_id="frame_000.png", game_frame_id="G1"))
+        controller._project.mappings.append(FrameMapping(ai_frame_id="frame_002.png", game_frame_id="G2"))
+        controller._project.mappings.append(FrameMapping(ai_frame_id="frame_004.png", game_frame_id="G3"))
+        controller._project._invalidate_mapping_index()
 
-        # Now reload with only 3 frames (indices 0, 1, 2)
+        # Now reload with only 3 frames (filenames frame_000, frame_001, frame_002)
         ai_dir2 = tmp_path / "ai_frames2"
         ai_dir2.mkdir()
         for i in range(3):
@@ -1330,11 +1339,11 @@ class TestAIFramesLoadingPrunesMappings:
 
         controller.load_ai_frames_from_directory(ai_dir2)
 
-        # Mapping to frame 4 should be pruned (index 4 no longer exists)
-        # Mappings to frames 0 and 2 should remain
+        # Mapping to frame_004.png should be pruned (file no longer exists)
+        # Mappings to frame_000.png and frame_002.png should remain
         assert len(controller._project.mappings) == 2
-        ai_indices = {m.ai_frame_index for m in controller._project.mappings}
-        assert ai_indices == {0, 2}
+        ai_ids = {m.ai_frame_id for m in controller._project.mappings}
+        assert ai_ids == {"frame_000.png", "frame_002.png"}
 
     def test_load_ai_frames_preserves_compatible_mappings(self, tmp_path: Path, qtbot) -> None:
         """Reloading AI frames with same or more frames preserves all mappings."""
@@ -1351,18 +1360,19 @@ class TestAIFramesLoadingPrunesMappings:
         controller = FrameMappingController()
         controller.load_ai_frames_from_directory(ai_dir)
 
-        # Create mappings for frames 0 and 2
+        # Create mappings for frames 0 and 2 (using filenames as IDs)
         controller._project.game_frames.append(GameFrame(id="G1", rom_offsets=[0x1000]))
         controller._project.game_frames.append(GameFrame(id="G2", rom_offsets=[0x2000]))
-        controller._project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="G1"))
-        controller._project.mappings.append(FrameMapping(ai_frame_index=2, game_frame_id="G2"))
+        controller._project.mappings.append(FrameMapping(ai_frame_id="frame_000.png", game_frame_id="G1"))
+        controller._project.mappings.append(FrameMapping(ai_frame_id="frame_002.png", game_frame_id="G2"))
+        controller._project._invalidate_mapping_index()
 
-        # Reload same directory - all mappings should remain
+        # Reload same directory - all mappings should remain (filenames match)
         controller.load_ai_frames_from_directory(ai_dir)
 
         assert len(controller._project.mappings) == 2
-        ai_indices = {m.ai_frame_index for m in controller._project.mappings}
-        assert ai_indices == {0, 2}
+        ai_ids = {m.ai_frame_id for m in controller._project.mappings}
+        assert ai_ids == {"frame_000.png", "frame_002.png"}
 
     def test_game_frames_unchanged_after_ai_frames_reload(self, tmp_path: Path, qtbot) -> None:
         """Reloading AI frames should not affect game frames."""
