@@ -24,9 +24,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from PIL import Image
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
+    QCheckBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -40,6 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.app_context import get_app_context
+from core.services.tile_sampling_service import calculate_auto_alignment
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.dialogs.replace_link_dialog import (
     confirm_replace_ai_frame_link,
@@ -81,6 +84,7 @@ class FrameMappingWorkspace(QWidget):
         # ROM tracking for injection (synced from sprite editor)
         self._rom_path: Path | None = None
         self._modified_rom_path: Path | None = None
+        self._last_injected_rom: Path | None = None  # Track last injection target for reuse
 
         # Selection tracking
         self._selected_ai_index: int | None = None
@@ -248,6 +252,11 @@ class FrameMappingWorkspace(QWidget):
 
         toolbar.addSeparator()
 
+        self._reuse_rom_checkbox = QCheckBox("Reuse Last ROM")
+        self._reuse_rom_checkbox.setToolTip("Inject into last injected ROM instead of creating a new copy")
+        self._reuse_rom_checkbox.setChecked(False)
+        toolbar.addWidget(self._reuse_rom_checkbox)
+
         self._inject_btn = QPushButton("Inject All")
         self._inject_btn.setToolTip("Inject all mapped frames into ROM")
         self._inject_btn.clicked.connect(lambda: self._on_inject_all())
@@ -290,6 +299,7 @@ class FrameMappingWorkspace(QWidget):
         self._mapping_panel.adjust_alignment_requested.connect(self._on_adjust_alignment)
         self._mapping_panel.drop_game_frame_requested.connect(self._on_drop_game_frame)
         self._mapping_panel.inject_mapping_requested.connect(self._on_inject_single)
+        self._mapping_panel.inject_selected_requested.connect(self._on_inject_selected)
 
         # Alignment Canvas signals
         self._alignment_canvas.alignment_changed.connect(self._on_alignment_changed)
@@ -673,16 +683,111 @@ class FrameMappingWorkspace(QWidget):
         # At this point self._rom_path is guaranteed not None and exists
         rom_path = cast(Path, self._rom_path)
 
-        reply = QMessageBox.question(
-            self,
-            "Confirm Injection",
-            f"Inject AI Frame {ai_frame_index}?\n\nA new copy of {rom_path.name} will be created for injection.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
+        # Check if we should reuse the last injected ROM
+        reuse_enabled = self._reuse_rom_checkbox.isChecked()
+        can_reuse = reuse_enabled and self._last_injected_rom is not None and self._last_injected_rom.exists()
 
-        if reply == QMessageBox.StandardButton.Yes:
-            self._controller.inject_mapping(ai_frame_index, rom_path)
+        if can_reuse:
+            target_rom = cast(Path, self._last_injected_rom)
+            reply = QMessageBox.question(
+                self,
+                "Confirm Injection",
+                f"Inject AI Frame {ai_frame_index}?\n\nReusing existing ROM: {target_rom.name}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+        else:
+            reply = QMessageBox.question(
+                self,
+                "Confirm Injection",
+                f"Inject AI Frame {ai_frame_index}?\n\nA new copy of {rom_path.name} will be created for injection.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Either reuse existing ROM or let inject_mapping create a new copy
+        if can_reuse:
+            target_rom = cast(Path, self._last_injected_rom)
+            success = self._controller.inject_mapping(ai_frame_index, rom_path, output_path=target_rom)
+        else:
+            # Create a new copy for injection
+            target_rom = self._controller.create_injection_copy(rom_path)
+            if target_rom is None:
+                QMessageBox.critical(self, "Inject Frame", "Failed to create ROM copy for injection.")
+                return
+            success = self._controller.inject_mapping(ai_frame_index, rom_path, output_path=target_rom)
+
+        # Track the successfully used ROM for future reuse
+        if success:
+            self._last_injected_rom = target_rom
+
+    def _on_inject_selected(self) -> None:
+        """Handle inject selected frames request from mapping panel."""
+        selected_indices = self._mapping_panel.get_selected_for_injection()
+
+        if not selected_indices:
+            QMessageBox.information(self, "Inject Selected", "No frames selected for injection.")
+            return
+
+        if not self._validate_rom_path():
+            return
+
+        # At this point self._rom_path is guaranteed not None and exists
+        rom_path = cast(Path, self._rom_path)
+
+        # Check if we should reuse the last injected ROM
+        reuse_enabled = self._reuse_rom_checkbox.isChecked()
+        can_reuse = reuse_enabled and self._last_injected_rom is not None and self._last_injected_rom.exists()
+
+        frame_count = len(selected_indices)
+        if can_reuse:
+            target_rom = cast(Path, self._last_injected_rom)
+            reply = QMessageBox.question(
+                self,
+                "Confirm Injection",
+                f"Inject {frame_count} selected frames?\n\nReusing existing ROM: {target_rom.name}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+        else:
+            reply = QMessageBox.question(
+                self,
+                "Confirm Injection",
+                f"Inject {frame_count} selected frames?\n\n"
+                f"A new copy of {rom_path.name} will be created for injection.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Either reuse existing ROM or create a new copy
+        if can_reuse:
+            target_rom = cast(Path, self._last_injected_rom)
+        else:
+            target_rom = self._controller.create_injection_copy(rom_path)
+            if target_rom is None:
+                QMessageBox.critical(self, "Inject Selected", "Failed to create ROM copy for injection.")
+                return
+
+        # Inject selected frames into the same copy
+        success_count = 0
+        for ai_index in selected_indices:
+            if self._controller.inject_mapping(ai_index, rom_path, output_path=target_rom):
+                success_count += 1
+
+        # Track the successfully used ROM for future reuse
+        if success_count > 0:
+            self._last_injected_rom = target_rom
+
+        if self._message_service:
+            self._message_service.show_message(
+                f"Injected {success_count}/{frame_count} selected frames into {target_rom.name}"
+            )
 
     def _on_inject_all(self) -> None:
         """Handle inject all mapped frames request."""
@@ -697,23 +802,40 @@ class FrameMappingWorkspace(QWidget):
         # At this point self._rom_path is guaranteed not None and exists
         rom_path = cast(Path, self._rom_path)
 
-        reply = QMessageBox.question(
-            self,
-            "Confirm Injection",
-            f"Inject {project.mapped_count} mapped frames?\n\n"
-            f"A new copy of {rom_path.name} will be created for injection.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
+        # Check if we should reuse the last injected ROM
+        reuse_enabled = self._reuse_rom_checkbox.isChecked()
+        can_reuse = reuse_enabled and self._last_injected_rom is not None and self._last_injected_rom.exists()
+
+        if can_reuse:
+            target_rom = cast(Path, self._last_injected_rom)
+            reply = QMessageBox.question(
+                self,
+                "Confirm Injection",
+                f"Inject {project.mapped_count} mapped frames?\n\nReusing existing ROM: {target_rom.name}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+        else:
+            reply = QMessageBox.question(
+                self,
+                "Confirm Injection",
+                f"Inject {project.mapped_count} mapped frames?\n\n"
+                f"A new copy of {rom_path.name} will be created for injection.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
 
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        # Create a single copy for all injections
-        target_rom = self._controller.create_injection_copy(rom_path)
-        if target_rom is None:
-            QMessageBox.critical(self, "Inject All", "Failed to create ROM copy for injection.")
-            return
+        # Either reuse existing ROM or create a new copy
+        if can_reuse:
+            target_rom = cast(Path, self._last_injected_rom)
+        else:
+            target_rom = self._controller.create_injection_copy(rom_path)
+            if target_rom is None:
+                QMessageBox.critical(self, "Inject All", "Failed to create ROM copy for injection.")
+                return
 
         # Inject all mapped frames into the same copy
         success_count = 0
@@ -723,6 +845,10 @@ class FrameMappingWorkspace(QWidget):
                 # Pass the created copy as output_path to avoid creating new copies
                 if self._controller.inject_mapping(ai_frame.index, rom_path, output_path=target_rom):
                     success_count += 1
+
+        # Track the successfully used ROM for future reuse
+        if success_count > 0:
+            self._last_injected_rom = target_rom
 
         if self._message_service:
             self._message_service.show_message(
@@ -814,14 +940,40 @@ class FrameMappingWorkspace(QWidget):
         # Create the mapping
         self._controller.create_mapping(ai_index, game_frame_id)
 
-        # Auto-center alignment
-        game_preview = self._controller.get_game_frame_preview(game_frame_id)
-        if ai_frame and ai_frame.path.exists() and game_preview:
-            ai_pixmap = QPixmap(str(ai_frame.path))
-            if not ai_pixmap.isNull():
-                center_x = (game_preview.width() - ai_pixmap.width()) // 2
-                center_y = (game_preview.height() - ai_pixmap.height()) // 2
-                self._controller.update_mapping_alignment(ai_index, center_x, center_y, False, False, set_edited=False)
+        # Auto-align using bounding box alignment (center AI content over game content)
+        if ai_frame and ai_frame.path.exists():
+            capture_result = self._controller.get_capture_result_for_game_frame(game_frame_id)
+            if capture_result and capture_result.has_entries:
+                try:
+                    ai_pil = Image.open(ai_frame.path).convert("RGBA")
+                    bbox = capture_result.bounding_box
+                    offset_x, offset_y = calculate_auto_alignment(ai_pil, bbox.x, bbox.y, bbox.width, bbox.height)
+                    self._controller.update_mapping_alignment(
+                        ai_index, offset_x, offset_y, False, False, set_edited=False
+                    )
+                except Exception as e:
+                    logger.warning("Auto-alignment failed, using center: %s", e)
+                    # Fallback to simple centering
+                    game_preview = self._controller.get_game_frame_preview(game_frame_id)
+                    if game_preview:
+                        ai_pixmap = QPixmap(str(ai_frame.path))
+                        if not ai_pixmap.isNull():
+                            center_x = (game_preview.width() - ai_pixmap.width()) // 2
+                            center_y = (game_preview.height() - ai_pixmap.height()) // 2
+                            self._controller.update_mapping_alignment(
+                                ai_index, center_x, center_y, False, False, set_edited=False
+                            )
+            else:
+                # No capture result - fallback to simple centering
+                game_preview = self._controller.get_game_frame_preview(game_frame_id)
+                if game_preview:
+                    ai_pixmap = QPixmap(str(ai_frame.path))
+                    if not ai_pixmap.isNull():
+                        center_x = (game_preview.width() - ai_pixmap.width()) // 2
+                        center_y = (game_preview.height() - ai_pixmap.height()) // 2
+                        self._controller.update_mapping_alignment(
+                            ai_index, center_x, center_y, False, False, set_edited=False
+                        )
 
         self._refresh_mapping_status()
         self._refresh_game_frame_link_status()

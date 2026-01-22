@@ -63,6 +63,7 @@ class MappingPanel(QWidget):
     adjust_alignment_requested = Signal(int)  # AI frame index
     drop_game_frame_requested = Signal(int, str)  # AI frame index, game frame ID
     inject_mapping_requested = Signal(int)  # AI frame index
+    inject_selected_requested = Signal()  # Request to inject selected frames
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -93,10 +94,10 @@ class MappingPanel(QWidget):
 
         layout.addLayout(header_layout)
 
-        # Mapping table
+        # Mapping table - now with checkbox column
         self._table = QTableWidget()
-        self._table.setColumnCount(6)
-        self._table.setHorizontalHeaderLabels(["#", "AI Frame", "Game Frame", "Offset", "Flip", "Status"])
+        self._table.setColumnCount(7)
+        self._table.setHorizontalHeaderLabels(["", "#", "AI Frame", "Game Frame", "Offset", "Flip", "Status"])
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -115,19 +116,46 @@ class MappingPanel(QWidget):
         # Configure header
         header = self._table.horizontalHeader()
         if header:
-            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # #
-            header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # AI Frame
-            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Game Frame
-            header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Offset
-            header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Flip
-            header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Status
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Checkbox
+            header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # #
+            header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # AI Frame
+            header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)  # Game Frame
+            header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Offset
+            header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Flip
+            header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)  # Status
 
         # Set row height for thumbnails
         self._table.verticalHeader().setDefaultSectionSize(THUMBNAIL_SIZE + 8)
         self._table.verticalHeader().setVisible(False)
 
         self._table.itemSelectionChanged.connect(self._on_selection_changed)
+        self._table.itemChanged.connect(self._on_item_changed)
         layout.addWidget(self._table, 1)
+
+        # Selection controls row
+        selection_layout = QHBoxLayout()
+        selection_layout.setSpacing(4)
+
+        self._select_all_btn = QPushButton("Select All")
+        self._select_all_btn.setToolTip("Check all mapped frames for injection")
+        self._select_all_btn.clicked.connect(self._on_select_all)
+        selection_layout.addWidget(self._select_all_btn)
+
+        self._deselect_all_btn = QPushButton("Deselect All")
+        self._deselect_all_btn.setToolTip("Uncheck all frames")
+        self._deselect_all_btn.clicked.connect(self._on_deselect_all)
+        selection_layout.addWidget(self._deselect_all_btn)
+
+        selection_layout.addStretch()
+
+        self._inject_selected_btn = QPushButton("Inject Selected")
+        self._inject_selected_btn.setToolTip("Inject only checked frames into ROM")
+        self._inject_selected_btn.setStyleSheet("background-color: #2c5d2c;")
+        self._inject_selected_btn.setEnabled(False)
+        self._inject_selected_btn.clicked.connect(self._on_inject_selected_clicked)
+        selection_layout.addWidget(self._inject_selected_btn)
+
+        layout.addLayout(selection_layout)
 
         # Action buttons
         button_layout = QHBoxLayout()
@@ -197,6 +225,7 @@ class MappingPanel(QWidget):
 
             if self._project is None:
                 self._status_label.setText("No project")
+                self._update_inject_selected_state()
                 return
 
             # Show all AI frames with their mapping status
@@ -204,12 +233,24 @@ class MappingPanel(QWidget):
                 row = self._table.rowCount()
                 self._table.insertRow(row)
 
-                # # column (row number)
+                # Get mapping to determine if frame is mapped
+                mapping = self._project.get_mapping_for_ai_frame_index(ai_frame.index)
+                is_mapped = mapping is not None
+
+                # Checkbox column (column 0)
+                checkbox_item = QTableWidgetItem()
+                checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+                # Default: check mapped frames, uncheck unmapped
+                checkbox_item.setCheckState(Qt.CheckState.Checked if is_mapped else Qt.CheckState.Unchecked)
+                checkbox_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
+                self._table.setItem(row, 0, checkbox_item)
+
+                # # column (row number) - column 1
                 num_item = QTableWidgetItem(str(ai_frame.index + 1))
                 num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self._table.setItem(row, 0, num_item)
+                self._table.setItem(row, 1, num_item)
 
-                # AI Frame column with thumbnail
+                # AI Frame column with thumbnail - column 2
                 ai_item = QTableWidgetItem(ai_frame.path.name)
                 ai_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
                 # Load thumbnail
@@ -223,10 +264,9 @@ class MappingPanel(QWidget):
                             Qt.TransformationMode.SmoothTransformation,
                         )
                         ai_item.setIcon(QIcon(scaled))
-                self._table.setItem(row, 1, ai_item)
+                self._table.setItem(row, 2, ai_item)
 
-                # Game Frame column
-                mapping = self._project.get_mapping_for_ai_frame_index(ai_frame.index)
+                # Game Frame column - column 3
                 if mapping:
                     game_item = QTableWidgetItem(mapping.game_frame_id)
                     status = mapping.status
@@ -242,13 +282,13 @@ class MappingPanel(QWidget):
                         )
                         game_item.setIcon(QIcon(scaled))
 
-                    # Offset column
+                    # Offset column - column 4
                     if mapping.offset_x != 0 or mapping.offset_y != 0:
                         offset_item = QTableWidgetItem(f"({mapping.offset_x}, {mapping.offset_y})")
                     else:
                         offset_item = QTableWidgetItem("—")
 
-                    # Flip column
+                    # Flip column - column 5
                     flip_parts = []
                     if mapping.flip_h:
                         flip_parts.append("H")
@@ -261,18 +301,18 @@ class MappingPanel(QWidget):
                     offset_item = QTableWidgetItem("—")
                     flip_item = QTableWidgetItem("—")
 
-                self._table.setItem(row, 2, game_item)
+                self._table.setItem(row, 3, game_item)
                 offset_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self._table.setItem(row, 3, offset_item)
+                self._table.setItem(row, 4, offset_item)
                 flip_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self._table.setItem(row, 4, flip_item)
+                self._table.setItem(row, 5, flip_item)
 
-                # Status column with color and indicator
+                # Status column with color and indicator - column 6
                 status_indicator = "●" if status != "unmapped" else "○"
                 status_item = QTableWidgetItem(f"{status_indicator} {status.capitalize()}")
                 color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
                 status_item.setForeground(QBrush(color))
-                self._table.setItem(row, 5, status_item)
+                self._table.setItem(row, 6, status_item)
 
             # Update status summary
             mapped = self._project.mapped_count
@@ -286,13 +326,16 @@ class MappingPanel(QWidget):
         if current_selection is not None:
             self.select_row_by_ai_index(current_selection)
 
+        # Update inject selected button state
+        self._update_inject_selected_state()
+
     def get_selected_ai_frame_index(self) -> int | None:
         """Get the AI frame index of the selected mapping row."""
         selected = self._table.selectedItems()
         if not selected:
             return None
         row = selected[0].row()
-        ai_item = self._table.item(row, 1)  # AI Frame column
+        ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
         if ai_item is None:
             return None
         return ai_item.data(Qt.ItemDataRole.UserRole)
@@ -308,7 +351,7 @@ class MappingPanel(QWidget):
         self._table.blockSignals(True)
         try:
             for row in range(self._table.rowCount()):
-                ai_item = self._table.item(row, 1)
+                ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
                 if ai_item is not None and ai_item.data(Qt.ItemDataRole.UserRole) == ai_index:
                     self._table.selectRow(row)
                     self._table.scrollToItem(ai_item)
@@ -500,3 +543,73 @@ class MappingPanel(QWidget):
         if self._drop_target_row is not None:
             self._set_row_highlight(self._drop_target_row, False)
             self._drop_target_row = None
+
+    def _on_select_all(self) -> None:
+        """Check all mapped frames for injection."""
+        if self._project is None:
+            return
+
+        self._table.blockSignals(True)
+        try:
+            for row in range(self._table.rowCount()):
+                checkbox_item = self._table.item(row, 0)
+                if checkbox_item:
+                    ai_index = checkbox_item.data(Qt.ItemDataRole.UserRole)
+                    # Only check mapped frames
+                    if self._project.get_mapping_for_ai_frame_index(ai_index):
+                        checkbox_item.setCheckState(Qt.CheckState.Checked)
+        finally:
+            self._table.blockSignals(False)
+
+        self._update_inject_selected_state()
+
+    def _on_deselect_all(self) -> None:
+        """Uncheck all frames."""
+        self._table.blockSignals(True)
+        try:
+            for row in range(self._table.rowCount()):
+                checkbox_item = self._table.item(row, 0)
+                if checkbox_item:
+                    checkbox_item.setCheckState(Qt.CheckState.Unchecked)
+        finally:
+            self._table.blockSignals(False)
+
+        self._update_inject_selected_state()
+
+    def _on_item_changed(self, item: QTableWidgetItem) -> None:
+        """Handle item changes (checkbox state changes)."""
+        # Only care about checkbox column (column 0)
+        if item.column() == 0:
+            self._update_inject_selected_state()
+
+    def _on_inject_selected_clicked(self) -> None:
+        """Handle inject selected button click."""
+        self.inject_selected_requested.emit()
+
+    def _update_inject_selected_state(self) -> None:
+        """Update the inject selected button enabled state."""
+        selected_count = len(self.get_selected_for_injection())
+        self._inject_selected_btn.setEnabled(selected_count > 0)
+        if selected_count > 0:
+            self._inject_selected_btn.setText(f"Inject Selected ({selected_count})")
+        else:
+            self._inject_selected_btn.setText("Inject Selected")
+
+    def get_selected_for_injection(self) -> list[int]:
+        """Get list of AI frame indices that are checked and mapped.
+
+        Returns:
+            List of AI frame indices selected for injection.
+        """
+        if self._project is None:
+            return []
+
+        selected: list[int] = []
+        for row in range(self._table.rowCount()):
+            checkbox_item = self._table.item(row, 0)
+            if checkbox_item and checkbox_item.checkState() == Qt.CheckState.Checked:
+                ai_index = checkbox_item.data(Qt.ItemDataRole.UserRole)
+                # Only include if actually mapped
+                if self._project.get_mapping_for_ai_frame_index(ai_index):
+                    selected.append(ai_index)
+        return selected

@@ -39,6 +39,10 @@ from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Transparency threshold for injection - pixels with alpha < this are treated as transparent
+# AI-generated images often have semi-transparent edges; 128 captures anti-aliased pixels
+INJECTION_TRANSPARENCY_THRESHOLD = 128
+
 
 class FrameMappingController(QObject):
     """Controller for frame mapping operations.
@@ -1154,6 +1158,13 @@ class FrameMappingController(QObject):
                     # Extract 8x8 tile from masked canvas
                     tile_img = masked_canvas.crop((canvas_x, canvas_y, canvas_x + 8, canvas_y + 8))
 
+                    # Check if tile has any content above transparency threshold
+                    # If not, clear it (make fully transparent) to replace original sprite data
+                    tile_alpha = tile_img.split()[3]
+                    has_content = any(p >= INJECTION_TRANSPARENCY_THRESHOLD for p in tile_alpha.getdata())
+                    if not has_content:
+                        tile_img = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+
                     # Debug: Save tile before counter-flip
                     if debug and debug_dir:
                         before_flip = tile_img.copy()
@@ -1203,10 +1214,13 @@ class FrameMappingController(QObject):
                     )
 
                 # Quantize to game palette for proper color mapping
+                # Use higher transparency threshold to treat semi-transparent pixels as transparent
                 snes_palette = capture_result.palettes.get(palette_index, [])
                 if snes_palette:
                     palette_rgb = snes_palette_to_rgb(snes_palette)
-                    chunk_img = quantize_to_palette(chunk_img, palette_rgb)
+                    chunk_img = quantize_to_palette(
+                        chunk_img, palette_rgb, transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD
+                    )
                     logger.debug(
                         "Quantized chunk for offset 0x%X to palette %d (%d colors)",
                         rom_offset,
