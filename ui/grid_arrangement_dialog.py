@@ -1519,6 +1519,21 @@ class GridArrangementDialog(SplitterDialog):
         # Refresh display
         self._update_displays()
 
+    def populate_from_capture_data(
+        self,
+        data: CaptureArrangementData,
+    ) -> None:
+        """Populate arrangement grid with captured tile data (public API for testing).
+
+        Args:
+            data: CaptureArrangementData from the converter
+        """
+        self._populate_from_capture_data(data)
+
+    def trigger_import_mesen_capture(self) -> None:
+        """Trigger the import Mesen capture workflow (public API for testing)."""
+        self._import_mesen_capture()
+
     def _build_rom_map_from_capture(
         self,
         data: CaptureArrangementData,

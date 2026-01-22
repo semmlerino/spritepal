@@ -87,6 +87,64 @@ class OverlayCanvas(QWidget):
         self._opacity = max(0.0, min(1.0, opacity))
         self.update()
 
+    @property
+    def offset_x(self) -> int:
+        """Get current X offset."""
+        return self._offset_x
+
+    @property
+    def offset_y(self) -> int:
+        """Get current Y offset."""
+        return self._offset_y
+
+    @property
+    def flip_h(self) -> bool:
+        """Get horizontal flip state."""
+        return self._flip_h
+
+    @property
+    def flip_v(self) -> bool:
+        """Get vertical flip state."""
+        return self._flip_v
+
+    @property
+    def opacity(self) -> float:
+        """Get current opacity (0.0-1.0)."""
+        return self._opacity
+
+    @property
+    def is_dragging(self) -> bool:
+        """Check if currently dragging."""
+        return self._dragging
+
+    def has_game_frame(self) -> bool:
+        """Check if a game frame is loaded."""
+        return self._game_pixmap is not None
+
+    def has_ai_frame(self) -> bool:
+        """Check if an AI frame is loaded."""
+        return self._ai_pixmap is not None
+
+    def get_game_frame_size(self) -> tuple[int, int] | None:
+        """Get the game frame dimensions, or None if no frame."""
+        if self._game_pixmap is None:
+            return None
+        return (self._game_pixmap.width(), self._game_pixmap.height())
+
+    def get_ai_frame_size(self) -> tuple[int, int] | None:
+        """Get the AI frame dimensions, or None if no frame."""
+        if self._ai_pixmap is None:
+            return None
+        return (self._ai_pixmap.width(), self._ai_pixmap.height())
+
+    def start_drag(self, start_pos: QPoint, start_offset_x: int = 0, start_offset_y: int = 0) -> None:
+        """Start a drag operation (public API for testing)."""
+        self._dragging = True
+        self._drag_start = start_pos
+        self._drag_start_offset_x = start_offset_x
+        self._drag_start_offset_y = start_offset_y
+        self.setCursor(Qt.CursorShape.ClosedHandCursor)
+
     @override
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Start dragging on left mouse button press."""
@@ -484,3 +542,40 @@ class AlignmentDialog(DialogBase):
             Tuple of (offset_x, offset_y, flip_h, flip_v)
         """
         return (self.offset_x, self.offset_y, self.flip_h, self.flip_v)
+
+    def set_offset_x(self, value: int) -> None:
+        """Set the X offset value."""
+        self._offset_x_spin.setValue(value)
+
+    def set_offset_y(self, value: int) -> None:
+        """Set the Y offset value."""
+        self._offset_y_spin.setValue(value)
+
+    def set_flip_h(self, checked: bool) -> None:
+        """Set the horizontal flip state."""
+        self._flip_h_check.setChecked(checked)
+
+    def set_flip_v(self, checked: bool) -> None:
+        """Set the vertical flip state."""
+        self._flip_v_check.setChecked(checked)
+
+    def set_opacity(self, percent: int) -> None:
+        """Set the opacity slider value (0-100)."""
+        self._opacity_slider.setValue(percent)
+
+    def get_opacity_percent(self) -> int:
+        """Get the opacity slider value (0-100)."""
+        return self._opacity_slider.value()
+
+    def get_opacity_label_text(self) -> str:
+        """Get the opacity label text."""
+        return self._opacity_label.text()
+
+    @property
+    def canvas(self) -> OverlayCanvas:
+        """Get the overlay canvas (for testing)."""
+        return self._canvas
+
+    def emit_canvas_offset(self, x: int, y: int) -> None:
+        """Emit a canvas offset_changed signal (for testing)."""
+        self._canvas.offset_changed.emit(x, y)

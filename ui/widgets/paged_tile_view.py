@@ -707,6 +707,125 @@ class PagedTileViewWidget(QWidget):
         """Return True if navigation to previous page is possible."""
         return len(self._rom_data) > 0 and self._current_page > 0
 
+    def total_page_count(self) -> int:
+        """Return the total number of pages."""
+        return self._total_pages
+
+    def get_grid_dimensions(self) -> tuple[int, int]:
+        """Return the current grid dimensions as (cols, rows)."""
+        return (self._cols, self._rows)
+
+    def is_palette_enabled(self) -> bool:
+        """Return True if palette rendering is enabled."""
+        return self._palette_enabled
+
+    def is_palette_checkbox_enabled(self) -> bool:
+        """Return True if the palette checkbox is enabled (has a palette set)."""
+        return self._palette_checkbox.isEnabled()
+
+    def is_palette_checked(self) -> bool:
+        """Return True if the palette checkbox is checked."""
+        return self._palette_checkbox.isChecked()
+
+    def set_palette_checked(self, checked: bool) -> None:
+        """Set the palette checkbox checked state."""
+        self._palette_checkbox.setChecked(checked)
+
+    def get_selected_palette_name(self) -> str:
+        """Return the name of the currently selected palette."""
+        return self._selected_palette_name
+
+    def get_palette(self) -> list[list[int]] | None:
+        """Return the current palette, or None for grayscale."""
+        return self._palette
+
+    def get_palette_names(self) -> list[str]:
+        """Return the list of available palette names."""
+        return [self._palette_combo.itemText(i) for i in range(self._palette_combo.count())]
+
+    def palette_count(self) -> int:
+        """Return the number of available palettes."""
+        return self._palette_combo.count()
+
+    def is_user_palette(self, name: str) -> bool:
+        """Return True if the named palette is a user-loaded palette."""
+        return name in self._user_palettes
+
+    def has_palette_option(self, name: str) -> bool:
+        """Return True if the named palette exists in the options."""
+        return name in self._palette_options
+
+    def can_rename_selected_palette(self) -> bool:
+        """Return True if the currently selected palette can be renamed."""
+        return self._action_rename.isEnabled()
+
+    def can_delete_selected_palette(self) -> bool:
+        """Return True if the currently selected palette can be deleted."""
+        return self._action_delete.isEnabled()
+
+    def get_status_text(self) -> str:
+        """Return the current status label text."""
+        return self._status_label.text()
+
+    def navigate_to_offset_text(self, text: str) -> None:
+        """
+        Navigate to an offset specified as text (hex or decimal).
+
+        This is a public interface for the go-to-offset feature.
+
+        Args:
+            text: Offset as string (e.g., "0x18000", "18000", "98304")
+        """
+        self._offset_input.setText(text)
+        self._on_goto_offset()
+
+    def get_offset_input_text(self) -> str:
+        """Return the current text in the offset input field."""
+        return self._offset_input.text()
+
+    def set_highlight(self, offset: int | None) -> None:
+        """Set or clear the highlight at a specific ROM offset."""
+        self._graphics_view.set_highlight(offset)
+
+    def get_highlight_offset(self) -> int | None:
+        """Return the current highlight offset, or None if no highlight."""
+        return self._graphics_view.get_highlight_offset()
+
+    def has_image(self) -> bool:
+        """Return True if the graphics view has an image displayed."""
+        return self._graphics_view.has_image()
+
+    def emit_tile_clicked(self, offset: int) -> None:
+        """Emit a tile_clicked signal (for testing)."""
+        self._graphics_view.tile_clicked.emit(offset)
+
+    def handle_tile_click(self, offset: int) -> None:
+        """Handle a tile click at the given offset (clears highlight)."""
+        self._on_tile_clicked(offset)
+
+    def set_grid_preset_index(self, index: int) -> None:
+        """Set the grid size by preset index."""
+        self._grid_combo.setCurrentIndex(index)
+
+    def get_grid_preset_index(self) -> int:
+        """Return the current grid preset index."""
+        return self._grid_combo.currentIndex()
+
+    def load_palette_file(self, file_path: Path) -> PaletteFileData | None:
+        """
+        Load a palette from a .pal.json file.
+
+        Args:
+            file_path: Path to the palette file
+
+        Returns:
+            PaletteFileData with "name" and "colors" keys
+
+        Raises:
+            ValueError: If file format is invalid
+        """
+        return self._load_palette_file(file_path)
+
     @property
     def _bytes_per_cell(self) -> int:
         """Get bytes per cell based on current view mode."""

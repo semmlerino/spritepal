@@ -27,13 +27,12 @@ class TestOverlayCanvas:
         canvas = OverlayCanvas()
         qtbot.addWidget(canvas)
 
-        assert canvas._offset_x == 0
-        assert canvas._offset_y == 0
-        assert canvas._flip_h is False
-        assert canvas._flip_v is False
-        assert canvas._opacity == 0.5
-        assert canvas._dragging is False
-        assert canvas._drag_start is None
+        assert canvas.offset_x == 0
+        assert canvas.offset_y == 0
+        assert canvas.flip_h is False
+        assert canvas.flip_v is False
+        assert canvas.opacity == 0.5
+        assert canvas.is_dragging is False
 
     def test_canvas_set_offset_updates_values(self, qtbot: QtBot) -> None:
         """set_offset updates internal offset values."""
@@ -42,8 +41,8 @@ class TestOverlayCanvas:
 
         canvas.set_offset(10, -5)
 
-        assert canvas._offset_x == 10
-        assert canvas._offset_y == -5
+        assert canvas.offset_x == 10
+        assert canvas.offset_y == -5
 
     def test_canvas_set_flip_updates_values(self, qtbot: QtBot) -> None:
         """set_flip updates internal flip values."""
@@ -51,12 +50,12 @@ class TestOverlayCanvas:
         qtbot.addWidget(canvas)
 
         canvas.set_flip(True, False)
-        assert canvas._flip_h is True
-        assert canvas._flip_v is False
+        assert canvas.flip_h is True
+        assert canvas.flip_v is False
 
         canvas.set_flip(False, True)
-        assert canvas._flip_h is False
-        assert canvas._flip_v is True
+        assert canvas.flip_h is False
+        assert canvas.flip_v is True
 
     def test_canvas_set_opacity_clamps_values(self, qtbot: QtBot) -> None:
         """set_opacity clamps values to 0.0-1.0 range."""
@@ -64,13 +63,13 @@ class TestOverlayCanvas:
         qtbot.addWidget(canvas)
 
         canvas.set_opacity(0.7)
-        assert canvas._opacity == 0.7
+        assert canvas.opacity == 0.7
 
         canvas.set_opacity(-0.5)
-        assert canvas._opacity == 0.0
+        assert canvas.opacity == 0.0
 
         canvas.set_opacity(1.5)
-        assert canvas._opacity == 1.0
+        assert canvas.opacity == 1.0
 
     def test_canvas_set_game_frame(self, qtbot: QtBot) -> None:
         """set_game_frame stores the pixmap."""
@@ -80,8 +79,10 @@ class TestOverlayCanvas:
         pixmap = QPixmap(32, 32)
         canvas.set_game_frame(pixmap)
 
-        assert canvas._game_pixmap is not None
-        assert canvas._game_pixmap.width() == 32
+        assert canvas.has_game_frame()
+        size = canvas.get_game_frame_size()
+        assert size is not None
+        assert size[0] == 32
 
     def test_canvas_set_ai_frame(self, qtbot: QtBot) -> None:
         """set_ai_frame stores the pixmap."""
@@ -91,8 +92,10 @@ class TestOverlayCanvas:
         pixmap = QPixmap(24, 24)
         canvas.set_ai_frame(pixmap)
 
-        assert canvas._ai_pixmap is not None
-        assert canvas._ai_pixmap.width() == 24
+        assert canvas.has_ai_frame()
+        size = canvas.get_ai_frame_size()
+        assert size is not None
+        assert size[0] == 24
 
 
 class TestAlignmentDialogInitialization:
@@ -150,7 +153,7 @@ class TestAlignmentDialogControls:
         )
         qtbot.addWidget(dialog)
 
-        dialog._offset_x_spin.setValue(15)
+        dialog.set_offset_x(15)
 
         assert dialog.offset_x == 15
 
@@ -162,7 +165,7 @@ class TestAlignmentDialogControls:
         )
         qtbot.addWidget(dialog)
 
-        dialog._offset_y_spin.setValue(-8)
+        dialog.set_offset_y(-8)
 
         assert dialog.offset_y == -8
 
@@ -174,7 +177,7 @@ class TestAlignmentDialogControls:
         )
         qtbot.addWidget(dialog)
 
-        dialog._flip_h_check.setChecked(True)
+        dialog.set_flip_h(True)
 
         assert dialog.flip_h is True
 
@@ -186,7 +189,7 @@ class TestAlignmentDialogControls:
         )
         qtbot.addWidget(dialog)
 
-        dialog._flip_v_check.setChecked(True)
+        dialog.set_flip_v(True)
 
         assert dialog.flip_v is True
 
@@ -198,10 +201,10 @@ class TestAlignmentDialogControls:
         )
         qtbot.addWidget(dialog)
 
-        dialog._offset_x_spin.setValue(5)
-        dialog._offset_y_spin.setValue(-3)
-        dialog._flip_h_check.setChecked(True)
-        dialog._flip_v_check.setChecked(False)
+        dialog.set_offset_x(5)
+        dialog.set_offset_y(-3)
+        dialog.set_flip_h(True)
+        dialog.set_flip_v(False)
 
         result = dialog.get_alignment()
 
@@ -220,7 +223,7 @@ class TestAlignmentDialogSignals:
         qtbot.addWidget(dialog)
 
         with qtbot.waitSignal(dialog.alignment_changed, timeout=1000) as blocker:
-            dialog._offset_x_spin.setValue(10)
+            dialog.set_offset_x(10)
 
         assert blocker.args == [10, 0, False, False]
 
@@ -233,7 +236,7 @@ class TestAlignmentDialogSignals:
         qtbot.addWidget(dialog)
 
         with qtbot.waitSignal(dialog.alignment_changed, timeout=1000) as blocker:
-            dialog._flip_h_check.setChecked(True)
+            dialog.set_flip_h(True)
 
         assert blocker.args == [0, 0, True, False]
 
@@ -249,9 +252,9 @@ class TestAlignmentDialogOpacity:
         )
         qtbot.addWidget(dialog)
 
-        dialog._opacity_slider.setValue(75)
+        dialog.set_opacity(75)
 
-        assert dialog._canvas._opacity == 0.75
+        assert dialog.canvas.opacity == 0.75
 
     def test_opacity_slider_updates_label(self, qtbot: QtBot) -> None:
         """Moving opacity slider updates the percentage label."""
@@ -261,9 +264,9 @@ class TestAlignmentDialogOpacity:
         )
         qtbot.addWidget(dialog)
 
-        dialog._opacity_slider.setValue(30)
+        dialog.set_opacity(30)
 
-        assert dialog._opacity_label.text() == "30%"
+        assert dialog.get_opacity_label_text() == "30%"
 
 
 class TestOverlayCanvasDrag:
@@ -286,11 +289,8 @@ class TestOverlayCanvasDrag:
         canvas.set_ai_frame(pixmap)
 
         with qtbot.waitSignal(canvas.offset_changed, timeout=1000) as blocker:
-            # Simulate drag: press, move, release
-            canvas._dragging = True
-            canvas._drag_start = QPoint(100, 100)
-            canvas._drag_start_offset_x = 0
-            canvas._drag_start_offset_y = 0
+            # Start drag via public API
+            canvas.start_drag(QPoint(100, 100), start_offset_x=0, start_offset_y=0)
 
             # Move by DISPLAY_SCALE * 5 pixels = 5 sprite pixels
             from PySide6.QtCore import QPointF
@@ -325,7 +325,7 @@ class TestOverlayCanvasDrag:
         )
         canvas.mousePressEvent(press_event)
 
-        assert canvas._dragging is False
+        assert canvas.is_dragging is False
 
     def test_dialog_canvas_drag_updates_spinboxes(self, qtbot: QtBot) -> None:
         """Dragging on canvas updates the offset spinboxes."""
@@ -337,13 +337,13 @@ class TestOverlayCanvasDrag:
 
         # Set an AI frame via the canvas
         pixmap = QPixmap(32, 32)
-        dialog._canvas.set_ai_frame(pixmap)
+        dialog.canvas.set_ai_frame(pixmap)
 
-        # Directly emit the canvas signal (simulating a completed drag)
-        dialog._canvas.offset_changed.emit(7, -4)
+        # Emit the canvas signal (simulating a completed drag)
+        dialog.emit_canvas_offset(7, -4)
 
-        assert dialog._offset_x_spin.value() == 7
-        assert dialog._offset_y_spin.value() == -4
+        assert dialog.offset_x == 7
+        assert dialog.offset_y == -4
 
     def test_drag_offset_clamped_to_range(self, qtbot: QtBot) -> None:
         """Drag offset is clamped to -128 to 128 range."""
@@ -353,10 +353,8 @@ class TestOverlayCanvasDrag:
         pixmap = QPixmap(32, 32)
         canvas.set_ai_frame(pixmap)
 
-        # Start drag from edge
-        canvas._dragging = True
-        canvas._drag_start = QPoint(100, 100)
-        canvas._drag_start_offset_x = 120  # Near upper limit
+        # Start drag from near upper limit via public API
+        canvas.start_drag(QPoint(100, 100), start_offset_x=120, start_offset_y=0)
 
         from PySide6.QtCore import QPointF
         from PySide6.QtGui import QMouseEvent

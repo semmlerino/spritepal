@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
+from PySide6.QtCore import Qt
 
 from core.mesen_integration.capture_to_arrangement import CaptureArrangementData, PaletteGroup
 from core.mesen_integration.click_extractor import CaptureResult, OAMEntry, OBSELConfig, TileData
@@ -204,8 +205,8 @@ class TestImportMesenCapture:
         with patch("PySide6.QtWidgets.QFileDialog.getOpenFileName") as mock_file_dialog:
             mock_file_dialog.return_value = ("", "")  # No file selected
 
-            # Should not raise
-            dialog._import_mesen_capture()
+            # Trigger import via button click
+            qtbot.mouseClick(dialog.import_capture_btn, Qt.MouseButton.LeftButton)
 
             # No changes to arrangement
             assert dialog.arrangement_manager.get_arranged_count() == 0
@@ -221,7 +222,8 @@ class TestImportMesenCapture:
             mock_file_dialog.return_value = (str(invalid_file), "")
 
             with patch("PySide6.QtWidgets.QMessageBox.warning") as mock_warning:
-                dialog._import_mesen_capture()
+                # Trigger import via button click
+                qtbot.mouseClick(dialog.import_capture_btn, Qt.MouseButton.LeftButton)
 
                 mock_warning.assert_called_once()
                 assert "Failed to parse" in str(mock_warning.call_args)
@@ -236,7 +238,8 @@ class TestImportMesenCapture:
         initial_count = dialog.arrangement_manager.get_arranged_count()
         assert initial_count == 0
 
-        dialog._populate_from_capture_data(sample_arrangement_data)
+        # Use public API
+        dialog.populate_from_capture_data(sample_arrangement_data)
 
         # Should have added 2 tiles
         assert len(dialog.tiles) == 2
@@ -254,7 +257,8 @@ class TestImportMesenCapture:
         # Add some existing tiles
         dialog.tiles[TilePosition(5, 5)] = Image.new("RGBA", (8, 8))
 
-        dialog._populate_from_capture_data(sample_arrangement_data)
+        # Use public API
+        dialog.populate_from_capture_data(sample_arrangement_data)
 
         # Old tile should be gone
         assert TilePosition(5, 5) not in dialog.tiles
@@ -268,7 +272,8 @@ class TestImportMesenCapture:
         qtbot: QtBot,
     ) -> None:
         """Populate method creates composite original_image."""
-        dialog._populate_from_capture_data(sample_arrangement_data)
+        # Use public API
+        dialog.populate_from_capture_data(sample_arrangement_data)
 
         assert dialog.original_image is not None
         # With 2 tiles side by side: 16x8
@@ -281,7 +286,8 @@ class TestImportMesenCapture:
         qtbot: QtBot,
     ) -> None:
         """Populate method updates processor grid dimensions."""
-        dialog._populate_from_capture_data(sample_arrangement_data)
+        # Use public API
+        dialog.populate_from_capture_data(sample_arrangement_data)
 
         # With 1 group of height 1 + 1 spacing = 2 rows
         assert dialog.processor.grid_rows >= 1
@@ -326,7 +332,8 @@ class TestImportMesenCapture:
                                 from PySide6.QtWidgets import QMessageBox
 
                                 mock_question.return_value = QMessageBox.StandardButton.No
-                                dialog._import_mesen_capture()
+                                # Trigger import via button click
+                                qtbot.mouseClick(dialog.import_capture_btn, Qt.MouseButton.LeftButton)
 
             # Status should have been updated
             mock_status.assert_called()
@@ -381,7 +388,8 @@ class TestImportMesenCaptureEdgeCases:
 
                             mock_question.return_value = QMessageBox.StandardButton.No
 
-                            dialog._import_mesen_capture()
+                            # Trigger import via button click
+                            qtbot.mouseClick(dialog.import_capture_btn, Qt.MouseButton.LeftButton)
 
                             # Original arrangement should still exist
                             assert dialog.arrangement_manager.get_arranged_count() == 1
@@ -433,7 +441,8 @@ class TestImportMesenCaptureEdgeCases:
                                 from PySide6.QtWidgets import QMessageBox
 
                                 mock_question.return_value = QMessageBox.StandardButton.No
-                                dialog._import_mesen_capture()
+                                # Trigger import via button click
+                                qtbot.mouseClick(dialog.import_capture_btn, Qt.MouseButton.LeftButton)
 
                             # Should warn about no tiles
                             mock_warning.assert_called_once()
