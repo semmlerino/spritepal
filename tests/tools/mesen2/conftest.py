@@ -46,6 +46,10 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         # Always mark as external_tools
         item.add_marker(pytest.mark.external_tools)
 
+        # Mark as allowing registry state (these tests don't use SpritePal managers)
+        # This prevents false-positive failures from the teardown registry check
+        item.add_marker(pytest.mark.allows_registry_state(reason="External tool tests, no SpritePal managers"))
+
         # Skip unless --run-mesen2 is passed
         if not run_mesen2:
             item.add_marker(pytest.mark.skip(reason="Mesen2 tests require --run-mesen2 flag"))
