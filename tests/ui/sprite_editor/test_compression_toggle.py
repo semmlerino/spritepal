@@ -203,18 +203,18 @@ class TestSmartPreviewCoordinatorCompressionType:
 
 
 # =============================================================================
-# PendingPreviewRequest Tests
+# SliderPreviewRequest Tests
 # =============================================================================
 
 
-class TestPendingPreviewRequestCompressionType:
-    """Tests for force_compression_type in PendingPreviewRequest."""
+class TestSliderPreviewRequestCompressionType:
+    """Tests for force_compression_type in SliderPreviewRequest."""
 
     def test_default_is_none(self) -> None:
         """Verify default force_compression_type is None."""
-        from ui.common.smart_preview_coordinator import PendingPreviewRequest
+        from ui.common.smart_preview_coordinator import SliderPreviewRequest
 
-        request = PendingPreviewRequest(
+        request = SliderPreviewRequest(
             request_id=1,
             offset=0x1000,
             rom_path="/path/to/rom.sfc",
@@ -223,9 +223,9 @@ class TestPendingPreviewRequestCompressionType:
 
     def test_can_specify_hal(self) -> None:
         """Verify HAL mode can be specified."""
-        from ui.common.smart_preview_coordinator import PendingPreviewRequest
+        from ui.common.smart_preview_coordinator import SliderPreviewRequest
 
-        request = PendingPreviewRequest(
+        request = SliderPreviewRequest(
             request_id=1,
             offset=0x1000,
             rom_path="/path/to/rom.sfc",
@@ -235,9 +235,9 @@ class TestPendingPreviewRequestCompressionType:
 
     def test_can_specify_raw(self) -> None:
         """Verify RAW mode can be specified."""
-        from ui.common.smart_preview_coordinator import PendingPreviewRequest
+        from ui.common.smart_preview_coordinator import SliderPreviewRequest
 
-        request = PendingPreviewRequest(
+        request = SliderPreviewRequest(
             request_id=1,
             offset=0x1000,
             rom_path="/path/to/rom.sfc",
@@ -259,7 +259,7 @@ class TestPooledPreviewWorkerCompressionType:
         import weakref
 
         from ui.common.preview_worker_pool import PooledPreviewWorker, PreviewWorkerPool
-        from ui.common.smart_preview_coordinator import PendingPreviewRequest
+        from ui.common.smart_preview_coordinator import SliderPreviewRequest
 
         # Create a pool and worker
         pool = PreviewWorkerPool(max_workers=1)
@@ -267,7 +267,7 @@ class TestPooledPreviewWorkerCompressionType:
 
         try:
             # Create a request with RAW mode
-            request = PendingPreviewRequest(
+            request = SliderPreviewRequest(
                 request_id=1,
                 offset=0x1000,
                 rom_path="/path/to/rom.sfc",
@@ -381,41 +381,46 @@ class TestROMWorkflowControllerCompressionToggle:
         # Create mock editing controller
         mock_editing = MagicMock()
 
-        # Create controller
-        controller = ROMWorkflowController(parent=None, editing_controller=mock_editing)
+        # Patch SmartPreviewCoordinator to avoid Qt worker initialization
+        with patch("ui.sprite_editor.controllers.rom_workflow_controller.SmartPreviewCoordinator"):
+            # Create controller
+            controller = ROMWorkflowController(parent=None, editing_controller=mock_editing)
 
-        # Create mock view with source bar
-        mock_view = MagicMock()
-        controller._view = mock_view
+            # Create mock view with source bar
+            mock_view = MagicMock()
+            controller._view = mock_view
 
-        # Simulate preview ready with HAL success
-        controller._on_preview_ready(
-            tile_data=b"\x00" * 64,
-            width=8,
-            height=8,
-            sprite_name="test_sprite",
-            compressed_size=32,
-            slack_size=0,
-            actual_offset=0x1000,
-            hal_succeeded=True,
-            header_bytes=b"",
-        )
+            # Simulate preview ready with HAL success
+            controller._on_preview_ready(
+                tile_data=b"\x00" * 64,
+                width=8,
+                height=8,
+                sprite_name="test_sprite",
+                compressed_size=32,
+                slack_size=0,
+                actual_offset=0x1000,
+                hal_succeeded=True,
+                header_bytes=b"",
+            )
 
-        # Verify dropdown was synced to HAL
-        mock_view.set_compression_type.assert_called_with(CompressionType.HAL)
+            # Verify dropdown was synced to HAL
+            mock_view.set_compression_type.assert_called_with(CompressionType.HAL)
 
-        # Now simulate preview ready with RAW (HAL failed)
-        controller._on_preview_ready(
-            tile_data=b"\x00" * 64,
-            width=8,
-            height=8,
-            sprite_name="test_sprite",
-            compressed_size=0,
-            slack_size=0,
-            actual_offset=0x2000,
-            hal_succeeded=False,
-            header_bytes=b"",
-        )
+            # Now simulate preview ready with RAW (HAL failed)
+            controller._on_preview_ready(
+                tile_data=b"\x00" * 64,
+                width=8,
+                height=8,
+                sprite_name="test_sprite",
+                compressed_size=0,
+                slack_size=0,
+                actual_offset=0x2000,
+                hal_succeeded=False,
+                header_bytes=b"",
+            )
 
-        # Verify dropdown was synced to RAW
-        mock_view.set_compression_type.assert_called_with(CompressionType.RAW)
+            # Verify dropdown was synced to RAW
+            mock_view.set_compression_type.assert_called_with(CompressionType.RAW)
+
+            # Cleanup
+            controller.cleanup()

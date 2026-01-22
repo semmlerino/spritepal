@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from shiboken6 import isValid
 
 from ui.common.spacing_constants import (
     MEDIUM_WIDTH,
@@ -381,6 +382,10 @@ class SpriteGalleryWidget(QWidget):
     def _update_visible_thumbnails(self) -> None:
         """Request thumbnails for visible items only."""
         if not self.list_view or not self.model:
+            return
+
+        # Check if underlying Qt object still exists (prevents segfault during teardown)
+        if not isValid(self.list_view):
             return
 
         # Get visible viewport
