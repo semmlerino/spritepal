@@ -1341,8 +1341,6 @@ class ROMWorkflowController(QObject):
 
         # Reload the original sprite data
         logger.info("Reverting sprite to original ROM data at offset 0x%06X", self.current_offset)
-        # Clear undo history using public API so signal is emitted
-        self._editing_controller.clear_undo_history()
         self.set_offset(self.current_offset, auto_open=True)
 
         if self._message_service:
@@ -2909,14 +2907,14 @@ class ROMWorkflowController(QObject):
 
         # Sync dropdown to reflect actual compression type used
         # (uses blockSignals internally to avoid triggering re-extraction)
-        if self._view:
-            self._view.set_compression_type(self.current_compression_type)
-
         # Clear loading state
         self._preview_pending = False
         if (view := self._view) and isValid(view):
             view.set_action_loading(False)
-            view.set_action_text("Open in Editor")
+            # Only set "Open in Editor" if we are NOT about to auto-open
+            # This prevents flicker when double-clicking
+            if not self._pending_open_in_editor:
+                view.set_action_text("Open in Editor")
             view.source_bar.set_action_enabled(True)
 
         if self._is_view_valid():
