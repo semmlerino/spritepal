@@ -87,7 +87,10 @@ class FrameMappingWorkspace(QWidget):
         self._last_injected_rom: Path | None = None  # Track last injection target for reuse
 
         # Selection tracking
+        # Index-based selection (legacy - for backwards compatibility)
         self._selected_ai_index: int | None = None
+        # ID-based selection (stable across reloads - preferred)
+        self._selected_ai_frame_id: str | None = None
         self._selected_game_id: str | None = None
 
         # Auto-advance toggle state (default: OFF per UX spec)
@@ -325,6 +328,7 @@ class FrameMappingWorkspace(QWidget):
         project = self._controller.project
         if project is None:
             self._selected_ai_index = None
+            self._selected_ai_frame_id = None
             self._selected_game_id = None
             self._project_label.setText("")
             self._ai_frames_pane.clear()
@@ -381,6 +385,7 @@ class FrameMappingWorkspace(QWidget):
         # Phase 2: Guard against invalid selections
         if index < 0:
             self._selected_ai_index = None
+            self._selected_ai_frame_id = None
             self._update_map_button_state()
             self._alignment_canvas.set_ai_frame(None)
             self._alignment_canvas.clear_alignment()
@@ -395,6 +400,9 @@ class FrameMappingWorkspace(QWidget):
 
         # Load AI frame into canvas
         frame = project.get_ai_frame_by_index(index)
+        if frame:
+            # Track by ID for stability across reloads
+            self._selected_ai_frame_id = frame.id
         self._alignment_canvas.set_ai_frame(frame)
 
         # Check for mapping (use index-based lookup)
@@ -462,6 +470,9 @@ class FrameMappingWorkspace(QWidget):
 
         # Load into canvas
         ai_frame = project.get_ai_frame_by_index(ai_frame_index)
+        if ai_frame:
+            # Track by ID for stability across reloads
+            self._selected_ai_frame_id = ai_frame.id
         self._alignment_canvas.set_ai_frame(ai_frame)
 
         # Load game frame if mapped (use index-based lookup)

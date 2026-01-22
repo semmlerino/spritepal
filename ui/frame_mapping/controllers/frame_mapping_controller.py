@@ -975,7 +975,11 @@ class FrameMappingController(QObject):
             logger.info("Created injection ROM copy: %s", injection_rom_path)
 
         current_rom_path = str(injection_rom_path)
-        first_injection = True
+        # Tracks whether this is the first tile group within THIS frame injection.
+        # Reset per inject_mapping() call - not per batch. Used for:
+        # - Deciding whether to create backup (only on first tile group)
+        # - Choosing source ROM when not using existing output
+        first_tile_group_in_frame = True
 
         try:
             # Verify and correct ROM attribution using ROMVerificationService
@@ -1264,73 +1268,89 @@ class FrameMappingController(QObject):
                 if debug and debug_dir:
                     chunk_img.save(debug_dir / f"chunk_0x{rom_offset:X}_post_quant.png")
 
-                # Save chunk to temp file
-                with tempfile.NamedTemporaryFile(suffix=f"_{rom_offset:X}.png", delete=False) as tmp:
-                    chunk_path = Path(tmp.name)
-                    chunk_img.save(chunk_path, "PNG")
+                # Save chunk to temp file and inject with guaranteed cleanup
+                chunk_path: Path | None = None
+                try:
+                    with tempfile.NamedTemporaryFile(suffix=f"_{rom_offset:X}.png", delete=False) as tmp:
+                        chunk_path = Path(tmp.name)
+                        chunk_img.save(chunk_path, "PNG")
 
-                # Inject this chunk
-                # Use RAW directly if we already know it's uncompressed, otherwise try HAL first
-                compression_used = "RAW" if is_raw_tile else "HAL"
-                if is_raw_tile:
-                    # Direct RAW injection for uncompressed tiles
-                    logger.info(
-                        "ROM offset 0x%X: Injecting as RAW (uncompressed) tile",
-                        rom_offset,
-                    )
-                    # preserve_existing=True when reusing an existing output ROM or for subsequent injections
-                    # This prevents overwriting prior injections when batch injecting
-                    result, message = injector.inject_sprite_to_rom(
-                        sprite_path=str(chunk_path),
-                        rom_path=str(rom_path) if first_injection else current_rom_path,
-                        output_path=current_rom_path,
-                        sprite_offset=rom_offset,
-                        fast_compression=False,
-                        create_backup=create_backup and first_injection,
-                        ignore_checksum=True,
-                        force=False,
-                        compression_type=CompressionType.RAW,
-                        preserve_existing=using_existing_output or not first_injection,
-                    )
-                else:
-                    # Try HAL compression first
-                    # preserve_existing=True when reusing an existing output ROM or for subsequent injections
-                    result, message = injector.inject_sprite_to_rom(
-                        sprite_path=str(chunk_path),
-                        rom_path=str(rom_path) if first_injection else current_rom_path,
-                        output_path=current_rom_path,
-                        sprite_offset=rom_offset,
-                        fast_compression=True,
-                        create_backup=create_backup and first_injection,
-                        ignore_checksum=True,
-                        force=False,
-                        compression_type=CompressionType.HAL,
-                        preserve_existing=using_existing_output or not first_injection,
-                    )
-
-                    # If HAL failed (decompression error OR data too large), try RAW
-                    if not result and ("decompress" in message.lower() or "too large" in message.lower()):
-                        compression_used = "RAW"
+                    # Inject this chunk
+                    # Use RAW directly if we already know it's uncompressed, otherwise try HAL first
+                    compression_used = "RAW" if is_raw_tile else "HAL"
+                    if is_raw_tile:
+                        # Direct RAW injection for uncompressed tiles
                         logger.info(
-                            "ROM offset 0x%X: HAL failed (%s), retrying as RAW",
+                            "ROM offset 0x%X: Injecting as RAW (uncompressed) tile",
                             rom_offset,
-                            "size" if "too large" in message.lower() else "decompress",
+                        )
+                        # preserve_existing=True when:
+                        # - using_existing_output: batch injection with pre-created output ROM
+                        # - not first_tile_group_in_frame: subsequent tile groups within this frame
+                        # When preserve_existing=True, ROMInjector reads from output_path,
+                        # so rom_path is only used as source when preserve_existing=False.
+                        source_rom = (
+                            current_rom_path
+                            if using_existing_output
+                            else (str(rom_path) if first_tile_group_in_frame else current_rom_path)
                         )
                         result, message = injector.inject_sprite_to_rom(
                             sprite_path=str(chunk_path),
-                            rom_path=str(rom_path) if first_injection else current_rom_path,
+                            rom_path=source_rom,
                             output_path=current_rom_path,
                             sprite_offset=rom_offset,
                             fast_compression=False,
-                            create_backup=create_backup and first_injection,
+                            create_backup=create_backup and first_tile_group_in_frame,
                             ignore_checksum=True,
                             force=False,
                             compression_type=CompressionType.RAW,
-                            preserve_existing=using_existing_output or not first_injection,
+                            preserve_existing=using_existing_output or not first_tile_group_in_frame,
+                        )
+                    else:
+                        # Try HAL compression first
+                        # preserve_existing logic same as RAW injection above
+                        source_rom = (
+                            current_rom_path
+                            if using_existing_output
+                            else (str(rom_path) if first_tile_group_in_frame else current_rom_path)
+                        )
+                        result, message = injector.inject_sprite_to_rom(
+                            sprite_path=str(chunk_path),
+                            rom_path=source_rom,
+                            output_path=current_rom_path,
+                            sprite_offset=rom_offset,
+                            fast_compression=True,
+                            create_backup=create_backup and first_tile_group_in_frame,
+                            ignore_checksum=True,
+                            force=False,
+                            compression_type=CompressionType.HAL,
+                            preserve_existing=using_existing_output or not first_tile_group_in_frame,
                         )
 
-                # Cleanup temp file
-                chunk_path.unlink()
+                        # If HAL failed (decompression error OR data too large), try RAW
+                        if not result and ("decompress" in message.lower() or "too large" in message.lower()):
+                            compression_used = "RAW"
+                            logger.info(
+                                "ROM offset 0x%X: HAL failed (%s), retrying as RAW",
+                                rom_offset,
+                                "size" if "too large" in message.lower() else "decompress",
+                            )
+                            result, message = injector.inject_sprite_to_rom(
+                                sprite_path=str(chunk_path),
+                                rom_path=source_rom,
+                                output_path=current_rom_path,
+                                sprite_offset=rom_offset,
+                                fast_compression=False,
+                                create_backup=create_backup and first_tile_group_in_frame,
+                                ignore_checksum=True,
+                                force=False,
+                                compression_type=CompressionType.RAW,
+                                preserve_existing=using_existing_output or not first_tile_group_in_frame,
+                            )
+                finally:
+                    # Guaranteed cleanup of temp file
+                    if chunk_path is not None:
+                        chunk_path.unlink(missing_ok=True)
 
                 if result:
                     # Debug: Verify bytes written to ROM
@@ -1352,7 +1372,7 @@ class FrameMappingController(QObject):
                             logger.warning("Could not verify ROM bytes: %s", e)
 
                     messages.append(f"Offset 0x{rom_offset:X}: Success ({tile_count} tiles, {compression_used})")
-                    first_injection = False
+                    first_tile_group_in_frame = False
                     success = True
                 else:
                     messages.append(f"Offset 0x{rom_offset:X}: Failed ({message})")

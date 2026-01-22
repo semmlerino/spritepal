@@ -293,7 +293,12 @@ class FrameMappingProject:
 
         Returns:
             The added frame (for method chaining)
+
+        Raises:
+            ValueError: If a game frame with the same ID already exists
         """
+        if self.get_game_frame_by_id(frame.id) is not None:
+            raise ValueError(f"Game frame with ID '{frame.id}' already exists")
         self.game_frames.append(frame)
         return frame
 

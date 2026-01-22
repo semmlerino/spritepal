@@ -568,6 +568,15 @@ class ROMInjector(SpriteInjector):
                 # First injection or new output: use original rom_path
                 source_rom_path = rom_path
 
+                # Defensive check: warn if preserve_existing was requested but output doesn't exist
+                # This may indicate a caller bug (expected pre-created output for batch injection)
+                if preserve_existing and output_path:
+                    logger.warning(
+                        "preserve_existing=True but output '%s' does not exist. "
+                        "Falling back to copying from rom_path. This may indicate a caller bug.",
+                        Path(output_path).name,
+                    )
+
                 # Create ROM copy for injection if output differs from input
                 # The original ROM remains untouched as a backup
                 if output_path != rom_path:

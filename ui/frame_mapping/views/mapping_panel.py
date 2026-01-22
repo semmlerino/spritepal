@@ -57,6 +57,7 @@ class MappingPanel(QWidget):
         inject_mapping_requested: Emitted when user requests injection (ai_frame_index)
     """
 
+    # Index-based signals (legacy - prefer ID-based for new code)
     mapping_selected = Signal(int)  # AI frame index
     edit_frame_requested = Signal(int)  # AI frame index
     remove_mapping_requested = Signal(int)  # AI frame index
@@ -65,11 +66,21 @@ class MappingPanel(QWidget):
     inject_mapping_requested = Signal(int)  # AI frame index
     inject_selected_requested = Signal()  # Request to inject selected frames
 
+    # ID-based signals (stable across index changes - preferred)
+    mapping_selected_by_id = Signal(str)  # AI frame ID (filename)
+    edit_frame_requested_by_id = Signal(str)  # AI frame ID
+    remove_mapping_requested_by_id = Signal(str)  # AI frame ID
+    adjust_alignment_requested_by_id = Signal(str)  # AI frame ID
+    inject_mapping_requested_by_id = Signal(str)  # AI frame ID
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._project: FrameMappingProject | None = None
         self._game_frame_previews: dict[str, QPixmap] = {}
         self._drop_target_row: int | None = None
+        # Track user-toggled checkbox state by AI frame ID (stable across reloads)
+        # None = use default (checked if mapped), set = explicit user choices
+        self._user_checked_ai_frame_ids: set[str] | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -203,6 +214,8 @@ class MappingPanel(QWidget):
             project: FrameMappingProject or None to clear
         """
         self._project = project
+        # Reset checkbox state when loading a new project
+        self._user_checked_ai_frame_ids = None
         self.refresh()
 
     def set_game_frame_previews(self, previews: dict[str, QPixmap]) -> None:
@@ -217,6 +230,18 @@ class MappingPanel(QWidget):
         """Refresh the mapping table from the current project."""
         # Store current selection before clearing
         current_selection = self.get_selected_ai_frame_index()
+
+        # Capture current checkbox state by AI frame ID (stable across index changes)
+        # Only capture if user has modified checkboxes (_user_checked_ai_frame_ids is not None)
+        # or if there's existing data to preserve
+        if self._project is not None and self._table.rowCount() > 0:
+            captured_checked_ids = self._capture_checkbox_state()
+            # Once user has interacted with checkboxes, preserve their choices
+            if self._user_checked_ai_frame_ids is not None:
+                # Update with any new checked items, remove unchecked items
+                self._user_checked_ai_frame_ids = captured_checked_ids
+            # Note: if _user_checked_ai_frame_ids is None, we use default behavior
+            # (checked = mapped) until user explicitly changes a checkbox
 
         # Block signals during rebuild to prevent spurious selection events
         self._table.blockSignals(True)
@@ -240,9 +265,19 @@ class MappingPanel(QWidget):
                 # Checkbox column (column 0)
                 checkbox_item = QTableWidgetItem()
                 checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-                # Default: check mapped frames, uncheck unmapped
-                checkbox_item.setCheckState(Qt.CheckState.Checked if is_mapped else Qt.CheckState.Unchecked)
+
+                # Determine checkbox state:
+                # - If user has toggled checkboxes, use their explicit choices
+                # - Otherwise, default to checked if mapped
+                if self._user_checked_ai_frame_ids is not None:
+                    should_check = ai_frame.id in self._user_checked_ai_frame_ids
+                else:
+                    should_check = is_mapped
+
+                checkbox_item.setCheckState(Qt.CheckState.Checked if should_check else Qt.CheckState.Unchecked)
                 checkbox_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
+                # Also store AI frame ID for stable reference (used by checkbox preservation)
+                checkbox_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
                 self._table.setItem(row, 0, checkbox_item)
 
                 # # column (row number) - column 1
@@ -340,6 +375,20 @@ class MappingPanel(QWidget):
             return None
         return ai_item.data(Qt.ItemDataRole.UserRole)
 
+    def get_selected_ai_frame_id(self) -> str | None:
+        """Get the AI frame ID (filename) of the selected mapping row.
+
+        This is more stable than index as it doesn't change when frames are reordered.
+        """
+        selected = self._table.selectedItems()
+        if not selected:
+            return None
+        row = selected[0].row()
+        checkbox_item = self._table.item(row, 0)  # Checkbox column stores ID in UserRole+1
+        if checkbox_item is None:
+            return None
+        return checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
+
     def select_row_by_ai_index(self, ai_index: int) -> None:
         """Select a row by AI frame index.
 
@@ -373,6 +422,7 @@ class MappingPanel(QWidget):
     def _on_selection_changed(self) -> None:
         """Handle selection change in the mapping table."""
         ai_index = self.get_selected_ai_frame_index()
+        ai_frame_id = self.get_selected_ai_frame_id()
         if ai_index is None:
             self._edit_button.setEnabled(False)
             self._align_button.setEnabled(False)
@@ -390,31 +440,47 @@ class MappingPanel(QWidget):
         self._align_button.setEnabled(has_mapping)
         self._remove_button.setEnabled(has_mapping)
         self._inject_button.setEnabled(has_mapping)
+
+        # Emit both index-based (legacy) and ID-based (preferred) signals
         self.mapping_selected.emit(ai_index)
+        if ai_frame_id is not None:
+            self.mapping_selected_by_id.emit(ai_frame_id)
 
     def _on_edit_clicked(self) -> None:
         """Handle edit button click."""
         ai_index = self.get_selected_ai_frame_index()
+        ai_frame_id = self.get_selected_ai_frame_id()
         if ai_index is not None:
             self.edit_frame_requested.emit(ai_index)
+        if ai_frame_id is not None:
+            self.edit_frame_requested_by_id.emit(ai_frame_id)
 
     def _on_remove_clicked(self) -> None:
         """Handle remove button click."""
         ai_index = self.get_selected_ai_frame_index()
+        ai_frame_id = self.get_selected_ai_frame_id()
         if ai_index is not None:
             self.remove_mapping_requested.emit(ai_index)
+        if ai_frame_id is not None:
+            self.remove_mapping_requested_by_id.emit(ai_frame_id)
 
     def _on_align_clicked(self) -> None:
         """Handle adjust alignment button click."""
         ai_index = self.get_selected_ai_frame_index()
+        ai_frame_id = self.get_selected_ai_frame_id()
         if ai_index is not None:
             self.adjust_alignment_requested.emit(ai_index)
+        if ai_frame_id is not None:
+            self.adjust_alignment_requested_by_id.emit(ai_frame_id)
 
     def _on_inject_clicked(self) -> None:
         """Handle inject button click."""
         ai_index = self.get_selected_ai_frame_index()
+        ai_frame_id = self.get_selected_ai_frame_id()
         if ai_index is not None:
             self.inject_mapping_requested.emit(ai_index)
+        if ai_frame_id is not None:
+            self.inject_mapping_requested_by_id.emit(ai_frame_id)
 
     def _on_context_menu(self, pos: QPoint) -> None:
         """Show context menu for mappings."""
@@ -424,10 +490,12 @@ class MappingPanel(QWidget):
 
         row = item.row()
         ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
+        checkbox_item = self._table.item(row, 0)  # Checkbox column has ID
         if ai_item is None:
             return
 
         ai_index = ai_item.data(Qt.ItemDataRole.UserRole)
+        ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1) if checkbox_item else None
         if ai_index is None:
             return
 
@@ -438,22 +506,43 @@ class MappingPanel(QWidget):
 
         menu = QMenu(self)
 
+        # Helper to emit both index and ID signals
+        def emit_edit() -> None:
+            self.edit_frame_requested.emit(ai_index)
+            if ai_frame_id:
+                self.edit_frame_requested_by_id.emit(ai_frame_id)
+
+        def emit_align() -> None:
+            self.adjust_alignment_requested.emit(ai_index)
+            if ai_frame_id:
+                self.adjust_alignment_requested_by_id.emit(ai_frame_id)
+
+        def emit_remove() -> None:
+            self.remove_mapping_requested.emit(ai_index)
+            if ai_frame_id:
+                self.remove_mapping_requested_by_id.emit(ai_frame_id)
+
+        def emit_inject() -> None:
+            self.inject_mapping_requested.emit(ai_index)
+            if ai_frame_id:
+                self.inject_mapping_requested_by_id.emit(ai_frame_id)
+
         edit_action = menu.addAction("Edit AI Frame")
-        edit_action.triggered.connect(lambda: self.edit_frame_requested.emit(ai_index))
+        edit_action.triggered.connect(emit_edit)
 
         if has_mapping:
             align_action = menu.addAction("Adjust Alignment")
-            align_action.triggered.connect(lambda: self.adjust_alignment_requested.emit(ai_index))
+            align_action.triggered.connect(emit_align)
 
             menu.addSeparator()
 
             remove_action = menu.addAction("Remove Mapping")
-            remove_action.triggered.connect(lambda: self.remove_mapping_requested.emit(ai_index))
+            remove_action.triggered.connect(emit_remove)
 
             menu.addSeparator()
 
             inject_action = menu.addAction("Inject to ROM")
-            inject_action.triggered.connect(lambda: self.inject_mapping_requested.emit(ai_index))
+            inject_action.triggered.connect(emit_inject)
 
         menu.exec(self._table.viewport().mapToGlobal(pos))
 
@@ -549,15 +638,22 @@ class MappingPanel(QWidget):
         if self._project is None:
             return
 
+        # Initialize tracking if not already done
+        if self._user_checked_ai_frame_ids is None:
+            self._user_checked_ai_frame_ids = set()
+
         self._table.blockSignals(True)
         try:
             for row in range(self._table.rowCount()):
                 checkbox_item = self._table.item(row, 0)
                 if checkbox_item:
                     ai_index = checkbox_item.data(Qt.ItemDataRole.UserRole)
+                    ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
                     # Only check mapped frames
                     if self._project.get_mapping_for_ai_frame_index(ai_index):
                         checkbox_item.setCheckState(Qt.CheckState.Checked)
+                        if ai_frame_id is not None:
+                            self._user_checked_ai_frame_ids.add(ai_frame_id)
         finally:
             self._table.blockSignals(False)
 
@@ -565,6 +661,9 @@ class MappingPanel(QWidget):
 
     def _on_deselect_all(self) -> None:
         """Uncheck all frames."""
+        # Initialize tracking and clear all
+        self._user_checked_ai_frame_ids = set()
+
         self._table.blockSignals(True)
         try:
             for row in range(self._table.rowCount()):
@@ -580,7 +679,42 @@ class MappingPanel(QWidget):
         """Handle item changes (checkbox state changes)."""
         # Only care about checkbox column (column 0)
         if item.column() == 0:
+            # User has explicitly toggled a checkbox - start tracking their choices
+            if self._user_checked_ai_frame_ids is None:
+                # First user interaction - capture current state as baseline
+                self._user_checked_ai_frame_ids = self._capture_checkbox_state()
+            else:
+                # Update the tracked set based on this change
+                ai_frame_id = item.data(Qt.ItemDataRole.UserRole + 1)
+                if ai_frame_id is not None:
+                    if item.checkState() == Qt.CheckState.Checked:
+                        self._user_checked_ai_frame_ids.add(ai_frame_id)
+                    else:
+                        self._user_checked_ai_frame_ids.discard(ai_frame_id)
             self._update_inject_selected_state()
+
+    def _capture_checkbox_state(self) -> set[str]:
+        """Capture current checkbox state as a set of checked AI frame IDs.
+
+        Returns:
+            Set of AI frame IDs (filenames) that are currently checked.
+        """
+        checked_ids: set[str] = set()
+        for row in range(self._table.rowCount()):
+            checkbox_item = self._table.item(row, 0)
+            if checkbox_item and checkbox_item.checkState() == Qt.CheckState.Checked:
+                ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
+                if ai_frame_id is not None:
+                    checked_ids.add(ai_frame_id)
+        return checked_ids
+
+    def reset_checkbox_state(self) -> None:
+        """Reset checkbox state to default (checked = mapped).
+
+        Call this when loading a new project or when user wants to reset.
+        """
+        self._user_checked_ai_frame_ids = None
+        self.refresh()
 
     def _on_inject_selected_clicked(self) -> None:
         """Handle inject selected button click."""
