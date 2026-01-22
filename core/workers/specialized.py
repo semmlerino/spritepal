@@ -7,12 +7,7 @@ reducing boilerplate and ensuring consistent signal wiring.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from PIL import Image
-
-    from core.managers.core_operations_manager import CoreOperationsManager
+from typing import Any
 
 from utils.logging_config import get_logger
 
@@ -81,48 +76,6 @@ class SignalConnectionHelper:
             logger.debug(f"Connected progress signal: {progress_signal_name}")
         else:
             logger.warning(f"Progress signal not found: {progress_signal_name}")
-
-    def connect_extraction_signals(self, extraction_manager: CoreOperationsManager) -> None:
-        """
-        Connect extraction-specific signals.
-
-        Args:
-            extraction_manager: The extraction manager instance
-        """
-        # Connect palette signals - cast to Any for signal access (protocols can't express Signal descriptors)
-        mgr: Any = extraction_manager  # pyright: ignore[reportExplicitAny] - Signal access requires runtime type
-        connection1 = mgr.palettes_extracted.connect(self.worker.palettes_ready.emit)
-        connection2 = mgr.active_palettes_found.connect(self.worker.active_palettes_ready.emit)
-        self._connections.extend([connection1, connection2])
-        logger.debug("Connected extraction-specific signals")
-
-    def connect_preview_signals(self, extraction_manager: CoreOperationsManager) -> None:
-        """
-        Connect preview generation signals with proper error handling.
-
-        Args:
-            extraction_manager: The extraction manager instance
-        """
-
-        def on_preview_generated(img: Image.Image, tile_count: int) -> None:
-            """Handle preview generation with Qt threading safety."""
-            try:
-                # CRITICAL FIX FOR BUG #26: Don't create Qt GUI objects (QPixmap) in worker thread
-                # Let the main thread handle pil_to_qpixmap conversion to avoid Qt threading violations
-                self.worker.preview_ready.emit(img, tile_count)  # Changed: emit PIL Image, not QPixmap
-                self.worker.preview_image_ready.emit(img)
-            except (RuntimeError, TypeError) as e:
-                logger.exception(f"Qt signal error emitting preview image: {e}")
-                self.worker.emit_warning(f"Preview generation failed: {e}")
-            except Exception as e:
-                logger.exception(f"Unexpected error emitting preview image: {e}")
-                self.worker.emit_warning(f"Preview generation failed: {e}")
-
-        # Cast to Any for signal access (protocols can't express Signal descriptors)
-        mgr: Any = extraction_manager  # pyright: ignore[reportExplicitAny] - Signal access requires runtime type
-        connection = mgr.preview_generated.connect(on_preview_generated)
-        self._connections.append(connection)
-        logger.debug("Connected preview generation signals")
 
     def connect_injection_signals(self, injection_manager: object) -> None:
         """

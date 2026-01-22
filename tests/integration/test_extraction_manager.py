@@ -414,22 +414,22 @@ class TestExtractionManager:
         vram_data = test_data_repo.get_vram_extraction_data("small")
 
         # Track real Qt signal emissions
-        progress_messages = []
-        files_created_events = []
+        progress_messages: list[str] = []
+        extraction_results: list[object] = []
 
-        def on_progress(msg):
+        def on_progress(msg: str) -> None:
             progress_messages.append(msg)
 
-        def on_files_created(files):
-            files_created_events.append(files)
+        def on_extraction_completed(result: object) -> None:
+            extraction_results.append(result)
 
         # Connect to real Qt signals
         manager.extraction_progress.connect(on_progress)
-        manager.files_created.connect(on_files_created)
+        manager.extraction_completed.connect(on_extraction_completed)
 
         try:
             # Run real extraction with Qt signal monitoring
-            with qtbot.waitSignal(manager.files_created, timeout=worker_timeout()):
+            with qtbot.waitSignal(manager.extraction_completed, timeout=worker_timeout()):
                 manager.extract_from_vram(vram_data["vram_path"], vram_data["output_base"], grayscale_mode=True)
 
             # Wait for all Qt events to process
@@ -437,13 +437,15 @@ class TestExtractionManager:
 
             # Verify real signal emissions occurred
             assert len(progress_messages) > 0, "Should emit progress signals"
-            assert len(files_created_events) > 0, "Should emit files created signal"
+            assert len(extraction_results) > 0, "Should emit extraction_completed signal"
 
             # Verify signal content is meaningful
             assert any("extract" in msg.lower() for msg in progress_messages)
 
-            # Verify files_created signal contains real file paths
-            created_files = files_created_events[0]
+            # Verify extraction_completed signal contains real file paths
+            result = extraction_results[0]
+            assert hasattr(result, "files"), "Result should have files attribute"
+            created_files = result.files  # type: ignore[union-attr]
             assert len(created_files) > 0
             assert all(Path(f).exists() for f in created_files)
 

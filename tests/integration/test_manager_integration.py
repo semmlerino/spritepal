@@ -69,21 +69,21 @@ class TestManagerIntegrationTDD:
         vram_data = test_data_repo.get_vram_extraction_data("small")
 
         # Track integration workflow signals
-        extraction_files = []
-        injection_results = []
+        extraction_results: list[object] = []
+        injection_results: list[tuple[bool, str]] = []
 
-        def on_extraction_complete(files):
-            extraction_files.extend(files)
+        def on_extraction_complete(result: object) -> None:
+            extraction_results.append(result)
 
-        def on_injection_complete(success, message):
+        def on_injection_complete(success: bool, message: str) -> None:
             injection_results.append((success, message))
 
         # Connect to real Qt signals across managers
-        extraction_mgr.files_created.connect(on_extraction_complete)
+        extraction_mgr.extraction_completed.connect(on_extraction_complete)
         injection_mgr.injection_finished.connect(on_injection_complete)
 
         # Phase 1: Extract sprite from VRAM (real extraction)
-        with qtbot.waitSignal(extraction_mgr.files_created, timeout=worker_timeout(LONG)):
+        with qtbot.waitSignal(extraction_mgr.extraction_completed, timeout=worker_timeout(LONG)):
             extracted_files = extraction_mgr.extract_from_vram(
                 vram_data["vram_path"], vram_data["output_base"], grayscale_mode=True
             )

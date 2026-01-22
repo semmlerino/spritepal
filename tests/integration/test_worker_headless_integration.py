@@ -83,16 +83,11 @@ class TestVRAMExtractionWorkerHeadless:
         Image.new("P", (128, 64), 0)
 
         # Mock manager signals to return Mock connections
+        # Worker only connects to extraction_progress (legacy signals were removed)
         mock_connection = Mock()
 
         mock_manager.extraction_progress = Mock()
         mock_manager.extraction_progress.connect = Mock(return_value=mock_connection)
-        mock_manager.palettes_extracted = Mock()
-        mock_manager.palettes_extracted.connect = Mock(return_value=mock_connection)
-        mock_manager.active_palettes_found = Mock()
-        mock_manager.active_palettes_found.connect = Mock(return_value=mock_connection)
-        mock_manager.preview_generated = Mock()
-        mock_manager.preview_generated.connect = Mock(return_value=mock_connection)
 
         # Mock the extraction result
         output_path = worker_params["output_base"] + ".png"

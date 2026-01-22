@@ -9,8 +9,6 @@ from enum import IntEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from PIL import Image
-
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
     from core.managers.core_operations_manager import CoreOperationsManager
@@ -1160,33 +1158,6 @@ class MainWindow(QMainWindow):
         # Handle active palettes if present
         if result.active_palette_indices:
             self._active_palettes = result.active_palette_indices
-
-    def _on_vram_preview_ready(self, pil_image: Image.Image, tile_count: int) -> None:
-        """Handle preview ready - convert PIL Image to QPixmap in main thread.
-
-        CRITICAL FIX FOR BUG #26: This MUST run in the main thread.
-        Manager emits PIL Image to avoid Qt threading violations.
-        """
-        pixmap = pil_to_qpixmap(pil_image)
-        if pixmap is not None:
-            self.sprite_preview.set_preview(pixmap, tile_count)
-            self.status_bar_manager.show_message(f"Preview updated: {tile_count} tiles")
-        else:
-            logger.error("Failed to convert PIL image to QPixmap for preview")
-
-    def _on_vram_palettes_ready(self, palettes: dict[int, list[list[int]]]) -> None:
-        """Handle palettes ready from extraction."""
-        # Store for dialog use
-        self._extracted_palettes = palettes
-        # Update palette preview widget with normalized data
-        normalized = self._normalize_palettes(palettes)
-        if normalized is not None:
-            self.palette_preview.set_all_palettes(normalized)
-
-    def _on_vram_active_palettes_ready(self, active_palettes: list[int]) -> None:
-        """Handle active palettes ready."""
-        # Store for dialog use
-        self._active_palettes = active_palettes
 
     def _on_vram_extraction_finished(self, extracted_files: list[str]) -> None:
         """Handle extraction finished."""
