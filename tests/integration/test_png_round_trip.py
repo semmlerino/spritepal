@@ -11,8 +11,9 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from core.injector import SpriteInjector, encode_4bpp_tile
+from core.injector import SpriteInjector
 from core.rom_extractor import ROMExtractor
+from core.tile_utils import encode_4bpp_tile
 
 # Systematic pytest markers applied based on test content analysis
 pytestmark = [

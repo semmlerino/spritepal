@@ -13,12 +13,14 @@ from __future__ import annotations
 
 from .data_repository import DataRepository
 from .environment_detection import get_environment_info, is_pyside6_available
+from .qt_pixmap_guard import install_qpixmap_guard
 from .test_signal import TestSignal, TestSignalBlocker
 
 # Always available (Qt-independent)
 __all__ = [
     "DataRepository",
     "get_environment_info",
+    "install_qpixmap_guard",
     "is_pyside6_available",
     "TestSignal",
     "TestSignalBlocker",

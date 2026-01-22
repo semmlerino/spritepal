@@ -23,8 +23,9 @@
 | `if pos:` for QPoint checks | Use `if pos is not None:` (QPoint(0,0) is falsy!) |
 
 **3. Testing** (when running tests):
-- Default: parallel via `-n auto` (see `pyproject.toml`)
-- **Flaky?** Run serial: `pytest -n 0 -vv` — if passes, it's a race condition
+- Default: serial for fast TDD iteration
+- **Full suite**: `pytest -n auto --dist=loadscope` for parallel execution
+- **Flaky?** If serial passes but parallel fails → race condition
 - **Quick triage**: `pytest --tb=no -q 2>&1 | tee /tmp/pytest_triage.log` then `pytest --lf -vv`
 
 **4. Fixtures** (when writing tests):
@@ -102,7 +103,8 @@
 uv run ruff check .              # Lint
 uv run ruff format .             # Format
 uv run basedpyright core ui utils  # Type check
-uv run pytest                    # Run all tests
+uv run pytest                    # Run tests (serial, fast for TDD)
+# Or for full suite: uv run pytest -n auto --dist=loadscope
 ```
 
 **Note:** If `uv` is not in PATH, use `~/.local/bin/uv run` as fallback (e.g., `~/.local/bin/uv run ruff check .`).
@@ -179,11 +181,11 @@ uv lock              # Update lockfile after dependency changes
 |------|---------|
 | **Quick pass/fail summary** | `pytest --tb=no -q 2>&1 \| tee /tmp/pytest_triage.log` |
 | **Re-run failures with details** | `pytest --lf -vv --tb=short` |
-| **Drill down on one test** | `pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0` |
+| **Drill down on one test** | `pytest tests/path/test_file.py::test_name -vv --tb=long -s` |
 | **Find slow tests** | `pytest --durations=20` |
 | **Filter by pattern** | `pytest -k "extraction and not slow" -vv` |
 | **Stop on first failure** | `pytest -x -vv` |
-| **Serial execution** | `pytest -n 0 -vv` |
+| **Full suite (parallel)** | `pytest -n auto --dist=loadscope` |
 
 **Note:** Pytest buffers output. Always `tee` to file first for large runs.
 
@@ -220,13 +222,16 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 - **`tmp_path`** - Always for file operations. Never hardcode paths.
 - **`qtbot`** - For Qt signal/widget testing.
 
-### Parallel Execution (Default)
+### Parallel Execution (Opt-In)
 
-Tests run parallel via `-n auto` (see `pyproject.toml`).
+Tests run serial by default for fast TDD iteration. For full suite runs, use parallel:
+
+```bash
+pytest -n auto --dist=loadscope   # Parallel execution
+```
 
 - **Config:** `--dist=loadscope` groups by module; `xdist_group("serial")` co-locates marked tests
 - **Not truly serial:** These only prevent parallel workers from running them, but don't guarantee exclusivity
-- **For truly serial:** Use `-n 0`
 
 ### Custom CLI Options (in conftest.py)
 
@@ -255,7 +260,7 @@ Use `helpers/signal_spy_utils.py:MultiSignalRecorder` to track and validate mult
 
 | Symptom | Solution |
 |---------|----------|
-| **Flaky (sometimes passes)** | Run serial: `pytest -n 0 -vv`. If passes → race condition. Check: non-context `waitSignal()`, hardcoded timeouts, `tmp_path` usage |
+| **Flaky (sometimes passes)** | Run serial (default) first; if passes but fails with `-n auto` → race condition. Check: non-context `waitSignal()`, hardcoded timeouts, `tmp_path` usage |
 | **"Fatal Python error: Aborted"** | `QPixmap` in worker thread. Replace with `ThreadSafeTestImage` |
 | **Hangs forever** | Ctrl-C → `--full-trace`. Check: dialog mocking `exec()`, worker cleanup in fixture teardown |
 | **Passes locally, fails in CI** | Usually timeout. Check `PYTEST_TIMEOUT_MULTIPLIER` or display requirements (offscreen is default) |

@@ -21,11 +21,12 @@ Fixtures are organized into modular files for maintainability:
 
 ## Parallel Execution (pytest-xdist)
 
-Tests run in parallel by default with `-n auto`. The policy is:
+Tests run serially by default for fast TDD iteration.
+For full suite runs, use parallel: `pytest -n auto --dist=loadscope`
+
+The policy when running parallel:
 - Tests marked `@pytest.mark.parallel_unsafe` are serialized
 - All other tests run in parallel across workers
-
-For serial debugging: `pytest -n 0`
 
 ## Fixture Scopes
 
@@ -49,8 +50,6 @@ import os
 # Set offscreen mode early
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-import importlib
-import importlib.abc
 import tempfile
 import warnings
 from collections.abc import Generator
@@ -71,6 +70,7 @@ import sys
 import pytest
 
 from .infrastructure.environment_detection import get_environment_info
+from .infrastructure.qt_pixmap_guard import install_qpixmap_guard
 
 # ============================================================================
 # pytest_plugins - Import fixtures from modular files
@@ -108,7 +108,7 @@ def pytest_configure(config):
         )
 
     # Install QPixmap guard via import hook - guarantees guard is installed even for late Qt imports
-    _install_qpixmap_guard_unconditional()
+    install_qpixmap_guard()
 
 
 def pytest_sessionstart(session: Any) -> None:
@@ -126,89 +126,6 @@ def pytest_sessionstart(session: Any) -> None:
 
     session.config._thread_baseline = threading.active_count()
     session.config._thread_identities = {t.ident: t.name for t in threading.enumerate() if t.ident is not None}
-
-
-def _patch_qpixmap_init() -> None:
-    """Patch QPixmap.__init__ to detect worker thread usage."""
-    try:
-        from PySide6.QtCore import QCoreApplication, QThread
-        from PySide6.QtGui import QPixmap
-
-        if hasattr(QPixmap, "_test_guard_installed"):
-            return  # Already installed
-
-        original_init = QPixmap.__init__
-
-        def guarded_init(self, *args, **kwargs):
-            app = QCoreApplication.instance()
-            if app and QThread.currentThread() != app.thread():
-                raise RuntimeError("CRITICAL: QPixmap created in worker thread! Use QImage or ThreadSafeTestImage.")
-            original_init(self, *args, **kwargs)
-
-        QPixmap.__init__ = guarded_init
-        QPixmap._test_guard_installed = True  # pyright: ignore[reportAttributeAccessIssue] - dynamic attr for test guard
-    except ImportError:
-        pass  # Qt not available, skip guard
-
-
-class _QPixmapGuardFinder(importlib.abc.MetaPathFinder):
-    """Import hook to install QPixmap guard when PySide6.QtGui is imported.
-
-    Uses modern find_spec protocol (PEP 451) instead of deprecated
-    find_module/load_module APIs.
-    """
-
-    _installed: bool = False
-
-    def find_spec(
-        self,
-        fullname: str,
-        path: Any,
-        target: Any = None,
-    ) -> None:
-        """Intercept PySide6.QtGui import and install QPixmap guard.
-
-        Instead of returning a ModuleSpec, we:
-        1. Remove ourselves from meta_path to avoid recursion
-        2. Import the real module (which goes into sys.modules)
-        3. Patch QPixmap
-        4. Return None - the caller finds the patched module in sys.modules
-        """
-        if fullname != "PySide6.QtGui" or self._installed:
-            return
-
-        # Mark as installed to prevent re-triggering
-        _QPixmapGuardFinder._installed = True
-
-        # Remove ourselves from meta_path to avoid recursion
-        if self in sys.meta_path:
-            sys.meta_path.remove(self)
-
-        # Import the real module (now in sys.modules)
-        importlib.import_module(fullname)
-
-        # Install the guard on QPixmap
-        _patch_qpixmap_init()
-
-        # Return None - caller finds patched module in sys.modules
-        return
-
-
-def _install_qpixmap_guard_unconditional() -> None:
-    """Install QPixmap guard unconditionally via import hook.
-
-    This ensures the guard is installed even for tests that import Qt late.
-    Uses an import hook that triggers as soon as PySide6.QtGui is imported.
-    """
-    # If Qt is already imported, patch directly
-    if "PySide6.QtGui" in sys.modules:
-        _patch_qpixmap_init()
-        return
-
-    # Otherwise, install an import hook to patch when Qt is imported
-    # Check if our hook is already installed
-    if not any(isinstance(finder, _QPixmapGuardFinder) for finder in sys.meta_path):
-        sys.meta_path.insert(0, _QPixmapGuardFinder())
 
 
 def pytest_addoption(parser: Any) -> None:
