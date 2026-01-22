@@ -952,8 +952,14 @@ class WorkbenchCanvas(QWidget):
         """Update scene rect and fit view to show both frames after alignment.
 
         After auto-align repositions the AI frame (potentially to large negative
-        coordinates), the view must be adjusted to show both frames. Simple
-        centerOn() doesn't work reliably when scroll bars are hidden.
+        coordinates), the view must be adjusted to show both frames. When the
+        offset is very large, the combined rect can span thousands of pixels,
+        causing excessive zoom-out that makes frames appear as tiny dots.
+
+        Fix: Clamp the viewport to a reasonable size based on the game frame
+        dimensions. If the combined rect is unreasonably large (more than 5x
+        the game frame), only fit the game frame and let the user pan to the
+        AI frame if needed.
         """
         # Get the combined bounding rect of both frames
         game_rect = self._game_frame_item.sceneBoundingRect()
@@ -965,11 +971,22 @@ class WorkbenchCanvas(QWidget):
 
         # Union of both rects plus padding
         combined = game_rect.united(ai_rect)
-        padded = combined.adjusted(-50, -50, 50, 50)
 
-        # Update scene rect to include both frames
-        self._view.setSceneRect(padded)
+        # CLAMP: If combined rect is unreasonably large due to extreme offset,
+        # only fit the game frame to prevent excessive zoom-out.
+        # Use 5x the game frame size as threshold for "reasonable".
+        max_reasonable_size = max(game_rect.width(), game_rect.height()) * 5
 
-        # Use fitInView to ensure the combined rect is visible
-        # KeepAspectRatio prevents distortion
-        self._view.fitInView(padded, Qt.AspectRatioMode.KeepAspectRatio)
+        if combined.width() > max_reasonable_size or combined.height() > max_reasonable_size:
+            # Large offset detected - center on game frame with modest padding
+            target_rect = game_rect.adjusted(-50, -50, 50, 50)
+        else:
+            # Normal case - show both frames with padding
+            target_rect = combined.adjusted(-50, -50, 50, 50)
+
+        # Update scene rect to include both frames (even if not all visible)
+        # This ensures the AI frame is still accessible via pan/zoom
+        self._view.setSceneRect(combined.adjusted(-50, -50, 50, 50))
+
+        # Use fitInView on the target rect (clamped if necessary)
+        self._view.fitInView(target_rect, Qt.AspectRatioMode.KeepAspectRatio)
