@@ -493,88 +493,7 @@ def test_something(app_context):
 
 ## Manager Access
 
-SpritePal uses **AppContext** to provide access to managers:
-
-### AppContext (`core/app_context.py`)
-
-The AppContext is the central access point for all managers:
-
-```python
-from core.app_context import get_app_context
-
-# Get a manager instance
-context = get_app_context()
-manager = context.core_operations_manager
-```
-
-**Key functions:**
-- `get_app_context()` - Get the global AppContext (raises if not initialized)
-- `create_app_context(...)` - Initialize AppContext with managers (done at startup)
-- `reset_app_context()` - Clear context (for tests)
-
-### Manager Lifecycle
-
-Managers are created at startup via `initialize_managers()`:
-
-**Initialization Flow:**
-```
-Application Start
-       ↓
-initialize_managers()
-       ↓
-1. Create ApplicationStateManager
-   ↓
-2. Create CoreOperationsManager
-   ↓
-3. create_app_context(...)         → Registers both managers
-   ↓
-Application Code: get_app_context().core_operations_manager
-       ↓
-AppContext returns the registered manager
-```
-
-**Why this order matters:** CoreOperationsManager creates ROMExtractor, which needs
-ROMCache, which needs ApplicationStateManager. Managers must be created in dependency order.
-
-### Quick Reference
-
-| Need | Use |
-|------|-----|
-| Get a manager in application code | `get_app_context().core_operations_manager` |
-| Pass manager to a class | Constructor parameter: `def __init__(self, manager: CoreOperationsManager)` |
-| Initialize all managers | `initialize_managers()` (done at app startup) |
-| Clean up at shutdown | `cleanup_managers()` |
-| Reset for tests | Use `app_context` fixture |
-
-### Available Protocols
-
-SpritePal uses concrete classes directly via DI. The `core/protocols/` directory is reserved for future protocol definitions.
-
-**Use concrete classes directly** (no protocol wrappers needed):
-- `CoreOperationsManager` - Extraction and injection operations
-- `ApplicationStateManager` - Session, state, settings
-- `ConfigurationService` - App configuration
-- `ROMCache` - ROM file caching
-- `ROMExtractor` - Low-level ROM extraction
-
-### What NOT to Do
-
-```python
-# BAD - direct instantiation
-from core.managers.core_operations_manager import CoreOperationsManager
-manager = CoreOperationsManager()  # Missing required dependencies
-
-# GOOD - use get_app_context() for proper initialization
-from core.app_context import get_app_context
-manager = get_app_context().core_operations_manager
-```
-
----
-
-## Manager Architecture
-
-SpritePal uses consolidated managers for all business logic. The adapter pattern
-that was previously used for backward compatibility has been fully removed.
+SpritePal uses **AppContext** (`core/app_context.py`) to provide access to managers.
 
 ### Architecture
 
@@ -591,246 +510,47 @@ that was previously used for backward compatibility has been fully removed.
 │  CoreOperationsManager:                                      │
 │    - Owns ROMService, VRAMService, ROMExtractor             │
 │    - Owns all extraction/injection business logic            │
-│    - Access via get_app_context().core_operations_manager    │
 │                                                              │
 │  ApplicationStateManager:                                    │
 │    - Owns session, settings, state, history                  │
-│    - Access via get_app_context().application_state_manager  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### Quick Reference
+
+| Need | Use |
+|------|-----|
+| Get a manager | `get_app_context().core_operations_manager` |
+| Pass to a class | Constructor: `def __init__(self, manager: CoreOperationsManager)` |
+| Initialize (app startup) | `initialize_managers()` |
+| Clean up (shutdown) | `cleanup_managers()` |
+| Reset (tests) | Use `app_context` fixture |
+
 ### Key Rules
 
-1. **Use get_app_context() for access**: Always get managers via `get_app_context()`,
-   never instantiate directly.
+1. **Always use `get_app_context()`** — never instantiate managers directly
+2. **Dependency order matters** — ApplicationStateManager must exist before CoreOperationsManager (ROMExtractor → ROMCache → ApplicationStateManager)
+3. **Services are shared** — ROMService, VRAMService, etc. are created once and reused
 
-2. **Single source of truth**: All business logic lives in consolidated managers.
-   No adapters or wrappers needed.
-
-3. **Services are shared**: ROMService, VRAMService, etc. are created once
-   by CoreOperationsManager and reused.
-
-### Example: Using CoreOperationsManager
+### Example
 
 ```python
 from core.app_context import get_app_context
 
-# Get manager via AppContext
 manager = get_app_context().core_operations_manager
-
-# Connect to signals
-manager.extraction_progress.connect(self._on_progress)
 manager.extraction_complete.connect(self._on_complete)
-
-# Call extraction methods
 result = manager.extract_from_rom(params)
 ```
-
-### Benefits of Consolidation
-
-- **Simpler code**: No adapter layers to maintain
-- **Single source of truth**: All business logic in one place
-- **Better discoverability**: Clear method locations
-- **Reduced duplication**: Services created once
 
 ---
 
 ## Mesen Integration Subsystem
 
-The `core/mesen_integration/` package provides tools for **live sprite capture** from the Mesen 2 emulator and **automated ROM offset discovery**. This is a critical subsystem for mapping VRAM tiles back to their source locations in ROM.
+The `core/mesen_integration/` package provides tools for live sprite capture from the Mesen 2 emulator and automated ROM offset discovery.
 
-### Purpose
+**Full documentation:** [docs/mesen2/architecture.md](mesen2/architecture.md)
 
-The subsystem bridges three domains:
-
-1. **Mesen 2 Lua Scripts** (`mesen2_integration/lua_scripts/`) - Capture sprites at runtime
-2. **JSON Exchange** (`mesen2_exchange/`) - Structured capture data
-3. **Python Analysis** (`core/mesen_integration/`) - ROM offset discovery
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     Mesen 2 Emulator                                │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │ sprite_rom_finder.lua (click on sprite → get ROM offset)    │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼ JSON
-┌─────────────────────────────────────────────────────────────────────┐
-│                  mesen2_exchange/*.json                             │
-│  (OAM entries, VRAM tile data, DMA logs, timing info)               │
-└─────────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                 core/mesen_integration/                             │
-│  ┌─────────────────────────────────────────────────────────────┐   │
-│  │         CorrelationPipeline (Orchestrator)                   │   │
-│  │  load_dma_log() → load_capture() → build_database() → run() │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                               │                                     │
-│         ┌─────────────────────┼─────────────────────┐              │
-│         ▼                     ▼                     ▼              │
-│  ┌─────────────┐    ┌─────────────────┐    ┌────────────────┐     │
-│  │click_extractor│    │timing_correlator│    │address_space   │     │
-│  │(parse JSON)  │    │(DMA matching)   │    │_bridge (SA-1)  │     │
-│  └─────────────┘    └─────────────────┘    └────────────────┘     │
-│         │                     │                     │              │
-│         └──────────┬──────────┴─────────────────────┘              │
-│                    ▼                                                │
-│         ┌─────────────────────┐                                    │
-│         │ tile_hash_database  │  Build searchable tile index       │
-│         └─────────────────────┘                                    │
-│                    │                                                │
-│                    ▼                                                │
-│         ┌─────────────────────┐                                    │
-│         │  rom_tile_matcher   │  Find ROM offsets via hash lookup  │
-│         └─────────────────────┘                                    │
-│                    │                                                │
-│                    ▼                                                │
-│         ┌─────────────────────────────────────────────────────┐   │
-│         │  capture_to_rom_mapper → CaptureMapResult            │   │
-│         │  (confidence scoring, ambiguity detection)           │   │
-│         └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼
-                     ROM offset for extraction
-```
-
-### Module Responsibilities
-
-| Module | Purpose | Key Classes/Functions |
-|--------|---------|----------------------|
-| `click_extractor.py` | Parse Mesen JSON captures | `MesenCaptureParser`, `OAMEntry`, `TileData` |
-| `address_space_bridge.py` | SA-1 ↔ SNES address conversion | `CanonicalAddress`, `sa1_to_canonical()` |
-| `timing_correlator.py` | Match tiles to DMA events | `TimingCorrelator`, `DMAEvent`, `TileCorrelation` |
-| `tile_hash_database.py` | Efficient tile similarity search | `TileHashDatabase`, `build_and_save_database()` |
-| `rom_tile_matcher.py` | Find ROM offsets via tile hashing | `ROMTileMatcher`, `TileLocation` |
-| `capture_to_rom_mapper.py` | Map entire captures to ROM | `CaptureToROMMapper`, `CaptureMapResult` |
-| `full_correlation_pipeline.py` | Orchestrate end-to-end workflow | `CorrelationPipeline`, `PipelineResults` |
-| `sa1_character_conversion.py` | SA-1 character format handling | `snes_4bpp_to_bitmap()`, `hash_two_planes()` |
-| `gfx_pointer_table.py` | Parse GFX pointer tables | `GFXPointerTableParser`, `rom_to_sa1_cpu()` |
-| `capture_renderer.py` | Render captures to images | `CaptureRenderer`, `render_capture_to_files()` |
-| `sprite_reassembler.py` | Reassemble multi-OAM sprites | (Used internally by pipeline) |
-
-### Import Rules
-
-The mesen_integration package follows standard Core layer rules:
-
-- ✅ **CAN import from**: `core/`, `utils/`, Python stdlib
-- ❌ **CANNOT import from**: `ui/`, `core/managers/` (except via protocols)
-- ❌ **CANNOT import from**: External emulators (pure Python analysis only)
-
-### Data Flow
-
-**Click-to-ROM Pipeline (sprite_rom_finder.lua → Python):**
-
-```
-1. User clicks sprite in Mesen 2 emulator
-                    ↓
-2. Lua script captures: OAM index, VRAM tile, DMA log
-                    ↓
-3. JSON written to mesen2_exchange/
-                    ↓
-4. click_extractor.py parses JSON → OAMEntry, TileData
-                    ↓
-5. timing_correlator.py correlates tile with DMA events
-                    ↓
-6. address_space_bridge.py converts SA-1 addresses → canonical
-                    ↓
-7. tile_hash_database.py indexes ROM tiles (with flip variants)
-                    ↓
-8. rom_tile_matcher.py looks up VRAM tile hash → TileLocation[]
-                    ↓
-9. capture_to_rom_mapper.py scores candidates, detects ambiguity
-                    ↓
-10. Return ROM offset with confidence score
-```
-
-### SA-1 Address Space
-
-Kirby Super Star uses the SA-1 coprocessor, which has a different memory map than standard SNES. The `address_space_bridge.py` module handles:
-
-- **Canonical addresses**: Unified representation for both SNES and SA-1 addresses
-- **Staging buffer detection**: Identify WRAM, IRAM, BWRAM staging areas
-- **DMA source normalization**: Convert DMA sources to ROM file offsets
-
-**Example:**
-```python
-from core.mesen_integration import sa1_to_canonical, CanonicalAddress
-
-# SA-1 CPU address 0xC08000 → ROM file offset 0x000000
-canonical = sa1_to_canonical(0xC08000)
-# canonical.rom_offset == 0x000000 (bank 0xC0 maps to ROM start)
-```
-
-### Key Patterns
-
-**1. Tile Hash Lookup**
-
-Tiles are indexed by their content hash (not position). This allows finding matching tiles anywhere in ROM:
-
-```python
-from core.mesen_integration import ROMTileMatcher
-
-matcher = ROMTileMatcher(rom_data)
-matcher.build_database()
-
-# Lookup VRAM tile (32 bytes of 4bpp data)
-locations = matcher.lookup_vram_tile(tile_bytes)
-# Returns list of TileLocation(offset, flip_h, flip_v)
-```
-
-**2. Confidence Scoring**
-
-The mapper detects ambiguous matches (multiple ROM locations with same tile):
-
-```python
-from core.mesen_integration import CaptureToROMMapper
-
-mapper = CaptureToROMMapper(rom_path)
-result = mapper.map_capture(capture_json)
-
-if result.is_confident():
-    offset = result.primary_rom_offset
-else:
-    # Multiple candidates - may need manual verification
-    for entry in result.get_entries_for_offset(candidate):
-        print(f"  {entry.scored_percentage}% confidence")
-```
-
-**3. Full Pipeline**
-
-For end-to-end processing:
-
-```python
-from core.mesen_integration import CorrelationPipeline, format_pipeline_report
-
-pipeline = CorrelationPipeline(rom_path)
-pipeline.load_dma_log("mesen2_exchange/dma_log.txt")
-pipeline.load_captures("mesen2_exchange/sprite_capture_*.json")
-pipeline.build_database()
-
-results = pipeline.run()
-print(format_pipeline_report(results))
-```
-
-### Usage in SpritePal
-
-This subsystem is used by:
-
-1. **Manual Offset Control** (`ui/dialogs/manual_offset_dialog.py`) - For verifying ROM offsets
-2. **Automated extraction workflows** - When Mesen 2 captures are available
-3. **Development/debugging** - Understanding where sprite data comes from
-
-### Related Documentation
-
-- **Lua Scripts**: See `mesen2_integration/README.md` for script usage
-- **SNES/SA-1 Hardware**: See `docs/mesen2/00_STABLE_SNES_FACTS.md`
-- **Kirby-Specific Mapping**: See `docs/mesen2/03_GAME_MAPPING_KIRBY_SA1.md`
+**Related:** [mesen2_integration/README.md](../mesen2_integration/README.md) (Lua scripts), [00_STABLE_SNES_FACTS.md](mesen2/00_STABLE_SNES_FACTS.md) (SNES hardware)
 
 ---
 
@@ -926,6 +646,8 @@ The Frame Mapping workspace enables:
 | `MappingPanel` | `ui/frame_mapping/views/mapping_panel.py` | Paired frames table and injection |
 | `FrameMappingProject` | `core/frame_mapping_project.py` | Project data model and serialization |
 | `SpriteSelectionDialog` | `ui/frame_mapping/dialogs/` | Sprite selection with tile grouping |
+| `SpriteCompositor` | `core/services/sprite_compositor.py` | Applies alignment/preview transforms for composite rendering |
+| `ROMVerificationService` | `core/services/rom_verification_service.py` | Verifies ROM offsets before injection |
 
 ### Key Features
 
@@ -980,4 +702,4 @@ The Frame Mapping package follows UI layer rules:
 
 ---
 
-*Last updated: January 21, 2026 (Added Frame Mapping Subsystem documentation)*
+*Last updated: January 22, 2026 (Extracted Mesen subsystem to mesen2/architecture.md; consolidated Manager sections)*

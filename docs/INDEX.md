@@ -31,7 +31,7 @@ This is the central entry point for all SpritePal documentation.
 | Document | Purpose |
 |----------|---------|
 | [mesen2_integration/README.md](../mesen2_integration/README.md) | Lua scripts, click-to-find workflow, batch files |
-| [architecture.md → Mesen Integration](architecture.md#mesen-integration-subsystem) | Python subsystem architecture, data flow |
+| [mesen2/architecture.md](mesen2/architecture.md) | Python subsystem architecture, data flow, SA-1 address space |
 
 ## Test Documentation
 
@@ -64,7 +64,7 @@ This is the central entry point for all SpritePal documentation.
 | Trace data flows | [application_flows.md](application_flows.md) |
 | Qt signals/workers | [testing_guide.md](testing_guide.md) → Signal Reference |
 | Find sprite ROM offset | [mesen2_integration/README.md](../mesen2_integration/README.md) → Click-to-Find |
-| Understand Mesen integration | [architecture.md](architecture.md) → Mesen Integration Subsystem |
+| Understand Mesen integration | [mesen2/architecture.md](mesen2/architecture.md) |
 | Run Mesen2 capture pipeline | [docs/mesen2/01_BUILD_SPECIFIC_CONTRACT.md](mesen2/01_BUILD_SPECIFIC_CONTRACT.md) → Runbook |
 | Use embedded Sprite Editor | [application_flows.md](application_flows.md) → Section 5 (Sprite Editor Tab) |
 | Map AI frames to game frames | [README.md](../README.md) → Frame Mapping Workspace |
@@ -96,4 +96,4 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
 ---
 
-*Last updated: January 21, 2026 (Added Frame Mapping Workspace documentation and quick reference)*
+*Last updated: January 22, 2026 (Updated Mesen integration links after extraction to mesen2/architecture.md)*
