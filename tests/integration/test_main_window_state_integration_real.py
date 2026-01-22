@@ -244,7 +244,6 @@ class TestRealMainWindowStateIntegration:
             # Set up real signal spies (vs mock signal tracking)
             QSignalSpy(main_window.extract_requested)
             editor_spy = QSignalSpy(main_window.open_in_editor_requested)
-            QSignalSpy(main_window.arrange_rows_requested)
             grid_spy = QSignalSpy(main_window.arrange_grid_requested)
             QSignalSpy(main_window.inject_requested)
 

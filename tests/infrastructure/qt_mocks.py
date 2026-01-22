@@ -82,7 +82,6 @@ class RealTestMainWindow(QObject):
     # Define signals as class attributes (required by Qt)
     extract_requested = Signal()
     open_in_editor_requested = Signal(str)
-    arrange_rows_requested = Signal(str)
     arrange_grid_requested = Signal(str)
     inject_requested = Signal()
 

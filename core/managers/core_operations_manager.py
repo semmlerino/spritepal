@@ -89,13 +89,6 @@ class CoreOperationsManager(BaseManager):
     compression_info = Signal(object)  # compression statistics
     progress_percent = Signal(int)  # percent only (for progress bars)
 
-    # Cache signals (deprecated - UI no longer connects to these)
-    # Kept for internal logging, will be removed in Phase 3
-    cache_operation_started = Signal(str, str)  # operation, key
-    cache_hit = Signal(str, float)  # key, load_time
-    cache_miss = Signal(str)  # key
-    cache_saved = Signal(str, int)  # key, size_bytes
-
     def __init__(
         self,
         parent: QObject | None = None,
@@ -630,24 +623,12 @@ class CoreOperationsManager(BaseManager):
             # Validate ROM file exists
             FileValidator.validate_rom_file_exists_or_raise(rom_path)
 
-            # Emit cache operation signal
-            self.cache_operation_started.emit("Loading", "sprite_locations")
-
             # Delegate to service
             assert self._rom_extractor is not None
             assert self._rom_cache is not None
-            locations, cache_hit, time_saved = get_sprite_locations_with_cache(
+            locations, _cache_hit, _time_saved = get_sprite_locations_with_cache(
                 rom_path, self._rom_extractor, self._rom_cache
             )
-
-            # Emit cache result signals
-            if cache_hit:
-                self.cache_hit.emit("sprite_locations", time_saved)
-            else:
-                self.cache_miss.emit("sprite_locations")
-                if locations:
-                    self.cache_operation_started.emit("Saving", "sprite_locations")
-                    self.cache_saved.emit("sprite_locations", len(locations))
 
             return locations
         except (OSError, PermissionError) as e:
@@ -1074,13 +1055,12 @@ class CoreOperationsManager(BaseManager):
                     cache_success = rom_cache.save_rom_info(rom_path, result)
                     if cache_success:
                         self._logger.debug(f"Cached ROM info for future use: {rom_path}")
-                        self.cache_saved.emit("rom_info", 1)
 
                 except Exception as sprite_error:
                     self._logger.warning(f"Failed to load sprite locations: {sprite_error}")
                     result["sprite_locations_error"] = str(sprite_error)
-            elif rom_cache.save_rom_info(rom_path, result):
-                self.cache_saved.emit("rom_info", 1)
+            else:
+                rom_cache.save_rom_info(rom_path, result)
 
         except Exception as e:
             self._logger.exception("Failed to load ROM info")

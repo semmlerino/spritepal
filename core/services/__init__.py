@@ -29,8 +29,8 @@ from core.services.path_suggestion_service import (
     validate_path,
 )
 from core.services.preview_generator import (
-    LRUCache,
     PaletteData,
+    PreviewCache,
     PreviewGenerator,
     PreviewRequest,
     PreviewResult,
@@ -47,8 +47,8 @@ from core.services.tile_sampling_service import (
 from core.services.worker_lifecycle import WorkerManager
 
 __all__ = [
-    "LRUCache",
     "PaletteData",
+    "PreviewCache",
     "PreviewGenerator",
     "PreviewRequest",
     "PreviewResult",

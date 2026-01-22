@@ -256,10 +256,6 @@ class SpriteLocationData(TypedDict):
     offset_variants: NotRequired[list[int] | None]
 
 
-# Backwards compatibility alias
-SpriteLocation: TypeAlias = SpriteLocationData
-
-
 # Literal types for mode values and status
 PresetSource = Literal["builtin", "user", "imported"]
 InjectionMode = Literal["rom", "vram"]
@@ -400,7 +396,6 @@ __all__ = [
     "SimilarityScore",
     "SourceType",
     "SpriteInfo",
-    "SpriteLocation",
     "SpriteLocationData",
     "SpriteOffset",
     "SpritePreset",

@@ -156,10 +156,6 @@ class PreviewCache(BaseLRUCache[PreviewResult]):
         return result
 
 
-# Backward compatibility alias
-LRUCache = PreviewCache
-
-
 class PreviewGenerator(QObject):
     """Consolidated preview generation service with caching and thread safety.
 

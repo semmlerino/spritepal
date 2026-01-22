@@ -418,26 +418,6 @@ class TestFileValidatorFacade:
 
         Path(tmp.name).unlink()
 
-    def test_backward_compatibility_methods(self):
-        """Test backward compatibility wrapper methods."""
-        # Test _validate_basic_file_properties
-        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp:
-            tmp.write(b"test")
-            tmp.flush()
-
-            result = FileValidator._validate_basic_file_properties(tmp.name, {".txt"})
-            assert result.is_valid
-
-            # Test _get_file_info
-            info = FileValidator._get_file_info(tmp.name)
-            assert info.exists
-
-            # Test _format_file_size
-            size_str = FileValidator._format_file_size(1024)
-            assert size_str == "1KB"
-
-        Path(tmp.name).unlink()
-
     def test_validate_file_existence_facade(self):
         """Test file existence validation through facade."""
         result = FileValidator.validate_file_existence("/nonexistent/file.txt")

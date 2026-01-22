@@ -100,7 +100,6 @@ class MainWindow(QMainWindow):
     # Signals
     extract_requested = Signal()
     open_in_editor_requested = Signal(str)  # sprite file path
-    arrange_rows_requested = Signal(str)  # sprite file path for arrangement
     arrange_grid_requested = Signal(str)  # sprite file path for grid arrangement
     inject_requested = Signal()  # inject sprite to VRAM
 
@@ -621,18 +620,6 @@ class MainWindow(QMainWindow):
             self.undo_action.setEnabled(False)
             self.redo_action.setEnabled(False)
 
-    def _on_tab_changed(self, index: int) -> None:
-        """Handle legacy tab changes (now unused with workspace architecture).
-
-        With the workspace architecture, tabs are in the extraction dock
-        and don't need action zone visibility toggling.
-
-        Args:
-            index: Tab index (unused)
-        """
-        # Action zone is always visible with dock content
-        pass
-
     def switch_to_workspace(self, workspace_mode: WorkspaceMode, tab_index: int | None = None) -> None:
         """Switch to a specific workspace and optionally a tab within it.
 
@@ -768,9 +755,6 @@ class MainWindow(QMainWindow):
         """Update initial UI state after setup"""
         # Update extraction mode (for VRAM panel)
         self._on_extraction_mode_changed(self.extraction_panel.mode_combo.currentIndex())
-
-        # Sync action_zone visibility with current tab
-        self._on_tab_changed(self.extraction_tabs.currentIndex())
 
     def _setup_status_bar_indicators(self) -> None:
         """Set up permanent status bar indicators"""

@@ -690,28 +690,6 @@ class FileValidator:
         """
         return FormatValidator.validate_offset(offset, max_offset)
 
-    # Backward compatibility methods
-    @classmethod
-    def _validate_basic_file_properties(
-        cls,
-        path: str,
-        allowed_extensions: set[str] | None = None,
-        min_size: int | None = None,
-        max_size: int | None = None,
-    ) -> ValidationResult:
-        """Backward compatibility wrapper for basic file validation."""
-        return BasicFileValidator.validate_properties(path, allowed_extensions, min_size, max_size)
-
-    @classmethod
-    def _get_file_info(cls, path: str) -> FileInfo:
-        """Backward compatibility wrapper for file info retrieval."""
-        return BasicFileValidator.get_file_info(path)
-
-    @classmethod
-    def _format_file_size(cls, size_bytes: int) -> str:
-        """Backward compatibility wrapper for file size formatting."""
-        return BasicFileValidator.format_file_size(size_bytes)
-
     # --- Convenience methods that raise ValidationError on failure ---
 
     @staticmethod

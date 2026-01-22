@@ -643,13 +643,6 @@ class TestSignals:
         """injection_finished signal should exist."""
         assert hasattr(manager, "injection_finished")
 
-    def test_cache_signals_exist(self, manager):
-        """Cache signals should exist."""
-        assert hasattr(manager, "cache_operation_started")
-        assert hasattr(manager, "cache_hit")
-        assert hasattr(manager, "cache_miss")
-        assert hasattr(manager, "cache_saved")
-
 
 class TestROMInjectionSettings:
     """Tests for ROM injection settings persistence."""

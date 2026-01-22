@@ -17,9 +17,9 @@ from PIL import Image
 from PySide6.QtGui import QPixmap
 
 from core.services.preview_generator import (
-    # Test characteristics: Timer usage
-    LRUCache,
     PaletteData,
+    # Test characteristics: Timer usage
+    PreviewCache,
     PreviewGenerator,
     PreviewRequest,
     PreviewResult,
@@ -41,12 +41,12 @@ pytestmark = [
 ]
 
 
-class TestLRUCache:
+class TestPreviewCache:
     """Test the LRU cache implementation."""
 
     def test_cache_creation(self):
         """Test cache creation with different sizes."""
-        cache = LRUCache(max_size=10)
+        cache = PreviewCache(max_size=10)
         assert cache.max_size == 10
         assert cache.get_stats()["cache_size"] == 0
 
@@ -60,7 +60,7 @@ class TestLRUCache:
 
     def test_cache_put_and_get(self):
         """Test basic cache put and get operations."""
-        cache = LRUCache(max_size=3)
+        cache = PreviewCache(max_size=3)
 
         # Create mock preview result
         pixmap = ThreadSafeTestImage(64, 64)
@@ -86,7 +86,7 @@ class TestLRUCache:
 
     def test_cache_eviction(self):
         """Test LRU eviction when cache is full."""
-        cache = LRUCache(max_size=2)
+        cache = PreviewCache(max_size=2)
 
         # Create test results
         results = []
@@ -115,7 +115,7 @@ class TestLRUCache:
 
     def test_cache_lru_ordering(self):
         """Test that least recently used items are evicted first."""
-        cache = LRUCache(max_size=2)
+        cache = PreviewCache(max_size=2)
 
         # Create test results
         pixmap = ThreadSafeTestImage(64, 64)
@@ -140,7 +140,7 @@ class TestLRUCache:
 
     def test_cache_clear(self):
         """Test cache clearing."""
-        cache = LRUCache(max_size=5)
+        cache = PreviewCache(max_size=5)
 
         # Add some items
         pixmap = ThreadSafeTestImage(64, 64)
@@ -161,7 +161,7 @@ class TestLRUCache:
 
     def test_cache_byte_size_tracking(self):
         """Test that cache tracks byte size correctly."""
-        cache = LRUCache(max_size=100, max_bytes=1024 * 1024)  # 1MB limit
+        cache = PreviewCache(max_size=100, max_bytes=1024 * 1024)  # 1MB limit
 
         pixmap = ThreadSafeTestImage(64, 64)  # 64*64*4 = 16KB
         pil_image = Image.new("RGB", (64, 64))  # 64*64*3 = 12KB
@@ -180,7 +180,7 @@ class TestLRUCache:
     def test_cache_byte_limit_eviction(self):
         """Test that cache evicts when byte limit is reached."""
         # Small byte limit to trigger eviction (~30KB limit)
-        cache = LRUCache(max_size=100, max_bytes=30 * 1024)
+        cache = PreviewCache(max_size=100, max_bytes=30 * 1024)
 
         # Each result is ~28KB (64*64*4 + 64*64*3 + 100)
         results = []
@@ -222,7 +222,7 @@ class TestLRUCache:
 
     def test_cache_stats_include_byte_info(self):
         """Test that cache stats include byte size information."""
-        cache = LRUCache(max_size=10, max_bytes=1024 * 1024)
+        cache = PreviewCache(max_size=10, max_bytes=1024 * 1024)
 
         stats = cache.get_stats()
 
@@ -236,7 +236,7 @@ class TestLRUCache:
 
     def test_cache_clear_resets_bytes(self):
         """Test that clearing cache resets byte tracking."""
-        cache = LRUCache(max_size=10, max_bytes=1024 * 1024)
+        cache = PreviewCache(max_size=10, max_bytes=1024 * 1024)
 
         pixmap = ThreadSafeTestImage(64, 64)
         pil_image = Image.new("RGB", (64, 64))
@@ -572,7 +572,7 @@ def test_cache_performance(qapp):
 
     Requires qapp fixture to ensure QApplication exists.
     """
-    cache = LRUCache(max_size=100)
+    cache = PreviewCache(max_size=100)
 
     # Pre-fill cache - use ThreadSafeTestImage for consistency
     pixmap = ThreadSafeTestImage(64, 64)
