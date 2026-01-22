@@ -521,6 +521,7 @@ class ROMInjector(SpriteInjector):
         force: bool = False,
         compression_type: CompressionType = CompressionType.HAL,
         header_bytes: bytes = b"",
+        preserve_existing: bool = False,
     ) -> tuple[bool, str]:
         """
         Inject sprite directly into ROM file with validation and backup.
@@ -539,6 +540,9 @@ class ROMInjector(SpriteInjector):
             header_bytes: Leading bytes stripped during extraction that must be prepended
                          back to the tile data before compression/injection to preserve
                          the original byte sequence and prevent color shift.
+            preserve_existing: If True and output_path exists, read from output_path instead
+                              of copying from rom_path. Use this for batch injections to
+                              preserve prior injections in the output ROM.
 
         Returns:
             Tuple of (success, message)
@@ -553,35 +557,46 @@ class ROMInjector(SpriteInjector):
                 rom_path, sprite_offset, lenient_checksum=ignore_checksum
             )
 
-            # Create ROM copy for injection if output differs from input
-            # The original ROM remains untouched as a backup
-            if output_path != rom_path:
-                try:
-                    self.copy_rom_for_injection(rom_path, output_path)
-                except Exception as e:
-                    logger.error(f"ROM copy creation failed: {e}")
-                    return False, (
-                        f"Cannot proceed: failed to create ROM copy ({e}). "
-                        "Ensure you have write permissions in the ROM directory."
-                    )
-            elif create_backup:
-                # Legacy behavior: if output_path == rom_path, create timestamped backup
-                try:
-                    backup_path = ROMBackupManager.create_backup(rom_path)
-                    logger.info(f"Created backup: {backup_path}")
-                except Exception as e:
-                    logger.error(f"Backup creation failed: {e}")
-                    return False, (
-                        f"Cannot proceed: backup creation failed ({e}). "
-                        "Refusing to modify ROM without a backup. "
-                        "Free up disk space or fix permissions and retry."
-                    )
+            # Determine source ROM for reading:
+            # - preserve_existing=True and output_path exists: read from output_path to preserve prior injections
+            # - Otherwise: read from rom_path (and optionally copy to output_path)
+            if preserve_existing and output_path and Path(output_path).exists():
+                # Batch injection: read from output to preserve prior injections
+                source_rom_path = output_path
+                logger.info(f"Preserving existing output ROM: reading from {Path(output_path).name}")
+            else:
+                # First injection or new output: use original rom_path
+                source_rom_path = rom_path
+
+                # Create ROM copy for injection if output differs from input
+                # The original ROM remains untouched as a backup
+                if output_path != rom_path:
+                    try:
+                        self.copy_rom_for_injection(rom_path, output_path)
+                    except Exception as e:
+                        logger.error(f"ROM copy creation failed: {e}")
+                        return False, (
+                            f"Cannot proceed: failed to create ROM copy ({e}). "
+                            "Ensure you have write permissions in the ROM directory."
+                        )
+                elif create_backup:
+                    # Legacy behavior: if output_path == rom_path, create timestamped backup
+                    try:
+                        backup_path = ROMBackupManager.create_backup(rom_path)
+                        logger.info(f"Created backup: {backup_path}")
+                    except Exception as e:
+                        logger.error(f"Backup creation failed: {e}")
+                        return False, (
+                            f"Cannot proceed: backup creation failed ({e}). "
+                            "Refusing to modify ROM without a backup. "
+                            "Free up disk space or fix permissions and retry."
+                        )
 
             # Read ROM header (using improved method)
-            self.header = self.read_rom_header(rom_path)
+            self.header = self.read_rom_header(source_rom_path)
 
-            # Load ROM data
-            with Path(rom_path).open("rb") as f:
+            # Load ROM data from source ROM
+            with Path(source_rom_path).open("rb") as f:
                 self.rom_data = bytearray(f.read())
 
             # Adjust sprite offset for SMC header (ROM offset -> file offset)

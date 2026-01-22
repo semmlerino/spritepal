@@ -729,6 +729,7 @@ class FrameMappingController(QObject):
         create_backup: bool = True,
         debug: bool = False,
         force_raw: bool = False,
+        allow_fallback: bool = False,
     ) -> bool:
         """Inject a mapped frame into the ROM using tile-aware masking.
 
@@ -750,6 +751,9 @@ class FrameMappingController(QObject):
             create_backup: Whether to create a backup before injection
             debug: Enable debug mode (saves intermediate images to /tmp/inject_debug/)
             force_raw: Force RAW (uncompressed) injection for all tiles, skip HAL compression
+            allow_fallback: If True, allow fallback to rom_offset filtering or all entries
+                           when stored entry IDs are stale. If False (default), abort injection
+                           and emit stale_entries_warning for user to decide.
 
         Returns:
             True if injection was successful
@@ -850,26 +854,47 @@ class FrameMappingController(QObject):
                 selected_ids = set(game_frame.selected_entry_ids)
                 relevant_entries = [e for e in capture_result.entries if e.id in selected_ids]
 
-                # Fallback if stored IDs are stale (mirrors preview at line 601)
+                # Fallback if stored IDs are stale
                 if not relevant_entries:
                     logger.warning(
-                        "Stored entry IDs %s not found in capture %s. Using rom_offset fallback.",
+                        "Stored entry IDs %s not found in capture %s.",
                         game_frame.selected_entry_ids,
                         game_frame.capture_path,
                     )
                     self.stale_entries_warning.emit(game_frame.id)
-                    # Fallback to rom_offset filtering
+
+                    if not allow_fallback:
+                        # Abort injection - let caller handle (show dialog, retry with allow_fallback=True)
+                        self.error_occurred.emit(
+                            f"Entry selection for '{game_frame.id}' is outdated. "
+                            "Reimport the capture or enable fallback mode."
+                        )
+                        return False
+
+                    # Fallback to rom_offset filtering (user allowed it)
+                    logger.info("Using rom_offset fallback (allow_fallback=True)")
                     relevant_entries = [e for e in capture_result.entries if e.rom_offset in game_frame.rom_offsets]
             else:
                 relevant_entries = [e for e in capture_result.entries if e.rom_offset in game_frame.rom_offsets]
 
             if not relevant_entries:
-                # Last resort: use all entries (mirrors preview behavior)
+                # Last resort: use all entries
                 logger.warning(
-                    "No entries match stored IDs or ROM offsets for frame %s. Using all entries.",
+                    "No entries match stored IDs or ROM offsets for frame %s.",
                     game_frame.id,
                 )
                 self.stale_entries_warning.emit(game_frame.id)
+
+                if not allow_fallback:
+                    # Abort injection - let caller handle
+                    self.error_occurred.emit(
+                        f"No valid entries found for '{game_frame.id}'. "
+                        "The capture file may have changed. Reimport the capture."
+                    )
+                    return False
+
+                # Use all entries (user allowed fallback)
+                logger.info("Using all entries fallback (allow_fallback=True)")
                 relevant_entries = capture_result.entries
 
             # Create filtered capture for compositing
@@ -937,7 +962,9 @@ class FrameMappingController(QObject):
         # Determine injection target:
         # - If output_path is provided and exists, use it directly (for batch injection)
         # - Otherwise, create a new numbered copy of the source ROM
-        if output_path and output_path.exists():
+        # Track whether we're reusing an existing ROM (vs freshly created) for preserve_existing logic
+        using_existing_output = output_path is not None and output_path.exists()
+        if using_existing_output:
             injection_rom_path = output_path
             logger.info("Using existing output ROM: %s", injection_rom_path)
         else:
@@ -1251,6 +1278,8 @@ class FrameMappingController(QObject):
                         "ROM offset 0x%X: Injecting as RAW (uncompressed) tile",
                         rom_offset,
                     )
+                    # preserve_existing=True when reusing an existing output ROM or for subsequent injections
+                    # This prevents overwriting prior injections when batch injecting
                     result, message = injector.inject_sprite_to_rom(
                         sprite_path=str(chunk_path),
                         rom_path=str(rom_path) if first_injection else current_rom_path,
@@ -1261,9 +1290,11 @@ class FrameMappingController(QObject):
                         ignore_checksum=True,
                         force=False,
                         compression_type=CompressionType.RAW,
+                        preserve_existing=using_existing_output or not first_injection,
                     )
                 else:
                     # Try HAL compression first
+                    # preserve_existing=True when reusing an existing output ROM or for subsequent injections
                     result, message = injector.inject_sprite_to_rom(
                         sprite_path=str(chunk_path),
                         rom_path=str(rom_path) if first_injection else current_rom_path,
@@ -1274,6 +1305,7 @@ class FrameMappingController(QObject):
                         ignore_checksum=True,
                         force=False,
                         compression_type=CompressionType.HAL,
+                        preserve_existing=using_existing_output or not first_injection,
                     )
 
                     # If HAL failed (decompression error OR data too large), try RAW
@@ -1294,6 +1326,7 @@ class FrameMappingController(QObject):
                             ignore_checksum=True,
                             force=False,
                             compression_type=CompressionType.RAW,
+                            preserve_existing=using_existing_output or not first_injection,
                         )
 
                 # Cleanup temp file

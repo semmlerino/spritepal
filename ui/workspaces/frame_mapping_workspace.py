@@ -93,6 +93,9 @@ class FrameMappingWorkspace(QWidget):
         # Auto-advance toggle state (default: OFF per UX spec)
         self._auto_advance_enabled = False
 
+        # Track stale entry warnings during injection (for retry with fallback)
+        self._stale_entry_frame_id: str | None = None
+
         # Create controller
         self._controller = FrameMappingController(self)
 
@@ -708,17 +711,40 @@ class FrameMappingWorkspace(QWidget):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
+        # Clear stale entry tracking before injection
+        self._stale_entry_frame_id = None
+
         # Either reuse existing ROM or let inject_mapping create a new copy
         if can_reuse:
             target_rom = cast(Path, self._last_injected_rom)
-            success = self._controller.inject_mapping(ai_frame_index, rom_path, output_path=target_rom)
         else:
             # Create a new copy for injection
             target_rom = self._controller.create_injection_copy(rom_path)
             if target_rom is None:
                 QMessageBox.critical(self, "Inject Frame", "Failed to create ROM copy for injection.")
                 return
-            success = self._controller.inject_mapping(ai_frame_index, rom_path, output_path=target_rom)
+
+        # Try injection with strict entry validation (no fallback)
+        success = self._controller.inject_mapping(ai_frame_index, rom_path, output_path=target_rom)
+
+        # If injection failed due to stale entries, offer to retry with fallback
+        if not success and self._stale_entry_frame_id is not None:
+            retry_reply = QMessageBox.question(
+                self,
+                "Entry Selection Outdated",
+                f"The stored entry selection for '{self._stale_entry_frame_id}' no longer "
+                f"matches the capture file.\n\n"
+                f"Would you like to inject using ROM offset filtering instead?\n\n"
+                f"Note: This may include unintended sprite entries. "
+                f"To avoid this, reimport the capture with updated entry selection.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if retry_reply == QMessageBox.StandardButton.Yes:
+                # Retry with allow_fallback=True
+                success = self._controller.inject_mapping(
+                    ai_frame_index, rom_path, output_path=target_rom, allow_fallback=True
+                )
 
         # Track the successfully used ROM for future reuse
         if success:
@@ -774,20 +800,29 @@ class FrameMappingWorkspace(QWidget):
                 QMessageBox.critical(self, "Inject Selected", "Failed to create ROM copy for injection.")
                 return
 
+        # Clear stale entry tracking before batch injection
+        self._stale_entry_frame_id = None
+
         # Inject selected frames into the same copy
         success_count = 0
+        failed_due_to_stale = 0
         for ai_index in selected_indices:
+            self._stale_entry_frame_id = None  # Reset for each frame
             if self._controller.inject_mapping(ai_index, rom_path, output_path=target_rom):
                 success_count += 1
+            elif self._stale_entry_frame_id is not None:
+                failed_due_to_stale += 1
 
         # Track the successfully used ROM for future reuse
         if success_count > 0:
             self._last_injected_rom = target_rom
 
+        # Report results
+        msg = f"Injected {success_count}/{frame_count} selected frames into {target_rom.name}"
+        if failed_due_to_stale > 0:
+            msg += f"\n{failed_due_to_stale} frame(s) skipped due to outdated entry selection."
         if self._message_service:
-            self._message_service.show_message(
-                f"Injected {success_count}/{frame_count} selected frames into {target_rom.name}"
-            )
+            self._message_service.show_message(msg)
 
     def _on_inject_all(self) -> None:
         """Handle inject all mapped frames request."""
@@ -837,23 +872,32 @@ class FrameMappingWorkspace(QWidget):
                 QMessageBox.critical(self, "Inject All", "Failed to create ROM copy for injection.")
                 return
 
+        # Clear stale entry tracking before batch injection
+        self._stale_entry_frame_id = None
+
         # Inject all mapped frames into the same copy
         success_count = 0
+        failed_due_to_stale = 0
         for ai_frame in project.ai_frames:
             mapping = project.get_mapping_for_ai_frame_index(ai_frame.index)
             if mapping:
+                self._stale_entry_frame_id = None  # Reset for each frame
                 # Pass the created copy as output_path to avoid creating new copies
                 if self._controller.inject_mapping(ai_frame.index, rom_path, output_path=target_rom):
                     success_count += 1
+                elif self._stale_entry_frame_id is not None:
+                    failed_due_to_stale += 1
 
         # Track the successfully used ROM for future reuse
         if success_count > 0:
             self._last_injected_rom = target_rom
 
+        # Report results
+        msg = f"Injected {success_count}/{project.mapped_count} frames into {target_rom.name}"
+        if failed_due_to_stale > 0:
+            msg += f"\n{failed_due_to_stale} frame(s) skipped due to outdated entry selection."
         if self._message_service:
-            self._message_service.show_message(
-                f"Injected {success_count}/{project.mapped_count} frames into {target_rom.name}"
-            )
+            self._message_service.show_message(msg)
 
     def _on_mapping_injected(self, ai_index: int, message: str) -> None:
         """Handle successful injection signal."""
@@ -888,15 +932,11 @@ class FrameMappingWorkspace(QWidget):
     def _on_stale_entries_warning(self, frame_id: str) -> None:
         """Handle stale entry ID warning from controller.
 
-        Shows a blocking dialog to inform user that stored entry selection is outdated.
+        Tracks the frame ID for potential retry with allow_fallback=True.
+        The injection will abort by default, and the caller can offer a retry option.
         """
-        QMessageBox.warning(
-            self,
-            "Entry Selection Stale",
-            f"The stored entry selection for '{frame_id}' is outdated.\n\n"
-            f"All entries from the capture will be used instead.\n\n"
-            f"To fix this, reimport the capture with updated entry selection.",
-        )
+        logger.info("Stale entries detected for frame '%s'", frame_id)
+        self._stale_entry_frame_id = frame_id
 
     # -------------------------------------------------------------------------
     # Helper Methods

@@ -1895,3 +1895,271 @@ class TestCompressionTypeSelection:
         assert len(injected_compression) == 1
         # Should default to RAW when no stored type
         assert injected_compression[0] == CompressionType.RAW
+
+
+class TestAllowFallbackParameter:
+    """Tests for the allow_fallback parameter in inject_mapping.
+
+    By default (allow_fallback=False), injection should abort when entry IDs are stale.
+    When allow_fallback=True, it should fall back to rom_offset filtering.
+    """
+
+    def test_injection_aborts_on_stale_entry_ids_without_allow_fallback(self, tmp_path: Path, qtbot) -> None:
+        """Injection should abort when stored entry IDs are stale and allow_fallback=False.
+
+        This is the default safe behavior to prevent silent data corruption.
+        """
+        rom_offset = 0x123456
+        capture_data = create_test_capture(
+            entry_ids=[10, 20],
+            rom_offsets=[rom_offset, rom_offset],
+        )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create AI frame
+        ai_frame_path = tmp_path / "ai_frame.png"
+        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
+
+        # Create project with stale selected_entry_ids
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[rom_offset],
+                selected_entry_ids=[99, 100],  # Stale IDs not in capture
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Create dummy ROM
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(b"\x00" * 0x200000)
+
+        # Injection should abort and emit stale_entries_warning + error_occurred
+        with qtbot.waitSignal(controller.stale_entries_warning, timeout=1000):
+            result = controller.inject_mapping(0, rom_path, allow_fallback=False)
+
+        # Should return False (aborted)
+        assert result is False
+
+    def test_injection_uses_fallback_when_explicitly_allowed(self, tmp_path: Path, qtbot) -> None:
+        """Injection should use rom_offset fallback when allow_fallback=True."""
+        tile_data = bytes([0x11] * 32)
+        tile_hex = tile_data.hex()
+
+        rom_offset = 0x35000
+        capture_data = create_capture_with_tile_data(
+            entry_id=10,
+            rom_offset=rom_offset,
+            tile_data_hex=tile_hex,
+        )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        rom_data = bytearray(0x200000)
+        rom_data[rom_offset : rom_offset + 32] = tile_data
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(bytes(rom_data))
+
+        ai_frame_path = tmp_path / "ai_frame.png"
+        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
+
+        # Create project with stale selected_entry_ids but valid rom_offsets
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[rom_offset],
+                selected_entry_ids=[99],  # Stale ID
+                compression_types={rom_offset: "raw"},
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        captured_entries: list[int] = []
+
+        def mock_render_selection(self):
+            for entry in self.capture.entries:
+                captured_entries.append(entry.id)
+            return Image.new("RGBA", (8, 8), (0, 0, 0, 255))
+
+        with (
+            patch(
+                "core.mesen_integration.capture_renderer.CaptureRenderer.render_selection",
+                mock_render_selection,
+            ),
+            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+            qtbot.waitSignal(controller.stale_entries_warning, timeout=1000),
+        ):
+            mock_injector = MagicMock()
+            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
+            mock_injector_class.return_value = mock_injector
+
+            (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
+
+            # With allow_fallback=True, injection should proceed using rom_offset filtering
+            result = controller.inject_mapping(0, rom_path, allow_fallback=True)
+
+        assert result is True
+        # Should have used entry 10 via rom_offset fallback
+        assert 10 in captured_entries
+
+
+class TestPreserveExistingParameter:
+    """Tests for the preserve_existing parameter in inject_mapping.
+
+    When using "Reuse ROM" option, subsequent injections should preserve prior injections
+    by reading from the output ROM instead of copying from the original ROM.
+    """
+
+    def test_preserve_existing_passed_to_injector_for_existing_output(self, tmp_path: Path, qtbot) -> None:
+        """When output_path exists, preserve_existing should be True for first injection."""
+        tile_data = bytes([0x11] * 32)
+        tile_hex = tile_data.hex()
+
+        rom_offset = 0x35000
+        capture_data = create_capture_with_tile_data(
+            entry_id=10,
+            rom_offset=rom_offset,
+            tile_data_hex=tile_hex,
+        )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        rom_data = bytearray(0x200000)
+        rom_data[rom_offset : rom_offset + 32] = tile_data
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(bytes(rom_data))
+
+        # Create existing output ROM (simulating "Reuse ROM" scenario)
+        output_rom_path = tmp_path / "output.sfc"
+        output_rom_path.write_bytes(bytes(rom_data))
+
+        ai_frame_path = tmp_path / "ai_frame.png"
+        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[rom_offset],
+                selected_entry_ids=[10],
+                compression_types={rom_offset: "raw"},
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        preserve_existing_values: list[bool] = []
+
+        with (
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+        ):
+            mock_injector = MagicMock()
+            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+
+            def capture_preserve_existing(**kwargs):
+                preserve_existing_values.append(kwargs.get("preserve_existing", False))
+                return (True, "Success")
+
+            mock_injector.inject_sprite_to_rom.side_effect = capture_preserve_existing
+            mock_injector_class.return_value = mock_injector
+
+            # Inject with existing output_path (simulates "Reuse ROM")
+            result = controller.inject_mapping(0, rom_path, output_path=output_rom_path)
+
+        assert result is True
+        # Since output_path exists, preserve_existing should be True
+        assert len(preserve_existing_values) == 1
+        assert preserve_existing_values[0] is True
+
+    def test_preserve_existing_false_for_fresh_copy(self, tmp_path: Path, qtbot) -> None:
+        """When creating a fresh copy, preserve_existing should be False for first injection."""
+        tile_data = bytes([0x11] * 32)
+        tile_hex = tile_data.hex()
+
+        rom_offset = 0x35000
+        capture_data = create_capture_with_tile_data(
+            entry_id=10,
+            rom_offset=rom_offset,
+            tile_data_hex=tile_hex,
+        )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        rom_data = bytearray(0x200000)
+        rom_data[rom_offset : rom_offset + 32] = tile_data
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(bytes(rom_data))
+
+        ai_frame_path = tmp_path / "ai_frame.png"
+        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[rom_offset],
+                selected_entry_ids=[10],
+                compression_types={rom_offset: "raw"},
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        preserve_existing_values: list[bool] = []
+
+        with (
+            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "new_output.sfc"),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+        ):
+            mock_injector = MagicMock()
+            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+
+            def capture_preserve_existing(**kwargs):
+                preserve_existing_values.append(kwargs.get("preserve_existing", False))
+                return (True, "Success")
+
+            mock_injector.inject_sprite_to_rom.side_effect = capture_preserve_existing
+            mock_injector_class.return_value = mock_injector
+
+            # Need to create the output file since _create_injection_copy is mocked
+            (tmp_path / "new_output.sfc").write_bytes(bytes(rom_data))
+
+            # Inject without existing output_path (creates new copy)
+            # Note: output_path=None means controller creates a fresh copy
+            result = controller.inject_mapping(0, rom_path, output_path=None)
+
+        assert result is True
+        # Since a fresh copy was created, preserve_existing should be False
+        assert len(preserve_existing_values) == 1
+        assert preserve_existing_values[0] is False
