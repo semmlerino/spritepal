@@ -3,6 +3,7 @@ import pytest
 from PySide6.QtTest import QSignalSpy
 
 from ui.sprite_editor.controllers.editing_controller import EditingController
+from ui.sprite_editor.views.workspaces.edit_workspace import EditWorkspace
 
 
 @pytest.fixture
@@ -173,3 +174,137 @@ def test_palette_signals(qtbot, controller):
     current_colors = controller.get_current_colors()
     assert current_colors[0] == (0, 0, 0)
     assert current_colors[1] == (10, 10, 10)
+
+
+# =============================================================================
+# Merged from tests/ui/test_shared_controller_bug.py
+# =============================================================================
+
+
+def test_shared_controller_multiple_views(qtbot):
+    """Regression test: connecting workspace2 must not disconnect workspace1.
+
+    This verifies that when multiple workspaces share a controller,
+    connecting a second workspace doesn't break signal delivery to the first.
+
+    (Merged from tests/ui/test_shared_controller_bug.py)
+    """
+    # Shared controller
+    controller = EditingController()
+
+    # Create two workspaces
+    workspace1 = EditWorkspace()
+    workspace2 = EditWorkspace()
+
+    # Wire workspace1 to controller
+    workspace1.set_controller(controller)
+
+    # Set a known palette state on workspace1
+    initial_palette = [(0, 0, 0)] * 16
+    initial_palette[5] = (100, 100, 100)  # Gray
+    controller.set_palette(initial_palette, "Initial")
+
+    # Verify workspace1 has the initial palette
+    assert workspace1.palette_panel.get_color_at(5) == (100, 100, 100)
+
+    # Now wire workspace2 to the same controller
+    # This is the critical moment - workspace1 should NOT be disconnected
+    workspace2.set_controller(controller)
+
+    # Change the palette via controller
+    new_palette = [(0, 0, 0)] * 16
+    new_palette[5] = (255, 0, 0)  # Red
+    controller.set_palette(new_palette, "Changed")
+
+    # If workspace1 was disconnected, it won't see the new palette
+    assert workspace1.palette_panel.get_color_at(5) == (255, 0, 0), (
+        "Workspace 1 was disconnected by Workspace 2's set_controller call! "
+        "Expected (255, 0, 0) but palette wasn't updated."
+    )
+
+    # Verify workspace2 also received the update
+    assert workspace2.palette_panel.get_color_at(5) == (255, 0, 0)
+
+
+# =============================================================================
+# Bug 1: Undo signal not emitted after clear (from test_ui_logic_desync_fixes.py)
+# =============================================================================
+
+
+class TestBug1UndoSignalAfterClear:
+    """Bug 1: Undo signal must be emitted after clearing undo history."""
+
+    def test_load_image_emits_undo_signal(self, qtbot) -> None:
+        """load_image() should emit undoStateChanged after clearing history.
+
+        After loading an image, the undo state should be (can_undo=False, can_redo=False)
+        and this state must be communicated via the undoStateChanged signal.
+        """
+        controller = EditingController()
+
+        # First, create some undo history
+        initial_data = np.zeros((8, 8), dtype=np.uint8)
+        controller.load_image(initial_data)
+        controller.set_selected_color(1)
+        controller.handle_pixel_press(0, 0)
+        controller.handle_pixel_release(0, 0)
+
+        # Verify we have undo state
+        assert controller.undo_manager.can_undo()
+
+        # Create new spy AFTER we have undo history
+        spy_undo = QSignalSpy(controller.undoStateChanged)
+        assert spy_undo.count() == 0
+
+        # Load a new image - this should clear undo history AND emit signal
+        new_data = np.ones((8, 8), dtype=np.uint8)
+        controller.load_image(new_data)
+
+        # Bug 1: undoStateChanged should be emitted after load_image clears history
+        assert spy_undo.count() >= 1, "undoStateChanged must be emitted after load_image"
+        last_args = spy_undo.at(spy_undo.count() - 1)
+        assert last_args[0] is False, "can_undo should be False after load_image"
+        assert last_args[1] is False, "can_redo should be False after load_image"
+
+
+# =============================================================================
+# Bug 3: Palette sources persist across ROM loads (from test_ui_logic_desync_fixes.py)
+# =============================================================================
+
+
+class TestBug3PaletteSourcesPersistence:
+    """Bug 3: Palette sources must be cleared when loading a new ROM."""
+
+    def test_editing_controller_clears_rom_sources(self, qtbot) -> None:
+        """EditingController should emit paletteSourcesCleared for 'rom' type."""
+        controller = EditingController()
+        spy_cleared = QSignalSpy(controller.paletteSourcesCleared)
+
+        # Register a ROM palette source
+        controller.register_palette_source("rom", 0, [(0, 0, 0)] * 16, "ROM Palette")
+        assert ("rom", 0) in controller._palette_sources
+
+        # Clear ROM sources
+        controller.clear_palette_sources("rom")
+
+        # Bug 3: Signal should be emitted
+        assert spy_cleared.count() >= 1, "paletteSourcesCleared should be emitted"
+        assert spy_cleared.at(spy_cleared.count() - 1)[0] == "rom"
+        assert ("rom", 0) not in controller._palette_sources
+
+    def test_editing_controller_clears_mesen_sources(self, qtbot) -> None:
+        """EditingController should emit paletteSourcesCleared for 'mesen' type."""
+        controller = EditingController()
+        spy_cleared = QSignalSpy(controller.paletteSourcesCleared)
+
+        # Register a Mesen palette source
+        controller.register_palette_source("mesen", 0, [(0, 0, 0)] * 16, "Mesen Capture")
+        assert ("mesen", 0) in controller._palette_sources
+
+        # Clear Mesen sources
+        controller.clear_palette_sources("mesen")
+
+        # Bug 3: Signal should be emitted
+        assert spy_cleared.count() >= 1, "paletteSourcesCleared should be emitted"
+        assert spy_cleared.at(spy_cleared.count() - 1)[0] == "mesen"
+        assert ("mesen", 0) not in controller._palette_sources
