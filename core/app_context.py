@@ -290,6 +290,10 @@ def create_app_context(
     settings_path: Path | None = None,
     configuration_service: ConfigurationService | None = None,
     qt_parent: QObject | None = None,
+    *,
+    hal_compressor: HALCompressor | None = None,
+    sprite_config_loader: SpriteConfigLoader | None = None,
+    default_palette_loader: DefaultPaletteLoader | None = None,
 ) -> AppContext:
     """
     Create and set the global AppContext.
@@ -326,6 +330,9 @@ def create_app_context(
         settings_path: Optional custom path for settings file (for testing)
         configuration_service: Optional pre-created ConfigurationService
         qt_parent: Optional Qt parent for managers (uses QApplication.instance() if None)
+        hal_compressor: Optional pre-created HALCompressor (for session-scoped caching in tests)
+        sprite_config_loader: Optional pre-created SpriteConfigLoader (for session-scoped caching)
+        default_palette_loader: Optional pre-created DefaultPaletteLoader (for session-scoped caching)
 
     Returns:
         The created AppContext
@@ -375,18 +382,29 @@ def create_app_context(
         logger.debug("SpritePresetManager created")
 
         # 4. Create shared stateless services (used by multiple components)
+        # These can be pre-created and passed in for session-scoped caching in tests
+        # Import locally to avoid shadowing parameter names
         from core.default_palette_loader import DefaultPaletteLoader
         from core.hal_compression import HALCompressor
         from core.sprite_config_loader import SpriteConfigLoader
 
-        hal_compressor = HALCompressor()
-        logger.debug("HALCompressor created (shared)")
+        if hal_compressor is None:
+            hal_compressor = HALCompressor()
+            logger.debug("HALCompressor created (shared)")
+        else:
+            logger.debug("HALCompressor provided (cached)")
 
-        sprite_config_loader = SpriteConfigLoader()
-        logger.debug("SpriteConfigLoader created (shared)")
+        if sprite_config_loader is None:
+            sprite_config_loader = SpriteConfigLoader()
+            logger.debug("SpriteConfigLoader created (shared)")
+        else:
+            logger.debug("SpriteConfigLoader provided (cached)")
 
-        default_palette_loader = DefaultPaletteLoader()
-        logger.debug("DefaultPaletteLoader created (shared)")
+        if default_palette_loader is None:
+            default_palette_loader = DefaultPaletteLoader()
+            logger.debug("DefaultPaletteLoader created (shared)")
+        else:
+            logger.debug("DefaultPaletteLoader provided (cached)")
 
         # 5. Create ROMCache and ROMExtractor (needed by CoreOperationsManager)
         from core.rom_extractor import ROMExtractor

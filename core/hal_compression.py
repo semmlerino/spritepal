@@ -990,6 +990,20 @@ class HALProcessPool:
 class HALCompressor:
     """Handles HAL compression/decompression for ROM injection"""
 
+    # Class-level cache for discovered tool paths to avoid repeated filesystem searches
+    # This provides significant speedup in test suites where HALCompressor is instantiated per-test
+    _tool_path_cache: dict[str, str] = {}
+
+    @classmethod
+    def clear_tool_cache(cls) -> None:
+        """Clear the cached tool paths.
+
+        Call this if tool binaries have moved or been recompiled.
+        Primarily useful for testing scenarios.
+        """
+        cls._tool_path_cache.clear()
+        logger.debug("HAL tool path cache cleared")
+
     def __init__(self, exhal_path: str | None = None, inhal_path: str | None = None, use_pool: bool = True):
         """
         Initialize HAL compressor.
@@ -1031,15 +1045,26 @@ class HALCompressor:
                 self._pool_failed = True
 
     def _find_tool(self, tool_name: str, provided_path: str | None = None) -> str:
-        """Find HAL compression tool executable"""
-        logger.info(f"Searching for {tool_name} tool")
+        """Find HAL compression tool executable.
 
+        Uses a class-level cache to avoid repeated filesystem searches.
+        The cache is keyed by tool_name and persists across instances.
+        """
+        # If explicit path provided, validate and return (don't cache user-provided paths)
         if provided_path:
             logger.debug(f"Checking provided path: {provided_path}")
             if Path(provided_path).is_file():
                 logger.info(f"Using provided {tool_name} at: {provided_path}")
                 return provided_path
             logger.warning(f"Provided path does not exist: {provided_path}")
+
+        # Check cache first (significant speedup in test suites)
+        if tool_name in HALCompressor._tool_path_cache:
+            cached_path = HALCompressor._tool_path_cache[tool_name]
+            logger.debug(f"Using cached path for {tool_name}: {cached_path}")
+            return cached_path
+
+        logger.info(f"Searching for {tool_name} tool")
 
         # Platform-specific executable suffix
         exe_suffix = ".exe" if platform.system() == "Windows" else ""
@@ -1080,7 +1105,11 @@ class HALCompressor:
                     # Check if file is executable
                     if not os.access(full_path, os.X_OK):
                         logger.warning(f"Found {tool_name} but it may not be executable: {full_path}")
-                    return str(full_path)
+                    # Cache the result for future lookups
+                    result_path = str(full_path)
+                    HALCompressor._tool_path_cache[tool_name] = result_path
+                    logger.debug(f"Cached {tool_name} path: {result_path}")
+                    return result_path
                 logger.debug(f"Location {i}/{len(search_paths)}: Not found at {full_path}")
             except Exception as e:
                 logger.debug(f"Location {i}/{len(search_paths)}: Error checking {path}: {e}")
