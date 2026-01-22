@@ -470,7 +470,10 @@ class TestInjectMappingFlipHandling:
         with (
             patch.object(Image.Image, "paste", track_paste),
             patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService", return_value=mock_verifier),
+            patch(
+                "ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService",
+                return_value=mock_verifier,
+            ),
             patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
@@ -580,7 +583,10 @@ class TestInjectMappingFlipHandling:
         with (
             patch.object(Image.Image, "save", track_save),
             patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService", return_value=mock_verifier),
+            patch(
+                "ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService",
+                return_value=mock_verifier,
+            ),
             patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
@@ -1219,3 +1225,289 @@ class TestGetGameFramePreviewFiltering:
         assert preview1 is not None
         # Same object returned from cache
         assert preview1 is preview2
+
+
+class TestDuplicateGameFrameIDs:
+    """Tests for Bug #4: duplicate GameFrame IDs on import.
+
+    When importing captures with the same filename from different directories,
+    the generated frame_id would collide, causing cache overwrites and lookup failures.
+    """
+
+    def test_generate_unique_frame_id_no_collision(self, tmp_path: Path, qtbot) -> None:
+        """Frame ID is unchanged when no collision exists."""
+        controller = FrameMappingController()
+        project = FrameMappingProject(name="test")
+        controller._project = project
+
+        # No existing frames, ID should be unchanged
+        unique_id = controller._generate_unique_frame_id("capture_001")
+        assert unique_id == "capture_001"
+
+    def test_generate_unique_frame_id_with_collision(self, tmp_path: Path, qtbot) -> None:
+        """Frame ID is suffixed when collision exists."""
+        controller = FrameMappingController()
+        project = FrameMappingProject(name="test")
+        project.game_frames.append(GameFrame(id="capture_001", rom_offsets=[0x1000]))
+        controller._project = project
+
+        # Collision exists, should get suffix
+        unique_id = controller._generate_unique_frame_id("capture_001")
+        assert unique_id == "capture_001_1"
+
+    def test_generate_unique_frame_id_multiple_collisions(self, tmp_path: Path, qtbot) -> None:
+        """Frame ID handles multiple collisions (increments suffix)."""
+        controller = FrameMappingController()
+        project = FrameMappingProject(name="test")
+        project.game_frames.append(GameFrame(id="capture_001", rom_offsets=[0x1000]))
+        project.game_frames.append(GameFrame(id="capture_001_1", rom_offsets=[0x2000]))
+        project.game_frames.append(GameFrame(id="capture_001_2", rom_offsets=[0x3000]))
+        controller._project = project
+
+        # Multiple collisions exist, should get next available suffix
+        unique_id = controller._generate_unique_frame_id("capture_001")
+        assert unique_id == "capture_001_3"
+
+    def test_game_frames_always_have_unique_ids(self, tmp_path: Path, qtbot) -> None:
+        """After adding multiple frames with same base ID, all IDs are unique."""
+        controller = FrameMappingController()
+        project = FrameMappingProject(name="test")
+        controller._project = project
+
+        # Simulate adding three frames that would have the same ID
+        ids = []
+        for i in range(3):
+            unique_id = controller._generate_unique_frame_id("capture_001")
+            project.game_frames.append(GameFrame(id=unique_id, rom_offsets=[0x1000 * (i + 1)]))
+            ids.append(unique_id)
+
+        # All IDs should be unique
+        assert len(ids) == len(set(ids))
+        assert ids == ["capture_001", "capture_001_1", "capture_001_2"]
+
+
+class TestAIFramesLoadingPrunesMappings:
+    """Tests for Bug #3: AI frames loading orphans mappings.
+
+    When reloading AI frames, mappings that reference non-existent indices
+    should be pruned to prevent orphaned references.
+    """
+
+    def test_load_ai_frames_prunes_orphaned_mappings(self, tmp_path: Path, qtbot) -> None:
+        """Reloading AI frames with fewer frames prunes invalid mappings."""
+        # Create initial AI frames directory with 5 frames
+        ai_dir = tmp_path / "ai_frames"
+        ai_dir.mkdir()
+        for i in range(5):
+            (ai_dir / f"frame_{i:03d}.png").write_bytes(
+                b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+                b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+                b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+                b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+            )
+
+        controller = FrameMappingController()
+        controller.load_ai_frames_from_directory(ai_dir)
+
+        # Create mappings for frames 0, 2, and 4
+        controller._project.game_frames.append(GameFrame(id="G1", rom_offsets=[0x1000]))
+        controller._project.game_frames.append(GameFrame(id="G2", rom_offsets=[0x2000]))
+        controller._project.game_frames.append(GameFrame(id="G3", rom_offsets=[0x3000]))
+        controller._project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="G1"))
+        controller._project.mappings.append(FrameMapping(ai_frame_index=2, game_frame_id="G2"))
+        controller._project.mappings.append(FrameMapping(ai_frame_index=4, game_frame_id="G3"))
+
+        # Now reload with only 3 frames (indices 0, 1, 2)
+        ai_dir2 = tmp_path / "ai_frames2"
+        ai_dir2.mkdir()
+        for i in range(3):
+            (ai_dir2 / f"frame_{i:03d}.png").write_bytes(
+                b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+                b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+                b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+                b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+            )
+
+        controller.load_ai_frames_from_directory(ai_dir2)
+
+        # Mapping to frame 4 should be pruned (index 4 no longer exists)
+        # Mappings to frames 0 and 2 should remain
+        assert len(controller._project.mappings) == 2
+        ai_indices = {m.ai_frame_index for m in controller._project.mappings}
+        assert ai_indices == {0, 2}
+
+    def test_load_ai_frames_preserves_compatible_mappings(self, tmp_path: Path, qtbot) -> None:
+        """Reloading AI frames with same or more frames preserves all mappings."""
+        ai_dir = tmp_path / "ai_frames"
+        ai_dir.mkdir()
+        for i in range(5):
+            (ai_dir / f"frame_{i:03d}.png").write_bytes(
+                b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+                b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+                b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+                b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+            )
+
+        controller = FrameMappingController()
+        controller.load_ai_frames_from_directory(ai_dir)
+
+        # Create mappings for frames 0 and 2
+        controller._project.game_frames.append(GameFrame(id="G1", rom_offsets=[0x1000]))
+        controller._project.game_frames.append(GameFrame(id="G2", rom_offsets=[0x2000]))
+        controller._project.mappings.append(FrameMapping(ai_frame_index=0, game_frame_id="G1"))
+        controller._project.mappings.append(FrameMapping(ai_frame_index=2, game_frame_id="G2"))
+
+        # Reload same directory - all mappings should remain
+        controller.load_ai_frames_from_directory(ai_dir)
+
+        assert len(controller._project.mappings) == 2
+        ai_indices = {m.ai_frame_index for m in controller._project.mappings}
+        assert ai_indices == {0, 2}
+
+    def test_game_frames_unchanged_after_ai_frames_reload(self, tmp_path: Path, qtbot) -> None:
+        """Reloading AI frames should not affect game frames."""
+        ai_dir = tmp_path / "ai_frames"
+        ai_dir.mkdir()
+        for i in range(3):
+            (ai_dir / f"frame_{i:03d}.png").write_bytes(
+                b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+                b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+                b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+                b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+            )
+
+        controller = FrameMappingController()
+        controller.load_ai_frames_from_directory(ai_dir)
+
+        # Add game frames
+        controller._project.game_frames.append(GameFrame(id="G1", rom_offsets=[0x1000]))
+        controller._project.game_frames.append(GameFrame(id="G2", rom_offsets=[0x2000]))
+
+        # Reload AI frames
+        controller.load_ai_frames_from_directory(ai_dir)
+
+        # Game frames should be unchanged
+        assert len(controller._project.game_frames) == 2
+        assert controller._project.game_frames[0].id == "G1"
+        assert controller._project.game_frames[1].id == "G2"
+
+
+class TestPreviewCacheInvalidation:
+    """Tests for Bug #5: Preview cache never invalidates.
+
+    The cache should check file mtime and regenerate if the source file changed.
+    """
+
+    def test_preview_cache_invalidates_on_file_change(self, tmp_path: Path, qtbot) -> None:
+        """Preview regenerates when source capture file is modified."""
+        import time
+
+        # Create initial capture
+        capture_data = create_test_capture([0, 1])
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        controller = FrameMappingController()
+        project = FrameMappingProject(name="test")
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                selected_entry_ids=[0, 1],
+            )
+        )
+        controller._project = project
+
+        # First request caches the preview
+        preview1 = controller.get_game_frame_preview("F001")
+        assert preview1 is not None
+
+        # Ensure mtime changes (some filesystems have second-level precision)
+        time.sleep(0.1)
+
+        # Modify the capture file
+        capture_data2 = create_test_capture([0, 1, 2])  # Add a third entry
+        capture_path.write_text(json.dumps(capture_data2))
+
+        # Second request should regenerate (different file content/mtime)
+        preview2 = controller.get_game_frame_preview("F001")
+        assert preview2 is not None
+
+        # Should be different pixmap objects (regenerated)
+        assert preview1 is not preview2
+
+    def test_preview_cache_returns_cached_if_file_unchanged(self, tmp_path: Path, qtbot) -> None:
+        """Preview returns cached pixmap when file hasn't changed."""
+        capture_data = create_test_capture([0, 1])
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        controller = FrameMappingController()
+        project = FrameMappingProject(name="test")
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                selected_entry_ids=[0, 1],
+            )
+        )
+        controller._project = project
+
+        # First and second requests should return same cached object
+        preview1 = controller.get_game_frame_preview("F001")
+        preview2 = controller.get_game_frame_preview("F001")
+
+        assert preview1 is not None
+        assert preview1 is preview2  # Same object from cache
+
+    def test_preview_cache_returns_cached_if_no_file(self, tmp_path: Path, qtbot) -> None:
+        """Preview returns cached pixmap when capture_path is None."""
+        controller = FrameMappingController()
+        project = FrameMappingProject(name="test")
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=None,  # No file
+                selected_entry_ids=[],
+            )
+        )
+        controller._project = project
+
+        # Manually add a preview to the cache using internal format (pixmap, mtime)
+        from PySide6.QtGui import QPixmap
+
+        cached_pixmap = QPixmap(10, 10)
+        # Cache stores (pixmap, mtime) - use 0.0 mtime for no-file case
+        controller._game_frame_previews["F001"] = (cached_pixmap, 0.0)
+
+        # Should return cached even with no file to compare
+        preview = controller.get_game_frame_preview("F001")
+        assert preview is cached_pixmap
+
+    def test_preview_cache_returns_cached_if_file_deleted(self, tmp_path: Path, qtbot) -> None:
+        """Preview returns cached pixmap when file has been deleted."""
+        capture_data = create_test_capture([0, 1])
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        controller = FrameMappingController()
+        project = FrameMappingProject(name="test")
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                selected_entry_ids=[0, 1],
+            )
+        )
+        controller._project = project
+
+        # First request caches the preview
+        preview1 = controller.get_game_frame_preview("F001")
+        assert preview1 is not None
+
+        # Delete the source file
+        capture_path.unlink()
+
+        # Should return cached since file doesn't exist anymore
+        preview2 = controller.get_game_frame_preview("F001")
+        assert preview2 is preview1

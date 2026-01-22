@@ -73,3 +73,82 @@ class TestRefreshPreservesSelection:
 
         assert pane.get_selected_index() == 3
         assert signal_emissions == []
+
+
+class TestFilterClearsSelectionSignal:
+    """Tests for Bug #1: selection state desync when filter hides selected item."""
+
+    def test_filter_hides_selected_item_emits_deselection_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """When unmapped filter hides a mapped (selected) frame, signal must emit -1."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        frames = create_ai_frames(tmp_path, num_frames=5)
+        pane.set_ai_frames(frames)
+
+        # Mark frame 2 as mapped
+        pane.set_mapping_status({0: "unmapped", 1: "unmapped", 2: "mapped", 3: "unmapped", 4: "unmapped"})
+
+        # Select the mapped frame
+        pane.select_frame(2)
+        assert pane.get_selected_index() == 2
+
+        # Now listen for signals
+        signal_emissions: list[int] = []
+        pane.ai_frame_selected.connect(lambda idx: signal_emissions.append(idx))
+
+        # Enable "show unmapped only" filter - should hide frame 2
+        pane._unmapped_filter.setChecked(True)
+
+        # Selection should be cleared and signal should emit -1
+        assert pane.get_selected_index() is None
+        assert signal_emissions == [-1], f"Expected [-1], got {signal_emissions}"
+
+    def test_search_hides_selected_item_emits_deselection_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """When search filter hides selected frame, signal must emit -1."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        frames = create_ai_frames(tmp_path, num_frames=5)
+        pane.set_ai_frames(frames)
+
+        # Select frame_002.png
+        pane.select_frame(2)
+        assert pane.get_selected_index() == 2
+
+        # Now listen for signals
+        signal_emissions: list[int] = []
+        pane.ai_frame_selected.connect(lambda idx: signal_emissions.append(idx))
+
+        # Search for "frame_004" - should hide frame_002
+        pane._search_box.setText("frame_004")
+
+        # Selection should be cleared and signal should emit -1
+        assert pane.get_selected_index() is None
+        assert signal_emissions == [-1], f"Expected [-1], got {signal_emissions}"
+
+    def test_no_signal_when_selection_preserved_after_filter(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """No deselection signal when filter doesn't hide the selected item."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        frames = create_ai_frames(tmp_path, num_frames=5)
+        pane.set_ai_frames(frames)
+
+        # Mark all as unmapped except frame 3
+        pane.set_mapping_status({0: "unmapped", 1: "unmapped", 2: "unmapped", 3: "mapped", 4: "unmapped"})
+
+        # Select an unmapped frame
+        pane.select_frame(0)
+        assert pane.get_selected_index() == 0
+
+        # Now listen for signals
+        signal_emissions: list[int] = []
+        pane.ai_frame_selected.connect(lambda idx: signal_emissions.append(idx))
+
+        # Enable "show unmapped only" filter - frame 0 is unmapped, should remain visible
+        pane._unmapped_filter.setChecked(True)
+
+        # Selection should be preserved and no signal emitted
+        assert pane.get_selected_index() == 0
+        assert signal_emissions == []

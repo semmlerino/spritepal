@@ -64,7 +64,8 @@ class FrameMappingController(QObject):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._project: FrameMappingProject | None = None
-        self._game_frame_previews: dict[str, QPixmap] = {}
+        # Cache stores (pixmap, mtime) for invalidation on file change
+        self._game_frame_previews: dict[str, tuple[QPixmap, float]] = {}
 
     @property
     def project(self) -> FrameMappingProject | None:
@@ -86,6 +87,31 @@ class FrameMappingController(QObject):
         self._game_frame_previews.clear()
         self.project_changed.emit()
         logger.info("Created new frame mapping project: %s", name)
+
+    def _generate_unique_frame_id(self, base_id: str) -> str:
+        """Generate a unique frame ID, adding suffix if collision exists.
+
+        Args:
+            base_id: The initial frame ID (e.g., from filename)
+
+        Returns:
+            A unique frame ID, potentially with _N suffix
+        """
+        if self._project is None:
+            return base_id
+
+        existing_ids = {gf.id for gf in self._project.game_frames}
+        if base_id not in existing_ids:
+            return base_id
+
+        # Find next available suffix
+        counter = 1
+        while f"{base_id}_{counter}" in existing_ids:
+            counter += 1
+
+        unique_id = f"{base_id}_{counter}"
+        logger.info("Renamed duplicate capture ID %s -> %s", base_id, unique_id)
+        return unique_id
 
     def load_project(self, path: Path) -> bool:
         """Load a project from file.
@@ -169,6 +195,20 @@ class FrameMappingController(QObject):
         self._project.ai_frames = frames  # type: ignore[union-attr]
         self._project.ai_frames_dir = directory  # type: ignore[union-attr]
 
+        # Bug #3 fix: Prune orphaned mappings that reference non-existent AI frame indices
+        valid_indices = {f.index for f in frames}
+        orphaned = [m for m in self._project.mappings if m.ai_frame_index not in valid_indices]  # type: ignore[union-attr]
+        if orphaned:
+            logger.info(
+                "Pruning %d orphaned mappings after AI frames reload",
+                len(orphaned),
+            )
+            self._project.mappings = [  # type: ignore[union-attr]
+                m
+                for m in self._project.mappings  # type: ignore[union-attr]
+                if m.ai_frame_index in valid_indices
+            ]
+
         self.ai_frames_loaded.emit(len(frames))
         self.project_changed.emit()
         logger.info("Loaded %d AI frames from %s", len(frames), directory)
@@ -235,6 +275,9 @@ class FrameMappingController(QObject):
             if frame_id.startswith("sprite_capture_"):
                 frame_id = frame_id.replace("sprite_capture_", "")
 
+            # Bug #4 fix: Ensure unique ID when importing captures with same filename
+            frame_id = self._generate_unique_frame_id(frame_id)
+
             # Get unique ROM offsets from selected entries only
             rom_offsets = filtered_capture.unique_rom_offsets
 
@@ -251,7 +294,9 @@ class FrameMappingController(QObject):
             qimg = QImage()
             qimg.loadFromData(buffer.read())
             pixmap = QPixmap.fromImage(qimg)
-            self._game_frame_previews[frame_id] = pixmap
+            # Cache with mtime for invalidation on file change
+            mtime = capture_path.stat().st_mtime if capture_path.exists() else 0.0
+            self._game_frame_previews[frame_id] = (pixmap, mtime)
 
             # Create game frame with selected entry IDs for filtering on retrieval
             bbox = filtered_capture.bounding_box
@@ -419,15 +464,36 @@ class FrameMappingController(QObject):
         regenerate the preview from the capture file. Respects selected_entry_ids
         filtering to show only the selected entries in the preview.
 
+        Bug #5 fix: Checks file mtime and regenerates if source file changed.
+
         Args:
             frame_id: Game frame ID
 
         Returns:
             QPixmap preview or None if not available
         """
-        # Return cached preview if available
+        # Check cache with mtime validation
         if frame_id in self._game_frame_previews:
-            return self._game_frame_previews[frame_id]
+            cached_pixmap, cached_mtime = self._game_frame_previews[frame_id]
+
+            # Get game frame to check file mtime
+            if self._project is not None:
+                game_frame = self._project.get_game_frame_by_id(frame_id)
+                if game_frame and game_frame.capture_path and game_frame.capture_path.exists():
+                    current_mtime = game_frame.capture_path.stat().st_mtime
+                    if current_mtime != cached_mtime:
+                        # File changed, fall through to regenerate
+                        logger.debug(
+                            "Preview cache invalidated for %s (mtime changed)",
+                            frame_id,
+                        )
+                    else:
+                        return cached_pixmap
+                else:
+                    # No file to compare, return cached
+                    return cached_pixmap
+            else:
+                return cached_pixmap
 
         # Try to regenerate from capture file (with filtering applied)
         capture_result = self.get_capture_result_for_game_frame(frame_id)
@@ -448,8 +514,14 @@ class FrameMappingController(QObject):
             qimg.loadFromData(buffer.read())
             pixmap = QPixmap.fromImage(qimg)
 
-            # Cache for future use
-            self._game_frame_previews[frame_id] = pixmap
+            # Cache with mtime for future validation
+            mtime = 0.0
+            if self._project is not None:
+                game_frame = self._project.get_game_frame_by_id(frame_id)
+                if game_frame and game_frame.capture_path and game_frame.capture_path.exists():
+                    mtime = game_frame.capture_path.stat().st_mtime
+
+            self._game_frame_previews[frame_id] = (pixmap, mtime)
             logger.debug("Regenerated preview for game frame %s from capture file", frame_id)
             return pixmap
 

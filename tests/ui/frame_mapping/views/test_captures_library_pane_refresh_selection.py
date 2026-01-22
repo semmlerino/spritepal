@@ -108,3 +108,85 @@ class TestRefreshPreservesSelection:
 
         # Selection should be preserved
         assert pane.get_selected_id() == "F001"
+
+
+class TestFilterClearsSelectionSignal:
+    """Tests for Bug #1: selection state desync when filter hides selected item."""
+
+    def test_filter_hides_selected_item_emits_deselection_signal(self, qtbot: QtBot) -> None:
+        """When unlinked filter hides a linked (selected) frame, signal must emit ''."""
+        pane = CapturesLibraryPane()
+        qtbot.addWidget(pane)
+
+        frame_a = GameFrame(id="F001", rom_offsets=[0x1000])
+        frame_b = GameFrame(id="F002", rom_offsets=[0x2000])
+        pane.set_game_frames([frame_a, frame_b])
+
+        # Mark F001 as linked (has ai_frame_index), F002 as unlinked
+        pane.set_link_status({"F001": 0, "F002": None})
+
+        # Select the linked frame
+        pane.select_frame("F001")
+        assert pane.get_selected_id() == "F001"
+
+        # Now listen for signals
+        signal_emissions: list[str] = []
+        pane.game_frame_selected.connect(lambda fid: signal_emissions.append(fid))
+
+        # Enable "show unlinked only" filter - should hide F001
+        pane._unlinked_filter.setChecked(True)
+
+        # Selection should be cleared and signal should emit ""
+        assert pane.get_selected_id() is None
+        assert signal_emissions == [""], f"Expected [''], got {signal_emissions}"
+
+    def test_search_hides_selected_item_emits_deselection_signal(self, qtbot: QtBot) -> None:
+        """When search filter hides selected frame, signal must emit ''."""
+        pane = CapturesLibraryPane()
+        qtbot.addWidget(pane)
+
+        frame_a = GameFrame(id="F001", rom_offsets=[0x1000])
+        frame_b = GameFrame(id="F002", rom_offsets=[0x2000])
+        pane.set_game_frames([frame_a, frame_b])
+
+        # Select F001
+        pane.select_frame("F001")
+        assert pane.get_selected_id() == "F001"
+
+        # Now listen for signals
+        signal_emissions: list[str] = []
+        pane.game_frame_selected.connect(lambda fid: signal_emissions.append(fid))
+
+        # Search for "F002" - should hide F001
+        pane._search_box.setText("F002")
+
+        # Selection should be cleared and signal should emit ""
+        assert pane.get_selected_id() is None
+        assert signal_emissions == [""], f"Expected [''], got {signal_emissions}"
+
+    def test_no_signal_when_selection_preserved_after_filter(self, qtbot: QtBot) -> None:
+        """No deselection signal when filter doesn't hide the selected item."""
+        pane = CapturesLibraryPane()
+        qtbot.addWidget(pane)
+
+        frame_a = GameFrame(id="F001", rom_offsets=[0x1000])
+        frame_b = GameFrame(id="F002", rom_offsets=[0x2000])
+        pane.set_game_frames([frame_a, frame_b])
+
+        # Mark F002 as linked, F001 as unlinked
+        pane.set_link_status({"F001": None, "F002": 0})
+
+        # Select the unlinked frame
+        pane.select_frame("F001")
+        assert pane.get_selected_id() == "F001"
+
+        # Now listen for signals
+        signal_emissions: list[str] = []
+        pane.game_frame_selected.connect(lambda fid: signal_emissions.append(fid))
+
+        # Enable "show unlinked only" filter - F001 is unlinked, should remain visible
+        pane._unlinked_filter.setChecked(True)
+
+        # Selection should be preserved and no signal emitted
+        assert pane.get_selected_id() == "F001"
+        assert signal_emissions == []

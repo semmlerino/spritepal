@@ -313,3 +313,8 @@ class AIFramesPane(QWidget):
                 self._list.clearSelection()
         finally:
             self._list.blockSignals(False)
+
+        # Bug #1 fix: If there was a selection and it's now gone (filtered out),
+        # explicitly notify listeners that selection was cleared
+        if current_selection is not None and not selection_restored:
+            self.ai_frame_selected.emit(-1)
