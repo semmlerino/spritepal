@@ -293,6 +293,7 @@ class FrameMappingWorkspace(QWidget):
 
         # Alignment Canvas signals
         self._alignment_canvas.alignment_changed.connect(self._on_alignment_changed)
+        self._alignment_canvas.compression_type_changed.connect(self._on_compression_type_changed)
 
     # -------------------------------------------------------------------------
     # Event Handlers
@@ -497,6 +498,36 @@ class FrameMappingWorkspace(QWidget):
         # Update alignment in controller (includes scale)
         self._controller.update_mapping_alignment(self._selected_ai_index, x, y, flip_h, flip_v, scale)
         self._mapping_panel.refresh()
+
+    def _on_compression_type_changed(self, compression_type: str) -> None:
+        """Handle compression type change from canvas.
+
+        Updates all ROM offsets in the current game frame to use the selected
+        compression type ("raw" or "hal").
+        """
+        if self._selected_game_id is None:
+            return
+
+        project = self._controller.project
+        if project is None:
+            return
+
+        game_frame = project.get_game_frame_by_id(self._selected_game_id)
+        if game_frame is None:
+            return
+
+        # Update compression type for all ROM offsets in this game frame
+        for rom_offset in game_frame.rom_offsets:
+            game_frame.compression_types[rom_offset] = compression_type
+
+        # Mark project as changed to trigger save
+        self._controller.project_changed.emit()
+        logger.info(
+            "Updated compression type for game frame %s to %s (%d offsets)",
+            game_frame.id,
+            compression_type,
+            len(game_frame.rom_offsets),
+        )
 
     def _on_adjust_alignment(self, ai_frame_index: int) -> None:
         """Handle adjust alignment request - focus the canvas."""

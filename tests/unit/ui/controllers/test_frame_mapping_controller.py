@@ -1691,22 +1691,19 @@ class TestStaleEntryIdsFallback:
         assert captured_entries == [10], f"Expected [10], got {captured_entries}"
 
 
-class TestCompressionTypeDetection:
-    """Tests for stored compression type detection during injection.
+class TestCompressionTypeSelection:
+    """Tests for user-controlled compression type selection.
 
-    Bug: HAL format has no magic header - any bytes can be valid HAL commands.
-    Detection was incorrectly identifying RAW tiles as HAL when tile data
-    accidentally formed valid HAL command sequences with acceptable ratios.
-
-    Fix: Store compression type on first injection, reuse on subsequent injections.
+    The compression type (RAW/HAL) is set by the user via UI toggle in the workbench.
+    New imports default to RAW. Legacy projects without stored types also default to RAW.
     """
 
-    def test_stored_compression_type_used_on_injection(self, tmp_path: Path, qtbot) -> None:
-        """Stored compression type should be used instead of runtime detection."""
+    def test_stored_raw_type_uses_raw_injection(self, tmp_path: Path, qtbot) -> None:
+        """Stored RAW compression type should use RAW injection."""
         tile_data = bytes([0x11] * 32)
         tile_hex = tile_data.hex()
 
-        rom_offset = 0x35000  # Dedede-like offset
+        rom_offset = 0x35000
 
         capture_data = create_capture_with_tile_data(
             entry_id=1,
@@ -1716,17 +1713,14 @@ class TestCompressionTypeDetection:
         capture_path = tmp_path / "capture.json"
         capture_path.write_text(json.dumps(capture_data))
 
-        # Create ROM with tile at offset
         rom_data = bytearray(0x200000)
         rom_data[rom_offset : rom_offset + 32] = tile_data
         rom_path = tmp_path / "test.sfc"
         rom_path.write_bytes(bytes(rom_data))
 
-        # Create AI frame
         ai_frame_path = tmp_path / "ai_frame.png"
         Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
 
-        # Set up project with STORED compression type = "raw"
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
@@ -1736,7 +1730,7 @@ class TestCompressionTypeDetection:
                 capture_path=capture_path,
                 rom_offsets=[rom_offset],
                 selected_entry_ids=[1],
-                compression_types={rom_offset: "raw"},  # Pre-stored as RAW
+                compression_types={rom_offset: "raw"},
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
@@ -1745,7 +1739,6 @@ class TestCompressionTypeDetection:
         controller = FrameMappingController()
         controller._project = project
 
-        # Track injection compression type
         from core.rom_injector import CompressionType
 
         injected_compression: list[CompressionType] = []
@@ -1755,9 +1748,6 @@ class TestCompressionTypeDetection:
             patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
-            # Even if find_compressed_sprite WOULD succeed (detecting as HAL),
-            # we should use stored "raw" type
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
             mock_injector.inject_sprite_to_rom.side_effect = (
                 lambda sprite_path, rom_path, output_path, sprite_offset, compression_type, **kw: (
                     injected_compression.append(compression_type),
@@ -1771,136 +1761,10 @@ class TestCompressionTypeDetection:
 
         assert result is True
         assert len(injected_compression) == 1
-        assert injected_compression[0] == CompressionType.RAW, (
-            f"Expected RAW (from stored type), got {injected_compression[0]}"
-        )
-
-    def test_compression_type_detected_and_stored_on_first_injection(self, tmp_path: Path, qtbot) -> None:
-        """When no stored type, detection should occur and result stored."""
-        tile_data = bytes([0x22] * 32)
-        tile_hex = tile_data.hex()
-
-        rom_offset = 0x40000
-
-        capture_data = create_capture_with_tile_data(
-            entry_id=1,
-            rom_offset=rom_offset,
-            tile_data_hex=tile_hex,
-        )
-        capture_path = tmp_path / "capture.json"
-        capture_path.write_text(json.dumps(capture_data))
-
-        # Create ROM with tile
-        rom_data = bytearray(0x200000)
-        rom_data[rom_offset : rom_offset + 32] = tile_data
-        rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(bytes(rom_data))
-
-        # Create AI frame
-        ai_frame_path = tmp_path / "ai_frame.png"
-        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
-
-        # Set up project WITHOUT stored compression types
-        project = FrameMappingProject(name="test")
-        project.ai_frames_dir = tmp_path
-        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        game_frame = GameFrame(
-            id="F001",
-            capture_path=capture_path,
-            rom_offsets=[rom_offset],
-            selected_entry_ids=[1],
-            compression_types={},  # Empty - needs detection
-        )
-        project.game_frames.append(game_frame)
-        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
-
-        controller = FrameMappingController()
-        controller._project = project
-
-        with (
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-        ):
-            mock_injector = MagicMock()
-            # Simulate HAL decompression FAILING -> should detect as RAW
-            mock_injector.find_compressed_sprite.side_effect = Exception("Not HAL compressed")
-            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
-            mock_injector_class.return_value = mock_injector
-
-            (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
-            result = controller.inject_mapping(0, rom_path)
-
-        assert result is True
-        # After injection, compression type should be stored
-        assert game_frame.compression_types.get(rom_offset) == "raw", (
-            f"Expected 'raw' to be stored, got {game_frame.compression_types}"
-        )
-
-    def test_hal_compression_detected_and_stored(self, tmp_path: Path, qtbot) -> None:
-        """HAL compression should be detected and stored when decompression succeeds."""
-        tile_data = bytes([0x33] * 32)
-        tile_hex = tile_data.hex()
-
-        rom_offset = 0x50000
-
-        capture_data = create_capture_with_tile_data(
-            entry_id=1,
-            rom_offset=rom_offset,
-            tile_data_hex=tile_hex,
-        )
-        capture_path = tmp_path / "capture.json"
-        capture_path.write_text(json.dumps(capture_data))
-
-        # Create ROM
-        rom_data = bytearray(0x200000)
-        rom_data[rom_offset : rom_offset + 32] = tile_data
-        rom_path = tmp_path / "test.sfc"
-        rom_path.write_bytes(bytes(rom_data))
-
-        # Create AI frame
-        ai_frame_path = tmp_path / "ai_frame.png"
-        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
-
-        # Set up project WITHOUT stored compression types
-        project = FrameMappingProject(name="test")
-        project.ai_frames_dir = tmp_path
-        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        game_frame = GameFrame(
-            id="F001",
-            capture_path=capture_path,
-            rom_offsets=[rom_offset],
-            selected_entry_ids=[1],
-            compression_types={},  # Empty - needs detection
-        )
-        project.game_frames.append(game_frame)
-        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
-
-        controller = FrameMappingController()
-        controller._project = project
-
-        with (
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-        ):
-            mock_injector = MagicMock()
-            # Simulate HAL decompression SUCCEEDING with tiles -> detect as HAL
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 64, 64)  # 2 tiles
-            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
-            mock_injector_class.return_value = mock_injector
-
-            (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
-            result = controller.inject_mapping(0, rom_path)
-
-        assert result is True
-        # After injection, compression type should be stored as HAL
-        assert game_frame.compression_types.get(rom_offset) == "hal", (
-            f"Expected 'hal' to be stored, got {game_frame.compression_types}"
-        )
+        assert injected_compression[0] == CompressionType.RAW
 
     def test_stored_hal_type_uses_hal_injection(self, tmp_path: Path, qtbot) -> None:
-        """Stored HAL type should use HAL compression for injection."""
+        """Stored HAL compression type should use HAL injection."""
         tile_data = bytes([0x44] * 32)
         tile_hex = tile_data.hex()
 
@@ -1914,17 +1778,14 @@ class TestCompressionTypeDetection:
         capture_path = tmp_path / "capture.json"
         capture_path.write_text(json.dumps(capture_data))
 
-        # Create ROM
         rom_data = bytearray(0x200000)
         rom_data[rom_offset : rom_offset + 32] = tile_data
         rom_path = tmp_path / "test.sfc"
         rom_path.write_bytes(bytes(rom_data))
 
-        # Create AI frame
         ai_frame_path = tmp_path / "ai_frame.png"
         Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
 
-        # Set up project with STORED compression type = "hal"
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
@@ -1934,7 +1795,7 @@ class TestCompressionTypeDetection:
                 capture_path=capture_path,
                 rom_offsets=[rom_offset],
                 selected_entry_ids=[1],
-                compression_types={rom_offset: "hal"},  # Pre-stored as HAL
+                compression_types={rom_offset: "hal"},
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
@@ -1943,7 +1804,6 @@ class TestCompressionTypeDetection:
         controller = FrameMappingController()
         controller._project = project
 
-        # Track injection compression type
         from core.rom_injector import CompressionType
 
         injected_compression: list[CompressionType] = []
@@ -1953,7 +1813,6 @@ class TestCompressionTypeDetection:
             patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
-            # For HAL, we still need tile count from decompression
             mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
             mock_injector.inject_sprite_to_rom.side_effect = (
                 lambda sprite_path, rom_path, output_path, sprite_offset, compression_type, **kw: (
@@ -1968,6 +1827,71 @@ class TestCompressionTypeDetection:
 
         assert result is True
         assert len(injected_compression) == 1
-        assert injected_compression[0] == CompressionType.HAL, (
-            f"Expected HAL (from stored type), got {injected_compression[0]}"
+        assert injected_compression[0] == CompressionType.HAL
+
+    def test_missing_compression_type_defaults_to_raw(self, tmp_path: Path, qtbot) -> None:
+        """Legacy projects without compression_types should default to RAW."""
+        tile_data = bytes([0x22] * 32)
+        tile_hex = tile_data.hex()
+
+        rom_offset = 0x40000
+
+        capture_data = create_capture_with_tile_data(
+            entry_id=1,
+            rom_offset=rom_offset,
+            tile_data_hex=tile_hex,
         )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        rom_data = bytearray(0x200000)
+        rom_data[rom_offset : rom_offset + 32] = tile_data
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(bytes(rom_data))
+
+        ai_frame_path = tmp_path / "ai_frame.png"
+        Image.new("RGBA", (8, 8), (255, 0, 0, 255)).save(ai_frame_path)
+
+        # Legacy project: no compression_types set
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[rom_offset],
+                selected_entry_ids=[1],
+                compression_types={},  # Empty - legacy project
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
+        project._invalidate_mapping_index()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        from core.rom_injector import CompressionType
+
+        injected_compression: list[CompressionType] = []
+
+        with (
+            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+        ):
+            mock_injector = MagicMock()
+            mock_injector.inject_sprite_to_rom.side_effect = (
+                lambda sprite_path, rom_path, output_path, sprite_offset, compression_type, **kw: (
+                    injected_compression.append(compression_type),
+                    (True, "Success"),
+                )[-1]
+            )
+            mock_injector_class.return_value = mock_injector
+
+            (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
+            result = controller.inject_mapping(0, rom_path)
+
+        assert result is True
+        assert len(injected_compression) == 1
+        # Should default to RAW when no stored type
+        assert injected_compression[0] == CompressionType.RAW

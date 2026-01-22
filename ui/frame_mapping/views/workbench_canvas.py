@@ -30,6 +30,7 @@ from PySide6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QMouseEvent, QPainter, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFrame,
     QGraphicsScene,
     QGraphicsView,
@@ -183,9 +184,12 @@ class WorkbenchCanvas(QWidget):
     Signals:
         alignment_changed: Emitted when alignment values change.
             Args: (offset_x: int, offset_y: int, flip_h: bool, flip_v: bool, scale: float)
+        compression_type_changed: Emitted when compression type selection changes.
+            Args: (compression_type: str) - "raw" or "hal"
     """
 
     alignment_changed = Signal(int, int, bool, bool, float)  # offset_x, offset_y, flip_h, flip_v, scale
+    compression_type_changed = Signal(str)  # "raw" or "hal"
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -342,6 +346,21 @@ class WorkbenchCanvas(QWidget):
         self._preview_checkbox.setToolTip("Show in-game preview (quantized, clipped to silhouette)")
         controls2.addWidget(self._preview_checkbox)
 
+        controls2.addWidget(self._create_separator())
+
+        # Compression type selector
+        compression_label = QLabel("Compression:")
+        compression_label.setStyleSheet("font-size: 11px;")
+        controls2.addWidget(compression_label)
+
+        self._compression_combo = QComboBox()
+        self._compression_combo.addItem("RAW", "raw")
+        self._compression_combo.addItem("HAL", "hal")
+        self._compression_combo.setStyleSheet("font-size: 11px;")
+        self._compression_combo.setToolTip("Compression type for ROM injection (RAW=uncompressed, HAL=compressed)")
+        self._compression_combo.setMaximumWidth(60)
+        controls2.addWidget(self._compression_combo)
+
         controls2.addStretch()
 
         # Auto-align button
@@ -372,6 +391,7 @@ class WorkbenchCanvas(QWidget):
         self._tile_overlay_checkbox.toggled.connect(self._on_tile_overlay_toggled)
         self._grid_checkbox.toggled.connect(self._on_grid_toggled)
         self._preview_checkbox.toggled.connect(self._on_preview_toggled)
+        self._compression_combo.currentIndexChanged.connect(self._on_compression_changed)
         self._auto_align_btn.clicked.connect(self._on_auto_align)
 
         # AI frame item signals
@@ -444,6 +464,19 @@ class WorkbenchCanvas(QWidget):
         if self._multi_palette_warning_label:
             has_multiple = self._has_multiple_palettes()
             self._multi_palette_warning_label.setVisible(has_multiple)
+
+        # Update compression type combo from game frame
+        # Use first ROM offset's type, or default to "raw"
+        compression_type = "raw"
+        if frame.rom_offsets and frame.compression_types:
+            first_offset = frame.rom_offsets[0]
+            compression_type = frame.compression_types.get(first_offset, "raw")
+        # Block signals to prevent triggering change handler during UI update
+        self._compression_combo.blockSignals(True)
+        index = self._compression_combo.findData(compression_type)
+        if index >= 0:
+            self._compression_combo.setCurrentIndex(index)
+        self._compression_combo.blockSignals(False)
 
     def _has_multiple_palettes(self) -> bool:
         """Check if capture has multiple distinct palettes.
@@ -605,6 +638,7 @@ class WorkbenchCanvas(QWidget):
         self._flip_v_checkbox.setEnabled(enabled)
         self._tile_overlay_checkbox.setEnabled(enabled)
         self._grid_checkbox.setEnabled(enabled)
+        self._compression_combo.setEnabled(enabled)
         self._auto_align_btn.setEnabled(enabled)
 
     def _update_status(self) -> None:
@@ -742,6 +776,12 @@ class WorkbenchCanvas(QWidget):
             # Show AI frame again for alignment work
             self._ai_frame_item.setVisible(True)
             self._preview_item.setVisible(False)
+
+    def _on_compression_changed(self, index: int) -> None:
+        """Handle compression type combo change."""
+        compression_type = self._compression_combo.currentData()
+        if compression_type and self._current_game_frame is not None:
+            self.compression_type_changed.emit(compression_type)
 
     def _schedule_preview_update(self) -> None:
         """Schedule a debounced preview generation."""
