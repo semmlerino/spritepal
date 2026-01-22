@@ -315,6 +315,7 @@ class FrameMappingController(QObject):
             self._project.add_game_frame(frame)  # type: ignore[union-attr]
             self.game_frame_added.emit(frame_id)
             self.project_changed.emit()
+            self.save_requested.emit()
             logger.info(
                 "Imported game frame %s from %s (%d of %d entries selected)",
                 frame_id,
@@ -386,6 +387,7 @@ class FrameMappingController(QObject):
         self._project.create_mapping(ai_frame.id, game_frame_id)
         self.mapping_created.emit(ai_frame_index, game_frame_id)
         self.project_changed.emit()
+        self.save_requested.emit()
         logger.info(
             "Created mapping: AI frame %s (idx %d) -> Game frame %s", ai_frame.id, ai_frame_index, game_frame_id
         )
@@ -433,6 +435,7 @@ class FrameMappingController(QObject):
         if self._project.remove_mapping_for_ai_frame_index(ai_frame_index):
             self.mapping_removed.emit(ai_frame_index)
             self.project_changed.emit()
+            self.save_requested.emit()
             logger.info("Removed mapping for AI frame %d", ai_frame_index)
             return True
         return False
@@ -677,6 +680,43 @@ class FrameMappingController(QObject):
             return True
         return False
 
+    def update_game_frame_compression(self, frame_id: str, compression_type: str) -> bool:
+        """Update compression type for a game frame.
+
+        Updates the compression type for all ROM offsets in the game frame.
+        This routes compression changes through the controller instead of
+        directly mutating game frame state.
+
+        Args:
+            frame_id: ID of the game frame
+            compression_type: New compression type ('raw' or 'hal')
+
+        Returns:
+            True if the update was successful
+        """
+        if self._project is None:
+            self.error_occurred.emit("No project loaded")
+            return False
+
+        game_frame = self._project.get_game_frame_by_id(frame_id)
+        if game_frame is None:
+            self.error_occurred.emit(f"Game frame {frame_id} not found")
+            return False
+
+        # Update compression type for all ROM offsets
+        for rom_offset in game_frame.rom_offsets:
+            game_frame.compression_types[rom_offset] = compression_type
+
+        self.project_changed.emit()
+        self.save_requested.emit()
+        logger.info(
+            "Updated compression type for game frame %s to %s (%d offsets)",
+            frame_id,
+            compression_type,
+            len(game_frame.rom_offsets),
+        )
+        return True
+
     def create_injection_copy(self, rom_path: Path) -> Path | None:
         """Create a numbered copy of the ROM for injection (public API).
 
@@ -870,6 +910,7 @@ class FrameMappingController(QObject):
         debug: bool = False,
         force_raw: bool = False,
         allow_fallback: bool = False,
+        emit_project_changed: bool = True,
     ) -> bool:
         """Inject a mapped frame into the ROM using tile-aware masking.
 
@@ -894,6 +935,8 @@ class FrameMappingController(QObject):
             allow_fallback: If True, allow fallback to rom_offset filtering or all entries
                            when stored entry IDs are stale. If False (default), abort injection
                            and emit stale_entries_warning for user to decide.
+            emit_project_changed: If True (default), emit project_changed after success.
+                                 Set False for batch operations to emit once at the end.
 
         Returns:
             True if injection was successful
@@ -1563,7 +1606,8 @@ class FrameMappingController(QObject):
                     logger.info("Injection results:\n%s", "\n".join(messages))
 
                 self.mapping_injected.emit(ai_frame_index, "\n".join(messages))
-                self.project_changed.emit()
+                if emit_project_changed:
+                    self.project_changed.emit()
             else:
                 # Rollback staging on failure - original ROM unchanged
                 self._rollback_staging(staging_path)

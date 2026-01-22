@@ -168,12 +168,14 @@ class TestRefreshPreservesSelection:
 
         This tests the scenario where project_changed signal causes set_project
         to be called again with the same project during alignment updates.
+        Note: Caller must call refresh() after set_project() to populate table.
         """
         panel = MappingPanel()
         qtbot.addWidget(panel)
 
         project = create_test_project(tmp_path, num_frames=5)
         panel.set_project(project)
+        panel.refresh()  # Caller must call refresh after set_project
 
         # Select row 2
         panel._table.selectRow(2)
@@ -184,7 +186,9 @@ class TestRefreshPreservesSelection:
         panel.mapping_selected.connect(lambda idx: signal_emissions.append(idx))
 
         # Call set_project with the same project (simulates project_changed handling)
+        # In real usage, workspace calls refresh() separately via _update_mapping_panel_previews
         panel.set_project(project)
+        panel.refresh()
 
         # Selection should be preserved
         assert panel.get_selected_ai_frame_index() == 2, "Selection was not preserved after set_project"
@@ -203,6 +207,7 @@ class TestRefreshPreservesSelection:
 
         project = create_test_project(tmp_path, num_frames=5)
         panel.set_project(project)
+        panel.refresh()  # Caller must call refresh after set_project
 
         # Select row 2
         panel._table.selectRow(2)
@@ -226,13 +231,15 @@ class TestRefreshPreservesSelection:
         """Test the exact scenario: set_project followed by refresh.
 
         This happens when project_changed signal causes set_project to be called,
-        followed by another refresh() in _on_alignment_changed.
+        followed by another refresh() via _update_mapping_panel_previews.
+        Note: set_project no longer calls refresh internally.
         """
         panel = MappingPanel()
         qtbot.addWidget(panel)
 
         project = create_test_project(tmp_path, num_frames=5)
         panel.set_project(project)
+        panel.refresh()  # Initial population
 
         # Select row 3
         panel._table.selectRow(3)
@@ -242,10 +249,10 @@ class TestRefreshPreservesSelection:
         signal_emissions: list[int] = []
         panel.mapping_selected.connect(lambda idx: signal_emissions.append(idx))
 
-        # Simulate the actual bug scenario:
-        # 1. project_changed causes set_project (which calls refresh internally)
+        # Simulate the workspace flow:
+        # 1. project_changed causes set_project (does NOT call refresh)
         panel.set_project(project)
-        # 2. Then _on_alignment_changed calls refresh directly
+        # 2. Then _update_mapping_panel_previews calls refresh
         panel.refresh()
 
         # Selection should still be preserved

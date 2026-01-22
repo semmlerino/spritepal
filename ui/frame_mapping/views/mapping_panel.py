@@ -210,13 +210,16 @@ class MappingPanel(QWidget):
     def set_project(self, project: FrameMappingProject | None) -> None:
         """Set the project to display mappings from.
 
+        Does NOT call refresh() - caller controls refresh timing to prevent
+        double refresh when project_changed signal triggers both set_project
+        and _update_mapping_panel_previews.
+
         Args:
             project: FrameMappingProject or None to clear
         """
         self._project = project
         # Reset checkbox state when loading a new project
         self._user_checked_ai_frame_ids = None
-        self.refresh()
 
     def set_game_frame_previews(self, previews: dict[str, QPixmap]) -> None:
         """Set the game frame preview pixmaps for thumbnail display.

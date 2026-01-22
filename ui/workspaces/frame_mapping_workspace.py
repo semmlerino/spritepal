@@ -99,6 +99,10 @@ class FrameMappingWorkspace(QWidget):
         # Track stale entry warnings during injection (for retry with fallback)
         self._stale_entry_frame_id: str | None = None
 
+        # Track project identity for canvas state preservation
+        # Only clear canvas when project identity changes (new/load), not on content updates
+        self._previous_project_id: int | None = None
+
         # Create controller
         self._controller = FrameMappingController(self)
 
@@ -322,11 +326,22 @@ class FrameMappingWorkspace(QWidget):
         logger.debug("Auto-advance %s", "enabled" if enabled else "disabled")
 
     def _on_project_changed(self) -> None:
-        """Handle project changes."""
-        # Clear canvas first to prevent stale display during reload
-        self._alignment_canvas.clear()
+        """Handle project changes.
 
+        Only clears canvas when project identity changes (new/load),
+        not on content updates within the same project.
+        """
         project = self._controller.project
+
+        # Check if project identity changed (new project loaded vs content update)
+        current_project_id = id(project) if project is not None else None
+        project_identity_changed = current_project_id != self._previous_project_id
+        self._previous_project_id = current_project_id
+
+        # Only clear canvas on actual project change, not content updates
+        if project_identity_changed:
+            self._alignment_canvas.clear()
+
         if project is None:
             self._selected_ai_index = None
             self._selected_ai_frame_id = None
@@ -534,32 +549,14 @@ class FrameMappingWorkspace(QWidget):
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.
 
-        Updates all ROM offsets in the current game frame to use the selected
-        compression type ("raw" or "hal").
+        Routes compression changes through the controller instead of
+        directly mutating game frame state.
         """
         if self._selected_game_id is None:
             return
 
-        project = self._controller.project
-        if project is None:
-            return
-
-        game_frame = project.get_game_frame_by_id(self._selected_game_id)
-        if game_frame is None:
-            return
-
-        # Update compression type for all ROM offsets in this game frame
-        for rom_offset in game_frame.rom_offsets:
-            game_frame.compression_types[rom_offset] = compression_type
-
-        # Mark project as changed to trigger save
-        self._controller.project_changed.emit()
-        logger.info(
-            "Updated compression type for game frame %s to %s (%d offsets)",
-            game_frame.id,
-            compression_type,
-            len(game_frame.rom_offsets),
-        )
+        # Route through controller for proper signal emission and auto-save
+        self._controller.update_game_frame_compression(self._selected_game_id, compression_type)
 
     def _on_adjust_alignment(self, ai_frame_index: int) -> None:
         """Handle adjust alignment request - focus the canvas."""
@@ -819,17 +816,19 @@ class FrameMappingWorkspace(QWidget):
         self._stale_entry_frame_id = None
 
         # Inject selected frames into the same copy
+        # Use emit_project_changed=False to avoid N emissions, emit once after batch
         success_count = 0
         failed_due_to_stale = 0
         for ai_index in selected_indices:
             self._stale_entry_frame_id = None  # Reset for each frame
-            if self._controller.inject_mapping(ai_index, rom_path, output_path=target_rom):
+            if self._controller.inject_mapping(ai_index, rom_path, output_path=target_rom, emit_project_changed=False):
                 success_count += 1
             elif self._stale_entry_frame_id is not None:
                 failed_due_to_stale += 1
 
-        # Track the successfully used ROM for future reuse
+        # Emit project_changed once for the entire batch if any succeeded
         if success_count > 0:
+            self._controller.project_changed.emit()
             self._last_injected_rom = target_rom
 
         # Report results
@@ -891,6 +890,7 @@ class FrameMappingWorkspace(QWidget):
         self._stale_entry_frame_id = None
 
         # Inject all mapped frames into the same copy
+        # Use emit_project_changed=False to avoid N emissions, emit once after batch
         success_count = 0
         failed_due_to_stale = 0
         for ai_frame in project.ai_frames:
@@ -898,13 +898,16 @@ class FrameMappingWorkspace(QWidget):
             if mapping:
                 self._stale_entry_frame_id = None  # Reset for each frame
                 # Pass the created copy as output_path to avoid creating new copies
-                if self._controller.inject_mapping(ai_frame.index, rom_path, output_path=target_rom):
+                if self._controller.inject_mapping(
+                    ai_frame.index, rom_path, output_path=target_rom, emit_project_changed=False
+                ):
                     success_count += 1
                 elif self._stale_entry_frame_id is not None:
                     failed_due_to_stale += 1
 
-        # Track the successfully used ROM for future reuse
+        # Emit project_changed once for the entire batch if any succeeded
         if success_count > 0:
+            self._controller.project_changed.emit()
             self._last_injected_rom = target_rom
 
         # Report results
@@ -952,7 +955,6 @@ class FrameMappingWorkspace(QWidget):
         """
         logger.info("Stale entries detected for frame '%s'", frame_id)
         self._stale_entry_frame_id = frame_id
-
 
     def _on_alignment_updated(self, ai_frame_index: int) -> None:
         """Handle alignment-only update from controller.
