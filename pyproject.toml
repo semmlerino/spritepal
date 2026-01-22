@@ -426,7 +426,7 @@ pythonpath = ["."]
 # Performance/benchmark tests excluded by default (timing-sensitive, prone to CI variance)
 # To run them: uv run pytest -m "performance or benchmark"
 # To also exclude slow tests: uv run pytest -m "not slow"
-addopts = "-v --tb=short -ra --maxfail=3 --strict-markers -m 'not performance and not benchmark'"
+addopts = "-v --tb=short -ra --maxfail=3 --strict-markers -m 'not performance and not benchmark' -p no:benchmark -p no:cov"
 
 # Qt-specific settings for pytest-qt
 qt_api = "pyside6"

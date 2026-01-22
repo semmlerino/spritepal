@@ -150,9 +150,11 @@ def auto_skip_without_real_sprites(test_rom_with_sprites):
     return test_rom_with_sprites
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def real_kirby_rom():
     """Provide path to real Kirby ROM if available for integration testing.
+
+    Session-scoped to avoid repeated path lookups across tests.
 
     Returns None if ROM not available. Tests using this MUST handle None case
     by calling pytest.skip() or using test_rom_with_real_sprites fixture.

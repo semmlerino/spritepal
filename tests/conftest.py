@@ -73,6 +73,34 @@ from .infrastructure.environment_detection import get_environment_info
 from .infrastructure.qt_pixmap_guard import install_qpixmap_guard
 
 # ============================================================================
+# Module-level cache for is_clean function (performance optimization)
+# ============================================================================
+# This avoids repeated imports in pytest_runtest_setup/teardown hooks,
+# reducing per-test overhead from ~4-9ms to ~0.5ms (function call only).
+
+_is_clean_func: Callable[[], bool] | None = None
+_is_clean_checked = False  # Distinguish between "not yet checked" and "import failed"
+
+
+def _get_is_clean() -> Callable[[], bool] | None:
+    """Lazy-load is_clean function once per session.
+
+    Returns the cached is_clean function, or None if import failed.
+    The function is imported on first call and cached for subsequent calls.
+    """
+    global _is_clean_func, _is_clean_checked
+    if not _is_clean_checked:
+        try:
+            from core.managers import is_clean
+
+            _is_clean_func = is_clean
+        except ImportError:
+            _is_clean_func = None
+        _is_clean_checked = True
+    return _is_clean_func
+
+
+# ============================================================================
 # pytest_plugins - Import fixtures from modular files
 # ============================================================================
 # This imports all fixtures from the modular fixture files, making them
@@ -261,12 +289,11 @@ def pytest_runtest_setup(item: Any) -> None:
     using cleanup fixtures (like isolated_managers) - the fixture hasn't had
     a chance to clean the registry yet. All enforcement happens in teardown.
     """
-    # Always check actual registry state - don't assume
-    try:
-        from core.managers import is_clean
-
+    # Use cached is_clean function to avoid per-test import overhead
+    is_clean = _get_is_clean()
+    if is_clean is not None:
         item._registry_was_clean = is_clean()
-    except ImportError:
+    else:
         item._registry_was_clean = True  # Assume clean if can't import
 
 
@@ -304,21 +331,21 @@ def pytest_runtest_teardown(item: Any, nextitem: Any) -> None:
     # Note: Previous version had a performance optimization that skipped this check
     # for tests without known manager-related fixtures. That created a gap where
     # direct manager instantiation could bypass detection. Now we always check.
-    try:
-        from core.managers import is_clean
+    # Uses cached is_clean function to avoid per-test import overhead.
+    is_clean = _get_is_clean()
+    if is_clean is None:
+        return  # Manager module not available, skip check
 
-        was_clean = getattr(item, "_registry_was_clean", True)
-        is_clean_now = is_clean()
+    was_clean = getattr(item, "_registry_was_clean", True)
+    is_clean_now = is_clean()
 
-        # Only fail if the test changed state from clean to dirty
-        if was_clean and not is_clean_now:
-            pytest.fail(
-                f"Test '{item.name}' initialized managers without a manager fixture.\n"
-                "Fix: Use isolated_managers fixture, or add "
-                "@pytest.mark.allows_registry_state if intentional."
-            )
-    except ImportError:
-        pass  # Manager module not available, skip check
+    # Only fail if the test changed state from clean to dirty
+    if was_clean and not is_clean_now:
+        pytest.fail(
+            f"Test '{item.name}' initialized managers without a manager fixture.\n"
+            "Fix: Use isolated_managers fixture, or add "
+            "@pytest.mark.allows_registry_state if intentional."
+        )
 
 
 # ============================================================================

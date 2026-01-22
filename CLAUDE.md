@@ -189,6 +189,30 @@ uv lock              # Update lockfile after dependency changes
 
 **Note:** Pytest buffers output. Always `tee` to file first for large runs.
 
+### Fast Test Runs (Performance Optimization)
+
+Use these selectors to skip heavy Qt/integration fixtures for faster TDD cycles:
+
+```bash
+# Pure unit tests (fastest TDD loop - skips Qt and manager overhead)
+pytest tests/unit/ -q
+
+# Non-GUI tests only
+pytest -m "not gui" -q
+
+# Quick smoke test (stop on first failure)
+pytest tests/unit/ -m "not slow" --maxfail=1 -q
+
+# Specific subsystem unit tests
+pytest tests/unit/core/ -q       # Core logic only
+pytest tests/unit/utils/ -q      # Utils only
+```
+
+**Why these are faster:**
+- Unit tests in `tests/unit/` don't trigger Qt fixtures or manager initialization
+- The `-q` flag reduces output overhead
+- Skipping `gui` marker avoids QApplication setup/teardown
+
 ### Writing Tests
 
 **Quick template:**
