@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from core.extractor import SpriteExtractor
+from core.extractor import VramSpriteExtractor
 from core.palette_manager import PaletteManager
 from utils.constants import (
     BYTES_PER_TILE,
@@ -75,11 +75,11 @@ class TestEndToEndWorkflow:
         shutil.rmtree(temp_dir)
 
     def test_extractor_palette_manager_integration(self, sample_files):
-        """Test SpriteExtractor and PaletteManager working together"""
+        """Test VramSpriteExtractor and PaletteManager working together"""
         output_dir = Path(sample_files["temp_dir"])
 
         # Extract sprites
-        extractor = SpriteExtractor()
+        extractor = VramSpriteExtractor()
         sprite_path = output_dir / "sprites.png"
         img, num_tiles = extractor.extract_sprites_grayscale(sample_files["vram_path"], str(sprite_path))
 
@@ -111,7 +111,7 @@ class TestEndToEndWorkflow:
         output_base = str(output_dir / "test_sprite")
 
         # Extract sprite
-        extractor = SpriteExtractor()
+        extractor = VramSpriteExtractor()
         sprite_path = f"{output_base}.png"
         extractor.extract_sprites_grayscale(sample_files["vram_path"], sprite_path)
 
@@ -182,7 +182,7 @@ class TestRealFilePatterns:
         cgram_path.write_bytes(cgram_data)
 
         # Run extraction
-        extractor = SpriteExtractor()
+        extractor = VramSpriteExtractor()
         palette_manager = PaletteManager()
 
         output_base = str(tmp_path / "sprites")

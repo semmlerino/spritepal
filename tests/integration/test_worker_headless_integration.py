@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 import pytest
 from PIL import Image
 
-from core.extractor import SpriteExtractor
+from core.extractor import VramSpriteExtractor
 from core.palette_manager import PaletteManager
 from core.workers import VRAMExtractionWorker
 from utils.constants import (
@@ -182,7 +182,7 @@ class TestWorkerBusinessLogic:
         cgram_path.write_bytes(cgram_data)
 
         # Simulate worker workflow
-        extractor = SpriteExtractor()
+        extractor = VramSpriteExtractor()
         palette_manager = PaletteManager()
 
         # Extract sprites

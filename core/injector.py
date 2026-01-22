@@ -10,16 +10,11 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import cast
 
-import numpy as np
 from PIL import Image
 
-from core.tile_utils import encode_4bpp_tile
 from core.types import ExtractionMetadata
 from utils.constants import (
     IMAGE_DIMENSION_MULTIPLE,
-    PIXEL_MASK_4BIT,
-    TILE_HEIGHT,
-    TILE_WIDTH,
     VRAM_SPRITE_OFFSET,
 )
 from utils.file_validator import atomic_write
@@ -133,91 +128,15 @@ class SpriteInjector:
             return False, f"Error validating sprite: {e!s}"
 
     def convert_png_to_4bpp(self, png_path: str) -> bytes:
-        """Convert PNG to SNES 4bpp tile data using NumPy vectorization."""
-        logger.info(f"Converting PNG to 4bpp: {png_path}")
+        """Convert PNG to SNES 4bpp tile data.
 
-        # Extract all needed data from image within context manager
-        with Image.open(png_path) as img:
-            width, height = img.size
+        Delegates to the centralized png_conversion service with permissive mode
+        to support grayscale and RGB/RGBA images (which are converted to grayscale).
+        """
+        from core.services.png_conversion import convert_png_to_4bpp
 
-            # Auto-pad to nearest multiple of 8 if needed (for composite sprites)
-            if width % 8 != 0 or height % 8 != 0:
-                padded_width = ((width + 7) // 8) * 8
-                padded_height = ((height + 7) // 8) * 8
-                logger.info(f"Padding image from {width}x{height} to {padded_width}x{padded_height} (tile-aligned)")
-                # Create padded image with transparent background (index 0)
-                padded = Image.new(img.mode, (padded_width, padded_height), 0)
-                padded.paste(img, (0, 0))
-                img = padded
-                width, height = padded_width, padded_height
-
-            # Handle different image modes - convert to NumPy array directly
-            if img.mode == "L":
-                # Grayscale mode - convert to NumPy and transform to palette indices
-                pixels = np.array(img, dtype=np.uint8)
-                original_max = int(pixels.max()) if pixels.size > 0 else 0
-                # Divide by 17 to get original 4-bit indices (0-15), clamp to 15
-                pixels = np.minimum(15, pixels // 17).astype(np.uint8)
-                logger.debug(
-                    f"Converting grayscale to palette indices: max grayscale={original_max}, max index={int(pixels.max()) if pixels.size > 0 else 0}"
-                )
-            elif img.mode == "P":
-                # Already indexed - convert directly to NumPy
-                pixels = np.array(img, dtype=np.uint8)
-                max_index = int(pixels.max()) if pixels.size > 0 else 0
-                logger.debug(f"Using indexed palette directly: max index={max_index}")
-
-                # Validate palette indices for 4-bit compatibility (strict - no recovery)
-                if max_index > 15:
-                    logger.error(
-                        f"PNG palette has indices up to {max_index}, which exceeds SNES 4bpp limit (15). "
-                        "This should have been caught during validation."
-                    )
-                    raise ValueError(
-                        f"PNG palette indices exceed 4bpp limit: max {max_index} (must be 0-15). "
-                        "Please validate the PNG before conversion."
-                    )
-            else:
-                # Convert to indexed mode
-                logger.warning(f"Converting {img.mode} to grayscale to recover indices")
-                # Use grayscale conversion to preserve intensity mapping
-                # This is safer than adaptive palette which can scramble index order
-                gray = img.convert("L")
-                pixels = np.array(gray, dtype=np.uint8)
-                pixels = np.minimum(15, pixels // 17).astype(np.uint8)
-
-        tiles_x = width // TILE_WIDTH
-        tiles_y = height // TILE_HEIGHT
-        total_tiles = tiles_x * tiles_y
-        logger.debug(f"Processing {total_tiles} tiles ({tiles_x}x{tiles_y})")
-
-        # Ensure pixels is 2D (height, width)
-        if pixels.ndim == 1:
-            pixels = pixels.reshape(height, width)
-
-        # Mask to 4-bit values
-        pixels = pixels & PIXEL_MASK_4BIT
-
-        # Reshape to extract tiles in one operation
-        # From (height, width) to (tiles_y, TILE_HEIGHT, tiles_x, TILE_WIDTH)
-        # Then transpose to (tiles_y, tiles_x, TILE_HEIGHT, TILE_WIDTH)
-        # This groups all pixels for each tile together
-        tiles = pixels[: tiles_y * TILE_HEIGHT, : tiles_x * TILE_WIDTH]
-        tiles = tiles.reshape(tiles_y, TILE_HEIGHT, tiles_x, TILE_WIDTH)
-        tiles = tiles.transpose(0, 2, 1, 3)  # Now shape is (tiles_y, tiles_x, 8, 8)
-
-        # Flatten to (total_tiles, 64) for processing
-        tiles = tiles.reshape(total_tiles, 64)
-
-        # Process all tiles - pre-allocate output for efficiency
-        output_data = bytearray(total_tiles * 32)
-
-        for i in range(total_tiles):
-            tile_data = encode_4bpp_tile(tiles[i])
-            output_data[i * 32 : (i + 1) * 32] = tile_data
-
-        logger.info(f"Converted {total_tiles} tiles to {len(output_data)} bytes of 4bpp tile data")
-        return bytes(output_data)
+        tile_data, _ = convert_png_to_4bpp(png_path, mode_policy="permissive")
+        return tile_data
 
     def inject_sprite(
         self,

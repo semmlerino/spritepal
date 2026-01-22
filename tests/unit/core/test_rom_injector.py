@@ -1,15 +1,16 @@
 """
-Tests for ROM injection boundary conditions.
+Tests for ROM injector functionality.
 
 These tests cover:
-- P0: High-priority boundary conditions for ROM injection
-- Slack space detection edge cases
+- Basic ROM header reading and checksum calculation
+- Slack space detection boundary conditions
 - Overflow protection and force injection mode
 - Effective limit calculation
+- RAW (uncompressed) injection mode
 
 Related tests:
 - tests/test_slack_detection.py - Basic slack detection patterns
-- tests/integration/test_rom_injection.py - Integration tests
+- tests/integration/test_injection_manager.py - Manager-level injection API
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from core.rom_injector import ROMInjector
+from core.rom_injector import ROMHeader, ROMInjector
 
 
 @pytest.fixture
@@ -27,6 +28,61 @@ def rom_injector() -> ROMInjector:
     injector = ROMInjector()
     injector.hal_compressor = MagicMock()
     return injector
+
+
+class TestROMInjectorBasics:
+    """Basic ROM injector tests for header reading and checksum calculation.
+
+    Migrated from tests/integration/test_rom_injection.py.
+    """
+
+    @pytest.fixture
+    def injector(self) -> ROMInjector:
+        return ROMInjector()
+
+    @pytest.fixture
+    def test_rom_data(self) -> bytes:
+        """Create a minimal SNES ROM with a valid header."""
+        data = bytearray(0x8000)
+        header_offset = 0x7FC0
+        title = b"TEST ROM".ljust(21, b" ")
+        data[header_offset : header_offset + 21] = title
+        data[header_offset + 21] = 0x20  # LoROM
+        data[header_offset + 23] = 0x08  # 256KB
+        checksum = 0x1234
+        complement = checksum ^ 0xFFFF
+        data[header_offset + 28 : header_offset + 30] = complement.to_bytes(2, "little")
+        data[header_offset + 30 : header_offset + 32] = checksum.to_bytes(2, "little")
+        return bytes(data)
+
+    def test_read_rom_header(self, injector: ROMInjector, test_rom_data: bytes, tmp_path) -> None:
+        """Test reading ROM header."""
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(test_rom_data)
+
+        header = injector.read_rom_header(str(rom_path))
+
+        assert header.title.strip() == "TEST ROM"
+        assert header.rom_type == 32
+        assert header.rom_size == 8
+        assert header.rom_type_offset == 0x7FC0
+
+    def test_checksum_calculation(self, injector: ROMInjector, test_rom_data: bytes) -> None:
+        """Test ROM checksum calculation."""
+        injector.header = ROMHeader(
+            title="TEST",
+            rom_type=0x20,
+            rom_size=0x08,
+            sram_size=0,
+            checksum=0,
+            checksum_complement=0,
+            header_offset=0,
+            rom_type_offset=0x7FC0,
+        )
+
+        checksum, complement = injector.calculate_checksum(bytearray(test_rom_data))
+        assert checksum ^ complement == 0xFFFF
+        assert checksum == sum(test_rom_data) & 0xFFFF
 
 
 class TestSlackSpaceDetection:

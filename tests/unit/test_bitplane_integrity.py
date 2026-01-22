@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
 
-from core.injector import encode_4bpp_tile
-from core.tile_utils import decode_4bpp_tile
+from core.tile_utils import decode_4bpp_tile, encode_4bpp_tile
 
 
 def test_bitplane_round_trip_random():

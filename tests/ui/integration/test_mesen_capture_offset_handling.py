@@ -179,7 +179,7 @@ class TestPreviewWorkerOffsetSelection:
     def test_preview_worker_prefers_primary_offset_when_ratio_check_rejects(self, qtbot, tmp_path):
         """Bug repro: preview worker should not skip primary offset due to ratio validation."""
         from ui.common.preview_worker_pool import PooledPreviewWorker
-        from ui.common.smart_preview_coordinator import PendingPreviewRequest
+        from ui.common.smart_preview_coordinator import SliderPreviewRequest
 
         class DummyPool:
             def _return_worker(self, _worker) -> None:
@@ -208,7 +208,7 @@ class TestPreviewWorkerOffsetSelection:
         extractor.rom_injector.find_compressed_sprite.side_effect = mock_find_compressed_sprite
 
         worker = PooledPreviewWorker(weakref.ref(DummyPool()))
-        request = PendingPreviewRequest(
+        request = SliderPreviewRequest(
             request_id=1,
             offset=primary_offset,
             rom_path=str(rom_path),

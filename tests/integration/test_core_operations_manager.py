@@ -178,7 +178,6 @@ class TestExtractionValidation:
         with pytest.raises(ValidationError, match="Must provide either vram_path or rom_path"):
             manager.validate_extraction_params(params)
 
-
     def test_validate_extraction_params_accepts_sprite_offset(self, manager, tmp_path):
         """validate_extraction_params should accept 'sprite_offset' (backward compatibility)."""
         rom_file = tmp_path / "test.sfc"

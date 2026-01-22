@@ -1,5 +1,5 @@
-FILE OFFSET: 0x281818
+FILE OFFSET: 0x293AEB
 ROM_CHECKSUM: 0xC6AA
-frame=2994
-timestamp=1768860867
-capture_time=2026-01-19 23:14:27
+frame=2929
+timestamp=1768996501
+capture_time=2026-01-21 12:55:01

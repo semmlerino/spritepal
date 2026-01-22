@@ -242,7 +242,7 @@ class TestCachePoisoningPrevention:
         cached_data_b = coordinator._cache.get(cache_key_b)
         cached_data_a = coordinator._cache.get(cache_key_a)
 
-        # Default empty tuple returned when cache miss (SpritePreviewCache.get() returns this)
+        # Default empty tuple returned when cache miss (SliderPreviewCache.get() returns this)
         default_cache_miss = (b"", 0, 0, None, 0, 0, -1, True, b"")
 
         # Offset B should be in cache (this is what the preload was for)

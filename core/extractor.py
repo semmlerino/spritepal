@@ -27,7 +27,7 @@ from utils.logging_config import get_logger
 logger: logging.Logger = get_logger(__name__)
 
 
-class SpriteExtractor:
+class VramSpriteExtractor:
     """Handles sprite extraction from VRAM dumps"""
 
     def __init__(self) -> None:
@@ -36,7 +36,7 @@ class SpriteExtractor:
         self.size: int = VRAM_SPRITE_SIZE
         self.tiles_per_row: int = DEFAULT_TILES_PER_ROW
         logger.debug(
-            f"SpriteExtractor initialized: offset=0x{self.offset:04X}, size={self.size}, tiles_per_row={self.tiles_per_row}"
+            f"VramSpriteExtractor initialized: offset=0x{self.offset:04X}, size={self.size}, tiles_per_row={self.tiles_per_row}"
         )
 
     def load_vram(self, vram_path: str) -> None:

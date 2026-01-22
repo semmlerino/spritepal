@@ -23,7 +23,7 @@ from core.exceptions import (
     ExtractionError,
     ValidationError,
 )
-from core.extractor import SpriteExtractor
+from core.extractor import VramSpriteExtractor
 from core.managers.application_state_manager import ApplicationStateManager
 from core.palette_manager import PaletteManager
 from core.services.extraction_results import ExtractionResult
@@ -130,7 +130,7 @@ class CoreOperationsManager(BaseManager):
                 The error message directs you to use create_app_context().
         """
         # Initialize components
-        self._sprite_extractor: SpriteExtractor | None = None
+        self._sprite_extractor: VramSpriteExtractor | None = None
         self._rom_extractor: ROMExtractor | None = rom_extractor
         self._palette_manager: PaletteManager | None = None
         self._current_worker: QThread | None = None
@@ -149,7 +149,7 @@ class CoreOperationsManager(BaseManager):
         """Initialize all core operation components."""
         try:
             # Initialize extractors
-            self._sprite_extractor = SpriteExtractor()
+            self._sprite_extractor = VramSpriteExtractor()
             self._palette_manager = PaletteManager()
 
             # Validate required dependencies (must be passed via constructor)
@@ -302,11 +302,8 @@ class CoreOperationsManager(BaseManager):
             # Extract palettes if requested - catch errors for partial success
             if not grayscale_mode and cgram_path:
                 try:
-                    from core.services.palette_utils import extract_palettes_and_create_files
-
                     assert self._palette_manager is not None
-                    palette_result = extract_palettes_and_create_files(
-                        palette_manager=self._palette_manager,
+                    palette_result = self._palette_manager.extract_and_create_palette_files(
                         cgram_path=cgram_path,
                         output_base=output_base,
                         png_file=output_file,
@@ -434,11 +431,8 @@ class CoreOperationsManager(BaseManager):
                 # Extract palettes if CGRAM provided - catch errors for partial success
                 if cgram_path:
                     try:
-                        from core.services.palette_utils import extract_palettes_and_create_files
-
                         assert self._palette_manager is not None
-                        palette_result = extract_palettes_and_create_files(
-                            palette_manager=self._palette_manager,
+                        palette_result = self._palette_manager.extract_and_create_palette_files(
                             cgram_path=cgram_path,
                             output_base=output_base,
                             png_file=output_path,

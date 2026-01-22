@@ -60,8 +60,10 @@ class ImageConverter:
         return tile_pixels
 
     def png_to_tiles(self, png_file: str) -> tuple[bytes, int]:
-        """
-        Convert PNG to SNES 4bpp tile data.
+        """Convert PNG to SNES 4bpp tile data.
+
+        Delegates to the centralized png_conversion service with strict mode,
+        requiring indexed color (P) mode with indices 0-15.
 
         Args:
             png_file: Path to PNG file (must be indexed color mode)
@@ -70,40 +72,12 @@ class ImageConverter:
             Tuple of (tile_data_bytes, total_tiles)
 
         Raises:
-            ValueError: If image is not in indexed color mode
+            ValueError: If image is not in indexed color mode or has indices > 15
             RuntimeError: If file operations fail
         """
-        try:
-            with Image.open(png_file) as img:
-                if img.mode != "P":
-                    raise ValueError(f"Image must be in indexed color mode (current: {img.mode})")
+        from core.services.png_conversion import convert_png_to_4bpp
 
-                width, height = img.size
-                tiles_x, tiles_y, total_tiles = calculate_tile_grid_padded(width, height)
-
-                pixels = list(cast(Iterable[int], img.getdata()))
-
-            output_data = bytearray()
-            padded_count = [0]
-
-            for tile_y_idx in range(tiles_y):
-                for tile_x_idx in range(tiles_x):
-                    tile_pixels = self._extract_tile_from_image(pixels, tile_x_idx, tile_y_idx, width, padded_count)
-                    tile_data = encode_4bpp_tile(tile_pixels)
-                    output_data.extend(tile_data)
-
-            if padded_count[0] > 0:
-                logger.warning(
-                    f"{padded_count[0]} pixel(s) were out of bounds and "
-                    f"padded with transparent (0). Image may not be tile-aligned."
-                )
-
-            return bytes(output_data), total_tiles
-
-        except ValueError:
-            raise
-        except (OSError, AttributeError) as e:
-            raise RuntimeError(f"Error converting PNG: {e}") from e
+        return convert_png_to_4bpp(png_file, mode_policy="strict")
 
     def image_to_tiles(self, img: Image.Image) -> bytes:
         """

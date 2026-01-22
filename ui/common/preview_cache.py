@@ -1,7 +1,22 @@
 """
-LRU Cache for sprite previews to enable instant display during slider scrubbing.
+LRU Cache for slider scrubbing previews to enable instant display.
 
-This module provides a memory-efficient cache for preview data:
+Architecture Note:
+    This cache is part of the UI preview stack, separate from core/services/preview_generator.py:
+
+    UI Layer (this module + smart_preview_coordinator.py):
+        - SliderPreviewCache: Fast in-memory LRU cache for offset slider scrubbing
+        - SmartPreviewCoordinator: Manages drag state, debouncing, and worker coordination
+        - Used for real-time 60 FPS preview updates during slider interaction
+
+    Core Layer (core/services/preview_generator.py):
+        - PreviewGenerator: General-purpose preview generation service
+        - Used for one-shot preview generation in dialogs and other non-slider contexts
+
+    The separation is intentional: slider interaction requires specialized timing/debouncing
+    that would complicate the general-purpose preview generator.
+
+Features:
 - LRU eviction policy to manage memory usage
 - Cache key generation based on ROM path and offset
 - Thread-safe operations for concurrent access
@@ -40,8 +55,11 @@ def _calculate_preview_size(data: PreviewData) -> int:
     return len(tile_data) + name_len + len(header_bytes) + 33  # Rough size estimate
 
 
-class SpritePreviewCache(BaseLRUCache[PreviewData]):
-    """LRU cache for sprite preview data.
+class SliderPreviewCache(BaseLRUCache[PreviewData]):
+    """LRU cache for slider scrubbing previews.
+
+    Used during ROM offset slider interactions to provide instant feedback.
+    This is separate from the preview generation service in core/services/.
 
     Features:
     - Thread-safe operations (inherited from BaseLRUCache)
@@ -51,7 +69,7 @@ class SpritePreviewCache(BaseLRUCache[PreviewData]):
     """
 
     def __init__(self, max_size: int = 20, max_memory_mb: float = 2.0):
-        """Initialize preview cache.
+        """Initialize slider preview cache.
 
         Args:
             max_size: Maximum number of entries to cache
@@ -61,7 +79,7 @@ class SpritePreviewCache(BaseLRUCache[PreviewData]):
             max_size=max_size,
             max_bytes=int(max_memory_mb * 1024 * 1024),
             size_fn=_calculate_preview_size,
-            name="sprite_preview_cache",
+            name="slider_preview_cache",
         )
 
     @staticmethod
@@ -132,7 +150,3 @@ class SpritePreviewCache(BaseLRUCache[PreviewData]):
             "memory_usage_mb": base_stats["current_mb"],
             "memory_utilization": current_bytes / max_bytes if max_bytes > 0 else 0,
         }
-
-
-# Backward compatibility alias
-PreviewCache = SpritePreviewCache

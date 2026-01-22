@@ -4,6 +4,19 @@ Preview Generator Service for SpritePal
 Consolidates all sprite preview generation logic into a reusable service with caching,
 thread safety, and support for different preview types (VRAM and ROM).
 
+Architecture Note:
+    This is the core layer's general-purpose preview generator. It is separate from
+    the UI layer's slider preview stack (ui/common/preview_cache.py and
+    ui/common/smart_preview_coordinator.py).
+
+    Use this PreviewGenerator for:
+    - One-shot preview generation in dialogs
+    - Non-slider contexts requiring preview images
+
+    Use the UI preview stack (SmartPreviewCoordinator) for:
+    - Real-time 60 FPS slider scrubbing
+    - Offset browsing with drag/debounce handling
+
 This service replaces scattered preview generation code in:
 - core/controller.py (_generate_preview method)
 - ui/dialogs/manual_offset_dialog_simplified.py

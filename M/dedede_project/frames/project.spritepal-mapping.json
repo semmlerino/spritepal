@@ -163,13 +163,40 @@
         12,
         13
       ]
+    },
+    {
+      "id": "capture_1769005750",
+      "rom_offsets": [
+        496380,
+        496444,
+        496508,
+        496572,
+        496636,
+        496700,
+        496764,
+        497276
+      ],
+      "capture_path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\capture_1769005750.json",
+      "palette_index": 0,
+      "width": 40,
+      "height": 48,
+      "selected_entry_ids": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ]
     }
   ],
   "mappings": [
     {
       "ai_frame_index": 0,
       "game_frame_id": "capture_1769005750",
-      "status": "mapped",
+      "status": "injected",
       "offset_x": -35,
       "offset_y": -49,
       "flip_h": false,

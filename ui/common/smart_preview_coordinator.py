@@ -1,6 +1,16 @@
 """
 Smart Preview Coordinator for real-time preview updates with memory caching.
 
+Architecture Note:
+    This is part of the UI preview stack for slider interaction, separate from
+    core/services/preview_generator.py. See ui/common/preview_cache.py for details.
+
+    The SmartPreviewCoordinator handles:
+    - Slider drag state tracking (IDLE/DRAGGING/SETTLING)
+    - Request debouncing with different timings per state
+    - Worker pool coordination for background preview generation
+    - SliderPreviewCache integration for instant cache hits
+
 This module provides smooth 60 FPS preview updates with:
 - Immediate UI feedback during dragging (16ms updates)
 - Cached preview display with 50ms debounce during drag
@@ -28,7 +38,7 @@ if TYPE_CHECKING:
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
 from PySide6.QtWidgets import QSlider
 
-from ui.common.preview_cache import PreviewCache
+from ui.common.preview_cache import SliderPreviewCache
 from ui.common.preview_worker_pool import PreviewWorkerPool
 from ui.common.timing_constants import REFRESH_RATE_60FPS
 from utils.logging_config import get_logger
@@ -60,7 +70,7 @@ class DragState(Enum):
     SETTLING = auto()  # Just released, waiting for final update
 
 
-class PendingPreviewRequest:
+class SliderPreviewRequest:
     """Represents a pending preview request with cancellation support.
 
     Note: This is distinct from core.services.preview_generator.PreviewRequest,
@@ -156,7 +166,7 @@ class SmartPreviewCoordinator(QObject):
         self._worker_pool.preview_error.connect(self._on_worker_preview_error)
 
         # Fast LRU memory cache
-        self._cache = PreviewCache(max_size=20)  # ~2MB cache
+        self._cache = SliderPreviewCache(max_size=20)  # ~2MB cache
 
         # Callbacks for external integration
         self._ui_update_callback: Callable[[int | None], None] | None = None
@@ -362,7 +372,7 @@ class SmartPreviewCoordinator(QObject):
             logger.debug(f"[PRELOAD] Creating background request: offset=0x{offset:06X}")
 
             # Create and submit background request
-            request = PendingPreviewRequest(
+            request = SliderPreviewRequest(
                 request_id=request_id,
                 offset=offset,
                 rom_path=rom_path,
@@ -568,7 +578,7 @@ class SmartPreviewCoordinator(QObject):
             )
 
             # Create preview request
-            request = PendingPreviewRequest(
+            request = SliderPreviewRequest(
                 request_id=request_id,
                 offset=offset,
                 rom_path=rom_path,
