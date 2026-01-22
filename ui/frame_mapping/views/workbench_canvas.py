@@ -202,16 +202,20 @@ class WorkbenchCanvas(QWidget):
         self._has_mapping = False
         self._updating_from_external = False
 
-        # Tile calculation debounce timer
+        # Tile calculation debounce timer with snapshot
         self._tile_calc_timer = QTimer(self)
         self._tile_calc_timer.setSingleShot(True)
         self._tile_calc_timer.timeout.connect(self._update_tile_touch_status)
+        # Snapshot: (offset_x, offset_y, scale) captured when scheduling
+        self._tile_calc_snapshot: tuple[int, int, float] | None = None
 
-        # Preview generation debounce timer
+        # Preview generation debounce timer with snapshot
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
         self._preview_timer.timeout.connect(self._generate_preview)
         self._preview_enabled = False
+        # Snapshot: (offset_x, offset_y, flip_h, flip_v, scale) captured when scheduling
+        self._preview_snapshot: tuple[int, int, bool, bool, float] | None = None
 
         self._tile_sampling_service = TileSamplingService()
         self._multi_palette_warning_label: QLabel | None = None
@@ -667,6 +671,18 @@ class WorkbenchCanvas(QWidget):
         else:
             self._status_label.setText("Drag to adjust, handles to scale")
 
+    def set_stale_entries_warning_visible(self, visible: bool) -> None:
+        """Set the visibility of the stale entries warning label.
+
+        Called when the controller detects stale entry IDs during injection
+        to proactively warn the user.
+
+        Args:
+            visible: Whether to show the warning label.
+        """
+        if self._stale_entries_warning_label:
+            self._stale_entries_warning_label.setVisible(visible)
+
     def _update_tile_overlay(self) -> None:
         """Update tile overlay from capture result."""
         if self._capture_result is None:
@@ -700,20 +716,38 @@ class WorkbenchCanvas(QWidget):
         self._tile_overlay_item.set_tile_rects(tile_rects)
 
     def _schedule_tile_touch_update(self) -> None:
-        """Schedule a debounced tile touch status update."""
-        self._tile_calc_timer.start(TILE_CALC_DEBOUNCE_MS)
+        """Schedule a debounced tile touch status update.
 
-    def _update_tile_touch_status(self) -> None:
-        """Update which tiles are touched by the AI frame overlay."""
-        if self._ai_image is None or self._capture_result is None:
-            self._tile_overlay_item.set_touched_indices(set())
-            return
-
-        # Get current transform values (in actual pixels, not display scale)
+        Captures current alignment snapshot to ensure the calculation uses
+        the values at schedule time, not fire time.
+        """
+        # Capture snapshot at schedule time (not fire time)
         pos = self._ai_frame_item.pos()
         offset_x = int(pos.x() / DISPLAY_SCALE)
         offset_y = int(pos.y() / DISPLAY_SCALE)
         scale = self._ai_frame_item.scale_factor()
+        self._tile_calc_snapshot = (offset_x, offset_y, scale)
+        self._tile_calc_timer.start(TILE_CALC_DEBOUNCE_MS)
+
+    def _update_tile_touch_status(self) -> None:
+        """Update which tiles are touched by the AI frame overlay.
+
+        Uses the alignment snapshot captured at schedule time if available,
+        otherwise falls back to current values.
+        """
+        if self._ai_image is None or self._capture_result is None:
+            self._tile_overlay_item.set_touched_indices(set())
+            return
+
+        # Use snapshot if available, otherwise use current values
+        if self._tile_calc_snapshot is not None:
+            offset_x, offset_y, scale = self._tile_calc_snapshot
+        else:
+            # Fallback to current values (for direct calls in tests)
+            pos = self._ai_frame_item.pos()
+            offset_x = int(pos.x() / DISPLAY_SCALE)
+            offset_y = int(pos.y() / DISPLAY_SCALE)
+            scale = self._ai_frame_item.scale_factor()
 
         # Build tile rects in actual coordinates
         tile_rects: list[QRectF] = []
@@ -756,12 +790,16 @@ class WorkbenchCanvas(QWidget):
 
     def _on_scale_slider_changed(self, value: int) -> None:
         """Handle scale slider change."""
+        if self._updating_from_external:
+            return
         scale = value / 100.0
         self._scale_value.setText(f"{scale:.1f}x")
         self._ai_frame_item.set_scale_factor(scale)
 
     def _on_flip_changed(self) -> None:
         """Handle flip checkbox change."""
+        if self._updating_from_external:
+            return
         flip_h = self._flip_h_checkbox.isChecked()
         flip_v = self._flip_v_checkbox.isChecked()
         self._ai_frame_item.set_flip(flip_h, flip_v)
@@ -801,9 +839,21 @@ class WorkbenchCanvas(QWidget):
             self.compression_type_changed.emit(compression_type)
 
     def _schedule_preview_update(self) -> None:
-        """Schedule a debounced preview generation."""
+        """Schedule a debounced preview generation.
+
+        Captures current alignment snapshot to ensure the preview uses
+        the values at schedule time, not fire time.
+        """
         if not self._preview_enabled:
             return
+        # Capture snapshot at schedule time (not fire time)
+        pos = self._ai_frame_item.pos()
+        offset_x = int(pos.x() / DISPLAY_SCALE)
+        offset_y = int(pos.y() / DISPLAY_SCALE)
+        flip_h = self._flip_h_checkbox.isChecked()
+        flip_v = self._flip_v_checkbox.isChecked()
+        scale = self._ai_frame_item.scale_factor()
+        self._preview_snapshot = (offset_x, offset_y, flip_h, flip_v, scale)
         self._preview_timer.start(PREVIEW_DEBOUNCE_MS)
 
     def _generate_preview(self) -> None:
@@ -813,6 +863,9 @@ class WorkbenchCanvas(QWidget):
         show original sprite pixels (WYSIWYG preview).
 
         Transform order: flip -> scale (SNES-correct, matching injection)
+
+        Uses the alignment snapshot captured at schedule time if available,
+        otherwise falls back to current values.
         """
         logger.debug("_generate_preview called, enabled=%s", self._preview_enabled)
         if not self._preview_enabled:
@@ -829,15 +882,19 @@ class WorkbenchCanvas(QWidget):
             self._preview_item.setVisible(False)
             return
 
-        try:
-            # Get current alignment values
-            offset = self._ai_frame_item.pos()
-            offset_x = int(offset.x() / DISPLAY_SCALE)
-            offset_y = int(offset.y() / DISPLAY_SCALE)
+        # Use snapshot if available, otherwise use current values
+        if self._preview_snapshot is not None:
+            offset_x, offset_y, flip_h, flip_v, scale = self._preview_snapshot
+        else:
+            # Fallback to current values (for direct calls in tests)
+            pos = self._ai_frame_item.pos()
+            offset_x = int(pos.x() / DISPLAY_SCALE)
+            offset_y = int(pos.y() / DISPLAY_SCALE)
             flip_h = self._flip_h_checkbox.isChecked()
             flip_v = self._flip_v_checkbox.isChecked()
             scale = self._ai_frame_item.scale_factor()
 
+        try:
             # Use SpriteCompositor with "original" policy for preview
             # This shows original pixels where AI doesn't cover (WYSIWYG)
             compositor = SpriteCompositor(uncovered_policy="original")

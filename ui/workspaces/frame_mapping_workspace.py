@@ -421,8 +421,8 @@ class FrameMappingWorkspace(QWidget):
             self._selected_ai_frame_id = frame.id
         self._alignment_canvas.set_ai_frame(frame)
 
-        # Check for mapping (use index-based lookup)
-        mapping = project.get_mapping_for_ai_frame_index(index)
+        # Check for mapping using ID-based lookup (O(1))
+        mapping = project.get_mapping_for_ai_frame(frame.id) if frame else None
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
@@ -550,14 +550,14 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
         """Handle alignment change from canvas (auto-save)."""
-        if self._selected_ai_index is None:
+        if self._selected_ai_index is None or self._selected_ai_frame_id is None:
             return
 
         project = self._controller.project
         if project is None:
             return
 
-        mapping = project.get_mapping_for_ai_frame_index(self._selected_ai_index)
+        mapping = project.get_mapping_for_ai_frame(self._selected_ai_frame_id)
         if mapping is None:
             return
 
@@ -950,7 +950,7 @@ class FrameMappingWorkspace(QWidget):
         success_count = 0
         failed_due_to_stale = 0
         for ai_frame in project.ai_frames:
-            mapping = project.get_mapping_for_ai_frame_index(ai_frame.index)
+            mapping = project.get_mapping_for_ai_frame(ai_frame.id)
             if mapping:
                 self._stale_entry_frame_id = None  # Reset for each frame
                 # Pass the created copy as output_path to avoid creating new copies
@@ -1008,9 +1008,15 @@ class FrameMappingWorkspace(QWidget):
 
         Tracks the frame ID for potential retry with allow_fallback=True.
         The injection will abort by default, and the caller can offer a retry option.
+
+        Also updates the canvas warning label if the frame matches the current selection.
         """
         logger.info("Stale entries detected for frame '%s'", frame_id)
         self._stale_entry_frame_id = frame_id
+
+        # Update canvas warning label if this is the currently selected game frame
+        if self._selected_game_id == frame_id:
+            self._alignment_canvas.set_stale_entries_warning_visible(True)
 
     def _on_alignment_updated(self, ai_frame_index: int) -> None:
         """Handle alignment-only update from controller.
@@ -1022,7 +1028,10 @@ class FrameMappingWorkspace(QWidget):
         project = self._controller.project
         if project is None:
             return
-        mapping = project.get_mapping_for_ai_frame_index(ai_frame_index)
+        ai_frame = project.get_ai_frame_by_index(ai_frame_index)
+        if ai_frame is None:
+            return
+        mapping = project.get_mapping_for_ai_frame(ai_frame.id)
         if mapping:
             self._mapping_panel.update_row_alignment(
                 ai_frame_index, mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v
@@ -1113,8 +1122,8 @@ class FrameMappingWorkspace(QWidget):
         self._refresh_game_frame_link_status()
         self._update_mapping_panel_previews()
 
-        # Update canvas with alignment
-        mapping = project.get_mapping_for_ai_frame_index(ai_index)
+        # Update canvas with alignment using ID-based lookup (O(1))
+        mapping = project.get_mapping_for_ai_frame(ai_frame.id) if ai_frame else None
         if mapping:
             self._alignment_canvas.set_alignment(
                 mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
@@ -1143,8 +1152,8 @@ class FrameMappingWorkspace(QWidget):
 
         for i in range(1, total):
             check_index = (current_index + i) % total
-            mapping = project.get_mapping_for_ai_frame_index(check_index)
-            if mapping is None:
+            check_frame = project.get_ai_frame_by_index(check_index)
+            if check_frame and project.get_mapping_for_ai_frame(check_frame.id) is None:
                 return check_index
 
         return None
@@ -1163,7 +1172,7 @@ class FrameMappingWorkspace(QWidget):
 
         status_map: dict[int, str] = {}
         for ai_frame in project.ai_frames:
-            mapping = project.get_mapping_for_ai_frame_index(ai_frame.index)
+            mapping = project.get_mapping_for_ai_frame(ai_frame.id)
             if mapping:
                 status_map[ai_frame.index] = mapping.status
             else:

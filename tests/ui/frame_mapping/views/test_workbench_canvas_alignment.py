@@ -255,13 +255,15 @@ class TestAutoAlignCoordinates:
             workspace._controller = MagicMock()
             workspace._message_service = None
             workspace._auto_advance_enabled = False
+            workspace._alignment_canvas = MagicMock()
 
             # Setup project with AI frame
             mock_project = MagicMock()
             mock_ai_frame = MagicMock()
             mock_ai_frame.path = ai_image_path
+            mock_ai_frame.id = "ai_frame_001"
             mock_project.get_ai_frame_by_index.return_value = mock_ai_frame
-            mock_project.get_mapping_for_ai_frame_index.return_value = None
+            mock_project.get_mapping_for_ai_frame.return_value = None
             workspace._controller.project = mock_project
             workspace._controller.get_existing_link_for_ai_frame.return_value = None
             workspace._controller.get_existing_link_for_game_frame.return_value = None
@@ -273,7 +275,7 @@ class TestAutoAlignCoordinates:
             mock_capture.bounding_box.y = 80
             mock_capture.bounding_box.width = 32
             mock_capture.bounding_box.height = 32
-            workspace._controller.get_capture_result_for_game_frame.return_value = mock_capture
+            workspace._controller.get_capture_result_for_game_frame.return_value = (mock_capture, False)
 
             # Call the real _attempt_link method
             FrameMappingWorkspace._attempt_link(workspace, ai_index=0, game_frame_id="frame1")
