@@ -1,100 +1,100 @@
 {
-  "version": 1,
+  "version": 2,
   "name": "Untitled",
-  "ai_frames_dir": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames",
+  "ai_frames_dir": "M\\dedede_project\\frames",
   "ai_frames": [
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_00.png",
+      "path": "M\\dedede_project\\frames\\frame_00.png",
       "index": 0,
       "width": 109,
       "height": 145
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_01.png",
+      "path": "M\\dedede_project\\frames\\frame_01.png",
       "index": 1,
       "width": 108,
       "height": 151
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_02.png",
+      "path": "M\\dedede_project\\frames\\frame_02.png",
       "index": 2,
       "width": 109,
       "height": 154
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_03.png",
+      "path": "M\\dedede_project\\frames\\frame_03.png",
       "index": 3,
       "width": 127,
       "height": 151
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_04.png",
+      "path": "M\\dedede_project\\frames\\frame_04.png",
       "index": 4,
       "width": 113,
       "height": 156
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_05.png",
+      "path": "M\\dedede_project\\frames\\frame_05.png",
       "index": 5,
       "width": 107,
       "height": 153
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_06.png",
+      "path": "M\\dedede_project\\frames\\frame_06.png",
       "index": 6,
       "width": 166,
       "height": 189
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_07.png",
+      "path": "M\\dedede_project\\frames\\frame_07.png",
       "index": 7,
       "width": 110,
       "height": 149
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_08.png",
+      "path": "M\\dedede_project\\frames\\frame_08.png",
       "index": 8,
       "width": 176,
       "height": 166
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_09.png",
+      "path": "M\\dedede_project\\frames\\frame_09.png",
       "index": 9,
       "width": 141,
       "height": 161
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_10.png",
+      "path": "M\\dedede_project\\frames\\frame_10.png",
       "index": 10,
       "width": 118,
       "height": 120
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_11.png",
+      "path": "M\\dedede_project\\frames\\frame_11.png",
       "index": 11,
       "width": 141,
       "height": 126
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_12.png",
+      "path": "M\\dedede_project\\frames\\frame_12.png",
       "index": 12,
       "width": 163,
       "height": 137
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_13.png",
+      "path": "M\\dedede_project\\frames\\frame_13.png",
       "index": 13,
       "width": 134,
       "height": 142
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\frame_14.png",
+      "path": "M\\dedede_project\\frames\\frame_14.png",
       "index": 14,
       "width": 132,
       "height": 74
     },
     {
-      "path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\M\\dedede_project\\frames\\spritesheet.png",
+      "path": "M\\dedede_project\\frames\\spritesheet.png",
       "index": 15,
       "width": 687,
       "height": 1024
@@ -102,13 +102,111 @@
   ],
   "game_frames": [
     {
-      "id": "full_dump_1768864767",
-      "rom_offsets": [],
-      "capture_path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\full_dump_1768864767.json",
+      "id": "capture_1769108252",
+      "rom_offsets": [
+        2627608,
+        2627672,
+        2627736,
+        2627800,
+        2627864,
+        2627896,
+        2627928,
+        2627960,
+        2628376,
+        2628408,
+        2628440,
+        2628472
+      ],
+      "capture_path": "mesen2_exchange\\capture_1769108252.json",
       "palette_index": 0,
-      "width": 82,
-      "height": 151,
-      "selected_entry_ids": []
+      "width": 48,
+      "height": 48,
+      "selected_entry_ids": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "compression_types": {
+        "2627608": "raw",
+        "2627672": "raw",
+        "2627736": "raw",
+        "2627800": "raw",
+        "2627864": "raw",
+        "2627896": "raw",
+        "2627928": "raw",
+        "2627960": "raw",
+        "2628376": "raw",
+        "2628408": "raw",
+        "2628440": "raw",
+        "2628472": "raw"
+      }
+    },
+    {
+      "id": "capture_1769108249",
+      "rom_offsets": [
+        2624536,
+        2624600,
+        2624664,
+        2624792,
+        2624856,
+        2624888,
+        2624920,
+        2624952,
+        2624984,
+        2625016,
+        2625368,
+        2625400,
+        2625432,
+        2625464,
+        2625496
+      ],
+      "capture_path": "mesen2_exchange\\capture_1769108249.json",
+      "palette_index": 0,
+      "width": 42,
+      "height": 48,
+      "selected_entry_ids": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21
+      ],
+      "compression_types": {
+        "2624536": "raw",
+        "2624600": "raw",
+        "2624664": "raw",
+        "2624792": "raw",
+        "2624856": "raw",
+        "2624888": "raw",
+        "2624920": "raw",
+        "2624952": "raw",
+        "2624984": "raw",
+        "2625016": "raw",
+        "2625368": "raw",
+        "2625400": "raw",
+        "2625432": "raw",
+        "2625464": "raw",
+        "2625496": "raw"
+      }
     },
     {
       "id": "capture_1769005750",
@@ -122,7 +220,7 @@
         496764,
         497276
       ],
-      "capture_path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\capture_1769005750.json",
+      "capture_path": "mesen2_exchange\\capture_1769005750.json",
       "palette_index": 0,
       "width": 40,
       "height": 48,
@@ -135,21 +233,31 @@
         11,
         12,
         13
-      ]
+      ],
+      "compression_types": {
+        "496380": "raw",
+        "496444": "raw",
+        "496508": "raw",
+        "496572": "raw",
+        "496636": "raw",
+        "496700": "raw",
+        "496764": "raw",
+        "497276": "raw"
+      }
     },
     {
-      "id": "capture_1769005750",
+      "id": "capture_1769108991",
       "rom_offsets": [
-        496380,
-        496444,
-        496508,
-        496572,
-        496636,
-        496700,
-        496764,
-        497276
+        2629656,
+        2629720,
+        2629784,
+        2629848,
+        2629912,
+        2629976,
+        2630040,
+        2630552
       ],
-      "capture_path": "C:\\CustomScripts\\KirbyMax\\workshop\\exhal-master\\spritepal\\mesen2_exchange\\capture_1769005750.json",
+      "capture_path": "mesen2_exchange\\capture_1769108991.json",
       "palette_index": 0,
       "width": 40,
       "height": 48,
@@ -162,16 +270,46 @@
         11,
         12,
         13
-      ]
+      ],
+      "compression_types": {
+        "2629656": "raw",
+        "2629720": "raw",
+        "2629784": "raw",
+        "2629848": "raw",
+        "2629912": "raw",
+        "2629976": "raw",
+        "2630040": "raw",
+        "2630552": "raw"
+      }
     }
   ],
   "mappings": [
     {
-      "ai_frame_index": 0,
+      "ai_frame_id": "frame_00.png",
+      "game_frame_id": "capture_1769108991",
+      "status": "edited",
+      "offset_x": -34,
+      "offset_y": -48,
+      "flip_h": true,
+      "flip_v": false,
+      "scale": 0.3438647390492749
+    },
+    {
+      "ai_frame_id": "frame_01.png",
       "game_frame_id": "capture_1769005750",
+      "status": "injected",
+      "offset_x": 4,
+      "offset_y": -2,
+      "flip_h": true,
+      "flip_v": false,
+      "scale": 0.3398982091008386
+    },
+    {
+      "ai_frame_id": "frame_03.png",
+      "game_frame_id": "capture_1769108249",
       "status": "mapped",
-      "offset_x": -35,
-      "offset_y": -49,
+      "offset_x": -11,
+      "offset_y": 36,
       "flip_h": false,
       "flip_v": false,
       "scale": 1.0
