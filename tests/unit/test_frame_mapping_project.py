@@ -556,3 +556,137 @@ class TestRemoveGameFrame:
         # Mapping should also be gone
         assert project.get_mapping_for_game_frame("G001") is None
         assert project.get_mapping_for_ai_frame("frame_001.png") is None
+
+
+class TestFacadeMethods:
+    """Tests for encapsulation facade methods."""
+
+    def test_replace_ai_frames_updates_list_and_index(self) -> None:
+        """replace_ai_frames updates frames and rebuilds index."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        frames = [
+            AIFrame(path=Path("frame_001.png"), index=0),
+            AIFrame(path=Path("frame_002.png"), index=1),
+        ]
+
+        project.replace_ai_frames(frames)
+
+        assert len(project.ai_frames) == 2
+        assert project.get_ai_frame_by_id("frame_001.png") is not None
+        assert project.get_ai_frame_by_id("frame_002.png") is not None
+
+    def test_replace_ai_frames_sets_directory(self) -> None:
+        """replace_ai_frames optionally sets ai_frames_dir."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        frames = [AIFrame(path=Path("/dir/frame.png"), index=0)]
+        directory = Path("/some/dir")
+
+        project.replace_ai_frames(frames, directory)
+
+        assert project.ai_frames_dir == directory
+
+    def test_replace_ai_frames_preserves_none_directory(self) -> None:
+        """replace_ai_frames keeps existing directory if none provided."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test", ai_frames_dir=Path("/existing"))
+        frames = [AIFrame(path=Path("frame.png"), index=0)]
+
+        project.replace_ai_frames(frames)
+
+        assert project.ai_frames_dir == Path("/existing")
+
+    def test_add_game_frame_appends_to_list(self) -> None:
+        """add_game_frame adds a frame to game_frames list."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        frame = GameFrame(id="G001", rom_offsets=[0x1000])
+
+        result = project.add_game_frame(frame)
+
+        assert len(project.game_frames) == 1
+        assert project.get_game_frame_by_id("G001") is not None
+        assert result is frame  # Returns same frame for chaining
+
+    def test_add_game_frame_returns_frame(self) -> None:
+        """add_game_frame returns the added frame."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        frame = GameFrame(id="G002", rom_offsets=[0x2000])
+
+        result = project.add_game_frame(frame)
+
+        assert result is frame
+
+    def test_filter_mappings_by_valid_ai_ids_removes_orphans(self) -> None:
+        """filter_mappings_by_valid_ai_ids removes mappings with invalid AI IDs."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        # Create frames and mappings
+        ai1 = AIFrame(path=Path("frame_001.png"), index=0)
+        ai2 = AIFrame(path=Path("frame_002.png"), index=1)
+        g1 = GameFrame(id="G001", rom_offsets=[0x1000])
+        g2 = GameFrame(id="G002", rom_offsets=[0x2000])
+
+        project.ai_frames = [ai1, ai2]
+        project.game_frames = [g1, g2]
+        project.create_mapping("frame_001.png", "G001")
+        project.create_mapping("frame_002.png", "G002")
+
+        assert len(project.mappings) == 2
+
+        # Filter to only keep frame_001.png
+        valid_ids = {"frame_001.png"}
+        removed = project.filter_mappings_by_valid_ai_ids(valid_ids)
+
+        assert removed == 1
+        assert len(project.mappings) == 1
+        assert project.get_mapping_for_ai_frame("frame_001.png") is not None
+        assert project.get_mapping_for_ai_frame("frame_002.png") is None
+
+    def test_filter_mappings_by_valid_ai_ids_returns_count(self) -> None:
+        """filter_mappings_by_valid_ai_ids returns number of removed mappings."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        ai1 = AIFrame(path=Path("frame_001.png"), index=0)
+        g1 = GameFrame(id="G001", rom_offsets=[0x1000])
+        project.ai_frames = [ai1]
+        project.game_frames = [g1]
+        project.create_mapping("frame_001.png", "G001")
+
+        # No orphans when all IDs valid
+        removed = project.filter_mappings_by_valid_ai_ids({"frame_001.png"})
+        assert removed == 0
+
+        # Remove all when empty set
+        removed = project.filter_mappings_by_valid_ai_ids(set())
+        assert removed == 1
+        assert len(project.mappings) == 0
+
+    def test_filter_mappings_by_valid_ai_ids_updates_index(self) -> None:
+        """filter_mappings_by_valid_ai_ids updates internal lookup index."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        ai1 = AIFrame(path=Path("frame_001.png"), index=0)
+        g1 = GameFrame(id="G001", rom_offsets=[0x1000])
+        project.ai_frames = [ai1]
+        project.game_frames = [g1]
+        project.create_mapping("frame_001.png", "G001")
+
+        # Verify index is populated
+        assert project.get_mapping_for_game_frame("G001") is not None
+
+        # Filter removes mapping
+        project.filter_mappings_by_valid_ai_ids(set())
+
+        # Index should be updated (None lookup)
+        assert project.get_mapping_for_game_frame("G001") is None

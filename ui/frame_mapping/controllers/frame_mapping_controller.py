@@ -19,6 +19,8 @@ from PIL import Image
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage, QPixmap
 
+from ui.common.qt_image_utils import pil_to_qpixmap
+
 if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
 
@@ -195,26 +197,17 @@ class FrameMappingController(QObject):
             )
             frames.append(frame)
 
-        self._project.ai_frames = frames  # type: ignore[union-attr]
-        self._project.ai_frames_dir = directory  # type: ignore[union-attr]
-
-        # Rebuild indices after replacing ai_frames
-        self._project._invalidate_ai_frame_index()  # type: ignore[union-attr]
+        # Replace AI frames using facade (handles index invalidation)
+        self._project.replace_ai_frames(frames, directory)  # type: ignore[union-attr]
 
         # Bug #3 fix: Prune orphaned mappings that reference non-existent AI frame IDs
         valid_ids = {f.id for f in frames}
-        orphaned = [m for m in self._project.mappings if m.ai_frame_id not in valid_ids]  # type: ignore[union-attr]
-        if orphaned:
+        removed = self._project.filter_mappings_by_valid_ai_ids(valid_ids)  # type: ignore[union-attr]
+        if removed > 0:
             logger.info(
                 "Pruning %d orphaned mappings after AI frames reload",
-                len(orphaned),
+                removed,
             )
-            self._project.mappings = [  # type: ignore[union-attr]
-                m
-                for m in self._project.mappings  # type: ignore[union-attr]
-                if m.ai_frame_id in valid_ids
-            ]
-            self._project._invalidate_mapping_index()  # type: ignore[union-attr]
 
         self.ai_frames_loaded.emit(len(frames))
         self.project_changed.emit()
@@ -292,16 +285,8 @@ class FrameMappingController(QObject):
             renderer = CaptureRenderer(filtered_capture)
             preview_img = renderer.render_selection()
 
-            # Convert PIL Image to QPixmap
-            from io import BytesIO
-
-            buffer = BytesIO()
-            preview_img.save(buffer, format="PNG")
-            buffer.seek(0)
-            qimg = QImage()
-            qimg.loadFromData(buffer.read())
-            pixmap = QPixmap.fromImage(qimg)
-            # Cache with mtime for invalidation on file change
+            # Convert PIL Image to QPixmap and cache with mtime for invalidation
+            pixmap = pil_to_qpixmap(preview_img)
             mtime = capture_path.stat().st_mtime if capture_path.exists() else 0.0
             self._game_frame_previews[frame_id] = (pixmap, mtime)
 
@@ -317,7 +302,7 @@ class FrameMappingController(QObject):
                 selected_entry_ids=[entry.id for entry in selected_entries],
             )
 
-            self._project.game_frames.append(frame)  # type: ignore[union-attr]
+            self._project.add_game_frame(frame)  # type: ignore[union-attr]
             self.game_frame_added.emit(frame_id)
             self.project_changed.emit()
             logger.info(
@@ -533,17 +518,8 @@ class FrameMappingController(QObject):
             renderer = CaptureRenderer(capture_result)
             preview_img = renderer.render_selection()
 
-            # Convert PIL Image to QPixmap
-            from io import BytesIO
-
-            buffer = BytesIO()
-            preview_img.save(buffer, format="PNG")
-            buffer.seek(0)
-            qimg = QImage()
-            qimg.loadFromData(buffer.read())
-            pixmap = QPixmap.fromImage(qimg)
-
-            # Cache with mtime for future validation
+            # Convert PIL Image to QPixmap and cache with mtime
+            pixmap = pil_to_qpixmap(preview_img)
             mtime = 0.0
             if self._project is not None:
                 game_frame = self._project.get_game_frame_by_id(frame_id)
@@ -566,7 +542,8 @@ class FrameMappingController(QObject):
         has stored selected entry IDs, only those entries are returned.
 
         If stored entry IDs no longer exist in the capture file (stale),
-        falls back to using all entries and emits stale_entries_warning signal.
+        falls back to rom_offset filtering (mirrors injection behavior) and
+        emits stale_entries_warning signal.
 
         Args:
             frame_id: Game frame ID
@@ -599,14 +576,27 @@ class FrameMappingController(QObject):
                 filtered_entries = [entry for entry in capture_result.entries if entry.id in selected_ids]
 
                 if not filtered_entries:
-                    # Stale entry IDs - fall back to unfiltered with warning
+                    # Stale entry IDs - fall back to rom_offset filtering (mirrors injection)
                     logger.warning(
-                        "Stored entry IDs %s not found in capture %s. Using all entries.",
+                        "Stored entry IDs %s not found in capture %s. Using rom_offset fallback.",
                         game_frame.selected_entry_ids,
                         capture_path,
                     )
                     self.stale_entries_warning.emit(frame_id)
-                    # Return unfiltered capture_result (don't create new one)
+                    # Fallback to rom_offset filtering (mirrors inject_mapping behavior)
+                    filtered_entries = [
+                        entry for entry in capture_result.entries if entry.rom_offset in game_frame.rom_offsets
+                    ]
+                    if filtered_entries:
+                        capture_result = CaptureResult(
+                            frame=capture_result.frame,
+                            visible_count=len(filtered_entries),
+                            obsel=capture_result.obsel,
+                            entries=filtered_entries,
+                            palettes=capture_result.palettes,
+                            timestamp=capture_result.timestamp,
+                        )
+                    # If still no entries, return unfiltered as last resort
                 else:
                     # Create filtered CaptureResult with only selected entries
                     capture_result = CaptureResult(

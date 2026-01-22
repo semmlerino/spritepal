@@ -260,6 +260,50 @@ class FrameMappingProject:
         """Invalidate AI frame index (call after modifying ai_frames)."""
         self._ai_frame_index_by_id = {f.id: f for f in self.ai_frames}
 
+    def replace_ai_frames(self, frames: list[AIFrame], ai_frames_dir: Path | None = None) -> None:
+        """Replace all AI frames and update internal indices.
+
+        This is the preferred method for setting AI frames as it ensures
+        index consistency. Avoids external access to private invalidation methods.
+
+        Args:
+            frames: New list of AI frames
+            ai_frames_dir: Optional directory path where frames are located
+        """
+        self.ai_frames = frames
+        if ai_frames_dir is not None:
+            self.ai_frames_dir = ai_frames_dir
+        self._invalidate_ai_frame_index()
+
+    def add_game_frame(self, frame: GameFrame) -> GameFrame:
+        """Add a game frame to the project.
+
+        Args:
+            frame: GameFrame to add
+
+        Returns:
+            The added frame (for method chaining)
+        """
+        self.game_frames.append(frame)
+        return frame
+
+    def filter_mappings_by_valid_ai_ids(self, valid_ai_ids: set[str]) -> int:
+        """Remove mappings that reference non-existent AI frame IDs.
+
+        Use this after reloading AI frames to prune orphaned mappings.
+
+        Args:
+            valid_ai_ids: Set of valid AI frame IDs to keep
+
+        Returns:
+            Number of mappings removed
+        """
+        original_len = len(self.mappings)
+        self.mappings = [m for m in self.mappings if m.ai_frame_id in valid_ai_ids]
+        if len(self.mappings) < original_len:
+            self._invalidate_mapping_index()
+        return original_len - len(self.mappings)
+
     def save(self, path: Path) -> None:
         """Save project to JSON file atomically.
 
@@ -410,7 +454,10 @@ class FrameMappingProject:
     def get_mapping_for_ai_frame_index(self, ai_frame_index: int) -> FrameMapping | None:
         """Get mapping for a specific AI frame by index.
 
-        Compatibility method for code that still uses indices.
+        .. deprecated::
+            Use get_mapping_for_ai_frame(ai_frame_id) instead. Index-based
+            lookups are fragile across project reloads and frame reordering.
+
         Converts index to ID internally.
 
         Args:
@@ -448,7 +495,10 @@ class FrameMappingProject:
     def get_ai_frame_index_linked_to_game_frame(self, game_frame_id: str) -> int | None:
         """Get the AI frame index linked to a specific game frame.
 
-        Compatibility method for code that still uses indices.
+        .. deprecated::
+            Use get_ai_frame_linked_to_game_frame(game_frame_id) to get the
+            AI frame ID instead. Index-based lookups are fragile across
+            project reloads.
 
         Args:
             game_frame_id: ID of the game frame
@@ -471,6 +521,10 @@ class FrameMappingProject:
 
     def get_ai_frame_by_index(self, index: int) -> AIFrame | None:
         """Get AI frame by index.
+
+        .. deprecated::
+            Use get_ai_frame_by_id(ai_frame_id) instead. Index-based lookups
+            are O(n) and fragile across project reloads.
 
         O(n) lookup - prefer get_ai_frame_by_id when possible.
         """
@@ -539,7 +593,9 @@ class FrameMappingProject:
     def create_mapping_by_index(self, ai_frame_index: int, game_frame_id: str) -> FrameMapping | None:
         """Create a new mapping using AI frame index.
 
-        Compatibility method for code that still uses indices.
+        .. deprecated::
+            Use create_mapping(ai_frame_id, game_frame_id) instead. Index-based
+            APIs are fragile across project reloads and frame reordering.
 
         Args:
             ai_frame_index: Index of the AI frame
@@ -606,7 +662,9 @@ class FrameMappingProject:
     ) -> bool:
         """Update alignment for a mapping using AI frame index.
 
-        Compatibility method for code that still uses indices.
+        .. deprecated::
+            Use update_mapping_alignment(ai_frame_id, ...) instead. Index-based
+            APIs are fragile across project reloads and frame reordering.
         """
         frame = self.get_ai_frame_by_index(ai_frame_index)
         if frame is None:
@@ -632,7 +690,9 @@ class FrameMappingProject:
     def remove_mapping_for_ai_frame_index(self, ai_frame_index: int) -> bool:
         """Remove mapping for an AI frame using index.
 
-        Compatibility method for code that still uses indices.
+        .. deprecated::
+            Use remove_mapping_for_ai_frame(ai_frame_id) instead. Index-based
+            APIs are fragile across project reloads and frame reordering.
 
         Args:
             ai_frame_index: Index of the AI frame
