@@ -561,6 +561,7 @@ class FrameMappingProject:
         flip_h: bool,
         flip_v: bool,
         scale: float = 1.0,
+        set_edited: bool = True,
     ) -> bool:
         """Update alignment for a mapping.
 
@@ -571,6 +572,8 @@ class FrameMappingProject:
             flip_h: Horizontal flip state
             flip_v: Vertical flip state
             scale: Scale factor (0.1 - 10.0)
+            set_edited: If True and status is not 'injected', set status to 'edited'.
+                        Use False for auto-centering during initial link creation.
 
         Returns:
             True if mapping was updated, False if no mapping exists
@@ -584,6 +587,11 @@ class FrameMappingProject:
         mapping.flip_h = flip_h
         mapping.flip_v = flip_v
         mapping.scale = max(0.1, min(10.0, scale))
+
+        # Transition to "edited" unless already injected or explicitly disabled
+        if set_edited and mapping.status != "injected":
+            mapping.status = "edited"
+
         return True
 
     def update_mapping_alignment_by_index(
@@ -594,6 +602,7 @@ class FrameMappingProject:
         flip_h: bool,
         flip_v: bool,
         scale: float = 1.0,
+        set_edited: bool = True,
     ) -> bool:
         """Update alignment for a mapping using AI frame index.
 
@@ -602,7 +611,7 @@ class FrameMappingProject:
         frame = self.get_ai_frame_by_index(ai_frame_index)
         if frame is None:
             return False
-        return self.update_mapping_alignment(frame.id, offset_x, offset_y, flip_h, flip_v, scale)
+        return self.update_mapping_alignment(frame.id, offset_x, offset_y, flip_h, flip_v, scale, set_edited)
 
     def remove_mapping_for_ai_frame(self, ai_frame_id: str) -> bool:
         """Remove mapping for an AI frame.

@@ -210,6 +210,7 @@ class WorkbenchCanvas(QWidget):
         self._preview_enabled = False
 
         self._tile_sampling_service = TileSamplingService()
+        self._multi_palette_warning_label: QLabel | None = None
 
         self._setup_ui()
         self._connect_signals()
@@ -233,6 +234,14 @@ class WorkbenchCanvas(QWidget):
         title_layout.addWidget(self._status_label)
 
         layout.addLayout(title_layout)
+
+        # Multi-palette warning banner
+        self._multi_palette_warning_label = QLabel("⚠ Multi-palette capture detected. Preview may not match injection.")
+        self._multi_palette_warning_label.setStyleSheet(
+            "background-color: #FFF3CD; color: #856404; padding: 6px 8px; border-radius: 4px; font-size: 11px;"
+        )
+        self._multi_palette_warning_label.setVisible(False)
+        layout.addWidget(self._multi_palette_warning_label)
 
         # Graphics scene and view
         self._scene = QGraphicsScene(self)
@@ -430,6 +439,26 @@ class WorkbenchCanvas(QWidget):
         self._update_status()
         # Update preview if enabled
         self._schedule_preview_update()
+
+        # Show warning if multi-palette capture detected
+        if self._multi_palette_warning_label:
+            has_multiple = self._has_multiple_palettes()
+            self._multi_palette_warning_label.setVisible(has_multiple)
+
+    def _has_multiple_palettes(self) -> bool:
+        """Check if capture has multiple distinct palettes.
+
+        Returns:
+            True if capture entries use different palette indices
+        """
+        if self._capture_result is None or not self._capture_result.entries:
+            return False
+
+        palettes = set()
+        for entry in self._capture_result.entries:
+            palettes.add(entry.palette)
+
+        return len(palettes) > 1
 
     def set_ai_frame(self, frame: AIFrame | None) -> None:
         """Set the AI frame (overlay).

@@ -41,7 +41,10 @@ from PySide6.QtWidgets import (
 
 from core.app_context import get_app_context
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
-from ui.frame_mapping.dialogs.replace_link_dialog import confirm_replace_link
+from ui.frame_mapping.dialogs.replace_link_dialog import (
+    confirm_replace_ai_frame_link,
+    confirm_replace_link,
+)
 from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
@@ -264,6 +267,8 @@ class FrameMappingWorkspace(QWidget):
         self._controller.mapping_injected.connect(self._on_mapping_injected)
         self._controller.error_occurred.connect(self._on_error)
         self._controller.status_update.connect(self._on_status_update)
+        self._controller.save_requested.connect(self._auto_save_after_injection)
+        self._controller.stale_entries_warning.connect(self._on_stale_entries_warning)
 
         # AI Frames Pane signals
         self._ai_frames_pane.ai_frame_selected.connect(self._on_ai_frame_selected)
@@ -398,15 +403,14 @@ class FrameMappingWorkspace(QWidget):
     def _on_game_frame_selected(self, frame_id: str) -> None:
         """Handle game frame selection in captures library.
 
-        If an AI frame is selected, attempts to create a link (pairing-first).
-
-        Phase 2 fix: Guard against invalid selections (empty string).
+        Updates preview in canvas if an AI frame is selected.
+        Note: No longer auto-links - linking requires explicit user action.
         """
         project = self._controller.project
         if project is None:
             return
 
-        # Phase 2: Guard against invalid selections
+        # Guard against invalid selections
         if not frame_id:
             self._selected_game_id = None
             self._update_map_button_state()
@@ -421,11 +425,6 @@ class FrameMappingWorkspace(QWidget):
             preview = self._controller.get_game_frame_preview(frame_id)
             capture_result = self._controller.get_capture_result_for_game_frame(frame_id)
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result)
-
-            # Phase 2: Guard before auto-linking - ensure game ID is valid
-            # (AI index already validated by outer condition)
-            if self._selected_game_id:
-                self._attempt_link(self._selected_ai_index, frame_id)
 
     def _on_mapping_selected(self, ai_frame_index: int) -> None:
         """Handle mapping row selection in drawer.
@@ -688,6 +687,41 @@ class FrameMappingWorkspace(QWidget):
         self._refresh_mapping_status()
         QMessageBox.information(self, "Injection Successful", message)
 
+    def _auto_save_after_injection(self) -> None:
+        """Handle auto-save request after successful injection.
+
+        Saves the project to the correct project file path (not ai_frames_dir).
+        """
+        if not self._project_path:
+            logger.warning("Cannot auto-save: no project path set")
+            return
+
+        try:
+            self._controller.save_project(self._project_path)
+            if self._message_service:
+                self._message_service.show_message("Project auto-saved", 2000)
+            logger.info("Auto-saved project to %s", self._project_path)
+        except Exception as e:
+            logger.exception("Failed to auto-save project after injection")
+            QMessageBox.warning(
+                self,
+                "Auto-Save Failed",
+                f"Failed to save project: {e}\n\nPlease save manually.",
+            )
+
+    def _on_stale_entries_warning(self, frame_id: str) -> None:
+        """Handle stale entry ID warning from controller.
+
+        Shows a blocking dialog to inform user that stored entry selection is outdated.
+        """
+        QMessageBox.warning(
+            self,
+            "Entry Selection Stale",
+            f"The stored entry selection for '{frame_id}' is outdated.\n\n"
+            f"All entries from the capture will be used instead.\n\n"
+            f"To fix this, reimport the capture with updated entry selection.",
+        )
+
     # -------------------------------------------------------------------------
     # Helper Methods
     # -------------------------------------------------------------------------
@@ -695,35 +729,49 @@ class FrameMappingWorkspace(QWidget):
     def _attempt_link(self, ai_index: int, game_frame_id: str) -> None:
         """Attempt to link an AI frame to a game frame.
 
-        Handles existing link confirmation and auto-advance.
+        Handles existing link confirmation (for both AI and game frames) and auto-advance.
+        Preserves alignment if mapping already exists for the same pair.
         """
         project = self._controller.project
         if project is None:
             return
 
-        # Check if game frame is already linked to a different AI frame
-        existing_link = self._controller.get_existing_link_for_game_frame(game_frame_id)
-        if existing_link is not None and existing_link != ai_index:
-            existing_ai = project.get_ai_frame_by_index(existing_link)
-            new_ai = project.get_ai_frame_by_index(ai_index)
-            existing_name = existing_ai.path.name if existing_ai else f"AI Frame {existing_link}"
-            new_name = new_ai.path.name if new_ai else f"AI Frame {ai_index}"
+        ai_frame = project.get_ai_frame_by_index(ai_index)
+        ai_name = ai_frame.path.name if ai_frame else f"AI Frame {ai_index}"
 
-            if not confirm_replace_link(self, game_frame_id, existing_name, new_name):
+        # Check if AI frame is already linked to a different game frame
+        existing_game_link = self._controller.get_existing_link_for_ai_frame(ai_index)
+        if existing_game_link is not None:
+            if existing_game_link == game_frame_id:
+                # Same pair - no-op, preserve existing alignment
+                if self._message_service:
+                    self._message_service.show_message(f"'{ai_name}' is already linked to '{game_frame_id}'", 2000)
+                return
+
+            # Different game frame - confirm replacement
+            if not confirm_replace_ai_frame_link(self, ai_name, existing_game_link, game_frame_id):
+                return
+
+        # Check if game frame is already linked to a different AI frame
+        existing_ai_link = self._controller.get_existing_link_for_game_frame(game_frame_id)
+        if existing_ai_link is not None and existing_ai_link != ai_index:
+            existing_ai = project.get_ai_frame_by_index(existing_ai_link)
+            existing_name = existing_ai.path.name if existing_ai else f"AI Frame {existing_ai_link}"
+
+            if not confirm_replace_link(self, game_frame_id, existing_name, ai_name):
                 return
 
         # Create the mapping
         self._controller.create_mapping(ai_index, game_frame_id)
 
         # Auto-center alignment
-        ai_frame = project.get_ai_frame_by_index(ai_index)
         game_preview = self._controller.get_game_frame_preview(game_frame_id)
         if ai_frame and ai_frame.path.exists() and game_preview:
             ai_pixmap = QPixmap(str(ai_frame.path))
             if not ai_pixmap.isNull():
                 center_x = (game_preview.width() - ai_pixmap.width()) // 2
                 center_y = (game_preview.height() - ai_pixmap.height()) // 2
-                self._controller.update_mapping_alignment(ai_index, center_x, center_y, False, False)
+                self._controller.update_mapping_alignment(ai_index, center_x, center_y, False, False, set_edited=False)
 
         self._refresh_mapping_status()
         self._refresh_game_frame_link_status()
@@ -737,7 +785,6 @@ class FrameMappingWorkspace(QWidget):
             )
 
         if self._message_service:
-            ai_name = ai_frame.path.name if ai_frame else f"AI Frame {ai_index}"
             self._message_service.show_message(f"Linked '{ai_name}' to '{game_frame_id}'", 3000)
 
         # Auto-advance if enabled

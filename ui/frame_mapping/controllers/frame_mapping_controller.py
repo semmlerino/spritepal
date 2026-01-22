@@ -61,6 +61,8 @@ class FrameMappingController(QObject):
     mapping_injected = Signal(int, str)  # ai_index, message
     error_occurred = Signal(str)  # error message
     status_update = Signal(str)  # status message for UI feedback
+    save_requested = Signal()  # Emitted when auto-save should occur (e.g., after injection)
+    stale_entries_warning = Signal(str)  # frame_id - Emitted when stored entry IDs are stale
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -407,6 +409,20 @@ class FrameMappingController(QObject):
             return None
         return self._project.get_ai_frame_index_linked_to_game_frame(game_frame_id)
 
+    def get_existing_link_for_ai_frame(self, ai_frame_index: int) -> str | None:
+        """Get the game frame ID currently linked to an AI frame.
+
+        Args:
+            ai_frame_index: Index of the AI frame to check
+
+        Returns:
+            Game frame ID if AI frame is linked, None otherwise
+        """
+        if self._project is None:
+            return None
+        mapping = self._project.get_mapping_for_ai_frame_index(ai_frame_index)
+        return mapping.game_frame_id if mapping else None
+
     def remove_mapping(self, ai_frame_index: int) -> bool:
         """Remove a mapping for an AI frame.
 
@@ -434,6 +450,7 @@ class FrameMappingController(QObject):
         flip_h: bool,
         flip_v: bool,
         scale: float = 1.0,
+        set_edited: bool = True,
     ) -> bool:
         """Update alignment for a mapping.
 
@@ -444,6 +461,8 @@ class FrameMappingController(QObject):
             flip_h: Horizontal flip state
             flip_v: Vertical flip state
             scale: Scale factor (0.1 - 10.0)
+            set_edited: If True and status is not 'injected', set status to 'edited'.
+                        Use False for auto-centering during initial link creation.
 
         Returns:
             True if alignment was updated
@@ -451,7 +470,9 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        if self._project.update_mapping_alignment_by_index(ai_frame_index, offset_x, offset_y, flip_h, flip_v, scale):
+        if self._project.update_mapping_alignment_by_index(
+            ai_frame_index, offset_x, offset_y, flip_h, flip_v, scale, set_edited
+        ):
             self.project_changed.emit()
             logger.info(
                 "Updated alignment for AI frame %d: offset=(%d, %d), flip=(%s, %s), scale=%.2f",
@@ -544,6 +565,9 @@ class FrameMappingController(QObject):
         the CaptureResult needed for preview generation. If the game frame
         has stored selected entry IDs, only those entries are returned.
 
+        If stored entry IDs no longer exist in the capture file (stale),
+        falls back to using all entries and emits stale_entries_warning signal.
+
         Args:
             frame_id: Game frame ID
 
@@ -573,23 +597,26 @@ class FrameMappingController(QObject):
             if game_frame.selected_entry_ids:
                 selected_ids = set(game_frame.selected_entry_ids)
                 filtered_entries = [entry for entry in capture_result.entries if entry.id in selected_ids]
-                # Create filtered CaptureResult with only selected entries
-                capture_result = CaptureResult(
-                    frame=capture_result.frame,
-                    visible_count=len(filtered_entries),
-                    obsel=capture_result.obsel,
-                    entries=filtered_entries,
-                    palettes=capture_result.palettes,
-                    timestamp=capture_result.timestamp,
-                )
 
-                if not capture_result.has_entries:
+                if not filtered_entries:
+                    # Stale entry IDs - fall back to unfiltered with warning
                     logger.warning(
-                        "No entries matched stored selection for game frame %s (IDs: %s)",
-                        frame_id,
+                        "Stored entry IDs %s not found in capture %s. Using all entries.",
                         game_frame.selected_entry_ids,
+                        capture_path,
                     )
-                    return None
+                    self.stale_entries_warning.emit(frame_id)
+                    # Return unfiltered capture_result (don't create new one)
+                else:
+                    # Create filtered CaptureResult with only selected entries
+                    capture_result = CaptureResult(
+                        frame=capture_result.frame,
+                        visible_count=len(filtered_entries),
+                        obsel=capture_result.obsel,
+                        entries=filtered_entries,
+                        palettes=capture_result.palettes,
+                        timestamp=capture_result.timestamp,
+                    )
 
             return capture_result
 
@@ -1284,11 +1311,8 @@ class FrameMappingController(QObject):
             # Update mapping status
             if success:
                 mapping.status = "injected"
-                if self._project.ai_frames_dir:
-                    try:
-                        self._project.save(self._project.ai_frames_dir / "project.spritepal-mapping.json")
-                    except Exception:
-                        logger.warning("Failed to auto-save project after injection")
+                # Emit signal for workspace to handle save with correct project path
+                self.save_requested.emit()
 
                 # Debug: Final summary
                 if debug and debug_dir:
@@ -1319,115 +1343,3 @@ class FrameMappingController(QObject):
                 logger.setLevel(original_log_level)
 
         return success
-
-    def _find_correct_rom_offsets(
-        self,
-        capture_result: CaptureResult,
-        rom_path: Path,
-        selected_entry_ids: list[int] | None = None,
-    ) -> dict[int, int | None]:
-        """Find correct ROM offsets for tiles with stale attribution.
-
-        Uses ROMTileMatcher to search the ROM for each tile's VRAM data.
-        This handles the case where VRAM was overwritten after the Lua script
-        recorded the ROM offset, making the attribution stale.
-
-        Args:
-            capture_result: Parsed capture with tile data
-            rom_path: Path to ROM file
-            selected_entry_ids: If provided, only process these entries
-
-        Returns:
-            Dict mapping original rom_offset → corrected rom_offset (or None if not found)
-        """
-        from core.mesen_integration.rom_tile_matcher import ROMTileMatcher
-
-        corrections: dict[int, int | None] = {}
-
-        # Initialize matcher with known sprite offsets
-        matcher = ROMTileMatcher(str(rom_path))
-        matcher.build_database()  # Indexes known HAL blocks
-
-        # Read ROM data for raw tile search fallback
-        rom_data = rom_path.read_bytes()
-
-        # Track statistics
-        total_tiles = 0
-        matched_tiles = 0
-        raw_matched = 0
-
-        # Process each tile
-        for entry in capture_result.entries:
-            if selected_entry_ids and entry.id not in selected_entry_ids:
-                continue
-            for tile in entry.tiles:
-                if tile.rom_offset is None:
-                    continue
-
-                # Skip if we've already processed this offset
-                if tile.rom_offset in corrections:
-                    continue
-
-                total_tiles += 1
-
-                # Search for this tile in ROM using ROMTileMatcher
-                matches = matcher.lookup_vram_tile(tile.data_bytes)
-
-                if matches:
-                    # Use best match (first result, sorted by ROM offset)
-                    best_match = matches[0]
-                    corrections[tile.rom_offset] = best_match.rom_offset
-                    matched_tiles += 1
-                    if best_match.rom_offset != tile.rom_offset:
-                        logger.debug(
-                            "Tile at 0x%X corrected to 0x%X (matched via HAL index)",
-                            tile.rom_offset,
-                            best_match.rom_offset,
-                        )
-                else:
-                    # Try raw tile search as fallback
-                    raw_offset = self._search_raw_tile(rom_data, tile.data_bytes)
-                    corrections[tile.rom_offset] = raw_offset
-                    if raw_offset is not None:
-                        raw_matched += 1
-                        if raw_offset != tile.rom_offset:
-                            logger.debug(
-                                "Tile at 0x%X corrected to 0x%X (matched via raw search)",
-                                tile.rom_offset,
-                                raw_offset,
-                            )
-                    else:
-                        logger.debug(
-                            "Tile at 0x%X not found in ROM (VRAM data: %s...)",
-                            tile.rom_offset,
-                            tile.data_hex[:16],
-                        )
-
-        logger.info(
-            "ROM offset correction: %d tiles processed, %d HAL matches, %d raw matches, %d not found",
-            total_tiles,
-            matched_tiles,
-            raw_matched,
-            total_tiles - matched_tiles - raw_matched,
-        )
-
-        return corrections
-
-    def _search_raw_tile(self, rom_data: bytes, tile_data: bytes) -> int | None:
-        """Search ROM for exact 32-byte tile match.
-
-        This is a fallback for tiles that aren't in HAL-compressed blocks.
-        Raw (uncompressed) tiles can be found by direct byte matching.
-
-        Args:
-            rom_data: Full ROM file contents
-            tile_data: 32 bytes of SNES 4bpp tile data
-
-        Returns:
-            ROM offset where tile was found, or None if not found
-        """
-        if len(tile_data) != 32:
-            return None
-
-        offset = rom_data.find(tile_data)
-        return offset if offset >= 0 else None

@@ -151,7 +151,7 @@ class TestGetCaptureResultFiltering:
         assert [e.id for e in result.entries] == [10, 20, 40]
 
     def test_returns_none_when_no_entries_match(self, tmp_path: Path, qtbot) -> None:
-        """Returns None when no entries match selected IDs."""
+        """Falls back to unfiltered capture when no entries match selected IDs."""
         # Create capture file with entries
         capture_data = create_test_capture([0, 1, 2])
         capture_path = tmp_path / "capture.json"
@@ -169,10 +169,14 @@ class TestGetCaptureResultFiltering:
         )
         controller._project = project
 
-        # Get capture result - should return None
-        result = controller.get_capture_result_for_game_frame("F001")
+        # Get capture result - should fall back to unfiltered with all entries
+        with qtbot.waitSignal(controller.stale_entries_warning, timeout=1000):
+            result = controller.get_capture_result_for_game_frame("F001")
 
-        assert result is None
+        # Should return unfiltered capture with all 3 entries
+        assert result is not None
+        assert len(result.entries) == 3
+        assert result.visible_count == 3
 
     def test_filters_single_entry(self, tmp_path: Path, qtbot) -> None:
         """Can filter down to a single entry."""
