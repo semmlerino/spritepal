@@ -998,7 +998,9 @@ class FrameMappingWorkspace(QWidget):
                 try:
                     ai_pil = Image.open(ai_frame.path).convert("RGBA")
                     bbox = capture_result.bounding_box
-                    offset_x, offset_y = calculate_auto_alignment(ai_pil, bbox.x, bbox.y, bbox.width, bbox.height)
+                    # Use (0, 0) for game bbox position since that's where it's displayed on canvas
+                    # (not the screen-relative capture coordinates)
+                    offset_x, offset_y = calculate_auto_alignment(ai_pil, 0, 0, bbox.width, bbox.height)
                     self._controller.update_mapping_alignment(
                         ai_index, offset_x, offset_y, False, False, set_edited=False
                     )
