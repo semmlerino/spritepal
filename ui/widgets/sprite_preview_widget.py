@@ -885,7 +885,14 @@ class SpritePreviewWidget(QWidget):
             # Get extraction manager for ROM access
             from core.app_context import get_app_context
 
-            extraction_manager = get_app_context().core_operations_manager
+            try:
+                extraction_manager = get_app_context().core_operations_manager
+            except RuntimeError:
+                progress_dialog.close()
+                QMessageBox.warning(
+                    self, "Not Available", "Application context not initialized. Please try again later."
+                )
+                return
             if not extraction_manager:
                 progress_dialog.close()
                 QMessageBox.warning(

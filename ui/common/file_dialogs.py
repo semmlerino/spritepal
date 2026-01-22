@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from PySide6.QtWidgets import QFileDialog, QWidget
 
 from core.app_context import get_app_context
+
+logger = logging.getLogger(__name__)
 
 
 class FileDialogHelper:
@@ -36,24 +39,30 @@ class FileDialogHelper:
         Returns:
             Selected directory path, or empty string if cancelled
         """
-        settings = get_app_context().application_state_manager
+        try:
+            settings = get_app_context().application_state_manager
+        except RuntimeError:
+            logger.warning("AppContext not available for browse_directory, using fallback")
+            settings = None
 
         # Determine initial directory
         if initial_dir and Path(initial_dir).exists():
             start_dir = initial_dir
-        elif settings_key:
+        elif settings_key and settings is not None:
             # Try to restore from settings
             saved_dir = str(settings.get(settings_namespace, settings_key, ""))
             start_dir = saved_dir if saved_dir and Path(saved_dir).exists() else settings.get_default_directory()
-        else:
+        elif settings is not None:
             start_dir = settings.get_default_directory()
+        else:
+            start_dir = str(Path.home())
 
         # Show directory dialog
         directory = QFileDialog.getExistingDirectory(
             parent, title, str(start_dir), QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks
         )
 
-        if directory:
+        if directory and settings is not None:
             # Save to settings for future use
             if settings_key:
                 settings.set(settings_namespace, settings_key, directory)
@@ -74,25 +83,31 @@ class FileDialogHelper:
         Returns:
             Selected file path, or empty string if cancelled
         """
-        settings = get_app_context().application_state_manager
+        try:
+            settings = get_app_context().application_state_manager
+        except RuntimeError:
+            logger.warning("AppContext not available for browse_open_file, using fallback")
+            settings = None
 
         # Determine initial directory
         if initial_path and Path(initial_path).exists():
             start_path = initial_path if Path(initial_path).is_file() else initial_path
-        elif settings_key:
+        elif settings_key and settings is not None:
             # Try to restore from settings
             saved_path = str(settings.get(settings_namespace, settings_key, ""))
             if saved_path and Path(saved_path).exists():
                 start_path = saved_path
             else:
                 start_path = settings.get_default_directory()
-        else:
+        elif settings is not None:
             start_path = settings.get_default_directory()
+        else:
+            start_path = str(Path.home())
 
         # Show open file dialog
         filename, _ = QFileDialog.getOpenFileName(parent, title, str(start_path), file_filter)
 
-        if filename:
+        if filename and settings is not None:
             # Save to settings for future use
             if settings_key:
                 settings.set(settings_namespace, settings_key, filename)
@@ -123,25 +138,31 @@ class FileDialogHelper:
         Returns:
             Selected file path, or empty string if cancelled
         """
-        settings = get_app_context().application_state_manager
+        try:
+            settings = get_app_context().application_state_manager
+        except RuntimeError:
+            logger.warning("AppContext not available for browse_save_file, using fallback")
+            settings = None
 
         # Determine initial path
         if initial_path:
             start_path = initial_path
-        elif settings_key:
+        elif settings_key and settings is not None:
             # Try to restore from settings
             saved_path = str(settings.get(settings_namespace, settings_key, ""))
             if saved_path and Path(saved_path).parent.exists():
                 start_path = saved_path
             else:
                 start_path = settings.get_default_directory()
-        else:
+        elif settings is not None:
             start_path = settings.get_default_directory()
+        else:
+            start_path = str(Path.home())
 
         # Show save file dialog
         filename, _ = QFileDialog.getSaveFileName(parent, title, str(start_path), file_filter)
 
-        if filename:
+        if filename and settings is not None:
             # Save to settings for future use
             if settings_key:
                 settings.set(settings_namespace, settings_key, filename)
@@ -164,7 +185,11 @@ class FileDialogHelper:
         Returns:
             Best initial directory to use
         """
-        settings = get_app_context().application_state_manager
+        try:
+            settings = get_app_context().application_state_manager
+        except RuntimeError:
+            logger.warning("AppContext not available for get_smart_initial_directory, using fallback")
+            settings = None
 
         # Check current path first
         if current_path:
@@ -177,13 +202,15 @@ class FileDialogHelper:
                 return current_path
 
         # Check fallback setting
-        if fallback_setting:
+        if fallback_setting and settings is not None:
             saved_dir = str(settings.get(fallback_namespace, fallback_setting, ""))
             if saved_dir and Path(saved_dir).exists():
                 return saved_dir
 
         # Use default directory
-        return settings.get_default_directory()
+        if settings is not None:
+            return settings.get_default_directory()
+        return str(Path.home())
 
 
 # Convenience functions for common dialog patterns

@@ -14,6 +14,8 @@ from PySide6.QtGui import QImage, QPixmap
 from shiboken6 import isValid
 
 from core.mesen_integration.log_watcher import CapturedOffset
+from core.services.library_service import LibraryService
+from core.services.mesen_capture_sync import MesenCaptureSync, ViewAssetBrowserAdapter
 from core.types import CompressionType
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
@@ -103,10 +105,6 @@ class ROMWorkflowController(QObject):
         self.state: str = "preview"  # 'preview', 'edit', 'save'
         self._current_source_type: str = "rom"  # Source type of currently selected sprite
 
-        # Track offset adjustments to prevent duplicate captures after resync
-        # Maps original ROM offset -> adjusted ROM offset
-        self._adjusted_offsets: dict[int, int] = {}
-
         # Current sprite data
         self.current_tile_data: bytes | None = None
         self.current_tile_offset: int = -1  # Offset current_tile_data belongs to
@@ -138,8 +136,19 @@ class ROMWorkflowController(QObject):
         # Thumbnail worker controller
         self._thumbnail_controller: ThumbnailWorkerController | None = None
 
-        # Queue for captures discovered before view is ready
-        self._pending_captures: list[CapturedOffset] = []
+        # Mesen capture sync service (extracted from this controller)
+        self._capture_sync = MesenCaptureSync(
+            on_thumbnail_request=self._request_capture_thumbnail,
+            message_service=message_service,
+        )
+        # Connect to LogWatcher via the service
+        self._capture_sync.connect(log_watcher)
+
+        # Library service (extracted from this controller)
+        self._library_service = LibraryService(
+            sprite_library=sprite_library,
+            on_message=self._show_message_if_available,
+        )
 
         # Connect editing controller validation signal
         self._editing_controller.validationChanged.connect(self._on_validation_changed)
@@ -151,17 +160,15 @@ class ROMWorkflowController(QObject):
         # Connect undo state changes for modified indicator
         self._editing_controller.undoStateChanged.connect(self._on_undo_state_changed)
 
-        # Connect LogWatcher
-        self._connect_log_watcher()
+    def _request_capture_thumbnail(self, offset: int) -> None:
+        """Request thumbnail generation for a capture offset (callback for MesenCaptureSync)."""
+        if self._thumbnail_controller:
+            self._thumbnail_controller.queue_thumbnail(offset)
 
-    def _connect_log_watcher(self) -> None:
-        """Connect LogWatcher signals to handle discovered offsets."""
-        if not self.log_watcher:
-            return
-        self.log_watcher.offset_discovered.connect(self._on_offset_discovered)
-        self.log_watcher.offset_rediscovered.connect(self._on_offset_rediscovered)
-        # Start watching if not already
-        self.log_watcher.start_watching()
+    def _show_message_if_available(self, message: str) -> None:
+        """Show a message if message service is available (callback for services)."""
+        if self._message_service:
+            self._message_service.show_message(message)
 
     def _setup_thumbnail_worker(self) -> None:
         """Create thumbnail worker after ROM is loaded."""
@@ -195,157 +202,23 @@ class ROMWorkflowController(QObject):
     def set_message_service(self, service: "StatusBarManager | None") -> None:
         """Inject message service after construction (for deferred initialization)."""
         self._message_service = service
+        self._capture_sync.set_message_service(service)
+        self._library_service.set_message_callback(self._show_message_if_available)
 
     def normalize_mesen_offset(self, offset: int) -> int:
         """Convert Mesen FILE OFFSET (file-based) to ROM offset (headerless)."""
-        if self.smc_header_offset <= 0:
-            return offset
-        if offset < self.smc_header_offset:
-            return offset
-        normalized = offset - self.smc_header_offset
-        logger.debug(
-            "[CAPTURE] Normalized Mesen FILE OFFSET 0x%06X -> 0x%06X (SMC header %d bytes)",
-            offset,
-            normalized,
-            self.smc_header_offset,
-        )
-        return normalized
+        return self._capture_sync.normalize_offset(offset)
 
     def _get_capture_name(self, capture: CapturedOffset) -> str:
         """Generate display name for captured sprite."""
-        rom_offset = self.normalize_mesen_offset(capture.offset)
-        if capture.frame is not None:
-            return f"0x{rom_offset:06X} (F{capture.frame})"
-        else:
-            # Fallback to timestamp if no frame
-            timestamp_str = capture.timestamp.strftime("%H:%M:%S")
-            return f"0x{rom_offset:06X} ({timestamp_str})"
-
-    def _on_offset_discovered(self, capture: object) -> None:
-        """Handle new offset discovered from Mesen2 log."""
-        if not isinstance(capture, CapturedOffset):
-            return
-
-        # Queue if view not ready yet
-        if self._view is None:
-            self._pending_captures.append(capture)
-            logger.debug("Queued capture 0x%06X (view not ready)", capture.offset)
-            return
-
-        # Process immediately
-        self._add_capture_to_browser(capture)
-
-    def _validate_capture_rom_match(self, capture: CapturedOffset) -> bool:
-        """Check if capture's ROM checksum matches the currently loaded ROM.
-
-        Returns True if:
-        - Checksums match
-        - Capture has no checksum (legacy capture, backward compatible)
-        - No ROM is loaded yet
-
-        Returns False (with warning) if checksums differ, indicating the capture
-        may be from a different ROM than the one currently loaded.
-        """
-        if capture.rom_checksum is None:
-            # Legacy capture without checksum - allow silently
-            return True
-        if self._loaded_rom_checksum is None:
-            # No ROM loaded yet - can't validate
-            return True
-        if capture.rom_checksum == self._loaded_rom_checksum:
-            return True
-
-        # Checksum mismatch - show warning
-        if self._message_service:
-            self._message_service.show_message(
-                f"Warning: Capture 0x{capture.offset:06X} may be from a different ROM "
-                f"(capture: 0x{capture.rom_checksum:04X}, loaded: 0x{self._loaded_rom_checksum:04X})"
-            )
-        logger.warning(
-            "ROM checksum mismatch for capture 0x%06X: capture=0x%04X, loaded=0x%04X",
-            capture.offset,
-            capture.rom_checksum,
-            self._loaded_rom_checksum,
-        )
-        return False
+        return self._capture_sync.get_capture_name(capture)
 
     def _add_capture_to_browser(self, capture: CapturedOffset) -> None:
-        """Add a capture to the browser with thumbnail."""
-        if not self._view:
-            return
+        """Add a capture to the browser with thumbnail.
 
-        # Validate ROM identity
-        if not self._validate_capture_rom_match(capture):
-            # Mismatched ROM - don't add to browser to avoid confusion/corruption
-            return
-
-        rom_offset = self.normalize_mesen_offset(capture.offset)
-
-        # Check if this offset was already adjusted - skip if the adjusted version exists
-        # This prevents duplicates when resync re-normalizes the original offset
-        if rom_offset in self._adjusted_offsets:
-            adjusted = self._adjusted_offsets[rom_offset]
-            if self._view.asset_browser.has_mesen_capture(adjusted, frame=capture.frame):
-                logger.debug(
-                    "Skipping already-adjusted capture 0x%06X -> 0x%06X (frame=%s)",
-                    rom_offset,
-                    adjusted,
-                    capture.frame,
-                )
-                return
-
-        name = self._get_capture_name(capture)
-        # Pass frame for proper deduplication (same offset, different frames should both appear)
-        self._view.add_mesen_capture(name, rom_offset, frame=capture.frame)
-
-        # Request thumbnail if worker is ready
-        if self._thumbnail_controller:
-            self._thumbnail_controller.queue_thumbnail(rom_offset)
-
-    def _on_offset_rediscovered(self, capture: object) -> None:
-        """Handle re-capture of existing offset from Mesen2 log.
-
-        This is called when the user clicks on the same sprite again.
-        The existing entry is updated (moved to top with new timestamp/frame).
+        Delegates to MesenCaptureSync service. Kept for backward compatibility with tests.
         """
-        if not isinstance(capture, CapturedOffset):
-            return
-
-        # Queue if view not ready yet
-        if self._view is None:
-            # For rediscoveries, we still queue them - they'll be processed in order
-            self._pending_captures.append(capture)
-            logger.debug("Queued rediscovered capture 0x%06X (view not ready)", capture.offset)
-            return
-
-        # Process immediately with update flag
-        self._update_capture_in_browser(capture)
-
-    def _update_capture_in_browser(self, capture: CapturedOffset) -> None:
-        """Update an existing capture in the browser (move to top with new data).
-
-        This handles re-clicking the same sprite - the old entry is removed
-        and a new one is added at the top with updated timestamp/frame.
-        """
-        if not self._view:
-            return
-
-        # Validate ROM identity
-        if not self._validate_capture_rom_match(capture):
-            # Mismatched ROM - don't update browser
-            return
-
-        rom_offset = self.normalize_mesen_offset(capture.offset)
-        name = self._get_capture_name(capture)
-
-        # Update existing (remove and re-add at top)
-        self._view.add_mesen_capture(name, rom_offset, frame=capture.frame, update_if_exists=True)
-
-        # Re-request thumbnail (user may want fresh thumbnail)
-        if self._thumbnail_controller:
-            self._thumbnail_controller.queue_thumbnail(rom_offset)
-
-        logger.debug("Updated capture in browser: 0x%06X", rom_offset)
+        self._capture_sync._add_capture_to_browser(capture)
 
     def set_view(self, view: "ROMWorkflowPage") -> None:
         """Set the view and connect signals."""
@@ -356,24 +229,12 @@ class ROMWorkflowController(QObject):
         if not self.rom_path:
             self._view.set_rom_available(False)
 
-        # Load existing captures into asset browser
-        if self.log_watcher:
-            # First: load persistent clicks from file (cross-session)
-            persistent_clicks = self.log_watcher.load_persistent_clicks()
-            for capture in persistent_clicks:
-                self._add_capture_to_browser(capture)
+        # Set the asset browser adapter on the capture sync service
+        # This will also process any pending captures
+        self._capture_sync.set_asset_browser(ViewAssetBrowserAdapter(view))
 
-            # Second: sync current session captures (may overlap with persistent,
-            # but _add_capture_to_browser handles duplicates via has_mesen_capture)
-            for capture in self.log_watcher.recent_captures:
-                self._add_capture_to_browser(capture)
-
-        # Flush any pending real-time captures (discovered before view was ready)
-        if self._pending_captures:
-            logger.info("Flushing %d pending captures", len(self._pending_captures))
-            for capture in self._pending_captures:
-                self._add_capture_to_browser(capture)
-            self._pending_captures.clear()
+        # Sync existing captures from log watcher
+        self._capture_sync.sync_from_log_watcher()
 
     def _connect_view_signals(self) -> None:
         """Connect view signals."""
@@ -599,18 +460,8 @@ class ROMWorkflowController(QObject):
                 self._message_service.show_message("Cannot save to library: no ROM loaded")
             return
 
-        if not self._sprite_library:
-            logger.warning("Cannot save to library: sprite library not available")
-            if self._message_service:
-                self._message_service.show_message("Cannot save to library: sprite library not available")
-            return
-
-        library = self._sprite_library
-
         # Check if already in library
-        rom_hash = library.compute_rom_hash(self.rom_path)
-        existing = library.get_by_offset(offset, rom_hash)
-        if existing:
+        if self._library_service.sprite_exists(offset, self.rom_path):
             logger.info("Sprite at 0x%06X already in library", offset)
             if self._message_service:
                 self._message_service.show_message(f"Sprite at 0x{offset:06X} is already in library")
@@ -631,10 +482,9 @@ class ROMWorkflowController(QObject):
         # Generate thumbnail (PIL Image for library storage)
         pil_thumbnail = self._generate_library_thumbnail(offset)
 
-        # Add to library (persistent storage)
-        # Returns None if persistence failed - in that case, don't update UI
-        sprite = library.add_sprite(
-            rom_offset=offset,
+        # Add to library via service (handles persistence and messaging)
+        sprite = self._library_service.save_sprite(
+            offset=offset,
             rom_path=self.rom_path,
             name=name,
             thumbnail=pil_thumbnail,
@@ -644,19 +494,12 @@ class ROMWorkflowController(QObject):
         )
 
         if sprite is None:
-            logger.error("Failed to save sprite to library: persistence failed for 0x%06X", offset)
-            if self._message_service:
-                self._message_service.show_message("Failed to save sprite to library (disk write error)")
-            return
+            return  # Service already showed error message
 
         # Also add to browser's Library category for immediate visibility
         if self._view:
             qpixmap = self._pil_to_qpixmap(pil_thumbnail) if pil_thumbnail else None
             self._view.add_library_sprite(name, offset, qpixmap)
-
-        logger.info("Saved to library: %s at 0x%06X", name, offset)
-        if self._message_service:
-            self._message_service.show_message(f"Saved '{name}' to library")
 
     def _get_display_name_for_offset(self, offset: int) -> str | None:
         """Get current display name for offset from browser."""
@@ -776,26 +619,16 @@ class ROMWorkflowController(QObject):
         logger.info("Asset renamed: 0x%06X → %s", offset, new_name)
         # Names are stored in widget's UserRole data, which updates on edit
         # Also update library if this sprite is in the library
-        if self.rom_path and self._sprite_library:
-            library = self._sprite_library
-            rom_hash = library.compute_rom_hash(self.rom_path)
-            existing = library.get_by_offset(offset, rom_hash)
-            if existing:
-                library.update_sprite(existing[0].unique_id, name=new_name)
-                logger.info("Updated library sprite name: %s", new_name)
+        if self.rom_path:
+            self._library_service.rename_sprite(offset, self.rom_path, new_name)
 
     def _on_asset_deleted(self, offset: int, source_type: str) -> None:
         """Handle asset deletion from context menu."""
         logger.info("Asset deleted: 0x%06X (%s)", offset, source_type)
 
-        # Handle persistent deletion
-        if source_type == "library" and self._sprite_library and self.rom_path:
-            library = self._sprite_library
-            rom_hash = library.compute_rom_hash(self.rom_path)
-            matches = library.get_by_offset(offset, rom_hash)
-            for sprite in matches:
-                library.remove_sprite(sprite.unique_id)
-                logger.info("Removed persistent sprite: %s", sprite.unique_id)
+        # Handle persistent deletion via library service
+        if source_type == "library" and self.rom_path:
+            self._library_service.delete_sprite(offset, self.rom_path)
 
         # Remove item from browser tree
         if self._view:
@@ -967,7 +800,7 @@ class ROMWorkflowController(QObject):
             self._view.clear_asset_browser()
 
         # Clear adjusted offset tracking for new ROM
-        self._adjusted_offsets.clear()
+        self._capture_sync._adjusted_offsets.clear()
 
         self.rom_path = path
         # Store SMC header offset and calculate actual ROM size
@@ -978,6 +811,12 @@ class ROMWorkflowController(QObject):
         self.rom_size = file_size - self.smc_header_offset
         self._rom_mtime = stat_result.st_mtime  # Track for external modification detection
         self._loaded_rom_checksum = header.checksum  # Store for capture validation
+
+        # Update capture sync service with ROM state
+        self._capture_sync.set_rom_state(
+            smc_header_offset=self.smc_header_offset,
+            rom_checksum=self._loaded_rom_checksum,
+        )
 
         # Update view
         if self._view:
@@ -1036,33 +875,7 @@ class ROMWorkflowController(QObject):
         Called when entering the sprite editor workspace to ensure all
         discovered captures are visible in the asset browser.
         """
-        if not self._view:
-            logger.warning("sync_captures_from_log_watcher: no view set")
-            return
-        if not self.log_watcher:
-            logger.warning("sync_captures_from_log_watcher: no log_watcher")
-            return
-
-        captures = self.log_watcher.recent_captures
-        logger.info(
-            "sync_captures_from_log_watcher: found %d captures in log_watcher",
-            len(captures),
-        )
-
-        # Sync all current session captures
-        for capture in captures:
-            logger.debug("  syncing capture: 0x%06X", capture.offset)
-            self._add_capture_to_browser(capture)
-
-        # Also sync persistent clicks
-        persistent = self.log_watcher.load_persistent_clicks()
-        logger.info(
-            "sync_captures_from_log_watcher: found %d persistent clicks",
-            len(persistent),
-        )
-        for capture in persistent:
-            logger.debug("  syncing persistent: 0x%06X", capture.offset)
-            self._add_capture_to_browser(capture)
+        self._capture_sync.sync_from_log_watcher()
 
     def ensure_and_select_capture(self, offset: int, name: str | None = None, frame: int | None = None) -> None:
         """Ensure a Mesen capture exists in the asset browser and select it.
@@ -3058,7 +2871,7 @@ class ROMWorkflowController(QObject):
                 f"[PREVIEW] Offset adjusted from 0x{old_offset:06X} to 0x{actual_offset:06X} (delta: {offset_delta:+d})"
             )
             # Track this adjustment to prevent duplicates during resync
-            self._adjusted_offsets[old_offset] = actual_offset
+            self._capture_sync.record_offset_adjustment(old_offset, actual_offset)
             # Keep pending auto-open aligned with the adjusted offset.
             if self._pending_open_in_editor and self._pending_open_offset not in (-1, actual_offset):
                 self._pending_open_offset = actual_offset

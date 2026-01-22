@@ -113,9 +113,16 @@ class TestFindAttributionFile:
         found = find_attribution_file(capture_path)
         assert found == sample_attribution_json
 
-    def test_returns_none_when_not_found(self, tmp_path: Path) -> None:
+    def test_returns_none_when_not_found(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Returns None when attribution file doesn't exist."""
         capture_path = tmp_path / "capture.json"
         capture_path.touch()
+
+        # Patch the fallback mesen2_exchange directory to not exist
+        # This prevents the function from finding the actual vram_attribution.json in the repo
+        import core.mesen_integration.vram_attribution as vram_module
+
+        fake_exchange_dir = tmp_path / "fake_mesen2_exchange"
+        monkeypatch.setattr(vram_module, "__file__", str(fake_exchange_dir / "core" / "mesen_integration" / "vram.py"))
 
         assert find_attribution_file(capture_path) is None
