@@ -20,15 +20,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.mime_constants import MIME_GAME_FRAME
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
 
 logger = get_logger(__name__)
-
-# MIME type for drag-drop (must match captures_library_pane.py)
-MIME_TYPE_GAME_FRAME = "application/x-spritepal-game-frame"
 
 # Thumbnail size for table cells
 THUMBNAIL_SIZE = 64
@@ -408,7 +406,7 @@ class MappingPanel(QWidget):
     def _drag_enter_event(self, event: QDragEnterEvent) -> None:
         """Handle drag enter event."""
         mime_data = event.mimeData()
-        if mime_data is not None and mime_data.hasFormat(MIME_TYPE_GAME_FRAME):  # type: ignore[reportUnnecessaryComparison]
+        if mime_data is not None and mime_data.hasFormat(MIME_GAME_FRAME):  # type: ignore[reportUnnecessaryComparison]
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -416,7 +414,7 @@ class MappingPanel(QWidget):
     def _drag_move_event(self, event: QDragMoveEvent) -> None:
         """Handle drag move event - highlight target row."""
         mime_data = event.mimeData()
-        if mime_data is None or not mime_data.hasFormat(MIME_TYPE_GAME_FRAME):  # type: ignore[reportUnnecessaryComparison]
+        if mime_data is None or not mime_data.hasFormat(MIME_GAME_FRAME):  # type: ignore[reportUnnecessaryComparison]
             event.ignore()
             return
 
@@ -445,7 +443,7 @@ class MappingPanel(QWidget):
         self._clear_drop_highlight()
 
         mime_data = event.mimeData()
-        if mime_data is None or not mime_data.hasFormat(MIME_TYPE_GAME_FRAME):  # type: ignore[reportUnnecessaryComparison]
+        if mime_data is None or not mime_data.hasFormat(MIME_GAME_FRAME):  # type: ignore[reportUnnecessaryComparison]
             event.ignore()
             return
 
@@ -467,7 +465,7 @@ class MappingPanel(QWidget):
             return
 
         # Get game frame ID from MIME data
-        raw_data = mime_data.data(MIME_TYPE_GAME_FRAME).data()
+        raw_data = mime_data.data(MIME_GAME_FRAME).data()
         game_frame_id = (
             raw_data.tobytes().decode("utf-8") if isinstance(raw_data, memoryview) else raw_data.decode("utf-8")
         )

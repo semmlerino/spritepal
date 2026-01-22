@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.mime_constants import MIME_GAME_FRAME
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -35,9 +36,6 @@ STATUS_COLORS = {
     "unlinked": QColor(180, 180, 180),  # Light gray
     "linked": QColor(76, 175, 80),  # Green
 }
-
-# MIME type for drag-drop
-MIME_TYPE_GAME_FRAME = "application/x-spritepal-game-frame"
 
 
 class CapturesLibraryPane(QWidget):
@@ -260,7 +258,7 @@ class CapturesLibraryPane(QWidget):
 
         drag = QDrag(self._list)
         mime_data = QMimeData()
-        mime_data.setData(MIME_TYPE_GAME_FRAME, frame_id.encode("utf-8"))
+        mime_data.setData(MIME_GAME_FRAME, frame_id.encode("utf-8"))
         mime_data.setText(frame_id)  # Fallback for debugging
         drag.setMimeData(mime_data)
 
@@ -347,3 +345,8 @@ class CapturesLibraryPane(QWidget):
                 self._list.clearSelection()
         finally:
             self._list.blockSignals(False)
+
+        # Bug #1 fix: If there was a selection and it's now gone (filtered out),
+        # explicitly notify listeners that selection was cleared
+        if current_selection is not None and not selection_restored:
+            self.game_frame_selected.emit("")

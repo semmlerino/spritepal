@@ -15,6 +15,7 @@ import pytest
 from PIL import Image
 
 from core.frame_mapping_project import AIFrame, FrameMapping, FrameMappingProject, GameFrame
+from core.services.rom_verification_service import ROMVerificationResult
 from ui.frame_mapping.controllers.frame_mapping_controller import (
     FrameMappingController,
 )
@@ -453,20 +454,23 @@ class TestInjectMappingFlipHandling:
                 pasted_tiles.append(im.copy())
             return original_paste(self, im, box, mask)
 
-        # Mock ROM offset correction to return identity mapping (no correction needed)
+        # Mock ROMVerificationService to return identity mapping (no correction needed)
         # This test focuses on flip handling, not ROM offset correction
-        def mock_find_correct_offsets(capture_result, rom_path, selected_entry_ids):
-            offsets = {}
-            for entry in capture_result.entries:
-                for tile in entry.tiles:
-                    if tile.rom_offset is not None:
-                        offsets[tile.rom_offset] = tile.rom_offset
-            return offsets
+        mock_verification = ROMVerificationResult(
+            corrections={0x100000: 0x100000},  # Identity mapping
+            matched_hal=4,
+            matched_raw=0,
+            not_found=0,
+            total=4,
+        )
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+        mock_verifier.apply_corrections.return_value = 0
 
         with (
             patch.object(Image.Image, "paste", track_paste),
             patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch.object(controller, "_find_correct_rom_offsets", side_effect=mock_find_correct_offsets),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService", return_value=mock_verifier),
             patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
@@ -560,20 +564,23 @@ class TestInjectMappingFlipHandling:
             saved_tile_images.append(self.copy())
             return original_save(self, path, *args, **kwargs)
 
-        # Mock ROM offset correction to return identity mapping (no correction needed)
+        # Mock ROMVerificationService to return identity mapping (no correction needed)
         # This test focuses on flip handling, not ROM offset correction
-        def mock_find_correct_offsets(capture_result, rom_path, selected_entry_ids):
-            offsets = {}
-            for entry in capture_result.entries:
-                for tile in entry.tiles:
-                    if tile.rom_offset is not None:
-                        offsets[tile.rom_offset] = tile.rom_offset
-            return offsets
+        mock_verification = ROMVerificationResult(
+            corrections={0x100000: 0x100000},  # Identity mapping
+            matched_hal=1,
+            matched_raw=0,
+            not_found=0,
+            total=1,
+        )
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+        mock_verifier.apply_corrections.return_value = 0
 
         with (
             patch.object(Image.Image, "save", track_save),
             patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch.object(controller, "_find_correct_rom_offsets", side_effect=mock_find_correct_offsets),
+            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService", return_value=mock_verifier),
             patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
@@ -1063,12 +1070,15 @@ class TestRomOffsetCorrection:
             (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
             controller.inject_mapping(0, rom_path)
 
-        # Check that correction statistics were logged
+        # Check that verification statistics were logged
+        # New format from ROMVerificationService: "ROM offset verification: N tiles, N HAL, N raw, N not found"
         log_messages = [r.message for r in caplog.records]
-        correction_logs = [m for m in log_messages if "offset" in m.lower() and "correct" in m.lower()]
+        verification_logs = [m for m in log_messages if "ROM offset verification" in m]
 
-        assert any("2 offsets corrected" in m for m in correction_logs), (
-            f"Expected log message about 2 corrected offsets, got: {correction_logs}"
+        assert len(verification_logs) >= 1, f"Expected ROM offset verification log, got: {log_messages}"
+        # Both tiles should have been found (via HAL or raw search)
+        assert any("2 tiles" in m for m in verification_logs), (
+            f"Expected log message about 2 tiles verified, got: {verification_logs}"
         )
 
 

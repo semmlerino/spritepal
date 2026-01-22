@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.frame_mapping_project import AIFrame, GameFrame
-from core.palette_utils import quantize_to_palette, snes_palette_to_rgb
+from core.services.sprite_compositor import SpriteCompositor, TransformParams
 from core.services.tile_sampling_service import (
     TileSamplingService,
     calculate_auto_alignment,
@@ -477,6 +477,8 @@ class WorkbenchCanvas(QWidget):
         flip_h: bool,
         flip_v: bool,
         scale: float = 1.0,
+        *,
+        has_mapping: bool = True,
     ) -> None:
         """Set the alignment values.
 
@@ -486,9 +488,10 @@ class WorkbenchCanvas(QWidget):
             flip_h: Horizontal flip state.
             flip_v: Vertical flip state.
             scale: Scale factor (0.1 - 10.0).
+            has_mapping: Whether this represents a valid mapping (affects control state).
         """
-        self._has_mapping = True
-        self._set_controls_enabled(True)
+        self._has_mapping = has_mapping
+        self._set_controls_enabled(has_mapping)
         self._updating_from_external = True
 
         try:
@@ -523,9 +526,7 @@ class WorkbenchCanvas(QWidget):
 
     def clear_alignment(self) -> None:
         """Clear alignment values (reset to defaults)."""
-        self._has_mapping = False
-        self._set_controls_enabled(False)
-        self.set_alignment(0, 0, False, False, 1.0)
+        self.set_alignment(0, 0, False, False, 1.0, has_mapping=False)
 
     def clear(self) -> None:
         """Clear all content."""
@@ -722,10 +723,10 @@ class WorkbenchCanvas(QWidget):
     def _generate_preview(self) -> None:
         """Generate the in-game preview image.
 
-        Creates a composite showing how the sprite will look in-game:
-        - Original sprite as base
-        - AI frame composited on top (replacing overlapping areas)
-        - Clipped to original sprite silhouette
+        Uses SpriteCompositor with "original" policy so uncovered areas
+        show original sprite pixels (WYSIWYG preview).
+
+        Transform order: flip -> scale (SNES-correct, matching injection)
         """
         logger.debug("_generate_preview called, enabled=%s", self._preview_enabled)
         if not self._preview_enabled:
@@ -751,64 +752,25 @@ class WorkbenchCanvas(QWidget):
             flip_v = self._flip_v_checkbox.isChecked()
             scale = self._ai_frame_item.scale_factor()
 
-            # Render original sprite from capture result
-            from core.mesen_integration.capture_renderer import CaptureRenderer
+            # Use SpriteCompositor with "original" policy for preview
+            # This shows original pixels where AI doesn't cover (WYSIWYG)
+            compositor = SpriteCompositor(uncovered_policy="original")
+            transform = TransformParams(
+                offset_x=offset_x,
+                offset_y=offset_y,
+                flip_h=flip_h,
+                flip_v=flip_v,
+                scale=scale,
+            )
 
-            renderer = CaptureRenderer(self._capture_result)
-            original_sprite = renderer.render_selection()
+            result = compositor.composite_frame(
+                ai_image=self._ai_image,
+                capture_result=self._capture_result,
+                transform=transform,
+                quantize=True,
+            )
 
-            # Get sprite dimensions
-            bbox = self._capture_result.bounding_box
-            canvas_w = bbox.width
-            canvas_h = bbox.height
-
-            # Start with original sprite as the base
-            preview_img = original_sprite.copy()
-
-            # Create a copy of the AI image and apply transforms
-            ai_img = self._ai_image.copy()
-
-            # Apply scale if not 1.0
-            if abs(scale - 1.0) > 0.01:
-                new_w = max(1, int(ai_img.width * scale))
-                new_h = max(1, int(ai_img.height * scale))
-                ai_img = ai_img.resize((new_w, new_h), Image.Resampling.NEAREST)
-
-            # Apply flips
-            if flip_h:
-                ai_img = ai_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-            if flip_v:
-                ai_img = ai_img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-
-            # Create canvas for the transformed AI image
-            ai_canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-            ai_canvas.paste(ai_img, (offset_x, offset_y), ai_img)
-
-            # Clip AI canvas to original sprite's silhouette
-            original_mask = original_sprite.split()[3]  # Alpha channel
-            clipped_ai = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-            clipped_ai.paste(ai_canvas, (0, 0), original_mask)
-
-            # Quantize to game palette for accurate color preview
-            # Use the first entry's palette (entries typically share palettes)
-            if self._capture_result.entries and self._capture_result.palettes:
-                first_entry = self._capture_result.entries[0]
-                snes_palette = self._capture_result.palettes.get(first_entry.palette, [])
-                if snes_palette:
-                    palette_rgb = snes_palette_to_rgb(snes_palette)
-                    # Save original alpha before quantization
-                    original_alpha = clipped_ai.split()[3]
-                    # Quantize to indexed palette
-                    indexed_ai = quantize_to_palette(clipped_ai, palette_rgb)
-                    # Convert back to RGBA for compositing
-                    quantized_rgba = indexed_ai.convert("RGBA")
-                    # Restore original alpha (SNES index 0 = transparent, but palette[0] has a color)
-                    quantized_rgba.putalpha(original_alpha)
-                    clipped_ai = quantized_rgba
-
-            # Composite: original sprite with AI frame on top
-            # The AI frame replaces original pixels where it has content
-            preview_img = Image.alpha_composite(preview_img, clipped_ai)
+            preview_img = result.composited_image
 
             # Convert PIL image to QPixmap
             from PySide6.QtGui import QImage

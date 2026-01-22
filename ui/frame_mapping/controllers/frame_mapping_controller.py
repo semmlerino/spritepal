@@ -30,6 +30,8 @@ from core.mesen_integration.click_extractor import (
 )
 from core.palette_utils import quantize_to_palette, snes_palette_to_rgb
 from core.rom_injector import ROMInjector
+from core.services.rom_verification_service import ROMVerificationService
+from core.services.sprite_compositor import SpriteCompositor, TransformParams
 from core.types import CompressionType
 from utils.logging_config import get_logger
 
@@ -705,48 +707,27 @@ class FrameMappingController(QObject):
             logger.info("Game frame: %s", game_frame.id)
             logger.info("ROM offsets: %s", [f"0x{o:X}" for o in game_frame.rom_offsets])
 
-        # 3. Load and Prepare Images
+        # 3. Load and Prepare Images using SpriteCompositor
         try:
             # Load AI image
             ai_img = Image.open(ai_frame.path).convert("RGBA")
 
-            # Apply flips (flip first, then position)
-            if mapping.flip_h:
-                ai_img = ai_img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-            if mapping.flip_v:
-                ai_img = ai_img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-
-            # Apply scale if not 1.0 (matching preview behavior in workbench_canvas)
-            if abs(mapping.scale - 1.0) > 0.01:
-                new_w = max(1, int(ai_img.width * mapping.scale))
-                new_h = max(1, int(ai_img.height * mapping.scale))
-                ai_img = ai_img.resize((new_w, new_h), Image.Resampling.NEAREST)
-
-            # Re-parse capture to get tile layout and render original mask
+            # Re-parse capture to get tile layout
             parser = MesenCaptureParser()
             capture_result = parser.parse_file(game_frame.capture_path)
 
-            # Render the FULL original frame to use as a mask
-            # We need to filter the capture to ONLY the entries relevant to this GameFrame
-            # (The GameFrame might have been imported from a subset of a larger capture)
-            # Filter by selected_entry_ids if available (user's explicit selection during import),
-            # otherwise fall back to rom_offsets for legacy projects.
-
+            # Filter capture to relevant entries
             if game_frame.selected_entry_ids:
-                # Use explicit entry selection (preferred - more precise)
                 selected_ids = set(game_frame.selected_entry_ids)
                 relevant_entries = [e for e in capture_result.entries if e.id in selected_ids]
             else:
-                # Legacy fallback: filter by ROM offset (may include unintended entries)
                 relevant_entries = [e for e in capture_result.entries if e.rom_offset in game_frame.rom_offsets]
 
             if not relevant_entries:
                 self.error_occurred.emit("No entries in capture match the GameFrame's ROM offsets.")
                 return False
 
-            # Create a filtered capture result for rendering the mask
-            from core.mesen_integration.click_extractor import CaptureResult
-
+            # Create filtered capture for compositing
             filtered_capture = CaptureResult(
                 frame=capture_result.frame,
                 visible_count=len(relevant_entries),
@@ -756,37 +737,37 @@ class FrameMappingController(QObject):
                 timestamp=capture_result.timestamp,
             )
 
-            renderer = CaptureRenderer(filtered_capture)
-            # This renders the composite original sprite
-            original_sprite_img = renderer.render_selection()
+            # Use SpriteCompositor for unified transform logic (flip -> scale order)
+            # Policy: "transparent" for injection (uncovered areas become index 0)
+            compositor = SpriteCompositor(uncovered_policy="transparent")
+            transform = TransformParams(
+                offset_x=mapping.offset_x,
+                offset_y=mapping.offset_y,
+                flip_h=mapping.flip_h,
+                flip_v=mapping.flip_v,
+                scale=mapping.scale,
+            )
 
-            # Create compositing canvas matching the GameFrame bounds
-            canvas_width = original_sprite_img.width
-            canvas_height = original_sprite_img.height
+            # Composite without quantization (tile-level quantization happens later)
+            composite_result = compositor.composite_frame(
+                ai_image=ai_img,
+                capture_result=filtered_capture,
+                transform=transform,
+                quantize=False,  # Quantize per-tile later
+            )
 
-            canvas = Image.new("RGBA", (canvas_width, canvas_height), (0, 0, 0, 0))
-
-            # Paste aligned AI image onto canvas
-            canvas.paste(ai_img, (mapping.offset_x, mapping.offset_y), ai_img)
-
-            # Apply Mask: Use original sprite's alpha channel to clip to silhouette.
-            # This ensures we only inject pixels where the original sprite had pixels.
-            # Key behavior for partial coverage:
-            # - Where original is opaque AND AI frame covers → AI frame pixels
-            # - Where original is opaque AND AI frame doesn't cover → transparent (index 0)
-            # - Where original is transparent → transparent (unchanged)
-            # This is the correct behavior: uncovered areas become transparent, not filled
-            # with original pixels.
-            mask = original_sprite_img.split()[3]  # Get alpha channel
-            masked_canvas = Image.new("RGBA", (canvas_width, canvas_height), (0, 0, 0, 0))
-            masked_canvas.paste(canvas, (0, 0), mask)
+            masked_canvas = composite_result.composited_image
+            canvas_width = composite_result.canvas_width
+            canvas_height = composite_result.canvas_height
 
             # Debug: Save intermediate images
             if debug and debug_dir:
+                # Render original for debug
+                renderer = CaptureRenderer(filtered_capture)
+                original_sprite_img = renderer.render_selection()
                 original_sprite_img.save(debug_dir / "original_sprite_mask.png")
-                canvas.save(debug_dir / "aligned_ai_frame.png")
                 masked_canvas.save(debug_dir / "masked_canvas.png")
-                logger.info("Saved debug images: original_sprite_mask.png, aligned_ai_frame.png, masked_canvas.png")
+                logger.info("Saved debug images: original_sprite_mask.png, masked_canvas.png")
                 logger.info(
                     "Canvas size: %dx%d, AI alignment: offset=(%d,%d) flip_h=%s flip_v=%s scale=%.2f",
                     canvas_width,
@@ -797,11 +778,6 @@ class FrameMappingController(QObject):
                     mapping.flip_v,
                     mapping.scale,
                 )
-
-            # At this point, `masked_canvas` contains the aligned AI pixels,
-            # but strictly clipped to the shape of the original sprite.
-            # Areas where AI frame didn't cover remain transparent (RGBA 0,0,0,0),
-            # which will be quantized to palette index 0 (transparency) during injection.
 
         except Exception as e:
             logger.exception("Failed to prepare masked image")
@@ -830,57 +806,40 @@ class FrameMappingController(QObject):
         first_injection = True
 
         try:
-            # Verify and correct ROM attribution for stale offsets
-            # The Mesen Lua script attributes ROM offsets to VRAM tiles during capture,
-            # but if VRAM is overwritten later, the offsets become stale.
-            # This searches the ROM to find the correct offset for each tile.
+            # Verify and correct ROM attribution using ROMVerificationService
             logger.info("Emitting status_update signal: 'Verifying ROM tile attribution...'")
             self.status_update.emit("Verifying ROM tile attribution...")
-            corrections = self._find_correct_rom_offsets(
+
+            verifier = ROMVerificationService(rom_path)
+            verification = verifier.verify_offsets(
                 filtered_capture,
-                rom_path,
                 game_frame.selected_entry_ids,
             )
 
-            # Count corrections for logging and UI feedback
-            stale_count = sum(1 for old, new in corrections.items() if old != new and new is not None)
-            unfound_count = sum(1 for new in corrections.values() if new is None)
-            total_offsets = len(corrections)
-
-            if stale_count > 0:
+            # Report verification results
+            if verification.has_corrections:
                 self.status_update.emit(
-                    f"ROM attribution: {stale_count} stale offsets corrected, {unfound_count} not found"
-                )
-                logger.info(
-                    "ROM attribution: %d offsets corrected, %d not found in ROM",
-                    stale_count,
-                    unfound_count,
+                    f"ROM attribution: {verification.matched_hal + verification.matched_raw - verification.total + len([o for o, n in verification.corrections.items() if o != n and n is not None])} stale offsets corrected, {verification.not_found} not found"
                 )
 
-            if unfound_count > 0 and unfound_count == len(corrections):
-                self.status_update.emit(f"ERROR: 0/{total_offsets} tiles found in ROM")
+            if not verification.all_found and verification.not_found == verification.total:
+                self.status_update.emit(f"ERROR: 0/{verification.total} tiles found in ROM")
                 self.error_occurred.emit(
                     "Could not find any tiles in ROM. The sprite data may use an "
                     "unknown compression format or the ROM may be modified."
                 )
                 return False
 
-            if stale_count == 0 and unfound_count == 0 and total_offsets > 0:
-                self.status_update.emit(f"ROM attribution verified: {total_offsets} tiles matched")
+            if verification.all_found and not verification.has_corrections and verification.total > 0:
+                self.status_update.emit(f"ROM attribution verified: {verification.total} tiles matched")
 
-            # Apply corrections to tiles before processing
-            for entry in relevant_entries:
-                for tile in entry.tiles:
-                    if tile.rom_offset is not None and tile.rom_offset in corrections:
-                        corrected = corrections[tile.rom_offset]
-                        if corrected is not None and corrected != tile.rom_offset:
-                            if debug:
-                                logger.info(
-                                    "Correcting tile rom_offset: 0x%X → 0x%X",
-                                    tile.rom_offset,
-                                    corrected,
-                                )
-                            tile.rom_offset = corrected
+            # Apply corrections to tiles
+            if debug:
+                for old_offset, new_offset in verification.corrections.items():
+                    if new_offset is not None and new_offset != old_offset:
+                        logger.info("Correcting tile rom_offset: 0x%X → 0x%X", old_offset, new_offset)
+
+            verifier.apply_corrections(relevant_entries, verification.corrections)
 
             # Group by individual tile ROM offsets (not entry-level offsets)
             # Each tile within an entry may have a different ROM offset

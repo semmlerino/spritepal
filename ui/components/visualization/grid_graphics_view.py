@@ -44,6 +44,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.common.mime_constants import MIME_TILES
+
 
 # Import TilePosition at runtime to avoid circular imports
 def _make_tile_position(row: int, col: int) -> TilePosition:
@@ -366,7 +368,7 @@ class GridGraphicsView(QGraphicsView):
         payload = f"{anchor_str}|{tiles_str}"
 
         mime_data.setText(payload)
-        mime_data.setData("application/x-spritepal-tiles", payload.encode())
+        mime_data.setData(MIME_TILES, payload.encode())
 
         drag.setMimeData(mime_data)
 
@@ -437,13 +439,13 @@ class GridGraphicsView(QGraphicsView):
     @override
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         """Handle drag enter"""
-        if event.mimeData().hasFormat("application/x-spritepal-tiles"):
+        if event.mimeData().hasFormat(MIME_TILES):
             event.acceptProposedAction()
 
     @override
     def dragMoveEvent(self, event: QDragMoveEvent) -> None:
         """Handle drag move with placeholder feedback"""
-        if event.mimeData().hasFormat("application/x-spritepal-tiles"):
+        if event.mimeData().hasFormat(MIME_TILES):
             event.acceptProposedAction()
 
             # Update drop placeholder
@@ -456,7 +458,7 @@ class GridGraphicsView(QGraphicsView):
 
             if target_tile and self._is_valid_tile(target_tile):
                 # Parse mime data to get relative offsets
-                data = str(event.mimeData().data("application/x-spritepal-tiles").data(), encoding="utf-8")
+                data = str(event.mimeData().data(MIME_TILES).data(), encoding="utf-8")
                 anchor_str, tiles_str = data.split("|")
                 ar, ac = map(int, anchor_str.split(","))
                 anchor = _make_tile_position(ar, ac)
@@ -516,12 +518,12 @@ class GridGraphicsView(QGraphicsView):
                 scene.removeItem(self.drop_placeholder)
             self.drop_placeholder = None
 
-        if event.mimeData().hasFormat("application/x-spritepal-tiles"):
+        if event.mimeData().hasFormat(MIME_TILES):
             pos = self.mapToScene(event.pos())
             target_tile = self._pos_to_tile(pos)
 
             if target_tile and self._is_valid_tile(target_tile):
-                data = str(event.mimeData().data("application/x-spritepal-tiles").data(), encoding="utf-8")
+                data = str(event.mimeData().data(MIME_TILES).data(), encoding="utf-8")
                 anchor_str, tiles_str = data.split("|")
                 # We don't need anchor here if we pass the whole list and target
                 # But for reordering logic in dialog, knowing the structure matters.
