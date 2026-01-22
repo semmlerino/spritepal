@@ -651,3 +651,86 @@ class TestBatchThumbnailWorkerThreadSafety(QtTestCase):
             assert thread_id == main_thread_id, "Signal not received in main thread"
 
         worker.cleanup()
+
+    def test_concurrent_cache_invalidation_during_generation(self, test_rom_file, real_rom_extractor):
+        """Verify invalidate_offset() is safe during active thumbnail processing.
+
+        Tests the thread-safety of calling invalidate_offset() from the main thread
+        while the worker thread is actively generating and caching thumbnails.
+        """
+        import concurrent.futures
+
+        base_worker = BatchThumbnailWorker(test_rom_file, real_rom_extractor)
+        worker = WorkerThreadWrapper(base_worker)
+
+        # Queue many thumbnails to ensure worker is busy
+        offsets = [0x10000 + i * 0x1000 for i in range(50)]
+        for offset in offsets:
+            worker.queue_thumbnail(offset, 128)
+
+        errors = []
+        invalidation_results = []
+
+        def invalidate_offsets():
+            """Invalidate offsets concurrently from separate thread."""
+            for offset in offsets[:25]:  # Invalidate first half
+                try:
+                    result = worker.invalidate_offset(offset, 128)
+                    invalidation_results.append((offset, result))
+                except Exception as e:
+                    errors.append(f"invalidate_offset error: {e}")
+
+        worker.start()
+
+        # Start concurrent invalidation while worker is processing
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(invalidate_offsets)
+            # Let worker process while invalidation runs
+            EventLoopHelper.process_events(1000)
+            future.result()  # Wait for invalidation to complete
+
+        worker.wait(10000)
+        worker.cleanup()
+
+        # No errors should have occurred
+        assert not errors, f"Errors during invalidation: {errors}"
+
+        # Some invalidations may succeed (if item was cached), some may fail (if not yet cached)
+        # The key is no crashes or race conditions occurred
+
+    def test_counter_mutex_under_concurrent_load(self, test_rom_file, real_rom_extractor):
+        """Test _counter_mutex thread safety under high concurrent access.
+
+        The _counter_mutex protects _completed_count and is accessed from
+        multiple threads. This test verifies no data corruption occurs.
+        """
+        base_worker = BatchThumbnailWorker(test_rom_file, real_rom_extractor)
+        worker = WorkerThreadWrapper(base_worker)
+
+        # Queue many thumbnails
+        num_thumbnails = 100
+        for i in range(num_thumbnails):
+            worker.queue_thumbnail(0x10000 + i * 0x800, 64)
+
+        progress_events = []
+
+        def on_progress(completed, total):
+            progress_events.append((completed, total))
+
+        worker.progress.connect(on_progress)
+
+        worker.start()
+        worker.wait(15000)
+        worker.cleanup()
+
+        # Verify progress tracking was consistent
+        # completed should always be <= total
+        for completed, total in progress_events:
+            assert completed <= total, f"Invalid progress: {completed}/{total}"
+
+        # completed should be monotonically increasing
+        completed_values = [p[0] for p in progress_events]
+        for i in range(1, len(completed_values)):
+            assert completed_values[i] >= completed_values[i - 1], (
+                f"Progress went backwards: {completed_values[i - 1]} -> {completed_values[i]}"
+            )

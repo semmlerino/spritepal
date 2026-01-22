@@ -170,6 +170,94 @@ class TestROMCacheCore:
         # Cache should be limited to 100 entries (oldest removed)
         assert rom_cache.get_hash_cache_size() <= 100
 
+    def test_hash_cache_evicts_oldest_on_101st_entry(self, rom_cache, tmp_path) -> None:
+        """Verify 101st entry triggers eviction of oldest entry.
+
+        This test verifies the specific LRU eviction behavior:
+        - First 100 entries are cached
+        - 101st entry causes the oldest (first) entry to be evicted
+        - Cache size stays at exactly 100
+        """
+        test_locations = {"test_sprite": {"offset": 0x1000, "bank": 0x20}}
+
+        # Create exactly 100 files and populate cache
+        test_files = []
+        for i in range(100):
+            test_file = tmp_path / f"rom_{i:03d}.sfc"
+            test_file.write_bytes(f"ROM_DATA_{i:03d}".encode() * 100)
+            test_files.append(str(test_file))
+            rom_cache.save_sprite_locations(str(test_file), test_locations)
+
+        # Verify cache is at capacity
+        assert rom_cache.get_hash_cache_size() == 100
+
+        # Get internal hash cache reference to verify eviction
+        # (accessing _hash_cache directly for verification only)
+        with rom_cache._hash_cache_lock:
+            # Build set of metadata keys for first few entries
+            first_entry_key = None
+            for key in rom_cache._hash_cache:
+                first_entry_key = key
+                break  # Get first (oldest) entry
+
+        assert first_entry_key is not None, "Cache should have entries"
+
+        # Add 101st entry - should trigger eviction
+        new_file = tmp_path / "rom_100.sfc"
+        new_file.write_bytes(b"NEW_ROM_DATA_100" * 100)
+        rom_cache.save_sprite_locations(str(new_file), test_locations)
+
+        # Cache should still be at 100 (evicted one, added one)
+        assert rom_cache.get_hash_cache_size() == 100
+
+        # Verify oldest entry was evicted
+        with rom_cache._hash_cache_lock:
+            assert first_entry_key not in rom_cache._hash_cache, "Oldest entry should have been evicted"
+
+    def test_concurrent_hash_cache_access_during_eviction(self, rom_cache, tmp_path) -> None:
+        """Verify hash cache is thread-safe during concurrent access with eviction.
+
+        Simulates multiple threads accessing the hash cache simultaneously,
+        including scenarios that trigger eviction. Tests for race conditions.
+        """
+        import concurrent.futures
+
+        test_locations = {"test_sprite": {"offset": 0x1000, "bank": 0x20}}
+
+        # Pre-create test files
+        all_files = []
+        for i in range(120):  # More than cache limit
+            test_file = tmp_path / f"concurrent_rom_{i:03d}.sfc"
+            test_file.write_bytes(f"CONCURRENT_ROM_{i:03d}".encode() * 100)
+            all_files.append(str(test_file))
+
+        errors = []
+
+        def access_cache(file_path: str) -> bool:
+            """Access cache - may trigger eviction."""
+            try:
+                rom_cache.save_sprite_locations(file_path, test_locations)
+                result = rom_cache.get_sprite_locations(file_path)
+                return result is not None
+            except Exception as e:
+                errors.append(str(e))
+                return False
+
+        # Concurrent access from multiple threads
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            # Submit all files for concurrent processing
+            futures = [executor.submit(access_cache, f) for f in all_files]
+            results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+        # No errors should have occurred
+        assert not errors, f"Errors during concurrent access: {errors}"
+
+        # All accesses should have succeeded
+        assert all(results), "Some cache accesses failed"
+
+        # Cache should be within limit
+        assert rom_cache.get_hash_cache_size() <= 100
+
     def test_nonexistent_file_handling_via_public_api(self, rom_cache) -> None:
         """Test handling of non-existent files via public API."""
         nonexistent_file = "/path/to/nonexistent/rom.sfc"

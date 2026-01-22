@@ -7,6 +7,10 @@ These tests focus on memory-related bugs that were fixed:
 - Weak references working correctly
 - No memory leaks with large sprite sets
 - Proper cleanup on component destruction
+
+NOTE: Tests using fictional mock classes (MockROMCache, MockThumbnailCache,
+MockMemoryPool, MockReferenceCounter, MockCacheCoordinator) have been removed.
+Those tests provided false confidence by testing mocks rather than production code.
 """
 
 from __future__ import annotations
@@ -18,7 +22,7 @@ import os
 import weakref
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -89,158 +93,12 @@ def mock_rom_cache():
     return cache
 
 
-class MockROMCache:
-    """Mock ROM cache for testing memory behavior."""
-
-    def __init__(self):
-        """Initialize mock ROM cache."""
-        self.cached_roms: dict[str, bytes] = {}
-        self.access_times: dict[str, float] = {}
-        self.max_cache_size = 50 * 1024 * 1024  # 50MB limit
-
-    def get_rom_data(self, rom_path: str) -> bytes | None:
-        """Get ROM data from cache or load it."""
-        if rom_path in self.cached_roms:
-            import time
-
-            self.access_times[rom_path] = time.time()
-            return self.cached_roms[rom_path]
-
-        # Load ROM data
-        try:
-            data = Path(rom_path).read_bytes()
-
-            # Check if adding this would exceed cache limit
-            if self._get_cache_size() + len(data) > self.max_cache_size:
-                self._evict_oldest()
-
-            self.cached_roms[rom_path] = data
-            import time
-
-            self.access_times[rom_path] = time.time()
-            return data
-        except Exception:
-            return None
-
-    def clear_cache(self):
-        """Clear all cached ROM data."""
-        self.cached_roms.clear()
-        self.access_times.clear()
-
-    def _get_cache_size(self) -> int:
-        """Get total size of cached data."""
-        return sum(len(data) for data in self.cached_roms.values())
-
-    def _evict_oldest(self):
-        """Evict oldest ROM from cache."""
-        if not self.access_times:
-            return
-
-        oldest_rom = min(self.access_times, key=self.access_times.get)
-        if oldest_rom in self.cached_roms:
-            del self.cached_roms[oldest_rom]
-        if oldest_rom in self.access_times:
-            del self.access_times[oldest_rom]
-
-
-class MockThumbnailCache:
-    """Mock thumbnail cache for testing memory behavior."""
-
-    def __init__(self, max_thumbnails=1000):
-        """Initialize thumbnail cache.
-
-        Args:
-            max_thumbnails: Maximum number of thumbnails to cache
-        """
-        self.thumbnails: dict[int, ThreadSafeTestImage] = {}
-        self.max_thumbnails = max_thumbnails
-        self.access_order: list[int] = []
-
-    def get_thumbnail(self, offset: int) -> ThreadSafeTestImage | None:
-        """Get thumbnail from cache."""
-        if offset in self.thumbnails:
-            # Move to end (most recent)
-            self.access_order.remove(offset)
-            self.access_order.append(offset)
-            return self.thumbnails[offset]
-        return None
-
-    def set_thumbnail(self, offset: int, image: ThreadSafeTestImage):
-        """Set thumbnail in cache."""
-        # Evict if at capacity
-        if len(self.thumbnails) >= self.max_thumbnails:
-            oldest_offset = self.access_order.pop(0)
-            if oldest_offset in self.thumbnails:
-                del self.thumbnails[oldest_offset]
-
-        self.thumbnails[offset] = image
-        self.access_order.append(offset)
-
-    def clear_cache(self):
-        """Clear all thumbnails."""
-        self.thumbnails.clear()
-        self.access_order.clear()
-
-    def get_cache_size_bytes(self) -> int:
-        """Estimate cache size in bytes."""
-        total_bytes = 0
-        for image in self.thumbnails.values():
-            if not image.isNull():
-                # Rough estimate: width * height * 4 bytes per pixel (RGBA)
-                total_bytes += image.width() * image.height() * 4
-        return total_bytes
-
-
 @pytest.mark.gui
 @pytest.mark.integration
 @pytest.mark.usefixtures("session_app_context")
 @pytest.mark.shared_state_safe
 class TestMemoryManagementIntegration(QtTestCase):
-    """Integration tests for memory management."""
-
-    def test_rom_cache_memory_limits(self, large_rom_data):
-        """Test ROM cache respects memory limits."""
-        cache = MockROMCache()
-        cache.max_cache_size = 10 * 1024 * 1024  # 10MB limit
-
-        # Create multiple ROM files
-        rom_paths = []
-        for i in range(3):
-            rom_path = Path(large_rom_data).parent / f"rom_{i}.sfc"
-            rom_path.write_bytes(Path(large_rom_data).read_bytes())
-            rom_paths.append(str(rom_path))
-
-        # Load ROMs into cache
-        for rom_path in rom_paths:
-            data = cache.get_rom_data(rom_path)
-            assert data is not None
-
-        # Cache should have evicted oldest ROM to stay within limit
-        cache_size = cache._get_cache_size()
-        assert cache_size <= cache.max_cache_size
-
-        # Should have fewer than 3 ROMs cached due to size limit
-        assert len(cache.cached_roms) < 3
-
-    def test_thumbnail_cache_memory_management(self):
-        """Test thumbnail cache memory management."""
-        cache = MockThumbnailCache(max_thumbnails=100)
-
-        # Create many large thumbnails
-        for i in range(150):
-            image = ThreadSafeTestImage(256, 256)
-            image.fill()  # Fill with color
-            cache.set_thumbnail(0x10000 + i * 0x1000, image)
-
-        # Should not exceed maximum
-        assert len(cache.thumbnails) <= cache.max_thumbnails
-
-        # Should have evicted oldest thumbnails
-        assert 0x10000 not in cache.thumbnails  # First thumbnail should be evicted
-
-        # Most recent thumbnails should still be there
-        last_offset = 0x10000 + 149 * 0x1000
-        assert cache.get_thumbnail(last_offset) is not None
+    """Integration tests for memory management using real components."""
 
     def test_weak_references_prevent_leaks(self, massive_sprite_dataset):
         """Test that weak references prevent memory leaks."""
@@ -307,7 +165,7 @@ class TestMemoryManagementIntegration(QtTestCase):
         mock_settings_manager,
         mock_rom_cache,
     ):
-        """Test that component cleanup releases memory."""
+        """Test that component cleanup releases memory using real DetachedGalleryWindow."""
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
         initial_widget_count = MemoryHelper.get_widget_count()
@@ -340,7 +198,7 @@ class TestMemoryManagementIntegration(QtTestCase):
 
     @skip_in_offscreen
     def test_large_rom_data_cleanup(self, large_rom_data):
-        """Test cleanup of large ROM data."""
+        """Test cleanup of large ROM data using real BatchThumbnailWorker."""
         import os
 
         # Monitor memory before loading ROM
@@ -422,7 +280,7 @@ class TestMemoryManagementIntegration(QtTestCase):
         mock_settings_manager,
         mock_rom_cache,
     ):
-        """Stress test memory management with repeated operations."""
+        """Stress test memory management with repeated operations using real components."""
         import os
 
         import psutil
@@ -544,250 +402,3 @@ class TestMemoryManagementIntegration(QtTestCase):
 
         # Safe implementation should have fewer live objects
         assert safe_live_count <= circular_live_count
-
-    def test_cache_eviction_policies(self):
-        """Test different cache eviction policies."""
-
-        class LRUCache:
-            def __init__(self, max_size=100):
-                self.max_size = max_size
-                self.cache = {}
-                self.access_order = []
-
-            def get(self, key):
-                if key in self.cache:
-                    # Move to end (most recent)
-                    self.access_order.remove(key)
-                    self.access_order.append(key)
-                    return self.cache[key]
-                return None
-
-            def put(self, key, value):
-                if key in self.cache:
-                    self.access_order.remove(key)
-                elif len(self.cache) >= self.max_size:
-                    # Evict least recently used
-                    oldest_key = self.access_order.pop(0)
-                    del self.cache[oldest_key]
-
-                self.cache[key] = value
-                self.access_order.append(key)
-
-            def size(self):
-                return len(self.cache)
-
-        cache = LRUCache(max_size=5)
-
-        # Fill cache
-        for i in range(5):
-            cache.put(f"key_{i}", f"value_{i}")
-
-        assert cache.size() == 5
-
-        # Access first item to make it recently used
-        cache.get("key_0")
-
-        # Add new item (should evict key_1, not key_0)
-        cache.put("key_5", "value_5")
-
-        assert cache.get("key_0") is not None  # Should still be there
-        assert cache.get("key_1") is None  # Should be evicted
-        assert cache.get("key_5") is not None  # Should be there
-
-
-@pytest.mark.headless
-@pytest.mark.integration
-class TestMemoryManagementHeadlessIntegration:
-    """Headless memory management tests using logic verification."""
-
-    def test_headless_memory_pool_logic(self):
-        """Test memory pool logic without Qt dependencies."""
-
-        class MockMemoryPool:
-            def __init__(self, pool_size=10, item_size=1024):
-                self.pool_size = pool_size
-                self.item_size = item_size
-                self.allocated_items = []
-                self.free_items = []
-
-                # Pre-allocate pool
-                for _ in range(pool_size):
-                    self.free_items.append(bytearray(item_size))
-
-            def allocate(self):
-                if self.free_items:
-                    item = self.free_items.pop()
-                    self.allocated_items.append(item)
-                    return item
-                return None  # Pool exhausted
-
-            def free(self, item):
-                if item in self.allocated_items:
-                    self.allocated_items.remove(item)
-                    self.free_items.append(item)
-                    # Clear item data
-                    for i in range(len(item)):
-                        item[i] = 0
-
-            def get_usage(self):
-                return {"allocated": len(self.allocated_items), "free": len(self.free_items), "total": self.pool_size}
-
-        pool = MockMemoryPool(pool_size=5)
-
-        # Test allocation
-        items = []
-        for i in range(5):
-            item = pool.allocate()
-            assert item is not None
-            items.append(item)
-
-        # Pool should be exhausted
-        assert pool.allocate() is None
-
-        usage = pool.get_usage()
-        assert usage["allocated"] == 5
-        assert usage["free"] == 0
-
-        # Free some items
-        for item in items[:3]:
-            pool.free(item)
-
-        usage = pool.get_usage()
-        assert usage["allocated"] == 2
-        assert usage["free"] == 3
-
-        # Should be able to allocate again
-        new_item = pool.allocate()
-        assert new_item is not None
-
-    def test_headless_reference_counting_logic(self):
-        """Test reference counting logic."""
-
-        class MockReferenceCounter:
-            def __init__(self):
-                self.references = {}
-                self.objects = {}
-
-            def create_object(self, obj_id, data):
-                self.objects[obj_id] = data
-                self.references[obj_id] = 0
-
-            def add_reference(self, obj_id):
-                if obj_id in self.references:
-                    self.references[obj_id] += 1
-                    return True
-                return False
-
-            def remove_reference(self, obj_id):
-                if obj_id in self.references:
-                    self.references[obj_id] -= 1
-                    if self.references[obj_id] <= 0:
-                        # Object can be cleaned up
-                        del self.objects[obj_id]
-                        del self.references[obj_id]
-                    return True
-                return False
-
-            def get_reference_count(self, obj_id):
-                return self.references.get(obj_id, 0)
-
-            def get_object_count(self):
-                return len(self.objects)
-
-        counter = MockReferenceCounter()
-
-        # Create objects
-        counter.create_object("obj1", "data1")
-        counter.create_object("obj2", "data2")
-
-        assert counter.get_object_count() == 2
-
-        # Add references
-        counter.add_reference("obj1")
-        counter.add_reference("obj1")
-        counter.add_reference("obj2")
-
-        assert counter.get_reference_count("obj1") == 2
-        assert counter.get_reference_count("obj2") == 1
-
-        # Remove references
-        counter.remove_reference("obj1")
-        assert counter.get_reference_count("obj1") == 1
-        assert counter.get_object_count() == 2  # Still alive
-
-        counter.remove_reference("obj1")
-        assert counter.get_object_count() == 1  # obj1 cleaned up
-
-        counter.remove_reference("obj2")
-        assert counter.get_object_count() == 0  # All cleaned up
-
-    def test_headless_cache_coherency_logic(self):
-        """Test cache coherency logic."""
-
-        class MockCacheCoordinator:
-            def __init__(self):
-                self.caches = {}
-                self.invalidation_log = []
-
-            def register_cache(self, cache_name, cache_impl):
-                self.caches[cache_name] = cache_impl
-
-            def invalidate_key(self, key):
-                """Invalidate key across all caches."""
-                for cache_name, cache in self.caches.items():
-                    if hasattr(cache, "invalidate"):
-                        cache.invalidate(key)
-                        self.invalidation_log.append((cache_name, key))
-
-            def clear_all_caches(self):
-                """Clear all registered caches."""
-                for cache_name, cache in self.caches.items():
-                    if hasattr(cache, "clear"):
-                        cache.clear()
-                        self.invalidation_log.append((cache_name, "CLEAR_ALL"))
-
-        class MockCache:
-            def __init__(self, name):
-                self.name = name
-                self.data = {}
-                self.invalidated_keys = set()
-
-            def put(self, key, value):
-                self.data[key] = value
-
-            def get(self, key):
-                if key in self.invalidated_keys:
-                    return None
-                return self.data.get(key)
-
-            def invalidate(self, key):
-                self.invalidated_keys.add(key)
-
-            def clear(self):
-                self.data.clear()
-                self.invalidated_keys.clear()
-
-        coordinator = MockCacheCoordinator()
-
-        # Create caches
-        cache1 = MockCache("cache1")
-        cache2 = MockCache("cache2")
-
-        coordinator.register_cache("cache1", cache1)
-        coordinator.register_cache("cache2", cache2)
-
-        # Add data to caches
-        cache1.put("key1", "value1")
-        cache2.put("key1", "value1_different")
-
-        # Invalidate key across all caches
-        coordinator.invalidate_key("key1")
-
-        # Both caches should return None for invalidated key
-        assert cache1.get("key1") is None
-        assert cache2.get("key1") is None
-
-        # Check invalidation log
-        assert len(coordinator.invalidation_log) == 2
-        assert ("cache1", "key1") in coordinator.invalidation_log
-        assert ("cache2", "key1") in coordinator.invalidation_log

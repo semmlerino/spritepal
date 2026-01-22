@@ -1,12 +1,21 @@
 """
-Production Worker Pool Signal Tests.
+Qt Signal Connection Pattern Tests.
 
-Tests targeting known issues in actual production code:
-- preview_worker_pool.py:447-450, 532-535 - _signals_connected flag desync
-- batch_thumbnail_worker.py:817-819 - signals not disconnected before reconnect
+Tests for Qt signal connection patterns and best practices used throughout the codebase.
+These tests use mock workers to verify PATTERNS (not production classes) including:
+- _signals_connected flag synchronization (prevents duplicate connections)
+- blockSignals() usage during cleanup
+- QueuedConnection for cross-thread signals
+- disconnect-before-reconnect patterns
 
-These tests use the real production classes (not mocks) to verify the actual
-signal connection behavior.
+NOTE: This file tests signal connection PATTERNS, not production BatchThumbnailWorker
+or PreviewWorkerPool classes directly. For production class testing, see:
+- tests/integration/test_batch_thumbnail_worker_integration.py
+- tests/ui/integration/test_preview_worker_pool.py (if it exists)
+
+The patterns tested here mirror those in:
+- preview_worker_pool.py:447-450, 532-535 - _signals_connected flag management
+- batch_thumbnail_worker.py:817-819 - signal connection lifecycle
 
 Async Safety Notes
 ------------------
