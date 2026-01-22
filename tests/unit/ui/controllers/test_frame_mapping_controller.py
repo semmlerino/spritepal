@@ -91,8 +91,8 @@ class TestGetCaptureResultFiltering:
         )
         controller._project = project
 
-        # Get capture result
-        result = controller.get_capture_result_for_game_frame("F001")
+        # Get capture result (returns tuple)
+        result, _ = controller.get_capture_result_for_game_frame("F001")
 
         assert result is not None
         assert len(result.entries) == 5
@@ -116,8 +116,8 @@ class TestGetCaptureResultFiltering:
         )
         controller._project = project
 
-        # Get capture result
-        result = controller.get_capture_result_for_game_frame("F001")
+        # Get capture result (returns tuple)
+        result, _ = controller.get_capture_result_for_game_frame("F001")
 
         assert result is not None
         assert len(result.entries) == 2
@@ -142,8 +142,8 @@ class TestGetCaptureResultFiltering:
         )
         controller._project = project
 
-        # Get capture result - should preserve capture file order
-        result = controller.get_capture_result_for_game_frame("F001")
+        # Get capture result - should preserve capture file order (returns tuple)
+        result, _ = controller.get_capture_result_for_game_frame("F001")
 
         assert result is not None
         assert len(result.entries) == 3
@@ -169,9 +169,9 @@ class TestGetCaptureResultFiltering:
         )
         controller._project = project
 
-        # Get capture result - should fall back to unfiltered with all entries
+        # Get capture result - should fall back to unfiltered with all entries (returns tuple)
         with qtbot.waitSignal(controller.stale_entries_warning, timeout=1000):
-            result = controller.get_capture_result_for_game_frame("F001")
+            result, _ = controller.get_capture_result_for_game_frame("F001")
 
         # Should return unfiltered capture with all 3 entries
         assert result is not None
@@ -197,8 +197,8 @@ class TestGetCaptureResultFiltering:
         )
         controller._project = project
 
-        # Get capture result
-        result = controller.get_capture_result_for_game_frame("F001")
+        # Get capture result (returns tuple)
+        result, _ = controller.get_capture_result_for_game_frame("F001")
 
         assert result is not None
         assert len(result.entries) == 1
@@ -1143,8 +1143,8 @@ class TestGetGameFramePreviewFiltering:
         preview = controller.get_game_frame_preview("F001")
         assert preview is not None
 
-        # Render what the filtered result SHOULD look like
-        filtered_result = controller.get_capture_result_for_game_frame("F001")
+        # Render what the filtered result SHOULD look like (returns tuple)
+        filtered_result, _ = controller.get_capture_result_for_game_frame("F001")
         assert filtered_result is not None
         assert len(filtered_result.entries) == 1
 
@@ -1199,8 +1199,8 @@ class TestGetGameFramePreviewFiltering:
         preview = controller.get_game_frame_preview("F001")
         assert preview is not None
 
-        # Get capture result (unfiltered)
-        full_result = controller.get_capture_result_for_game_frame("F001")
+        # Get capture result (unfiltered, returns tuple)
+        full_result, _ = controller.get_capture_result_for_game_frame("F001")
         assert full_result is not None
         assert len(full_result.entries) == 3
 
@@ -1487,12 +1487,12 @@ class TestPreviewCacheInvalidation:
         )
         controller._project = project
 
-        # Manually add a preview to the cache using internal format (pixmap, mtime)
+        # Manually add a preview to the cache using internal format (pixmap, mtime, entry_ids)
         from PySide6.QtGui import QPixmap
 
         cached_pixmap = QPixmap(10, 10)
-        # Cache stores (pixmap, mtime) - use 0.0 mtime for no-file case
-        controller._game_frame_previews["F001"] = (cached_pixmap, 0.0)
+        # Cache stores (pixmap, mtime, entry_ids) - use 0.0 mtime and empty tuple for no-file case
+        controller._game_frame_previews["F001"] = (cached_pixmap, 0.0, ())
 
         # Should return cached even with no file to compare
         preview = controller.get_game_frame_preview("F001")
@@ -1567,9 +1567,9 @@ class TestStaleEntryIdsFallback:
         )
         controller._project = project
 
-        # Preview should emit stale_entries_warning
+        # Preview should emit stale_entries_warning (returns tuple)
         with qtbot.waitSignal(controller.stale_entries_warning, timeout=1000):
-            result = controller.get_capture_result_for_game_frame("F001")
+            result, _ = controller.get_capture_result_for_game_frame("F001")
 
         # Should fall back to rom_offset filtering
         assert result is not None
@@ -1609,8 +1609,8 @@ class TestStaleEntryIdsFallback:
         # (This verifies the fallback code path is being executed)
         with qtbot.waitSignal(controller.stale_entries_warning, timeout=1000):
             # We're not calling inject_mapping directly, but verifying internal filtering
-            # by checking the controller's filtering logic matches preview
-            result = controller.get_capture_result_for_game_frame("F001")
+            # by checking the controller's filtering logic matches preview (returns tuple)
+            result, _ = controller.get_capture_result_for_game_frame("F001")
 
         # Both preview and injection should return same fallback result
         assert result is not None
@@ -1654,8 +1654,8 @@ class TestStaleEntryIdsFallback:
         controller = FrameMappingController()
         controller._project = project
 
-        # Preview should filter to entry 10 only
-        preview_result = controller.get_capture_result_for_game_frame("F001")
+        # Preview should filter to entry 10 only (returns tuple)
+        preview_result, _ = controller.get_capture_result_for_game_frame("F001")
         assert preview_result is not None
         assert len(preview_result.entries) == 1
         assert preview_result.entries[0].id == 10

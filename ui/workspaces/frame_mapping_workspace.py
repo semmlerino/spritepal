@@ -284,6 +284,7 @@ class FrameMappingWorkspace(QWidget):
         self._controller.status_update.connect(self._on_status_update)
         self._controller.save_requested.connect(self._auto_save_after_injection)
         self._controller.stale_entries_warning.connect(self._on_stale_entries_warning)
+        self._controller.alignment_updated.connect(self._on_alignment_updated)
 
         # AI Frames Pane signals
         self._ai_frames_pane.ai_frame_selected.connect(self._on_ai_frame_selected)
@@ -491,6 +492,8 @@ class FrameMappingWorkspace(QWidget):
         else:
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
+            self._captures_pane.clear_selection()
+            self._selected_game_id = None
 
         self._update_map_button_state()
 
@@ -949,6 +952,25 @@ class FrameMappingWorkspace(QWidget):
         """
         logger.info("Stale entries detected for frame '%s'", frame_id)
         self._stale_entry_frame_id = frame_id
+
+
+    def _on_alignment_updated(self, ai_frame_index: int) -> None:
+        """Handle alignment-only update from controller.
+
+        This is a targeted signal that avoids the full project_changed refresh,
+        which would blank the canvas. Only updates status indicators.
+        """
+        # Update mapping panel row (preserves checkbox state)
+        project = self._controller.project
+        if project is None:
+            return
+        mapping = project.get_mapping_for_ai_frame_index(ai_frame_index)
+        if mapping:
+            self._mapping_panel.update_row_alignment(
+                ai_frame_index, mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v
+            )
+        # Refresh status indicators (doesn't touch canvas)
+        self._refresh_mapping_status()
 
     # -------------------------------------------------------------------------
     # Helper Methods

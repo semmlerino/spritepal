@@ -50,11 +50,12 @@ class FrameMappingController(QObject):
     Manages the data model and coordinates view updates.
 
     Signals:
-        project_changed: Emitted when project is loaded/created/modified
+        project_changed: Emitted when project is loaded/created/modified (structural changes)
         ai_frames_loaded: Emitted when AI frames are loaded (count)
         game_frame_added: Emitted when a game frame is added (frame_id)
         mapping_created: Emitted when a mapping is created (ai_index, game_id)
         mapping_removed: Emitted when a mapping is removed (ai_index)
+        alignment_updated: Emitted when mapping alignment changes (ai_frame_index)
         error_occurred: Emitted on errors (error_message)
     """
 
@@ -69,12 +70,13 @@ class FrameMappingController(QObject):
     status_update = Signal(str)  # status message for UI feedback
     save_requested = Signal()  # Emitted when auto-save should occur (e.g., after injection)
     stale_entries_warning = Signal(str)  # frame_id - Emitted when stored entry IDs are stale
+    alignment_updated = Signal(int)  # ai_frame_index - Emitted when alignment changes (not structural)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._project: FrameMappingProject | None = None
-        # Cache stores (pixmap, mtime) for invalidation on file change
-        self._game_frame_previews: dict[str, tuple[QPixmap, float]] = {}
+        # Cache stores (pixmap, mtime, selected_entry_ids) for invalidation on change
+        self._game_frame_previews: dict[str, tuple[QPixmap, float, tuple[int, ...]]] = {}
 
     @property
     def project(self) -> FrameMappingProject | None:
@@ -289,10 +291,11 @@ class FrameMappingController(QObject):
             renderer = CaptureRenderer(filtered_capture)
             preview_img = renderer.render_selection()
 
-            # Convert PIL Image to QPixmap and cache with mtime for invalidation
+            # Convert PIL Image to QPixmap and cache with mtime + entry IDs for invalidation
             pixmap = pil_to_qpixmap(preview_img)
             mtime = capture_path.stat().st_mtime if capture_path.exists() else 0.0
-            self._game_frame_previews[frame_id] = (pixmap, mtime)
+            entry_ids = tuple(entry.id for entry in selected_entries)
+            self._game_frame_previews[frame_id] = (pixmap, mtime, entry_ids)
 
             # Create game frame with selected entry IDs for filtering on retrieval
             bbox = filtered_capture.bounding_box
@@ -465,7 +468,8 @@ class FrameMappingController(QObject):
         if self._project.update_mapping_alignment_by_index(
             ai_frame_index, offset_x, offset_y, flip_h, flip_v, scale, set_edited
         ):
-            self.project_changed.emit()
+            # Use targeted signal to avoid full UI refresh (which blanks canvas)
+            self.alignment_updated.emit(ai_frame_index)
             logger.info(
                 "Updated alignment for AI frame %d: offset=(%d, %d), flip=(%s, %s), scale=%.2f",
                 ai_frame_index,
@@ -485,7 +489,7 @@ class FrameMappingController(QObject):
         regenerate the preview from the capture file. Respects selected_entry_ids
         filtering to show only the selected entries in the preview.
 
-        Bug #5 fix: Checks file mtime and regenerates if source file changed.
+        Cache key includes (mtime, selected_entry_ids) to invalidate when either changes.
 
         Args:
             frame_id: Game frame ID
@@ -493,27 +497,35 @@ class FrameMappingController(QObject):
         Returns:
             QPixmap preview or None if not available
         """
-        # Check cache with mtime validation
+        # Check cache first
         if frame_id in self._game_frame_previews:
-            cached_pixmap, cached_mtime = self._game_frame_previews[frame_id]
+            cached_pixmap, cached_mtime, cached_entries = self._game_frame_previews[frame_id]
 
-            # Get game frame to check file mtime
-            if self._project is not None:
-                game_frame = self._project.get_game_frame_by_id(frame_id)
-                if game_frame and game_frame.capture_path and game_frame.capture_path.exists():
+            # Get game frame to validate cache
+            game_frame = self._project.get_game_frame_by_id(frame_id) if self._project else None
+            if game_frame:
+                current_entries = tuple(game_frame.selected_entry_ids)
+
+                # If file exists, check both mtime and entries
+                if game_frame.capture_path and game_frame.capture_path.exists():
                     current_mtime = game_frame.capture_path.stat().st_mtime
                     if current_mtime != cached_mtime:
-                        # File changed, fall through to regenerate
                         logger.debug(
                             "Preview cache invalidated for %s (mtime changed)",
+                            frame_id,
+                        )
+                    elif current_entries != cached_entries:
+                        logger.debug(
+                            "Preview cache invalidated for %s (selected_entry_ids changed)",
                             frame_id,
                         )
                     else:
                         return cached_pixmap
                 else:
-                    # No file to compare, return cached
+                    # No file to compare - return cached (file may have been deleted)
                     return cached_pixmap
             else:
+                # No project/game_frame - return cached
                 return cached_pixmap
 
         # Try to regenerate from capture file (with filtering applied)
@@ -525,15 +537,18 @@ class FrameMappingController(QObject):
             renderer = CaptureRenderer(capture_result)
             preview_img = renderer.render_selection()
 
-            # Convert PIL Image to QPixmap and cache with mtime
+            # Convert PIL Image to QPixmap and cache with mtime + entry IDs
             pixmap = pil_to_qpixmap(preview_img)
-            mtime = 0.0
+            current_mtime = 0.0
+            current_entries: tuple[int, ...] = ()
             if self._project is not None:
                 game_frame = self._project.get_game_frame_by_id(frame_id)
-                if game_frame and game_frame.capture_path and game_frame.capture_path.exists():
-                    mtime = game_frame.capture_path.stat().st_mtime
+                if game_frame:
+                    current_entries = tuple(game_frame.selected_entry_ids)
+                    if game_frame.capture_path and game_frame.capture_path.exists():
+                        current_mtime = game_frame.capture_path.stat().st_mtime
 
-            self._game_frame_previews[frame_id] = (pixmap, mtime)
+            self._game_frame_previews[frame_id] = (pixmap, current_mtime, current_entries)
             logger.debug("Regenerated preview for game frame %s from capture file", frame_id)
             return pixmap
 
