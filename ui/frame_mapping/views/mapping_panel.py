@@ -423,7 +423,7 @@ class MappingPanel(QWidget):
             return
 
         row = item.row()
-        ai_item = self._table.item(row, 1)
+        ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
         if ai_item is None:
             return
 
@@ -508,7 +508,7 @@ class MappingPanel(QWidget):
             return
 
         row = item.row()
-        ai_item = self._table.item(row, 1)
+        ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
         if ai_item is None:
             event.ignore()
             return
