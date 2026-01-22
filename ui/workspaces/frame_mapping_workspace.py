@@ -306,6 +306,9 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_project_changed(self) -> None:
         """Handle project changes."""
+        # Clear canvas first to prevent stale display during reload
+        self._alignment_canvas.clear()
+
         project = self._controller.project
         if project is None:
             self._selected_ai_index = None
@@ -368,6 +371,7 @@ class FrameMappingWorkspace(QWidget):
             self._update_map_button_state()
             self._alignment_canvas.set_ai_frame(None)
             self._alignment_canvas.clear_alignment()
+            self._mapping_panel.clear_selection()
             return
 
         self._selected_ai_index = index

@@ -316,6 +316,17 @@ class MappingPanel(QWidget):
         finally:
             self._table.blockSignals(False)
 
+    def clear_selection(self) -> None:
+        """Clear the current table selection.
+
+        Blocks signals to prevent feedback loops.
+        """
+        self._table.blockSignals(True)
+        try:
+            self._table.clearSelection()
+        finally:
+            self._table.blockSignals(False)
+
     def _on_selection_changed(self) -> None:
         """Handle selection change in the mapping table."""
         ai_index = self.get_selected_ai_frame_index()

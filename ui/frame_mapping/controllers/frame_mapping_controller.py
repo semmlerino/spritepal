@@ -860,8 +860,13 @@ class FrameMappingController(QObject):
                 relevant_entries = [e for e in capture_result.entries if e.rom_offset in game_frame.rom_offsets]
 
             if not relevant_entries:
-                self.error_occurred.emit("No entries in capture match the GameFrame's ROM offsets.")
-                return False
+                # Last resort: use all entries (mirrors preview behavior)
+                logger.warning(
+                    "No entries match stored IDs or ROM offsets for frame %s. Using all entries.",
+                    game_frame.id,
+                )
+                self.stale_entries_warning.emit(game_frame.id)
+                relevant_entries = capture_result.entries
 
             # Create filtered capture for compositing
             filtered_capture = CaptureResult(
