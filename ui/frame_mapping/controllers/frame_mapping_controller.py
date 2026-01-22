@@ -414,7 +414,8 @@ class FrameMappingController(QObject):
         """Get the rendered preview pixmap for a game frame.
 
         If the preview is not cached but the capture file exists, attempts to
-        regenerate the preview from the capture file.
+        regenerate the preview from the capture file. Respects selected_entry_ids
+        filtering to show only the selected entries in the preview.
 
         Args:
             frame_id: Game frame ID
@@ -426,27 +427,12 @@ class FrameMappingController(QObject):
         if frame_id in self._game_frame_previews:
             return self._game_frame_previews[frame_id]
 
-        # Try to regenerate from capture file
-        if self._project is None:
-            return None
-
-        game_frame = self._project.get_game_frame_by_id(frame_id)
-        if game_frame is None or game_frame.capture_path is None:
-            return None
-
-        capture_path = game_frame.capture_path
-        if not capture_path.exists():
-            logger.warning("Capture file not found for game frame %s: %s", frame_id, capture_path)
+        # Try to regenerate from capture file (with filtering applied)
+        capture_result = self.get_capture_result_for_game_frame(frame_id)
+        if capture_result is None or not capture_result.has_entries:
             return None
 
         try:
-            # Re-parse and render the capture
-            parser = MesenCaptureParser()
-            capture_result = parser.parse_file(capture_path)
-
-            if not capture_result.has_entries:
-                return None
-
             renderer = CaptureRenderer(capture_result)
             preview_img = renderer.render_selection()
 

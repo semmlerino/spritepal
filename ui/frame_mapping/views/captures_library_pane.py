@@ -274,55 +274,76 @@ class CapturesLibraryPane(QWidget):
 
     def _refresh_list(self) -> None:
         """Refresh the list with current filter and search."""
-        self._list.clear()
+        current_selection = self.get_selected_id()
+        selection_restored = False
 
-        visible_count = 0
-        total_count = len(self._game_frames)
+        self._list.blockSignals(True)
+        try:
+            self._list.clear()
 
-        for frame in self._game_frames:
-            linked_ai = self._link_status.get(frame.id)
+            visible_count = 0
+            total_count = len(self._game_frames)
 
-            # Apply unlinked filter
-            if self._show_unlinked_only and linked_ai is not None:
-                continue
+            for frame in self._game_frames:
+                linked_ai = self._link_status.get(frame.id)
 
-            # Apply search filter
-            if self._search_text and self._search_text not in frame.id.lower():
-                continue
+                # Apply unlinked filter
+                if self._show_unlinked_only and linked_ai is not None:
+                    continue
 
-            visible_count += 1
+                # Apply search filter
+                if self._search_text and self._search_text not in frame.id.lower():
+                    continue
 
-            item = QListWidgetItem()
+                visible_count += 1
 
-            # Add link status badge to text
-            if linked_ai is not None:
-                color = STATUS_COLORS["linked"]
-                item.setText(f"✓ {frame.id}")
-                item.setToolTip(f"Linked to AI frame #{linked_ai}")
+                item = QListWidgetItem()
+
+                # Add link status badge to text
+                if linked_ai is not None:
+                    color = STATUS_COLORS["linked"]
+                    item.setText(f"✓ {frame.id}")
+                    item.setToolTip(f"Linked to AI frame #{linked_ai}")
+                else:
+                    color = STATUS_COLORS["unlinked"]
+                    item.setText(frame.id)
+                    item.setToolTip("Unlinked - drag to mapping drawer to link")
+
+                item.setData(Qt.ItemDataRole.UserRole, frame.id)
+                item.setForeground(QBrush(color))
+
+                # Use in-memory preview if available
+                if frame.id in self._game_frame_previews:
+                    pixmap = self._game_frame_previews[frame.id]
+                    if not pixmap.isNull():
+                        scaled = pixmap.scaled(
+                            THUMBNAIL_SIZE,
+                            THUMBNAIL_SIZE,
+                            Qt.AspectRatioMode.KeepAspectRatio,
+                            Qt.TransformationMode.SmoothTransformation,
+                        )
+                        item.setIcon(QIcon(scaled))
+
+                self._list.addItem(item)
+
+            # Update count label
+            if self._show_unlinked_only or self._search_text:
+                self._count_label.setText(f"{visible_count}/{total_count}")
             else:
-                color = STATUS_COLORS["unlinked"]
-                item.setText(frame.id)
-                item.setToolTip("Unlinked - drag to mapping drawer to link")
+                self._count_label.setText(f"{total_count} capture{'s' if total_count != 1 else ''}")
 
-            item.setData(Qt.ItemDataRole.UserRole, frame.id)
-            item.setForeground(QBrush(color))
+            # Restore selection if the previously selected item is still visible
+            if current_selection is not None:
+                for row in range(self._list.count()):
+                    item = self._list.item(row)
+                    if item and item.data(Qt.ItemDataRole.UserRole) == current_selection:
+                        self._list.setCurrentRow(row)
+                        self._list.scrollToItem(item)
+                        selection_restored = True
+                        break
 
-            # Use in-memory preview if available
-            if frame.id in self._game_frame_previews:
-                pixmap = self._game_frame_previews[frame.id]
-                if not pixmap.isNull():
-                    scaled = pixmap.scaled(
-                        THUMBNAIL_SIZE,
-                        THUMBNAIL_SIZE,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                    item.setIcon(QIcon(scaled))
-
-            self._list.addItem(item)
-
-        # Update count label
-        if self._show_unlinked_only or self._search_text:
-            self._count_label.setText(f"{visible_count}/{total_count}")
-        else:
-            self._count_label.setText(f"{total_count} capture{'s' if total_count != 1 else ''}")
+            if not selection_restored:
+                self._list.setCurrentRow(-1)
+                self._list.clearSelection()
+        finally:
+            self._list.blockSignals(False)
