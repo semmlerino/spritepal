@@ -1365,10 +1365,14 @@ class WorkbenchCanvas(QWidget):
     def set_sheet_palette(self, palette: SheetPalette | None) -> None:
         """Set the sheet palette for color-to-index lookups.
 
+        Also regenerates the preview with the updated palette colors.
+
         Args:
             palette: SheetPalette to use for pixel inspection, or None to clear.
         """
         self._sheet_palette = palette
+        # Regenerate preview with updated palette colors
+        self._schedule_preview_update()
 
     def _on_scene_mouse_moved(self, scene_x: float, scene_y: float) -> None:
         """Handle mouse move over the scene - schedule pixel lookup.

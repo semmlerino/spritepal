@@ -794,6 +794,7 @@ class FrameMappingWorkspace(QWidget):
         # Connect signals
         editor.save_requested.connect(self._on_palette_editor_save)
         editor.closed.connect(lambda fid=ai_frame_id: self._on_palette_editor_closed(fid))
+        editor.palette_color_changed.connect(self._on_editor_palette_color_changed)
 
         # Show the editor
         editor.show()
@@ -860,6 +861,18 @@ class FrameMappingWorkspace(QWidget):
         if ai_frame_id in self._palette_editors:
             del self._palette_editors[ai_frame_id]
             logger.debug("Palette editor closed for: %s", ai_frame_id)
+
+    def _on_editor_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
+        """Handle palette color change from palette editor window.
+
+        Routes the change through the controller to update the project
+        and trigger refresh of all affected UI components.
+
+        Args:
+            index: Palette index that changed
+            color: New RGB color tuple
+        """
+        self._controller.set_sheet_palette_color(index, color)
 
     def _on_delete_capture(self, frame_id: str) -> None:
         """Handle delete capture request."""

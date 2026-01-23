@@ -49,10 +49,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
     Signals:
         save_requested: (ai_frame_id, indexed_data, output_path) - Request to save
         closed: Editor window was closed
+        palette_color_changed: (index, rgb) - Palette color was edited via right-click
     """
 
     save_requested = Signal(str, object, str)  # ai_frame_id, np.ndarray, output_path
     closed = Signal()
+    palette_color_changed = Signal(int, tuple)  # index, (r, g, b)
 
     def __init__(
         self,
@@ -469,6 +471,9 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         # Also sync the palette panel's swatch (in case signal didn't update it)
         self._palette_panel.sync_palette(self._palette)
+
+        # Notify workspace to refresh other frames with updated palette
+        self.palette_color_changed.emit(index, color)
 
     def _on_palette_merge_requested(self, primary_index: int, merge_index: int) -> None:
         """Handle palette merge request (Ctrl+click).
