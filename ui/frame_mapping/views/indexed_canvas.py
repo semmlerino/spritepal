@@ -234,10 +234,7 @@ class IndexedCanvasView(QGraphicsView):
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle mouse press for panning, painting, and brush resize."""
         # Ctrl+RMB starts brush resize
-        if (
-            event.button() == Qt.MouseButton.RightButton
-            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
-        ):
+        if event.button() == Qt.MouseButton.RightButton and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             self._is_resizing_brush = True
             self._resize_start_x = event.position().x()
             self._resize_start_size = self._brush_size
@@ -441,6 +438,15 @@ class IndexedCanvas(QWidget):
         self._view.set_image_size(indexed_data.shape[1], indexed_data.shape[0])
         self._render_image()
         self._update_grid_overlay()
+
+    def refresh_palette(self) -> None:
+        """Re-render the image with the current palette.
+
+        Call this when palette colors have changed but the indexed data
+        hasn't changed. This re-reads colors from the palette and re-renders.
+        """
+        self._render_image()
+        self._update_highlight_overlay()
 
     def _render_image(self) -> None:
         """Render the indexed data to a pixmap."""

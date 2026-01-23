@@ -301,6 +301,20 @@ class EditorPalettePanel(QWidget):
             if i < len(palette.colors):
                 swatch.set_color(palette.colors[i])
 
+    def sync_palette(self, palette: SheetPalette) -> None:
+        """Sync palette colors from a SheetPalette, preserving free slot state.
+
+        Unlike set_palette(), this preserves the visual state of free slots.
+
+        Args:
+            palette: SheetPalette with 16 colors
+        """
+        for i, swatch in enumerate(self._swatches):
+            if i < len(palette.colors):
+                # Only update color if not a free slot
+                if i not in self._free_slots:
+                    swatch.set_color(palette.colors[i])
+
     def set_active_index(self, index: int) -> None:
         """Set the currently active (selected) palette index.
 
