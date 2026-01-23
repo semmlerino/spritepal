@@ -56,8 +56,8 @@ class AIFramesPane(QWidget):
     ai_frame_selected = Signal(str)  # AI frame ID (filename)
     map_requested = Signal()  # User wants to map selected frames
     auto_advance_changed = Signal(bool)  # Auto-advance toggle state changed
-    edit_in_sprite_editor_requested = Signal(int)  # AI frame index
-    remove_from_project_requested = Signal(int)  # AI frame index
+    edit_in_sprite_editor_requested = Signal(str)  # AI frame ID
+    remove_from_project_requested = Signal(str)  # AI frame ID
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -266,19 +266,19 @@ class AIFramesPane(QWidget):
         if item is None:  # type: ignore[reportUnnecessaryComparison]
             return
 
-        index = item.data(Qt.ItemDataRole.UserRole)
-        if index is None:
+        frame_id = item.data(Qt.ItemDataRole.UserRole)
+        if frame_id is None:
             return
 
         menu = QMenu(self)
 
         edit_action = menu.addAction("Edit in Sprite Editor")
-        edit_action.triggered.connect(lambda: self.edit_in_sprite_editor_requested.emit(index))
+        edit_action.triggered.connect(lambda: self.edit_in_sprite_editor_requested.emit(frame_id))
 
         menu.addSeparator()
 
         remove_action = menu.addAction("Remove from Project")
-        remove_action.triggered.connect(lambda: self.remove_from_project_requested.emit(index))
+        remove_action.triggered.connect(lambda: self.remove_from_project_requested.emit(frame_id))
 
         menu.exec(self._list.mapToGlobal(pos))
 

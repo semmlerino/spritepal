@@ -303,13 +303,13 @@ class FrameMappingWorkspace(QWidget):
         self._captures_pane.delete_capture_requested.connect(self._on_delete_capture)
         self._captures_pane.show_details_requested.connect(self._on_show_capture_details)
 
-        # Mapping Panel (Drawer) signals - using ID-based signals for stability
-        self._mapping_panel.mapping_selected_by_id.connect(self._on_mapping_selected)
-        self._mapping_panel.edit_frame_requested_by_id.connect(self._on_edit_frame)
-        self._mapping_panel.remove_mapping_requested_by_id.connect(self._on_remove_mapping)
-        self._mapping_panel.adjust_alignment_requested_by_id.connect(self._on_adjust_alignment)
-        self._mapping_panel.drop_game_frame_requested_by_id.connect(self._on_drop_game_frame)
-        self._mapping_panel.inject_mapping_requested_by_id.connect(self._on_inject_single)
+        # Mapping Panel (Drawer) signals - ID-based
+        self._mapping_panel.mapping_selected.connect(self._on_mapping_selected)
+        self._mapping_panel.edit_frame_requested.connect(self._on_edit_frame)
+        self._mapping_panel.remove_mapping_requested.connect(self._on_remove_mapping)
+        self._mapping_panel.adjust_alignment_requested.connect(self._on_adjust_alignment)
+        self._mapping_panel.drop_game_frame_requested.connect(self._on_drop_game_frame)
+        self._mapping_panel.inject_mapping_requested.connect(self._on_inject_single)
         self._mapping_panel.inject_selected_requested.connect(self._on_inject_selected)
 
         # Alignment Canvas signals
@@ -717,11 +717,11 @@ class FrameMappingWorkspace(QWidget):
 
         QMessageBox.information(self, "Capture Details", "\n".join(details))
 
-    def _on_remove_ai_frame(self, index: int) -> None:
+    def _on_remove_ai_frame(self, ai_frame_id: str) -> None:
         """Handle remove AI frame from project request."""
         # Not implemented - would need controller support
         if self._message_service:
-            self._message_service.show_message("Remove AI frame (not implemented)")
+            self._message_service.show_message(f"Remove AI frame '{ai_frame_id}' (not implemented)")
 
     def _on_remove_mapping(self, ai_frame_id: str) -> None:
         """Handle remove mapping request.
@@ -986,10 +986,10 @@ class FrameMappingWorkspace(QWidget):
         if self._message_service:
             self._message_service.show_message(msg)
 
-    def _on_mapping_injected(self, ai_index: int, message: str) -> None:
+    def _on_mapping_injected(self, ai_frame_id: str, message: str) -> None:
         """Handle successful injection signal."""
         if self._message_service:
-            self._message_service.show_message(f"Injection successful for frame {ai_index}")
+            self._message_service.show_message(f"Injection successful for frame {ai_frame_id}")
 
         self._refresh_mapping_status()
         QMessageBox.information(self, "Injection Successful", message)
@@ -1031,7 +1031,7 @@ class FrameMappingWorkspace(QWidget):
         if self._selected_game_id == frame_id:
             self._alignment_canvas.set_stale_entries_warning_visible(True)
 
-    def _on_alignment_updated(self, ai_frame_index: int) -> None:
+    def _on_alignment_updated(self, ai_frame_id: str) -> None:
         """Handle alignment-only update from controller.
 
         This is a targeted signal that avoids the full project_changed refresh,
@@ -1041,13 +1041,13 @@ class FrameMappingWorkspace(QWidget):
         project = self._controller.project
         if project is None:
             return
-        ai_frame = project.get_ai_frame_by_index(ai_frame_index)
+        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
         if ai_frame is None:
             return
-        mapping = project.get_mapping_for_ai_frame(ai_frame.id)
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         if mapping:
             self._mapping_panel.update_row_alignment(
-                ai_frame_index, mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v
+                ai_frame.index, mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v
             )
         # Refresh status indicators (doesn't touch canvas)
         self._refresh_mapping_status()

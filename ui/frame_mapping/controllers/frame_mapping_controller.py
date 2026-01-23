@@ -63,14 +63,14 @@ class FrameMappingController(QObject):
     ai_frames_loaded = Signal(int)  # count
     game_frame_added = Signal(str)  # game frame ID
     game_frame_removed = Signal(str)  # game frame ID
-    mapping_created = Signal(int, str)  # ai_index, game_id
-    mapping_removed = Signal(int)  # ai_index
-    mapping_injected = Signal(int, str)  # ai_index, message
+    mapping_created = Signal(str, str)  # ai_frame_id, game_frame_id
+    mapping_removed = Signal(str)  # ai_frame_id
+    mapping_injected = Signal(str, str)  # ai_frame_id, message
     error_occurred = Signal(str)  # error message
     status_update = Signal(str)  # status message for UI feedback
     save_requested = Signal()  # Emitted when auto-save should occur (e.g., after injection)
     stale_entries_warning = Signal(str)  # frame_id - Emitted when stored entry IDs are stale
-    alignment_updated = Signal(int)  # ai_frame_index - Emitted when alignment changes (not structural)
+    alignment_updated = Signal(str)  # ai_frame_id - Emitted when alignment changes (not structural)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -385,7 +385,7 @@ class FrameMappingController(QObject):
 
         # Use ID-based mapping (stable across reloads)
         self._project.create_mapping(ai_frame.id, game_frame_id)
-        self.mapping_created.emit(ai_frame_index, game_frame_id)
+        self.mapping_created.emit(ai_frame.id, game_frame_id)
         self.project_changed.emit()
         self.save_requested.emit()
         logger.info(
@@ -432,11 +432,16 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
+        # Get the AI frame ID before removing (for signal emission)
+        ai_frame = self._project.get_ai_frame_by_index(ai_frame_index)
+        if ai_frame is None:
+            return False
+
         if self._project.remove_mapping_for_ai_frame_index(ai_frame_index):
-            self.mapping_removed.emit(ai_frame_index)
+            self.mapping_removed.emit(ai_frame.id)
             self.project_changed.emit()
             self.save_requested.emit()
-            logger.info("Removed mapping for AI frame %d", ai_frame_index)
+            logger.info("Removed mapping for AI frame %s (idx %d)", ai_frame.id, ai_frame_index)
             return True
         return False
 
@@ -453,10 +458,7 @@ class FrameMappingController(QObject):
             return False
 
         if self._project.remove_mapping_for_ai_frame(ai_frame_id):
-            # Emit index-based signal for backwards compatibility
-            ai_frame = self._project.get_ai_frame_by_id(ai_frame_id)
-            if ai_frame:
-                self.mapping_removed.emit(ai_frame.index)
+            self.mapping_removed.emit(ai_frame_id)
             self.project_changed.emit()
             self.save_requested.emit()
             logger.info("Removed mapping for AI frame %s", ai_frame_id)
@@ -491,13 +493,19 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
+        # Get AI frame for ID-based signal emission
+        ai_frame = self._project.get_ai_frame_by_index(ai_frame_index)
+        if ai_frame is None:
+            return False
+
         if self._project.update_mapping_alignment_by_index(
             ai_frame_index, offset_x, offset_y, flip_h, flip_v, scale, set_edited
         ):
             # Use targeted signal to avoid full UI refresh (which blanks canvas)
-            self.alignment_updated.emit(ai_frame_index)
+            self.alignment_updated.emit(ai_frame.id)
             logger.info(
-                "Updated alignment for AI frame %d: offset=(%d, %d), flip=(%s, %s), scale=%.2f",
+                "Updated alignment for AI frame %s (idx %d): offset=(%d, %d), flip=(%s, %s), scale=%.2f",
+                ai_frame.id,
                 ai_frame_index,
                 offset_x,
                 offset_y,
@@ -1628,7 +1636,7 @@ class FrameMappingController(QObject):
                     logger.info("Debug output saved to: %s", debug_dir)
                     logger.info("Injection results:\n%s", "\n".join(messages))
 
-                self.mapping_injected.emit(ai_frame_index, "\n".join(messages))
+                self.mapping_injected.emit(ai_frame.id, "\n".join(messages))
                 if emit_project_changed:
                     self.project_changed.emit()
             else:

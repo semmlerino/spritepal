@@ -57,22 +57,14 @@ class MappingPanel(QWidget):
         inject_mapping_requested: Emitted when user requests injection (ai_frame_index)
     """
 
-    # Index-based signals (legacy - prefer ID-based for new code)
-    mapping_selected = Signal(int)  # AI frame index
-    edit_frame_requested = Signal(int)  # AI frame index
-    remove_mapping_requested = Signal(int)  # AI frame index
-    adjust_alignment_requested = Signal(int)  # AI frame index
-    drop_game_frame_requested = Signal(int, str)  # AI frame index, game frame ID
-    inject_mapping_requested = Signal(int)  # AI frame index
+    # ID-based signals (stable across index changes)
+    mapping_selected = Signal(str)  # AI frame ID (filename)
+    edit_frame_requested = Signal(str)  # AI frame ID
+    remove_mapping_requested = Signal(str)  # AI frame ID
+    adjust_alignment_requested = Signal(str)  # AI frame ID
+    drop_game_frame_requested = Signal(str, str)  # AI frame ID, game frame ID
+    inject_mapping_requested = Signal(str)  # AI frame ID
     inject_selected_requested = Signal()  # Request to inject selected frames
-
-    # ID-based signals (stable across index changes - preferred)
-    mapping_selected_by_id = Signal(str)  # AI frame ID (filename)
-    edit_frame_requested_by_id = Signal(str)  # AI frame ID
-    remove_mapping_requested_by_id = Signal(str)  # AI frame ID
-    adjust_alignment_requested_by_id = Signal(str)  # AI frame ID
-    drop_game_frame_requested_by_id = Signal(str, str)  # AI frame ID, game frame ID
-    inject_mapping_requested_by_id = Signal(str)  # AI frame ID
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -493,7 +485,7 @@ class MappingPanel(QWidget):
         """Handle selection change in the mapping table."""
         ai_index = self.get_selected_ai_frame_index()
         ai_frame_id = self.get_selected_ai_frame_id()
-        if ai_index is None:
+        if ai_index is None or ai_frame_id is None:
             self._edit_button.setEnabled(False)
             self._align_button.setEnabled(False)
             self._remove_button.setEnabled(False)
@@ -511,46 +503,31 @@ class MappingPanel(QWidget):
         self._remove_button.setEnabled(has_mapping)
         self._inject_button.setEnabled(has_mapping)
 
-        # Emit both index-based (legacy) and ID-based (preferred) signals
-        self.mapping_selected.emit(ai_index)
-        if ai_frame_id is not None:
-            self.mapping_selected_by_id.emit(ai_frame_id)
+        self.mapping_selected.emit(ai_frame_id)
 
     def _on_edit_clicked(self) -> None:
         """Handle edit button click."""
-        ai_index = self.get_selected_ai_frame_index()
         ai_frame_id = self.get_selected_ai_frame_id()
-        if ai_index is not None:
-            self.edit_frame_requested.emit(ai_index)
         if ai_frame_id is not None:
-            self.edit_frame_requested_by_id.emit(ai_frame_id)
+            self.edit_frame_requested.emit(ai_frame_id)
 
     def _on_remove_clicked(self) -> None:
         """Handle remove button click."""
-        ai_index = self.get_selected_ai_frame_index()
         ai_frame_id = self.get_selected_ai_frame_id()
-        if ai_index is not None:
-            self.remove_mapping_requested.emit(ai_index)
         if ai_frame_id is not None:
-            self.remove_mapping_requested_by_id.emit(ai_frame_id)
+            self.remove_mapping_requested.emit(ai_frame_id)
 
     def _on_align_clicked(self) -> None:
         """Handle adjust alignment button click."""
-        ai_index = self.get_selected_ai_frame_index()
         ai_frame_id = self.get_selected_ai_frame_id()
-        if ai_index is not None:
-            self.adjust_alignment_requested.emit(ai_index)
         if ai_frame_id is not None:
-            self.adjust_alignment_requested_by_id.emit(ai_frame_id)
+            self.adjust_alignment_requested.emit(ai_frame_id)
 
     def _on_inject_clicked(self) -> None:
         """Handle inject button click."""
-        ai_index = self.get_selected_ai_frame_index()
         ai_frame_id = self.get_selected_ai_frame_id()
-        if ai_index is not None:
-            self.inject_mapping_requested.emit(ai_index)
         if ai_frame_id is not None:
-            self.inject_mapping_requested_by_id.emit(ai_frame_id)
+            self.inject_mapping_requested.emit(ai_frame_id)
 
     def _on_context_menu(self, pos: QPoint) -> None:
         """Show context menu for mappings."""
@@ -561,12 +538,12 @@ class MappingPanel(QWidget):
         row = item.row()
         ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
         checkbox_item = self._table.item(row, 0)  # Checkbox column has ID
-        if ai_item is None:
+        if ai_item is None or checkbox_item is None:
             return
 
         ai_index = ai_item.data(Qt.ItemDataRole.UserRole)
-        ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1) if checkbox_item else None
-        if ai_index is None:
+        ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
+        if ai_index is None or ai_frame_id is None:
             return
 
         has_mapping = False
@@ -576,43 +553,22 @@ class MappingPanel(QWidget):
 
         menu = QMenu(self)
 
-        # Helper to emit both index and ID signals
-        def emit_edit() -> None:
-            self.edit_frame_requested.emit(ai_index)
-            if ai_frame_id:
-                self.edit_frame_requested_by_id.emit(ai_frame_id)
-
-        def emit_align() -> None:
-            self.adjust_alignment_requested.emit(ai_index)
-            if ai_frame_id:
-                self.adjust_alignment_requested_by_id.emit(ai_frame_id)
-
-        def emit_remove() -> None:
-            self.remove_mapping_requested.emit(ai_index)
-            if ai_frame_id:
-                self.remove_mapping_requested_by_id.emit(ai_frame_id)
-
-        def emit_inject() -> None:
-            self.inject_mapping_requested.emit(ai_index)
-            if ai_frame_id:
-                self.inject_mapping_requested_by_id.emit(ai_frame_id)
-
         edit_action = menu.addAction("Edit AI Frame")
-        edit_action.triggered.connect(emit_edit)
+        edit_action.triggered.connect(lambda: self.edit_frame_requested.emit(ai_frame_id))
 
         if has_mapping:
             align_action = menu.addAction("Adjust Alignment")
-            align_action.triggered.connect(emit_align)
+            align_action.triggered.connect(lambda: self.adjust_alignment_requested.emit(ai_frame_id))
 
             menu.addSeparator()
 
             remove_action = menu.addAction("Remove Mapping")
-            remove_action.triggered.connect(emit_remove)
+            remove_action.triggered.connect(lambda: self.remove_mapping_requested.emit(ai_frame_id))
 
             menu.addSeparator()
 
             inject_action = menu.addAction("Inject to ROM")
-            inject_action.triggered.connect(emit_inject)
+            inject_action.triggered.connect(lambda: self.inject_mapping_requested.emit(ai_frame_id))
 
         menu.exec(self._table.viewport().mapToGlobal(pos))
 
@@ -667,15 +623,13 @@ class MappingPanel(QWidget):
             return
 
         row = item.row()
-        ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
         checkbox_item = self._table.item(row, 0)  # Checkbox column has ID
-        if ai_item is None:
+        if checkbox_item is None:
             event.ignore()
             return
 
-        ai_index = ai_item.data(Qt.ItemDataRole.UserRole)
-        ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1) if checkbox_item else None
-        if ai_index is None:
+        ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
+        if ai_frame_id is None:
             event.ignore()
             return
 
@@ -685,10 +639,7 @@ class MappingPanel(QWidget):
             raw_data.tobytes().decode("utf-8") if isinstance(raw_data, memoryview) else raw_data.decode("utf-8")
         )
 
-        # Emit both index-based (legacy) and ID-based (preferred) signals
-        self.drop_game_frame_requested.emit(ai_index, game_frame_id)
-        if ai_frame_id is not None:
-            self.drop_game_frame_requested_by_id.emit(ai_frame_id, game_frame_id)
+        self.drop_game_frame_requested.emit(ai_frame_id, game_frame_id)
         event.acceptProposedAction()
 
     def _set_row_highlight(self, row: int, highlighted: bool) -> None:
