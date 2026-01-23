@@ -258,7 +258,10 @@ class PaletteEditorController(QObject):
             return
 
         # Update the palette color
+        logger.debug(f"Controller updating palette[{index}] to {color}")
+        logger.debug(f"Palette before: {self._palette.colors[index]}")
         self._palette.colors[index] = color
+        logger.debug(f"Palette after: {self._palette.colors[index]}")
         self._mark_dirty()
         # Trigger canvas refresh with new palette colors
         self.image_changed.emit()

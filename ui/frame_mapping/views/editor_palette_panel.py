@@ -37,7 +37,7 @@ class ColorSwatch(QFrame):
     clicked = Signal(int)  # palette index
     ctrl_clicked = Signal(int)  # palette index (for merge target selection)
     hovered = Signal(int)  # palette index
-    color_change_requested = Signal(int, tuple)  # (index, (r, g, b))
+    color_change_requested = Signal(int, object)  # (index, (r, g, b)) - use object for tuple
 
     def __init__(
         self,
@@ -173,6 +173,7 @@ class ColorSwatch(QFrame):
 
         if color.isValid():
             new_color = (color.red(), color.green(), color.blue())
+            logger.debug(f"ColorSwatch emitting color_change_requested: index={self._index}, color={new_color}")
             self.color_change_requested.emit(self._index, new_color)
 
     @override
@@ -228,7 +229,7 @@ class EditorPalettePanel(QWidget):
 
     index_selected = Signal(int)
     index_hovered = Signal(int)
-    color_changed = Signal(int, tuple)  # (index, (r, g, b))
+    color_changed = Signal(int, object)  # (index, (r, g, b)) - use object for tuple
     merge_requested = Signal(int, int)  # (primary_index, merge_index)
 
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -429,9 +430,13 @@ class EditorPalettePanel(QWidget):
 
     def _on_color_change_requested(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle color change from right-click."""
+        logger.debug(f"Color change requested: index={index}, color={color}")
         if 0 < index < len(self._swatches):
+            logger.debug(f"Updating swatch {index} to color {color}")
             self._swatches[index].set_color(color)
             self.color_changed.emit(index, color)
+        else:
+            logger.warning(f"Invalid index {index} for color change")
 
     @override
     def sizeHint(self) -> QSize:

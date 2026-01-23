@@ -445,6 +445,8 @@ class IndexedCanvas(QWidget):
         Call this when palette colors have changed but the indexed data
         hasn't changed. This re-reads colors from the palette and re-renders.
         """
+        if self._palette:
+            logger.debug(f"Canvas refresh_palette: colors={self._palette.colors[:5]}...")
         self._render_image()
         self._update_highlight_overlay()
 

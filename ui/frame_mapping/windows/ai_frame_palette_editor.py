@@ -452,8 +452,10 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _on_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle palette color change from right-click."""
+        logger.debug(f"Window received color_changed: index={index}, color={color}")
         self._controller.set_palette_color(index, color)
         # Explicitly refresh canvas to show new palette colors
+        logger.debug(f"Window palette[{index}] is now: {self._palette.colors[index]}")
         self._canvas.refresh_palette()
 
     def _on_palette_merge_requested(self, primary_index: int, merge_index: int) -> None:
