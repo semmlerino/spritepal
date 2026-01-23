@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
+from PIL import Image
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
@@ -25,6 +26,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.palette_utils import quantize_to_palette
+from core.services.image_utils import pil_to_qpixmap
 from ui.frame_mapping.views.sheet_palette_widget import SheetPaletteWidget
 from utils.logging_config import get_logger
 
@@ -98,6 +101,7 @@ class AIFramesPane(QWidget):
         self._show_unmapped_only = False
         self._search_text: str = ""
         self._tag_filter: str = ""  # Empty = show all, or specific tag to filter
+        self._sheet_palette: SheetPalette | None = None  # For quantized thumbnails
 
         # Tab management
         self._tab_folders: list[Path | None] = [None]  # One empty tab initially
@@ -339,10 +343,16 @@ class AIFramesPane(QWidget):
     def set_sheet_palette(self, palette: SheetPalette | None) -> None:
         """Set the sheet palette to display.
 
+        Updates the palette widget and refreshes all thumbnails to show
+        quantized colors matching the new palette.
+
         Args:
             palette: SheetPalette to display, or None to clear
         """
+        self._sheet_palette = palette
         self._palette_widget.set_palette(palette)
+        # Refresh thumbnails to show quantized colors
+        self._refresh_list(is_frame_list_change=False)
 
     def get_sheet_palette(self) -> SheetPalette | None:
         """Get the current sheet palette.
@@ -377,6 +387,58 @@ class AIFramesPane(QWidget):
         """Handle filter checkbox toggle."""
         self._show_unmapped_only = checked
         self._refresh_list()
+
+    def _create_quantized_thumbnail(self, frame_path: Path) -> QPixmap | None:
+        """Create a palette-quantized thumbnail for an AI frame.
+
+        If a sheet palette is defined, quantizes the frame image to show
+        WYSIWYG colors matching the workbench preview. Otherwise loads
+        the raw PNG.
+
+        Args:
+            frame_path: Path to the AI frame PNG file
+
+        Returns:
+            Scaled QPixmap ready for list item icon, or None on failure
+        """
+        if not frame_path.exists():
+            return None
+
+        # Load original image with PIL
+        try:
+            pil_image = Image.open(frame_path)
+        except Exception:
+            logger.warning("Failed to load image: %s", frame_path)
+            return None
+
+        # Apply palette quantization if palette is defined
+        if self._sheet_palette is not None:
+            try:
+                # Ensure RGBA for quantization
+                if pil_image.mode != "RGBA":
+                    pil_image = pil_image.convert("RGBA")
+
+                # Quantize to palette (returns indexed image)
+                indexed = quantize_to_palette(pil_image, self._sheet_palette.colors)
+
+                # Convert indexed back to RGBA for display (preserves palette colors)
+                pil_image = indexed.convert("RGBA")
+            except Exception:
+                logger.warning("Failed to quantize image: %s", frame_path, exc_info=True)
+                # Fall through to use original image
+
+        # Convert to QPixmap
+        pixmap = pil_to_qpixmap(pil_image)
+        if pixmap is None or pixmap.isNull():
+            return None
+
+        # Scale to thumbnail size
+        return pixmap.scaled(
+            THUMBNAIL_SIZE,
+            THUMBNAIL_SIZE,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
 
     def _on_selection_changed(self, row: int) -> None:
         """Handle AI frame selection change."""
@@ -431,9 +493,11 @@ class AIFramesPane(QWidget):
         edit_action.triggered.connect(lambda: self.edit_in_sprite_editor_requested.emit(frame_id))
 
         edit_palette_action = menu.addAction("Edit Palette...")
+
         def emit_edit_palette() -> None:
             logger.info("Edit Palette clicked for frame: %s", frame_id)
             self.edit_frame_palette_requested.emit(frame_id)
+
         edit_palette_action.triggered.connect(emit_edit_palette)
 
         menu.addSeparator()
@@ -505,17 +569,10 @@ class AIFramesPane(QWidget):
                 color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
                 item.setForeground(QBrush(color))
 
-                # Load thumbnail if file exists
-                if frame.path.exists():
-                    pixmap = QPixmap(str(frame.path))
-                    if not pixmap.isNull():
-                        scaled = pixmap.scaled(
-                            THUMBNAIL_SIZE,
-                            THUMBNAIL_SIZE,
-                            Qt.AspectRatioMode.KeepAspectRatio,
-                            Qt.TransformationMode.SmoothTransformation,
-                        )
-                        item.setIcon(QIcon(scaled))
+                # Load thumbnail (quantized if palette defined)
+                thumbnail = self._create_quantized_thumbnail(frame.path)
+                if thumbnail is not None:
+                    item.setIcon(QIcon(thumbnail))
 
                 self._list.addItem(item)
 
