@@ -412,6 +412,26 @@ class MappingPanel(QWidget):
         finally:
             self._table.blockSignals(False)
 
+    def select_row_by_ai_id(self, ai_frame_id: str) -> None:
+        """Select a row by AI frame ID (filename).
+
+        Blocks signals to prevent feedback loops.
+        This is the preferred method as IDs are stable across reloads/reordering.
+
+        Args:
+            ai_frame_id: AI frame ID (filename) to select
+        """
+        self._table.blockSignals(True)
+        try:
+            for row in range(self._table.rowCount()):
+                checkbox_item = self._table.item(row, 0)  # Checkbox column stores ID in UserRole+1
+                if checkbox_item is not None and checkbox_item.data(Qt.ItemDataRole.UserRole + 1) == ai_frame_id:
+                    self._table.selectRow(row)
+                    self._table.scrollToItem(checkbox_item)
+                    break
+        finally:
+            self._table.blockSignals(False)
+
     def update_row_alignment(
         self,
         ai_index: int,

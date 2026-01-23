@@ -53,7 +53,7 @@ class AIFramesPane(QWidget):
         remove_from_project_requested: Emitted when user requests removal (index)
     """
 
-    ai_frame_selected = Signal(int)  # AI frame index
+    ai_frame_selected = Signal(str)  # AI frame ID (filename)
     map_requested = Signal()  # User wants to map selected frames
     auto_advance_changed = Signal(bool)  # Auto-advance toggle state changed
     edit_in_sprite_editor_requested = Signal(int)  # AI frame index
@@ -162,7 +162,20 @@ class AIFramesPane(QWidget):
         self._refresh_list(is_frame_list_change=False)
 
     def get_selected_index(self) -> int | None:
-        """Get the currently selected AI frame index."""
+        """Get the currently selected AI frame index.
+
+        Note: Prefer get_selected_id() for stable references across reloads.
+        """
+        current = self._list.currentItem()
+        if current is None:  # type: ignore[reportUnnecessaryComparison]
+            return None
+        return current.data(Qt.ItemDataRole.UserRole + 1)
+
+    def get_selected_id(self) -> str | None:
+        """Get the currently selected AI frame ID (filename).
+
+        This is the preferred method as IDs are stable across reloads/reordering.
+        """
         current = self._list.currentItem()
         if current is None:  # type: ignore[reportUnnecessaryComparison]
             return None
@@ -172,6 +185,7 @@ class AIFramesPane(QWidget):
         """Programmatically select an AI frame by index.
 
         Blocks signals to prevent feedback loops.
+        Note: Prefer select_frame_by_id() for stable references across reloads.
 
         Args:
             index: The AI frame index to select
@@ -180,7 +194,27 @@ class AIFramesPane(QWidget):
         try:
             for row in range(self._list.count()):
                 item = self._list.item(row)
-                if item is not None and item.data(Qt.ItemDataRole.UserRole) == index:  # type: ignore[reportUnnecessaryComparison]
+                if item is not None and item.data(Qt.ItemDataRole.UserRole + 1) == index:  # type: ignore[reportUnnecessaryComparison]
+                    self._list.setCurrentRow(row)
+                    self._list.scrollToItem(item)
+                    break
+        finally:
+            self._list.blockSignals(False)
+
+    def select_frame_by_id(self, frame_id: str) -> None:
+        """Programmatically select an AI frame by ID (filename).
+
+        Blocks signals to prevent feedback loops.
+        This is the preferred method as IDs are stable across reloads/reordering.
+
+        Args:
+            frame_id: The AI frame ID (filename) to select
+        """
+        self._list.blockSignals(True)
+        try:
+            for row in range(self._list.count()):
+                item = self._list.item(row)
+                if item is not None and item.data(Qt.ItemDataRole.UserRole) == frame_id:  # type: ignore[reportUnnecessaryComparison]
                     self._list.setCurrentRow(row)
                     self._list.scrollToItem(item)
                     break
@@ -212,14 +246,14 @@ class AIFramesPane(QWidget):
         """Handle AI frame selection change."""
         if row < 0:
             # Phase 4 fix: Notify listeners of cleared selection
-            self.ai_frame_selected.emit(-1)
+            self.ai_frame_selected.emit("")
             return
         item = self._list.item(row)
         if item is None:  # type: ignore[reportUnnecessaryComparison]
             return
-        index = item.data(Qt.ItemDataRole.UserRole)
-        if index is not None:
-            self.ai_frame_selected.emit(index)
+        frame_id = item.data(Qt.ItemDataRole.UserRole)
+        if frame_id is not None:
+            self.ai_frame_selected.emit(frame_id)
 
     def _on_context_menu(self, pos: object) -> None:
         """Show context menu for AI frames."""
@@ -256,8 +290,9 @@ class AIFramesPane(QWidget):
                 is restored to notify workspace. If False (set_mapping_status), suppress
                 signal to avoid spurious updates during status-only changes.
         """
-        current_selection = self.get_selected_index()
+        current_selection_id = self.get_selected_id()
         selection_restored = False
+        restored_id: str | None = None
 
         self._list.blockSignals(True)
         try:
@@ -283,7 +318,9 @@ class AIFramesPane(QWidget):
                 # Add status indicator to text
                 status_indicator = "●" if status != "unmapped" else "○"
                 item.setText(f"{status_indicator} {frame.path.name}")
-                item.setData(Qt.ItemDataRole.UserRole, frame.index)
+                # Store frame ID in UserRole (primary), index in UserRole+1 (backward compat)
+                item.setData(Qt.ItemDataRole.UserRole, frame.id)
+                item.setData(Qt.ItemDataRole.UserRole + 1, frame.index)
 
                 # Apply status color
                 color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
@@ -309,13 +346,15 @@ class AIFramesPane(QWidget):
             else:
                 self._count_label.setText(f"{total_count} frame{'s' if total_count != 1 else ''}")
 
-            if current_selection is not None:
+            # Restore selection by ID (stable across reloads)
+            if current_selection_id is not None:
                 for row in range(self._list.count()):
                     item = self._list.item(row)
-                    if item and item.data(Qt.ItemDataRole.UserRole) == current_selection:
+                    if item and item.data(Qt.ItemDataRole.UserRole) == current_selection_id:
                         self._list.setCurrentRow(row)
                         self._list.scrollToItem(item)
                         selection_restored = True
+                        restored_id = current_selection_id
                         break
 
             if not selection_restored:
@@ -325,8 +364,8 @@ class AIFramesPane(QWidget):
             self._list.blockSignals(False)
 
         # Phase 2 fix: Notify listeners if selection was silently restored during frame list change
-        if is_frame_list_change and selection_restored and current_selection is not None:
-            self.ai_frame_selected.emit(current_selection)
-        # Bug #1 fix: Always emit -1 when selection was lost (filter/search/reload)
-        elif current_selection is not None and not selection_restored:
-            self.ai_frame_selected.emit(-1)
+        if is_frame_list_change and selection_restored and restored_id is not None:
+            self.ai_frame_selected.emit(restored_id)
+        # Bug #1 fix: Always emit empty string when selection was lost (filter/search/reload)
+        elif current_selection_id is not None and not selection_restored:
+            self.ai_frame_selected.emit("")

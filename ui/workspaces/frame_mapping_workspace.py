@@ -387,42 +387,42 @@ class FrameMappingWorkspace(QWidget):
         else:
             logger.warning("No message service set - status update not shown in UI")
 
-    def _on_ai_frame_selected(self, index: int) -> None:
+    def _on_ai_frame_selected(self, frame_id: str) -> None:
         """Handle AI frame selection in left pane.
 
         Syncs with drawer and canvas. If mapped, shows alignment.
 
-        Phase 2 fix: Guard against invalid selections (index < 0).
+        Args:
+            frame_id: The AI frame ID (filename), or empty string for cleared selection.
         """
         project = self._controller.project
         if project is None:
             return
 
-        # Phase 2: Guard against invalid selections
-        if index < 0:
-            self._selected_ai_index = None
+        # Guard against cleared selection
+        if not frame_id:
             self._selected_ai_frame_id = None
+            self._selected_ai_index = None
             self._update_map_button_state()
             self._alignment_canvas.set_ai_frame(None)
             self._alignment_canvas.clear_alignment()
             self._mapping_panel.clear_selection()
             return
 
-        self._selected_ai_index = index
+        self._selected_ai_frame_id = frame_id
         self._update_map_button_state()
 
-        # Sync drawer selection
-        self._mapping_panel.select_row_by_ai_index(index)
+        # Sync drawer selection by ID
+        self._mapping_panel.select_row_by_ai_id(frame_id)
 
-        # Load AI frame into canvas
-        frame = project.get_ai_frame_by_index(index)
+        # Load AI frame into canvas and derive index for backward compatibility
+        frame = project.get_ai_frame_by_id(frame_id)
         if frame:
-            # Track by ID for stability across reloads
-            self._selected_ai_frame_id = frame.id
+            self._selected_ai_index = frame.index
         self._alignment_canvas.set_ai_frame(frame)
 
         # Check for mapping using ID-based lookup (O(1))
-        mapping = project.get_mapping_for_ai_frame(frame.id) if frame else None
+        mapping = project.get_mapping_for_ai_frame(frame_id) if frame else None
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
             preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
@@ -465,7 +465,7 @@ class FrameMappingWorkspace(QWidget):
         self._update_map_button_state()
 
         # Show preview in canvas if AI frame is selected
-        if self._selected_ai_index is not None:
+        if self._selected_ai_frame_id is not None:
             game_frame = project.get_game_frame_by_id(frame_id)
             preview = self._controller.get_game_frame_preview(frame_id)
             capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
@@ -521,7 +521,7 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_map_selected(self) -> None:
         """Handle map button click in AI frames pane."""
-        if self._selected_ai_index is None:
+        if self._selected_ai_frame_id is None:
             QMessageBox.information(self, "Map Frames", "Please select an AI frame first.")
             return
 
@@ -529,7 +529,16 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(self, "Map Frames", "Please select a game frame first.")
             return
 
-        self._attempt_link(self._selected_ai_index, self._selected_game_id)
+        # Derive index for _attempt_link which still uses index-based API
+        project = self._controller.project
+        if project is None:
+            return
+
+        ai_frame = project.get_ai_frame_by_id(self._selected_ai_frame_id)
+        if ai_frame is None:
+            return
+
+        self._attempt_link(ai_frame.index, self._selected_game_id)
 
     def _on_drop_game_frame(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Handle game frame dropped onto drawer row.
@@ -550,7 +559,7 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
         """Handle alignment change from canvas (auto-save)."""
-        if self._selected_ai_index is None or self._selected_ai_frame_id is None:
+        if self._selected_ai_frame_id is None:
             return
 
         project = self._controller.project
@@ -561,10 +570,16 @@ class FrameMappingWorkspace(QWidget):
         if mapping is None:
             return
 
+        # Derive index for methods that still use index-based API
+        ai_frame = project.get_ai_frame_by_id(self._selected_ai_frame_id)
+        if ai_frame is None:
+            return
+        ai_index = ai_frame.index
+
         # Update alignment in controller (includes scale)
-        self._controller.update_mapping_alignment(self._selected_ai_index, x, y, flip_h, flip_v, scale)
+        self._controller.update_mapping_alignment(ai_index, x, y, flip_h, flip_v, scale)
         # Use targeted row update instead of full refresh to preserve checkbox state
-        self._mapping_panel.update_row_alignment(self._selected_ai_index, x, y, flip_h, flip_v)
+        self._mapping_panel.update_row_alignment(ai_index, x, y, flip_h, flip_v)
 
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.
@@ -592,11 +607,9 @@ class FrameMappingWorkspace(QWidget):
         if ai_frame is None:
             return
 
-        ai_frame_index = ai_frame.index
-
-        # Select the row first
-        self._ai_frames_pane.select_frame(ai_frame_index)
-        self._on_ai_frame_selected(ai_frame_index)
+        # Select the frame first (using index for backward-compat select_frame method)
+        self._ai_frames_pane.select_frame(ai_frame.index)
+        self._on_ai_frame_selected(ai_frame_id)
 
         # Focus the canvas for keyboard input
         self._alignment_canvas.focus_canvas()
@@ -1134,10 +1147,12 @@ class FrameMappingWorkspace(QWidget):
 
         # Auto-advance if enabled
         if self._auto_advance_enabled:
-            next_unmapped = self._find_next_unmapped_ai_frame(ai_index)
-            if next_unmapped is not None:
-                self._ai_frames_pane.select_frame(next_unmapped)
-                self._on_ai_frame_selected(next_unmapped)
+            next_unmapped_index = self._find_next_unmapped_ai_frame(ai_index)
+            if next_unmapped_index is not None:
+                next_frame = project.get_ai_frame_by_index(next_unmapped_index)
+                if next_frame:
+                    self._ai_frames_pane.select_frame(next_unmapped_index)
+                    self._on_ai_frame_selected(next_frame.id)
 
     def _find_next_unmapped_ai_frame(self, current_index: int) -> int | None:
         """Find the next unmapped AI frame after the given index."""
@@ -1160,7 +1175,7 @@ class FrameMappingWorkspace(QWidget):
 
     def _update_map_button_state(self) -> None:
         """Update the Map Selected button enabled state."""
-        both_selected = self._selected_ai_index is not None and self._selected_game_id is not None
+        both_selected = self._selected_ai_frame_id is not None and self._selected_game_id is not None
         self._ai_frames_pane.set_map_button_enabled(both_selected)
 
     def _refresh_mapping_status(self) -> None:
