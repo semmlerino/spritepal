@@ -315,6 +315,7 @@ class FrameMappingWorkspace(QWidget):
         # Alignment Canvas signals
         self._alignment_canvas.alignment_changed.connect(self._on_alignment_changed)
         self._alignment_canvas.compression_type_changed.connect(self._on_compression_type_changed)
+        self._alignment_canvas.apply_scale_to_all_requested.connect(self._on_apply_scale_to_all)
 
     # -------------------------------------------------------------------------
     # Event Handlers
@@ -592,6 +593,54 @@ class FrameMappingWorkspace(QWidget):
 
         # Route through controller for proper signal emission and auto-save
         self._controller.update_game_frame_compression(self._selected_game_id, compression_type)
+
+    def _on_apply_scale_to_all(self, scale: float) -> None:
+        """Handle apply scale to all request from canvas.
+
+        Shows confirmation dialog with count of affected mappings,
+        then applies scale to all mappings except the current one.
+
+        Args:
+            scale: Scale factor to apply (0.1 - 1.0)
+        """
+        project = self._controller.project
+        if project is None or project.mapped_count == 0:
+            if self._message_service:
+                self._message_service.show_message("No mapped frames to update", 2000)
+            return
+
+        # Get current AI frame to exclude
+        current_ai_frame_id = self._alignment_canvas.get_current_ai_frame_id()
+
+        # Count how many mappings will be affected (exclude current)
+        affected_count = sum(1 for m in project.mappings if m.ai_frame_id != current_ai_frame_id)
+
+        if affected_count == 0:
+            if self._message_service:
+                self._message_service.show_message("No other mappings to update", 2000)
+            return
+
+        # Show confirmation dialog
+        reply = QMessageBox.question(
+            self,
+            "Apply Scale to All",
+            f"Apply scale {scale:.0%} to {affected_count} other mapped frames?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Apply scale to all mappings except current
+        updated_count = self._controller.apply_scale_to_all_mappings(scale, current_ai_frame_id)
+
+        if self._message_service:
+            self._message_service.show_message(f"Applied scale {scale:.0%} to {updated_count} mappings", 3000)
+
+        # Refresh UI
+        self._mapping_panel.refresh()
+        self._refresh_mapping_status()
 
     def _on_adjust_alignment(self, ai_frame_id: str) -> None:
         """Handle adjust alignment request - focus the canvas.

@@ -187,6 +187,7 @@ class WorkbenchCanvas(QWidget):
 
     alignment_changed = Signal(int, int, bool, bool, float)  # offset_x, offset_y, flip_h, flip_v, scale
     compression_type_changed = Signal(str)  # "raw" or "hal"
+    apply_scale_to_all_requested = Signal(float)  # scale factor to apply to all other mappings
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -306,7 +307,7 @@ class WorkbenchCanvas(QWidget):
         controls1.addWidget(scale_label)
 
         self._scale_slider = QSlider(Qt.Orientation.Horizontal)
-        self._scale_slider.setRange(10, 300)  # 0.1 to 3.0
+        self._scale_slider.setRange(10, 100)  # 0.1 to 1.0
         self._scale_slider.setValue(100)
         self._scale_slider.setMaximumWidth(80)
         controls1.addWidget(self._scale_slider)
@@ -382,10 +383,42 @@ class WorkbenchCanvas(QWidget):
         self._auto_align_btn.setToolTip("Center AI frame over game frame based on bounding boxes")
         controls2.addWidget(self._auto_align_btn)
 
+        # Match Scale checkbox (next to Auto-Align)
+        self._match_scale_checkbox = QCheckBox("Match Scale")
+        self._match_scale_checkbox.setStyleSheet("font-size: 11px;")
+        self._match_scale_checkbox.setToolTip("Auto-Align also scales AI frame to fit game sprite bounds")
+        controls2.addWidget(self._match_scale_checkbox)
+
         layout.addLayout(controls2)
 
+        # Controls row 3: Preserve Silhouette and Apply Scale to All
+        controls3 = QHBoxLayout()
+        controls3.setContentsMargins(0, 0, 0, 0)
+        controls3.setSpacing(8)
+
+        # Preserve Silhouette checkbox
+        self._preserve_silhouette_checkbox = QCheckBox("Preserve Silhouette")
+        self._preserve_silhouette_checkbox.setStyleSheet("font-size: 11px;")
+        self._preserve_silhouette_checkbox.setToolTip(
+            "When checked, AI content is clipped to original sprite silhouette. "
+            "When unchecked, AI content fully replaces original within tile bounds."
+        )
+        self._preserve_silhouette_checkbox.setChecked(False)  # Default: complete replacement
+        controls3.addWidget(self._preserve_silhouette_checkbox)
+
+        controls3.addStretch()
+
+        # Apply Scale to All button
+        self._apply_scale_all_btn = QPushButton("Apply Scale to All")
+        self._apply_scale_all_btn.setStyleSheet("font-size: 11px;")
+        self._apply_scale_all_btn.setMaximumWidth(120)
+        self._apply_scale_all_btn.setToolTip("Apply current scale to all other mapped frames")
+        controls3.addWidget(self._apply_scale_all_btn)
+
+        layout.addLayout(controls3)
+
         # Hotkey hints
-        hints_label = QLabel("Arrow keys: nudge 1px | Shift+Arrow: 8px")
+        hints_label = QLabel("Arrow keys: nudge 1px | Shift+Arrow: 8px | +/-: scale 5%")
         hints_label.setStyleSheet("font-size: 10px; color: #888; font-style: italic;")
         layout.addWidget(hints_label)
 
@@ -410,6 +443,8 @@ class WorkbenchCanvas(QWidget):
         self._preview_checkbox.toggled.connect(self._on_preview_toggled)
         self._compression_combo.currentIndexChanged.connect(self._on_compression_changed)
         self._auto_align_btn.clicked.connect(self._on_auto_align)
+        self._preserve_silhouette_checkbox.toggled.connect(self._on_preserve_silhouette_toggled)
+        self._apply_scale_all_btn.clicked.connect(self._on_apply_scale_to_all)
 
         # AI frame item signals
         self._ai_frame_item.transform_changed.connect(self._on_ai_frame_transform_changed)
@@ -659,6 +694,23 @@ class WorkbenchCanvas(QWidget):
             self._ai_frame_item.scale_factor(),
         )
 
+    def get_preserve_silhouette(self) -> bool:
+        """Get current preserve silhouette setting.
+
+        Returns:
+            True if AI content should be clipped to original silhouette,
+            False for complete replacement within tile bounds.
+        """
+        return self._preserve_silhouette_checkbox.isChecked()
+
+    def get_current_ai_frame_id(self) -> str | None:
+        """Get the current AI frame ID.
+
+        Returns:
+            AI frame ID or None if no frame is selected.
+        """
+        return self._current_ai_frame.id if self._current_ai_frame else None
+
     def focus_canvas(self) -> None:
         """Set focus to the canvas for keyboard input."""
         self._view.setFocus()
@@ -677,6 +729,9 @@ class WorkbenchCanvas(QWidget):
         self._tile_overlay_checkbox.setEnabled(enabled)
         self._grid_checkbox.setEnabled(enabled)
         self._compression_combo.setEnabled(enabled)
+        self._match_scale_checkbox.setEnabled(enabled)
+        self._preserve_silhouette_checkbox.setEnabled(enabled)
+        self._apply_scale_all_btn.setEnabled(enabled)
         # Auto-align button managed separately by _update_auto_align_button_state()
         self._update_auto_align_button_state()
 
@@ -895,6 +950,25 @@ class WorkbenchCanvas(QWidget):
         if compression_type and self._current_game_frame is not None:
             self.compression_type_changed.emit(compression_type)
 
+    def _on_preserve_silhouette_toggled(self, checked: bool) -> None:
+        """Handle preserve silhouette checkbox toggle.
+
+        Updates the preview to reflect the new silhouette clipping behavior.
+        """
+        # Schedule preview update to reflect the change
+        self._schedule_preview_update()
+
+    def _on_apply_scale_to_all(self) -> None:
+        """Handle Apply Scale to All button click.
+
+        Emits signal with current scale for the workspace to handle
+        (showing confirmation dialog and calling controller).
+        """
+        if not self._has_mapping:
+            return
+        current_scale = self._ai_frame_item.scale_factor()
+        self.apply_scale_to_all_requested.emit(current_scale)
+
     def _schedule_preview_update(self) -> None:
         """Schedule a debounced preview generation.
 
@@ -954,7 +1028,12 @@ class WorkbenchCanvas(QWidget):
         try:
             # Use SpriteCompositor with "original" policy for preview
             # This shows original pixels where AI doesn't cover (WYSIWYG)
-            compositor = SpriteCompositor(uncovered_policy="original")
+            # preserve_silhouette controls whether AI is clipped to original alpha mask
+            preserve_silhouette = self._preserve_silhouette_checkbox.isChecked()
+            compositor = SpriteCompositor(
+                uncovered_policy="original",
+                preserve_silhouette=preserve_silhouette,
+            )
             transform = TransformParams(
                 offset_x=offset_x,
                 offset_y=offset_y,
@@ -1009,6 +1088,9 @@ class WorkbenchCanvas(QWidget):
 
         Calculates alignment offset that centers the AI frame content over the game
         frame, accounting for current flip and scale transforms.
+
+        If Match Scale is checked, also calculates scale to fit AI content within
+        game sprite bounds (using smaller dimension to fit within bounds).
         """
         if self._ai_image is None:
             logger.warning("Auto-align skipped: AI image not loaded (PIL load may have failed)")
@@ -1027,16 +1109,37 @@ class WorkbenchCanvas(QWidget):
             ai_bbox = (0, 0, self._ai_image.width, self._ai_image.height)
 
         ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
-        ai_width = ai_x2 - ai_x
-        ai_height = ai_y2 - ai_y
-
-        # Calculate AI content center in original image coordinates
-        ai_center_x = ai_x + ai_width / 2
-        ai_center_y = ai_y + ai_height / 2
+        ai_content_width = ai_x2 - ai_x
+        ai_content_height = ai_y2 - ai_y
 
         # Apply flip corrections (flip changes where content visually appears)
         flip_h = self._flip_h_checkbox.isChecked()
         flip_v = self._flip_v_checkbox.isChecked()
+
+        # Game frame bounding box
+        bbox = self._capture_result.bounding_box
+
+        # Calculate scale if Match Scale is checked
+        if self._match_scale_checkbox.isChecked() and ai_content_width > 0 and ai_content_height > 0:
+            # Calculate scale to fit AI content within game bounds
+            scale_x = bbox.width / ai_content_width
+            scale_y = bbox.height / ai_content_height
+            # Use smaller dimension to fit within bounds (preserves aspect ratio)
+            scale = min(scale_x, scale_y)
+            # Clamp to valid range
+            scale = max(0.1, min(1.0, scale))
+            logger.debug(
+                "Auto-align: Match Scale calculated scale=%.2f (scale_x=%.2f, scale_y=%.2f)",
+                scale,
+                scale_x,
+                scale_y,
+            )
+        else:
+            scale = self._ai_frame_item.scale_factor()
+
+        # Calculate AI content center in original image coordinates
+        ai_center_x = ai_x + ai_content_width / 2
+        ai_center_y = ai_y + ai_content_height / 2
 
         if flip_h:
             ai_center_x = self._ai_image.width - ai_center_x
@@ -1044,12 +1147,10 @@ class WorkbenchCanvas(QWidget):
             ai_center_y = self._ai_image.height - ai_center_y
 
         # Apply scale to get visual content center
-        scale = self._ai_frame_item.scale_factor()
         scaled_ai_center_x = ai_center_x * scale
         scaled_ai_center_y = ai_center_y * scale
 
         # Game frame center (displayed at origin 0,0)
-        bbox = self._capture_result.bounding_box
         game_center_x = bbox.width / 2
         game_center_y = bbox.height / 2
 
@@ -1057,7 +1158,7 @@ class WorkbenchCanvas(QWidget):
         offset_x = int(game_center_x - scaled_ai_center_x)
         offset_y = int(game_center_y - scaled_ai_center_y)
 
-        # Apply the alignment (keep current flip and scale)
+        # Apply the alignment (with potentially updated scale)
         self.set_alignment(
             offset_x,
             offset_y,

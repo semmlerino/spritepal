@@ -164,7 +164,7 @@ class FrameMapping:
     offset_y: int = 0
     flip_h: bool = False
     flip_v: bool = False
-    scale: float = 1.0  # Uniform scale factor (0.1 - 10.0)
+    scale: float = 1.0  # Uniform scale factor (0.1 - 1.0)
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to dictionary for JSON storage."""
@@ -657,7 +657,7 @@ class FrameMappingProject:
         mapping.offset_y = offset_y
         mapping.flip_h = flip_h
         mapping.flip_v = flip_v
-        mapping.scale = max(0.1, min(10.0, scale))
+        mapping.scale = max(0.1, min(1.0, scale))
 
         # Phase 5 fix: Transition to "edited" when alignment changes (removed guard)
         if set_edited:

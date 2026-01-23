@@ -103,7 +103,7 @@ class ScaleHandle(QGraphicsRectItem):
                 scale_factor = current_dist / start_dist
                 new_scale = self._drag_start_scale * scale_factor
                 # Clamp scale
-                new_scale = max(0.1, min(10.0, new_scale))
+                new_scale = max(0.1, min(1.0, new_scale))
 
                 # Capture center before scaling
                 center_before = self._ai_frame.sceneBoundingRect().center()
@@ -184,7 +184,7 @@ class AIFrameItem(QGraphicsObject):
 
     def set_scale_factor(self, scale: float) -> None:
         """Set the uniform scale factor."""
-        scale = max(0.1, min(10.0, scale))
+        scale = max(0.1, min(1.0, scale))
         if abs(scale - self._scale_factor) > 0.001:
             self.prepareGeometryChange()
             self._scale_factor = scale
@@ -307,7 +307,7 @@ class AIFrameItem(QGraphicsObject):
 
     @override
     def keyPressEvent(self, event: object) -> None:
-        """Handle arrow keys for nudging."""
+        """Handle arrow keys for nudging and +/- for scaling."""
         from PySide6.QtGui import QKeyEvent
 
         if isinstance(event, QKeyEvent):
@@ -326,8 +326,39 @@ class AIFrameItem(QGraphicsObject):
             elif key == Qt.Key.Key_Down:
                 self.moveBy(0, step)
                 event.accept()
+            elif key in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
+                # Scale up by 5%
+                self._adjust_scale(0.05)
+                event.accept()
+            elif key == Qt.Key.Key_Minus:
+                # Scale down by 5%
+                self._adjust_scale(-0.05)
+                event.accept()
             else:
                 event.ignore()
+
+    def _adjust_scale(self, delta: float) -> None:
+        """Adjust scale by delta, preserving center position.
+
+        Args:
+            delta: Scale change (e.g., 0.05 for +5%, -0.05 for -5%)
+        """
+        new_scale = self._scale_factor + delta
+        new_scale = max(0.1, min(1.0, new_scale))
+
+        if abs(new_scale - self._scale_factor) < 0.001:
+            return
+
+        # Capture center before scaling
+        center_before = self.sceneBoundingRect().center()
+
+        # Apply scale
+        self.set_scale_factor(new_scale)
+
+        # Reposition to preserve center
+        center_after = self.sceneBoundingRect().center()
+        delta_pos = center_before - center_after
+        self.setPos(self.pos() + delta_pos)
 
 
 class TileOverlayItem(QGraphicsItem):

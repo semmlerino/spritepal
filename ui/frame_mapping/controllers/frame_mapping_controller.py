@@ -516,6 +516,42 @@ class FrameMappingController(QObject):
             return True
         return False
 
+    def apply_scale_to_all_mappings(self, scale: float, exclude_ai_frame_id: str | None = None) -> int:
+        """Apply a scale value to all mapped frames.
+
+        Args:
+            scale: Scale factor to apply (0.1 - 1.0)
+            exclude_ai_frame_id: AI frame ID to exclude (typically the current frame)
+
+        Returns:
+            Number of mappings updated
+        """
+        if self._project is None:
+            return 0
+
+        updated_count = 0
+        for mapping in self._project.mappings:
+            # Skip excluded frame
+            if mapping.ai_frame_id == exclude_ai_frame_id:
+                continue
+
+            # Update only the scale, preserve other alignment values
+            mapping.scale = max(0.1, min(1.0, scale))
+            mapping.status = "edited"
+            updated_count += 1
+
+        if updated_count > 0:
+            self.project_changed.emit()
+            self.save_requested.emit()
+            logger.info(
+                "Applied scale %.2f to %d mappings (excluded: %s)",
+                scale,
+                updated_count,
+                exclude_ai_frame_id,
+            )
+
+        return updated_count
+
     def get_game_frame_preview(self, frame_id: str) -> QPixmap | None:
         """Get the rendered preview pixmap for a game frame.
 
@@ -942,6 +978,7 @@ class FrameMappingController(QObject):
         force_raw: bool = False,
         allow_fallback: bool = False,
         emit_project_changed: bool = True,
+        preserve_silhouette: bool = True,
     ) -> bool:
         """Inject a mapped frame into the ROM using tile-aware masking.
 
@@ -968,6 +1005,9 @@ class FrameMappingController(QObject):
                            and emit stale_entries_warning for user to decide.
             emit_project_changed: If True (default), emit project_changed after success.
                                  Set False for batch operations to emit once at the end.
+            preserve_silhouette: If True (default), AI content is clipped to original sprite
+                                silhouette. If False, AI content fully replaces original
+                                within tile bounds (complete replacement mode).
 
         Returns:
             True if injection was successful
@@ -1123,7 +1163,11 @@ class FrameMappingController(QObject):
 
             # Use SpriteCompositor for unified transform logic (flip -> scale order)
             # Policy: "transparent" for injection (uncovered areas become index 0)
-            compositor = SpriteCompositor(uncovered_policy="transparent")
+            # preserve_silhouette controls whether AI is clipped to original alpha mask
+            compositor = SpriteCompositor(
+                uncovered_policy="transparent",
+                preserve_silhouette=preserve_silhouette,
+            )
             transform = TransformParams(
                 offset_x=mapping.offset_x,
                 offset_y=mapping.offset_y,

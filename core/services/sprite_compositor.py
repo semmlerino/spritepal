@@ -71,6 +71,7 @@ class SpriteCompositor:
     def __init__(
         self,
         uncovered_policy: Literal["transparent", "original"] = "transparent",
+        preserve_silhouette: bool = True,
     ) -> None:
         """Initialize the compositor.
 
@@ -79,8 +80,13 @@ class SpriteCompositor:
                 original sprite:
                 - "transparent": Uncovered areas become transparent (injection default)
                 - "original": Uncovered areas show original sprite pixels (preview default)
+            preserve_silhouette: If True (default), AI content is clipped to the
+                original sprite's silhouette (alpha mask). If False, AI content
+                fully replaces the original within tile bounds - pixels outside
+                the original silhouette but within canvas bounds are preserved.
         """
         self._uncovered_policy: Literal["transparent", "original"] = uncovered_policy
+        self._preserve_silhouette = preserve_silhouette
 
     def composite_frame(
         self,
@@ -139,16 +145,22 @@ class SpriteCompositor:
         original_mask = original_sprite.split()[3]
 
         # Apply mask and handle uncovered areas based on policy
-        if self._uncovered_policy == "transparent":
-            # Uncovered areas become transparent (for injection)
+        if self._preserve_silhouette and self._uncovered_policy == "transparent":
+            # Legacy behavior: clip AI to original silhouette (for injection)
             composited = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
             composited.paste(ai_canvas, (0, 0), original_mask)
-        else:
-            # Uncovered areas show original sprite (for preview)
+        elif self._preserve_silhouette:
+            # Legacy behavior: clip AI to original silhouette (for preview)
             # Start with original, composite AI on top
             clipped_ai = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
             clipped_ai.paste(ai_canvas, (0, 0), original_mask)
             composited = Image.alpha_composite(original_sprite.copy(), clipped_ai)
+        elif self._uncovered_policy == "transparent":
+            # Complete replacement: AI canvas as-is (already has transparency)
+            composited = ai_canvas.copy()
+        else:
+            # Complete replacement: Composite AI over original
+            composited = Image.alpha_composite(original_sprite.copy(), ai_canvas)
 
         # Quantize to game palette if requested
         if quantize:
