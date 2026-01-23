@@ -52,6 +52,7 @@ from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
+from ui.frame_mapping.windows import AIFramePaletteEditorWindow
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -98,6 +99,9 @@ class FrameMappingWorkspace(QWidget):
 
         # Track stale entry warnings during injection (for retry with fallback)
         self._stale_entry_frame_id: str | None = None
+
+        # Track open palette editor windows (frame_id -> editor window)
+        self._palette_editors: dict[str, AIFramePaletteEditorWindow] = {}
 
         # Track project identity for canvas state preservation
         # Only clear canvas when project identity changes (new/load), not on content updates
@@ -295,6 +299,7 @@ class FrameMappingWorkspace(QWidget):
         self._ai_frames_pane.map_requested.connect(self._on_map_selected)
         self._ai_frames_pane.auto_advance_changed.connect(self._on_auto_advance_changed)
         self._ai_frames_pane.edit_in_sprite_editor_requested.connect(self._on_edit_frame)
+        self._ai_frames_pane.edit_frame_palette_requested.connect(self._on_edit_frame_palette)
         self._ai_frames_pane.remove_from_project_requested.connect(self._on_remove_ai_frame)
         # Sheet palette signals
         self._ai_frames_pane.palette_edit_requested.connect(self._on_palette_edit_requested)
@@ -735,6 +740,105 @@ class FrameMappingWorkspace(QWidget):
         # No linked AI frame - emit with empty path (will need handling in main window)
         if self._message_service:
             self._message_service.show_message("No AI frame linked to this capture", 3000)
+
+    def _on_edit_frame_palette(self, ai_frame_id: str) -> None:
+        """Handle edit frame palette request - open palette index editor.
+
+        Opens a modeless window for editing palette indices of the AI frame
+        before ROM injection.
+
+        Args:
+            ai_frame_id: AI frame ID (filename)
+        """
+        project = self._controller.project
+        if project is None:
+            return
+
+        # Check if editor is already open for this frame
+        if ai_frame_id in self._palette_editors:
+            editor = self._palette_editors[ai_frame_id]
+            editor.raise_()
+            editor.activateWindow()
+            return
+
+        # Get the AI frame
+        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
+        if ai_frame is None:
+            logger.warning("AI frame not found: %s", ai_frame_id)
+            return
+
+        # Get the sheet palette - required for palette editing
+        sheet_palette = project.sheet_palette
+        if sheet_palette is None:
+            QMessageBox.warning(
+                self,
+                "No Palette Set",
+                "Please set a sheet palette before editing palette indices.\n\n"
+                "Right-click on the palette panel and choose 'Edit Palette...' "
+                "or 'Extract from Capture...' to set one.",
+            )
+            return
+
+        # Create the editor window
+        editor = AIFramePaletteEditorWindow(ai_frame, sheet_palette, self)
+
+        # Track the editor window
+        self._palette_editors[ai_frame_id] = editor
+
+        # Connect signals
+        editor.save_requested.connect(self._on_palette_editor_save)
+        editor.closed.connect(lambda fid=ai_frame_id: self._on_palette_editor_closed(fid))
+
+        # Show the editor
+        editor.show()
+
+        logger.info("Opened palette editor for: %s", ai_frame_id)
+
+    def _on_palette_editor_save(self, ai_frame_id: str, indexed_data: object, output_path: str) -> None:
+        """Handle save from palette editor.
+
+        Updates the AIFrame path and refreshes the workspace.
+
+        Args:
+            ai_frame_id: AI frame ID
+            indexed_data: Numpy array of indexed pixel data (unused here)
+            output_path: Path to the saved edited PNG
+        """
+        project = self._controller.project
+        if project is None:
+            return
+
+        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
+        if ai_frame is None:
+            return
+
+        # Update the AI frame path to point to the edited file
+        ai_frame.path = Path(output_path)
+
+        # Mark project as modified (will auto-save on next operation)
+        self._controller.project_changed.emit()
+
+        # Refresh the AI frames pane to show updated preview
+        self._ai_frames_pane.refresh_frame(ai_frame_id)
+
+        # Update workbench if this frame is selected
+        if self._selected_ai_frame_id == ai_frame_id:
+            self._on_ai_frame_selected(ai_frame_id)
+
+        if self._message_service:
+            self._message_service.show_message(f"Saved edited palette: {Path(output_path).name}", 3000)
+
+    def _on_palette_editor_closed(self, ai_frame_id: str) -> None:
+        """Handle palette editor window closed.
+
+        Removes the editor from tracking dict.
+
+        Args:
+            ai_frame_id: AI frame ID of the closed editor
+        """
+        if ai_frame_id in self._palette_editors:
+            del self._palette_editors[ai_frame_id]
+            logger.debug("Palette editor closed for: %s", ai_frame_id)
 
     def _on_delete_capture(self, frame_id: str) -> None:
         """Handle delete capture request."""
@@ -1212,9 +1316,7 @@ class FrameMappingWorkspace(QWidget):
         # Also update the workbench canvas for pixel inspection
         self._alignment_canvas.set_sheet_palette(palette)
 
-    def _on_pixel_hovered(
-        self, x: int, y: int, rgb: object, palette_index: int
-    ) -> None:
+    def _on_pixel_hovered(self, x: int, y: int, rgb: object, palette_index: int) -> None:
         """Handle pixel hover on workbench - highlight palette swatch."""
         self._ai_frames_pane.highlight_palette_index(palette_index)
 

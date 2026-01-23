@@ -74,6 +74,7 @@ class AIFramesPane(QWidget):
     map_requested = Signal()  # User wants to map selected frames
     auto_advance_changed = Signal(bool)  # Auto-advance toggle state changed
     edit_in_sprite_editor_requested = Signal(str)  # AI frame ID
+    edit_frame_palette_requested = Signal(str)  # AI frame ID - open palette index editor
     remove_from_project_requested = Signal(str)  # AI frame ID
     # Sheet palette signals
     palette_edit_requested = Signal()  # User wants to edit sheet palette
@@ -428,6 +429,9 @@ class AIFramesPane(QWidget):
 
         edit_action = menu.addAction("Edit in Sprite Editor")
         edit_action.triggered.connect(lambda: self.edit_in_sprite_editor_requested.emit(frame_id))
+
+        edit_palette_action = menu.addAction("Edit Palette...")
+        edit_palette_action.triggered.connect(lambda: self.edit_frame_palette_requested.emit(frame_id))
 
         menu.addSeparator()
 
