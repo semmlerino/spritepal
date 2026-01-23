@@ -996,6 +996,26 @@ class FrameMappingController(QObject):
             return True
         return False
 
+    def remove_ai_frame(self, frame_id: str) -> bool:
+        """Remove an AI frame from the project.
+
+        Also removes any associated mapping.
+
+        Args:
+            frame_id: ID of the AI frame to remove.
+
+        Returns:
+            True if the frame was found and removed.
+        """
+        if self._project is None:
+            return False
+
+        if self._project.remove_ai_frame(frame_id):
+            self.project_changed.emit()
+            logger.info("Removed AI frame %s", frame_id)
+            return True
+        return False
+
     def update_game_frame_compression(self, frame_id: str, compression_type: str) -> bool:
         """Update compression type for a game frame.
 

@@ -956,9 +956,44 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_remove_ai_frame(self, ai_frame_id: str) -> None:
         """Handle remove AI frame from project request."""
-        # Not implemented - would need controller support
-        if self._message_service:
-            self._message_service.show_message(f"Remove AI frame '{ai_frame_id}' (not implemented)")
+        project = self._controller.project
+        if project is None:
+            return
+
+        # Get frame info for display and confirmation
+        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
+        if ai_frame is None:
+            return
+
+        frame_name = ai_frame.name
+
+        # Check if frame is mapped - warn user
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
+        if mapping is not None:
+            reply = QMessageBox.question(
+                self,
+                "Remove Mapped Frame?",
+                f"'{frame_name}' is mapped to a game capture.\n\n"
+                "Removing it will also delete the mapping.\n\n"
+                "Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
+        # Remove the AI frame (also removes mapping)
+        if self._controller.remove_ai_frame(ai_frame_id):
+            # Clear selection if deleted frame was selected
+            if self._selected_ai_frame_id == ai_frame_id:
+                self._selected_ai_frame_id = None
+                self._selected_ai_index = None
+                self._alignment_canvas.set_ai_frame(None)
+                self._alignment_canvas.clear_alignment()
+                self._update_map_button_state()
+
+            if self._message_service:
+                self._message_service.show_message(f"Removed: {frame_name}")
 
     def _on_remove_mapping(self, ai_frame_id: str) -> None:
         """Handle remove mapping request.

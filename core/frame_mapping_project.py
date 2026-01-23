@@ -728,6 +728,29 @@ class FrameMappingProject:
 
         return True
 
+    def remove_ai_frame(self, frame_id: str) -> bool:
+        """Remove an AI frame and its associated mapping.
+
+        Args:
+            frame_id: ID of the AI frame to remove.
+
+        Returns:
+            True if the frame was found and removed, False otherwise.
+        """
+        frame = self.get_ai_frame_by_id(frame_id)
+        if frame is None:
+            return False
+
+        # Remove any mapping associated with this AI frame
+        self.mappings = [m for m in self.mappings if m.ai_frame_id != frame_id]
+        self._invalidate_mapping_index()
+
+        # Remove the AI frame
+        self.ai_frames.remove(frame)
+        self._invalidate_ai_frame_index()
+
+        return True
+
     def create_mapping(self, ai_frame_id: str, game_frame_id: str) -> FrameMapping:
         """Create a new mapping between an AI frame and a game frame.
 

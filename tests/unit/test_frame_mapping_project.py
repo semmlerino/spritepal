@@ -1030,6 +1030,61 @@ class TestRemoveGameFrame:
         assert project.get_mapping_for_ai_frame("frame_001.png") is None
 
 
+class TestRemoveAIFrame:
+    """Tests for removing AI frames from project."""
+
+    def test_remove_ai_frame_basic(self) -> None:
+        """Remove an AI frame from project."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        ai_frame = AIFrame(path=Path("frame_001.png"), index=0)
+        project.ai_frames.append(ai_frame)
+        project._invalidate_ai_frame_index()  # Rebuild index after direct append
+
+        assert len(project.ai_frames) == 1
+        assert project.get_ai_frame_by_id("frame_001.png") is not None
+
+        # Remove the AI frame
+        result = project.remove_ai_frame("frame_001.png")
+
+        assert result is True
+        assert len(project.ai_frames) == 0
+        assert project.get_ai_frame_by_id("frame_001.png") is None
+
+    def test_remove_ai_frame_nonexistent(self) -> None:
+        """Remove nonexistent AI frame returns False."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+
+        result = project.remove_ai_frame("NONEXISTENT")
+
+        assert result is False
+
+    def test_remove_ai_frame_also_removes_mapping(self) -> None:
+        """Removing an AI frame also removes its mapping."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        ai_frame = AIFrame(path=Path("frame_001.png"), index=0)
+        game_frame = GameFrame(id="G001", rom_offsets=[0x1000])
+        project.ai_frames.append(ai_frame)
+        project._invalidate_ai_frame_index()  # Rebuild index after direct append
+        project.game_frames.append(game_frame)
+        project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
+
+        assert project.get_mapping_for_game_frame("G001") is not None
+        assert project.get_mapping_for_ai_frame("frame_001.png") is not None
+
+        # Remove the AI frame
+        project.remove_ai_frame("frame_001.png")
+
+        # Mapping should also be gone
+        assert project.get_mapping_for_game_frame("G001") is None
+        assert project.get_mapping_for_ai_frame("frame_001.png") is None
+
+
 class TestFacadeMethods:
     """Tests for encapsulation facade methods."""
 
