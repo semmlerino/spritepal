@@ -47,6 +47,7 @@ class ColorSwatch(QFrame):
         self._color = color
         self._is_selected = False
         self._is_hovered = False
+        self._is_highlighted = False
 
         self.setFixedSize(SWATCH_SIZE, SWATCH_SIZE)
         self.setMouseTracking(True)
@@ -62,6 +63,11 @@ class ColorSwatch(QFrame):
         self._is_selected = selected
         self._update_style()
 
+    def set_highlighted(self, highlighted: bool) -> None:
+        """Set highlight state (from canvas hover)."""
+        self._is_highlighted = highlighted
+        self._update_style()
+
     def _update_style(self) -> None:
         """Update widget style based on state."""
         r, g, b = self._color
@@ -72,18 +78,26 @@ class ColorSwatch(QFrame):
                 QFrame {
                     background-color: qlineargradient(spread:repeat, x1:0, y1:0, x2:0.5, y2:0.5,
                         stop:0 #666666, stop:0.5 #666666, stop:0.5 #888888, stop:1 #888888);
-                    border: 2px solid %s;
+                    border: 3px solid %s;
                 }
             """
         else:
             style = """
                 QFrame {
                     background-color: rgb(%d, %d, %d);
-                    border: 2px solid %s;
+                    border: 3px solid %s;
                 }
             """
 
-        border_color = "#FFFF00" if self._is_selected else ("#888" if self._is_hovered else "#444")
+        # Priority: selected (yellow) > highlighted (green) > hovered (gray) > default
+        if self._is_selected:
+            border_color = "#FFFF00"  # Yellow for selected
+        elif self._is_highlighted:
+            border_color = "#00FF00"  # Green for highlighted from canvas
+        elif self._is_hovered:
+            border_color = "#888"
+        else:
+            border_color = "#444"
 
         if self._index == 0:
             self.setStyleSheet(style % border_color)
@@ -234,6 +248,15 @@ class EditorPalettePanel(QWidget):
     def get_active_index(self) -> int:
         """Get the currently active palette index."""
         return self._active_index
+
+    def highlight_index(self, index: int | None) -> None:
+        """Highlight a palette index (from canvas hover).
+
+        Args:
+            index: Palette index to highlight, or None to clear
+        """
+        for i, swatch in enumerate(self._swatches):
+            swatch.set_highlighted(index is not None and i == index)
 
     def _on_swatch_clicked(self, index: int) -> None:
         """Handle swatch click."""

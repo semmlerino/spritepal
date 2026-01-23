@@ -193,12 +193,16 @@ class IndexedCanvasView(QGraphicsView):
         scene_pos = self.mapToScene(event.position().toPoint())
         img_x, img_y = self._scene_to_image_coords(scene_pos)
 
+        print(f"[DEBUG] Click at scene {scene_pos} -> image ({img_x}, {img_y}), bounds ({self._image_width}, {self._image_height})")  # noqa: T201
+
         if 0 <= img_x < self._image_width and 0 <= img_y < self._image_height:
             button = 0 if event.button() == Qt.MouseButton.LeftButton else 1
+            print(f"[DEBUG] Emitting pixel_clicked({img_x}, {img_y}, {button})")  # noqa: T201
             self.pixel_clicked.emit(img_x, img_y, button)
             self._is_dragging = True
             event.accept()
         else:
+            print("[DEBUG] Click outside image bounds")  # noqa: T201
             super().mousePressEvent(event)
 
     @override
@@ -406,12 +410,12 @@ class IndexedCanvas(QWidget):
             self._selection_item.setPixmap(QPixmap())
             return
 
-        # Create semi-transparent yellow overlay for selected pixels
+        # Create semi-transparent green overlay for selected pixels
         overlay = np.zeros((height, width, 4), dtype=np.uint8)
 
         for x, y in self._selection_mask.get_selected_pixels():
             if 0 <= x < width and 0 <= y < height:
-                overlay[y, x] = (255, 255, 0, 100)  # Yellow with alpha
+                overlay[y, x] = (0, 255, 0, 120)  # Green with alpha
 
         qimage = QImage(
             overlay.data,

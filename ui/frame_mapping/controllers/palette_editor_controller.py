@@ -257,7 +257,9 @@ class PaletteEditorController(QObject):
             button: Mouse button (0=left, 1=right)
             modifiers: Keyboard modifiers (Qt flags)
         """
+        print(f"[DEBUG] handle_pixel_click({x}, {y}, button={button}, tool={self._current_tool})")  # noqa: T201
         if self._image_model is None:
+            print("[DEBUG] No image model!")  # noqa: T201
             return
 
         # Right-click picks color
@@ -323,12 +325,15 @@ class PaletteEditorController(QObject):
 
     def _handle_pencil(self, x: int, y: int) -> None:
         """Handle pencil tool click/drag."""
+        print(f"[DEBUG] _handle_pencil({x}, {y}), active_index={self._active_index}")  # noqa: T201
         if self._image_model is None:
             return
 
         # Get pixels in brush area
         pixels_to_paint = self._get_brush_pixels(x, y)
+        print(f"[DEBUG] Painting {len(pixels_to_paint)} pixels")  # noqa: T201
 
+        commands_added = 0
         for px, py in pixels_to_paint:
             old_color = self._image_model.get_pixel(px, py)
             if old_color != self._active_index:
@@ -339,8 +344,12 @@ class PaletteEditorController(QObject):
                     new_color=self._active_index,
                 )
                 self._undo_manager.execute_command(cmd, self._image_model)
+                commands_added += 1
 
+        print(f"[DEBUG] Added {commands_added} commands, stack_size={len(self._undo_manager.command_stack)}, can_undo={self._undo_manager.can_undo()}")  # noqa: T201
         self._mark_dirty()
+        self._emit_undo_state()  # Update undo/redo button state
+        print("[DEBUG] Emitting image_changed")  # noqa: T201
         self.image_changed.emit()
         self._schedule_preview()
 
@@ -485,10 +494,13 @@ class PaletteEditorController(QObject):
 
     def undo(self) -> bool:
         """Undo the last operation."""
+        print(f"[DEBUG] undo() called, can_undo={self._undo_manager.can_undo()}, stack_size={len(self._undo_manager.command_stack)}, current_index={self._undo_manager.current_index}")  # noqa: T201
         if self._image_model is None:
+            print("[DEBUG] No image model for undo")  # noqa: T201
             return False
 
         result = self._undo_manager.undo(self._image_model)
+        print(f"[DEBUG] undo result: {result}")  # noqa: T201
         if result:
             self._emit_undo_state()
             self.image_changed.emit()

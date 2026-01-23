@@ -85,13 +85,15 @@ class AIFramePaletteEditorWindow(QMainWindow):
         main_layout.setContentsMargins(4, 4, 4, 4)
         main_layout.setSpacing(4)
 
+        # Center: Canvas (created first - tool panel references it)
+        self._canvas = IndexedCanvas()
+        self._canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
         # Left: Tool panel
         self._tool_panel = self._create_tool_panel()
         main_layout.addWidget(self._tool_panel)
 
-        # Center: Canvas
-        self._canvas = IndexedCanvas()
-        self._canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        # Add canvas to layout
         main_layout.addWidget(self._canvas, 1)
 
         # Right: Palette panel
@@ -119,39 +121,47 @@ class AIFramePaletteEditorWindow(QMainWindow):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(2)
+        layout.setSpacing(4)
+
+        # Tools header
+        tools_label = QLabel("Tools")
+        tools_label.setStyleSheet("font-weight: bold; color: #AAA;")
+        layout.addWidget(tools_label)
 
         # Tool buttons
         self._tool_group = QButtonGroup(self)
         self._tool_group.setExclusive(True)
 
         tools = [
-            (EditorTool.PENCIL, "P", "Pencil (P)"),
-            (EditorTool.ERASER, "E", "Eraser (E)"),
-            (EditorTool.FILL, "F", "Fill (F)"),
-            (EditorTool.CONTIGUOUS_SELECT, "W", "Contiguous Select (W)"),
-            (EditorTool.GLOBAL_SELECT, "G", "Global Select (G)"),
+            (EditorTool.PENCIL, "Pencil", "P", "Draw with selected color (P)"),
+            (EditorTool.ERASER, "Eraser", "E", "Erase to transparent (E)"),
+            (EditorTool.FILL, "Fill", "F", "Flood fill area (F)"),
+            (EditorTool.CONTIGUOUS_SELECT, "Select", "W", "Select connected pixels (W)"),
+            (EditorTool.GLOBAL_SELECT, "Sel All", "G", "Select all pixels of color (G)"),
         ]
 
         self._tool_buttons: dict[EditorTool, QToolButton] = {}
 
-        for tool, shortcut_key, tooltip in tools:
+        for tool, label, shortcut_key, tooltip in tools:
             btn = QToolButton()
-            btn.setText(shortcut_key)
+            btn.setText(f"{label} [{shortcut_key}]")
             btn.setToolTip(tooltip)
             btn.setCheckable(True)
-            btn.setFixedSize(36, 36)
+            btn.setFixedHeight(28)
+            btn.setMinimumWidth(90)
             btn.setStyleSheet("""
                 QToolButton {
-                    font-weight: bold;
-                    font-size: 14px;
+                    font-size: 11px;
                     border: 1px solid #555;
                     border-radius: 4px;
                     background: #333;
+                    padding: 2px 6px;
+                    text-align: left;
                 }
                 QToolButton:checked {
                     background: #555;
                     border-color: #88F;
+                    font-weight: bold;
                 }
                 QToolButton:hover {
                     background: #444;
@@ -293,11 +303,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
             shortcut = QShortcut(QKeySequence(key), self)
             shortcut.activated.connect(lambda index=idx: self._select_index(index))
 
-        # Brush size shortcuts
-        QShortcut(QKeySequence("["), self).activated.connect(self._decrease_brush)
-        QShortcut(QKeySequence("]"), self).activated.connect(self._increase_brush)
+        # Brush size shortcuts (Ctrl+Plus/Minus)
+        QShortcut(QKeySequence("Ctrl+-"), self).activated.connect(self._decrease_brush)
+        QShortcut(QKeySequence("Ctrl+="), self).activated.connect(self._increase_brush)
+        QShortcut(QKeySequence("Ctrl++"), self).activated.connect(self._increase_brush)
 
-        # Zoom shortcuts
+        # Zoom shortcuts (without Ctrl)
         QShortcut(QKeySequence("+"), self).activated.connect(self._canvas.zoom_in)
         QShortcut(QKeySequence("="), self).activated.connect(self._canvas.zoom_in)
         QShortcut(QKeySequence("-"), self).activated.connect(self._canvas.zoom_out)
@@ -369,8 +380,10 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _on_image_changed(self) -> None:
         """Handle image data change."""
+        print("[DEBUG] _on_image_changed called")  # noqa: T201
         data = self._controller.get_indexed_data()
         if data is not None:
+            print(f"[DEBUG] Updating canvas with data shape {data.shape}")  # noqa: T201
             self._canvas.set_image(data, self._palette)
 
     def _on_selection_changed(self) -> None:
@@ -386,6 +399,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
         """Handle pixel info update."""
         self._coord_label.setText(f"({x}, {y})")
         self._index_label.setText(f"Index: {index}")
+        # Highlight the corresponding palette swatch
+        self._palette_panel.highlight_index(index)
 
     def _on_dirty_changed(self, is_dirty: bool) -> None:
         """Handle dirty state change."""
@@ -414,6 +429,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
         """Handle mouse leaving canvas."""
         self._coord_label.setText("(-, -)")
         self._index_label.setText("Index: -")
+        # Clear palette highlight
+        self._palette_panel.highlight_index(None)
 
     def _on_palette_index_selected(self, index: int) -> None:
         """Handle palette panel selection."""
