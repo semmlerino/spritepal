@@ -71,22 +71,18 @@ class SpriteCompositor:
     def __init__(
         self,
         uncovered_policy: Literal["transparent", "original"] = "transparent",
-        preserve_silhouette: bool = True,
     ) -> None:
         """Initialize the compositor.
 
         Args:
             uncovered_policy: How to handle areas where AI doesn't cover the
                 original sprite:
-                - "transparent": Uncovered areas become transparent (injection default)
-                - "original": Uncovered areas show original sprite pixels (preview default)
-            preserve_silhouette: If True (default), AI content is clipped to the
-                original sprite's silhouette (alpha mask). If False, AI content
-                fully replaces the original within tile bounds - pixels outside
-                the original silhouette but within canvas bounds are preserved.
+                - "transparent": Original sprite is completely removed; only AI
+                  content remains. Uncovered areas become transparent.
+                - "original": Original sprite is preserved where AI doesn't cover
+                  it. AI content composites on top of the original.
         """
         self._uncovered_policy: Literal["transparent", "original"] = uncovered_policy
-        self._preserve_silhouette = preserve_silhouette
 
     def composite_frame(
         self,
@@ -141,25 +137,15 @@ class SpriteCompositor:
         ai_canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
         ai_canvas.paste(transformed_ai, (transform.offset_x, transform.offset_y), transformed_ai)
 
-        # Get original sprite's alpha channel as mask
+        # Get original sprite's alpha channel as mask (for result metadata)
         original_mask = original_sprite.split()[3]
 
-        # Apply mask and handle uncovered areas based on policy
-        if self._preserve_silhouette and self._uncovered_policy == "transparent":
-            # Legacy behavior: clip AI to original silhouette (for injection)
-            composited = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-            composited.paste(ai_canvas, (0, 0), original_mask)
-        elif self._preserve_silhouette:
-            # Legacy behavior: clip AI to original silhouette (for preview)
-            # Start with original, composite AI on top
-            clipped_ai = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-            clipped_ai.paste(ai_canvas, (0, 0), original_mask)
-            composited = Image.alpha_composite(original_sprite.copy(), clipped_ai)
-        elif self._uncovered_policy == "transparent":
-            # Complete replacement: AI canvas as-is (already has transparency)
+        # Apply compositing based on policy
+        if self._uncovered_policy == "transparent":
+            # Original sprite completely removed - only AI content remains
             composited = ai_canvas.copy()
         else:
-            # Complete replacement: Composite AI over original
+            # Original sprite preserved - AI composites on top
             composited = Image.alpha_composite(original_sprite.copy(), ai_canvas)
 
         # Quantize to game palette if requested

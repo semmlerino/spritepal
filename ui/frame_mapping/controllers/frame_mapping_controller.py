@@ -13,7 +13,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
@@ -978,7 +978,7 @@ class FrameMappingController(QObject):
         force_raw: bool = False,
         allow_fallback: bool = False,
         emit_project_changed: bool = True,
-        preserve_silhouette: bool = True,
+        preserve_sprite: bool = False,
     ) -> bool:
         """Inject a mapped frame into the ROM using tile-aware masking.
 
@@ -989,9 +989,8 @@ class FrameMappingController(QObject):
            a. Identify which tiles belong to this offset.
            b. Create a sub-canvas for this offset.
            c. Crop the aligned AI image to these tiles.
-           d. Mask the AI image using the original game sprite's alpha channel
-              (preserving silhouette/topology).
-           e. Inject this specific masked chunk into the ROM.
+           d. Composite AI over original (or replace completely).
+           e. Inject this specific chunk into the ROM.
 
         Args:
             ai_frame_index: Index of the AI frame to inject
@@ -1005,9 +1004,9 @@ class FrameMappingController(QObject):
                            and emit stale_entries_warning for user to decide.
             emit_project_changed: If True (default), emit project_changed after success.
                                  Set False for batch operations to emit once at the end.
-            preserve_silhouette: If True (default), AI content is clipped to original sprite
-                                silhouette. If False, AI content fully replaces original
-                                within tile bounds (complete replacement mode).
+            preserve_sprite: If True, original sprite remains visible where AI doesn't
+                            cover it. If False (default), original sprite is completely
+                            removed - only AI content remains.
 
         Returns:
             True if injection was successful
@@ -1162,12 +1161,11 @@ class FrameMappingController(QObject):
             )
 
             # Use SpriteCompositor for unified transform logic (flip -> scale order)
-            # Policy: "transparent" for injection (uncovered areas become index 0)
-            # preserve_silhouette controls whether AI is clipped to original alpha mask
-            compositor = SpriteCompositor(
-                uncovered_policy="transparent",
-                preserve_silhouette=preserve_silhouette,
-            )
+            # Policy based on preserve_sprite:
+            # - False (default): "transparent" - original sprite removed, only AI content
+            # - True: "original" - original sprite visible where AI doesn't cover
+            uncovered_policy: Literal["transparent", "original"] = "original" if preserve_sprite else "transparent"
+            compositor = SpriteCompositor(uncovered_policy=uncovered_policy)
             transform = TransformParams(
                 offset_x=mapping.offset_x,
                 offset_y=mapping.offset_y,

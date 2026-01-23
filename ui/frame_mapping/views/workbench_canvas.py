@@ -23,7 +23,7 @@ Scene Structure:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Literal, override
 
 from PIL import Image
 from PySide6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, Signal
@@ -391,20 +391,21 @@ class WorkbenchCanvas(QWidget):
 
         layout.addLayout(controls2)
 
-        # Controls row 3: Preserve Silhouette and Apply Scale to All
+        # Controls row 3: Preserve sprite and Apply Scale to All
         controls3 = QHBoxLayout()
         controls3.setContentsMargins(0, 0, 0, 0)
         controls3.setSpacing(8)
 
-        # Preserve Silhouette checkbox
-        self._preserve_silhouette_checkbox = QCheckBox("Preserve Silhouette")
-        self._preserve_silhouette_checkbox.setStyleSheet("font-size: 11px;")
-        self._preserve_silhouette_checkbox.setToolTip(
-            "When checked, AI content is clipped to original sprite silhouette. "
-            "When unchecked, AI content fully replaces original within tile bounds."
+        # Preserve sprite checkbox
+        self._preserve_sprite_checkbox = QCheckBox("Preserve sprite")
+        self._preserve_sprite_checkbox.setStyleSheet("font-size: 11px;")
+        self._preserve_sprite_checkbox.setToolTip(
+            "When checked, original game sprite remains visible where AI frame "
+            "doesn't cover it. When unchecked (default), original sprite is "
+            "completely removed - only AI frame content remains."
         )
-        self._preserve_silhouette_checkbox.setChecked(False)  # Default: complete replacement
-        controls3.addWidget(self._preserve_silhouette_checkbox)
+        self._preserve_sprite_checkbox.setChecked(False)  # Default: remove original
+        controls3.addWidget(self._preserve_sprite_checkbox)
 
         controls3.addStretch()
 
@@ -443,7 +444,7 @@ class WorkbenchCanvas(QWidget):
         self._preview_checkbox.toggled.connect(self._on_preview_toggled)
         self._compression_combo.currentIndexChanged.connect(self._on_compression_changed)
         self._auto_align_btn.clicked.connect(self._on_auto_align)
-        self._preserve_silhouette_checkbox.toggled.connect(self._on_preserve_silhouette_toggled)
+        self._preserve_sprite_checkbox.toggled.connect(self._on_preserve_sprite_toggled)
         self._apply_scale_all_btn.clicked.connect(self._on_apply_scale_to_all)
 
         # AI frame item signals
@@ -694,14 +695,14 @@ class WorkbenchCanvas(QWidget):
             self._ai_frame_item.scale_factor(),
         )
 
-    def get_preserve_silhouette(self) -> bool:
-        """Get current preserve silhouette setting.
+    def get_preserve_sprite(self) -> bool:
+        """Get current preserve sprite setting.
 
         Returns:
-            True if AI content should be clipped to original silhouette,
-            False for complete replacement within tile bounds.
+            True if original sprite should remain visible where AI doesn't cover,
+            False if original sprite should be completely removed (default).
         """
-        return self._preserve_silhouette_checkbox.isChecked()
+        return self._preserve_sprite_checkbox.isChecked()
 
     def get_current_ai_frame_id(self) -> str | None:
         """Get the current AI frame ID.
@@ -730,7 +731,7 @@ class WorkbenchCanvas(QWidget):
         self._grid_checkbox.setEnabled(enabled)
         self._compression_combo.setEnabled(enabled)
         self._match_scale_checkbox.setEnabled(enabled)
-        self._preserve_silhouette_checkbox.setEnabled(enabled)
+        self._preserve_sprite_checkbox.setEnabled(enabled)
         self._apply_scale_all_btn.setEnabled(enabled)
         # Auto-align button managed separately by _update_auto_align_button_state()
         self._update_auto_align_button_state()
@@ -950,10 +951,10 @@ class WorkbenchCanvas(QWidget):
         if compression_type and self._current_game_frame is not None:
             self.compression_type_changed.emit(compression_type)
 
-    def _on_preserve_silhouette_toggled(self, checked: bool) -> None:
-        """Handle preserve silhouette checkbox toggle.
+    def _on_preserve_sprite_toggled(self, checked: bool) -> None:
+        """Handle preserve sprite checkbox toggle.
 
-        Updates the preview to reflect the new silhouette clipping behavior.
+        Updates the preview to reflect the new compositing behavior.
         """
         # Schedule preview update to reflect the change
         self._schedule_preview_update()
@@ -1026,14 +1027,13 @@ class WorkbenchCanvas(QWidget):
             scale = self._ai_frame_item.scale_factor()
 
         try:
-            # Use SpriteCompositor with "original" policy for preview
-            # This shows original pixels where AI doesn't cover (WYSIWYG)
-            # preserve_silhouette controls whether AI is clipped to original alpha mask
-            preserve_silhouette = self._preserve_silhouette_checkbox.isChecked()
-            compositor = SpriteCompositor(
-                uncovered_policy="original",
-                preserve_silhouette=preserve_silhouette,
+            # Use SpriteCompositor with policy based on "Preserve sprite" checkbox
+            # - Checked: "original" - original sprite visible where AI doesn't cover
+            # - Unchecked: "transparent" - original sprite completely removed
+            uncovered_policy: Literal["transparent", "original"] = (
+                "original" if self._preserve_sprite_checkbox.isChecked() else "transparent"
             )
+            compositor = SpriteCompositor(uncovered_policy=uncovered_policy)
             transform = TransformParams(
                 offset_x=offset_x,
                 offset_y=offset_y,
