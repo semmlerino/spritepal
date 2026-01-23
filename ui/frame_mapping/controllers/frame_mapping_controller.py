@@ -567,14 +567,6 @@ class FrameMappingController(QObject):
         if updated_count > 0:
             self.project_changed.emit()
             self.save_requested.emit()
-            logger.info(
-                "Applied transforms (offset=%d,%d scale=%.2f) to %d mappings (excluded: %s)",
-                offset_x,
-                offset_y,
-                scale,
-                updated_count,
-                exclude_ai_frame_id,
-            )
 
         return updated_count
 
