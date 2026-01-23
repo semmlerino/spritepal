@@ -328,6 +328,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._canvas.pixel_hovered.connect(self._on_canvas_hovered)
         self._canvas.mouse_left.connect(self._on_canvas_left)
         self._canvas.drag_ended.connect(self._controller.finish_stroke)
+        self._canvas.brush_size_changed.connect(self._on_brush_size_changed)
 
         # Palette panel signals
         self._palette_panel.index_selected.connect(self._on_palette_index_selected)
@@ -379,6 +380,10 @@ class AIFramePaletteEditorWindow(QMainWindow):
         new_size = min(5, self._controller.brush_size + 1)
         self._controller.set_brush_size(new_size)
         self._canvas.set_brush_size(new_size)
+
+    def _on_brush_size_changed(self, size: int) -> None:
+        """Handle brush size change from Ctrl+RMB drag on canvas."""
+        self._controller.set_brush_size(size)
 
     def _on_grid_toggled(self, checked: bool) -> None:
         """Handle grid toggle."""

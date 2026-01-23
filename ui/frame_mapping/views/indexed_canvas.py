@@ -63,6 +63,7 @@ class IndexedCanvasView(QGraphicsView):
     pixel_dragged = Signal(int, int)  # image x, y
     drag_ended = Signal()
     mouse_left = Signal()
+    brush_size_changed = Signal(int)  # new brush size
 
     def __init__(self, scene: QGraphicsScene, parent: QWidget | None = None) -> None:
         super().__init__(scene, parent)
@@ -75,6 +76,10 @@ class IndexedCanvasView(QGraphicsView):
         self._is_dragging = False
         self._brush_size = 1
         self._brush_cursor: QCursor | None = None
+        # Brush resize drag state (Ctrl+RMB)
+        self._is_resizing_brush = False
+        self._resize_start_x: float = 0
+        self._resize_start_size: int = 1
 
     def _setup_view(self) -> None:
         """Configure view settings."""
@@ -227,7 +232,19 @@ class IndexedCanvasView(QGraphicsView):
 
     @override
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        """Handle mouse press for panning and painting."""
+        """Handle mouse press for panning, painting, and brush resize."""
+        # Ctrl+RMB starts brush resize
+        if (
+            event.button() == Qt.MouseButton.RightButton
+            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            self._is_resizing_brush = True
+            self._resize_start_x = event.position().x()
+            self._resize_start_size = self._brush_size
+            self.setCursor(Qt.CursorShape.SizeHorCursor)
+            event.accept()
+            return
+
         # Middle button or space+left button starts panning
         if event.button() == Qt.MouseButton.MiddleButton or (
             event.button() == Qt.MouseButton.LeftButton and self._is_space_pressed
@@ -252,7 +269,20 @@ class IndexedCanvasView(QGraphicsView):
 
     @override
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        """Handle mouse move for panning, dragging, and hover."""
+        """Handle mouse move for panning, dragging, brush resize, and hover."""
+        # Handle brush resize drag
+        if self._is_resizing_brush:
+            delta_x = event.position().x() - self._resize_start_x
+            # 20 pixels of movement = 1 size change
+            size_delta = int(delta_x / 20)
+            new_size = max(1, min(5, self._resize_start_size + size_delta))
+            if new_size != self._brush_size:
+                self._brush_size = new_size
+                self._update_brush_cursor()
+                self.brush_size_changed.emit(new_size)
+            event.accept()
+            return
+
         # Handle panning
         if self._is_panning and self._pan_start is not None:
             delta = event.position() - self._pan_start
@@ -279,6 +309,13 @@ class IndexedCanvasView(QGraphicsView):
     @override
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         """Handle mouse release."""
+        # End brush resize
+        if event.button() == Qt.MouseButton.RightButton and self._is_resizing_brush:
+            self._is_resizing_brush = False
+            self._update_brush_cursor()  # Restore brush cursor
+            event.accept()
+            return
+
         if event.button() == Qt.MouseButton.MiddleButton or (
             event.button() == Qt.MouseButton.LeftButton and self._is_panning
         ):
@@ -329,6 +366,7 @@ class IndexedCanvas(QWidget):
     pixel_dragged = Signal(int, int)
     drag_ended = Signal()
     mouse_left = Signal()
+    brush_size_changed = Signal(int)  # new brush size from Ctrl+RMB drag
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -389,6 +427,7 @@ class IndexedCanvas(QWidget):
         self._view.pixel_dragged.connect(self.pixel_dragged)
         self._view.drag_ended.connect(self.drag_ended)
         self._view.mouse_left.connect(self.mouse_left)
+        self._view.brush_size_changed.connect(self.brush_size_changed)
 
     def set_image(self, indexed_data: np.ndarray, palette: SheetPalette) -> None:
         """Set the indexed image data and palette.
@@ -467,9 +506,9 @@ class IndexedCanvas(QWidget):
         # Create mask of pixels matching the highlight index
         mask = self._indexed_data == self._highlight_index
 
-        # Create semi-transparent yellow overlay for highlighted pixels
+        # Create semi-transparent green overlay for highlighted pixels
         overlay = np.zeros((height, width, 4), dtype=np.uint8)
-        overlay[mask] = (255, 255, 0, 80)  # Yellow with lower alpha
+        overlay[mask] = (0, 200, 0, 100)  # Green with alpha
 
         qimage = QImage(
             overlay.data,
