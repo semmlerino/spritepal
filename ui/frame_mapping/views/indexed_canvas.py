@@ -335,6 +335,7 @@ class IndexedCanvas(QWidget):
         self._indexed_data: np.ndarray | None = None
         self._palette: SheetPalette | None = None
         self._selection_mask: SelectionMask | None = None
+        self._highlight_index: int | None = None  # Palette index to highlight
         self._show_grid = False
         self._grid_size = 8
 
@@ -354,6 +355,11 @@ class IndexedCanvas(QWidget):
         # Add pixmap item for the image
         self._pixmap_item = QGraphicsPixmapItem()
         self._scene.addItem(self._pixmap_item)
+
+        # Add palette highlight overlay (shows pixels using selected index)
+        self._highlight_item = QGraphicsPixmapItem()
+        self._highlight_item.setZValue(0.5)  # Between image and selection
+        self._scene.addItem(self._highlight_item)
 
         # Add selection overlay item (on top of image)
         self._selection_item = QGraphicsPixmapItem()
@@ -440,6 +446,41 @@ class IndexedCanvas(QWidget):
         """
         self._selection_mask = mask
         self._update_selection_overlay()
+
+    def set_highlight_index(self, index: int | None) -> None:
+        """Highlight all pixels using the specified palette index.
+
+        Args:
+            index: Palette index to highlight (0-15), or None to clear
+        """
+        self._highlight_index = index
+        self._update_highlight_overlay()
+
+    def _update_highlight_overlay(self) -> None:
+        """Update the highlight overlay showing pixels with selected index."""
+        if self._indexed_data is None or self._highlight_index is None:
+            self._highlight_item.setPixmap(QPixmap())
+            return
+
+        height, width = self._indexed_data.shape
+
+        # Create mask of pixels matching the highlight index
+        mask = self._indexed_data == self._highlight_index
+
+        # Create semi-transparent yellow overlay for highlighted pixels
+        overlay = np.zeros((height, width, 4), dtype=np.uint8)
+        overlay[mask] = (255, 255, 0, 80)  # Yellow with lower alpha
+
+        qimage = QImage(
+            overlay.data,
+            width,
+            height,
+            width * 4,
+            QImage.Format.Format_RGBA8888,
+        )
+        qimage = qimage.copy()
+
+        self._highlight_item.setPixmap(QPixmap.fromImage(qimage))
 
     def _update_selection_overlay(self) -> None:
         """Update the selection overlay pixmap."""

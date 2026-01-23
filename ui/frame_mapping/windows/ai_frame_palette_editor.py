@@ -389,6 +389,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
         data = self._controller.get_indexed_data()
         if data is not None:
             self._canvas.set_image(data, self._palette)
+            # Refresh highlight overlay with new data
+            self._canvas.set_highlight_index(self._controller.active_index)
 
     def _on_selection_changed(self) -> None:
         """Handle selection change."""
@@ -439,6 +441,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
     def _on_palette_index_selected(self, index: int) -> None:
         """Handle palette panel selection."""
         self._controller.set_active_index(index)
+        # Highlight all pixels using this index
+        self._canvas.set_highlight_index(index)
 
     def _on_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle palette color change from right-click."""
