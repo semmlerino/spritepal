@@ -341,7 +341,7 @@ class FrameMappingWorkspace(QWidget):
         # Alignment Canvas signals
         self._alignment_canvas.alignment_changed.connect(self._on_alignment_changed)
         self._alignment_canvas.compression_type_changed.connect(self._on_compression_type_changed)
-        self._alignment_canvas.apply_scale_to_all_requested.connect(self._on_apply_scale_to_all)
+        self._alignment_canvas.apply_transforms_to_all_requested.connect(self._on_apply_transforms_to_all)
 
     # -------------------------------------------------------------------------
     # Event Handlers
@@ -624,13 +624,15 @@ class FrameMappingWorkspace(QWidget):
         # Route through controller for proper signal emission and auto-save
         self._controller.update_game_frame_compression(self._selected_game_id, compression_type)
 
-    def _on_apply_scale_to_all(self, scale: float) -> None:
-        """Handle apply scale to all request from canvas.
+    def _on_apply_transforms_to_all(self, offset_x: int, offset_y: int, scale: float) -> None:
+        """Handle apply transformations to all request from canvas.
 
         Shows confirmation dialog with count of affected mappings,
-        then applies scale to all mappings except the current one.
+        then applies position and scale to all mappings except the current one.
 
         Args:
+            offset_x: X offset to apply
+            offset_y: Y offset to apply
             scale: Scale factor to apply (0.1 - 1.0)
         """
         project = self._controller.project
@@ -653,8 +655,8 @@ class FrameMappingWorkspace(QWidget):
         # Show confirmation dialog
         reply = QMessageBox.question(
             self,
-            "Apply Scale to All",
-            f"Apply scale {scale:.0%} to {affected_count} other mapped frames?",
+            "Apply Transformations to All",
+            f"Apply position ({offset_x}, {offset_y}) and scale {scale:.0%} to {affected_count} other mapped frames?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -662,11 +664,13 @@ class FrameMappingWorkspace(QWidget):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        # Apply scale to all mappings except current
-        updated_count = self._controller.apply_scale_to_all_mappings(scale, current_ai_frame_id)
+        # Apply transformations to all mappings except current
+        updated_count = self._controller.apply_transforms_to_all_mappings(
+            offset_x, offset_y, scale, current_ai_frame_id
+        )
 
         if self._message_service:
-            self._message_service.show_message(f"Applied scale {scale:.0%} to {updated_count} mappings", 3000)
+            self._message_service.show_message(f"Applied transformations to {updated_count} mappings", 3000)
 
         # Refresh UI
         self._mapping_panel.refresh()

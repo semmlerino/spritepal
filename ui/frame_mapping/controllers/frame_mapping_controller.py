@@ -528,10 +528,18 @@ class FrameMappingController(QObject):
             return True
         return False
 
-    def apply_scale_to_all_mappings(self, scale: float, exclude_ai_frame_id: str | None = None) -> int:
-        """Apply a scale value to all mapped frames.
+    def apply_transforms_to_all_mappings(
+        self,
+        offset_x: int,
+        offset_y: int,
+        scale: float,
+        exclude_ai_frame_id: str | None = None,
+    ) -> int:
+        """Apply position and scale to all mapped frames.
 
         Args:
+            offset_x: X offset to apply
+            offset_y: Y offset to apply
             scale: Scale factor to apply (0.1 - 1.0)
             exclude_ai_frame_id: AI frame ID to exclude (typically the current frame)
 
@@ -547,7 +555,9 @@ class FrameMappingController(QObject):
             if mapping.ai_frame_id == exclude_ai_frame_id:
                 continue
 
-            # Update only the scale, preserve other alignment values
+            # Update position and scale, preserve flip values
+            mapping.offset_x = offset_x
+            mapping.offset_y = offset_y
             mapping.scale = max(0.1, min(1.0, scale))
             mapping.status = "edited"
             updated_count += 1
@@ -556,7 +566,9 @@ class FrameMappingController(QObject):
             self.project_changed.emit()
             self.save_requested.emit()
             logger.info(
-                "Applied scale %.2f to %d mappings (excluded: %s)",
+                "Applied transforms (offset=%d,%d scale=%.2f) to %d mappings (excluded: %s)",
+                offset_x,
+                offset_y,
                 scale,
                 updated_count,
                 exclude_ai_frame_id,

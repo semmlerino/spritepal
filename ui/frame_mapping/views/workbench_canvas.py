@@ -217,7 +217,7 @@ class WorkbenchCanvas(QWidget):
 
     alignment_changed = Signal(int, int, bool, bool, float)  # offset_x, offset_y, flip_h, flip_v, scale
     compression_type_changed = Signal(str)  # "raw" or "hal"
-    apply_scale_to_all_requested = Signal(float)  # scale factor to apply to all other mappings
+    apply_transforms_to_all_requested = Signal(int, int, float)  # offset_x, offset_y, scale
     # Pixel inspection signals
     pixel_hovered = Signal(int, int, object, int)  # x, y, rgb (tuple or None), palette_index
     pixel_left = Signal()  # mouse left the canvas
@@ -492,12 +492,12 @@ class WorkbenchCanvas(QWidget):
 
         controls3.addStretch()
 
-        # Apply Scale to All button
-        self._apply_scale_all_btn = QPushButton("Apply Scale to All")
-        self._apply_scale_all_btn.setStyleSheet("font-size: 11px;")
-        self._apply_scale_all_btn.setMaximumWidth(120)
-        self._apply_scale_all_btn.setToolTip("Apply current scale to all other mapped frames")
-        controls3.addWidget(self._apply_scale_all_btn)
+        # Apply Transformations to All button
+        self._apply_transforms_all_btn = QPushButton("Apply Transforms to All")
+        self._apply_transforms_all_btn.setStyleSheet("font-size: 11px;")
+        self._apply_transforms_all_btn.setMaximumWidth(140)
+        self._apply_transforms_all_btn.setToolTip("Apply current position and scale to all other mapped frames")
+        controls3.addWidget(self._apply_transforms_all_btn)
 
         layout.addLayout(controls3)
 
@@ -528,7 +528,7 @@ class WorkbenchCanvas(QWidget):
         self._compression_combo.currentIndexChanged.connect(self._on_compression_changed)
         self._auto_align_btn.clicked.connect(self._on_auto_align)
         self._preserve_sprite_checkbox.toggled.connect(self._on_preserve_sprite_toggled)
-        self._apply_scale_all_btn.clicked.connect(self._on_apply_scale_to_all)
+        self._apply_transforms_all_btn.clicked.connect(self._on_apply_transforms_to_all)
 
         # AI frame item signals
         self._ai_frame_item.transform_changed.connect(self._on_ai_frame_transform_changed)
@@ -824,7 +824,7 @@ class WorkbenchCanvas(QWidget):
         self._compression_combo.setEnabled(enabled)
         self._match_scale_checkbox.setEnabled(enabled)
         self._preserve_sprite_checkbox.setEnabled(enabled)
-        self._apply_scale_all_btn.setEnabled(enabled)
+        self._apply_transforms_all_btn.setEnabled(enabled)
         # Auto-align button managed separately by _update_auto_align_button_state()
         self._update_auto_align_button_state()
 
@@ -1071,16 +1071,16 @@ class WorkbenchCanvas(QWidget):
             # Show game frame for alignment or when preserving original
             self._game_frame_item.setVisible(True)
 
-    def _on_apply_scale_to_all(self) -> None:
-        """Handle Apply Scale to All button click.
+    def _on_apply_transforms_to_all(self) -> None:
+        """Handle Apply Transformations to All button click.
 
-        Emits signal with current scale for the workspace to handle
+        Emits signal with current position and scale for the workspace to handle
         (showing confirmation dialog and calling controller).
         """
         if not self._has_mapping:
             return
-        current_scale = self._ai_frame_item.scale_factor()
-        self.apply_scale_to_all_requested.emit(current_scale)
+        offset_x, offset_y, _flip_h, _flip_v, scale = self.get_alignment()
+        self.apply_transforms_to_all_requested.emit(offset_x, offset_y, scale)
 
     def _schedule_preview_update(self) -> None:
         """Schedule a debounced preview generation.
