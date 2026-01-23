@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, override
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPen
 from PySide6.QtWidgets import (
+    QColorDialog,
     QFrame,
     QGridLayout,
     QLabel,
@@ -35,6 +36,7 @@ class ColorSwatch(QFrame):
 
     clicked = Signal(int)  # palette index
     hovered = Signal(int)  # palette index
+    color_change_requested = Signal(int, tuple)  # (index, (r, g, b))
 
     def __init__(
         self,
@@ -106,10 +108,31 @@ class ColorSwatch(QFrame):
 
     @override
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        """Handle click to select color."""
+        """Handle click to select color, right-click to change color."""
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit(self._index)
+        elif event.button() == Qt.MouseButton.RightButton:
+            self._show_color_picker()
         super().mousePressEvent(event)
+
+    def _show_color_picker(self) -> None:
+        """Show color picker dialog to change this swatch's color."""
+        # Don't allow changing index 0 (transparent)
+        if self._index == 0:
+            return
+
+        r, g, b = self._color
+        initial_color = QColor(r, g, b)
+
+        color = QColorDialog.getColor(
+            initial_color,
+            self,
+            f"Choose color for index {self._index}",
+        )
+
+        if color.isValid():
+            new_color = (color.red(), color.green(), color.blue())
+            self.color_change_requested.emit(self._index, new_color)
 
     @override
     def enterEvent(self, event: object) -> None:
@@ -158,10 +181,12 @@ class EditorPalettePanel(QWidget):
     Signals:
         index_selected: (index) - User selected a palette index
         index_hovered: (index) - User is hovering over a palette index
+        color_changed: (index, (r, g, b)) - User changed a color via right-click
     """
 
     index_selected = Signal(int)
     index_hovered = Signal(int)
+    color_changed = Signal(int, tuple)  # (index, (r, g, b))
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -197,6 +222,7 @@ class EditorPalettePanel(QWidget):
             swatch = ColorSwatch(i, color, self)
             swatch.clicked.connect(self._on_swatch_clicked)
             swatch.hovered.connect(self._on_swatch_hovered)
+            swatch.color_change_requested.connect(self._on_color_change_requested)
             self._swatches.append(swatch)
             grid.addWidget(swatch, row, col)
 
@@ -274,6 +300,12 @@ class EditorPalettePanel(QWidget):
             else:
                 self._hover_label.setText(f"{index}: RGB({r}, {g}, {b})")
         self.index_hovered.emit(index)
+
+    def _on_color_change_requested(self, index: int, color: tuple[int, int, int]) -> None:
+        """Handle color change from right-click."""
+        if 0 < index < len(self._swatches):
+            self._swatches[index].set_color(color)
+            self.color_changed.emit(index, color)
 
     @override
     def sizeHint(self) -> QSize:

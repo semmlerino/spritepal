@@ -240,6 +240,24 @@ class PaletteEditorController(QObject):
         """Set the brush size (1-5)."""
         self._brush_size = max(1, min(5, size))
 
+    def set_palette_color(self, index: int, color: tuple[int, int, int]) -> None:
+        """Change a palette color.
+
+        Args:
+            index: Palette index (1-15, 0 is always transparent)
+            color: RGB tuple (r, g, b)
+        """
+        if not self._palette:
+            return
+        if not 0 < index < len(self._palette.colors):
+            return
+
+        # Update the palette color
+        self._palette.colors[index] = color
+        self._mark_dirty()
+        # Trigger canvas refresh with new palette colors
+        self.image_changed.emit()
+
     # --- Pixel Operations ---
 
     def handle_pixel_click(

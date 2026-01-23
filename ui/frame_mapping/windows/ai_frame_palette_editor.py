@@ -330,6 +330,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         # Palette panel signals
         self._palette_panel.index_selected.connect(self._on_palette_index_selected)
+        self._palette_panel.color_changed.connect(self._on_palette_color_changed)
 
     def _load_image(self) -> None:
         """Load the AI frame image."""
@@ -435,6 +436,10 @@ class AIFramePaletteEditorWindow(QMainWindow):
     def _on_palette_index_selected(self, index: int) -> None:
         """Handle palette panel selection."""
         self._controller.set_active_index(index)
+
+    def _on_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
+        """Handle palette color change from right-click."""
+        self._controller.set_palette_color(index, color)
 
     def _on_save(self) -> None:
         """Handle save action."""
