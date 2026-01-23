@@ -445,7 +445,7 @@ class WorkbenchCanvas(QWidget):
         controls2.addWidget(self._create_separator())
 
         # Compression type selector
-        compression_label = QLabel("Compression:")
+        compression_label = QLabel("Compression (frame):")
         compression_label.setStyleSheet("font-size: 11px;")
         controls2.addWidget(compression_label)
 
@@ -453,7 +453,10 @@ class WorkbenchCanvas(QWidget):
         self._compression_combo.addItem("RAW", "raw")
         self._compression_combo.addItem("HAL", "hal")
         self._compression_combo.setStyleSheet("font-size: 11px;")
-        self._compression_combo.setToolTip("Compression type for ROM injection (RAW=uncompressed, HAL=compressed)")
+        self._compression_combo.setToolTip(
+            "Compression type for ROM injection (applies to all offsets in this capture). "
+            "RAW=uncompressed, HAL=compressed"
+        )
         self._compression_combo.setMaximumWidth(60)
         controls2.addWidget(self._compression_combo)
 
@@ -1000,6 +1003,12 @@ class WorkbenchCanvas(QWidget):
         center_after = self._ai_frame_item.sceneBoundingRect().center()
         delta = center_before - center_after
         self._ai_frame_item.setPos(self._ai_frame_item.pos() + delta)
+
+        # Schedule updates and emit alignment change for persistence
+        # (matches _on_flip_changed pattern for consistency)
+        self._schedule_tile_touch_update()
+        self._schedule_preview_update()
+        self._emit_alignment_changed()
 
     def _on_flip_changed(self) -> None:
         """Handle flip checkbox change."""
