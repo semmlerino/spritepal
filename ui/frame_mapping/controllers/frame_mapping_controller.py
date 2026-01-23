@@ -1569,16 +1569,11 @@ class FrameMappingController(QObject):
                         # preserve_existing=True when:
                         # - using_existing_output: batch injection with pre-created output ROM
                         # - not first_tile_group_in_frame: subsequent tile groups within this frame
-                        # When preserve_existing=True, ROMInjector reads from output_path,
-                        # so rom_path is only used as source when preserve_existing=False.
-                        source_rom = (
-                            current_rom_path
-                            if using_existing_output
-                            else (str(rom_path) if first_tile_group_in_frame else current_rom_path)
-                        )
+                        # When preserve_existing=True, ROMInjector reads from output_path (staging),
+                        # so rom_path is only used for validation and initial copy.
                         result, message = injector.inject_sprite_to_rom(
                             sprite_path=str(chunk_path),
-                            rom_path=source_rom,
+                            rom_path=str(rom_path),
                             output_path=current_rom_path,
                             sprite_offset=rom_offset,
                             fast_compression=False,
@@ -1591,14 +1586,9 @@ class FrameMappingController(QObject):
                     else:
                         # Try HAL compression first
                         # preserve_existing logic same as RAW injection above
-                        source_rom = (
-                            current_rom_path
-                            if using_existing_output
-                            else (str(rom_path) if first_tile_group_in_frame else current_rom_path)
-                        )
                         result, message = injector.inject_sprite_to_rom(
                             sprite_path=str(chunk_path),
-                            rom_path=source_rom,
+                            rom_path=str(rom_path),
                             output_path=current_rom_path,
                             sprite_offset=rom_offset,
                             fast_compression=True,
@@ -1619,7 +1609,7 @@ class FrameMappingController(QObject):
                             )
                             result, message = injector.inject_sprite_to_rom(
                                 sprite_path=str(chunk_path),
-                                rom_path=source_rom,
+                                rom_path=str(rom_path),
                                 output_path=current_rom_path,
                                 sprite_offset=rom_offset,
                                 fast_compression=False,
