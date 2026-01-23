@@ -190,3 +190,180 @@ class TestCompositeResult:
         assert result.canvas_width == 16
         assert result.canvas_height == 16
         assert result.uncovered_policy == "transparent"
+
+
+class TestTransparentPolicyMasking:
+    """Test that transparent policy masks AI content to sprite tile boundaries.
+
+    Bug: When uncovered_policy="transparent", the AI image was shown for the
+    entire bounding box, not just where sprite tiles exist. This caused
+    AI content to appear in gaps between sprite tiles.
+    """
+
+    def test_ai_content_masked_to_sprite_tiles_only(self) -> None:
+        """AI content should only appear where original sprite has opaque pixels.
+
+        Creates a sprite with two 8x8 tiles separated by an 8-pixel gap.
+        The bounding box is 24x8, but only pixels 0-7 and 16-23 have tiles.
+        The AI image fills the entire box with red.
+
+        Expected: Gap (pixels 8-15) should be transparent, not red.
+        """
+        from dataclasses import dataclass, field
+
+        @dataclass
+        class MockTileData:
+            tile_index: int
+            vram_addr: int
+            pos_x: int
+            pos_y: int
+            data_hex: str
+            rom_offset: int | None = None
+
+            @property
+            def data_bytes(self) -> bytes:
+                return bytes.fromhex(self.data_hex)
+
+        @dataclass
+        class MockOAMEntry:
+            id: int
+            x: int
+            y: int
+            width: int
+            height: int
+            palette: int
+            flip_h: bool = False
+            flip_v: bool = False
+            priority: int = 0
+            tile: int = 0
+            name_table: int = 0
+            size_large: bool = False
+            rom_offset: int = 0x10000
+            tiles: list = field(default_factory=list)
+
+            @property
+            def tiles_wide(self) -> int:
+                return self.width // 8
+
+            @property
+            def tiles_high(self) -> int:
+                return self.height // 8
+
+        @dataclass
+        class MockCaptureBoundingBox:
+            x: int
+            y: int
+            width: int
+            height: int
+
+        @dataclass
+        class MockCaptureResultFull:
+            frame: int
+            visible_count: int
+            obsel: int
+            entries: list
+            palettes: dict
+            timestamp: str = ""
+
+            @property
+            def bounding_box(self) -> MockCaptureBoundingBox:
+                if not self.entries:
+                    return MockCaptureBoundingBox(0, 0, 0, 0)
+                min_x = min(e.x for e in self.entries)
+                min_y = min(e.y for e in self.entries)
+                max_x = max(e.x + e.width for e in self.entries)
+                max_y = max(e.y + e.height for e in self.entries)
+                return MockCaptureBoundingBox(min_x, min_y, max_x - min_x, max_y - min_y)
+
+        # Create a solid 8x8 tile (all opaque white pixels)
+        # 4bpp tile data: 32 bytes, each pixel is color index 15 (fully opaque white)
+        # For simplicity, create tile data that renders as solid when decoded
+        solid_tile_hex = "ff" * 32  # All bits set = color index 15
+
+        # Two entries: one at x=0, one at x=16, both 8x8
+        # This creates a gap at x=8-15
+        entry1 = MockOAMEntry(
+            id=0,
+            x=0,
+            y=0,
+            width=8,
+            height=8,
+            palette=0,
+            tiles=[
+                MockTileData(
+                    tile_index=0,
+                    vram_addr=0,
+                    pos_x=0,
+                    pos_y=0,
+                    data_hex=solid_tile_hex,
+                )
+            ],
+        )
+        entry2 = MockOAMEntry(
+            id=1,
+            x=16,  # 8-pixel gap from entry1
+            y=0,
+            width=8,
+            height=8,
+            palette=0,
+            tiles=[
+                MockTileData(
+                    tile_index=1,
+                    vram_addr=0,
+                    pos_x=0,
+                    pos_y=0,
+                    data_hex=solid_tile_hex,
+                )
+            ],
+        )
+
+        # Palette 0: 16 colors, all white for simplicity
+        palettes = {0: [(255, 255, 255)] * 16}
+
+        capture = MockCaptureResultFull(
+            frame=0,
+            visible_count=2,
+            obsel=0,
+            entries=[entry1, entry2],
+            palettes=palettes,
+        )
+
+        # Bounding box is 24x8 (from x=0 to x=24)
+        assert capture.bounding_box.width == 24
+        assert capture.bounding_box.height == 8
+
+        # AI image: solid red, fills entire bounding box
+        ai_image = Image.new("RGBA", (24, 8), (255, 0, 0, 255))
+
+        # Composite with transparent policy
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        transform = TransformParams(offset_x=0, offset_y=0)
+
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=False,  # Don't quantize to preserve exact colors
+        )
+
+        composited = result.composited_image
+
+        # Check that gap region (x=8-15) is transparent
+        # The bug: currently these pixels are red (from AI image)
+        # Expected: these pixels should be transparent (alpha=0)
+        for x in range(8, 16):
+            pixel = composited.getpixel((x, 0))
+            assert pixel[3] == 0, (
+                f"Pixel at ({x}, 0) should be transparent (alpha=0), "
+                f"but got alpha={pixel[3]}. The AI content is leaking into "
+                f"areas outside the sprite tiles."
+            )
+
+        # Verify that tile regions do have AI content (sanity check)
+        # Left tile region (x=0-7) should have red from AI
+        pixel_left = composited.getpixel((4, 4))
+        assert pixel_left[3] > 0, "Left tile region should have opaque content"
+
+        # Right tile region (x=16-23) should have red from AI
+        pixel_right = composited.getpixel((20, 4))
+        assert pixel_right[3] > 0, "Right tile region should have opaque content"

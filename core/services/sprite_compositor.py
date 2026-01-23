@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
+import numpy as np
 from PIL import Image
 
 from core.mesen_integration.capture_renderer import CaptureRenderer
@@ -143,7 +144,17 @@ class SpriteCompositor:
         # Apply compositing based on policy
         if self._uncovered_policy == "transparent":
             # Original sprite completely removed - only AI content remains
+            # BUT: AI content is masked to only appear where original sprite had tiles
+            # This prevents AI content from "leaking" into gaps between sprite tiles
             composited = ai_canvas.copy()
+            # Apply original sprite mask: keep AI alpha only where original was opaque
+            ai_alpha = composited.split()[3]
+            # Use minimum of AI alpha and original mask - this preserves AI transparency
+            # while ensuring nothing appears outside sprite tile boundaries
+            masked_alpha = Image.fromarray(
+                np.minimum(np.array(ai_alpha), np.array(original_mask))
+            )
+            composited.putalpha(masked_alpha)
         else:
             # Original sprite preserved - AI composites on top
             composited = Image.alpha_composite(original_sprite.copy(), ai_canvas)
