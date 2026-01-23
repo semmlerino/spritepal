@@ -443,6 +443,7 @@ class WorkbenchCanvas(QWidget):
             self._game_pixmap = None
             self._game_frame_item.setPixmap(QPixmap())
             self._tile_overlay_item.set_tile_rects([])
+            self._update_auto_align_button_state()
             return
 
         if preview_pixmap is not None:
@@ -483,6 +484,8 @@ class WorkbenchCanvas(QWidget):
         # Update tile overlay from capture result
         self._update_tile_overlay()
         self._update_status()
+        # Update auto-align button state based on new game frame
+        self._update_auto_align_button_state()
         # Update preview if enabled
         self._schedule_preview_update()
 
@@ -531,6 +534,7 @@ class WorkbenchCanvas(QWidget):
             self._ai_pixmap = None
             self._ai_image = None
             self._ai_frame_item.set_pixmap(None)
+            self._update_auto_align_button_state()
             return
 
         if frame.path.exists():
@@ -538,7 +542,12 @@ class WorkbenchCanvas(QWidget):
             # Also load as PIL image for auto-alignment
             try:
                 self._ai_image = Image.open(frame.path).convert("RGBA")
-            except Exception:
+            except Exception as e:
+                logger.warning(
+                    "Failed to load PIL image for %s: %s - auto-align will be disabled",
+                    frame.path,
+                    e,
+                )
                 self._ai_image = None
         else:
             self._ai_pixmap = None
@@ -555,6 +564,8 @@ class WorkbenchCanvas(QWidget):
             self._ai_frame_item.set_pixmap(scaled)
 
         self._update_status()
+        # Update auto-align button state based on new AI frame
+        self._update_auto_align_button_state()
         # Update preview if enabled
         self._schedule_preview_update()
 
@@ -657,7 +668,11 @@ class WorkbenchCanvas(QWidget):
         self._ai_frame_item.setSelected(True)
 
     def _set_controls_enabled(self, enabled: bool) -> None:
-        """Enable or disable alignment controls."""
+        """Enable or disable alignment controls.
+
+        Note: Auto-align button is managed separately by _update_auto_align_button_state()
+        because it has additional requirements (AI image and capture result).
+        """
         self._opacity_slider.setEnabled(enabled)
         self._scale_slider.setEnabled(enabled)
         self._flip_h_checkbox.setEnabled(enabled)
@@ -665,7 +680,33 @@ class WorkbenchCanvas(QWidget):
         self._tile_overlay_checkbox.setEnabled(enabled)
         self._grid_checkbox.setEnabled(enabled)
         self._compression_combo.setEnabled(enabled)
-        self._auto_align_btn.setEnabled(enabled)
+        # Auto-align button managed separately by _update_auto_align_button_state()
+        self._update_auto_align_button_state()
+
+    def _can_auto_align(self) -> bool:
+        """Check if auto-align is possible.
+
+        Auto-align requires:
+        - A valid PIL image (for content detection)
+        - A capture result (for bounding box)
+        - An active mapping
+        """
+        return self._ai_image is not None and self._capture_result is not None and self._has_mapping
+
+    def _update_auto_align_button_state(self) -> None:
+        """Update auto-align button enabled state based on current conditions."""
+        can_align = self._can_auto_align()
+        self._auto_align_btn.setEnabled(can_align)
+        if not can_align:
+            # Provide tooltip explaining why auto-align is disabled
+            if self._ai_image is None:
+                self._auto_align_btn.setToolTip("Auto-align requires AI image to be loaded")
+            elif self._capture_result is None:
+                self._auto_align_btn.setToolTip("Auto-align requires game frame capture")
+            elif not self._has_mapping:
+                self._auto_align_btn.setToolTip("Auto-align requires a frame mapping")
+        else:
+            self._auto_align_btn.setToolTip("Automatically align AI frame to game sprite bounds")
 
     def _update_status(self) -> None:
         """Update the status label."""
@@ -968,7 +1009,14 @@ class WorkbenchCanvas(QWidget):
 
     def _on_auto_align(self) -> None:
         """Handle auto-align button click."""
-        if self._ai_image is None or self._capture_result is None:
+        if self._ai_image is None:
+            logger.warning("Auto-align skipped: AI image not loaded (PIL load may have failed)")
+            self._status_label.setText("Auto-align requires AI image")
+            return
+
+        if self._capture_result is None:
+            logger.warning("Auto-align skipped: No capture result available")
+            self._status_label.setText("Auto-align requires game frame capture")
             return
 
         bbox = self._capture_result.bounding_box
