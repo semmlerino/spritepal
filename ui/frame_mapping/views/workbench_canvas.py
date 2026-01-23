@@ -44,10 +44,7 @@ from PySide6.QtWidgets import (
 
 from core.frame_mapping_project import AIFrame, GameFrame
 from core.services.sprite_compositor import SpriteCompositor, TransformParams
-from core.services.tile_sampling_service import (
-    TileSamplingService,
-    calculate_auto_alignment,
-)
+from core.services.tile_sampling_service import TileSamplingService
 from ui.frame_mapping.views.workbench_items import (
     AIFrameItem,
     GameFrameItem,
@@ -1008,7 +1005,11 @@ class WorkbenchCanvas(QWidget):
             self._preview_item.setVisible(False)
 
     def _on_auto_align(self) -> None:
-        """Handle auto-align button click."""
+        """Handle auto-align button click.
+
+        Calculates alignment offset that centers the AI frame content over the game
+        frame, accounting for current flip and scale transforms.
+        """
         if self._ai_image is None:
             logger.warning("Auto-align skipped: AI image not loaded (PIL load may have failed)")
             self._status_label.setText("Auto-align requires AI image")
@@ -1019,22 +1020,50 @@ class WorkbenchCanvas(QWidget):
             self._status_label.setText("Auto-align requires game frame capture")
             return
 
-        bbox = self._capture_result.bounding_box
-        offset_x, offset_y = calculate_auto_alignment(
-            self._ai_image,
-            0,  # Relative to sprite origin
-            0,
-            bbox.width,
-            bbox.height,
-        )
+        # Get AI content bounding box (non-transparent pixels)
+        ai_bbox = self._ai_image.getbbox()
+        if ai_bbox is None:
+            # No non-transparent pixels - use full image
+            ai_bbox = (0, 0, self._ai_image.width, self._ai_image.height)
 
-        # Apply the alignment
+        ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
+        ai_width = ai_x2 - ai_x
+        ai_height = ai_y2 - ai_y
+
+        # Calculate AI content center in original image coordinates
+        ai_center_x = ai_x + ai_width / 2
+        ai_center_y = ai_y + ai_height / 2
+
+        # Apply flip corrections (flip changes where content visually appears)
+        flip_h = self._flip_h_checkbox.isChecked()
+        flip_v = self._flip_v_checkbox.isChecked()
+
+        if flip_h:
+            ai_center_x = self._ai_image.width - ai_center_x
+        if flip_v:
+            ai_center_y = self._ai_image.height - ai_center_y
+
+        # Apply scale to get visual content center
+        scale = self._ai_frame_item.scale_factor()
+        scaled_ai_center_x = ai_center_x * scale
+        scaled_ai_center_y = ai_center_y * scale
+
+        # Game frame center (displayed at origin 0,0)
+        bbox = self._capture_result.bounding_box
+        game_center_x = bbox.width / 2
+        game_center_y = bbox.height / 2
+
+        # Calculate offset to align centers
+        offset_x = int(game_center_x - scaled_ai_center_x)
+        offset_y = int(game_center_y - scaled_ai_center_y)
+
+        # Apply the alignment (keep current flip and scale)
         self.set_alignment(
             offset_x,
             offset_y,
-            self._flip_h_checkbox.isChecked(),
-            self._flip_v_checkbox.isChecked(),
-            self._ai_frame_item.scale_factor(),
+            flip_h,
+            flip_v,
+            scale,
         )
         self._emit_alignment_changed()
         # Update scene rect and center view on aligned frames

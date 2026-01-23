@@ -278,3 +278,169 @@ class TestAutoAlignButtonStateOnFrameChanges:
 
         # Button should now be disabled (no capture result)
         assert not canvas._auto_align_btn.isEnabled(), "Button should be disabled after game frame cleared"
+
+
+class TestAutoAlignWithTransforms:
+    """Tests for Bug: Auto-align doesn't account for flip/scale transforms.
+
+    Bug: When the AI frame has scale != 1.0 or flip enabled, the auto-align
+    calculates offset based on the original (untransformed) image bbox,
+    resulting in incorrect positioning.
+
+    Note: Position values in tests are in display coordinates (DISPLAY_SCALE = 2).
+    Logical offset = position / DISPLAY_SCALE.
+    """
+
+    def test_auto_align_accounts_for_scale(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Auto-align should calculate offset based on scaled content position.
+
+        Bug: With scale=0.5, the visual content center is at half position,
+        but offset is calculated as if scale=1.0.
+        """
+        from PIL import ImageDraw
+
+        from ui.frame_mapping.views.workbench_canvas import DISPLAY_SCALE
+
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+
+        # Create AI image with content NOT at origin (centered at 100, 100)
+        ai_image_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (200, 200), (0, 0, 0, 0))  # Transparent bg
+        draw = ImageDraw.Draw(ai_img)
+        # Draw content from (80, 80) to (120, 120) - center at (100, 100)
+        draw.rectangle([80, 80, 120, 120], fill=(255, 0, 0, 255))
+        ai_img.save(ai_image_path)
+
+        # Create game frame preview (40x40, center at 20, 20)
+        game_preview_path = tmp_path / "game.png"
+        game_preview = Image.new("RGBA", (40, 40), (0, 255, 0, 255))
+        game_preview.save(game_preview_path)
+
+        class MockBoundingBox:
+            x = 0
+            y = 0
+            width = 40
+            height = 40
+
+        class MockCaptureResult:
+            entries: list[object] = []
+            palettes: dict[int, object] = {}
+            bounding_box = MockBoundingBox()
+            has_entries = True
+
+        game_frame = GameFrame(id="test_frame", width=40, height=40)
+
+        # Setup canvas
+        canvas.set_game_frame(
+            frame=game_frame,
+            preview_pixmap=QPixmap(str(game_preview_path)),
+            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+        )
+        canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
+
+        # Set alignment with scale=0.5 (AI frame will be visually 100x100)
+        # At scale=0.5: content is at visual position (40, 40) to (60, 60)
+        # Visual content center: (50, 50)
+        # Game center: (20, 20)
+        # Expected logical offset to align centers: (20 - 50, 20 - 50) = (-30, -30)
+        canvas.set_alignment(0, 0, False, False, 0.5)
+
+        # Trigger auto-align
+        canvas._on_auto_align()
+
+        # Get resulting offset
+        # With scale=0.5, visual content center is at 0.5 * 100 = 50
+        # Game center is at 20
+        # Logical offset should be 20 - 50 = -30
+        ai_pos = canvas._ai_frame_item.pos()
+
+        # Position is in display coordinates (logical * DISPLAY_SCALE)
+        expected_logical_offset = -30
+        expected_display_x = expected_logical_offset * DISPLAY_SCALE
+        expected_display_y = expected_logical_offset * DISPLAY_SCALE
+
+        assert abs(ai_pos.x() - expected_display_x) < 2, (
+            f"Expected display offset_x ~{expected_display_x}, got {ai_pos.x()}. "
+            "Auto-align may not be accounting for scale."
+        )
+        assert abs(ai_pos.y() - expected_display_y) < 2, (
+            f"Expected display offset_y ~{expected_display_y}, got {ai_pos.y()}. "
+            "Auto-align may not be accounting for scale."
+        )
+
+    def test_auto_align_accounts_for_flip_h(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Auto-align should calculate offset based on flipped content position.
+
+        Bug: With flip_h=True, the visual content center mirrors,
+        but offset is calculated as if not flipped.
+        """
+        from PIL import ImageDraw
+
+        from ui.frame_mapping.views.workbench_canvas import DISPLAY_SCALE
+
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+
+        # Create AI image with content on the LEFT side
+        ai_image_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (100, 100), (0, 0, 0, 0))  # Transparent bg
+        draw = ImageDraw.Draw(ai_img)
+        # Draw content from (10, 40) to (30, 60) - center at (20, 50)
+        draw.rectangle([10, 40, 30, 60], fill=(255, 0, 0, 255))
+        ai_img.save(ai_image_path)
+
+        # Create game frame preview (40x40, center at 20, 20)
+        game_preview_path = tmp_path / "game.png"
+        game_preview = Image.new("RGBA", (40, 40), (0, 255, 0, 255))
+        game_preview.save(game_preview_path)
+
+        class MockBoundingBox:
+            x = 0
+            y = 0
+            width = 40
+            height = 40
+
+        class MockCaptureResult:
+            entries: list[object] = []
+            palettes: dict[int, object] = {}
+            bounding_box = MockBoundingBox()
+            has_entries = True
+
+        game_frame = GameFrame(id="test_frame", width=40, height=40)
+
+        # Setup canvas
+        canvas.set_game_frame(
+            frame=game_frame,
+            preview_pixmap=QPixmap(str(game_preview_path)),
+            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+        )
+        canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
+
+        # Set alignment with flip_h=True (content visually moves to right side)
+        # Original content center: (20, 50)
+        # After flip_h: visual center X = 100 - 20 = 80, Y = 50
+        # Game center: (20, 20)
+        # Expected logical offset: (20 - 80, 20 - 50) = (-60, -30)
+        canvas.set_alignment(0, 0, True, False, 1.0)
+
+        # Trigger auto-align
+        canvas._on_auto_align()
+
+        # Get resulting offset (in display coordinates)
+        ai_pos = canvas._ai_frame_item.pos()
+
+        expected_logical_x = -60  # 20 - 80 (flipped center)
+        expected_logical_y = -30  # 20 - 50 (unchanged)
+        expected_display_x = expected_logical_x * DISPLAY_SCALE
+        expected_display_y = expected_logical_y * DISPLAY_SCALE
+
+        # Allow small rounding tolerance (int conversion in offset calculation)
+        assert abs(ai_pos.x() - expected_display_x) < 4, (
+            f"Expected display offset_x ~{expected_display_x}, got {ai_pos.x()}. "
+            "Auto-align may not be accounting for horizontal flip."
+        )
+        assert abs(ai_pos.y() - expected_display_y) < 4, (
+            f"Expected display offset_y ~{expected_display_y}, got {ai_pos.y()}. "
+            "Auto-align should not affect Y with only horizontal flip."
+        )
