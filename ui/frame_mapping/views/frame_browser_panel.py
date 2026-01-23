@@ -205,7 +205,6 @@ class FrameBrowserPanel(QWidget):
 
         count = len(frames)
         self._ai_count_label.setText(f"{count} frame{'s' if count != 1 else ''}")
-        logger.debug("Loaded %d AI frames into browser", count)
 
     def set_game_frames(self, frames: list[GameFrame]) -> None:
         """Set the game frames to display.
@@ -215,7 +214,6 @@ class FrameBrowserPanel(QWidget):
         """
         self._game_frames = frames
         self._refresh_game_list()
-        logger.debug("Loaded %d game frames into browser", len(frames))
 
     def add_game_frame(self, frame: GameFrame) -> None:
         """Add a single game frame to the list.

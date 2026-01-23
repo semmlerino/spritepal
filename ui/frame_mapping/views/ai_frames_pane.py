@@ -246,7 +246,6 @@ class AIFramesPane(QWidget):
         self._refresh_list(is_frame_list_change=is_frame_list_change)
         # Enable palette buttons when frames are loaded
         self._palette_widget.set_buttons_enabled(len(frames) > 0)
-        logger.debug("Loaded %d AI frames into pane", len(frames))
 
     def set_mapping_status(self, status_map: dict[int, str]) -> None:
         """Update the mapping status for AI frames.

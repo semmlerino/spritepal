@@ -109,16 +109,6 @@ class SpriteCompositor:
         Returns:
             CompositeResult with the composited image and metadata.
         """
-        logger.debug(
-            "composite_frame: policy=%s, transform=(%d,%d) flip_h=%s flip_v=%s scale=%.2f",
-            self._uncovered_policy,
-            transform.offset_x,
-            transform.offset_y,
-            transform.flip_h,
-            transform.flip_v,
-            transform.scale,
-        )
-
         # Ensure RGBA mode
         if ai_image.mode != "RGBA":
             ai_image = ai_image.convert("RGBA")
@@ -155,9 +145,7 @@ class SpriteCompositor:
             ai_alpha = composited.split()[3]
             # Use minimum of AI alpha and original mask - this preserves AI transparency
             # while ensuring nothing appears outside sprite tile boundaries
-            masked_alpha = Image.fromarray(
-                np.minimum(np.array(ai_alpha), np.array(original_mask))
-            )
+            masked_alpha = Image.fromarray(np.minimum(np.array(ai_alpha), np.array(original_mask)))
             composited.putalpha(masked_alpha)
         else:
             # Original sprite preserved - AI composites on top
@@ -165,9 +153,7 @@ class SpriteCompositor:
 
         # Quantize to game palette if requested
         if quantize:
-            composited = self._quantize_to_palette(
-                composited, filtered_capture, sheet_palette=sheet_palette
-            )
+            composited = self._quantize_to_palette(composited, filtered_capture, sheet_palette=sheet_palette)
 
         return CompositeResult(
             composited_image=composited,
@@ -264,14 +250,9 @@ class SpriteCompositor:
                     sheet_palette.color_mappings,
                     transparency_threshold=1,
                 )
-                logger.debug(
-                    "Quantized preview using sheet palette with %d color mappings",
-                    len(sheet_palette.color_mappings),
-                )
             else:
                 # Sheet palette without explicit mappings -> nearest color
                 indexed = quantize_to_palette(image, palette_rgb)
-                logger.debug("Quantized preview using sheet palette (nearest color)")
         else:
             # Fallback: capture palette (existing behavior)
             if not capture_result.entries or not capture_result.palettes:

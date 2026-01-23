@@ -134,7 +134,6 @@ class CapturesLibraryPane(QWidget):
         """
         self._game_frames = frames
         self._refresh_list()
-        logger.debug("Loaded %d game frames into captures pane", len(frames))
 
     def set_link_status(self, link_status: dict[str, int | None]) -> None:
         """Set the link status for game frames.

@@ -609,17 +609,7 @@ class FrameMappingController(QObject):
                 # If file exists, check both mtime and entries
                 if game_frame.capture_path and game_frame.capture_path.exists():
                     current_mtime = game_frame.capture_path.stat().st_mtime
-                    if current_mtime != cached_mtime:
-                        logger.debug(
-                            "Preview cache invalidated for %s (mtime changed)",
-                            frame_id,
-                        )
-                        cache_was_invalidated = True
-                    elif current_entries != cached_entries:
-                        logger.debug(
-                            "Preview cache invalidated for %s (selected_entry_ids changed)",
-                            frame_id,
-                        )
+                    if current_mtime != cached_mtime or current_entries != cached_entries:
                         cache_was_invalidated = True
                     else:
                         return cached_pixmap
@@ -651,7 +641,6 @@ class FrameMappingController(QObject):
                         current_mtime = game_frame.capture_path.stat().st_mtime
 
             self._game_frame_previews[frame_id] = (pixmap, current_mtime, current_entries)
-            logger.debug("Regenerated preview for game frame %s from capture file", frame_id)
 
             # Notify if this was a cache invalidation (not first-time generation)
             if cache_was_invalidated:
@@ -1221,20 +1210,9 @@ class FrameMappingController(QObject):
             # Check for padding boundary (all 0x00 or all 0xFF)
             if all(b == 0x00 for b in tile_data) or all(b == 0xFF for b in tile_data):
                 # Found boundary - return count of tiles before it
-                logger.debug(
-                    "_detect_raw_slot_size: offset 0x%X boundary at tile %d (0x%X)",
-                    file_offset,
-                    tile_index,
-                    tile_start - smc_header,
-                )
                 return tile_index if tile_index > 0 else None
 
         # No boundary found within max_tiles
-        logger.debug(
-            "_detect_raw_slot_size: offset 0x%X no boundary found within %d tiles",
-            file_offset,
-            max_tiles,
-        )
         return None
 
     def inject_mapping(
@@ -1623,12 +1601,6 @@ class FrameMappingController(QObject):
                             entry.flip_v,
                         )
 
-            logger.debug(
-                "Tile-level grouping: %d unique ROM offsets from %d entries",
-                len(tile_groups),
-                len(relevant_entries),
-            )
-
             # Read ROM data once for querying original tile counts
             rom_data = rom_path.read_bytes()
 
@@ -1706,15 +1678,6 @@ class FrameMappingController(QObject):
                 # Try to make a square-ish grid, preferring wider layouts
                 grid_width = math.ceil(math.sqrt(tile_count))
                 grid_height = math.ceil(tile_count / grid_width)
-
-                logger.debug(
-                    "ROM offset 0x%X: injecting %d tiles (of %d captured), grid %dx%d",
-                    rom_offset,
-                    tile_count,
-                    captured_tile_count,
-                    grid_width,
-                    grid_height,
-                )
 
                 # Create output image for this ROM offset's tiles
                 chunk_img = Image.new(
@@ -1808,19 +1771,10 @@ class FrameMappingController(QObject):
                             sheet_palette.color_mappings,
                             transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD,
                         )
-                        logger.debug(
-                            "Quantized chunk for offset 0x%X using sheet palette with %d mappings",
-                            rom_offset,
-                            len(sheet_palette.color_mappings),
-                        )
                     else:
                         # Sheet palette without explicit mappings -> nearest color
                         chunk_img = quantize_to_palette(
                             chunk_img, palette_rgb, transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD
-                        )
-                        logger.debug(
-                            "Quantized chunk for offset 0x%X using sheet palette (nearest color)",
-                            rom_offset,
                         )
                 else:
                     # Fallback: use capture palette (original behavior)
@@ -1829,12 +1783,6 @@ class FrameMappingController(QObject):
                         palette_rgb = snes_palette_to_rgb(snes_palette)
                         chunk_img = quantize_to_palette(
                             chunk_img, palette_rgb, transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD
-                        )
-                        logger.debug(
-                            "Quantized chunk for offset 0x%X to capture palette %d (%d colors)",
-                            rom_offset,
-                            palette_index,
-                            len(palette_rgb),
                         )
                     else:
                         logger.warning(
@@ -2032,7 +1980,6 @@ class FrameMappingController(QObject):
             return False
         result = self._project.add_frame_tag(frame_id, tag)
         if result:
-            logger.debug("Added tag '%s' to frame '%s'", tag, frame_id)
             self.frame_tags_changed.emit(frame_id)
         return result
 
@@ -2050,7 +1997,6 @@ class FrameMappingController(QObject):
             return False
         result = self._project.remove_frame_tag(frame_id, tag)
         if result:
-            logger.debug("Removed tag '%s' from frame '%s'", tag, frame_id)
             self.frame_tags_changed.emit(frame_id)
         return result
 
@@ -2068,7 +2014,6 @@ class FrameMappingController(QObject):
             return False
         result = self._project.toggle_frame_tag(frame_id, tag)
         if result:
-            logger.debug("Toggled tag '%s' on frame '%s'", tag, frame_id)
             self.frame_tags_changed.emit(frame_id)
         return result
 
@@ -2086,7 +2031,6 @@ class FrameMappingController(QObject):
             return False
         result = self._project.set_frame_tags(frame_id, tags)
         if result:
-            logger.debug("Set tags for frame '%s': %s", frame_id, sorted(tags))
             self.frame_tags_changed.emit(frame_id)
         return result
 
