@@ -81,6 +81,8 @@ class FrameMappingController(QObject):
     # AI Frame Organization signals (V4)
     frame_renamed = Signal(str)  # ai_frame_id - display name changed
     frame_tags_changed = Signal(str)  # ai_frame_id - tags changed
+    # Capture Organization signals
+    capture_renamed = Signal(str)  # game_frame_id - display name changed
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -2096,3 +2098,43 @@ class FrameMappingController(QObject):
             Set of valid tag names
         """
         return FRAME_TAGS
+
+    # ─── Capture (GameFrame) Organization ──────────────────────────────────────
+
+    def rename_capture(self, game_frame_id: str, new_name: str | None) -> bool:
+        """Set display name for a game frame (capture).
+
+        Args:
+            game_frame_id: ID of the game frame to rename
+            new_name: New display name (empty or None to clear)
+
+        Returns:
+            True if renamed successfully, False otherwise
+        """
+        if self._project is None:
+            return False
+        # Normalize empty string to None
+        display_name = new_name.strip() if new_name else None
+        if display_name == "":
+            display_name = None
+        if self._project.set_capture_display_name(game_frame_id, display_name):
+            self.capture_renamed.emit(game_frame_id)
+            self.save_requested.emit()
+            return True
+        return False
+
+    def get_capture_display_name(self, game_frame_id: str) -> str | None:
+        """Get display name for a game frame (capture).
+
+        Args:
+            game_frame_id: ID of the game frame
+
+        Returns:
+            Display name if set, None otherwise
+        """
+        if self._project is None:
+            return None
+        frame = self._project.get_game_frame_by_id(game_frame_id)
+        if frame is None:
+            return None
+        return frame.display_name

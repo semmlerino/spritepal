@@ -176,6 +176,15 @@ class GameFrame:
     height: int = 0
     selected_entry_ids: list[int] = field(default_factory=list)  # OAM entry IDs selected during import
     compression_types: dict[int, str] = field(default_factory=dict)  # ROM offset -> "hal" | "raw"
+    display_name: str | None = None  # Optional user-defined display name
+
+    @property
+    def name(self) -> str:
+        """Display name for this frame.
+
+        Returns the display_name if set, otherwise returns the id.
+        """
+        return self.display_name or self.id
 
     def to_dict(self, base_path: Path | None = None) -> dict[str, object]:
         """Serialize to dictionary for JSON storage.
@@ -195,7 +204,7 @@ class GameFrame:
         # Convert int keys to strings for JSON serialization
         compression_types_str = {str(k): v for k, v in self.compression_types.items()}
 
-        return {
+        result: dict[str, object] = {
             "id": self.id,
             "rom_offsets": self.rom_offsets,
             "capture_path": capture_path_str,
@@ -205,6 +214,10 @@ class GameFrame:
             "selected_entry_ids": self.selected_entry_ids,
             "compression_types": compression_types_str,
         }
+        # Only include display_name if set (keeps file compact)
+        if self.display_name is not None:
+            result["display_name"] = self.display_name
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, object], base_path: Path | None = None) -> GameFrame:
@@ -233,6 +246,7 @@ class GameFrame:
             height=cast(int, data.get("height", 0)),
             selected_entry_ids=cast(list[int], data.get("selected_entry_ids", [])),
             compression_types=compression_types,
+            display_name=cast(str | None, data.get("display_name")),
         )
 
 
@@ -936,4 +950,22 @@ class FrameMappingProject:
             return False
         valid_tags = frozenset(t for t in tags if t in FRAME_TAGS)
         object.__setattr__(frame, "tags", valid_tags)
+        return True
+
+    # ─── Capture (GameFrame) Organization ──────────────────────────────────────
+
+    def set_capture_display_name(self, game_frame_id: str, display_name: str | None) -> bool:
+        """Set display name for a game frame (capture).
+
+        Args:
+            game_frame_id: ID of the game frame
+            display_name: New display name, or None to clear
+
+        Returns:
+            True if frame was found and updated, False otherwise
+        """
+        frame = self.get_game_frame_by_id(game_frame_id)
+        if frame is None:
+            return False
+        object.__setattr__(frame, "display_name", display_name)
         return True

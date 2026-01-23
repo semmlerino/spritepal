@@ -558,6 +558,126 @@ class TestGameFrame:
         assert data["compression_types"] == {"327680": "raw"}
 
 
+class TestGameFrameOrganization:
+    """Tests for GameFrame display_name and name property."""
+
+    def test_display_name_defaults_to_none(self) -> None:
+        """GameFrame has None display_name by default."""
+        frame = GameFrame(id="F001")
+        assert frame.display_name is None
+
+    def test_display_name_can_be_set(self) -> None:
+        """GameFrame accepts display_name at creation."""
+        frame = GameFrame(id="F001", display_name="Walk Cycle 1")
+        assert frame.display_name == "Walk Cycle 1"
+
+    def test_name_property_returns_display_name_if_set(self) -> None:
+        """name property returns display_name when set."""
+        frame = GameFrame(id="F001", display_name="My Custom Name")
+        assert frame.name == "My Custom Name"
+
+    def test_name_property_returns_id_if_no_display_name(self) -> None:
+        """name property returns id when display_name is None."""
+        frame = GameFrame(id="F001")
+        assert frame.name == "F001"
+
+    def test_display_name_roundtrip(self) -> None:
+        """display_name survives to_dict/from_dict cycle."""
+        frame = GameFrame(id="F001", display_name="Dedede Attack")
+        data = frame.to_dict()
+        restored = GameFrame.from_dict(data)
+        assert restored.display_name == "Dedede Attack"
+
+    def test_display_name_not_in_dict_when_none(self) -> None:
+        """to_dict() omits display_name when None (compact format)."""
+        frame = GameFrame(id="F001")
+        data = frame.to_dict()
+        assert "display_name" not in data
+
+    def test_display_name_in_dict_when_set(self) -> None:
+        """to_dict() includes display_name when set."""
+        frame = GameFrame(id="F001", display_name="Test Name")
+        data = frame.to_dict()
+        assert data["display_name"] == "Test Name"
+
+    def test_backward_compatibility_missing_display_name(self) -> None:
+        """Old project files without display_name load correctly."""
+        old_data: dict[str, object] = {
+            "id": "F001",
+            "rom_offsets": [0x1B0000],
+            # No display_name - simulating old format
+        }
+        frame = GameFrame.from_dict(old_data)
+        assert frame.display_name is None
+        assert frame.name == "F001"
+
+
+class TestFrameMappingProjectCaptureOrganization:
+    """Tests for FrameMappingProject capture organization methods."""
+
+    def test_set_capture_display_name_success(self) -> None:
+        """set_capture_display_name updates game frame."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.game_frames = [GameFrame(id="F001")]
+
+        result = project.set_capture_display_name("F001", "My Capture")
+        assert result is True
+
+        frame = project.get_game_frame_by_id("F001")
+        assert frame is not None
+        assert frame.display_name == "My Capture"
+
+    def test_set_capture_display_name_clear(self) -> None:
+        """set_capture_display_name can clear display name."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.game_frames = [GameFrame(id="F001", display_name="Old Name")]
+
+        result = project.set_capture_display_name("F001", None)
+        assert result is True
+
+        frame = project.get_game_frame_by_id("F001")
+        assert frame is not None
+        assert frame.display_name is None
+
+    def test_set_capture_display_name_nonexistent(self) -> None:
+        """set_capture_display_name returns False for nonexistent frame."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+
+        result = project.set_capture_display_name("NONEXISTENT", "Name")
+        assert result is False
+
+    def test_capture_organization_persists_through_save_load(self, tmp_path: Path) -> None:
+        """Capture display names persist through save/load cycle."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.game_frames = [
+            GameFrame(id="F001", display_name="Walk Cycle"),
+            GameFrame(id="F002"),  # No display name
+        ]
+
+        save_path = tmp_path / "test.spritepal-mapping.json"
+        project.save(save_path)
+
+        loaded = FrameMappingProject.load(save_path)
+
+        frame1 = loaded.get_game_frame_by_id("F001")
+        assert frame1 is not None
+        assert frame1.display_name == "Walk Cycle"
+        assert frame1.name == "Walk Cycle"
+
+        frame2 = loaded.get_game_frame_by_id("F002")
+        assert frame2 is not None
+        assert frame2.display_name is None
+        assert frame2.name == "F002"
+
+
 class TestFrameMappingProjectAlignment:
     """Tests for FrameMappingProject alignment update functionality."""
 

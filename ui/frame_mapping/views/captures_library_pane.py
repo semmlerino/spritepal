@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -49,12 +50,14 @@ class CapturesLibraryPane(QWidget):
         edit_in_sprite_editor_requested: Emitted when user requests edit (frame_id)
         delete_capture_requested: Emitted when user requests deletion (frame_id)
         show_details_requested: Emitted when user wants to see details (frame_id)
+        capture_rename_requested: Emitted when user wants to rename (frame_id, new_name)
     """
 
     game_frame_selected = Signal(str)  # Game frame ID
     edit_in_sprite_editor_requested = Signal(str)  # Game frame ID
     delete_capture_requested = Signal(str)  # Game frame ID
     show_details_requested = Signal(str)  # Game frame ID
+    capture_rename_requested = Signal(str, str)  # Game frame ID, new display name
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -117,6 +120,7 @@ class CapturesLibraryPane(QWidget):
         self._list.currentRowChanged.connect(self._on_selection_changed)
         self._list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._on_context_menu)
+        self._list.itemDoubleClicked.connect(self._on_item_double_clicked)
         layout.addWidget(self._list, 1)
 
         # Override startDrag to provide custom MIME data
@@ -229,6 +233,15 @@ class CapturesLibraryPane(QWidget):
 
         menu = QMenu(self)
 
+        # Find the frame to get its current name
+        frame = next((f for f in self._game_frames if f.id == frame_id), None)
+        current_name = frame.name if frame else frame_id
+
+        rename_action = menu.addAction("Rename...")
+        rename_action.triggered.connect(lambda: self._show_rename_dialog(frame_id, current_name))
+
+        menu.addSeparator()
+
         edit_action = menu.addAction("Edit in Sprite Editor")
         edit_action.triggered.connect(lambda: self.edit_in_sprite_editor_requested.emit(frame_id))
 
@@ -289,23 +302,35 @@ class CapturesLibraryPane(QWidget):
                 if self._show_unlinked_only and linked_ai is not None:
                     continue
 
-                # Apply search filter
-                if self._search_text and self._search_text not in frame.id.lower():
-                    continue
+                # Apply search filter (match both display name and original ID)
+                if self._search_text:
+                    search_target = f"{frame.name.lower()} {frame.id.lower()}"
+                    if self._search_text not in search_target:
+                        continue
 
                 visible_count += 1
 
                 item = QListWidgetItem()
 
-                # Add link status badge to text
+                # Build display text and tooltip
+                display_text = frame.name
+                if frame.display_name:
+                    # Show display name with original ID in tooltip
+                    tooltip = f"Original ID: {frame.id}"
+                else:
+                    tooltip = ""
+
+                # Add link status badge to text and tooltip
                 if linked_ai is not None:
                     color = STATUS_COLORS["linked"]
-                    item.setText(f"✓ {frame.id}")
-                    item.setToolTip(f"Linked to AI frame #{linked_ai}")
+                    item.setText(f"✓ {display_text}")
+                    tooltip_suffix = f"Linked to AI frame #{linked_ai}"
+                    item.setToolTip(f"{tooltip}\n{tooltip_suffix}" if tooltip else tooltip_suffix)
                 else:
                     color = STATUS_COLORS["unlinked"]
-                    item.setText(frame.id)
-                    item.setToolTip("Unlinked - drag to mapping drawer to link")
+                    item.setText(display_text)
+                    tooltip_suffix = "Unlinked - drag to mapping drawer to link"
+                    item.setToolTip(f"{tooltip}\n{tooltip_suffix}" if tooltip else tooltip_suffix)
 
                 item.setData(Qt.ItemDataRole.UserRole, frame.id)
                 item.setForeground(QBrush(color))
@@ -350,3 +375,38 @@ class CapturesLibraryPane(QWidget):
         # explicitly notify listeners that selection was cleared
         if current_selection is not None and not selection_restored:
             self.game_frame_selected.emit("")
+
+    def _show_rename_dialog(self, frame_id: str, current_name: str) -> None:
+        """Show dialog to rename a capture.
+
+        Args:
+            frame_id: ID of the frame to rename
+            current_name: Current display name
+        """
+        new_name, ok = QInputDialog.getText(
+            self,
+            "Rename Capture",
+            "Enter new name (leave empty to use original ID):",
+            QLineEdit.EchoMode.Normal,
+            current_name,
+        )
+        if ok:
+            self.capture_rename_requested.emit(frame_id, new_name)
+
+    def _on_item_double_clicked(self, item: QListWidgetItem) -> None:
+        """Handle double-click to rename a capture."""
+        frame_id = item.data(Qt.ItemDataRole.UserRole)
+        if frame_id is None:
+            return
+        # Find the frame to get its current name
+        frame = next((f for f in self._game_frames if f.id == frame_id), None)
+        current_name = frame.name if frame else frame_id
+        self._show_rename_dialog(frame_id, current_name)
+
+    def refresh_frame(self, frame_id: str) -> None:
+        """Refresh display for a specific frame (e.g., after rename).
+
+        Args:
+            frame_id: ID of the frame that changed
+        """
+        self._refresh_list()

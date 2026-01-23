@@ -315,12 +315,14 @@ class FrameMappingWorkspace(QWidget):
         self._ai_frames_pane.frame_tag_toggled.connect(self._on_frame_tag_toggled)
         self._controller.frame_renamed.connect(self._on_frame_organization_changed)
         self._controller.frame_tags_changed.connect(self._on_frame_organization_changed)
+        self._controller.capture_renamed.connect(self._on_capture_organization_changed)
 
         # Captures Library Pane signals
         self._captures_pane.game_frame_selected.connect(self._on_game_frame_selected)
         self._captures_pane.edit_in_sprite_editor_requested.connect(self._on_edit_game_frame)
         self._captures_pane.delete_capture_requested.connect(self._on_delete_capture)
         self._captures_pane.show_details_requested.connect(self._on_show_capture_details)
+        self._captures_pane.capture_rename_requested.connect(self._on_capture_rename_requested)
 
         # Mapping Panel (Drawer) signals - ID-based
         self._mapping_panel.mapping_selected.connect(self._on_mapping_selected)
@@ -1495,6 +1497,23 @@ class FrameMappingWorkspace(QWidget):
             frame_id: ID of the frame that changed
         """
         self._ai_frames_pane.refresh_frame(frame_id)
+
+    def _on_capture_rename_requested(self, frame_id: str, new_name: str) -> None:
+        """Handle capture rename request from Captures Library pane.
+
+        Args:
+            frame_id: ID of the capture to rename
+            new_name: New display name (empty to clear)
+        """
+        self._controller.rename_capture(frame_id, new_name)
+
+    def _on_capture_organization_changed(self, frame_id: str) -> None:
+        """Handle capture rename - refresh UI.
+
+        Args:
+            frame_id: ID of the capture that changed
+        """
+        self._captures_pane.refresh_frame(frame_id)
 
     def _on_import_capture(self) -> None:
         """Handle import capture button click."""
