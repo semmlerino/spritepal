@@ -432,7 +432,6 @@ class AIFramesPane(QWidget):
 
         edit_palette_action = menu.addAction("Edit Palette...")
         def emit_edit_palette() -> None:
-            print(f"[DEBUG] Edit Palette clicked for frame: {frame_id}")  # noqa: T201
             logger.info("Edit Palette clicked for frame: %s", frame_id)
             self.edit_frame_palette_requested.emit(frame_id)
         edit_palette_action.triggered.connect(emit_edit_palette)

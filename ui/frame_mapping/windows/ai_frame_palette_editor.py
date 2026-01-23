@@ -340,6 +340,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
             data = self._controller.get_indexed_data()
             if data is not None:
                 self._canvas.set_image(data, self._palette)
+                # Initialize brush cursor
+                self._canvas.set_brush_size(self._controller.brush_size)
         else:
             QMessageBox.warning(
                 self,
@@ -369,11 +371,13 @@ class AIFramePaletteEditorWindow(QMainWindow):
         """Decrease brush size."""
         new_size = max(1, self._controller.brush_size - 1)
         self._controller.set_brush_size(new_size)
+        self._canvas.set_brush_size(new_size)
 
     def _increase_brush(self) -> None:
         """Increase brush size."""
         new_size = min(5, self._controller.brush_size + 1)
         self._controller.set_brush_size(new_size)
+        self._canvas.set_brush_size(new_size)
 
     def _on_grid_toggled(self, checked: bool) -> None:
         """Handle grid toggle."""
@@ -381,10 +385,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _on_image_changed(self) -> None:
         """Handle image data change."""
-        print("[DEBUG] _on_image_changed called")  # noqa: T201
         data = self._controller.get_indexed_data()
         if data is not None:
-            print(f"[DEBUG] Updating canvas with data shape {data.shape}")  # noqa: T201
             self._canvas.set_image(data, self._palette)
 
     def _on_selection_changed(self) -> None:

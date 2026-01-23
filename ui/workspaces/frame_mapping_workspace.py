@@ -750,11 +750,9 @@ class FrameMappingWorkspace(QWidget):
         Args:
             ai_frame_id: AI frame ID (filename)
         """
-        print(f"[DEBUG] _on_edit_frame_palette called with: {ai_frame_id}")  # noqa: T201
         logger.info("_on_edit_frame_palette called with: %s", ai_frame_id)
         project = self._controller.project
         if project is None:
-            print("[DEBUG] No project loaded")  # noqa: T201
             logger.warning("No project loaded")
             return
 
@@ -768,15 +766,11 @@ class FrameMappingWorkspace(QWidget):
         # Get the AI frame
         ai_frame = project.get_ai_frame_by_id(ai_frame_id)
         if ai_frame is None:
-            print(f"[DEBUG] AI frame not found: {ai_frame_id}")  # noqa: T201
             logger.warning("AI frame not found: %s", ai_frame_id)
             return
 
-        print(f"[DEBUG] Found AI frame: {ai_frame.path}")  # noqa: T201
-
         # Get the sheet palette - required for palette editing
         sheet_palette = project.sheet_palette
-        print(f"[DEBUG] Sheet palette: {sheet_palette}")  # noqa: T201
         if sheet_palette is None:
             QMessageBox.warning(
                 self,

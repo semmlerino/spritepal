@@ -16,6 +16,7 @@ from PySide6.QtCore import QPointF, QRect, QRectF, Qt, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
+    QCursor,
     QImage,
     QMouseEvent,
     QPainter,
@@ -72,6 +73,8 @@ class IndexedCanvasView(QGraphicsView):
         self._pan_start: QPointF | None = None
         self._is_space_pressed = False
         self._is_dragging = False
+        self._brush_size = 1
+        self._brush_cursor: QCursor | None = None
 
     def _setup_view(self) -> None:
         """Configure view settings."""
@@ -95,6 +98,50 @@ class IndexedCanvasView(QGraphicsView):
         self._image_width = max(1, width)
         self._image_height = max(1, height)
 
+    def set_brush_size(self, size: int) -> None:
+        """Set the brush size and update cursor.
+
+        Args:
+            size: Brush size (1-5)
+        """
+        self._brush_size = max(1, min(5, size))
+        self._update_brush_cursor()
+
+    def _update_brush_cursor(self) -> None:
+        """Create and set a cursor showing the brush size."""
+        # Get current zoom level
+        zoom = self.transform().m11()  # Scale factor
+
+        # Calculate cursor size based on brush and zoom
+        # Make the cursor visible at different zoom levels
+        cursor_size = max(16, int(self._brush_size * zoom * 2))
+
+        # Create pixmap for cursor
+        pixmap = QPixmap(cursor_size + 2, cursor_size + 2)
+        pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+
+        # Draw outline square showing brush size
+        pen = QPen(QColor(255, 255, 255), 1)
+        painter.setPen(pen)
+        rect_size = int(self._brush_size * zoom)
+        offset = (cursor_size - rect_size) // 2
+        painter.drawRect(offset, offset, rect_size, rect_size)
+
+        # Draw inner square for visibility on light backgrounds
+        pen.setColor(QColor(0, 0, 0))
+        painter.setPen(pen)
+        painter.drawRect(offset + 1, offset + 1, rect_size - 2, rect_size - 2)
+
+        painter.end()
+
+        # Create cursor with hotspot at center
+        hotspot = cursor_size // 2
+        self._brush_cursor = QCursor(pixmap, hotspot, hotspot)
+        self.setCursor(self._brush_cursor)
+
     def get_zoom(self) -> float:
         """Get current zoom level."""
         return self.transform().m11()
@@ -104,6 +151,8 @@ class IndexedCanvasView(QGraphicsView):
         zoom = max(MIN_ZOOM, min(MAX_ZOOM, zoom))
         self.resetTransform()
         self.scale(zoom, zoom)
+        # Update brush cursor for new zoom level
+        self._update_brush_cursor()
 
     @override
     def drawBackground(self, painter: QPainter, rect: QRectF | QRect) -> None:
@@ -193,16 +242,12 @@ class IndexedCanvasView(QGraphicsView):
         scene_pos = self.mapToScene(event.position().toPoint())
         img_x, img_y = self._scene_to_image_coords(scene_pos)
 
-        print(f"[DEBUG] Click at scene {scene_pos} -> image ({img_x}, {img_y}), bounds ({self._image_width}, {self._image_height})")  # noqa: T201
-
         if 0 <= img_x < self._image_width and 0 <= img_y < self._image_height:
             button = 0 if event.button() == Qt.MouseButton.LeftButton else 1
-            print(f"[DEBUG] Emitting pixel_clicked({img_x}, {img_y}, {button})")  # noqa: T201
             self.pixel_clicked.emit(img_x, img_y, button)
             self._is_dragging = True
             event.accept()
         else:
-            print("[DEBUG] Click outside image bounds")  # noqa: T201
             super().mousePressEvent(event)
 
     @override
@@ -359,18 +404,16 @@ class IndexedCanvas(QWidget):
 
         height, width = self._indexed_data.shape
 
-        # Create RGBA image
-        rgba = np.zeros((height, width, 4), dtype=np.uint8)
+        # Create color lookup table from palette (16 colors + alpha)
+        lut = np.zeros((16, 4), dtype=np.uint8)
+        lut[0] = (0, 0, 0, 0)  # Index 0 = transparent
+        for i in range(1, min(16, len(self._palette.colors))):
+            r, g, b = self._palette.colors[i]
+            lut[i] = (r, g, b, 255)
 
-        for y in range(height):
-            for x in range(width):
-                idx = self._indexed_data[y, x]
-                if idx == 0:
-                    # Transparent
-                    rgba[y, x] = (0, 0, 0, 0)
-                elif 0 < idx < len(self._palette.colors):
-                    r, g, b = self._palette.colors[idx]
-                    rgba[y, x] = (r, g, b, 255)
+        # Vectorized lookup - much faster than nested loops
+        indices = np.clip(self._indexed_data, 0, 15)
+        rgba = lut[indices]
 
         # Convert to QImage
         qimage = QImage(
@@ -434,6 +477,14 @@ class IndexedCanvas(QWidget):
         self._grid_item.setVisible(show)
         if show:
             self._update_grid_overlay()
+
+    def set_brush_size(self, size: int) -> None:
+        """Set the brush size cursor.
+
+        Args:
+            size: Brush size (1-5)
+        """
+        self._view.set_brush_size(size)
 
     def set_grid_size(self, size: int) -> None:
         """Set the grid cell size."""
