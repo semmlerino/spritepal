@@ -555,11 +555,13 @@ class FrameMappingWorkspace(QWidget):
             # Sync captures selection
             self._captures_pane.select_frame(mapping.game_frame_id)
             self._selected_game_id = mapping.game_frame_id
+            self._current_canvas_game_id = mapping.game_frame_id
         else:
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
             self._captures_pane.clear_selection()
             self._selected_game_id = None
+            self._current_canvas_game_id = None
 
         self._update_map_button_state()
 
@@ -927,6 +929,7 @@ class FrameMappingWorkspace(QWidget):
             # Phase 3b fix: Clear selection if deleted frame was selected
             if self._selected_game_id == frame_id:
                 self._selected_game_id = None
+                self._current_canvas_game_id = None
                 self._alignment_canvas.set_game_frame(None)
                 self._alignment_canvas.clear_alignment()
                 self._update_map_button_state()
@@ -990,6 +993,7 @@ class FrameMappingWorkspace(QWidget):
             if self._selected_ai_frame_id == ai_frame_id:
                 self._selected_ai_frame_id = None
                 self._selected_ai_index = None
+                self._current_canvas_game_id = None
                 self._alignment_canvas.set_ai_frame(None)
                 self._alignment_canvas.clear_alignment()
                 self._update_map_button_state()
@@ -1013,6 +1017,7 @@ class FrameMappingWorkspace(QWidget):
         self._captures_pane.clear_selection()
         # Phase 3c fix: Clear selected game ID and update Map button
         self._selected_game_id = None
+        self._current_canvas_game_id = None
         self._update_map_button_state()
 
     def _on_inject_single(self, ai_frame_id: str) -> None:
@@ -1317,16 +1322,13 @@ class FrameMappingWorkspace(QWidget):
         project = self._controller.project
         if project is None:
             return
-        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
-        if ai_frame is None:
-            return
         mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         if mapping:
             self._mapping_panel.update_row_alignment(
-                ai_frame.index, mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v
+                ai_frame_id, mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v
             )
             # Also update the status column (alignment changes set status="edited")
-            self._mapping_panel.update_row_status(ai_frame.index, mapping.status)
+            self._mapping_panel.update_row_status(ai_frame_id, mapping.status)
         # Refresh status indicators (doesn't touch canvas)
         self._refresh_mapping_status()
 
@@ -1573,13 +1575,14 @@ class FrameMappingWorkspace(QWidget):
             self._ai_frames_pane.set_mapping_status({})
             return
 
-        status_map: dict[int, str] = {}
+        # Use ID-keyed status map (stable across reloads/reordering)
+        status_map: dict[str, str] = {}
         for ai_frame in project.ai_frames:
             mapping = project.get_mapping_for_ai_frame(ai_frame.id)
             if mapping:
-                status_map[ai_frame.index] = mapping.status
+                status_map[ai_frame.id] = mapping.status
             else:
-                status_map[ai_frame.index] = "unmapped"
+                status_map[ai_frame.id] = "unmapped"
 
         self._ai_frames_pane.set_mapping_status(status_map)
 

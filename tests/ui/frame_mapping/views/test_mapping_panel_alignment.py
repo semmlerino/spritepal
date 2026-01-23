@@ -59,7 +59,8 @@ class TestMappingPanelAlignmentUpdate:
         assert checkbox_0.checkState() == Qt.CheckState.Unchecked
 
         # Update alignment for first frame (simulates drag or arrow key)
-        panel.update_row_alignment(0, offset_x=5, offset_y=10, flip_h=False, flip_v=False)
+        # Note: AIFrame.id is computed from path.name, so "frame1.png" is the ID
+        panel.update_row_alignment("frame1.png", offset_x=5, offset_y=10, flip_h=False, flip_v=False)
 
         # Checkbox state should be PRESERVED
         assert checkbox_0.checkState() == Qt.CheckState.Unchecked, "Checkbox state was reset by alignment update"
@@ -102,8 +103,8 @@ class TestMappingPanelAlignmentUpdate:
         initial_game_text = game_frame_item.text()
         initial_status_text = status_item.text()
 
-        # Update alignment
-        panel.update_row_alignment(0, offset_x=15, offset_y=-20, flip_h=True, flip_v=False)
+        # Update alignment (use AI frame ID, not index)
+        panel.update_row_alignment("frame1.png", offset_x=15, offset_y=-20, flip_h=True, flip_v=False)
 
         # Verify offset and flip columns WERE updated
         offset_item = panel._table.item(0, 4)
@@ -138,14 +139,14 @@ class TestMappingPanelAlignmentUpdate:
         panel.set_project(project)
         panel.refresh()
 
-        # Set non-zero offset first
-        panel.update_row_alignment(0, offset_x=5, offset_y=5, flip_h=False, flip_v=False)
+        # Set non-zero offset first (use AI frame ID)
+        panel.update_row_alignment("frame1.png", offset_x=5, offset_y=5, flip_h=False, flip_v=False)
         offset_item = panel._table.item(0, 4)
         assert offset_item is not None
         assert offset_item.text() == "(5, 5)"
 
         # Update to zero offset
-        panel.update_row_alignment(0, offset_x=0, offset_y=0, flip_h=False, flip_v=False)
+        panel.update_row_alignment("frame1.png", offset_x=0, offset_y=0, flip_h=False, flip_v=False)
         assert offset_item.text() == "—"
 
     def test_alignment_update_handles_both_flips(self, qtbot) -> None:
@@ -168,14 +169,14 @@ class TestMappingPanelAlignmentUpdate:
         panel.set_project(project)
         panel.refresh()
 
-        # Update with both flips
-        panel.update_row_alignment(0, offset_x=0, offset_y=0, flip_h=True, flip_v=True)
+        # Update with both flips (use AI frame ID)
+        panel.update_row_alignment("frame1.png", offset_x=0, offset_y=0, flip_h=True, flip_v=True)
         flip_item = panel._table.item(0, 5)
         assert flip_item is not None
         assert flip_item.text() == "HV"
 
     def test_alignment_update_for_nonexistent_row_is_noop(self, qtbot) -> None:
-        """Updating alignment for non-existent AI index does nothing."""
+        """Updating alignment for non-existent AI frame ID does nothing."""
         panel = MappingPanel()
         qtbot.addWidget(panel)
 
@@ -195,7 +196,7 @@ class TestMappingPanelAlignmentUpdate:
         panel.refresh()
 
         # Try to update non-existent row (should not raise)
-        panel.update_row_alignment(999, offset_x=10, offset_y=10, flip_h=True, flip_v=True)
+        panel.update_row_alignment("nonexistent_frame.png", offset_x=10, offset_y=10, flip_h=True, flip_v=True)
 
         # Verify existing row was not affected
         offset_item = panel._table.item(0, 4)
@@ -237,8 +238,8 @@ class TestMappingPanelStatusUpdate:
         assert status_item is not None
         assert "Mapped" in status_item.text()
 
-        # Update status to "edited"
-        panel.update_row_status(0, "edited")
+        # Update status to "edited" (use AI frame ID)
+        panel.update_row_status("frame1.png", "edited")
 
         # Verify status column was updated
         assert "Edited" in status_item.text()
@@ -270,8 +271,8 @@ class TestMappingPanelStatusUpdate:
         panel.set_project(project)
         panel.refresh()
 
-        # Update status to "unmapped"
-        panel.update_row_status(0, "unmapped")
+        # Update status to "unmapped" (use AI frame ID)
+        panel.update_row_status("frame1.png", "unmapped")
 
         status_item = panel._table.item(0, 6)
         assert status_item is not None
@@ -319,8 +320,8 @@ class TestMappingPanelStatusUpdate:
         initial_flip = flip_item.text()
         initial_checkbox = checkbox_item.checkState()
 
-        # Update status
-        panel.update_row_status(0, "injected")
+        # Update status (use AI frame ID)
+        panel.update_row_status("frame1.png", "injected")
 
         # Verify other columns were NOT changed
         assert offset_item.text() == initial_offset
@@ -328,7 +329,7 @@ class TestMappingPanelStatusUpdate:
         assert checkbox_item.checkState() == initial_checkbox
 
     def test_status_update_for_nonexistent_row_is_noop(self, qtbot) -> None:
-        """Updating status for non-existent AI index does nothing."""
+        """Updating status for non-existent AI frame ID does nothing."""
         panel = MappingPanel()
         qtbot.addWidget(panel)
 
@@ -359,7 +360,7 @@ class TestMappingPanelStatusUpdate:
         initial_status = status_item.text()
 
         # Try to update non-existent row (should not raise)
-        panel.update_row_status(999, "edited")
+        panel.update_row_status("nonexistent_frame.png", "edited")
 
         # Verify existing row was not affected
         assert status_item.text() == initial_status

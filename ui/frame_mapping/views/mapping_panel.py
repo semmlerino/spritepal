@@ -264,8 +264,8 @@ class MappingPanel(QWidget):
                 row = self._table.rowCount()
                 self._table.insertRow(row)
 
-                # Get mapping to determine if frame is mapped
-                mapping = self._project.get_mapping_for_ai_frame_index(ai_frame.index)
+                # Get mapping to determine if frame is mapped (use ID-based lookup)
+                mapping = self._project.get_mapping_for_ai_frame(ai_frame.id)
                 is_mapped = mapping is not None
 
                 # Checkbox column (column 0)
@@ -294,6 +294,8 @@ class MappingPanel(QWidget):
                 # AI Frame column with thumbnail - column 2
                 ai_item = QTableWidgetItem(ai_frame.path.name)
                 ai_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
+                # Also store AI frame ID for ID-based lookups
+                ai_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
                 # Load thumbnail
                 if ai_frame.path.exists():
                     pixmap = QPixmap(str(ai_frame.path))
@@ -440,7 +442,7 @@ class MappingPanel(QWidget):
 
     def update_row_alignment(
         self,
-        ai_index: int,
+        ai_frame_id: str,
         offset_x: int,
         offset_y: int,
         flip_h: bool,
@@ -452,16 +454,16 @@ class MappingPanel(QWidget):
         during interactive alignment adjustments (dragging, arrow keys).
 
         Args:
-            ai_index: AI frame index to update
+            ai_frame_id: AI frame ID (filename) to update
             offset_x: New X offset
             offset_y: New Y offset
             flip_h: Horizontal flip state
             flip_v: Vertical flip state
         """
-        # Find the row for this AI frame
+        # Find the row for this AI frame by ID
         for row in range(self._table.rowCount()):
-            ai_item = self._table.item(row, 2)  # AI Frame column
-            if ai_item is not None and ai_item.data(Qt.ItemDataRole.UserRole) == ai_index:
+            checkbox_item = self._table.item(row, 0)  # Checkbox column stores ID in UserRole+1
+            if checkbox_item is not None and checkbox_item.data(Qt.ItemDataRole.UserRole + 1) == ai_frame_id:
                 # Update Offset column (4)
                 if offset_x != 0 or offset_y != 0:
                     offset_text = f"({offset_x}, {offset_y})"
@@ -484,20 +486,20 @@ class MappingPanel(QWidget):
 
                 break
 
-    def update_row_status(self, ai_index: int, status: str) -> None:
+    def update_row_status(self, ai_frame_id: str, status: str) -> None:
         """Update only the status column for a specific row.
 
         This is more efficient than full refresh() and preserves checkbox state
         during interactive alignment adjustments (dragging, arrow keys).
 
         Args:
-            ai_index: AI frame index to update
+            ai_frame_id: AI frame ID (filename) to update
             status: New status ("unmapped", "mapped", "edited", "injected")
         """
-        # Find the row for this AI frame
+        # Find the row for this AI frame by ID
         for row in range(self._table.rowCount()):
-            ai_item = self._table.item(row, 2)  # AI Frame column
-            if ai_item is not None and ai_item.data(Qt.ItemDataRole.UserRole) == ai_index:
+            checkbox_item = self._table.item(row, 0)  # Checkbox column stores ID in UserRole+1
+            if checkbox_item is not None and checkbox_item.data(Qt.ItemDataRole.UserRole + 1) == ai_frame_id:
                 # Update Status column (6)
                 status_indicator = "●" if status != "unmapped" else "○"
                 status_item = self._table.item(row, 6)
@@ -522,8 +524,8 @@ class MappingPanel(QWidget):
 
     def _update_button_states(self) -> None:
         """Update button enabled states based on current selection."""
-        ai_index = self.get_selected_ai_frame_index()
-        if ai_index is None:
+        ai_frame_id = self.get_selected_ai_frame_id()
+        if ai_frame_id is None:
             self._edit_button.setEnabled(False)
             self._align_button.setEnabled(False)
             self._remove_button.setEnabled(False)
@@ -532,7 +534,7 @@ class MappingPanel(QWidget):
 
         has_mapping = False
         if self._project:
-            mapping = self._project.get_mapping_for_ai_frame_index(ai_index)
+            mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
             has_mapping = mapping is not None
 
         self._edit_button.setEnabled(True)
@@ -578,19 +580,17 @@ class MappingPanel(QWidget):
             return
 
         row = item.row()
-        ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
         checkbox_item = self._table.item(row, 0)  # Checkbox column has ID
-        if ai_item is None or checkbox_item is None:
+        if checkbox_item is None:
             return
 
-        ai_index = ai_item.data(Qt.ItemDataRole.UserRole)
         ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
-        if ai_index is None or ai_frame_id is None:
+        if ai_frame_id is None:
             return
 
         has_mapping = False
         if self._project:
-            mapping = self._project.get_mapping_for_ai_frame_index(ai_index)
+            mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
             has_mapping = mapping is not None
 
         menu = QMenu(self)
@@ -714,13 +714,11 @@ class MappingPanel(QWidget):
             for row in range(self._table.rowCount()):
                 checkbox_item = self._table.item(row, 0)
                 if checkbox_item:
-                    ai_index = checkbox_item.data(Qt.ItemDataRole.UserRole)
                     ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
-                    # Only check mapped frames
-                    if self._project.get_mapping_for_ai_frame_index(ai_index):
+                    # Only check mapped frames (use ID-based lookup)
+                    if ai_frame_id and self._project.get_mapping_for_ai_frame(ai_frame_id):
                         checkbox_item.setCheckState(Qt.CheckState.Checked)
-                        if ai_frame_id is not None:
-                            self._user_checked_ai_frame_ids.add(ai_frame_id)
+                        self._user_checked_ai_frame_ids.add(ai_frame_id)
         finally:
             self._table.blockSignals(False)
 
@@ -810,7 +808,8 @@ class MappingPanel(QWidget):
             checkbox_item = self._table.item(row, 0)
             if checkbox_item and checkbox_item.checkState() == Qt.CheckState.Checked:
                 ai_index = checkbox_item.data(Qt.ItemDataRole.UserRole)
-                # Only include if actually mapped
-                if self._project.get_mapping_for_ai_frame_index(ai_index):
+                ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
+                # Only include if actually mapped (use ID-based lookup)
+                if ai_frame_id and self._project.get_mapping_for_ai_frame(ai_frame_id):
                     selected.append(ai_index)
         return selected

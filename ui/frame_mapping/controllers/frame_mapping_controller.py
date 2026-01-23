@@ -614,11 +614,14 @@ class FrameMappingController(QObject):
                     else:
                         return cached_pixmap
                 else:
-                    # No file to compare - return cached (file may have been deleted)
-                    return cached_pixmap
+                    # File missing: invalidate cache and fall through to regeneration
+                    # (which will return None since file doesn't exist)
+                    del self._game_frame_previews[frame_id]
+                    cache_was_invalidated = True
             else:
-                # No project/game_frame - return cached
-                return cached_pixmap
+                # No project/game_frame - invalidate stale cache entry
+                del self._game_frame_previews[frame_id]
+                return None
 
         # Try to regenerate from capture file (with filtering applied)
         capture_result, _ = self.get_capture_result_for_game_frame(frame_id)

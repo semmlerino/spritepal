@@ -97,7 +97,7 @@ class AIFramesPane(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._ai_frames: list[AIFrame] = []
-        self._mapping_status: dict[int, str] = {}  # ai_frame_index -> status
+        self._mapping_status: dict[str, str] = {}  # ai_frame_id -> status
         self._show_unmapped_only = False
         self._search_text: str = ""
         self._tag_filter: str = ""  # Empty = show all, or specific tag to filter
@@ -247,11 +247,11 @@ class AIFramesPane(QWidget):
         # Enable palette buttons when frames are loaded
         self._palette_widget.set_buttons_enabled(len(frames) > 0)
 
-    def set_mapping_status(self, status_map: dict[int, str]) -> None:
+    def set_mapping_status(self, status_map: dict[str, str]) -> None:
         """Update the mapping status for AI frames.
 
         Args:
-            status_map: Dictionary mapping AI frame index to status string
+            status_map: Dictionary mapping AI frame ID (filename) to status string
         """
         self._mapping_status = status_map
         self._refresh_list(is_frame_list_change=False)
@@ -537,7 +537,8 @@ class AIFramesPane(QWidget):
             total_count = len(self._ai_frames)
 
             for frame in self._ai_frames:
-                status = self._mapping_status.get(frame.index, "unmapped")
+                # Use ID-based lookup for status (stable across reloads/reordering)
+                status = self._mapping_status.get(frame.id, "unmapped")
 
                 # Apply unmapped filter
                 if self._show_unmapped_only and status != "unmapped":

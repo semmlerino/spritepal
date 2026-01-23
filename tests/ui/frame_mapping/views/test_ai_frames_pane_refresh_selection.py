@@ -54,7 +54,8 @@ class TestRefreshPreservesSelection:
         signal_emissions: list[str] = []
         pane.ai_frame_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
 
-        status_map = dict.fromkeys(range(5), "mapped")
+        # Use AI frame IDs (filenames) as keys
+        status_map = {f"frame_{i:03d}.png": "mapped" for i in range(5)}
         pane.set_mapping_status(status_map)
 
         assert pane.get_selected_index() == 2
@@ -90,8 +91,14 @@ class TestFilterClearsSelectionSignal:
         frames = create_ai_frames(tmp_path, num_frames=5)
         pane.set_ai_frames(frames)
 
-        # Mark frame 2 as mapped
-        pane.set_mapping_status({0: "unmapped", 1: "unmapped", 2: "mapped", 3: "unmapped", 4: "unmapped"})
+        # Mark frame 2 as mapped (use AI frame IDs as keys)
+        pane.set_mapping_status({
+            "frame_000.png": "unmapped",
+            "frame_001.png": "unmapped",
+            "frame_002.png": "mapped",
+            "frame_003.png": "unmapped",
+            "frame_004.png": "unmapped",
+        })
 
         # Select the mapped frame
         pane.select_frame(2)
@@ -139,8 +146,14 @@ class TestFilterClearsSelectionSignal:
         frames = create_ai_frames(tmp_path, num_frames=5)
         pane.set_ai_frames(frames)
 
-        # Mark all as unmapped except frame 3
-        pane.set_mapping_status({0: "unmapped", 1: "unmapped", 2: "unmapped", 3: "mapped", 4: "unmapped"})
+        # Mark all as unmapped except frame 3 (use AI frame IDs as keys)
+        pane.set_mapping_status({
+            "frame_000.png": "unmapped",
+            "frame_001.png": "unmapped",
+            "frame_002.png": "unmapped",
+            "frame_003.png": "mapped",
+            "frame_004.png": "unmapped",
+        })
 
         # Select an unmapped frame
         pane.select_frame(0)
