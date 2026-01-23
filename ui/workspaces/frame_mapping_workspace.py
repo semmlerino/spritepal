@@ -365,6 +365,9 @@ class FrameMappingWorkspace(QWidget):
 
         self._project_label.setText(f"- {project.name}")
         self._ai_frames_pane.set_ai_frames(project.ai_frames)
+        # Sync tab folder from project if current tab is empty
+        if project.ai_frames_dir and self._ai_frames_pane.get_current_tab_folder() is None:
+            self._ai_frames_pane.set_current_tab_folder(project.ai_frames_dir)
         self._ai_frames_pane.set_sheet_palette(project.sheet_palette)  # Load sheet palette
         self._captures_pane.set_game_frames(project.game_frames)
         self._mapping_panel.set_project(project)

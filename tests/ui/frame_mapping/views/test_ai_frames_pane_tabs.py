@@ -284,3 +284,59 @@ class TestClearResetsTabs:
         assert pane._tab_bar.count() == 1
         assert pane._tab_bar.tabText(0) == "New"
         assert pane._tab_folders == [None]
+
+
+class TestTabFolderPreservation:
+    """Tests for tab folder preservation when switching tabs.
+
+    Bug: When adding a new tab, the previous tab's folder association was lost,
+    causing frames to not reload when switching back.
+    """
+
+    def test_switching_back_to_original_tab_emits_folder(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Switching back to original tab should emit its folder path."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        folder1 = tmp_path / "v1_sprites"
+        folder1.mkdir()
+
+        # Set folder on first tab
+        pane.set_current_tab_folder(folder1)
+        assert pane._tab_bar.tabText(0) == "v1_sprites"
+        assert pane.get_current_tab_folder() == folder1
+
+        # Add new empty tab
+        pane._on_add_tab_clicked()
+        assert pane._tab_bar.count() == 2
+        assert pane._tab_bar.currentIndex() == 1
+        assert pane.get_current_tab_folder() is None
+
+        # Collect signals when switching back
+        emitted_paths: list[Path | None] = []
+        pane.tab_folder_changed.connect(lambda p: emitted_paths.append(p))
+
+        # Switch back to first tab
+        pane._tab_bar.setCurrentIndex(0)
+
+        # Should emit folder1 path for reloading frames
+        assert len(emitted_paths) == 1
+        assert emitted_paths[0] == folder1
+
+    def test_tab_folder_survives_add_tab(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Adding a new tab should not affect previous tab's folder."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        folder = tmp_path / "sprites"
+        folder.mkdir()
+
+        # Set folder on first tab
+        pane.set_current_tab_folder(folder)
+
+        # Add new tab (switches to it)
+        pane._on_add_tab_clicked()
+
+        # First tab should still have its folder
+        assert pane._tab_folders[0] == folder
+        assert pane._tab_bar.tabText(0) == "sprites"
