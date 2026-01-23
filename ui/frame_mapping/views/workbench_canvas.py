@@ -1419,16 +1419,34 @@ class WorkbenchCanvas(QWidget):
         if self._ai_image is None:
             return None
 
-        # Convert scene coords to AI image coords
-        # Scene is scaled by DISPLAY_SCALE, so divide to get original coords
-        img_x = int(scene_x / DISPLAY_SCALE)
-        img_y = int(scene_y / DISPLAY_SCALE)
+        # Get AI frame transform parameters
+        frame_pos = self._ai_frame_item.pos()
+        user_scale = self._ai_frame_item.scale_factor()
+        flip_h = self._flip_h_checkbox.isChecked()
+        flip_v = self._flip_v_checkbox.isChecked()
 
-        # Check bounds
-        if img_x < 0 or img_x >= self._ai_image.width:
+        # Convert scene coords to local coords (relative to AI frame item)
+        local_x = scene_x - frame_pos.x()
+        local_y = scene_y - frame_pos.y()
+
+        # Divide by total scale (DISPLAY_SCALE * user_scale) to get original image coords
+        total_scale = DISPLAY_SCALE * user_scale
+        img_x = int(local_x / total_scale)
+        img_y = int(local_y / total_scale)
+
+        # Check bounds before applying flip (bounds are in original image space)
+        width = self._ai_image.width
+        height = self._ai_image.height
+        if img_x < 0 or img_x >= width:
             return None
-        if img_y < 0 or img_y >= self._ai_image.height:
+        if img_y < 0 or img_y >= height:
             return None
+
+        # Apply inverse flip to get actual pixel in original (non-flipped) image
+        if flip_h:
+            img_x = width - 1 - img_x
+        if flip_v:
+            img_y = height - 1 - img_y
 
         # Get pixel color from AI image
         try:
@@ -1497,11 +1515,7 @@ class WorkbenchCanvas(QWidget):
         for idx, pal_color in enumerate(self._sheet_palette.colors):
             if idx == 0:
                 continue  # Skip transparency index
-            dist = (
-                (color[0] - pal_color[0]) ** 2
-                + (color[1] - pal_color[1]) ** 2
-                + (color[2] - pal_color[2]) ** 2
-            )
+            dist = (color[0] - pal_color[0]) ** 2 + (color[1] - pal_color[1]) ** 2 + (color[2] - pal_color[2]) ** 2
             if dist < min_dist:
                 min_dist = dist
                 best_idx = idx
@@ -1595,6 +1609,11 @@ class WorkbenchCanvas(QWidget):
         if self._pixel_highlight_item is None:
             return
 
+        # Get current transform parameters
+        user_scale = self._ai_frame_item.scale_factor()
+        flip_h = self._flip_h_checkbox.isChecked()
+        flip_v = self._flip_v_checkbox.isChecked()
+
         # Generate mask showing pixels using this palette index
         try:
             # Create a mask image with same size as AI frame
@@ -1629,13 +1648,17 @@ class WorkbenchCanvas(QWidget):
                         # Highlight this pixel with yellow tint at 50% opacity
                         pixels[x, y] = (255, 255, 0, 128)
 
-            # Convert to QPixmap and display
-            # Scale to display size
-            scaled_width = width * DISPLAY_SCALE
-            scaled_height = height * DISPLAY_SCALE
-            scaled_mask = mask.resize(
-                (scaled_width, scaled_height), Image.Resampling.NEAREST
-            )
+            # Apply flip transforms to match AI frame display
+            if flip_h:
+                mask = mask.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            if flip_v:
+                mask = mask.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+
+            # Scale to display size (DISPLAY_SCALE * user_scale)
+            total_scale = DISPLAY_SCALE * user_scale
+            scaled_width = int(width * total_scale)
+            scaled_height = int(height * total_scale)
+            scaled_mask = mask.resize((scaled_width, scaled_height), Image.Resampling.NEAREST)
 
             # Convert PIL image to QPixmap
             data = scaled_mask.tobytes("raw", "RGBA")
