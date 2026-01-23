@@ -222,6 +222,16 @@ class MappingPanel(QWidget):
         """
         self._game_frame_previews = previews
 
+    def update_game_frame_preview(self, frame_id: str, preview: QPixmap) -> None:
+        """Update the preview for a single game frame.
+
+        Args:
+            frame_id: The game frame ID
+            preview: The new preview QPixmap
+        """
+        self._game_frame_previews[frame_id] = preview
+        self.refresh()
+
     def refresh(self) -> None:
         """Refresh the mapping table from the current project."""
         # Store current selection by ID (stable across reordering)

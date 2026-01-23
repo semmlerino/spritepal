@@ -93,6 +93,9 @@ class FrameMappingWorkspace(QWidget):
         # ID-based selection (stable across reloads - preferred)
         self._selected_ai_frame_id: str | None = None
         self._selected_game_id: str | None = None
+        # Canvas display tracking - what the canvas is actually showing
+        # May differ from _selected_game_id when user clicks a different capture
+        self._current_canvas_game_id: str | None = None
 
         # Auto-advance toggle state (default: OFF per UX spec)
         self._auto_advance_enabled = False
@@ -293,6 +296,7 @@ class FrameMappingWorkspace(QWidget):
         self._controller.save_requested.connect(self._auto_save_after_injection)
         self._controller.stale_entries_warning.connect(self._on_stale_entries_warning)
         self._controller.alignment_updated.connect(self._on_alignment_updated)
+        self._controller.preview_cache_invalidated.connect(self._on_preview_cache_invalidated)
 
         # AI Frames Pane signals
         self._ai_frames_pane.ai_frame_selected.connect(self._on_ai_frame_selected)
@@ -438,6 +442,9 @@ class FrameMappingWorkspace(QWidget):
             self._alignment_canvas.set_ai_frame(None)
             self._alignment_canvas.clear_alignment()
             self._mapping_panel.clear_selection()
+            self._captures_pane.clear_selection()
+            self._selected_game_id = None
+            self._current_canvas_game_id = None
             return
 
         self._selected_ai_frame_id = frame_id
@@ -462,14 +469,16 @@ class FrameMappingWorkspace(QWidget):
             self._alignment_canvas.set_alignment(
                 mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
             )
-            # Sync captures selection
+            # Sync captures selection and track canvas state
             self._captures_pane.select_frame(mapping.game_frame_id)
             self._selected_game_id = mapping.game_frame_id
+            self._current_canvas_game_id = mapping.game_frame_id
         else:
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
             self._captures_pane.clear_selection()
             self._selected_game_id = None
+            self._current_canvas_game_id = None
 
         self._update_map_button_state()
 
@@ -486,6 +495,7 @@ class FrameMappingWorkspace(QWidget):
         # Guard against invalid selections
         if not frame_id:
             self._selected_game_id = None
+            self._current_canvas_game_id = None
             # Phase 3a fix: Clear canvas state
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
@@ -501,6 +511,7 @@ class FrameMappingWorkspace(QWidget):
             preview = self._controller.get_game_frame_preview(frame_id)
             capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
+            self._current_canvas_game_id = frame_id
 
     def _on_mapping_selected(self, ai_frame_id: str) -> None:
         """Handle mapping row selection in drawer.
@@ -589,7 +600,12 @@ class FrameMappingWorkspace(QWidget):
         self._attempt_link(ai_frame.index, game_frame_id)
 
     def _on_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
-        """Handle alignment change from canvas (auto-save)."""
+        """Handle alignment change from canvas (auto-save).
+
+        Alignment changes are only applied when the canvas is displaying the same
+        game frame as the existing mapping. This prevents accidental edits when
+        the user is previewing a different capture.
+        """
         if self._selected_ai_frame_id is None:
             return
 
@@ -599,6 +615,15 @@ class FrameMappingWorkspace(QWidget):
 
         mapping = project.get_mapping_for_ai_frame(self._selected_ai_frame_id)
         if mapping is None:
+            return
+
+        # Block alignment edit if canvas is showing a different game frame than the mapping
+        # This prevents accidentally modifying the mapping when previewing other captures
+        if self._current_canvas_game_id != mapping.game_frame_id:
+            logger.debug(
+                f"Blocking alignment change: canvas shows {self._current_canvas_game_id}, "
+                f"mapping points to {mapping.game_frame_id}"
+            )
             return
 
         # Derive index for methods that still use index-based API
@@ -1553,6 +1578,23 @@ class FrameMappingWorkspace(QWidget):
         # Also update captures pane with previews for thumbnails
         self._captures_pane.set_game_frame_previews(previews)
 
+    def _on_preview_cache_invalidated(self, frame_id: str) -> None:
+        """Handle preview cache invalidation for a specific game frame.
+
+        Updates the mapping panel and captures pane with the fresh preview thumbnail
+        for the invalidated frame.
+
+        Args:
+            frame_id: The game frame ID whose preview was regenerated
+        """
+        preview = self._controller.get_game_frame_preview(frame_id)
+        if preview:
+            # Update mapping panel with the fresh preview
+            self._mapping_panel.update_game_frame_preview(frame_id, preview)
+            # Update captures pane thumbnail
+            self._captures_pane.update_frame_preview(frame_id, preview)
+            logger.debug("Updated thumbnails for invalidated preview: %s", frame_id)
+
     # -------------------------------------------------------------------------
     # File Operations
     # -------------------------------------------------------------------------
@@ -1602,8 +1644,9 @@ class FrameMappingWorkspace(QWidget):
             self._last_ai_dir = path
             self._controller.load_ai_frames_from_directory(path)
         elif self._controller.project is not None:
-            # Empty tab - clear frames
+            # Empty tab - clear frames and orphaned mappings
             self._controller.project.replace_ai_frames([], None)
+            self._controller.project.filter_mappings_by_valid_ai_ids(set())
             self._controller.project_changed.emit()
 
     def _on_frame_rename_requested(self, frame_id: str, display_name: str) -> None:

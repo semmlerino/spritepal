@@ -83,6 +83,8 @@ class FrameMappingController(QObject):
     frame_tags_changed = Signal(str)  # ai_frame_id - tags changed
     # Capture Organization signals
     capture_renamed = Signal(str)  # game_frame_id - display name changed
+    # Preview cache signal - emitted when a preview is regenerated (mtime/entries changed)
+    preview_cache_invalidated = Signal(str)  # game_frame_id - preview was regenerated
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -584,6 +586,8 @@ class FrameMappingController(QObject):
         filtering to show only the selected entries in the preview.
 
         Cache key includes (mtime, selected_entry_ids) to invalidate when either changes.
+        Emits preview_cache_invalidated when a cached preview is regenerated due to
+        mtime or entry ID changes.
 
         Args:
             frame_id: Game frame ID
@@ -591,6 +595,8 @@ class FrameMappingController(QObject):
         Returns:
             QPixmap preview or None if not available
         """
+        cache_was_invalidated = False
+
         # Check cache first
         if frame_id in self._game_frame_previews:
             cached_pixmap, cached_mtime, cached_entries = self._game_frame_previews[frame_id]
@@ -608,11 +614,13 @@ class FrameMappingController(QObject):
                             "Preview cache invalidated for %s (mtime changed)",
                             frame_id,
                         )
+                        cache_was_invalidated = True
                     elif current_entries != cached_entries:
                         logger.debug(
                             "Preview cache invalidated for %s (selected_entry_ids changed)",
                             frame_id,
                         )
+                        cache_was_invalidated = True
                     else:
                         return cached_pixmap
                 else:
@@ -644,6 +652,11 @@ class FrameMappingController(QObject):
 
             self._game_frame_previews[frame_id] = (pixmap, current_mtime, current_entries)
             logger.debug("Regenerated preview for game frame %s from capture file", frame_id)
+
+            # Notify if this was a cache invalidation (not first-time generation)
+            if cache_was_invalidated:
+                self.preview_cache_invalidated.emit(frame_id)
+
             return pixmap
 
         except Exception as e:

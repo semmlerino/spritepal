@@ -154,6 +154,16 @@ class CapturesLibraryPane(QWidget):
         self._game_frame_previews = previews
         self._refresh_list()
 
+    def update_frame_preview(self, frame_id: str, preview: QPixmap) -> None:
+        """Update the preview for a single game frame and refresh display.
+
+        Args:
+            frame_id: The game frame ID
+            preview: The new preview QPixmap
+        """
+        self._game_frame_previews[frame_id] = preview
+        self._refresh_list()
+
     def get_selected_id(self) -> str | None:
         """Get the currently selected game frame ID."""
         current = self._list.currentItem()
