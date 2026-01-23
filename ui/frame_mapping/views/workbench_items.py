@@ -88,7 +88,7 @@ class ScaleHandle(QGraphicsRectItem):
 
     @override
     def mouseMoveEvent(self, event: object) -> None:
-        """Handle scale drag."""
+        """Handle scale drag, preserving center position."""
         from PySide6.QtWidgets import QGraphicsSceneMouseEvent
 
         if isinstance(event, QGraphicsSceneMouseEvent) and self._drag_start_pos is not None:
@@ -104,7 +104,17 @@ class ScaleHandle(QGraphicsRectItem):
                 new_scale = self._drag_start_scale * scale_factor
                 # Clamp scale
                 new_scale = max(0.1, min(10.0, new_scale))
+
+                # Capture center before scaling
+                center_before = self._ai_frame.sceneBoundingRect().center()
+
+                # Apply scale
                 self._ai_frame.set_scale_factor(new_scale)
+
+                # Reposition to preserve center
+                center_after = self._ai_frame.sceneBoundingRect().center()
+                delta = center_before - center_after
+                self._ai_frame.setPos(self._ai_frame.pos() + delta)
 
             event.accept()
 
@@ -155,6 +165,7 @@ class AIFrameItem(QGraphicsObject):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsFocusable, True)
         self.setAcceptHoverEvents(True)
 
         # Create scale handles
@@ -290,6 +301,8 @@ class AIFrameItem(QGraphicsObject):
             self._emit_transform()
         elif change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
             self.show_handles(bool(value))
+            if value:  # When selected, take focus to receive key events
+                self.setFocus()
         return super().itemChange(change, value)
 
     @override
