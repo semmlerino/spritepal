@@ -224,8 +224,8 @@ class MappingPanel(QWidget):
 
     def refresh(self) -> None:
         """Refresh the mapping table from the current project."""
-        # Store current selection before clearing
-        current_selection = self.get_selected_ai_frame_index()
+        # Store current selection by ID (stable across reordering)
+        current_selection_id = self.get_selected_ai_frame_id()
 
         # Capture current checkbox state by AI frame ID (stable across index changes)
         # Only capture if user has modified checkboxes (_user_checked_ai_frame_ids is not None)
@@ -353,9 +353,9 @@ class MappingPanel(QWidget):
         finally:
             self._table.blockSignals(False)
 
-        # Restore selection (outside try/finally so signals fire normally if needed)
-        if current_selection is not None:
-            self.select_row_by_ai_index(current_selection)
+        # Restore selection by ID (stable across reordering)
+        if current_selection_id is not None:
+            self.select_row_by_ai_id(current_selection_id)
 
         # Update inject selected button state
         self._update_inject_selected_state()
@@ -403,6 +403,8 @@ class MappingPanel(QWidget):
                     break
         finally:
             self._table.blockSignals(False)
+        # Update button states since signals were blocked during selection
+        self._update_button_states()
 
     def select_row_by_ai_id(self, ai_frame_id: str) -> None:
         """Select a row by AI frame ID (filename).
@@ -423,6 +425,8 @@ class MappingPanel(QWidget):
                     break
         finally:
             self._table.blockSignals(False)
+        # Update button states since signals were blocked during selection
+        self._update_button_states()
 
     def update_row_alignment(
         self,
@@ -480,30 +484,35 @@ class MappingPanel(QWidget):
             self._table.clearSelection()
         finally:
             self._table.blockSignals(False)
+        # Update button states since signals were blocked during selection clear
+        self._update_button_states()
 
-    def _on_selection_changed(self) -> None:
-        """Handle selection change in the mapping table."""
+    def _update_button_states(self) -> None:
+        """Update button enabled states based on current selection."""
         ai_index = self.get_selected_ai_frame_index()
-        ai_frame_id = self.get_selected_ai_frame_id()
-        if ai_index is None or ai_frame_id is None:
+        if ai_index is None:
             self._edit_button.setEnabled(False)
             self._align_button.setEnabled(False)
             self._remove_button.setEnabled(False)
             self._inject_button.setEnabled(False)
             return
 
-        # Check if there's a mapping for this frame
         has_mapping = False
         if self._project:
             mapping = self._project.get_mapping_for_ai_frame_index(ai_index)
             has_mapping = mapping is not None
 
-        self._edit_button.setEnabled(True)  # Can always edit AI frame
+        self._edit_button.setEnabled(True)
         self._align_button.setEnabled(has_mapping)
         self._remove_button.setEnabled(has_mapping)
         self._inject_button.setEnabled(has_mapping)
 
-        self.mapping_selected.emit(ai_frame_id)
+    def _on_selection_changed(self) -> None:
+        """Handle selection change in the mapping table."""
+        self._update_button_states()
+        ai_frame_id = self.get_selected_ai_frame_id()
+        if ai_frame_id is not None:
+            self.mapping_selected.emit(ai_frame_id)
 
     def _on_edit_clicked(self) -> None:
         """Handle edit button click."""

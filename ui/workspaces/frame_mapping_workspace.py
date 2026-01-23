@@ -577,9 +577,9 @@ class FrameMappingWorkspace(QWidget):
         ai_index = ai_frame.index
 
         # Update alignment in controller (includes scale)
+        # This emits alignment_updated signal which triggers _on_alignment_updated()
+        # which handles updating the mapping panel row
         self._controller.update_mapping_alignment(ai_index, x, y, flip_h, flip_v, scale)
-        # Use targeted row update instead of full refresh to preserve checkbox state
-        self._mapping_panel.update_row_alignment(ai_index, x, y, flip_h, flip_v)
 
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.
@@ -732,6 +732,7 @@ class FrameMappingWorkspace(QWidget):
         self._controller.remove_mapping_by_id(ai_frame_id)
         self._refresh_mapping_status()
         self._refresh_game_frame_link_status()
+        self._mapping_panel.refresh()  # Refresh table after mapping removal
         self._alignment_canvas.clear_alignment()
         # Phase 3c fix: Clear game frame from canvas and update map button
         self._alignment_canvas.set_game_frame(None)
@@ -992,6 +993,7 @@ class FrameMappingWorkspace(QWidget):
             self._message_service.show_message(f"Injection successful for frame {ai_frame_id}")
 
         self._refresh_mapping_status()
+        self._mapping_panel.refresh()  # Refresh table to show updated status
         QMessageBox.information(self, "Injection Successful", message)
 
     def _auto_save_after_injection(self) -> None:
@@ -1179,7 +1181,12 @@ class FrameMappingWorkspace(QWidget):
         self._ai_frames_pane.set_map_button_enabled(both_selected)
 
     def _refresh_mapping_status(self) -> None:
-        """Refresh the AI frame mapping status indicators."""
+        """Refresh the AI frame mapping status indicators.
+
+        Note: This only updates status indicators. Callers that also need
+        to refresh the mapping panel table should call _update_mapping_panel_previews()
+        or _mapping_panel.refresh() separately.
+        """
         project = self._controller.project
         if project is None:
             self._ai_frames_pane.set_mapping_status({})
@@ -1194,7 +1201,6 @@ class FrameMappingWorkspace(QWidget):
                 status_map[ai_frame.index] = "unmapped"
 
         self._ai_frames_pane.set_mapping_status(status_map)
-        self._mapping_panel.refresh()
 
     def _refresh_game_frame_link_status(self) -> None:
         """Refresh the game frame link status indicators."""
