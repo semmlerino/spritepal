@@ -544,13 +544,13 @@ class IndexedCanvas(QWidget):
             self._selection_item.setPixmap(QPixmap())
             return
 
-        # Create semi-transparent green overlay for selected pixels
+        # Create semi-transparent cyan overlay for selected pixels (distinct from green highlight)
         # Use BGRA order for Format_ARGB32
         overlay = np.zeros((height, width, 4), dtype=np.uint8)
 
         for x, y in self._selection_mask.get_selected_pixels():
             if 0 <= x < width and 0 <= y < height:
-                overlay[y, x] = (0, 255, 0, 120)  # BGRA: Blue=0, Green=255, Red=0, Alpha=120
+                overlay[y, x] = (255, 255, 0, 120)  # BGRA: Blue=255, Green=255, Red=0, Alpha=120 (cyan)
 
         overlay = np.ascontiguousarray(overlay)
 

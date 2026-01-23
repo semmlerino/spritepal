@@ -152,8 +152,18 @@ class AIFramePaletteEditorWindow(QMainWindow):
             (EditorTool.PENCIL, "Pencil", "P", "Draw with selected color (P)"),
             (EditorTool.ERASER, "Eraser", "E", "Erase to transparent (E)"),
             (EditorTool.FILL, "Fill", "F", "Flood fill area (F)"),
-            (EditorTool.CONTIGUOUS_SELECT, "Select", "W", "Select connected pixels (W)"),
-            (EditorTool.GLOBAL_SELECT, "Sel All", "G", "Select all pixels of color (G)"),
+            (
+                EditorTool.CONTIGUOUS_SELECT,
+                "Select",
+                "W",
+                "Select connected pixels (W)\n[Shift: Add, Ctrl: Subtract]",
+            ),
+            (
+                EditorTool.GLOBAL_SELECT,
+                "Sel All",
+                "G",
+                "Select all pixels of color (G)\n[Shift: Add, Ctrl: Subtract]",
+            ),
         ]
 
         self._tool_buttons: dict[EditorTool, QToolButton] = {}
@@ -337,6 +347,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._controller.undo_state_changed.connect(self._on_undo_state_changed)
         self._controller.pixel_info.connect(self._on_pixel_info)
         self._controller.dirty_changed.connect(self._on_dirty_changed)
+        self._controller.active_index_changed.connect(self._on_active_index_changed)
 
         # Canvas signals
         self._canvas.pixel_clicked.connect(self._on_canvas_clicked)
@@ -437,6 +448,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
         if is_dirty:
             title += " *"
         self.setWindowTitle(title)
+
+    def _on_active_index_changed(self, index: int) -> None:
+        """Handle active index change from controller (e.g., right-click pick)."""
+        self._palette_panel.set_active_index(index)
+        # Update canvas highlight to show all pixels using this index
+        self._canvas.set_highlight_index(index)
 
     def _on_canvas_clicked(self, x: int, y: int, button: int) -> None:
         """Handle canvas click."""

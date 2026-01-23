@@ -42,9 +42,11 @@ class EditorStatusBar(QWidget):
         self.tile_label: QLabel | None = None
         self.address_label: QLabel | None = None
         self.color_preview: QLabel | None = None
+        self.color_index_label: QLabel | None = None
 
         # Current state
         self._current_color = (128, 128, 128)
+        self._current_index: int | None = None
 
         self._setup_ui()
 
@@ -80,6 +82,15 @@ class EditorStatusBar(QWidget):
 
         # Stretch space
         layout.addStretch(1)
+
+        # Color index label
+        self.color_index_label = QLabel("Index: --")
+        self.color_index_label.setFont(self._monospace_font)
+        self.color_index_label.setMinimumWidth(60)
+        layout.addWidget(self.color_index_label)
+
+        # Spacing
+        layout.addSpacing(SPACING_SMALL)
 
         # Color preview
         self.color_preview = QLabel()
@@ -124,8 +135,11 @@ class EditorStatusBar(QWidget):
         palette.setColor(QPalette.ColorRole.Window, color)
         self.color_preview.setPalette(palette)
 
-        # Update tooltip
-        self.color_preview.setToolTip(f"Current color: RGB({r}, {g}, {b})")
+        # Update tooltip with index if available
+        if self._current_index is not None:
+            self.color_preview.setToolTip(f"Index {self._current_index}: RGB({r}, {g}, {b})")
+        else:
+            self.color_preview.setToolTip(f"Current color: RGB({r}, {g}, {b})")
 
     def update_cursor(self, x: int, y: int) -> None:
         """
@@ -174,6 +188,31 @@ class EditorStatusBar(QWidget):
         g = max(0, min(255, color[1]))
         b = max(0, min(255, color[2]))
         self._current_color = (r, g, b)
+
+        self._update_color_preview()
+
+    def update_color_with_index(
+        self, color: tuple[int, int, int], index: int | None
+    ) -> None:
+        """Update the color preview display with palette index.
+
+        Args:
+            color: RGB color as tuple (r, g, b) with values 0-255.
+            index: Palette index (0-15), or None if unknown.
+        """
+        # Clamp each component to valid range
+        r = max(0, min(255, color[0]))
+        g = max(0, min(255, color[1]))
+        b = max(0, min(255, color[2]))
+        self._current_color = (r, g, b)
+        self._current_index = index
+
+        # Update the index label
+        if self.color_index_label is not None:
+            if index is not None:
+                self.color_index_label.setText(f"Index: {index}")
+            else:
+                self.color_index_label.setText("Index: --")
 
         self._update_color_preview()
 

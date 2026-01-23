@@ -194,6 +194,18 @@ class ColorPaletteWidget(QWidget):
             col = i % 4
             x = col * self.cell_size + 5
             y = row * self.cell_size + 5
+            swatch_w = self.cell_size - 2
+            swatch_h = self.cell_size - 2
+
+            # Index 0 is always transparent - draw checkerboard background
+            if i == 0:
+                # Draw checkerboard pattern to indicate transparency
+                check_size = 4
+                for cy in range(0, swatch_h, check_size):
+                    for cx in range(0, swatch_w, check_size):
+                        is_dark = ((cx // check_size) + (cy // check_size)) % 2 == 0
+                        check_color = QColor(100, 100, 100) if is_dark else QColor(180, 180, 180)
+                        painter.fillRect(x + cx, y + cy, check_size, check_size, check_color)
 
             # Draw color swatch - ensure we have valid colors
             if i < len(self.colors):
@@ -202,7 +214,10 @@ class ColorPaletteWidget(QWidget):
             else:
                 color = QColor(0, 0, 0)
 
-            painter.fillRect(x, y, self.cell_size - 2, self.cell_size - 2, color)
+            # For index 0, draw semi-transparent to show checkerboard beneath
+            if i == 0:
+                color.setAlpha(180)
+            painter.fillRect(x, y, swatch_w, swatch_h, color)
 
             # Draw external palette indicator on first cell
             if self.is_external_palette and i == 0:
@@ -222,8 +237,11 @@ class ColorPaletteWidget(QWidget):
                 painter.setPen(Qt.GlobalColor.white if _should_use_white_text(self.colors[i]) else Qt.GlobalColor.black)
             else:
                 painter.setPen(Qt.GlobalColor.white)
+            # For index 0, always use contrasting text
+            if i == 0:
+                painter.setPen(Qt.GlobalColor.white)
             painter.drawText(
-                QRect(x, y, self.cell_size - 2, self.cell_size - 2),
+                QRect(x, y, swatch_w, swatch_h),
                 Qt.AlignmentFlag.AlignCenter,
                 str(i),
             )

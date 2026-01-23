@@ -609,11 +609,11 @@ class EditWorkspace(QWidget):
             tile_id = (y // 8) * tiles_per_row + (x // 8)
             self._status_bar.update_tile(tile_id)
 
-        # Get pixel color and update color preview
+        # Get pixel color and update color preview with index
         color_index = self._controller.image_model.get_pixel(x, y)
         colors = self._controller.get_current_colors()
         if 0 <= color_index < len(colors):
-            self._status_bar.update_color(colors[color_index])
+            self._status_bar.update_color_with_index(colors[color_index], color_index)
 
     # Validation facade methods
 

@@ -80,6 +80,7 @@ class PaletteEditorController(QObject):
     pixel_info = Signal(int, int, int)  # x, y, palette_index
     preview_requested = Signal(np.ndarray)  # indexed data for preview
     dirty_changed = Signal(bool)  # is_dirty
+    active_index_changed = Signal(int)  # new active palette index
 
     PREVIEW_DEBOUNCE_MS = 100
 
@@ -236,8 +237,9 @@ class PaletteEditorController(QObject):
 
     def set_active_index(self, index: int) -> None:
         """Set the active palette index."""
-        if 0 <= index <= 15:
+        if 0 <= index <= 15 and index != self._active_index:
             self._active_index = index
+            self.active_index_changed.emit(index)
 
     def set_brush_size(self, size: int) -> None:
         """Set the brush size (1-5)."""
