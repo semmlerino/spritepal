@@ -311,28 +311,30 @@ class AIFrameItem(QGraphicsObject):
         from PySide6.QtGui import QKeyEvent
 
         if isinstance(event, QKeyEvent):
-            step = 8 if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else 1
+            shift_held = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+            nudge_step = 8 if shift_held else 1
+            scale_step = 0.05 if shift_held else 0.01  # 5% with Shift, 1% without
             key = event.key()
 
             if key == Qt.Key.Key_Left:
-                self.moveBy(-step, 0)
+                self.moveBy(-nudge_step, 0)
                 event.accept()
             elif key == Qt.Key.Key_Right:
-                self.moveBy(step, 0)
+                self.moveBy(nudge_step, 0)
                 event.accept()
             elif key == Qt.Key.Key_Up:
-                self.moveBy(0, -step)
+                self.moveBy(0, -nudge_step)
                 event.accept()
             elif key == Qt.Key.Key_Down:
-                self.moveBy(0, step)
+                self.moveBy(0, nudge_step)
                 event.accept()
             elif key in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
-                # Scale up by 5%
-                self._adjust_scale(0.05)
+                # Scale up (1% default, 5% with Shift)
+                self._adjust_scale(scale_step)
                 event.accept()
             elif key == Qt.Key.Key_Minus:
-                # Scale down by 5%
-                self._adjust_scale(-0.05)
+                # Scale down (1% default, 5% with Shift)
+                self._adjust_scale(-scale_step)
                 event.accept()
             else:
                 event.ignore()

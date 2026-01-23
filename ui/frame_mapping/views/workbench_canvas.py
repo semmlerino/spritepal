@@ -418,7 +418,7 @@ class WorkbenchCanvas(QWidget):
         layout.addLayout(controls3)
 
         # Hotkey hints
-        hints_label = QLabel("Arrow keys: nudge 1px | Shift+Arrow: 8px | +/-: scale 5%")
+        hints_label = QLabel("Arrow: nudge 1px (Shift: 8px) | +/-: scale 1% (Shift: 5%)")
         hints_label.setStyleSheet("font-size: 10px; color: #888; font-style: italic;")
         layout.addWidget(hints_label)
 
