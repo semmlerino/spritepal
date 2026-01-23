@@ -35,6 +35,7 @@ class ColorSwatch(QFrame):
     """Individual color swatch with selection indicator."""
 
     clicked = Signal(int)  # palette index
+    ctrl_clicked = Signal(int)  # palette index (for merge target selection)
     hovered = Signal(int)  # palette index
     color_change_requested = Signal(int, tuple)  # (index, (r, g, b))
 
@@ -50,6 +51,8 @@ class ColorSwatch(QFrame):
         self._is_selected = False
         self._is_hovered = False
         self._is_highlighted = False
+        self._is_merge_target = False
+        self._is_free = False
 
         self.setFixedSize(SWATCH_SIZE, SWATCH_SIZE)
         self.setMouseTracking(True)
@@ -70,9 +73,41 @@ class ColorSwatch(QFrame):
         self._is_highlighted = highlighted
         self._update_style()
 
+    def set_merge_target(self, is_target: bool) -> None:
+        """Set merge target state (Ctrl+click selection for merging)."""
+        self._is_merge_target = is_target
+        self._update_style()
+
+    def set_free(self, is_free: bool) -> None:
+        """Set free slot state (after merge, slot becomes unused)."""
+        self._is_free = is_free
+        self._update_style()
+
+    def is_free(self) -> bool:
+        """Check if this slot is marked as free."""
+        return self._is_free
+
     def _update_style(self) -> None:
         """Update widget style based on state."""
         r, g, b = self._color
+
+        # Free slot - show as dark purple
+        if self._is_free and self._index != 0:
+            style = """
+                QFrame {
+                    background-color: rgb(48, 16, 64);
+                    border: 3px solid %s;
+                }
+            """
+            # Free slots still show border based on state
+            if self._is_merge_target:
+                border_color = "#00FFFF"  # Cyan for merge target
+            elif self._is_hovered:
+                border_color = "#888"
+            else:
+                border_color = "#333"
+            self.setStyleSheet(style % border_color)
+            return
 
         if self._index == 0:
             # Transparent - checkerboard pattern
@@ -91,9 +126,11 @@ class ColorSwatch(QFrame):
                 }
             """
 
-        # Priority: selected (yellow) > highlighted (green) > hovered (gray) > default
+        # Priority: selected (yellow) > merge_target (cyan) > highlighted (green) > hovered (gray) > default
         if self._is_selected:
             border_color = "#FFFF00"  # Yellow for selected
+        elif self._is_merge_target:
+            border_color = "#00FFFF"  # Cyan for merge target
         elif self._is_highlighted:
             border_color = "#00FF00"  # Green for highlighted from canvas
         elif self._is_hovered:
@@ -108,9 +145,13 @@ class ColorSwatch(QFrame):
 
     @override
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        """Handle click to select color, right-click to change color."""
+        """Handle click to select color, Ctrl+click for merge, right-click to change color."""
         if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit(self._index)
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                # Ctrl+click for merge target selection
+                self.ctrl_clicked.emit(self._index)
+            else:
+                self.clicked.emit(self._index)
         elif event.button() == Qt.MouseButton.RightButton:
             self._show_color_picker()
         super().mousePressEvent(event)
@@ -182,16 +223,20 @@ class EditorPalettePanel(QWidget):
         index_selected: (index) - User selected a palette index
         index_hovered: (index) - User is hovering over a palette index
         color_changed: (index, (r, g, b)) - User changed a color via right-click
+        merge_requested: (primary_index, merge_index) - User wants to merge two palettes
     """
 
     index_selected = Signal(int)
     index_hovered = Signal(int)
     color_changed = Signal(int, tuple)  # (index, (r, g, b))
+    merge_requested = Signal(int, int)  # (primary_index, merge_index)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._swatches: list[ColorSwatch] = []
         self._active_index = 1
+        self._merge_target_index: int | None = None
+        self._free_slots: set[int] = set()
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -221,6 +266,7 @@ class EditorPalettePanel(QWidget):
             color = (128, 128, 128) if i > 0 else (0, 0, 0)
             swatch = ColorSwatch(i, color, self)
             swatch.clicked.connect(self._on_swatch_clicked)
+            swatch.ctrl_clicked.connect(self._on_swatch_ctrl_clicked)
             swatch.hovered.connect(self._on_swatch_hovered)
             swatch.color_change_requested.connect(self._on_color_change_requested)
             self._swatches.append(swatch)
@@ -286,8 +332,74 @@ class EditorPalettePanel(QWidget):
 
     def _on_swatch_clicked(self, index: int) -> None:
         """Handle swatch click."""
+        # Clear any merge target on regular click
+        self.clear_merge_target()
         self.set_active_index(index)
         self.index_selected.emit(index)
+
+    def _on_swatch_ctrl_clicked(self, index: int) -> None:
+        """Handle Ctrl+click for merge target selection.
+
+        When Ctrl+click is used on a second palette:
+        - If same as active: do nothing
+        - If no active selection: do nothing
+        - If index 0: do nothing (can't merge with transparent)
+        - Otherwise: emit merge_requested signal
+        """
+        # Can't merge with transparent
+        if index == 0:
+            return
+
+        # Can't merge same index
+        if index == self._active_index:
+            return
+
+        # Can't merge with index 0 as primary
+        if self._active_index == 0:
+            return
+
+        # Can't merge if primary is free
+        if self._active_index in self._free_slots:
+            return
+
+        # Set as merge target and emit signal
+        self._set_merge_target(index)
+
+        # Emit merge signal: primary stays, merge_index gets absorbed
+        self.merge_requested.emit(self._active_index, index)
+
+    def _set_merge_target(self, index: int | None) -> None:
+        """Set the merge target index with visual indicator."""
+        # Clear previous target
+        if self._merge_target_index is not None and self._merge_target_index < len(self._swatches):
+            self._swatches[self._merge_target_index].set_merge_target(False)
+
+        self._merge_target_index = index
+
+        # Set new target
+        if index is not None and index < len(self._swatches):
+            self._swatches[index].set_merge_target(True)
+
+    def clear_merge_target(self) -> None:
+        """Clear the merge target selection."""
+        self._set_merge_target(None)
+
+    def mark_slot_free(self, index: int) -> None:
+        """Mark a palette slot as free (after merge).
+
+        Args:
+            index: Palette index to mark as free (1-15)
+        """
+        if not 0 < index < len(self._swatches):
+            return
+
+        self._free_slots.add(index)
+        self._swatches[index].set_free(True)
+        self.clear_merge_target()
+
+    def is_slot_free(self, index: int) -> bool:
+        """Check if a slot is marked as free."""
+        return index in self._free_slots
 
     def _on_swatch_hovered(self, index: int) -> None:
         """Handle swatch hover."""

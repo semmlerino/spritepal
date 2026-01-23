@@ -263,6 +263,65 @@ class PaletteEditorController(QObject):
         # Trigger canvas refresh with new palette colors
         self.image_changed.emit()
 
+    def merge_palette_indices(self, primary_index: int, merge_index: int) -> bool:
+        """Merge two palette indices - all pixels using merge_index become primary_index.
+
+        This frees up the merge_index slot for other uses.
+
+        Args:
+            primary_index: The index that will remain (pixels keep this color)
+            merge_index: The index that will be absorbed (pixels become primary_index)
+
+        Returns:
+            True if merge was performed, False if invalid
+        """
+        if self._image_model is None:
+            return False
+        if not self._palette:
+            return False
+
+        # Validate indices
+        if not 0 < primary_index < 16:
+            return False
+        if not 0 < merge_index < 16:
+            return False
+        if primary_index == merge_index:
+            return False
+
+        data = self._image_model.data
+
+        # Find all pixels with merge_index
+        import numpy as np
+
+        mask = data == merge_index
+        pixel_count = int(np.sum(mask))
+
+        if pixel_count == 0:
+            # No pixels to merge, but still mark the slot as free
+            logger.debug(f"No pixels with index {merge_index}, slot marked free")
+            self._mark_dirty()
+            self.image_changed.emit()
+            return True
+
+        # Create undo command batch for all changed pixels
+        batch = BatchCommand()
+        ys, xs = np.where(mask)
+        for y, x in zip(ys, xs, strict=False):
+            cmd = DrawPixelCommand(x=int(x), y=int(y), old_color=merge_index, new_color=primary_index)
+            cmd.execute(self._image_model)
+            batch.add_command(cmd)
+
+        # Record the batch for undo
+        self._undo_manager.record_command(batch)
+
+        logger.info(f"Merged {pixel_count} pixels from index {merge_index} to {primary_index}")
+
+        self._mark_dirty()
+        self._emit_undo_state()
+        self.image_changed.emit()
+        self._schedule_preview()
+        return True
+
     # --- Pixel Operations ---
 
     def handle_pixel_click(

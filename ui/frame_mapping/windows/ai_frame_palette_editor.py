@@ -333,6 +333,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         # Palette panel signals
         self._palette_panel.index_selected.connect(self._on_palette_index_selected)
         self._palette_panel.color_changed.connect(self._on_palette_color_changed)
+        self._palette_panel.merge_requested.connect(self._on_palette_merge_requested)
 
     def _load_image(self) -> None:
         """Load the AI frame image."""
@@ -452,6 +453,17 @@ class AIFramePaletteEditorWindow(QMainWindow):
     def _on_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle palette color change from right-click."""
         self._controller.set_palette_color(index, color)
+
+    def _on_palette_merge_requested(self, primary_index: int, merge_index: int) -> None:
+        """Handle palette merge request (Ctrl+click).
+
+        Merges all pixels using merge_index into primary_index, freeing up
+        the merge_index slot (shown as dark purple).
+        """
+        if self._controller.merge_palette_indices(primary_index, merge_index):
+            # Mark the merged slot as free in the palette panel
+            self._palette_panel.mark_slot_free(merge_index)
+            logger.info(f"Merged palette index {merge_index} into {primary_index}")
 
     def _on_save(self) -> None:
         """Handle save action."""
