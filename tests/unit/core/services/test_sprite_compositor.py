@@ -367,3 +367,275 @@ class TestTransparentPolicyMasking:
         # Right tile region (x=16-23) should have red from AI
         pixel_right = composited.getpixel((20, 4))
         assert pixel_right[3] > 0, "Right tile region should have opaque content"
+
+
+class TestSheetPaletteQuantization:
+    """Test that sheet_palette parameter takes priority over capture palette.
+
+    The preview should match injection behavior: sheet_palette > capture palette.
+    """
+
+    def test_sheet_palette_used_when_provided(self) -> None:
+        """composite_frame should use sheet_palette colors when provided."""
+        from dataclasses import dataclass, field
+
+        from core.frame_mapping_project import SheetPalette
+
+        @dataclass
+        class MockTileData:
+            tile_index: int
+            vram_addr: int
+            pos_x: int
+            pos_y: int
+            data_hex: str
+            rom_offset: int | None = None
+
+            @property
+            def data_bytes(self) -> bytes:
+                return bytes.fromhex(self.data_hex)
+
+        @dataclass
+        class MockOAMEntry:
+            id: int
+            x: int
+            y: int
+            width: int
+            height: int
+            palette: int
+            flip_h: bool = False
+            flip_v: bool = False
+            priority: int = 0
+            tile: int = 0
+            name_table: int = 0
+            size_large: bool = False
+            rom_offset: int = 0x10000
+            tiles: list = field(default_factory=list)
+
+            @property
+            def tiles_wide(self) -> int:
+                return self.width // 8
+
+            @property
+            def tiles_high(self) -> int:
+                return self.height // 8
+
+        @dataclass
+        class MockCaptureBoundingBox:
+            x: int
+            y: int
+            width: int
+            height: int
+
+        @dataclass
+        class MockCaptureResultFull:
+            frame: int
+            visible_count: int
+            obsel: int
+            entries: list
+            palettes: dict
+            timestamp: str = ""
+
+            @property
+            def bounding_box(self) -> MockCaptureBoundingBox:
+                if not self.entries:
+                    return MockCaptureBoundingBox(0, 0, 0, 0)
+                min_x = min(e.x for e in self.entries)
+                min_y = min(e.y for e in self.entries)
+                max_x = max(e.x + e.width for e in self.entries)
+                max_y = max(e.y + e.height for e in self.entries)
+                return MockCaptureBoundingBox(min_x, min_y, max_x - min_x, max_y - min_y)
+
+        # Create a solid 8x8 tile
+        solid_tile_hex = "ff" * 32
+
+        entry = MockOAMEntry(
+            id=0,
+            x=0,
+            y=0,
+            width=8,
+            height=8,
+            palette=0,
+            tiles=[
+                MockTileData(
+                    tile_index=0,
+                    vram_addr=0,
+                    pos_x=0,
+                    pos_y=0,
+                    data_hex=solid_tile_hex,
+                )
+            ],
+        )
+
+        # Capture palette: all red
+        capture_palettes = {0: [(0, 255, 0, 255)] * 16}
+
+        capture = MockCaptureResultFull(
+            frame=0,
+            visible_count=1,
+            obsel=0,
+            entries=[entry],
+            palettes=capture_palettes,
+        )
+
+        # Sheet palette: different colors (blue-ish)
+        sheet_palette = SheetPalette(
+            colors=[
+                (0, 0, 0),  # 0: transparent
+                (0, 0, 255),  # 1: blue
+                (0, 0, 200),  # 2: dark blue
+                (0, 0, 150),  # 3: darker blue
+            ]
+            + [(100, 100, 100)] * 12,  # pad to 16
+            color_mappings={(255, 0, 0): 1},  # Map red to index 1 (blue)
+        )
+
+        # AI image: solid red
+        ai_image = Image.new("RGBA", (8, 8), (255, 0, 0, 255))
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        transform = TransformParams(offset_x=0, offset_y=0)
+
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=True,
+            sheet_palette=sheet_palette,
+        )
+
+        composited = result.composited_image
+
+        # The red AI pixels should have been mapped to index 1 (blue)
+        # via the sheet_palette color_mappings
+        pixel = composited.getpixel((4, 4))
+        assert pixel[:3] == (0, 0, 255), (
+            f"Expected blue (0,0,255) from sheet_palette mapping, "
+            f"but got {pixel[:3]}. Sheet palette should take priority."
+        )
+
+    def test_capture_palette_used_without_sheet_palette(self) -> None:
+        """composite_frame should fall back to capture palette when no sheet_palette."""
+        from dataclasses import dataclass, field
+
+        @dataclass
+        class MockTileData:
+            tile_index: int
+            vram_addr: int
+            pos_x: int
+            pos_y: int
+            data_hex: str
+            rom_offset: int | None = None
+
+            @property
+            def data_bytes(self) -> bytes:
+                return bytes.fromhex(self.data_hex)
+
+        @dataclass
+        class MockOAMEntry:
+            id: int
+            x: int
+            y: int
+            width: int
+            height: int
+            palette: int
+            flip_h: bool = False
+            flip_v: bool = False
+            priority: int = 0
+            tile: int = 0
+            name_table: int = 0
+            size_large: bool = False
+            rom_offset: int = 0x10000
+            tiles: list = field(default_factory=list)
+
+            @property
+            def tiles_wide(self) -> int:
+                return self.width // 8
+
+            @property
+            def tiles_high(self) -> int:
+                return self.height // 8
+
+        @dataclass
+        class MockCaptureBoundingBox:
+            x: int
+            y: int
+            width: int
+            height: int
+
+        @dataclass
+        class MockCaptureResultFull:
+            frame: int
+            visible_count: int
+            obsel: int
+            entries: list
+            palettes: dict
+            timestamp: str = ""
+
+            @property
+            def bounding_box(self) -> MockCaptureBoundingBox:
+                if not self.entries:
+                    return MockCaptureBoundingBox(0, 0, 0, 0)
+                min_x = min(e.x for e in self.entries)
+                min_y = min(e.y for e in self.entries)
+                max_x = max(e.x + e.width for e in self.entries)
+                max_y = max(e.y + e.height for e in self.entries)
+                return MockCaptureBoundingBox(min_x, min_y, max_x - min_x, max_y - min_y)
+
+        # Create a solid 8x8 tile
+        solid_tile_hex = "ff" * 32
+
+        entry = MockOAMEntry(
+            id=0,
+            x=0,
+            y=0,
+            width=8,
+            height=8,
+            palette=0,
+            tiles=[
+                MockTileData(
+                    tile_index=0,
+                    vram_addr=0,
+                    pos_x=0,
+                    pos_y=0,
+                    data_hex=solid_tile_hex,
+                )
+            ],
+        )
+
+        # SNES palette format: 16-bit BGR555 values (not RGB tuples)
+        # Green (R=0, G=31, B=0) in BGR555: 0000 0011 1110 0000 = 0x03E0
+        snes_palettes = {0: [0x03E0] * 16}  # All green
+
+        capture = MockCaptureResultFull(
+            frame=0,
+            visible_count=1,
+            obsel=0,
+            entries=[entry],
+            palettes=snes_palettes,
+        )
+
+        # AI image: solid red
+        ai_image = Image.new("RGBA", (8, 8), (255, 0, 0, 255))
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        transform = TransformParams(offset_x=0, offset_y=0)
+
+        # No sheet_palette provided - should fall back to capture palette
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=True,
+            sheet_palette=None,
+        )
+
+        composited = result.composited_image
+
+        # The result should be quantized to the capture palette (green)
+        pixel = composited.getpixel((4, 4))
+        # Should be green since that's the only color in capture palette
+        # SNES green (31 in 5-bit) expands to 248 in 8-bit (31 << 3)
+        assert pixel[:3] == (0, 248, 0), (
+            f"Expected green (0,248,0) from capture palette (SNES 5-bit scaled), "
+            f"but got {pixel[:3]}. Should fall back to capture palette."
+        )

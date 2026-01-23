@@ -474,6 +474,29 @@ class MappingPanel(QWidget):
 
                 break
 
+    def update_row_status(self, ai_index: int, status: str) -> None:
+        """Update only the status column for a specific row.
+
+        This is more efficient than full refresh() and preserves checkbox state
+        during interactive alignment adjustments (dragging, arrow keys).
+
+        Args:
+            ai_index: AI frame index to update
+            status: New status ("unmapped", "mapped", "edited", "injected")
+        """
+        # Find the row for this AI frame
+        for row in range(self._table.rowCount()):
+            ai_item = self._table.item(row, 2)  # AI Frame column
+            if ai_item is not None and ai_item.data(Qt.ItemDataRole.UserRole) == ai_index:
+                # Update Status column (6)
+                status_indicator = "●" if status != "unmapped" else "○"
+                status_item = self._table.item(row, 6)
+                if status_item is not None:
+                    status_item.setText(f"{status_indicator} {status.capitalize()}")
+                    color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
+                    status_item.setForeground(QBrush(color))
+                break
+
     def clear_selection(self) -> None:
         """Clear the current table selection.
 

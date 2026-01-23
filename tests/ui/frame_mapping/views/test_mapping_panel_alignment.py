@@ -201,3 +201,165 @@ class TestMappingPanelAlignmentUpdate:
         offset_item = panel._table.item(0, 4)
         assert offset_item is not None
         assert offset_item.text() == "—"  # Still default
+
+
+class TestMappingPanelStatusUpdate:
+    """Tests for targeted status column update."""
+
+    def test_status_update_changes_status_column_text(self, qtbot) -> None:
+        """update_row_status changes the status column text and color."""
+        panel = MappingPanel()
+        qtbot.addWidget(panel)
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("/fake/frame1.png"), index=0),
+        ]
+        project.game_frames = [
+            GameFrame(id="GF001"),
+        ]
+        project.mappings = [
+            FrameMapping(
+                ai_frame_id="frame1.png",
+                game_frame_id="GF001",
+                offset_x=0,
+                offset_y=0,
+                status="mapped",
+            ),
+        ]
+        project._invalidate_mapping_index()
+
+        panel.set_project(project)
+        panel.refresh()
+
+        # Verify initial status
+        status_item = panel._table.item(0, 6)
+        assert status_item is not None
+        assert "Mapped" in status_item.text()
+
+        # Update status to "edited"
+        panel.update_row_status(0, "edited")
+
+        # Verify status column was updated
+        assert "Edited" in status_item.text()
+        assert "●" in status_item.text()  # Filled indicator for non-unmapped
+
+    def test_status_update_to_unmapped_shows_empty_indicator(self, qtbot) -> None:
+        """Unmapped status shows empty circle indicator."""
+        panel = MappingPanel()
+        qtbot.addWidget(panel)
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("/fake/frame1.png"), index=0),
+        ]
+        project.game_frames = [
+            GameFrame(id="GF001"),
+        ]
+        project.mappings = [
+            FrameMapping(
+                ai_frame_id="frame1.png",
+                game_frame_id="GF001",
+                offset_x=0,
+                offset_y=0,
+                status="mapped",
+            ),
+        ]
+        project._invalidate_mapping_index()
+
+        panel.set_project(project)
+        panel.refresh()
+
+        # Update status to "unmapped"
+        panel.update_row_status(0, "unmapped")
+
+        status_item = panel._table.item(0, 6)
+        assert status_item is not None
+        assert "Unmapped" in status_item.text()
+        assert "○" in status_item.text()  # Empty indicator for unmapped
+
+    def test_status_update_preserves_other_columns(self, qtbot) -> None:
+        """Status update does not affect other columns."""
+        panel = MappingPanel()
+        qtbot.addWidget(panel)
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("/fake/frame1.png"), index=0),
+        ]
+        project.game_frames = [
+            GameFrame(id="GF001"),
+        ]
+        project.mappings = [
+            FrameMapping(
+                ai_frame_id="frame1.png",
+                game_frame_id="GF001",
+                offset_x=5,
+                offset_y=10,
+                flip_h=True,
+                flip_v=False,
+                status="mapped",
+            ),
+        ]
+        project._invalidate_mapping_index()
+
+        panel.set_project(project)
+        panel.refresh()
+
+        # Get initial values
+        offset_item = panel._table.item(0, 4)
+        flip_item = panel._table.item(0, 5)
+        checkbox_item = panel._table.item(0, 0)
+
+        assert offset_item is not None
+        assert flip_item is not None
+        assert checkbox_item is not None
+
+        initial_offset = offset_item.text()
+        initial_flip = flip_item.text()
+        initial_checkbox = checkbox_item.checkState()
+
+        # Update status
+        panel.update_row_status(0, "injected")
+
+        # Verify other columns were NOT changed
+        assert offset_item.text() == initial_offset
+        assert flip_item.text() == initial_flip
+        assert checkbox_item.checkState() == initial_checkbox
+
+    def test_status_update_for_nonexistent_row_is_noop(self, qtbot) -> None:
+        """Updating status for non-existent AI index does nothing."""
+        panel = MappingPanel()
+        qtbot.addWidget(panel)
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("/fake/frame1.png"), index=0),
+        ]
+        project.game_frames = [
+            GameFrame(id="GF001"),
+        ]
+        project.mappings = [
+            FrameMapping(
+                ai_frame_id="frame1.png",
+                game_frame_id="GF001",
+                offset_x=0,
+                offset_y=0,
+                status="mapped",
+            ),
+        ]
+        project._invalidate_mapping_index()
+
+        panel.set_project(project)
+        panel.refresh()
+
+        # Get initial status
+        status_item = panel._table.item(0, 6)
+        assert status_item is not None
+        initial_status = status_item.text()
+
+        # Try to update non-existent row (should not raise)
+        panel.update_row_status(999, "edited")
+
+        # Verify existing row was not affected
+        assert status_item.text() == initial_status

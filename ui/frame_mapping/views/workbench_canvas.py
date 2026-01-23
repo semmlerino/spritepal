@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFrame,
+    QGraphicsPixmapItem,
     QGraphicsScene,
     QGraphicsView,
     QHBoxLayout,
@@ -55,6 +56,7 @@ from ui.frame_mapping.views.workbench_items import (
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from core.frame_mapping_project import SheetPalette
     from core.mesen_integration.click_extractor import CaptureResult
 
 logger = get_logger(__name__)
@@ -67,6 +69,9 @@ CANVAS_SIZE = 300
 TILE_CALC_DEBOUNCE_MS = 100
 # Debounce delay for preview generation (ms)
 PREVIEW_DEBOUNCE_MS = 150
+# Debounce delay for pixel hover updates (ms)
+PIXEL_HOVER_DEBOUNCE_MS = 50
+PIXEL_HIGHLIGHT_DEBOUNCE_MS = 100  # Debounce for mask generation when hovering palette
 
 
 class WorkbenchGraphicsView(QGraphicsView):
@@ -75,7 +80,15 @@ class WorkbenchGraphicsView(QGraphicsView):
     Interactions:
     - Ctrl+MouseWheel: Zoom view (0.25x to 4x)
     - Middle mouse drag: Pan view
+
+    Signals:
+        scene_mouse_moved: Emitted when mouse moves over the scene (scene_x, scene_y)
+        scene_mouse_left: Emitted when mouse leaves the viewport
     """
+
+    scene_mouse_moved = Signal(float, float)  # scene_x, scene_y
+    scene_mouse_left = Signal()
+    scene_clicked = Signal(float, float)  # scene_x, scene_y
 
     def __init__(self, scene: QGraphicsScene, parent: QWidget | None = None) -> None:
         super().__init__(scene, parent)
@@ -87,6 +100,9 @@ class WorkbenchGraphicsView(QGraphicsView):
         self.setBackgroundBrush(QBrush(QColor(26, 26, 26)))
         self.setMinimumSize(CANVAS_SIZE, CANVAS_SIZE)
         self.setStyleSheet("border: 1px solid #444;")
+
+        # Enable mouse tracking for hover detection
+        self.setMouseTracking(True)
 
         # Pan state for middle mouse button
         self._is_panning = False
@@ -134,18 +150,23 @@ class WorkbenchGraphicsView(QGraphicsView):
 
     @override
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        """Handle mouse press for middle button pan."""
+        """Handle mouse press for middle button pan and left-click."""
         if event.button() == Qt.MouseButton.MiddleButton:
             self._is_panning = True
             self._pan_start = event.position()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
             event.accept()
+        elif event.button() == Qt.MouseButton.LeftButton:
+            # Emit click position for eyedropper mode
+            scene_pos = self.mapToScene(event.position().toPoint())
+            self.scene_clicked.emit(scene_pos.x(), scene_pos.y())
+            super().mousePressEvent(event)
         else:
             super().mousePressEvent(event)
 
     @override
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        """Handle mouse move for panning."""
+        """Handle mouse move for panning and emit scene position."""
         if self._is_panning and self._pan_start is not None:
             delta = event.position() - self._pan_start
             self._pan_start = event.position()
@@ -155,7 +176,16 @@ class WorkbenchGraphicsView(QGraphicsView):
             self.verticalScrollBar().setValue(self.verticalScrollBar().value() - int(delta.y()))
             event.accept()
         else:
+            # Emit scene position for pixel inspection
+            scene_pos = self.mapToScene(event.position().toPoint())
+            self.scene_mouse_moved.emit(scene_pos.x(), scene_pos.y())
             super().mouseMoveEvent(event)
+
+    @override
+    def leaveEvent(self, event: object) -> None:
+        """Handle mouse leaving the viewport."""
+        self.scene_mouse_left.emit()
+        super().leaveEvent(event)  # type: ignore[arg-type]
 
     @override
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
@@ -188,6 +218,10 @@ class WorkbenchCanvas(QWidget):
     alignment_changed = Signal(int, int, bool, bool, float)  # offset_x, offset_y, flip_h, flip_v, scale
     compression_type_changed = Signal(str)  # "raw" or "hal"
     apply_scale_to_all_requested = Signal(float)  # scale factor to apply to all other mappings
+    # Pixel inspection signals
+    pixel_hovered = Signal(int, int, object, int)  # x, y, rgb (tuple or None), palette_index
+    pixel_left = Signal()  # mouse left the canvas
+    eyedropper_picked = Signal(object, int)  # rgb (tuple), palette_index
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -219,6 +253,23 @@ class WorkbenchCanvas(QWidget):
         self._multi_palette_warning_label: QLabel | None = None
         self._stale_entries_warning_label: QLabel | None = None
 
+        # Pixel hover tracking
+        self._pixel_hover_timer = QTimer(self)
+        self._pixel_hover_timer.setSingleShot(True)
+        self._pixel_hover_timer.timeout.connect(self._emit_pixel_hovered)
+        self._pending_hover_pos: tuple[float, float] | None = None
+        self._sheet_palette: SheetPalette | None = None
+
+        # Eyedropper mode
+        self._eyedropper_mode = False
+
+        # Pixel highlight for bidirectional palette-to-canvas highlighting
+        self._pixel_highlight_timer = QTimer(self)
+        self._pixel_highlight_timer.setSingleShot(True)
+        self._pixel_highlight_timer.timeout.connect(self._generate_pixel_highlight_mask)
+        self._pending_highlight_index: int | None = None
+        self._pixel_highlight_item: QGraphicsPixmapItem | None = None
+
         self._setup_ui()
         self._connect_signals()
 
@@ -241,6 +292,32 @@ class WorkbenchCanvas(QWidget):
         title_layout.addWidget(self._status_label)
 
         layout.addLayout(title_layout)
+
+        # Pixel inspector row
+        pixel_inspector = QHBoxLayout()
+        pixel_inspector.setContentsMargins(0, 0, 0, 0)
+        pixel_inspector.setSpacing(8)
+
+        pixel_label = QLabel("Pixel:")
+        pixel_label.setStyleSheet("font-size: 10px; color: #888;")
+        pixel_inspector.addWidget(pixel_label)
+
+        self._pixel_info_label = QLabel("--")
+        self._pixel_info_label.setStyleSheet("font-size: 10px; font-family: monospace;")
+        self._pixel_info_label.setMinimumWidth(200)
+        pixel_inspector.addWidget(self._pixel_info_label)
+
+        pixel_inspector.addStretch()
+
+        self._eyedropper_btn = QPushButton("🎯 Pick")
+        self._eyedropper_btn.setToolTip("Pick color from canvas (E)")
+        self._eyedropper_btn.setCheckable(True)
+        self._eyedropper_btn.setStyleSheet("font-size: 10px; padding: 2px 6px;")
+        self._eyedropper_btn.setFixedHeight(22)
+        self._eyedropper_btn.toggled.connect(self._on_eyedropper_toggled)
+        pixel_inspector.addWidget(self._eyedropper_btn)
+
+        layout.addLayout(pixel_inspector)
 
         # Multi-palette warning banner
         self._multi_palette_warning_label = QLabel("⚠ Multi-palette capture detected. Preview may not match injection.")
@@ -277,6 +354,12 @@ class WorkbenchCanvas(QWidget):
         self._scene.addItem(self._tile_overlay_item)
         self._scene.addItem(self._ai_frame_item)
         self._scene.addItem(self._grid_overlay_item)
+
+        # Pixel highlight overlay (created on demand, added to scene here)
+        self._pixel_highlight_item = QGraphicsPixmapItem()
+        self._pixel_highlight_item.setZValue(100)  # Above AI frame, below grid
+        self._pixel_highlight_item.setVisible(False)
+        self._scene.addItem(self._pixel_highlight_item)
 
         # Controls row 1: Opacity and Scale
         controls1 = QHBoxLayout()
@@ -449,6 +532,15 @@ class WorkbenchCanvas(QWidget):
 
         # AI frame item signals
         self._ai_frame_item.transform_changed.connect(self._on_ai_frame_transform_changed)
+
+        # View mouse signals for pixel inspection
+        self._view.scene_mouse_moved.connect(self._on_scene_mouse_moved)
+        self._view.scene_mouse_left.connect(self._on_scene_mouse_left)
+        self._view.scene_clicked.connect(self._on_scene_clicked)
+
+        # Internal pixel info label updates
+        self.pixel_hovered.connect(self._update_pixel_info_label)
+        self.pixel_left.connect(self._clear_pixel_info_label)
 
     def set_game_frame(
         self,
@@ -931,7 +1023,7 @@ class WorkbenchCanvas(QWidget):
         """Handle preview toggle.
 
         When enabled, shows a preview of how the final sprite will look
-        after injection (quantized to palette, clipped to silhouette).
+        after injection (quantized to palette).
         The AI frame switches to ghost mode (outline only) so it can
         still be repositioned while viewing the preview.
         """
@@ -944,6 +1036,8 @@ class WorkbenchCanvas(QWidget):
             # Show AI frame again for alignment work
             self._ai_frame_item.set_ghost_mode(False)
             self._preview_item.setVisible(False)
+        # Update game frame visibility based on preview + preserve sprite state
+        self._update_game_frame_visibility()
 
     def _on_compression_changed(self, index: int) -> None:
         """Handle compression type combo change."""
@@ -958,6 +1052,24 @@ class WorkbenchCanvas(QWidget):
         """
         # Schedule preview update to reflect the change
         self._schedule_preview_update()
+        # Update game frame visibility based on preview + preserve sprite state
+        self._update_game_frame_visibility()
+
+    def _update_game_frame_visibility(self) -> None:
+        """Update game frame item visibility based on preview and preserve sprite state.
+
+        When preview is enabled:
+        - If "Preserve sprite" is ON: game frame visible (shows through transparent areas)
+        - If "Preserve sprite" is OFF: game frame hidden (being completely replaced)
+
+        When preview is disabled: game frame always visible for alignment work.
+        """
+        if self._preview_enabled and not self._preserve_sprite_checkbox.isChecked():
+            # Preview ON + Preserve sprite OFF = hide game frame (complete replacement)
+            self._game_frame_item.setVisible(False)
+        else:
+            # Show game frame for alignment or when preserving original
+            self._game_frame_item.setVisible(True)
 
     def _on_apply_scale_to_all(self) -> None:
         """Handle Apply Scale to All button click.
@@ -1047,6 +1159,7 @@ class WorkbenchCanvas(QWidget):
                 capture_result=self._capture_result,
                 transform=transform,
                 quantize=True,
+                sheet_palette=self._sheet_palette,
             )
 
             preview_img = result.composited_image
@@ -1244,3 +1357,328 @@ class WorkbenchCanvas(QWidget):
 
         # Use fitInView on the target rect (clamped if necessary)
         self._view.fitInView(target_rect, Qt.AspectRatioMode.KeepAspectRatio)
+
+    # -------------------------------------------------------------------------
+    # Pixel Inspection
+    # -------------------------------------------------------------------------
+
+    def set_sheet_palette(self, palette: SheetPalette | None) -> None:
+        """Set the sheet palette for color-to-index lookups.
+
+        Args:
+            palette: SheetPalette to use for pixel inspection, or None to clear.
+        """
+        self._sheet_palette = palette
+
+    def _on_scene_mouse_moved(self, scene_x: float, scene_y: float) -> None:
+        """Handle mouse move over the scene - schedule pixel lookup.
+
+        Uses debouncing to avoid excessive updates on rapid mouse movement.
+        """
+        self._pending_hover_pos = (scene_x, scene_y)
+        self._pixel_hover_timer.start(PIXEL_HOVER_DEBOUNCE_MS)
+
+    def _on_scene_mouse_left(self) -> None:
+        """Handle mouse leaving the canvas."""
+        self._pending_hover_pos = None
+        self._pixel_hover_timer.stop()
+        self.pixel_left.emit()
+
+    def _emit_pixel_hovered(self) -> None:
+        """Emit pixel_hovered signal with color and palette index.
+
+        Called after debounce timer fires with the pending hover position.
+        """
+        if self._pending_hover_pos is None:
+            return
+
+        scene_x, scene_y = self._pending_hover_pos
+
+        # Get pixel info at the scene position
+        result = self._get_pixel_at_scene_pos(scene_x, scene_y)
+        if result is None:
+            # Outside AI frame bounds
+            self.pixel_hovered.emit(-1, -1, None, -1)
+            return
+
+        img_x, img_y, rgb, palette_index = result
+        self.pixel_hovered.emit(img_x, img_y, rgb, palette_index)
+
+    def _get_pixel_at_scene_pos(
+        self, scene_x: float, scene_y: float
+    ) -> tuple[int, int, tuple[int, int, int], int] | None:
+        """Get pixel information at a scene position.
+
+        Args:
+            scene_x: X coordinate in scene space
+            scene_y: Y coordinate in scene space
+
+        Returns:
+            Tuple of (img_x, img_y, rgb, palette_index) or None if outside bounds.
+        """
+        if self._ai_image is None:
+            return None
+
+        # Convert scene coords to AI image coords
+        # Scene is scaled by DISPLAY_SCALE, so divide to get original coords
+        img_x = int(scene_x / DISPLAY_SCALE)
+        img_y = int(scene_y / DISPLAY_SCALE)
+
+        # Check bounds
+        if img_x < 0 or img_x >= self._ai_image.width:
+            return None
+        if img_y < 0 or img_y >= self._ai_image.height:
+            return None
+
+        # Get pixel color from AI image
+        try:
+            pixel_raw = self._ai_image.getpixel((img_x, img_y))
+            # Cast to tuple for type safety (PIL returns various types)
+            if isinstance(pixel_raw, (int, float)):
+                return None  # Grayscale single value - not supported
+            if not isinstance(pixel_raw, tuple):
+                return None
+            # Handle RGBA or RGB
+            if len(pixel_raw) == 4:
+                r, g, b, a = int(pixel_raw[0]), int(pixel_raw[1]), int(pixel_raw[2]), int(pixel_raw[3])
+                if a == 0:
+                    # Transparent pixel - index 0
+                    return (img_x, img_y, (r, g, b), 0)
+                rgb = (r, g, b)
+            elif len(pixel_raw) >= 3:
+                rgb = (int(pixel_raw[0]), int(pixel_raw[1]), int(pixel_raw[2]))
+            else:
+                return None
+
+            # Lookup palette index
+            palette_index = self._lookup_palette_index(rgb)
+            return (img_x, img_y, rgb, palette_index)
+
+        except Exception as e:
+            logger.debug("Failed to get pixel at (%d, %d): %s", img_x, img_y, e)
+            return None
+
+    def _lookup_palette_index(self, rgb: tuple[int, int, int]) -> int:
+        """Lookup the palette index for an RGB color.
+
+        Uses explicit color_mappings if available, otherwise finds nearest color.
+
+        Args:
+            rgb: RGB color tuple
+
+        Returns:
+            Palette index (0-15) or -1 if no palette is set.
+        """
+        if self._sheet_palette is None:
+            return -1
+
+        # Check explicit mappings first
+        if rgb in self._sheet_palette.color_mappings:
+            return self._sheet_palette.color_mappings[rgb]
+
+        # Fallback to nearest color in palette
+        return self._find_nearest_palette_index(rgb)
+
+    def _find_nearest_palette_index(self, color: tuple[int, int, int]) -> int:
+        """Find the palette index with the nearest color.
+
+        Args:
+            color: RGB color tuple
+
+        Returns:
+            Index of nearest palette color (1-15, skipping index 0/transparency).
+        """
+        if self._sheet_palette is None or not self._sheet_palette.colors:
+            return -1
+
+        min_dist = float("inf")
+        best_idx = 1  # Default to index 1, skip 0 (transparency)
+
+        for idx, pal_color in enumerate(self._sheet_palette.colors):
+            if idx == 0:
+                continue  # Skip transparency index
+            dist = (
+                (color[0] - pal_color[0]) ** 2
+                + (color[1] - pal_color[1]) ** 2
+                + (color[2] - pal_color[2]) ** 2
+            )
+            if dist < min_dist:
+                min_dist = dist
+                best_idx = idx
+
+        return best_idx
+
+    # -------------------------------------------------------------------------
+    # Eyedropper Mode
+    # -------------------------------------------------------------------------
+
+    def set_eyedropper_mode(self, enabled: bool) -> None:
+        """Enable or disable eyedropper mode.
+
+        When enabled, clicking on the canvas will pick the pixel color
+        and emit eyedropper_picked signal.
+
+        Args:
+            enabled: True to enable eyedropper mode.
+        """
+        self._eyedropper_mode = enabled
+        if enabled:
+            self._view.setCursor(Qt.CursorShape.CrossCursor)
+        else:
+            self._view.unsetCursor()
+
+    def is_eyedropper_mode(self) -> bool:
+        """Check if eyedropper mode is active."""
+        return self._eyedropper_mode
+
+    def _on_eyedropper_toggled(self, checked: bool) -> None:
+        """Handle eyedropper button toggle."""
+        self.set_eyedropper_mode(checked)
+
+    def _update_pixel_info_label(self, x: int, y: int, rgb: object, palette_index: int) -> None:
+        """Update the pixel info label with hover information.
+
+        Args:
+            x: Image X coordinate
+            y: Image Y coordinate
+            rgb: RGB tuple or None if outside bounds
+            palette_index: Palette index (0-15) or -1 if no palette
+        """
+        if x < 0 or rgb is None:
+            self._pixel_info_label.setText("--")
+            return
+
+        # Cast rgb properly
+        r, g, b = rgb  # type: ignore[misc]
+
+        if palette_index >= 0:
+            text = f"({x:3}, {y:3})  RGB({r:3},{g:3},{b:3})  Idx:{palette_index:X}"
+        else:
+            text = f"({x:3}, {y:3})  RGB({r:3},{g:3},{b:3})"
+
+        self._pixel_info_label.setText(text)
+
+    def _clear_pixel_info_label(self) -> None:
+        """Clear the pixel info label when mouse leaves."""
+        self._pixel_info_label.setText("--")
+
+    def highlight_pixels_by_index(self, index: int | None) -> None:
+        """Highlight all pixels that use the given palette index.
+
+        This is called when the user hovers over a palette swatch to show
+        which pixels in the AI frame use that color.
+
+        Args:
+            index: Palette index to highlight, or None to hide highlight
+        """
+        if index is None:
+            # Hide highlight immediately
+            self._pixel_highlight_timer.stop()
+            self._pending_highlight_index = None
+            if self._pixel_highlight_item is not None:
+                self._pixel_highlight_item.setVisible(False)
+            return
+
+        # Debounce the mask generation
+        self._pending_highlight_index = index
+        self._pixel_highlight_timer.start(PIXEL_HIGHLIGHT_DEBOUNCE_MS)
+
+    def _generate_pixel_highlight_mask(self) -> None:
+        """Generate and display the pixel highlight mask for the pending index."""
+        index = self._pending_highlight_index
+        if index is None:
+            return
+
+        if self._ai_image is None:
+            return
+
+        if self._pixel_highlight_item is None:
+            return
+
+        # Generate mask showing pixels using this palette index
+        try:
+            # Create a mask image with same size as AI frame
+            width, height = self._ai_image.size
+            # Create RGBA image for the mask (yellow with transparency)
+            mask = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            pixels = mask.load()
+            ai_pixels = self._ai_image.load()
+
+            if pixels is None or ai_pixels is None:
+                return
+
+            # Find all pixels that map to this palette index
+            for y in range(height):
+                for x in range(width):
+                    pixel_raw = ai_pixels[x, y]
+                    if isinstance(pixel_raw, (int, float)):
+                        continue  # Grayscale, skip
+
+                    # At this point pixel_raw is a tuple - check length
+                    if len(pixel_raw) < 3:
+                        continue
+
+                    # Check if pixel has alpha and is transparent
+                    if len(pixel_raw) >= 4 and int(pixel_raw[3]) == 0:
+                        continue  # Skip transparent pixels
+
+                    rgb = (int(pixel_raw[0]), int(pixel_raw[1]), int(pixel_raw[2]))
+                    pixel_index = self._lookup_palette_index(rgb)
+
+                    if pixel_index == index:
+                        # Highlight this pixel with yellow tint at 50% opacity
+                        pixels[x, y] = (255, 255, 0, 128)
+
+            # Convert to QPixmap and display
+            # Scale to display size
+            scaled_width = width * DISPLAY_SCALE
+            scaled_height = height * DISPLAY_SCALE
+            scaled_mask = mask.resize(
+                (scaled_width, scaled_height), Image.Resampling.NEAREST
+            )
+
+            # Convert PIL image to QPixmap
+            data = scaled_mask.tobytes("raw", "RGBA")
+            from PySide6.QtGui import QImage
+
+            qimage = QImage(
+                data,
+                scaled_width,
+                scaled_height,
+                scaled_width * 4,
+                QImage.Format.Format_RGBA8888,
+            )
+            pixmap = QPixmap.fromImage(qimage)
+
+            # Position the highlight overlay to match the AI frame
+            self._pixel_highlight_item.setPixmap(pixmap)
+            self._pixel_highlight_item.setPos(self._ai_frame_item.pos())
+            self._pixel_highlight_item.setVisible(True)
+
+        except Exception as e:
+            logger.warning("Failed to generate pixel highlight mask: %s", e)
+            self._pixel_highlight_item.setVisible(False)
+
+    def _on_scene_clicked(self, scene_x: float, scene_y: float) -> None:
+        """Handle click on the scene - pick color if eyedropper mode is active.
+
+        Args:
+            scene_x: Scene X coordinate
+            scene_y: Scene Y coordinate
+        """
+        if not self._eyedropper_mode:
+            return
+
+        # Get pixel info at clicked position
+        result = self._get_pixel_at_scene_pos(scene_x, scene_y)
+        if result is None:
+            return
+
+        _img_x, _img_y, rgb, palette_index = result
+
+        # Emit the picked color and disable eyedropper mode (single-shot)
+        self.eyedropper_picked.emit(rgb, palette_index)
+
+        # Auto-disable eyedropper mode
+        self._eyedropper_btn.setChecked(False)
+        self.set_eyedropper_mode(False)

@@ -301,6 +301,12 @@ class FrameMappingWorkspace(QWidget):
         self._ai_frames_pane.palette_extract_requested.connect(self._on_palette_extract_requested)
         self._ai_frames_pane.palette_clear_requested.connect(self._on_palette_clear_requested)
         self._controller.sheet_palette_changed.connect(self._on_sheet_palette_changed)
+        # Bidirectional palette highlighting signals
+        self._alignment_canvas.pixel_hovered.connect(self._on_pixel_hovered)
+        self._alignment_canvas.pixel_left.connect(self._on_pixel_left)
+        self._alignment_canvas.eyedropper_picked.connect(self._on_eyedropper_picked)
+        self._ai_frames_pane.palette_color_changed.connect(self._on_palette_color_changed)
+        self._ai_frames_pane.palette_swatch_hovered.connect(self._on_palette_swatch_hovered)
         # Drag-drop and tab signals
         self._ai_frames_pane.folder_dropped.connect(self._on_ai_folder_dropped)
         self._ai_frames_pane.tab_folder_changed.connect(self._on_ai_tab_folder_changed)
@@ -1112,6 +1118,8 @@ class FrameMappingWorkspace(QWidget):
             self._mapping_panel.update_row_alignment(
                 ai_frame.index, mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v
             )
+            # Also update the status column (alignment changes set status="edited")
+            self._mapping_panel.update_row_status(ai_frame.index, mapping.status)
         # Refresh status indicators (doesn't touch canvas)
         self._refresh_mapping_status()
 
@@ -1194,6 +1202,33 @@ class FrameMappingWorkspace(QWidget):
         """Handle sheet palette change from controller."""
         palette = self._controller.get_sheet_palette()
         self._ai_frames_pane.set_sheet_palette(palette)
+        # Also update the workbench canvas for pixel inspection
+        self._alignment_canvas.set_sheet_palette(palette)
+
+    def _on_pixel_hovered(
+        self, x: int, y: int, rgb: object, palette_index: int
+    ) -> None:
+        """Handle pixel hover on workbench - highlight palette swatch."""
+        self._ai_frames_pane.highlight_palette_index(palette_index)
+
+    def _on_pixel_left(self) -> None:
+        """Handle mouse leaving workbench - clear palette highlight."""
+        self._ai_frames_pane.highlight_palette_index(None)
+
+    def _on_eyedropper_picked(self, rgb: object, palette_index: int) -> None:
+        """Handle eyedropper pick - select palette swatch."""
+        self._ai_frames_pane.select_palette_index(palette_index)
+
+    def _on_palette_color_changed(self, index: int, rgb: object) -> None:
+        """Handle palette color change - update controller."""
+        if isinstance(rgb, tuple) and len(rgb) >= 3:
+            rgb_tuple = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
+            self._controller.set_sheet_palette_color(index, rgb_tuple)
+
+    def _on_palette_swatch_hovered(self, index: object) -> None:
+        """Handle palette swatch hover - highlight pixels on canvas."""
+        if index is None or isinstance(index, int):
+            self._alignment_canvas.highlight_pixels_by_index(index)
 
     # -------------------------------------------------------------------------
     # Helper Methods

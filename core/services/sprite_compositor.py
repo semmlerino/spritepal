@@ -19,10 +19,11 @@ import numpy as np
 from PIL import Image
 
 from core.mesen_integration.capture_renderer import CaptureRenderer
-from core.palette_utils import quantize_to_palette, snes_palette_to_rgb
+from core.palette_utils import quantize_to_palette, quantize_with_mappings, snes_palette_to_rgb
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from core.frame_mapping_project import SheetPalette
     from core.mesen_integration.click_extractor import CaptureResult
 
 logger = get_logger(__name__)
@@ -92,6 +93,7 @@ class SpriteCompositor:
         transform: TransformParams,
         selected_entry_ids: list[int] | None = None,
         quantize: bool = True,
+        sheet_palette: SheetPalette | None = None,
     ) -> CompositeResult:
         """Composite an AI frame onto a game sprite.
 
@@ -101,6 +103,8 @@ class SpriteCompositor:
             transform: Alignment parameters (offset, flip, scale).
             selected_entry_ids: If provided, only these entries are included.
             quantize: Whether to quantize to the game palette.
+            sheet_palette: If provided, use this palette for quantization instead
+                of the capture palette. This ensures preview matches injection.
 
         Returns:
             CompositeResult with the composited image and metadata.
@@ -161,7 +165,9 @@ class SpriteCompositor:
 
         # Quantize to game palette if requested
         if quantize:
-            composited = self._quantize_to_palette(composited, filtered_capture)
+            composited = self._quantize_to_palette(
+                composited, filtered_capture, sheet_palette=sheet_palette
+            )
 
         return CompositeResult(
             composited_image=composited,
@@ -229,27 +235,56 @@ class SpriteCompositor:
         self,
         image: Image.Image,
         capture_result: CaptureResult,
+        sheet_palette: SheetPalette | None = None,
     ) -> Image.Image:
-        """Quantize image to the game palette.
+        """Quantize image to a palette.
 
-        Uses the first entry's palette (entries typically share palettes).
+        Priority: sheet_palette > capture palette (matches injection behavior).
+
+        Args:
+            image: RGBA image to quantize.
+            capture_result: Mesen capture with palette info (fallback).
+            sheet_palette: User-defined palette with color mappings (preferred).
+
+        Returns:
+            Quantized RGBA image.
         """
-        if not capture_result.entries or not capture_result.palettes:
-            return image
-
-        first_entry = capture_result.entries[0]
-        snes_palette = capture_result.palettes.get(first_entry.palette, [])
-
-        if not snes_palette:
-            return image
-
-        palette_rgb = snes_palette_to_rgb(snes_palette)
-
         # Save original alpha before quantization
         original_alpha = image.split()[3]
 
-        # Quantize to indexed palette
-        indexed = quantize_to_palette(image, palette_rgb)
+        # Priority: sheet_palette > capture palette (matches injection behavior)
+        if sheet_palette is not None:
+            # Use sheet palette (user-defined for consistent AI frame rendering)
+            palette_rgb = list(sheet_palette.colors)
+            if sheet_palette.color_mappings:
+                # Use explicit color mappings
+                indexed = quantize_with_mappings(
+                    image,
+                    palette_rgb,
+                    sheet_palette.color_mappings,
+                    transparency_threshold=1,
+                )
+                logger.debug(
+                    "Quantized preview using sheet palette with %d color mappings",
+                    len(sheet_palette.color_mappings),
+                )
+            else:
+                # Sheet palette without explicit mappings -> nearest color
+                indexed = quantize_to_palette(image, palette_rgb)
+                logger.debug("Quantized preview using sheet palette (nearest color)")
+        else:
+            # Fallback: capture palette (existing behavior)
+            if not capture_result.entries or not capture_result.palettes:
+                return image
+
+            first_entry = capture_result.entries[0]
+            snes_palette = capture_result.palettes.get(first_entry.palette, [])
+
+            if not snes_palette:
+                return image
+
+            palette_rgb = snes_palette_to_rgb(snes_palette)
+            indexed = quantize_to_palette(image, palette_rgb)
 
         # Convert back to RGBA for compositing
         quantized_rgba = indexed.convert("RGBA")
