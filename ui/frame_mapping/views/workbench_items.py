@@ -150,6 +150,7 @@ class AIFrameItem(QGraphicsObject):
         self._flip_h = False
         self._flip_v = False
         self._opacity = 0.7
+        self._ghost_mode = False
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -196,6 +197,11 @@ class AIFrameItem(QGraphicsObject):
         self._opacity = max(0.0, min(1.0, opacity))
         self.update()
 
+    def set_ghost_mode(self, enabled: bool) -> None:
+        """Enable ghost mode (outline only) for preview."""
+        self._ghost_mode = enabled
+        self.update()
+
     def show_handles(self, visible: bool) -> None:
         """Show or hide scale handles."""
         for handle in self._handles:
@@ -233,18 +239,41 @@ class AIFrameItem(QGraphicsObject):
             return
 
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
-        painter.setOpacity(self._opacity)
-
-        # Apply flip transform
-        pixmap = self._pixmap
-        if self._flip_h or self._flip_v:
-            transform = QTransform()
-            transform.scale(-1 if self._flip_h else 1, -1 if self._flip_v else 1)
-            pixmap = pixmap.transformed(transform)
-
-        # Scale and draw
         target_rect = self.boundingRect()
-        painter.drawPixmap(target_rect.toRect(), pixmap)
+
+        if self._ghost_mode:
+            # Ghost mode: dashed yellow outline with corner markers
+            painter.setOpacity(0.5)
+            pen = QPen(QColor(255, 255, 0, 200))
+            pen.setWidth(2)
+            pen.setStyle(Qt.PenStyle.DashLine)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(target_rect)
+            # Corner markers for grabbing
+            marker_size = 6
+            painter.setBrush(QColor(255, 255, 0, 200))
+            painter.setPen(Qt.PenStyle.NoPen)
+            for corner in [
+                target_rect.topLeft(),
+                target_rect.topRight(),
+                target_rect.bottomLeft(),
+                target_rect.bottomRight(),
+            ]:
+                painter.drawEllipse(corner, marker_size, marker_size)
+        else:
+            # Normal rendering
+            painter.setOpacity(self._opacity)
+
+            # Apply flip transform
+            pixmap = self._pixmap
+            if self._flip_h or self._flip_v:
+                transform = QTransform()
+                transform.scale(-1 if self._flip_h else 1, -1 if self._flip_v else 1)
+                pixmap = pixmap.transformed(transform)
+
+            # Scale and draw
+            painter.drawPixmap(target_rect.toRect(), pixmap)
 
         painter.setOpacity(1.0)
 

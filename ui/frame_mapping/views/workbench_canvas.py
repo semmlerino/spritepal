@@ -84,7 +84,7 @@ class WorkbenchGraphicsView(QGraphicsView):
         super().__init__(scene, parent)
         self.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate)
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setBackgroundBrush(QBrush(QColor(26, 26, 26)))
@@ -386,6 +386,11 @@ class WorkbenchCanvas(QWidget):
         controls2.addWidget(self._auto_align_btn)
 
         layout.addLayout(controls2)
+
+        # Hotkey hints
+        hints_label = QLabel("Arrow keys: nudge 1px | Shift+Arrow: 8px")
+        hints_label.setStyleSheet("font-size: 10px; color: #888; font-style: italic;")
+        layout.addWidget(hints_label)
 
         # Set initial enabled state
         self._set_controls_enabled(False)
@@ -789,12 +794,26 @@ class WorkbenchCanvas(QWidget):
         self._ai_frame_item.set_overlay_opacity(value / 100.0)
 
     def _on_scale_slider_changed(self, value: int) -> None:
-        """Handle scale slider change."""
+        """Handle scale slider change, preserving center position."""
         if self._updating_from_external:
             return
-        scale = value / 100.0
-        self._scale_value.setText(f"{scale:.1f}x")
-        self._ai_frame_item.set_scale_factor(scale)
+
+        new_scale = value / 100.0
+        old_scale = self._ai_frame_item.scale_factor()
+        if abs(new_scale - old_scale) < 0.001:
+            return
+
+        # Capture center before scaling
+        center_before = self._ai_frame_item.sceneBoundingRect().center()
+
+        # Apply scale
+        self._scale_value.setText(f"{new_scale:.1f}x")
+        self._ai_frame_item.set_scale_factor(new_scale)
+
+        # Reposition to preserve center
+        center_after = self._ai_frame_item.sceneBoundingRect().center()
+        delta = center_before - center_after
+        self._ai_frame_item.setPos(self._ai_frame_item.pos() + delta)
 
     def _on_flip_changed(self) -> None:
         """Handle flip checkbox change."""
@@ -819,17 +838,17 @@ class WorkbenchCanvas(QWidget):
 
         When enabled, shows a preview of how the final sprite will look
         after injection (quantized to palette, clipped to silhouette).
-        The AI frame is hidden when preview is enabled to show only the
-        final composited result.
+        The AI frame switches to ghost mode (outline only) so it can
+        still be repositioned while viewing the preview.
         """
         self._preview_enabled = checked
         if checked:
-            # Hide AI frame to show only the preview result
-            self._ai_frame_item.setVisible(False)
+            # Ghost mode: visible outline, still draggable
+            self._ai_frame_item.set_ghost_mode(True)
             self._schedule_preview_update()
         else:
             # Show AI frame again for alignment work
-            self._ai_frame_item.setVisible(True)
+            self._ai_frame_item.set_ghost_mode(False)
             self._preview_item.setVisible(False)
 
     def _on_compression_changed(self, index: int) -> None:

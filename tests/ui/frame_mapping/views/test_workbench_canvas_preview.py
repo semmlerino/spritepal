@@ -70,16 +70,19 @@ class TestPreviewToggle:
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        # AI frame should be visible by default
+        # AI frame should be visible and not in ghost mode by default
         assert canvas._ai_frame_item.isVisible()
+        assert not canvas._ai_frame_item._ghost_mode
 
-        # Enable preview - AI frame should be hidden
+        # Enable preview - AI frame should enter ghost mode (still visible, but outline only)
         canvas._preview_checkbox.setChecked(True)
-        assert not canvas._ai_frame_item.isVisible()
+        assert canvas._ai_frame_item.isVisible()
+        assert canvas._ai_frame_item._ghost_mode
 
-        # Disable preview - AI frame should be visible again
+        # Disable preview - AI frame should exit ghost mode
         canvas._preview_checkbox.setChecked(False)
         assert canvas._ai_frame_item.isVisible()
+        assert not canvas._ai_frame_item._ghost_mode
 
 
 class TestPreviewGeneration:
