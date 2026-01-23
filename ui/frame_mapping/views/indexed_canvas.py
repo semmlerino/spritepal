@@ -458,23 +458,28 @@ class IndexedCanvas(QWidget):
         height, width = self._indexed_data.shape
 
         # Create color lookup table from palette (16 colors + alpha)
+        # Use BGRA order for Qt's native format on most systems
         lut = np.zeros((16, 4), dtype=np.uint8)
         lut[0] = (0, 0, 0, 0)  # Index 0 = transparent
         for i in range(1, min(16, len(self._palette.colors))):
             r, g, b = self._palette.colors[i]
-            lut[i] = (r, g, b, 255)
+            # Store as BGRA for Format_ARGB32 (which is actually BGRA in memory)
+            lut[i] = (b, g, r, 255)
 
         # Vectorized lookup - much faster than nested loops
         indices = np.clip(self._indexed_data, 0, 15)
-        rgba = lut[indices]
+        bgra = lut[indices]
 
-        # Convert to QImage
+        # Ensure array is contiguous for QImage
+        bgra = np.ascontiguousarray(bgra)
+
+        # Convert to QImage using ARGB32 (native format, stored as BGRA)
         qimage = QImage(
-            rgba.data,
+            bgra.data,
             width,
             height,
             width * 4,
-            QImage.Format.Format_RGBA8888,
+            QImage.Format.Format_ARGB32,
         )
         # Make a copy since numpy array may be modified
         qimage = qimage.copy()
@@ -515,15 +520,18 @@ class IndexedCanvas(QWidget):
         mask = self._indexed_data == self._highlight_index
 
         # Create semi-transparent green overlay for highlighted pixels
+        # Use BGRA order for Format_ARGB32
         overlay = np.zeros((height, width, 4), dtype=np.uint8)
-        overlay[mask] = (0, 200, 0, 100)  # Green with alpha
+        overlay[mask] = (0, 200, 0, 100)  # BGRA: Blue=0, Green=200, Red=0, Alpha=100
+
+        overlay = np.ascontiguousarray(overlay)
 
         qimage = QImage(
             overlay.data,
             width,
             height,
             width * 4,
-            QImage.Format.Format_RGBA8888,
+            QImage.Format.Format_ARGB32,
         )
         qimage = qimage.copy()
 
@@ -542,18 +550,21 @@ class IndexedCanvas(QWidget):
             return
 
         # Create semi-transparent green overlay for selected pixels
+        # Use BGRA order for Format_ARGB32
         overlay = np.zeros((height, width, 4), dtype=np.uint8)
 
         for x, y in self._selection_mask.get_selected_pixels():
             if 0 <= x < width and 0 <= y < height:
-                overlay[y, x] = (0, 255, 0, 120)  # Green with alpha
+                overlay[y, x] = (0, 255, 0, 120)  # BGRA: Blue=0, Green=255, Red=0, Alpha=120
+
+        overlay = np.ascontiguousarray(overlay)
 
         qimage = QImage(
             overlay.data,
             width,
             height,
             width * 4,
-            QImage.Format.Format_RGBA8888,
+            QImage.Format.Format_ARGB32,
         )
         qimage = qimage.copy()
 
