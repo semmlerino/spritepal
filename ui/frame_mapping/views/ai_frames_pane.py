@@ -353,6 +353,9 @@ class AIFramesPane(QWidget):
         self._palette_widget.set_palette(palette)
         # Refresh thumbnails to show quantized colors
         self._refresh_list(is_frame_list_change=False)
+        # Force Qt to repaint the list viewport to ensure icon updates are visible
+        # This fixes a Qt issue where icon caching can prevent visual updates
+        self._list.viewport().update()
 
     def get_sheet_palette(self) -> SheetPalette | None:
         """Get the current sheet palette.
