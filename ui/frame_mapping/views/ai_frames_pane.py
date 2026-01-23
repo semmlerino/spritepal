@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QIcon, QPixmap
+from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -16,14 +18,18 @@ from PySide6.QtWidgets import (
     QMenu,
     QPushButton,
     QSizePolicy,
+    QTabBar,
     QVBoxLayout,
     QWidget,
 )
 
+from ui.frame_mapping.views.sheet_palette_widget import SheetPaletteWidget
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import AIFrame
+
+from core.frame_mapping_project import SheetPalette
 
 logger = get_logger(__name__)
 
@@ -58,6 +64,13 @@ class AIFramesPane(QWidget):
     auto_advance_changed = Signal(bool)  # Auto-advance toggle state changed
     edit_in_sprite_editor_requested = Signal(str)  # AI frame ID
     remove_from_project_requested = Signal(str)  # AI frame ID
+    # Sheet palette signals
+    palette_edit_requested = Signal()  # User wants to edit sheet palette
+    palette_extract_requested = Signal()  # User wants to extract palette from sheet
+    palette_clear_requested = Signal()  # User wants to clear sheet palette
+    # Drag-and-drop / tab signals
+    folder_dropped = Signal(object)  # Path - emitted when folder/PNG dropped
+    tab_folder_changed = Signal(object)  # Path | None - active tab's folder changed
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -66,6 +79,11 @@ class AIFramesPane(QWidget):
         self._show_unmapped_only = False
         self._search_text: str = ""
 
+        # Tab management
+        self._tab_folders: list[Path | None] = [None]  # One empty tab initially
+        self._suppress_tab_signal: bool = False
+
+        self.setAcceptDrops(True)
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -78,6 +96,43 @@ class AIFramesPane(QWidget):
         title = QLabel("AI Frames")
         title.setStyleSheet("font-weight: bold; font-size: 12px;")
         layout.addWidget(title)
+
+        # Tab bar for multiple folders
+        tab_container = QHBoxLayout()
+        tab_container.setContentsMargins(0, 0, 0, 0)
+        tab_container.setSpacing(2)
+
+        self._tab_bar = QTabBar()
+        self._tab_bar.setTabsClosable(True)
+        self._tab_bar.setMovable(False)
+        self._tab_bar.setExpanding(False)
+        self._tab_bar.setDocumentMode(True)
+        self._tab_bar.addTab("New")  # Initial empty tab
+        self._tab_bar.tabCloseRequested.connect(self._on_tab_close_requested)
+        self._tab_bar.currentChanged.connect(self._on_tab_changed)
+        tab_container.addWidget(self._tab_bar, 1)
+
+        self._add_tab_btn = QPushButton("+")
+        self._add_tab_btn.setFixedSize(24, 24)
+        self._add_tab_btn.setToolTip("Add new tab")
+        self._add_tab_btn.clicked.connect(self._on_add_tab_clicked)
+        tab_container.addWidget(self._add_tab_btn)
+
+        layout.addLayout(tab_container)
+
+        # Sheet palette widget (collapsible section)
+        self._palette_widget = SheetPaletteWidget()
+        self._palette_widget.edit_requested.connect(self.palette_edit_requested.emit)
+        self._palette_widget.extract_requested.connect(self.palette_extract_requested.emit)
+        self._palette_widget.clear_requested.connect(self.palette_clear_requested.emit)
+        self._palette_widget.set_buttons_enabled(False)  # Disabled until frames are loaded
+        layout.addWidget(self._palette_widget)
+
+        # Separator line
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(separator)
 
         # Search box
         self._search_box = QLineEdit()
@@ -150,6 +205,8 @@ class AIFramesPane(QWidget):
         is_frame_list_change = frames is not self._ai_frames or len(frames) != len(self._ai_frames)
         self._ai_frames = frames
         self._refresh_list(is_frame_list_change=is_frame_list_change)
+        # Enable palette buttons when frames are loaded
+        self._palette_widget.set_buttons_enabled(len(frames) > 0)
         logger.debug("Loaded %d AI frames into pane", len(frames))
 
     def set_mapping_status(self, status_map: dict[int, str]) -> None:
@@ -222,15 +279,43 @@ class AIFramesPane(QWidget):
             self._list.blockSignals(False)
 
     def clear(self) -> None:
-        """Clear all AI frames."""
+        """Clear all AI frames and reset tabs."""
         self._ai_frames = []
         self._mapping_status = {}
         self._list.clear()
         self._count_label.setText("No frames")
+        self._palette_widget.set_palette(None)
+        self._palette_widget.set_buttons_enabled(False)
+
+        # Reset tabs to single empty tab
+        self._suppress_tab_signal = True
+        try:
+            while self._tab_bar.count() > 0:
+                self._tab_bar.removeTab(0)
+            self._tab_bar.addTab("New")
+            self._tab_folders = [None]
+        finally:
+            self._suppress_tab_signal = False
 
     def set_map_button_enabled(self, enabled: bool) -> None:
         """Set the enabled state of the Map Selected button."""
         self._map_button.setEnabled(enabled)
+
+    def set_sheet_palette(self, palette: SheetPalette | None) -> None:
+        """Set the sheet palette to display.
+
+        Args:
+            palette: SheetPalette to display, or None to clear
+        """
+        self._palette_widget.set_palette(palette)
+
+    def get_sheet_palette(self) -> SheetPalette | None:
+        """Get the current sheet palette.
+
+        Returns:
+            SheetPalette if defined, None otherwise
+        """
+        return self._palette_widget.get_palette()
 
     def _on_search_changed(self, text: str) -> None:
         """Handle search text change."""
@@ -369,3 +454,153 @@ class AIFramesPane(QWidget):
         # Bug #1 fix: Always emit empty string when selection was lost (filter/search/reload)
         elif current_selection_id is not None and not selection_restored:
             self.ai_frame_selected.emit("")
+
+    # ─── Drag and Drop ────────────────────────────────────────────────────────
+
+    @override
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        """Accept drag if URLs contain a folder or PNG file."""
+        mime_data = event.mimeData()
+        if mime_data.hasUrls():
+            for url in mime_data.urls():
+                if url.isLocalFile():
+                    path = Path(url.toLocalFile())
+                    if path.is_dir() or (path.is_file() and path.suffix.lower() == ".png"):
+                        event.acceptProposedAction()
+                        # Visual feedback - dashed border on list
+                        self._list.setStyleSheet("QListWidget { border: 2px dashed #4CAF50; }")
+                        return
+        event.ignore()
+
+    @override
+    def dragLeaveEvent(self, event: QDragLeaveEvent) -> None:
+        """Reset visual feedback when drag leaves."""
+        self._list.setStyleSheet("")
+        event.accept()
+
+    @override
+    def dropEvent(self, event: QDropEvent) -> None:
+        """Handle drop - emit folder_dropped signal."""
+        self._list.setStyleSheet("")  # Reset visual feedback
+
+        mime_data = event.mimeData()
+        if not mime_data.hasUrls():
+            event.ignore()
+            return
+
+        for url in mime_data.urls():
+            if url.isLocalFile():
+                path = Path(url.toLocalFile())
+                # If PNG dropped, use parent directory
+                if path.is_file() and path.suffix.lower() == ".png":
+                    path = path.parent
+                if path.is_dir():
+                    logger.info("Folder dropped: %s", path)
+                    self.folder_dropped.emit(path)
+                    event.acceptProposedAction()
+                    return
+
+        event.ignore()
+
+    # ─── Tab Management ───────────────────────────────────────────────────────
+
+    def add_folder_tab(self, folder_path: Path) -> int:
+        """Add a new tab with folder name and switch to it.
+
+        Args:
+            folder_path: Path to the folder
+
+        Returns:
+            Index of the new tab
+        """
+        self._suppress_tab_signal = True
+        try:
+            tab_name = folder_path.name or str(folder_path)
+            index = self._tab_bar.addTab(tab_name)
+            self._tab_folders.append(folder_path)
+            self._tab_bar.setCurrentIndex(index)
+        finally:
+            self._suppress_tab_signal = False
+
+        # Emit signal for the new tab
+        self.tab_folder_changed.emit(folder_path)
+        return index
+
+    def close_tab(self, index: int) -> None:
+        """Close tab at given index.
+
+        If closing the last tab, reset to a single empty tab.
+
+        Args:
+            index: Tab index to close
+        """
+        if index < 0 or index >= self._tab_bar.count():
+            return
+
+        self._suppress_tab_signal = True
+        try:
+            self._tab_bar.removeTab(index)
+            del self._tab_folders[index]
+
+            # If no tabs left, add an empty one
+            if self._tab_bar.count() == 0:
+                self._tab_bar.addTab("New")
+                self._tab_folders = [None]
+        finally:
+            self._suppress_tab_signal = False
+
+        # Emit signal for the now-current tab
+        current_folder = self.get_current_tab_folder()
+        self.tab_folder_changed.emit(current_folder)
+
+    def set_current_tab_folder(self, folder_path: Path) -> None:
+        """Associate a folder with the current tab.
+
+        Updates the tab label to show the folder name.
+
+        Args:
+            folder_path: Path to associate with current tab
+        """
+        index = self._tab_bar.currentIndex()
+        if index < 0 or index >= len(self._tab_folders):
+            return
+
+        self._tab_folders[index] = folder_path
+        tab_name = folder_path.name or str(folder_path)
+        self._tab_bar.setTabText(index, tab_name)
+
+    def get_current_tab_folder(self) -> Path | None:
+        """Get the folder associated with the current tab.
+
+        Returns:
+            Path if tab has folder, None for empty tabs
+        """
+        index = self._tab_bar.currentIndex()
+        if index < 0 or index >= len(self._tab_folders):
+            return None
+        return self._tab_folders[index]
+
+    def _on_tab_changed(self, index: int) -> None:
+        """Handle tab selection change."""
+        if self._suppress_tab_signal:
+            return
+        if index < 0 or index >= len(self._tab_folders):
+            return
+        folder = self._tab_folders[index]
+        self.tab_folder_changed.emit(folder)
+
+    def _on_tab_close_requested(self, index: int) -> None:
+        """Handle tab close button click."""
+        self.close_tab(index)
+
+    def _on_add_tab_clicked(self) -> None:
+        """Handle add tab button click."""
+        self._suppress_tab_signal = True
+        try:
+            index = self._tab_bar.addTab("New")
+            self._tab_folders.append(None)
+            self._tab_bar.setCurrentIndex(index)
+        finally:
+            self._suppress_tab_signal = False
+        # Emit signal for the new empty tab
+        self.tab_folder_changed.emit(None)

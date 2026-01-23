@@ -296,6 +296,14 @@ class FrameMappingWorkspace(QWidget):
         self._ai_frames_pane.auto_advance_changed.connect(self._on_auto_advance_changed)
         self._ai_frames_pane.edit_in_sprite_editor_requested.connect(self._on_edit_frame)
         self._ai_frames_pane.remove_from_project_requested.connect(self._on_remove_ai_frame)
+        # Sheet palette signals
+        self._ai_frames_pane.palette_edit_requested.connect(self._on_palette_edit_requested)
+        self._ai_frames_pane.palette_extract_requested.connect(self._on_palette_extract_requested)
+        self._ai_frames_pane.palette_clear_requested.connect(self._on_palette_clear_requested)
+        self._controller.sheet_palette_changed.connect(self._on_sheet_palette_changed)
+        # Drag-drop and tab signals
+        self._ai_frames_pane.folder_dropped.connect(self._on_ai_folder_dropped)
+        self._ai_frames_pane.tab_folder_changed.connect(self._on_ai_tab_folder_changed)
 
         # Captures Library Pane signals
         self._captures_pane.game_frame_selected.connect(self._on_game_frame_selected)
@@ -357,6 +365,7 @@ class FrameMappingWorkspace(QWidget):
 
         self._project_label.setText(f"- {project.name}")
         self._ai_frames_pane.set_ai_frames(project.ai_frames)
+        self._ai_frames_pane.set_sheet_palette(project.sheet_palette)  # Load sheet palette
         self._captures_pane.set_game_frames(project.game_frames)
         self._mapping_panel.set_project(project)
         self._update_map_button_state()
@@ -1104,6 +1113,86 @@ class FrameMappingWorkspace(QWidget):
         self._refresh_mapping_status()
 
     # -------------------------------------------------------------------------
+    # Sheet Palette Handlers
+    # -------------------------------------------------------------------------
+
+    def _on_palette_edit_requested(self) -> None:
+        """Handle request to edit the sheet palette."""
+        from ui.frame_mapping.dialogs.sheet_palette_mapping_dialog import SheetPaletteMappingDialog
+
+        # Extract colors from all AI frames
+        sheet_colors = self._controller.extract_sheet_colors()
+        if not sheet_colors:
+            QMessageBox.information(
+                self,
+                "No AI Frames",
+                "No AI frames loaded. Please load AI frames first to extract colors.",
+            )
+            return
+
+        # Get current palette and available game palettes
+        current_palette = self._controller.get_sheet_palette()
+        game_palettes = self._controller.get_game_palettes()
+
+        # Open dialog
+        dialog = SheetPaletteMappingDialog(
+            sheet_colors=sheet_colors,
+            current_palette=current_palette,
+            game_palettes=game_palettes,
+            parent=self,
+        )
+
+        if dialog.exec():
+            # Apply the result
+            new_palette = dialog.get_result()
+            self._controller.set_sheet_palette(new_palette)
+            if self._message_service:
+                self._message_service.show_message(
+                    f"Sheet palette applied ({len(new_palette.color_mappings)} color mappings)"
+                )
+
+    def _on_palette_extract_requested(self) -> None:
+        """Handle request to extract palette from AI sheet."""
+        sheet_colors = self._controller.extract_sheet_colors()
+        if not sheet_colors:
+            QMessageBox.information(
+                self,
+                "No AI Frames",
+                "No AI frames loaded. Please load AI frames first.",
+            )
+            return
+
+        # Generate palette
+        new_palette = self._controller.generate_sheet_palette_from_colors(sheet_colors)
+        self._controller.set_sheet_palette(new_palette)
+
+        if self._message_service:
+            self._message_service.show_message(f"Extracted 16-color palette from {len(sheet_colors)} unique colors")
+
+    def _on_palette_clear_requested(self) -> None:
+        """Handle request to clear the sheet palette."""
+        if self._controller.get_sheet_palette() is None:
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Clear Sheet Palette",
+            "Clear the sheet palette?\n\nInjections will use capture palettes instead.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self._controller.set_sheet_palette(None)
+            if self._message_service:
+                self._message_service.show_message("Sheet palette cleared")
+
+    def _on_sheet_palette_changed(self) -> None:
+        """Handle sheet palette change from controller."""
+        palette = self._controller.get_sheet_palette()
+        self._ai_frames_pane.set_sheet_palette(palette)
+
+    # -------------------------------------------------------------------------
     # Helper Methods
     # -------------------------------------------------------------------------
 
@@ -1298,7 +1387,43 @@ class FrameMappingWorkspace(QWidget):
         if directory:
             path = Path(directory)
             self._last_ai_dir = path
+            # Update the current tab to associate with this folder
+            self._ai_frames_pane.set_current_tab_folder(path)
             self._controller.load_ai_frames_from_directory(path)
+
+    def _on_ai_folder_dropped(self, path: object) -> None:
+        """Load AI frames from dropped folder.
+
+        Args:
+            path: Path object (typed as object due to Signal limitation)
+        """
+        if not isinstance(path, Path) or not path.is_dir():
+            return
+        self._last_ai_dir = path
+
+        # If current tab is empty, update it; otherwise add new tab
+        if self._ai_frames_pane.get_current_tab_folder() is None:
+            self._ai_frames_pane.set_current_tab_folder(path)
+        else:
+            self._ai_frames_pane.add_folder_tab(path)
+            # Note: add_folder_tab emits tab_folder_changed which will load frames
+            return
+
+        self._controller.load_ai_frames_from_directory(path)
+
+    def _on_ai_tab_folder_changed(self, path: object) -> None:
+        """Reload frames when tab changes.
+
+        Args:
+            path: Path | None (typed as object due to Signal limitation)
+        """
+        if path is not None and isinstance(path, Path) and path.is_dir():
+            self._last_ai_dir = path
+            self._controller.load_ai_frames_from_directory(path)
+        elif self._controller.project is not None:
+            # Empty tab - clear frames
+            self._controller.project.replace_ai_frames([], None)
+            self._controller.project_changed.emit()
 
     def _on_import_capture(self) -> None:
         """Handle import capture button click."""
