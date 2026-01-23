@@ -764,6 +764,7 @@ class WorkbenchCanvas(QWidget):
         self._ai_pixmap = None
         self._ai_image = None
         self._has_mapping = False
+        self._sheet_palette = None  # Reset palette on clear
 
         self._game_frame_item.setPixmap(QPixmap())
         self._ai_frame_item.set_pixmap(None)

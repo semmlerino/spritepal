@@ -382,6 +382,7 @@ class FrameMappingWorkspace(QWidget):
             self._captures_pane.clear()
             self._mapping_panel.set_project(None)
             self._alignment_canvas.clear()
+            self._alignment_canvas.set_sheet_palette(None)  # Clear canvas palette
             self._update_map_button_state()
             return
 
@@ -391,6 +392,7 @@ class FrameMappingWorkspace(QWidget):
         if project.ai_frames_dir and self._ai_frames_pane.get_current_tab_folder() is None:
             self._ai_frames_pane.set_current_tab_folder(project.ai_frames_dir)
         self._ai_frames_pane.set_sheet_palette(project.sheet_palette)  # Load sheet palette
+        self._alignment_canvas.set_sheet_palette(project.sheet_palette)  # Sync canvas palette
         self._captures_pane.set_game_frames(project.game_frames)
         self._mapping_panel.set_project(project)
         self._update_map_button_state()
@@ -1616,8 +1618,8 @@ class FrameMappingWorkspace(QWidget):
     def _on_preview_cache_invalidated(self, frame_id: str) -> None:
         """Handle preview cache invalidation for a specific game frame.
 
-        Updates the mapping panel and captures pane with the fresh preview thumbnail
-        for the invalidated frame.
+        Updates the mapping panel, captures pane, and workbench canvas (if displaying
+        the invalidated frame) with the fresh preview.
 
         Args:
             frame_id: The game frame ID whose preview was regenerated
@@ -1628,6 +1630,16 @@ class FrameMappingWorkspace(QWidget):
             self._mapping_panel.update_game_frame_preview(frame_id, preview)
             # Update captures pane thumbnail
             self._captures_pane.update_frame_preview(frame_id, preview)
+
+            # Also update workbench canvas if this frame is currently displayed
+            if self._current_canvas_game_id == frame_id:
+                project = self._controller.project
+                if project:
+                    game_frame = project.get_game_frame_by_id(frame_id)
+                    if game_frame:
+                        capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
+                        self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
+
             logger.debug("Updated thumbnails for invalidated preview: %s", frame_id)
 
     # -------------------------------------------------------------------------

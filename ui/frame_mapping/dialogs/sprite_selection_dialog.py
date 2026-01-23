@@ -82,6 +82,14 @@ class SpriteSelectionDialog(DialogBase):
         """Return user's selected OAM entries."""
         return self._selected_entries
 
+    @property
+    def selected_palette(self) -> int:
+        """Return the selected palette filter value, or -1 if All Palettes."""
+        if self._palette_filter is None:
+            return -1
+        data = self._palette_filter.currentData()
+        return data if data is not None else -1
+
     @override
     def _setup_ui(self) -> None:
         """Set up the dialog UI."""

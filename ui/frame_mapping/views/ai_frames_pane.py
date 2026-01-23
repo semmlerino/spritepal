@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.palette_utils import quantize_to_palette
+from core.palette_utils import quantize_to_palette, quantize_with_mappings
 from core.services.image_utils import pil_to_qpixmap
 from ui.frame_mapping.views.sheet_palette_widget import SheetPaletteWidget
 from utils.logging_config import get_logger
@@ -420,8 +420,16 @@ class AIFramesPane(QWidget):
                 if pil_image.mode != "RGBA":
                     pil_image = pil_image.convert("RGBA")
 
-                # Quantize to palette (returns indexed image)
-                indexed = quantize_to_palette(pil_image, self._sheet_palette.colors)
+                # Use color_mappings if defined, otherwise simple quantization
+                if self._sheet_palette.color_mappings:
+                    indexed = quantize_with_mappings(
+                        pil_image,
+                        self._sheet_palette.colors,
+                        self._sheet_palette.color_mappings,
+                        transparency_threshold=1,
+                    )
+                else:
+                    indexed = quantize_to_palette(pil_image, self._sheet_palette.colors)
 
                 # Convert indexed back to RGBA for display (preserves palette colors)
                 pil_image = indexed.convert("RGBA")

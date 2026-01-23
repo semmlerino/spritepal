@@ -311,6 +311,13 @@ class FrameMappingController(QObject):
             entry_ids = tuple(entry.id for entry in selected_entries)
             self._game_frame_previews[frame_id] = (pixmap, mtime, entry_ids)
 
+            # Infer palette from selected entries (use first entry's palette if all same)
+            palette_idx = 0
+            if selected_entries:
+                first_palette = selected_entries[0].palette
+                if all(e.palette == first_palette for e in selected_entries):
+                    palette_idx = first_palette
+
             # Create game frame with selected entry IDs for filtering on retrieval
             bbox = filtered_capture.bounding_box
             # Default all ROM offsets to RAW compression (user can change in workbench)
@@ -319,7 +326,7 @@ class FrameMappingController(QObject):
                 id=frame_id,
                 rom_offsets=rom_offsets,
                 capture_path=capture_path,
-                palette_index=0,  # Could extract from capture
+                palette_index=palette_idx,  # Inferred from selected entries
                 width=bbox.width,
                 height=bbox.height,
                 selected_entry_ids=[entry.id for entry in selected_entries],
@@ -331,11 +338,12 @@ class FrameMappingController(QObject):
             self.project_changed.emit()
             self.save_requested.emit()
             logger.info(
-                "Imported game frame %s from %s (%d of %d entries selected)",
+                "Imported game frame %s from %s (%d of %d entries selected, palette=%d)",
                 frame_id,
                 capture_path,
                 len(selected_entries),
                 len(capture_result.entries),
+                palette_idx,
             )
             return frame
 
@@ -1001,6 +1009,7 @@ class FrameMappingController(QObject):
         """Update compression type for a game frame.
 
         Updates the compression type for all ROM offsets in the game frame.
+        By design, compression is a single setting per game frame, not per offset.
         This routes compression changes through the controller instead of
         directly mutating game frame state.
 
