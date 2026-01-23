@@ -173,7 +173,6 @@ class ColorSwatch(QFrame):
 
         if color.isValid():
             new_color = (color.red(), color.green(), color.blue())
-            logger.debug(f"ColorSwatch emitting color_change_requested: index={self._index}, color={new_color}")
             self.color_change_requested.emit(self._index, new_color)
 
     @override
@@ -430,9 +429,7 @@ class EditorPalettePanel(QWidget):
 
     def _on_color_change_requested(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle color change from right-click."""
-        logger.debug(f"Color change requested: index={index}, color={color}")
         if 0 < index < len(self._swatches):
-            logger.debug(f"Updating swatch {index} to color {color}")
             self._swatches[index].set_color(color)
             self.color_changed.emit(index, color)
         else:

@@ -1111,17 +1111,10 @@ class WorkbenchCanvas(QWidget):
         Uses the alignment snapshot captured at schedule time if available,
         otherwise falls back to current values.
         """
-        logger.debug("_generate_preview called, enabled=%s", self._preview_enabled)
         if not self._preview_enabled:
             self._preview_item.setVisible(False)
             return
 
-        logger.debug(
-            "_generate_preview: ai_image=%s, capture_result=%s, game_pixmap=%s",
-            self._ai_image is not None,
-            self._capture_result is not None,
-            self._game_pixmap is not None,
-        )
         if self._ai_image is None or self._capture_result is None or self._game_pixmap is None:
             self._preview_item.setVisible(False)
             return
@@ -1184,11 +1177,6 @@ class WorkbenchCanvas(QWidget):
                 Qt.TransformationMode.FastTransformation,
             )
 
-            logger.debug(
-                "_generate_preview: setting pixmap size=%dx%d",
-                scaled_pixmap.width(),
-                scaled_pixmap.height(),
-            )
             self._preview_item.setPixmap(scaled_pixmap)
             self._preview_item.setVisible(True)
 

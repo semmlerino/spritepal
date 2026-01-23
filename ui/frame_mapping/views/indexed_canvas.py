@@ -8,7 +8,6 @@ indexed palette images with selection overlay support.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, override
 
 import numpy as np
@@ -38,8 +37,6 @@ if TYPE_CHECKING:
     from core.editing import SelectionMask
     from core.frame_mapping_project import SheetPalette
 
-
-logger = logging.getLogger(__name__)
 
 # Canvas display constants
 CANVAS_MIN_SIZE = 300
@@ -445,8 +442,6 @@ class IndexedCanvas(QWidget):
         Call this when palette colors have changed but the indexed data
         hasn't changed. This re-reads colors from the palette and re-renders.
         """
-        if self._palette:
-            logger.debug(f"Canvas refresh_palette: colors={self._palette.colors[:5]}...")
         self._render_image()
         self._update_highlight_overlay()
 

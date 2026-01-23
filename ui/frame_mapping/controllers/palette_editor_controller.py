@@ -233,13 +233,11 @@ class PaletteEditorController(QObject):
     def set_tool(self, tool: EditorTool) -> None:
         """Set the active tool."""
         self._current_tool = tool
-        logger.debug("Tool changed to %s", tool.name)
 
     def set_active_index(self, index: int) -> None:
         """Set the active palette index."""
         if 0 <= index <= 15:
             self._active_index = index
-            logger.debug("Active index changed to %d", index)
 
     def set_brush_size(self, size: int) -> None:
         """Set the brush size (1-5)."""
@@ -258,10 +256,7 @@ class PaletteEditorController(QObject):
             return
 
         # Update the palette color
-        logger.debug(f"Controller updating palette[{index}] to {color}")
-        logger.debug(f"Palette before: {self._palette.colors[index]}")
         self._palette.colors[index] = color
-        logger.debug(f"Palette after: {self._palette.colors[index]}")
         self._mark_dirty()
         # Trigger canvas refresh with new palette colors
         self.image_changed.emit()
@@ -301,7 +296,6 @@ class PaletteEditorController(QObject):
 
         if pixel_count == 0:
             # No pixels to merge, but still mark the slot as free
-            logger.debug(f"No pixels with index {merge_index}, slot marked free")
             self._mark_dirty()
             self.image_changed.emit()
             return True
