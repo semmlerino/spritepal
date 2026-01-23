@@ -800,9 +800,11 @@ class FrameMappingWorkspace(QWidget):
         """Handle save from palette editor.
 
         Updates the AIFrame path and refreshes the workspace.
+        When the path changes (e.g., sprite_00.png -> sprite_00_edited.png),
+        all references to the frame ID must be updated.
 
         Args:
-            ai_frame_id: AI frame ID
+            ai_frame_id: AI frame ID (old filename)
             indexed_data: Numpy array of indexed pixel data (unused here)
             output_path: Path to the saved edited PNG
         """
@@ -810,22 +812,35 @@ class FrameMappingWorkspace(QWidget):
         if project is None:
             return
 
-        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
-        if ai_frame is None:
+        # Use project method to update path and fix all references
+        new_id = project.update_ai_frame_path(ai_frame_id, Path(output_path))
+        if new_id is None:
+            logger.warning("Failed to update AI frame path: frame %s not found", ai_frame_id)
             return
 
-        # Update the AI frame path to point to the edited file
-        ai_frame.path = Path(output_path)
+        # Update workspace tracking if ID changed
+        if new_id != ai_frame_id:
+            # Update palette editor tracking
+            if ai_frame_id in self._palette_editors:
+                editor = self._palette_editors.pop(ai_frame_id)
+                self._palette_editors[new_id] = editor
+
+            # Update selection tracking
+            if self._selected_ai_frame_id == ai_frame_id:
+                self._selected_ai_frame_id = new_id
 
         # Mark project as modified (will auto-save on next operation)
         self._controller.project_changed.emit()
 
         # Refresh the AI frames pane to show updated preview
-        self._ai_frames_pane.refresh_frame(ai_frame_id)
+        self._ai_frames_pane.refresh_frame(new_id)
+
+        # Refresh the mapping panel to show the updated frame
+        self._mapping_panel.refresh()
 
         # Update workbench if this frame is selected
-        if self._selected_ai_frame_id == ai_frame_id:
-            self._on_ai_frame_selected(ai_frame_id)
+        if self._selected_ai_frame_id == new_id:
+            self._on_ai_frame_selected(new_id)
 
         if self._message_service:
             self._message_service.show_message(f"Saved edited palette: {Path(output_path).name}", 3000)

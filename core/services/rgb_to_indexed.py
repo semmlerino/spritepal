@@ -196,13 +196,14 @@ def convert_indexed_to_pil_indexed(
 
     This creates a true indexed PNG with the palette embedded,
     which is what we want for the edited output.
+    Index 0 is marked as transparent.
 
     Args:
         data: 2D numpy array (H, W) of palette indices (0-15)
         palette: SheetPalette with colors
 
     Returns:
-        PIL Image in "P" (palette) mode
+        PIL Image in "P" (palette) mode with index 0 as transparent
     """
     height, width = data.shape
 
@@ -223,6 +224,10 @@ def convert_indexed_to_pil_indexed(
 
     # Set pixel data
     img.putdata(list(data.flatten()))
+
+    # Mark index 0 as transparent
+    # This sets the tRNS chunk in the PNG
+    img.info["transparency"] = 0
 
     return img
 

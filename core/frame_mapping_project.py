@@ -652,6 +652,39 @@ class FrameMappingProject:
         """
         return self._ai_frame_index_by_id.get(ai_frame_id)
 
+    def update_ai_frame_path(self, old_id: str, new_path: Path) -> str | None:
+        """Update an AI frame's path and fix all references.
+
+        When an AI frame is edited and saved with a new filename,
+        this updates the frame and any associated mapping to use
+        the new ID (derived from the new path).
+
+        Args:
+            old_id: Current AI frame ID (old filename)
+            new_path: New path for the AI frame
+
+        Returns:
+            New AI frame ID if successful, None if frame not found
+        """
+        ai_frame = self._ai_frame_index_by_id.get(old_id)
+        if ai_frame is None:
+            return None
+
+        # Update the AI frame's path
+        ai_frame.path = new_path
+        new_id = ai_frame.id  # Computed from new path.name
+
+        # Update any mapping that references this AI frame
+        mapping = self._mapping_index_by_ai.get(old_id)
+        if mapping is not None:
+            mapping.ai_frame_id = new_id
+
+        # Rebuild indices to reflect the new ID
+        self._rebuild_indices()
+
+        logger.info("Updated AI frame path: %s -> %s (new ID: %s)", old_id, new_path, new_id)
+        return new_id
+
     def get_ai_frame_by_index(self, index: int) -> AIFrame | None:
         """Get AI frame by index.
 
