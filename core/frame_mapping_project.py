@@ -17,13 +17,77 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class SheetPalette:
+    """Palette configuration for an AI sprite sheet.
+
+    Defines a 16-color palette and optional explicit color mappings for
+    consistent quantization across all AI frames in a project.
+
+    Attributes:
+        colors: List of 16 RGB tuples (index 0 = transparent)
+        color_mappings: Dict mapping AI frame RGB colors to palette indices
+    """
+
+    colors: list[tuple[int, int, int]]  # 16 RGB colors (index 0 = transparent)
+    color_mappings: dict[tuple[int, int, int], int] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, object]:
+        """Serialize to dictionary for JSON storage."""
+        # Convert tuple keys to strings for JSON compatibility
+        mappings_serializable = {f"{r},{g},{b}": idx for (r, g, b), idx in self.color_mappings.items()}
+        return {
+            "colors": [list(c) for c in self.colors],
+            "color_mappings": mappings_serializable,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> SheetPalette:
+        """Deserialize from dictionary."""
+        colors_raw = cast(list[list[int]], data.get("colors", []))
+        colors = [tuple(c) for c in colors_raw]
+        # Ensure we have exactly 16 colors, pad with black if needed
+        while len(colors) < 16:
+            colors.append((0, 0, 0))
+        colors = [(c[0], c[1], c[2]) for c in colors[:16]]
+
+        # Convert string keys back to tuples
+        mappings_raw = cast(dict[str, int], data.get("color_mappings", {}))
+        color_mappings: dict[tuple[int, int, int], int] = {}
+        for key_str, idx in mappings_raw.items():
+            parts = key_str.split(",")
+            if len(parts) == 3:
+                try:
+                    rgb = (int(parts[0]), int(parts[1]), int(parts[2]))
+                    color_mappings[rgb] = idx
+                except ValueError:
+                    logger.warning("Invalid color mapping key: %s", key_str)
+
+        return cls(colors=colors, color_mappings=color_mappings)
+
+
+# Preset tags for AI frame organization
+FRAME_TAGS = frozenset({"keep", "discard", "wip", "final", "review"})
+
+
+@dataclass
 class AIFrame:
-    """Represents an AI-generated sprite frame."""
+    """Represents an AI-generated sprite frame.
+
+    Attributes:
+        path: Path to the image file
+        index: Position in the frame list
+        width: Image width in pixels
+        height: Image height in pixels
+        display_name: Optional user-friendly name (alias), shown instead of filename
+        tags: Set of preset tags for organization (keep, discard, wip, final, review)
+    """
 
     path: Path
     index: int
     width: int = 0
     height: int = 0
+    display_name: str | None = None
+    tags: frozenset[str] = field(default_factory=frozenset)
 
     @property
     def id(self) -> str:
@@ -33,6 +97,14 @@ class AIFrame:
         unlike the position-dependent `index` field.
         """
         return self.path.name
+
+    @property
+    def name(self) -> str:
+        """Display name for this frame.
+
+        Returns display_name if set, otherwise the filename.
+        """
+        return self.display_name or self.path.name
 
     def to_dict(self, base_path: Path | None = None) -> dict[str, object]:
         """Serialize to dictionary for JSON storage.
@@ -48,12 +120,18 @@ class AIFrame:
                 # Not under base_path, keep absolute
                 pass
 
-        return {
+        result: dict[str, object] = {
             "path": path_str,
             "index": self.index,
             "width": self.width,
             "height": self.height,
         }
+        # Only include optional fields if set (keeps file compact)
+        if self.display_name is not None:
+            result["display_name"] = self.display_name
+        if self.tags:
+            result["tags"] = sorted(self.tags)  # Sort for deterministic output
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, object], base_path: Path | None = None) -> AIFrame:
@@ -62,16 +140,27 @@ class AIFrame:
         Args:
             data: Dictionary data.
             base_path: Optional base directory to resolve relative paths against.
+
+        Note:
+            Handles backward compatibility - display_name and tags default to
+            None/empty if not present (V3 files).
         """
         path = Path(cast(str, data["path"]))
         if base_path and not path.is_absolute():
             path = base_path / path
+
+        # Load tags (V4+), validate against allowed set
+        tags_raw = data.get("tags", [])
+        tags_list = cast(list[str], tags_raw) if tags_raw else []
+        tags = frozenset(t for t in tags_list if t in FRAME_TAGS)
 
         return cls(
             path=path,
             index=cast(int, data["index"]),
             width=cast(int, data.get("width", 0)),
             height=cast(int, data.get("height", 0)),
+            display_name=cast(str | None, data.get("display_name")),
+            tags=tags,
         )
 
 
@@ -222,8 +311,12 @@ class FrameMapping:
 
 
 # Supported project file versions
-SUPPORTED_VERSIONS = {1, 2}
-CURRENT_VERSION = 2
+# V1: ai_frame_index (position-dependent)
+# V2: ai_frame_id (filename, stable)
+# V3: sheet_palette for AI frame quantization
+# V4: display_name and tags for AI frame organization
+SUPPORTED_VERSIONS = {1, 2, 3, 4}
+CURRENT_VERSION = 4
 
 
 @dataclass
@@ -238,6 +331,8 @@ class FrameMappingProject:
     Version history:
     - V1: Used ai_frame_index (position-dependent, breaks on reload)
     - V2: Uses ai_frame_id (filename, stable across reloads)
+    - V3: Adds sheet_palette for consistent AI frame quantization
+    - V4: Adds display_name and tags for AI frame organization
     """
 
     name: str
@@ -245,6 +340,7 @@ class FrameMappingProject:
     ai_frames: list[AIFrame] = field(default_factory=list)
     game_frames: list[GameFrame] = field(default_factory=list)
     mappings: list[FrameMapping] = field(default_factory=list)
+    sheet_palette: SheetPalette | None = None
 
     # Internal caches (not serialized)
     _mapping_index_by_ai: dict[str, FrameMapping] = field(default_factory=dict, init=False, repr=False, compare=False)
@@ -348,6 +444,7 @@ class FrameMappingProject:
             "ai_frames": [f.to_dict(base_path) for f in self.ai_frames],
             "game_frames": [f.to_dict(base_path) for f in self.game_frames],
             "mappings": [m.to_dict() for m in self.mappings],
+            "sheet_palette": self.sheet_palette.to_dict() if self.sheet_palette else None,
         }
 
         # Ensure parent directory exists
@@ -418,12 +515,19 @@ class FrameMappingProject:
         else:
             mappings = [FrameMapping.from_dict(m) for m in data.get("mappings", [])]
 
+        # Load sheet_palette (v3+, None for older versions)
+        sheet_palette: SheetPalette | None = None
+        sheet_palette_data = data.get("sheet_palette")
+        if sheet_palette_data is not None:
+            sheet_palette = SheetPalette.from_dict(cast(dict[str, object], sheet_palette_data))
+
         project = cls(
             name=data["name"],
             ai_frames_dir=ai_frames_dir,
             ai_frames=ai_frames,
             game_frames=game_frames,
             mappings=mappings,
+            sheet_palette=sheet_palette,
         )
 
         # Prune orphaned mappings (referencing non-existent frames)
@@ -729,3 +833,107 @@ class FrameMappingProject:
     def total_ai_frames(self) -> int:
         """Total number of AI frames."""
         return len(self.ai_frames)
+
+    # ─── AI Frame Organization (V4) ───────────────────────────────────────────
+
+    def set_frame_display_name(self, ai_frame_id: str, display_name: str | None) -> bool:
+        """Set display name for an AI frame.
+
+        Args:
+            ai_frame_id: ID of the AI frame (filename)
+            display_name: New display name, or None to clear
+
+        Returns:
+            True if frame was found and updated, False otherwise
+        """
+        frame = self.get_ai_frame_by_id(ai_frame_id)
+        if frame is None:
+            return False
+        # Dataclasses are mutable, we can update in place
+        object.__setattr__(frame, "display_name", display_name)
+        return True
+
+    def add_frame_tag(self, ai_frame_id: str, tag: str) -> bool:
+        """Add a tag to an AI frame.
+
+        Args:
+            ai_frame_id: ID of the AI frame (filename)
+            tag: Tag to add (must be in FRAME_TAGS)
+
+        Returns:
+            True if frame was found and tag added, False otherwise
+        """
+        if tag not in FRAME_TAGS:
+            logger.warning("Invalid tag '%s', must be one of %s", tag, FRAME_TAGS)
+            return False
+        frame = self.get_ai_frame_by_id(ai_frame_id)
+        if frame is None:
+            return False
+        object.__setattr__(frame, "tags", frame.tags | {tag})
+        return True
+
+    def remove_frame_tag(self, ai_frame_id: str, tag: str) -> bool:
+        """Remove a tag from an AI frame.
+
+        Args:
+            ai_frame_id: ID of the AI frame (filename)
+            tag: Tag to remove
+
+        Returns:
+            True if frame was found and tag removed, False otherwise
+        """
+        frame = self.get_ai_frame_by_id(ai_frame_id)
+        if frame is None:
+            return False
+        object.__setattr__(frame, "tags", frame.tags - {tag})
+        return True
+
+    def toggle_frame_tag(self, ai_frame_id: str, tag: str) -> bool:
+        """Toggle a tag on an AI frame.
+
+        Args:
+            ai_frame_id: ID of the AI frame (filename)
+            tag: Tag to toggle (must be in FRAME_TAGS)
+
+        Returns:
+            True if frame was found and tag toggled, False otherwise
+        """
+        if tag not in FRAME_TAGS:
+            logger.warning("Invalid tag '%s', must be one of %s", tag, FRAME_TAGS)
+            return False
+        frame = self.get_ai_frame_by_id(ai_frame_id)
+        if frame is None:
+            return False
+        if tag in frame.tags:
+            object.__setattr__(frame, "tags", frame.tags - {tag})
+        else:
+            object.__setattr__(frame, "tags", frame.tags | {tag})
+        return True
+
+    def get_frames_with_tag(self, tag: str) -> list[AIFrame]:
+        """Get all AI frames with a specific tag.
+
+        Args:
+            tag: Tag to filter by
+
+        Returns:
+            List of AIFrame objects with the tag
+        """
+        return [f for f in self.ai_frames if tag in f.tags]
+
+    def set_frame_tags(self, ai_frame_id: str, tags: frozenset[str]) -> bool:
+        """Set all tags for an AI frame (replace existing).
+
+        Args:
+            ai_frame_id: ID of the AI frame (filename)
+            tags: New set of tags (invalid tags are filtered out)
+
+        Returns:
+            True if frame was found and updated, False otherwise
+        """
+        frame = self.get_ai_frame_by_id(ai_frame_id)
+        if frame is None:
+            return False
+        valid_tags = frozenset(t for t in tags if t in FRAME_TAGS)
+        object.__setattr__(frame, "tags", valid_tags)
+        return True

@@ -310,6 +310,11 @@ class FrameMappingWorkspace(QWidget):
         # Drag-drop and tab signals
         self._ai_frames_pane.folder_dropped.connect(self._on_ai_folder_dropped)
         self._ai_frames_pane.tab_folder_changed.connect(self._on_ai_tab_folder_changed)
+        # Frame organization signals (V4)
+        self._ai_frames_pane.frame_rename_requested.connect(self._on_frame_rename_requested)
+        self._ai_frames_pane.frame_tag_toggled.connect(self._on_frame_tag_toggled)
+        self._controller.frame_renamed.connect(self._on_frame_organization_changed)
+        self._controller.frame_tags_changed.connect(self._on_frame_organization_changed)
 
         # Captures Library Pane signals
         self._captures_pane.game_frame_selected.connect(self._on_game_frame_selected)
@@ -1462,6 +1467,34 @@ class FrameMappingWorkspace(QWidget):
             # Empty tab - clear frames
             self._controller.project.replace_ai_frames([], None)
             self._controller.project_changed.emit()
+
+    def _on_frame_rename_requested(self, frame_id: str, display_name: str) -> None:
+        """Handle frame rename request from AI Frames pane.
+
+        Args:
+            frame_id: ID of the frame to rename
+            display_name: New display name (empty string clears)
+        """
+        # Empty string means clear display name
+        name = display_name if display_name else None
+        self._controller.rename_frame(frame_id, name)
+
+    def _on_frame_tag_toggled(self, frame_id: str, tag: str) -> None:
+        """Handle frame tag toggle request from AI Frames pane.
+
+        Args:
+            frame_id: ID of the frame
+            tag: Tag to toggle
+        """
+        self._controller.toggle_frame_tag(frame_id, tag)
+
+    def _on_frame_organization_changed(self, frame_id: str) -> None:
+        """Handle frame rename/tag change - refresh UI.
+
+        Args:
+            frame_id: ID of the frame that changed
+        """
+        self._ai_frames_pane.refresh_frame(frame_id)
 
     def _on_import_capture(self) -> None:
         """Handle import capture button click."""

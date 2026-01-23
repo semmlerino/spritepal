@@ -9,8 +9,10 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -29,7 +31,7 @@ from utils.logging_config import get_logger
 if TYPE_CHECKING:
     from core.frame_mapping_project import AIFrame
 
-from core.frame_mapping_project import SheetPalette
+from core.frame_mapping_project import FRAME_TAGS, SheetPalette
 
 logger = get_logger(__name__)
 
@@ -42,6 +44,15 @@ STATUS_COLORS = {
     "mapped": QColor(76, 175, 80),  # Green
     "edited": QColor(33, 150, 243),  # Blue
     "injected": QColor(156, 39, 176),  # Purple
+}
+
+# Tag colors for frame organization
+TAG_COLORS = {
+    "keep": QColor(76, 175, 80),  # Green
+    "discard": QColor(244, 67, 54),  # Red
+    "wip": QColor(255, 193, 7),  # Amber
+    "final": QColor(156, 39, 176),  # Purple
+    "review": QColor(33, 150, 243),  # Blue
 }
 
 
@@ -68,9 +79,16 @@ class AIFramesPane(QWidget):
     palette_edit_requested = Signal()  # User wants to edit sheet palette
     palette_extract_requested = Signal()  # User wants to extract palette from sheet
     palette_clear_requested = Signal()  # User wants to clear sheet palette
+    # Sheet palette interactive signals (for bidirectional highlighting)
+    palette_index_selected = Signal(int)  # User clicked a swatch
+    palette_color_changed = Signal(int, object)  # index, rgb tuple - user edited a color
+    palette_swatch_hovered = Signal(object)  # int index or None - user hovered swatch
     # Drag-and-drop / tab signals
     folder_dropped = Signal(object)  # Path - emitted when folder/PNG dropped
     tab_folder_changed = Signal(object)  # Path | None - active tab's folder changed
+    # Frame organization signals (V4)
+    frame_rename_requested = Signal(str, str)  # frame_id, new_display_name
+    frame_tag_toggled = Signal(str, str)  # frame_id, tag
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -78,6 +96,7 @@ class AIFramesPane(QWidget):
         self._mapping_status: dict[int, str] = {}  # ai_frame_index -> status
         self._show_unmapped_only = False
         self._search_text: str = ""
+        self._tag_filter: str = ""  # Empty = show all, or specific tag to filter
 
         # Tab management
         self._tab_folders: list[Path | None] = [None]  # One empty tab initially
@@ -125,6 +144,10 @@ class AIFramesPane(QWidget):
         self._palette_widget.edit_requested.connect(self.palette_edit_requested.emit)
         self._palette_widget.extract_requested.connect(self.palette_extract_requested.emit)
         self._palette_widget.clear_requested.connect(self.palette_clear_requested.emit)
+        # Interactive signals for bidirectional highlighting
+        self._palette_widget.index_selected.connect(self.palette_index_selected.emit)
+        self._palette_widget.color_changed.connect(self.palette_color_changed.emit)
+        self._palette_widget.swatch_hovered.connect(self.palette_swatch_hovered.emit)
         self._palette_widget.set_buttons_enabled(False)  # Disabled until frames are loaded
         layout.addWidget(self._palette_widget)
 
@@ -153,6 +176,16 @@ class AIFramesPane(QWidget):
 
         filter_layout.addStretch()
 
+        # Tag filter dropdown
+        self._tag_filter_combo = QComboBox()
+        self._tag_filter_combo.setStyleSheet("font-size: 10px;")
+        self._tag_filter_combo.setToolTip("Filter by tag")
+        self._tag_filter_combo.addItem("All Tags", "")
+        for tag in sorted(FRAME_TAGS):
+            self._tag_filter_combo.addItem(tag.capitalize(), tag)
+        self._tag_filter_combo.currentIndexChanged.connect(self._on_tag_filter_changed)
+        filter_layout.addWidget(self._tag_filter_combo)
+
         self._unmapped_filter = QCheckBox("Unmapped")
         self._unmapped_filter.setToolTip("Show only unmapped AI frames")
         self._unmapped_filter.setStyleSheet("font-size: 10px;")
@@ -171,6 +204,7 @@ class AIFramesPane(QWidget):
         self._list.currentRowChanged.connect(self._on_selection_changed)
         self._list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._on_context_menu)
+        self._list.itemDoubleClicked.connect(self._on_item_double_clicked)
         layout.addWidget(self._list, 1)
 
         # Bottom controls
@@ -317,6 +351,22 @@ class AIFramesPane(QWidget):
         """
         return self._palette_widget.get_palette()
 
+    def highlight_palette_index(self, index: int | None) -> None:
+        """Highlight a palette swatch (from canvas pixel hover).
+
+        Args:
+            index: Palette index to highlight, or None to clear
+        """
+        self._palette_widget.highlight_index(index)
+
+    def select_palette_index(self, index: int) -> None:
+        """Select a palette swatch (from eyedropper pick).
+
+        Args:
+            index: Palette index to select
+        """
+        self._palette_widget.select_index(index)
+
     def _on_search_changed(self, text: str) -> None:
         """Handle search text change."""
         self._search_text = text.lower()
@@ -355,7 +405,26 @@ class AIFramesPane(QWidget):
         if frame_id is None:
             return
 
+        # Get frame to check current tags
+        frame = next((f for f in self._ai_frames if f.id == frame_id), None)
+        current_tags = frame.tags if frame else frozenset()
+
         menu = QMenu(self)
+
+        # Rename action
+        rename_action = menu.addAction("Rename...")
+        rename_action.triggered.connect(lambda: self._show_rename_dialog(frame_id))
+
+        # Tags submenu
+        tags_menu = menu.addMenu("Tags")
+        for tag in sorted(FRAME_TAGS):
+            action = tags_menu.addAction(tag.capitalize())
+            action.setCheckable(True)
+            action.setChecked(tag in current_tags)
+            # Capture tag in closure
+            action.triggered.connect(lambda checked, t=tag: self.frame_tag_toggled.emit(frame_id, t))
+
+        menu.addSeparator()
 
         edit_action = menu.addAction("Edit in Sprite Editor")
         edit_action.triggered.connect(lambda: self.edit_in_sprite_editor_requested.emit(frame_id))
@@ -393,16 +462,34 @@ class AIFramesPane(QWidget):
                 if self._show_unmapped_only and status != "unmapped":
                     continue
 
-                # Apply search filter
-                if self._search_text and self._search_text not in frame.path.name.lower():
+                # Apply tag filter
+                if self._tag_filter and self._tag_filter not in frame.tags:
                     continue
+
+                # Apply search filter - search both display name and filename
+                if self._search_text:
+                    search_target = frame.name.lower()  # Uses display_name if set
+                    if self._search_text not in search_target and self._search_text not in frame.path.name.lower():
+                        continue
 
                 visible_count += 1
 
                 item = QListWidgetItem()
-                # Add status indicator to text
+                # Add status indicator and display name
                 status_indicator = "●" if status != "unmapped" else "○"
-                item.setText(f"{status_indicator} {frame.path.name}")
+                display_text = frame.name  # Uses display_name if set, else filename
+
+                # Add tag chips as suffix
+                if frame.tags:
+                    tag_str = " ".join(f"[{t}]" for t in sorted(frame.tags))
+                    display_text = f"{display_text}  {tag_str}"
+
+                item.setText(f"{status_indicator} {display_text}")
+
+                # Set tooltip with filename if display_name is set
+                if frame.display_name:
+                    item.setToolTip(f"File: {frame.path.name}")
+
                 # Store frame ID in UserRole (primary), index in UserRole+1 (backward compat)
                 item.setData(Qt.ItemDataRole.UserRole, frame.id)
                 item.setData(Qt.ItemDataRole.UserRole + 1, frame.index)
@@ -426,7 +513,7 @@ class AIFramesPane(QWidget):
                 self._list.addItem(item)
 
             # Update count label
-            if self._show_unmapped_only or self._search_text:
+            if self._show_unmapped_only or self._search_text or self._tag_filter:
                 self._count_label.setText(f"{visible_count}/{total_count}")
             else:
                 self._count_label.setText(f"{total_count} frame{'s' if total_count != 1 else ''}")
@@ -454,6 +541,48 @@ class AIFramesPane(QWidget):
         # Bug #1 fix: Always emit empty string when selection was lost (filter/search/reload)
         elif current_selection_id is not None and not selection_restored:
             self.ai_frame_selected.emit("")
+
+    def _on_tag_filter_changed(self, index: int) -> None:
+        """Handle tag filter combo box change."""
+        self._tag_filter = self._tag_filter_combo.currentData() or ""
+        self._refresh_list()
+
+    def _show_rename_dialog(self, frame_id: str) -> None:
+        """Show rename dialog for a frame."""
+        frame = next((f for f in self._ai_frames if f.id == frame_id), None)
+        if frame is None:
+            return
+
+        current_name = frame.display_name or frame.path.stem  # Stem = filename without extension
+        new_name, ok = QInputDialog.getText(
+            self,
+            "Rename Frame",
+            f"Enter display name for {frame.path.name}:",
+            QLineEdit.EchoMode.Normal,
+            current_name,
+        )
+        if ok and new_name != current_name:
+            # Empty string clears display name (reverts to filename)
+            display_name = new_name.strip() if new_name.strip() else None
+            self.frame_rename_requested.emit(frame_id, display_name or "")
+
+    def _on_item_double_clicked(self, item: QListWidgetItem) -> None:
+        """Handle double-click on list item - show rename dialog."""
+        frame_id = item.data(Qt.ItemDataRole.UserRole)
+        if frame_id:
+            self._show_rename_dialog(frame_id)
+
+    def refresh_frame(self, frame_id: str) -> None:
+        """Refresh display for a single frame after tag/name change.
+
+        Triggers a full list refresh to reflect the change.
+
+        Args:
+            frame_id: ID of the frame that changed
+        """
+        # For simplicity, refresh the entire list
+        # A more optimized approach would update only the affected item
+        self._refresh_list(is_frame_list_change=False)
 
     # ─── Drag and Drop ────────────────────────────────────────────────────────
 

@@ -144,6 +144,306 @@ class TestAIFrame:
         assert frame2.id == "sprite.png"
 
 
+class TestAIFrameOrganization:
+    """Tests for AIFrame display_name and tags (V4 features)."""
+
+    def test_display_name_defaults_to_none(self) -> None:
+        """AIFrame display_name defaults to None."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0)
+        assert frame.display_name is None
+
+    def test_display_name_can_be_set(self) -> None:
+        """AIFrame display_name can be explicitly set."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0, display_name="Walk Cycle 1")
+        assert frame.display_name == "Walk Cycle 1"
+
+    def test_tags_defaults_to_empty(self) -> None:
+        """AIFrame tags defaults to empty frozenset."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0)
+        assert frame.tags == frozenset()
+
+    def test_tags_can_be_set(self) -> None:
+        """AIFrame tags can be explicitly set."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"keep", "final"}))
+        assert frame.tags == frozenset({"keep", "final"})
+
+    def test_name_property_returns_display_name_if_set(self) -> None:
+        """AIFrame.name returns display_name when set."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0, display_name="My Custom Name")
+        assert frame.name == "My Custom Name"
+
+    def test_name_property_returns_filename_if_no_display_name(self) -> None:
+        """AIFrame.name returns filename when display_name is None."""
+        frame = AIFrame(path=Path("/tmp/sprites/frame_001.png"), index=0)
+        assert frame.name == "frame_001.png"
+
+    def test_display_name_roundtrip(self) -> None:
+        """display_name survives to_dict/from_dict cycle."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0, display_name="Walk Cycle 1")
+        data = frame.to_dict()
+        restored = AIFrame.from_dict(data)
+        assert restored.display_name == "Walk Cycle 1"
+
+    def test_tags_roundtrip(self) -> None:
+        """tags survives to_dict/from_dict cycle."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"keep", "wip"}))
+        data = frame.to_dict()
+        restored = AIFrame.from_dict(data)
+        assert restored.tags == frozenset({"keep", "wip"})
+
+    def test_display_name_not_in_dict_when_none(self) -> None:
+        """to_dict() omits display_name when None for compact output."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0)
+        data = frame.to_dict()
+        assert "display_name" not in data
+
+    def test_tags_not_in_dict_when_empty(self) -> None:
+        """to_dict() omits tags when empty for compact output."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0)
+        data = frame.to_dict()
+        assert "tags" not in data
+
+    def test_display_name_in_dict_when_set(self) -> None:
+        """to_dict() includes display_name when set."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0, display_name="Custom")
+        data = frame.to_dict()
+        assert data["display_name"] == "Custom"
+
+    def test_tags_in_dict_when_set(self) -> None:
+        """to_dict() includes tags as sorted list when set."""
+        frame = AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"wip", "keep"}))
+        data = frame.to_dict()
+        assert data["tags"] == ["keep", "wip"]  # Sorted alphabetically
+
+    def test_backward_compatibility_missing_display_name(self) -> None:
+        """V3 files without display_name load with None."""
+        old_data: dict[str, object] = {
+            "path": "frame_001.png",
+            "index": 0,
+            "width": 32,
+            "height": 32,
+            # No display_name - simulating V3 format
+        }
+        frame = AIFrame.from_dict(old_data)
+        assert frame.display_name is None
+
+    def test_backward_compatibility_missing_tags(self) -> None:
+        """V3 files without tags load with empty set."""
+        old_data: dict[str, object] = {
+            "path": "frame_001.png",
+            "index": 0,
+            "width": 32,
+            "height": 32,
+            # No tags - simulating V3 format
+        }
+        frame = AIFrame.from_dict(old_data)
+        assert frame.tags == frozenset()
+
+    def test_tags_filters_invalid_values(self) -> None:
+        """from_dict() filters out invalid tag values."""
+        data: dict[str, object] = {
+            "path": "frame_001.png",
+            "index": 0,
+            "tags": ["keep", "invalid_tag", "wip", "another_bad"],
+        }
+        frame = AIFrame.from_dict(data)
+        assert frame.tags == frozenset({"keep", "wip"})  # Only valid tags kept
+
+
+class TestFrameMappingProjectOrganization:
+    """Tests for FrameMappingProject frame organization methods (V4 features)."""
+
+    def test_set_frame_display_name_success(self) -> None:
+        """set_frame_display_name updates frame's display name."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project._rebuild_indices()
+
+        result = project.set_frame_display_name("frame_001.png", "Walk Cycle 1")
+
+        assert result is True
+        frame = project.get_ai_frame_by_id("frame_001.png")
+        assert frame is not None
+        assert frame.display_name == "Walk Cycle 1"
+
+    def test_set_frame_display_name_clear(self) -> None:
+        """set_frame_display_name can clear display name with None."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0, display_name="Old Name")]
+        project._rebuild_indices()
+
+        project.set_frame_display_name("frame_001.png", None)
+
+        frame = project.get_ai_frame_by_id("frame_001.png")
+        assert frame is not None
+        assert frame.display_name is None
+
+    def test_set_frame_display_name_nonexistent(self) -> None:
+        """set_frame_display_name returns False for nonexistent frame."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+
+        result = project.set_frame_display_name("nonexistent.png", "Name")
+
+        assert result is False
+
+    def test_add_frame_tag_success(self) -> None:
+        """add_frame_tag adds a tag to the frame."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project._rebuild_indices()
+
+        result = project.add_frame_tag("frame_001.png", "keep")
+
+        assert result is True
+        frame = project.get_ai_frame_by_id("frame_001.png")
+        assert frame is not None
+        assert "keep" in frame.tags
+
+    def test_add_frame_tag_multiple(self) -> None:
+        """add_frame_tag can add multiple tags."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project._rebuild_indices()
+
+        project.add_frame_tag("frame_001.png", "keep")
+        project.add_frame_tag("frame_001.png", "final")
+
+        frame = project.get_ai_frame_by_id("frame_001.png")
+        assert frame is not None
+        assert frame.tags == frozenset({"keep", "final"})
+
+    def test_add_frame_tag_invalid(self) -> None:
+        """add_frame_tag rejects invalid tags."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project._rebuild_indices()
+
+        result = project.add_frame_tag("frame_001.png", "invalid_tag")
+
+        assert result is False
+        frame = project.get_ai_frame_by_id("frame_001.png")
+        assert frame is not None
+        assert "invalid_tag" not in frame.tags
+
+    def test_remove_frame_tag_success(self) -> None:
+        """remove_frame_tag removes a tag from the frame."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"keep", "wip"}))]
+        project._rebuild_indices()
+
+        result = project.remove_frame_tag("frame_001.png", "keep")
+
+        assert result is True
+        frame = project.get_ai_frame_by_id("frame_001.png")
+        assert frame is not None
+        assert frame.tags == frozenset({"wip"})
+
+    def test_toggle_frame_tag_adds_when_missing(self) -> None:
+        """toggle_frame_tag adds tag when not present."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project._rebuild_indices()
+
+        project.toggle_frame_tag("frame_001.png", "keep")
+
+        frame = project.get_ai_frame_by_id("frame_001.png")
+        assert frame is not None
+        assert "keep" in frame.tags
+
+    def test_toggle_frame_tag_removes_when_present(self) -> None:
+        """toggle_frame_tag removes tag when already present."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"keep"}))]
+        project._rebuild_indices()
+
+        project.toggle_frame_tag("frame_001.png", "keep")
+
+        frame = project.get_ai_frame_by_id("frame_001.png")
+        assert frame is not None
+        assert "keep" not in frame.tags
+
+    def test_get_frames_with_tag(self) -> None:
+        """get_frames_with_tag returns matching frames."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"keep"})),
+            AIFrame(path=Path("frame_002.png"), index=1, tags=frozenset({"discard"})),
+            AIFrame(path=Path("frame_003.png"), index=2, tags=frozenset({"keep", "final"})),
+        ]
+        project._rebuild_indices()
+
+        keep_frames = project.get_frames_with_tag("keep")
+
+        assert len(keep_frames) == 2
+        ids = {f.id for f in keep_frames}
+        assert ids == {"frame_001.png", "frame_003.png"}
+
+    def test_set_frame_tags_replaces_all(self) -> None:
+        """set_frame_tags replaces all existing tags."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"keep", "wip"}))]
+        project._rebuild_indices()
+
+        project.set_frame_tags("frame_001.png", frozenset({"final", "review"}))
+
+        frame = project.get_ai_frame_by_id("frame_001.png")
+        assert frame is not None
+        assert frame.tags == frozenset({"final", "review"})
+
+    def test_organization_persists_through_save_load(self, tmp_path: Path) -> None:
+        """display_name and tags survive save/load cycle."""
+        from core.frame_mapping_project import FrameMappingProject
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(
+                path=Path("frame_001.png"),
+                index=0,
+                display_name="Walk Cycle 1",
+                tags=frozenset({"keep", "final"}),
+            ),
+            AIFrame(path=Path("frame_002.png"), index=1, tags=frozenset({"discard"})),
+        ]
+        project._rebuild_indices()
+
+        save_path = tmp_path / "test.spritepal-mapping.json"
+        project.save(save_path)
+
+        loaded = FrameMappingProject.load(save_path)
+
+        frame1 = loaded.get_ai_frame_by_id("frame_001.png")
+        assert frame1 is not None
+        assert frame1.display_name == "Walk Cycle 1"
+        assert frame1.tags == frozenset({"keep", "final"})
+
+        frame2 = loaded.get_ai_frame_by_id("frame_002.png")
+        assert frame2 is not None
+        assert frame2.display_name is None
+        assert frame2.tags == frozenset({"discard"})
+
+
 class TestGameFrame:
     """Basic tests for GameFrame dataclass."""
 
@@ -481,13 +781,15 @@ class TestFrameMappingProjectAtomicSave:
             data = json.load(f)
 
         assert data["name"] == "test"
-        assert data["version"] == 2
+        from core.frame_mapping_project import CURRENT_VERSION
 
-    def test_save_uses_v2_format(self, tmp_path: Path) -> None:
-        """Save uses version 2 format with ai_frame_id."""
+        assert data["version"] == CURRENT_VERSION
+
+    def test_save_uses_current_format(self, tmp_path: Path) -> None:
+        """Save uses current format version with ai_frame_id."""
         import json
 
-        from core.frame_mapping_project import FrameMappingProject
+        from core.frame_mapping_project import CURRENT_VERSION, FrameMappingProject
 
         project = FrameMappingProject(name="test")
         project.create_mapping(ai_frame_id="sprite.png", game_frame_id="G001")
@@ -498,7 +800,7 @@ class TestFrameMappingProjectAtomicSave:
         with open(save_path) as f:
             data = json.load(f)
 
-        assert data["version"] == 2
+        assert data["version"] == CURRENT_VERSION
         assert len(data["mappings"]) == 1
         assert data["mappings"][0]["ai_frame_id"] == "sprite.png"
         assert "ai_frame_index" not in data["mappings"][0]

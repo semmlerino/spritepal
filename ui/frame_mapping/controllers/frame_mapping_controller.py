@@ -24,13 +24,19 @@ from ui.common.qt_image_utils import pil_to_qpixmap
 if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
 
-from core.frame_mapping_project import AIFrame, FrameMappingProject, GameFrame
+from core.frame_mapping_project import (
+    FRAME_TAGS,
+    AIFrame,
+    FrameMappingProject,
+    GameFrame,
+    SheetPalette,
+)
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import (
     CaptureResult,
     MesenCaptureParser,
 )
-from core.palette_utils import quantize_to_palette, snes_palette_to_rgb
+from core.palette_utils import quantize_to_palette, quantize_with_mappings, snes_palette_to_rgb
 from core.rom_injector import ROMInjector
 from core.services.rom_verification_service import ROMVerificationService
 from core.services.sprite_compositor import SpriteCompositor, TransformParams
@@ -71,6 +77,10 @@ class FrameMappingController(QObject):
     save_requested = Signal()  # Emitted when auto-save should occur (e.g., after injection)
     stale_entries_warning = Signal(str)  # frame_id - Emitted when stored entry IDs are stale
     alignment_updated = Signal(str)  # ai_frame_id - Emitted when alignment changes (not structural)
+    sheet_palette_changed = Signal()  # Emitted when sheet palette is set/cleared
+    # AI Frame Organization signals (V4)
+    frame_renamed = Signal(str)  # ai_frame_id - display name changed
+    frame_tags_changed = Signal(str)  # ai_frame_id - tags changed
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -721,6 +731,218 @@ class FrameMappingController(QObject):
         if self._project is None:
             return []
         return self._project.game_frames
+
+    # --- Sheet Palette Methods ---
+
+    def get_sheet_palette(self) -> SheetPalette | None:
+        """Get the current sheet palette.
+
+        Returns:
+            SheetPalette if defined, None otherwise
+        """
+        if self._project is None:
+            return None
+        return self._project.sheet_palette
+
+    def set_sheet_palette(self, palette: SheetPalette | None) -> None:
+        """Set the sheet palette for the project.
+
+        Args:
+            palette: SheetPalette to set, or None to clear
+        """
+        if self._project is None:
+            logger.warning("set_sheet_palette: No project loaded")
+            return
+
+        self._project.sheet_palette = palette
+        self.sheet_palette_changed.emit()
+        self.project_changed.emit()
+        if palette is not None:
+            logger.info("Set sheet palette with %d color mappings", len(palette.color_mappings))
+        else:
+            logger.info("Cleared sheet palette")
+
+    def set_sheet_palette_color(self, index: int, rgb: tuple[int, int, int]) -> None:
+        """Update a single color in the sheet palette.
+
+        Args:
+            index: Palette index (0-15)
+            rgb: New RGB color tuple
+        """
+        if self._project is None:
+            logger.warning("set_sheet_palette_color: No project loaded")
+            return
+
+        if self._project.sheet_palette is None:
+            logger.warning("set_sheet_palette_color: No sheet palette defined")
+            return
+
+        if not 0 <= index < 16:
+            logger.warning("set_sheet_palette_color: Invalid index %d", index)
+            return
+
+        # Update the palette color
+        palette = self._project.sheet_palette
+        colors = list(palette.colors)
+        if index < len(colors):
+            colors[index] = rgb
+        else:
+            # Extend if needed
+            while len(colors) <= index:
+                colors.append((0, 0, 0))
+            colors[index] = rgb
+
+        # Update color_mappings: keep existing mappings unchanged
+        updated_mappings = dict(palette.color_mappings)
+
+        # Create new palette with updated colors
+        from core.frame_mapping_project import SheetPalette
+
+        self._project.sheet_palette = SheetPalette(
+            colors=colors,
+            color_mappings=updated_mappings,
+        )
+
+        self.sheet_palette_changed.emit()
+        self.project_changed.emit()
+        logger.info("Updated sheet palette color [%d] to RGB%s", index, rgb)
+
+    def extract_sheet_colors(self) -> dict[tuple[int, int, int], int]:
+        """Extract unique colors from all AI frames in the project.
+
+        Returns:
+            Dict mapping RGB tuples to pixel counts
+        """
+        from ui.dialogs.color_mapping_dialog import extract_unique_colors
+
+        if self._project is None:
+            return {}
+
+        all_colors: dict[tuple[int, int, int], int] = {}
+
+        for ai_frame in self._project.ai_frames:
+            if not ai_frame.path.exists():
+                continue
+
+            try:
+                img = Image.open(ai_frame.path)
+                frame_colors = extract_unique_colors(img, ignore_transparent=True)
+                # Merge with totals
+                for color, count in frame_colors.items():
+                    all_colors[color] = all_colors.get(color, 0) + count
+            except Exception as e:
+                logger.warning("Failed to extract colors from %s: %s", ai_frame.path, e)
+
+        logger.info("Extracted %d unique colors from %d AI frames", len(all_colors), len(self._project.ai_frames))
+        return all_colors
+
+    def generate_sheet_palette_from_colors(
+        self,
+        colors: dict[tuple[int, int, int], int] | None = None,
+    ) -> SheetPalette:
+        """Generate a 16-color palette from AI sheet colors.
+
+        Args:
+            colors: Color counts to use, or None to extract from AI frames
+
+        Returns:
+            Generated SheetPalette with auto-mapped colors
+        """
+        from ui.dialogs.color_mapping_dialog import (
+            _find_nearest_palette_index,
+            quantize_colors_to_palette,
+        )
+
+        if colors is None:
+            colors = self.extract_sheet_colors()
+
+        # Generate 16-color palette
+        palette_colors = quantize_colors_to_palette(colors, max_colors=16, snap_to_snes=True)
+
+        # Auto-map all colors to nearest palette colors
+        color_mappings: dict[tuple[int, int, int], int] = {}
+        for color in colors:
+            color_mappings[color] = _find_nearest_palette_index(color, palette_colors)
+
+        return SheetPalette(colors=palette_colors, color_mappings=color_mappings)
+
+    def copy_game_palette_to_sheet(self, game_frame_id: str) -> SheetPalette | None:
+        """Create a SheetPalette from a game frame's palette.
+
+        Args:
+            game_frame_id: ID of game frame to copy palette from
+
+        Returns:
+            SheetPalette with the game frame's colors, or None if not found
+        """
+        from ui.dialogs.color_mapping_dialog import _find_nearest_palette_index
+
+        if self._project is None:
+            return None
+
+        game_frame = self._project.get_game_frame_by_id(game_frame_id)
+        if game_frame is None or game_frame.capture_path is None:
+            return None
+
+        # Parse capture to get palette
+        try:
+            parser = MesenCaptureParser()
+            capture_result = parser.parse_file(game_frame.capture_path)
+            palette_index = game_frame.palette_index
+            snes_palette = capture_result.palettes.get(palette_index, [])
+
+            if not snes_palette:
+                logger.warning("No palette found for game frame %s", game_frame_id)
+                return None
+
+            # Convert to RGB
+            palette_rgb = snes_palette_to_rgb(snes_palette)
+
+            # Ensure 16 colors
+            while len(palette_rgb) < 16:
+                palette_rgb.append((0, 0, 0))
+            palette_rgb = palette_rgb[:16]
+
+            # Auto-map sheet colors to this palette
+            sheet_colors = self.extract_sheet_colors()
+            color_mappings: dict[tuple[int, int, int], int] = {}
+            for color in sheet_colors:
+                color_mappings[color] = _find_nearest_palette_index(color, palette_rgb)
+
+            logger.info("Copied palette from game frame %s", game_frame_id)
+            return SheetPalette(colors=palette_rgb, color_mappings=color_mappings)
+
+        except Exception as e:
+            logger.exception("Failed to copy game palette from %s: %s", game_frame_id, e)
+            return None
+
+    def get_game_palettes(self) -> dict[str, list[tuple[int, int, int]]]:
+        """Get palettes from all game frames.
+
+        Returns:
+            Dict mapping game frame IDs to their RGB palettes
+        """
+        if self._project is None:
+            return {}
+
+        result: dict[str, list[tuple[int, int, int]]] = {}
+
+        for game_frame in self._project.game_frames:
+            if game_frame.capture_path is None or not game_frame.capture_path.exists():
+                continue
+
+            try:
+                parser = MesenCaptureParser()
+                capture_result = parser.parse_file(game_frame.capture_path)
+                palette_index = game_frame.palette_index
+                snes_palette = capture_result.palettes.get(palette_index, [])
+
+                if snes_palette:
+                    result[game_frame.id] = snes_palette_to_rgb(snes_palette)
+            except Exception as e:
+                logger.debug("Could not load palette for %s: %s", game_frame.id, e)
+
+        return result
 
     def remove_game_frame(self, frame_id: str) -> bool:
         """Remove a game frame from the project.
@@ -1524,25 +1746,54 @@ class FrameMappingController(QObject):
                         tile_count,
                     )
 
-                # Quantize to game palette for proper color mapping
+                # Quantize to palette for proper color mapping
                 # Use higher transparency threshold to treat semi-transparent pixels as transparent
-                snes_palette = capture_result.palettes.get(palette_index, [])
-                if snes_palette:
-                    palette_rgb = snes_palette_to_rgb(snes_palette)
-                    chunk_img = quantize_to_palette(
-                        chunk_img, palette_rgb, transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD
-                    )
-                    logger.debug(
-                        "Quantized chunk for offset 0x%X to palette %d (%d colors)",
-                        rom_offset,
-                        palette_index,
-                        len(palette_rgb),
-                    )
+                # Priority: sheet_palette > capture palette
+                if self._project and self._project.sheet_palette:
+                    # Use sheet palette (user-defined for consistent AI frame rendering)
+                    sheet_palette = self._project.sheet_palette
+                    palette_rgb = list(sheet_palette.colors)
+                    if sheet_palette.color_mappings:
+                        # Use explicit color mappings
+                        chunk_img = quantize_with_mappings(
+                            chunk_img,
+                            palette_rgb,
+                            sheet_palette.color_mappings,
+                            transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD,
+                        )
+                        logger.debug(
+                            "Quantized chunk for offset 0x%X using sheet palette with %d mappings",
+                            rom_offset,
+                            len(sheet_palette.color_mappings),
+                        )
+                    else:
+                        # Sheet palette without explicit mappings -> nearest color
+                        chunk_img = quantize_to_palette(
+                            chunk_img, palette_rgb, transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD
+                        )
+                        logger.debug(
+                            "Quantized chunk for offset 0x%X using sheet palette (nearest color)",
+                            rom_offset,
+                        )
                 else:
-                    logger.warning(
-                        "No palette data found for palette index %d, using grayscale fallback",
-                        palette_index,
-                    )
+                    # Fallback: use capture palette (original behavior)
+                    snes_palette = capture_result.palettes.get(palette_index, [])
+                    if snes_palette:
+                        palette_rgb = snes_palette_to_rgb(snes_palette)
+                        chunk_img = quantize_to_palette(
+                            chunk_img, palette_rgb, transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD
+                        )
+                        logger.debug(
+                            "Quantized chunk for offset 0x%X to capture palette %d (%d colors)",
+                            rom_offset,
+                            palette_index,
+                            len(palette_rgb),
+                        )
+                    else:
+                        logger.warning(
+                            "No palette data found for palette index %d, using grayscale fallback",
+                            palette_index,
+                        )
 
                 # Debug: Save chunk after quantization
                 if debug and debug_dir:
@@ -1699,3 +1950,149 @@ class FrameMappingController(QObject):
                 self._rollback_staging(staging_path)
 
         return success
+
+    # ─── AI Frame Organization (V4) ───────────────────────────────────────────
+
+    def rename_frame(self, frame_id: str, display_name: str | None) -> bool:
+        """Set display name for an AI frame.
+
+        Args:
+            frame_id: ID of the AI frame (filename)
+            display_name: New display name, or None to clear
+
+        Returns:
+            True if frame was found and renamed
+        """
+        if self._project is None:
+            return False
+        result = self._project.set_frame_display_name(frame_id, display_name)
+        if result:
+            logger.info("Renamed frame '%s' to '%s'", frame_id, display_name or "(cleared)")
+            self.frame_renamed.emit(frame_id)
+        return result
+
+    def add_frame_tag(self, frame_id: str, tag: str) -> bool:
+        """Add a tag to an AI frame.
+
+        Args:
+            frame_id: ID of the AI frame (filename)
+            tag: Tag to add (must be in FRAME_TAGS)
+
+        Returns:
+            True if frame was found and tag added
+        """
+        if self._project is None:
+            return False
+        result = self._project.add_frame_tag(frame_id, tag)
+        if result:
+            logger.debug("Added tag '%s' to frame '%s'", tag, frame_id)
+            self.frame_tags_changed.emit(frame_id)
+        return result
+
+    def remove_frame_tag(self, frame_id: str, tag: str) -> bool:
+        """Remove a tag from an AI frame.
+
+        Args:
+            frame_id: ID of the AI frame (filename)
+            tag: Tag to remove
+
+        Returns:
+            True if frame was found and tag removed
+        """
+        if self._project is None:
+            return False
+        result = self._project.remove_frame_tag(frame_id, tag)
+        if result:
+            logger.debug("Removed tag '%s' from frame '%s'", tag, frame_id)
+            self.frame_tags_changed.emit(frame_id)
+        return result
+
+    def toggle_frame_tag(self, frame_id: str, tag: str) -> bool:
+        """Toggle a tag on an AI frame.
+
+        Args:
+            frame_id: ID of the AI frame (filename)
+            tag: Tag to toggle (must be in FRAME_TAGS)
+
+        Returns:
+            True if frame was found and tag toggled
+        """
+        if self._project is None:
+            return False
+        result = self._project.toggle_frame_tag(frame_id, tag)
+        if result:
+            logger.debug("Toggled tag '%s' on frame '%s'", tag, frame_id)
+            self.frame_tags_changed.emit(frame_id)
+        return result
+
+    def set_frame_tags(self, frame_id: str, tags: frozenset[str]) -> bool:
+        """Set all tags for an AI frame (replace existing).
+
+        Args:
+            frame_id: ID of the AI frame (filename)
+            tags: New set of tags
+
+        Returns:
+            True if frame was found and tags updated
+        """
+        if self._project is None:
+            return False
+        result = self._project.set_frame_tags(frame_id, tags)
+        if result:
+            logger.debug("Set tags for frame '%s': %s", frame_id, sorted(tags))
+            self.frame_tags_changed.emit(frame_id)
+        return result
+
+    def get_frame_tags(self, frame_id: str) -> frozenset[str]:
+        """Get tags for an AI frame.
+
+        Args:
+            frame_id: ID of the AI frame (filename)
+
+        Returns:
+            Set of tags (empty if frame not found)
+        """
+        if self._project is None:
+            return frozenset()
+        frame = self._project.get_ai_frame_by_id(frame_id)
+        if frame is None:
+            return frozenset()
+        return frame.tags
+
+    def get_frame_display_name(self, frame_id: str) -> str | None:
+        """Get display name for an AI frame.
+
+        Args:
+            frame_id: ID of the AI frame (filename)
+
+        Returns:
+            Display name if set, None otherwise
+        """
+        if self._project is None:
+            return None
+        frame = self._project.get_ai_frame_by_id(frame_id)
+        if frame is None:
+            return None
+        return frame.display_name
+
+    def get_frames_with_tag(self, tag: str) -> list[AIFrame]:
+        """Get all AI frames with a specific tag.
+
+        Args:
+            tag: Tag to filter by
+
+        Returns:
+            List of AIFrame objects with the tag
+        """
+        if self._project is None:
+            return []
+        return self._project.get_frames_with_tag(tag)
+
+    @staticmethod
+    def get_available_tags() -> frozenset[str]:
+        """Get the set of valid frame tags.
+
+        Returns:
+            Set of valid tag names
+        """
+        return FRAME_TAGS
