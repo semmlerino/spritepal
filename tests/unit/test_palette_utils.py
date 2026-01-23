@@ -6,7 +6,11 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from core.palette_utils import quantize_to_palette, snes_palette_to_rgb
+from core.palette_utils import (
+    quantize_to_palette,
+    quantize_with_mappings,
+    snes_palette_to_rgb,
+)
 
 
 class TestSnesPaletteToRgb:
@@ -181,6 +185,39 @@ class TestQuantizeToPalette:
         pixels = np.array(result)
         assert np.all(pixels == 1), "All green pixels should map to index 1"
 
+    def test_opaque_pixel_never_quantized_to_index_0(self) -> None:
+        """Opaque pixels should never map to index 0 (transparency index).
+
+        Index 0 is reserved for transparency in SNES sprites. Even if an opaque
+        pixel's color is closest to palette[0], it should map to the next-closest
+        color (index 1+) to preserve visibility in-game.
+        """
+        # Create 2x2 image with opaque black pixel (closest to palette[0])
+        img = Image.new("RGBA", (2, 2), (0, 0, 0, 0))
+        img.putpixel((0, 0), (0, 0, 0, 255))  # Opaque black - closest to palette[0]
+        img.putpixel((1, 0), (255, 0, 0, 255))  # Opaque red
+        img.putpixel((0, 1), (0, 0, 0, 0))  # Fully transparent - should be index 0
+        img.putpixel((1, 1), (0, 0, 0, 0))  # Fully transparent - should be index 0
+
+        # Palette where index 0 is black (the transparency placeholder color)
+        # Opaque black pixels should map to index 1 (dark gray), not index 0
+        palette = [
+            (0, 0, 0),  # 0: transparency placeholder (black)
+            (17, 17, 17),  # 1: very dark gray (next closest to black)
+            (255, 0, 0),  # 2: red
+        ]
+        palette.extend([(128, 128, 128)] * 13)  # Fill rest with gray
+
+        result = quantize_to_palette(img, palette)
+        pixels = list(result.getdata())
+
+        # Pixel layout: (0,0), (1,0), (0,1), (1,1)
+        assert pixels[0] != 0, "Opaque black pixel incorrectly mapped to index 0"
+        assert pixels[0] == 1, "Opaque black should map to dark gray (index 1)"
+        assert pixels[1] == 2, "Opaque red should map to red (index 2)"
+        assert pixels[2] == 0, "Transparent pixel should map to index 0"
+        assert pixels[3] == 0, "Transparent pixel should map to index 0"
+
 
 class TestPaletteUtilsIntegration:
     """Integration tests combining both functions."""
@@ -228,3 +265,44 @@ class TestPaletteUtilsIntegration:
         pixels = np.array(result)
 
         assert np.all(pixels == 0), "Transparent pixels should remain index 0"
+
+
+class TestQuantizeWithMappings:
+    """Tests for quantize_with_mappings function."""
+
+    def test_opaque_pixel_never_quantized_to_index_0_with_mappings(self) -> None:
+        """Opaque pixels should never map to index 0 in fallback nearest-color.
+
+        Even with color mappings, the nearest-color fallback should exclude
+        index 0 for opaque pixels.
+        """
+        # Create 2x2 image with opaque black pixel (closest to palette[0])
+        img = Image.new("RGBA", (2, 2), (0, 0, 0, 0))
+        img.putpixel((0, 0), (0, 0, 0, 255))  # Opaque black - closest to palette[0]
+        img.putpixel((1, 0), (128, 0, 0, 255))  # Opaque dark red - not in mappings
+        img.putpixel((0, 1), (0, 0, 0, 0))  # Transparent - should be index 0
+        img.putpixel((1, 1), (255, 0, 0, 255))  # Opaque red - has explicit mapping
+
+        # Palette where index 0 is black (transparency placeholder)
+        palette = [
+            (0, 0, 0),  # 0: transparency placeholder
+            (17, 17, 17),  # 1: very dark gray
+            (130, 0, 0),  # 2: dark red
+            (255, 0, 0),  # 3: red (explicit mapping target)
+        ]
+        palette.extend([(128, 128, 128)] * 12)
+
+        # Only map exact red (255, 0, 0) explicitly
+        color_mappings: dict[tuple[int, int, int], int] = {
+            (255, 0, 0): 3,  # Red -> index 3
+        }
+
+        result = quantize_with_mappings(img, palette, color_mappings)
+        pixels = list(result.getdata())
+
+        # Pixel layout: (0,0), (1,0), (0,1), (1,1)
+        assert pixels[0] != 0, "Opaque black pixel incorrectly mapped to index 0"
+        assert pixels[0] == 1, "Opaque black should map to dark gray (index 1)"
+        assert pixels[1] == 2, "Opaque dark red should map to dark red (index 2)"
+        assert pixels[2] == 0, "Transparent pixel should map to index 0"
+        assert pixels[3] == 3, "Explicitly mapped red should be index 3"

@@ -50,6 +50,7 @@ def quantize_to_palette(
 
     Uses nearest-color matching (Euclidean distance in RGB space).
     Transparent pixels (alpha < threshold) map to index 0.
+    Opaque pixels never map to index 0 (reserved for transparency).
 
     Args:
         img: PIL Image in RGBA mode
@@ -84,12 +85,16 @@ def quantize_to_palette(
     pixel_rgb = pixel_rgb[:, :, np.newaxis, :]  # Shape: (H, W, 1, 3)
     palette_broadcast = palette_arr[np.newaxis, np.newaxis, :, :]  # Shape: (1, 1, 16, 3)
 
-    # Squared Euclidean distance (no need for sqrt since we only compare)
-    distances = np.sum((pixel_rgb - palette_broadcast) ** 2, axis=-1)  # Shape: (H, W, 16)
+    # Squared Euclidean distance (use float64 to allow inf for masking)
+    distances = np.sum((pixel_rgb - palette_broadcast) ** 2, axis=-1).astype(np.float64)  # Shape: (H, W, 16)
+
+    # For opaque pixels: exclude index 0 from consideration
+    # Index 0 is reserved for transparency in SNES sprites
+    # Set distance to index 0 to infinity for opaque pixels so argmin picks index 1+
+    opaque_mask = ~transparent_mask
+    distances[opaque_mask, 0] = np.inf
 
     # Find nearest color for each pixel
-    # Skip index 0 (transparency) for opaque pixels - find nearest among indices 1-15
-    # For transparent pixels, we'll override to 0 anyway
     indices = np.argmin(distances, axis=-1).astype(np.uint8)  # Shape: (H, W)
 
     # Override transparent pixels to index 0
@@ -113,6 +118,98 @@ def quantize_to_palette(
         height,
         len(palette_rgb),
         int(np.sum(transparent_mask)),
+    )
+
+    return indexed_img
+
+
+def quantize_with_mappings(
+    img: Image.Image,
+    palette_rgb: list[tuple[int, int, int]],
+    color_mappings: dict[tuple[int, int, int], int],
+    transparency_threshold: int = 1,
+) -> Image.Image:
+    """Quantize RGBA image using explicit color mappings with nearest-color fallback.
+
+    User-defined mappings are applied first. Any colors not in the mapping
+    fall back to nearest-color matching (Euclidean distance in RGB space).
+    Transparent pixels (alpha < threshold) always map to index 0.
+    Opaque pixels never map to index 0 in fallback (reserved for transparency).
+
+    Args:
+        img: PIL Image in RGBA mode
+        palette_rgb: List of 16 RGB tuples defining the target palette
+        color_mappings: Dict mapping RGB tuples to palette indices (user-defined)
+        transparency_threshold: Alpha values below this map to index 0
+
+    Returns:
+        PIL Image in mode "P" (indexed) with the specified palette
+    """
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+
+    # Convert image to numpy array
+    pixels = np.array(img, dtype=np.uint8)
+    height, width = pixels.shape[:2]
+
+    # Extract RGBA channels
+    r = pixels[:, :, 0].astype(np.int32)
+    g = pixels[:, :, 1].astype(np.int32)
+    b = pixels[:, :, 2].astype(np.int32)
+    alpha = pixels[:, :, 3]
+
+    # Create transparency mask
+    transparent_mask = alpha < transparency_threshold
+
+    # Build palette as numpy array for vectorized distance calculation
+    palette_arr = np.array(palette_rgb, dtype=np.int32)  # Shape: (16, 3)
+
+    # Calculate squared distances to all palette colors for nearest-color fallback
+    pixel_rgb = np.stack([r, g, b], axis=-1)  # Shape: (H, W, 3)
+    pixel_rgb_broadcast = pixel_rgb[:, :, np.newaxis, :]  # Shape: (H, W, 1, 3)
+    palette_broadcast = palette_arr[np.newaxis, np.newaxis, :, :]  # Shape: (1, 1, 16, 3)
+
+    # Squared Euclidean distance (use float64 to allow inf for masking)
+    distances = np.sum((pixel_rgb_broadcast - palette_broadcast) ** 2, axis=-1).astype(np.float64)  # Shape: (H, W, 16)
+
+    # For opaque pixels: exclude index 0 from consideration in fallback
+    # Index 0 is reserved for transparency in SNES sprites
+    opaque_mask = ~transparent_mask
+    distances[opaque_mask, 0] = np.inf
+
+    # Find nearest color for each pixel (fallback)
+    indices = np.argmin(distances, axis=-1).astype(np.uint8)  # Shape: (H, W)
+
+    # Apply explicit color mappings (override nearest-color for mapped colors)
+    mapped_count = 0
+    for rgb_color, palette_idx in color_mappings.items():
+        # Find pixels matching this exact RGB color
+        mask = (r == rgb_color[0]) & (g == rgb_color[1]) & (b == rgb_color[2])
+        if np.any(mask):
+            indices[mask] = palette_idx
+            mapped_count += int(np.sum(mask))
+
+    # Override transparent pixels to index 0
+    indices[transparent_mask] = 0
+
+    # Create indexed PIL image
+    indexed_img = Image.fromarray(indices, mode="P")
+
+    # Build palette for PIL (flat list of RGB values, padded to 256 colors)
+    flat_palette: list[int] = []
+    for rgb in palette_rgb:
+        flat_palette.extend([rgb[0], rgb[1], rgb[2]])
+    # Pad to 256 colors (PIL requirement for mode P)
+    flat_palette.extend([0] * (768 - len(flat_palette)))
+
+    indexed_img.putpalette(flat_palette)
+
+    logger.debug(
+        "Quantized %dx%d with mappings: %d explicit mappings applied, %d pixels mapped",
+        width,
+        height,
+        len(color_mappings),
+        mapped_count,
     )
 
     return indexed_img
