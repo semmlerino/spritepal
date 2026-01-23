@@ -327,6 +327,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._canvas.pixel_dragged.connect(self._on_canvas_dragged)
         self._canvas.pixel_hovered.connect(self._on_canvas_hovered)
         self._canvas.mouse_left.connect(self._on_canvas_left)
+        self._canvas.drag_ended.connect(self._controller.finish_stroke)
 
         # Palette panel signals
         self._palette_panel.index_selected.connect(self._on_palette_index_selected)

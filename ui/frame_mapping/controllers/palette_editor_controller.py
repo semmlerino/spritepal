@@ -16,6 +16,7 @@ from PIL import Image
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from core.editing import (
+    BatchCommand,
     DrawPixelCommand,
     FloodFillCommand,
     IndexedImageModel,
@@ -95,6 +96,10 @@ class PaletteEditorController(QObject):
         self._current_tool = EditorTool.PENCIL
         self._active_index = 1  # Default to index 1 (not transparent)
         self._brush_size = 1
+
+        # Stroke tracking for batched undo
+        self._current_stroke: BatchCommand | None = None
+        self._stroke_pixels_painted: set[tuple[int, int]] = set()
 
         # Modification tracking
         self._is_dirty = False
@@ -344,10 +349,19 @@ class PaletteEditorController(QObject):
         if self._image_model is None:
             return
 
+        # Start a new stroke batch if needed
+        if self._current_stroke is None:
+            self._current_stroke = BatchCommand()
+            self._stroke_pixels_painted = set()
+
         # Get pixels in brush area
         pixels_to_paint = self._get_brush_pixels(x, y)
 
         for px, py in pixels_to_paint:
+            # Skip if already painted in this stroke
+            if (px, py) in self._stroke_pixels_painted:
+                continue
+
             old_color = self._image_model.get_pixel(px, py)
             if old_color != self._active_index:
                 cmd = DrawPixelCommand(
@@ -356,10 +370,13 @@ class PaletteEditorController(QObject):
                     old_color=old_color,
                     new_color=self._active_index,
                 )
-                self._undo_manager.execute_command(cmd, self._image_model)
+                # Execute immediately for visual feedback
+                cmd.execute(self._image_model)
+                # Add to batch for grouped undo
+                self._current_stroke.add_command(cmd)
+                self._stroke_pixels_painted.add((px, py))
 
         self._mark_dirty()
-        self._emit_undo_state()
         self.image_changed.emit()
         self._schedule_preview()
 
@@ -368,17 +385,44 @@ class PaletteEditorController(QObject):
         if self._image_model is None:
             return
 
+        # Start a new stroke batch if needed
+        if self._current_stroke is None:
+            self._current_stroke = BatchCommand()
+            self._stroke_pixels_painted = set()
+
         pixels_to_erase = self._get_brush_pixels(x, y)
 
         for px, py in pixels_to_erase:
+            # Skip if already painted in this stroke
+            if (px, py) in self._stroke_pixels_painted:
+                continue
+
             old_color = self._image_model.get_pixel(px, py)
             if old_color != 0:
                 cmd = DrawPixelCommand(x=px, y=py, old_color=old_color, new_color=0)
-                self._undo_manager.execute_command(cmd, self._image_model)
+                # Execute immediately for visual feedback
+                cmd.execute(self._image_model)
+                # Add to batch for grouped undo
+                self._current_stroke.add_command(cmd)
+                self._stroke_pixels_painted.add((px, py))
 
         self._mark_dirty()
         self.image_changed.emit()
         self._schedule_preview()
+
+    def finish_stroke(self) -> None:
+        """Finish the current stroke and commit it to undo history.
+
+        Called when mouse is released after painting.
+        """
+        if self._current_stroke is not None and self._current_stroke.commands:
+            # Record the batch in undo manager (already executed)
+            self._undo_manager.record_command(self._current_stroke)
+            self._emit_undo_state()
+
+        # Clear stroke state
+        self._current_stroke = None
+        self._stroke_pixels_painted = set()
 
     def _handle_fill(self, x: int, y: int) -> None:
         """Handle flood fill tool click."""
