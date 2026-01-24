@@ -29,6 +29,7 @@ from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import (
     CaptureResult,
     MesenCaptureParser,
+    OAMEntry,
 )
 from core.palette_utils import snes_palette_to_rgb
 from core.services.injection_debug_context import InjectionDebugContext
@@ -227,18 +228,14 @@ class FrameMappingController(QObject):
         logger.info("Loaded %d AI frames from %s", len(frames), directory)
         return len(frames)
 
-    def import_mesen_capture(self, capture_path: Path, parent: QObject | None = None) -> GameFrame | None:
-        """Import a game frame from a Mesen 2 capture file.
+    def import_mesen_capture(self, capture_path: Path) -> None:
+        """Parse a Mesen 2 capture file and emit signal for sprite selection.
 
-        Shows a sprite selection dialog to let the user choose which OAM entries
-        to include in the import.
+        The workspace handles showing the sprite selection dialog and calls
+        complete_capture_import() with the user's selection.
 
         Args:
             capture_path: Path to capture JSON file
-            parent: Parent widget for the selection dialog
-
-        Returns:
-            The created GameFrame, or None on error/cancel
         """
         if self._project is None:
             self.new_project()
@@ -250,30 +247,43 @@ class FrameMappingController(QObject):
 
             if not capture_result.has_entries:
                 self.error_occurred.emit(f"No sprite entries in capture: {capture_path}")
-                return None
+                return
 
-            # Show sprite selection dialog
-            from PySide6.QtWidgets import QDialog, QWidget
+            # Emit signal for workspace to show sprite selection dialog
+            self.capture_import_requested.emit(capture_result, capture_path)
 
-            from ui.frame_mapping.dialogs.sprite_selection_dialog import (
-                SpriteSelectionDialog,
-            )
+        except Exception as e:
+            logger.exception("Failed to parse capture from %s", capture_path)
+            self.error_occurred.emit(f"Failed to parse capture: {e}")
 
-            parent_widget = parent if isinstance(parent, QWidget) else None
-            dialog = SpriteSelectionDialog(capture_result, parent=parent_widget)
+    def complete_capture_import(
+        self,
+        capture_path: Path,
+        capture_result: CaptureResult,
+        selected_entries: list[OAMEntry],
+    ) -> GameFrame | None:
+        """Complete capture import after user selection.
 
-            if dialog.exec() != QDialog.DialogCode.Accepted:
-                # User cancelled
-                return None
+        Called by workspace after sprite selection dialog is accepted.
 
-            selected_entries = dialog.selected_entries
-            if not selected_entries:
-                self.error_occurred.emit("No sprites selected")
-                return None
+        Args:
+            capture_path: Path to capture JSON file
+            capture_result: Parsed capture result
+            selected_entries: OAM entries selected by user
 
+        Returns:
+            The created GameFrame, or None on error
+        """
+        if self._project is None:
+            self.error_occurred.emit("No project loaded")
+            return None
+
+        if not selected_entries:
+            self.error_occurred.emit("No sprites selected")
+            return None
+
+        try:
             # Create filtered CaptureResult with only selected entries
-            from core.mesen_integration.click_extractor import CaptureResult
-
             filtered_capture = CaptureResult(
                 frame=capture_result.frame,
                 visible_count=len(selected_entries),
@@ -326,7 +336,7 @@ class FrameMappingController(QObject):
                 compression_types=default_compression_types,
             )
 
-            self._project.add_game_frame(frame)  # type: ignore[union-attr]
+            self._project.add_game_frame(frame)
             self.game_frame_added.emit(frame_id)
             self.project_changed.emit()
             self.save_requested.emit()
@@ -345,33 +355,33 @@ class FrameMappingController(QObject):
             self.error_occurred.emit(f"Failed to import capture: {e}")
             return None
 
-    def import_capture_directory(self, directory: Path, parent: QObject | None = None) -> int:
-        """Import all captures from a directory.
+    def import_capture_directory(self, directory: Path) -> list[Path]:
+        """Parse all captures from a directory and emit signals for each.
 
-        Shows a sprite selection dialog for each capture file.
+        Emits capture_import_requested for each valid capture file.
+        The workspace handles showing dialogs and calling complete_capture_import().
 
         Args:
             directory: Directory containing capture JSON files
-            parent: Parent widget for selection dialogs
 
         Returns:
-            Number of captures imported
+            List of capture file paths that were parsed (for workspace to track)
         """
         if not directory.is_dir():
             self.error_occurred.emit(f"Not a directory: {directory}")
-            return 0
+            return []
 
         json_files = sorted(directory.glob("sprite_capture_*.json"))
         if not json_files:
             json_files = sorted(directory.glob("*.json"))
 
-        imported = 0
+        parsed_paths: list[Path] = []
         for json_path in json_files:
-            if self.import_mesen_capture(json_path, parent):
-                imported += 1
+            self.import_mesen_capture(json_path)
+            parsed_paths.append(json_path)
 
-        logger.info("Imported %d captures from %s", imported, directory)
-        return imported
+        logger.info("Parsed %d captures from %s", len(parsed_paths), directory)
+        return parsed_paths
 
     def create_mapping(self, ai_frame_id: str, game_frame_id: str) -> bool:
         """Create a mapping between an AI frame and a game frame.

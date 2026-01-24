@@ -201,7 +201,7 @@ class TestInjectionDebugContextEnabled:
         """save_debug_image handles save errors gracefully."""
         ctx = InjectionDebugContext(enabled=True)
         mock_img = MagicMock(spec=Image.Image)
-        mock_img.save.side_effect = IOError("Save failed")
+        mock_img.save.side_effect = OSError("Save failed")
 
         with ctx:
             # Should not raise
