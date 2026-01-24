@@ -1,25 +1,26 @@
+"""Tests for Qt signal/slot framework patterns.
+
+These tests verify thread safety, timing, signal blocking, and error handling
+patterns for the Qt signal/slot system. They use real dialog instances as
+test subjects but focus on framework behavior rather than application logic.
+
+For application-specific dialog tests, see:
+  tests/unit/ui/dialogs/test_manual_offset_dialog.py
+"""
+
 from __future__ import annotations
 
-import tempfile
 import time
-from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Qt, QThread, Slot
 
 from core.app_context import get_app_context
-
-pytestmark = [pytest.mark.integration]
-from unittest.mock import patch
-
-import pytest
-from PySide6.QtCore import Qt, QThread, Slot
-
 from tests.fixtures.timeouts import SHORT, signal_timeout
 from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
-from ui.rom_extraction_panel import ROMExtractionPanel
 from utils.logging_config import get_logger
+
+pytestmark = [pytest.mark.integration]
 
 logger = get_logger(__name__)
 
@@ -29,7 +30,6 @@ def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
 
     Used by tests that have managers_initialized fixture.
     """
-
     context = get_app_context()
     return UnifiedManualOffsetDialog(
         parent,
@@ -37,33 +37,6 @@ def _create_dialog(parent=None) -> UnifiedManualOffsetDialog:
         settings_manager=context.application_state_manager,
         extraction_manager=context.core_operations_manager,
     )
-
-
-@pytest.fixture
-def temp_rom_file():
-    """Create a temporary ROM file for testing."""
-    with tempfile.NamedTemporaryFile(suffix=".sfc", delete=False) as f:
-        # Write minimal ROM header
-        f.write(b"\x00" * 0x8000)  # 32KB of zeros
-        temp_path = f.name
-
-    yield temp_path
-
-    # Cleanup
-    try:
-        Path(temp_path).unlink()
-    except Exception:
-        # Caught exception during operation
-        pass
-
-
-@pytest.fixture
-def real_extraction_manager():
-    """Create a mock extraction manager."""
-    manager = MagicMock()
-    manager.extract_sprite = MagicMock(return_value=(None, None))
-    manager.get_sprite_at_offset = MagicMock(return_value=None)
-    return manager
 
 
 class SignalRecorder(QObject):
@@ -110,99 +83,6 @@ class SignalRecorder(QObject):
         if signal_name:
             return sum(1 for name, _, _ in self.emissions if name == signal_name)
         return len(self.emissions)
-
-
-@pytest.mark.gui
-@pytest.mark.usefixtures("session_app_context")
-@pytest.mark.shared_state_safe
-class TestDialogSignalConnections:
-    """Test UnifiedManualOffsetDialog signal connections."""
-
-    def test_dialog_signals_exist(self, qtbot, managers_initialized):
-        """Test that dialog has required signals."""
-        dialog = _create_dialog(None)
-        qtbot.addWidget(dialog)
-
-        # Check signals exist
-        assert hasattr(dialog, "offset_changed")
-        assert hasattr(dialog, "sprite_found")
-
-        # Check they are Qt signals
-        assert isinstance(dialog.offset_changed, Signal)
-        assert isinstance(dialog.sprite_found, Signal)
-
-    def test_offset_changed_emission(self, qtbot, managers_initialized):
-        """Test offset_changed signal is emitted with correct value."""
-        dialog = _create_dialog(None)
-        qtbot.addWidget(dialog)
-
-        # Create signal spy
-        with qtbot.waitSignal(dialog.offset_changed, timeout=signal_timeout()) as blocker:
-            # Trigger offset change
-            dialog.set_offset(0x1000)
-
-        # Verify signal was emitted with correct value
-        assert blocker.args == [0x1000]
-
-    def test_sprite_found_emission(self, qtbot, managers_initialized):
-        """Test sprite_found signal is emitted with correct parameters."""
-        dialog = _create_dialog(None)
-        qtbot.addWidget(dialog)
-
-        # Create signal spy
-        with qtbot.waitSignal(dialog.sprite_found, timeout=signal_timeout()) as blocker:
-            # Trigger sprite found (simulate Apply button)
-            dialog._apply_offset()
-
-        # Verify signal was emitted with offset and name
-        assert len(blocker.args) == 2
-        assert isinstance(blocker.args[0], int)  # offset
-        assert isinstance(blocker.args[1], str)  # sprite name
-
-    def test_multiple_rapid_emissions(self, qtbot, managers_initialized, wait_for_signal_processed):
-        """Test handling of multiple rapid signal emissions."""
-        dialog = _create_dialog(None)
-        qtbot.addWidget(dialog)
-
-        recorder = SignalRecorder()
-        dialog.offset_changed.connect(recorder.record_offset_changed)
-
-        # Emit multiple signals rapidly
-        offsets = [0x1000, 0x2000, 0x3000, 0x4000, 0x5000]
-        for offset in offsets:
-            dialog.set_offset(offset)
-
-        # Wait for all signals to be processed
-        qtbot.waitUntil(lambda: recorder.count("offset_changed") == len(offsets), timeout=signal_timeout())
-
-        # Verify all signals were received
-        emissions = recorder.get_emissions("offset_changed")
-        received_offsets = [args[0] for args, _ in emissions]
-        assert received_offsets == offsets
-
-    def test_signal_connection_types(self, qtbot, managers_initialized, wait_for_signal_processed):
-        """Test different Qt connection types for cross-thread safety."""
-        dialog = _create_dialog(None)
-        qtbot.addWidget(dialog)
-
-        recorder = SignalRecorder()
-
-        # Test AutoConnection (default)
-        dialog.offset_changed.connect(recorder.record_offset_changed)
-
-        # Test QueuedConnection (for cross-thread)
-        dialog.sprite_found.connect(recorder.record_sprite_found, Qt.ConnectionType.QueuedConnection)
-
-        # Emit signals
-        dialog.set_offset(0x1000)
-        dialog._apply_offset()
-
-        # Wait for queued connections to be processed
-        qtbot.waitUntil(lambda: recorder.count() == 2, timeout=signal_timeout())
-
-        # Verify both signals received
-        assert recorder.count("offset_changed") == 1
-        assert recorder.count("sprite_found") == 1
 
 
 @pytest.mark.gui
