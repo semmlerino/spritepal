@@ -1,13 +1,18 @@
 """Workspace State Manager.
 
 Manages UI state for the Frame Mapping workspace, including:
-- Selection tracking (AI frame, game frame, canvas state)
+- Selection tracking (AI frame, game frame, canvas state) - CACHED from panes
 - ROM path tracking
 - Directory history
 - Project identity tracking
 - Auto-advance toggle state
 
 This is a pure state container with no Qt dependencies or signals.
+
+NOTE: Selection state properties are CACHED for performance. The panes
+(AIFramesPane, CapturesLibraryPane) are the source of truth. Workspace
+provides helper methods (_get_selected_ai_frame_id, _get_selected_game_id)
+that query panes first, falling back to cached state when pane unavailable.
 """
 
 from __future__ import annotations
@@ -132,27 +137,38 @@ class WorkspaceStateManager:
         return self._rom_path is not None and self._rom_path.exists()
 
     # -------------------------------------------------------------------------
-    # Selection State Properties
+    # Selection State Properties (Cached for Performance)
     # -------------------------------------------------------------------------
+    # NOTE: Panes (AIFramesPane, CapturesLibraryPane) are the SOURCE OF TRUTH
+    # for selection state. These properties are CACHED for convenience/performance.
+    # When freshness matters, query panes directly via workspace helper methods.
 
     @property
     def selected_ai_frame_id(self) -> str | None:
-        """Get the selected AI frame ID."""
+        """Get the cached selected AI frame ID.
+
+        NOTE: This is a performance cache. For fresh state, query AIFramesPane
+        via workspace._get_selected_ai_frame_id() which checks the pane first.
+        """
         return self._selected_ai_frame_id
 
     @selected_ai_frame_id.setter
     def selected_ai_frame_id(self, frame_id: str | None) -> None:
-        """Set the selected AI frame ID."""
+        """Set the cached selected AI frame ID."""
         self._selected_ai_frame_id = frame_id
 
     @property
     def selected_game_id(self) -> str | None:
-        """Get the selected game frame ID."""
+        """Get the cached selected game frame ID.
+
+        NOTE: This is a performance cache. For fresh state, query CapturesLibraryPane
+        via workspace._get_selected_game_id() which checks the pane first.
+        """
         return self._selected_game_id
 
     @selected_game_id.setter
     def selected_game_id(self, frame_id: str | None) -> None:
-        """Set the selected game frame ID."""
+        """Set the cached selected game frame ID."""
         self._selected_game_id = frame_id
 
     @property

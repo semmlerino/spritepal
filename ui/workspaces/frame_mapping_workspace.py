@@ -343,6 +343,42 @@ class FrameMappingWorkspace(QWidget):
         redo_shortcut = QShortcut(QKeySequence.StandardKey.Redo, self)
         redo_shortcut.activated.connect(self._on_redo)
 
+    # -------------------------------------------------------------------------
+    # Selection State Helpers (Panes as Source of Truth)
+    # -------------------------------------------------------------------------
+
+    def _get_selected_ai_frame_id(self) -> str | None:
+        """Get the currently selected AI frame ID.
+
+        Queries AIFramesPane first (source of truth), falls back to cached state.
+        Use this when you need fresh selection state.
+
+        Returns:
+            AI frame ID (filename) or None if no selection
+        """
+        # Query pane (source of truth)
+        pane_selection = self._ai_frames_pane.get_selected_id()
+        if pane_selection is not None:
+            return pane_selection
+        # Fallback to cached state if pane not available or returns None
+        return self._state.selected_ai_frame_id
+
+    def _get_selected_game_id(self) -> str | None:
+        """Get the currently selected game frame ID.
+
+        Queries CapturesLibraryPane first (source of truth), falls back to cached state.
+        Use this when you need fresh selection state.
+
+        Returns:
+            Game frame ID or None if no selection
+        """
+        # Query pane (source of truth)
+        pane_selection = self._captures_pane.get_selected_id()
+        if pane_selection is not None:
+            return pane_selection
+        # Fallback to cached state if pane not available or returns None
+        return self._state.selected_game_id
+
     def _on_undo(self) -> None:
         """Handle Ctrl+Z - undo last action."""
         desc = self._controller.undo()
