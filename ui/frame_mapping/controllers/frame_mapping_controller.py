@@ -36,7 +36,12 @@ from core.mesen_integration.click_extractor import (
     CaptureResult,
     MesenCaptureParser,
 )
-from core.palette_utils import quantize_to_palette, quantize_with_mappings, snes_palette_to_rgb
+from core.palette_utils import (
+    QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    quantize_to_palette,
+    quantize_with_mappings,
+    snes_palette_to_rgb,
+)
 from core.rom_injector import ROMInjector
 from core.services.rom_verification_service import ROMVerificationService
 from core.services.sprite_compositor import SpriteCompositor, TransformParams
@@ -44,10 +49,6 @@ from core.types import CompressionType
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-
-# Transparency threshold for injection - pixels with alpha < this are treated as transparent
-# AI-generated images often have semi-transparent edges; 128 captures anti-aliased pixels
-INJECTION_TRANSPARENCY_THRESHOLD = 128
 
 
 class FrameMappingController(QObject):
@@ -832,7 +833,7 @@ class FrameMappingController(QObject):
         Returns:
             Dict mapping RGB tuples to pixel counts
         """
-        from ui.dialogs.color_mapping_dialog import extract_unique_colors
+        from core.palette_utils import extract_unique_colors
 
         if self._project is None:
             return {}
@@ -867,8 +868,8 @@ class FrameMappingController(QObject):
         Returns:
             Generated SheetPalette with auto-mapped colors
         """
-        from ui.dialogs.color_mapping_dialog import (
-            _find_nearest_palette_index,
+        from core.palette_utils import (
+            find_nearest_palette_index,
             quantize_colors_to_palette,
         )
 
@@ -881,7 +882,7 @@ class FrameMappingController(QObject):
         # Auto-map all colors to nearest palette colors
         color_mappings: dict[tuple[int, int, int], int] = {}
         for color in colors:
-            color_mappings[color] = _find_nearest_palette_index(color, palette_colors)
+            color_mappings[color] = find_nearest_palette_index(color, palette_colors)
 
         return SheetPalette(colors=palette_colors, color_mappings=color_mappings)
 
@@ -894,7 +895,7 @@ class FrameMappingController(QObject):
         Returns:
             SheetPalette with the game frame's colors, or None if not found
         """
-        from ui.dialogs.color_mapping_dialog import _find_nearest_palette_index
+        from core.palette_utils import find_nearest_palette_index
 
         if self._project is None:
             return None
@@ -926,7 +927,7 @@ class FrameMappingController(QObject):
             sheet_colors = self.extract_sheet_colors()
             color_mappings: dict[tuple[int, int, int], int] = {}
             for color in sheet_colors:
-                color_mappings[color] = _find_nearest_palette_index(color, palette_rgb)
+                color_mappings[color] = find_nearest_palette_index(color, palette_rgb)
 
             logger.info("Copied palette from game frame %s", game_frame_id)
             return SheetPalette(colors=palette_rgb, color_mappings=color_mappings)
@@ -1708,7 +1709,7 @@ class FrameMappingController(QObject):
                     # Check if tile has any content above transparency threshold
                     # If not, clear it (make fully transparent) to replace original sprite data
                     tile_alpha = tile_img.split()[3]
-                    has_content = any(p >= INJECTION_TRANSPARENCY_THRESHOLD for p in tile_alpha.getdata())
+                    has_content = any(p >= QUANTIZATION_TRANSPARENCY_THRESHOLD for p in tile_alpha.getdata())
                     if not has_content:
                         tile_img = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
 
@@ -1773,12 +1774,12 @@ class FrameMappingController(QObject):
                             chunk_img,
                             palette_rgb,
                             sheet_palette.color_mappings,
-                            transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD,
+                            transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
                         )
                     else:
                         # Sheet palette without explicit mappings -> nearest color
                         chunk_img = quantize_to_palette(
-                            chunk_img, palette_rgb, transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD
+                            chunk_img, palette_rgb, transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD
                         )
                 else:
                     # Fallback: use capture palette (original behavior)
@@ -1786,7 +1787,7 @@ class FrameMappingController(QObject):
                     if snes_palette:
                         palette_rgb = snes_palette_to_rgb(snes_palette)
                         chunk_img = quantize_to_palette(
-                            chunk_img, palette_rgb, transparency_threshold=INJECTION_TRANSPARENCY_THRESHOLD
+                            chunk_img, palette_rgb, transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD
                         )
                     else:
                         logger.warning(

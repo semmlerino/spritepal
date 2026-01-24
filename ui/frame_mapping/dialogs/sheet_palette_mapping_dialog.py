@@ -19,11 +19,8 @@ from PySide6.QtWidgets import (
 )
 
 from core.frame_mapping_project import SheetPalette
+from core.palette_utils import find_nearest_palette_index, quantize_colors_to_palette
 from ui.components.base.dialog_base import DialogBase
-from ui.dialogs.color_mapping_dialog import (
-    _find_nearest_palette_index,
-    quantize_colors_to_palette,
-)
 from utils.color_distance import detect_rare_important_colors, perceptual_distance
 from utils.logging_config import get_logger
 
@@ -300,7 +297,7 @@ class SheetPaletteMappingDialog(DialogBase):
         # Compute initial mappings for unmapped colors
         for color in sheet_colors:
             if color not in self._color_mappings:
-                self._color_mappings[color] = _find_nearest_palette_index(color, self._palette_colors)
+                self._color_mappings[color] = find_nearest_palette_index(color, self._palette_colors)
 
         # UI state
         self._palette_slots: list[PaletteSlotWidget] = []
@@ -551,7 +548,7 @@ class SheetPaletteMappingDialog(DialogBase):
                         continue
 
             # Auto-map to nearest perceptual match
-            nearest_idx = _find_nearest_palette_index(color, self._palette_colors)
+            nearest_idx = find_nearest_palette_index(color, self._palette_colors)
             self._color_mappings[color] = nearest_idx
 
         # Update UI rows

@@ -7,8 +7,14 @@ import pytest
 from PIL import Image
 
 from core.palette_utils import (
+    QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    SNES_PALETTE_SIZE,
+    extract_unique_colors,
+    find_nearest_palette_index,
+    quantize_colors_to_palette,
     quantize_to_palette,
     quantize_with_mappings,
+    snap_to_snes_color,
     snes_palette_to_rgb,
 )
 
@@ -306,3 +312,115 @@ class TestQuantizeWithMappings:
         assert pixels[1] == 2, "Opaque dark red should map to dark red (index 2)"
         assert pixels[2] == 0, "Transparent pixel should map to index 0"
         assert pixels[3] == 3, "Explicitly mapped red should be index 3"
+
+
+class TestSnapToSnesColor:
+    """Tests for snap_to_snes_color function."""
+
+    def test_exact_snes_color_unchanged(self) -> None:
+        """Colors already SNES-valid should be unchanged."""
+        assert snap_to_snes_color((248, 128, 0)) == (248, 128, 0)
+        assert snap_to_snes_color((0, 0, 0)) == (0, 0, 0)
+
+    def test_snaps_to_nearest_multiple_of_8(self) -> None:
+        """Colors should snap to nearest multiple of 8."""
+        # 255 snaps to 248 (nearest valid SNES value)
+        assert snap_to_snes_color((255, 255, 255)) == (248, 248, 248)
+        # 4 snaps to 0
+        assert snap_to_snes_color((4, 4, 4)) == (0, 0, 0)
+        # 5 snaps to 8
+        assert snap_to_snes_color((5, 5, 5)) == (8, 8, 8)
+
+    def test_clamps_to_valid_range(self) -> None:
+        """Values should be clamped to 0-248."""
+        # Already tested via 255 -> 248, but be explicit
+        result = snap_to_snes_color((255, 0, 127))
+        assert result[0] == 248
+        assert result[2] == 128
+
+
+class TestFindNearestPaletteIndex:
+    """Tests for find_nearest_palette_index function."""
+
+    def test_finds_exact_match(self) -> None:
+        """Exact color match should return correct index."""
+        palette = [(0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)]
+        assert find_nearest_palette_index((255, 0, 0), palette) == 1
+        assert find_nearest_palette_index((0, 255, 0), palette) == 2
+        assert find_nearest_palette_index((0, 0, 255), palette) == 3
+
+    def test_skips_index_zero_by_default(self) -> None:
+        """Should skip index 0 when skip_zero=True."""
+        palette = [(255, 0, 0), (0, 0, 0)]  # Index 0 is closest match
+        # But we skip it, so result should be index 1
+        result = find_nearest_palette_index((255, 0, 0), palette, skip_zero=True)
+        assert result == 1
+
+    def test_includes_index_zero_when_requested(self) -> None:
+        """Should include index 0 when skip_zero=False."""
+        palette = [(255, 0, 0), (0, 0, 0)]
+        result = find_nearest_palette_index((255, 0, 0), palette, skip_zero=False)
+        assert result == 0
+
+
+class TestExtractUniqueColors:
+    """Tests for extract_unique_colors function."""
+
+    def test_extracts_solid_color(self) -> None:
+        """Single color image should have one color."""
+        img = Image.new("RGBA", (4, 4), (255, 0, 0, 255))
+        result = extract_unique_colors(img)
+        assert len(result) == 1
+        assert (255, 0, 0) in result
+        assert result[(255, 0, 0)] == 16  # 4x4 = 16 pixels
+
+    def test_ignores_transparent_by_default(self) -> None:
+        """Transparent pixels should be ignored by default."""
+        img = Image.new("RGBA", (4, 4), (255, 0, 0, 0))
+        result = extract_unique_colors(img)
+        assert len(result) == 0
+
+    def test_ignores_semi_transparent(self) -> None:
+        """Semi-transparent pixels (alpha < 128) should be ignored."""
+        img = Image.new("RGBA", (4, 4), (255, 0, 0, 64))
+        result = extract_unique_colors(img, alpha_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD)
+        assert len(result) == 0
+
+    def test_includes_opaque(self) -> None:
+        """Opaque pixels (alpha >= 128) should be included."""
+        img = Image.new("RGBA", (4, 4), (255, 0, 0, 128))
+        result = extract_unique_colors(img, alpha_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD)
+        assert len(result) == 1
+        assert (255, 0, 0) in result
+
+
+class TestQuantizeColorsToPalette:
+    """Tests for quantize_colors_to_palette function."""
+
+    def test_returns_16_colors(self) -> None:
+        """Should return exactly 16 colors."""
+        colors = {(255, 0, 0): 100, (0, 255, 0): 50}
+        result = quantize_colors_to_palette(colors)
+        assert len(result) == SNES_PALETTE_SIZE
+
+    def test_index_zero_is_black(self) -> None:
+        """Index 0 should always be black (transparency)."""
+        colors = {(255, 0, 0): 100}
+        result = quantize_colors_to_palette(colors)
+        assert result[0] == (0, 0, 0)
+
+    def test_snaps_to_snes_by_default(self) -> None:
+        """Colors should be snapped to SNES-valid values."""
+        colors = {(255, 127, 63): 100}
+        result = quantize_colors_to_palette(colors, snap_to_snes=True)
+        # All colors should be multiples of 8
+        for r, g, b in result:
+            assert r % 8 == 0, f"Red {r} not multiple of 8"
+            assert g % 8 == 0, f"Green {g} not multiple of 8"
+            assert b % 8 == 0, f"Blue {b} not multiple of 8"
+
+    def test_empty_colors_returns_black_palette(self) -> None:
+        """Empty color dict should return all-black palette."""
+        result = quantize_colors_to_palette({})
+        assert len(result) == SNES_PALETTE_SIZE
+        assert all(c == (0, 0, 0) for c in result)

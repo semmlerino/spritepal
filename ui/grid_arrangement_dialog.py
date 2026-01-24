@@ -1894,10 +1894,8 @@ class GridArrangementDialog(SplitterDialog):
             return
 
         # Import extraction functions
-        from ui.dialogs.color_mapping_dialog import (
-            extract_colors_from_sampled_overlay,
-            quantize_colors_to_palette,
-        )
+        from core.palette_utils import quantize_colors_to_palette
+        from ui.dialogs.color_mapping_dialog import extract_colors_from_sampled_overlay
 
         # Extract colors from sampled overlay regions
         self._update_status("Extracting colors from overlay...")
@@ -1944,7 +1942,7 @@ class GridArrangementDialog(SplitterDialog):
         self._update_displays()
 
         # Count how many colors were merged by SNES snapping
-        from ui.dialogs.color_mapping_dialog import snap_to_snes_color
+        from core.palette_utils import snap_to_snes_color
 
         snapped_colors = {snap_to_snes_color(c) for c in color_counts}
         colors_merged = unique_count - len(snapped_colors)

@@ -13,6 +13,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
+# Import here to avoid circular imports (palette_utils imports from here via TYPE_CHECKING)
+# Use lazy import in from_dict to avoid issues during module load
+SNES_PALETTE_SIZE = 16
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,13 +46,40 @@ class SheetPalette:
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> SheetPalette:
-        """Deserialize from dictionary."""
+        """Deserialize from dictionary.
+
+        Performs validation and clamping:
+        - RGB values are clamped to 0-255 (backward compatible)
+        - Mapping indices are clamped to 0-15 (SNES_PALETTE_SIZE - 1)
+        - Warnings are logged for invalid values
+        """
         colors_raw = cast(list[list[int]], data.get("colors", []))
-        colors = [tuple(c) for c in colors_raw]
+        colors: list[tuple[int, int, int]] = []
+
+        for c in colors_raw:
+            if len(c) >= 3:
+                # Validate and clamp RGB values to 0-255
+                r = max(0, min(255, c[0]))
+                g = max(0, min(255, c[1]))
+                b = max(0, min(255, c[2]))
+                if r != c[0] or g != c[1] or b != c[2]:
+                    logger.warning(
+                        "RGB value clamped: (%d, %d, %d) -> (%d, %d, %d)",
+                        c[0],
+                        c[1],
+                        c[2],
+                        r,
+                        g,
+                        b,
+                    )
+                colors.append((r, g, b))
+            else:
+                colors.append((0, 0, 0))
+
         # Ensure we have exactly 16 colors, pad with black if needed
-        while len(colors) < 16:
+        while len(colors) < SNES_PALETTE_SIZE:
             colors.append((0, 0, 0))
-        colors = [(c[0], c[1], c[2]) for c in colors[:16]]
+        colors = colors[:SNES_PALETTE_SIZE]
 
         # Convert string keys back to tuples
         mappings_raw = cast(dict[str, int], data.get("color_mappings", {}))
@@ -58,7 +89,16 @@ class SheetPalette:
             if len(parts) == 3:
                 try:
                     rgb = (int(parts[0]), int(parts[1]), int(parts[2]))
-                    color_mappings[rgb] = idx
+                    # Validate and clamp mapping index to 0-15
+                    idx_clamped = max(0, min(SNES_PALETTE_SIZE - 1, idx))
+                    if idx_clamped != idx:
+                        logger.warning(
+                            "Mapping index clamped: %d -> %d for color %s",
+                            idx,
+                            idx_clamped,
+                            key_str,
+                        )
+                    color_mappings[rgb] = idx_clamped
                 except ValueError:
                     logger.warning("Invalid color mapping key: %s", key_str)
 

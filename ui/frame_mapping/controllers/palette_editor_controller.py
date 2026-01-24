@@ -133,12 +133,10 @@ class PaletteEditorController(QObject):
             color_mapping_report: Analysis of RGB→indexed conversion quality
         """
         try:
-            pil_image = Image.open(image_path)
-
-            # Analyze color usage before conversion
-            report = analyze_color_usage(pil_image, palette)
-
-            indexed_data = convert_rgb_to_indexed(pil_image, palette)
+            with Image.open(image_path) as pil_image:
+                # Analyze color usage before conversion
+                report = analyze_color_usage(pil_image, palette)
+                indexed_data = convert_rgb_to_indexed(pil_image, palette)
 
             self._image_model = IndexedImageModel()
             self._image_model.set_data(indexed_data)

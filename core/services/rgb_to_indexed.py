@@ -8,11 +8,12 @@ palette-based images (for SNES injection).
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING
 
 import numpy as np
 from PIL import Image
+
+from utils.color_distance import perceptual_distance, perceptual_distance_sq
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import SheetPalette
@@ -48,9 +49,6 @@ def convert_rgb_to_indexed(
     # Output array of palette indices
     indexed = np.zeros((height, width), dtype=np.uint8)
 
-    # Pre-compute palette colors as numpy array for fast distance calculation
-    palette_colors = np.array(palette.colors, dtype=np.float32)
-
     # Process each pixel
     for y in range(height):
         for x in range(width):
@@ -68,88 +66,38 @@ def convert_rgb_to_indexed(
                 indexed[y, x] = palette.color_mappings[rgb]
                 continue
 
-            # Fall back to nearest color (Euclidean distance in RGB)
-            best_idx = _find_nearest_color(rgb, palette_colors)
+            # Fall back to nearest color (perceptual LAB distance)
+            best_idx = _find_nearest_color(rgb, palette.colors)
             indexed[y, x] = best_idx
 
     return indexed
 
 
-def convert_rgb_to_indexed_fast(
-    image: Image.Image,
-    palette: SheetPalette,
-    *,
-    transparency_threshold: int = 128,
-) -> np.ndarray:
-    """Optimized conversion using vectorized operations where possible.
-
-    Args:
-        image: PIL Image in RGB or RGBA mode
-        palette: SheetPalette with colors and optional color_mappings
-        transparency_threshold: Alpha values below this become index 0
-
-    Returns:
-        2D numpy array (H, W) of uint8 palette indices (0-15)
-    """
-    # Ensure RGBA mode for alpha handling
-    if image.mode != "RGBA":
-        image = image.convert("RGBA")
-
-    img_data = np.array(image)
-    height, width = img_data.shape[:2]
-
-    # Output array
-    indexed = np.zeros((height, width), dtype=np.uint8)
-
-    # Extract channels
-    rgb = img_data[:, :, :3].astype(np.float32)
-    alpha = img_data[:, :, 3]
-
-    # Create mask for transparent pixels
-    transparent_mask = alpha < transparency_threshold
-
-    # Build lookup for explicit mappings
-    mapping_lookup: dict[tuple[int, int, int], int] = palette.color_mappings.copy()
-
-    # Palette as numpy array
-    palette_colors = np.array(palette.colors, dtype=np.float32)
-
-    # Process non-transparent pixels
-    for y in range(height):
-        for x in range(width):
-            if transparent_mask[y, x]:
-                indexed[y, x] = 0
-                continue
-
-            r, g, b = int(rgb[y, x, 0]), int(rgb[y, x, 1]), int(rgb[y, x, 2])
-            key = (r, g, b)
-
-            if key in mapping_lookup:
-                indexed[y, x] = mapping_lookup[key]
-            else:
-                # Find nearest color
-                pixel_color = rgb[y, x]
-                distances = np.sum((palette_colors - pixel_color) ** 2, axis=1)
-                indexed[y, x] = int(np.argmin(distances))
-
-    return indexed
-
-
-def _find_nearest_color(rgb: tuple[int, int, int], palette_colors: np.ndarray) -> int:
+def _find_nearest_color(rgb: tuple[int, int, int], palette_colors: list[tuple[int, int, int]]) -> int:
     """Find the palette index with the nearest color to the given RGB.
 
-    Uses Euclidean distance in RGB color space.
+    Uses perceptual CIELAB distance for better color matching.
+    Skips index 0 (reserved for transparency) for opaque pixels.
 
     Args:
         rgb: RGB color tuple to match
-        palette_colors: Numpy array of palette colors (16, 3)
+        palette_colors: List of RGB tuples (16 colors)
 
     Returns:
-        Palette index (0-15) of nearest color
+        Palette index (1-15) of nearest color (never returns 0)
     """
-    pixel = np.array(rgb, dtype=np.float32)
-    distances = np.sum((palette_colors - pixel) ** 2, axis=1)
-    return int(np.argmin(distances))
+    min_dist = float("inf")
+    best_idx = 1  # Skip index 0 (transparent)
+
+    for idx, pal_color in enumerate(palette_colors):
+        if idx == 0:
+            continue  # Skip transparent index
+        dist = perceptual_distance_sq(rgb, pal_color)
+        if dist < min_dist:
+            min_dist = dist
+            best_idx = idx
+
+    return best_idx
 
 
 def convert_indexed_to_rgb(
@@ -233,16 +181,19 @@ def convert_indexed_to_pil_indexed(
 
 
 def get_color_distance(color1: tuple[int, int, int], color2: tuple[int, int, int]) -> float:
-    """Calculate Euclidean distance between two RGB colors.
+    """Calculate perceptual distance between two RGB colors using CIELAB.
+
+    Uses CIELAB color space for perceptually accurate distance measurement.
+    This better matches human perception than RGB Euclidean distance.
 
     Args:
         color1: First RGB color tuple
         color2: Second RGB color tuple
 
     Returns:
-        Euclidean distance in RGB space
+        Perceptual distance (Delta E) in CIELAB space
     """
-    return math.sqrt(sum((c1 - c2) ** 2 for c1, c2 in zip(color1, color2, strict=True)))
+    return perceptual_distance(color1, color2)
 
 
 def find_closest_palette_index(
@@ -253,20 +204,22 @@ def find_closest_palette_index(
 ) -> tuple[int, float]:
     """Find the palette index closest to a given RGB color.
 
+    Uses perceptual CIELAB distance for better color matching.
+
     Args:
         rgb: RGB color to match
         palette: SheetPalette with colors
         skip_transparent: If True, skip index 0 (transparent)
 
     Returns:
-        Tuple of (palette_index, distance)
+        Tuple of (palette_index, perceptual_distance)
     """
     best_idx = 0 if not skip_transparent else 1
     best_distance = float("inf")
 
     start_idx = 1 if skip_transparent else 0
     for idx in range(start_idx, len(palette.colors)):
-        distance = get_color_distance(rgb, palette.colors[idx])
+        distance = perceptual_distance(rgb, palette.colors[idx])
         if distance < best_distance:
             best_distance = distance
             best_idx = idx

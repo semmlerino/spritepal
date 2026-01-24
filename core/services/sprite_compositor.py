@@ -19,7 +19,12 @@ import numpy as np
 from PIL import Image
 
 from core.mesen_integration.capture_renderer import CaptureRenderer
-from core.palette_utils import quantize_to_palette, quantize_with_mappings, snes_palette_to_rgb
+from core.palette_utils import (
+    QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    quantize_to_palette,
+    quantize_with_mappings,
+    snes_palette_to_rgb,
+)
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -248,7 +253,7 @@ class SpriteCompositor:
                     image,
                     palette_rgb,
                     sheet_palette.color_mappings,
-                    transparency_threshold=1,
+                    transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
                 )
             else:
                 # Sheet palette without explicit mappings -> nearest color

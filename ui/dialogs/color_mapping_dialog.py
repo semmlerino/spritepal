@@ -16,72 +16,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.palette_utils import (
+    QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    find_nearest_palette_index,
+)
 from ui.components.base.dialog_base import DialogBase
-from utils.color_distance import perceptual_distance_sq
 
 if TYPE_CHECKING:
-    from PIL import Image
-
     from ui.row_arrangement.grid_arrangement_manager import ArrangementType
     from ui.row_arrangement.overlay_layer import OverlayLayer
 
 
-def _color_distance_sq(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float:
-    """Calculate squared perceptual distance between two RGB colors using CIELAB.
-
-    This provides better matching for human perception than RGB Euclidean distance.
-    """
-    return perceptual_distance_sq(c1, c2)
-
-
-def snap_to_snes_color(color: tuple[int, int, int]) -> tuple[int, int, int]:
-    """Snap an RGB color to the nearest SNES-valid color.
-
-    SNES uses BGR555 (5 bits per channel), so valid RGB888 values
-    must be multiples of 8: 0, 8, 16, ..., 240, 248.
-
-    Args:
-        color: RGB tuple with 8-bit values (0-255)
-
-    Returns:
-        RGB tuple snapped to nearest SNES-valid values
-    """
-
-    def snap_component(val: int) -> int:
-        # Round to nearest multiple of 8, clamped to 0-248
-        snapped = round(val / 8) * 8
-        return max(0, min(248, snapped))
-
-    return (snap_component(color[0]), snap_component(color[1]), snap_component(color[2]))
-
-
-def _find_nearest_palette_index(
-    color: tuple[int, int, int],
-    palette: list[tuple[int, int, int]],
-    skip_zero: bool = True,
-) -> int:
-    """Find the palette index with the nearest color.
-
-    Args:
-        color: RGB color tuple to match
-        palette: List of RGB palette colors
-        skip_zero: If True, skip index 0 (transparency) for opaque colors
-
-    Returns:
-        Index of nearest palette color
-    """
-    min_dist = float("inf")
-    best_idx = 1 if skip_zero else 0
-
-    for idx, pal_color in enumerate(palette):
-        if skip_zero and idx == 0:
-            continue
-        dist = _color_distance_sq(color, pal_color)
-        if dist < min_dist:
-            min_dist = dist
-            best_idx = idx
-
-    return best_idx
+# Backward compatibility alias for internal use (dialog class still uses this name)
+_find_nearest_palette_index = find_nearest_palette_index
 
 
 class ColorSwatchWidget(QWidget):
@@ -310,69 +257,12 @@ class ColorMappingDialog(DialogBase):
         self._color_mappings[overlay_color] = palette_index
 
 
-def extract_unique_colors(
-    image: Image.Image,
-    ignore_transparent: bool = True,
-    alpha_threshold: int = 128,
-) -> dict[tuple[int, int, int], int]:
-    """Extract unique RGB colors from an image with their pixel counts.
-
-    Args:
-        image: PIL Image to analyze
-        ignore_transparent: If True, skip pixels with alpha < threshold
-        alpha_threshold: Alpha value below which pixels are considered transparent
-
-    Returns:
-        Dict mapping RGB tuples to pixel counts
-    """
-    import numpy as np
-
-    if image.mode != "RGBA":
-        image = image.convert("RGBA")
-
-    # Convert to numpy array for fast processing
-    pixels = np.array(image)
-
-    # Flatten to (N, 4) where N is total pixels
-    flat_pixels = pixels.reshape(-1, 4)
-
-    # Filter out transparent pixels if requested
-    if ignore_transparent:
-        opaque_mask = flat_pixels[:, 3] >= alpha_threshold
-        flat_pixels = flat_pixels[opaque_mask]
-
-    if len(flat_pixels) == 0:
-        return {}
-
-    # Get RGB only (drop alpha)
-    rgb_pixels = flat_pixels[:, :3]
-
-    # Use numpy unique to count colors efficiently
-    # Pack RGB into single integers for fast comparison
-    packed = (
-        rgb_pixels[:, 0].astype(np.uint32) << 16
-        | rgb_pixels[:, 1].astype(np.uint32) << 8
-        | rgb_pixels[:, 2].astype(np.uint32)
-    )
-    unique_packed, counts = np.unique(packed, return_counts=True)
-
-    # Unpack back to RGB tuples
-    color_counts: dict[tuple[int, int, int], int] = {}
-    for packed_color, count in zip(unique_packed, counts, strict=False):
-        r = int((packed_color >> 16) & 0xFF)
-        g = int((packed_color >> 8) & 0xFF)
-        b = int(packed_color & 0xFF)
-        color_counts[(r, g, b)] = int(count)
-
-    return color_counts
-
-
 def extract_colors_from_sampled_overlay(
     overlay_layer: OverlayLayer,
     grid_mapping: Mapping[tuple[int, int], tuple[ArrangementType, str]],
     tile_width: int,
     tile_height: int,
-    alpha_threshold: int = 128,
+    alpha_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD,
 ) -> dict[tuple[int, int, int], int]:
     """Extract unique colors from the actual sampled overlay regions.
 
@@ -434,98 +324,3 @@ def extract_colors_from_sampled_overlay(
         color_counts[rgb] = color_counts.get(rgb, 0) + 1
 
     return color_counts
-
-
-def quantize_colors_to_palette(
-    color_counts: dict[tuple[int, int, int], int],
-    max_colors: int = 16,
-    *,
-    snap_to_snes: bool = True,
-) -> list[tuple[int, int, int]]:
-    """Quantize colors to a limited palette.
-
-    Uses PIL's median-cut quantization to reduce colors.
-    Index 0 is reserved for transparency (black).
-
-    Args:
-        color_counts: Dict mapping RGB tuples to pixel counts
-        max_colors: Maximum colors in output palette (default 16 for SNES)
-        snap_to_snes: If True, snap colors to SNES-valid values (multiples of 8)
-
-    Returns:
-        List of RGB tuples (max_colors entries, index 0 = transparency)
-    """
-    from PIL import Image
-
-    if not color_counts:
-        # Return empty palette with black at index 0
-        return [(0, 0, 0)] * max_colors
-
-    # Optionally snap input colors to SNES-valid values first
-    # This merges similar colors that would map to the same SNES color
-    if snap_to_snes:
-        snapped_counts: dict[tuple[int, int, int], int] = {}
-        for color, count in color_counts.items():
-            snapped = snap_to_snes_color(color)
-            snapped_counts[snapped] = snapped_counts.get(snapped, 0) + count
-        color_counts = snapped_counts
-
-    # Sort colors by frequency
-    sorted_colors = sorted(color_counts.items(), key=lambda x: x[1], reverse=True)
-
-    # If we have few enough colors, use them directly
-    if len(sorted_colors) <= max_colors - 1:  # -1 for transparency
-        palette: list[tuple[int, int, int]] = [(0, 0, 0)]  # Index 0 = transparent/black
-        for color, _count in sorted_colors:
-            palette.append(color)
-        # Pad with black if needed
-        while len(palette) < max_colors:
-            palette.append((0, 0, 0))
-        return palette
-
-    # Create a small image with all colors weighted by frequency
-    # This gives better quantization results
-    total_pixels = sum(color_counts.values())
-    img_size = min(256, max(16, int(total_pixels**0.5)))  # Reasonable size
-
-    # Build image data
-    pixel_data: list[tuple[int, int, int]] = []
-    for color, count in sorted_colors:
-        # Add each color proportionally to its frequency
-        weight = max(1, int(count * img_size * img_size / total_pixels))
-        pixel_data.extend([color] * weight)
-
-    # Ensure we have enough pixels
-    while len(pixel_data) < img_size * img_size:
-        pixel_data.append(sorted_colors[0][0])  # Pad with most common color
-
-    # Create image and quantize
-    img = Image.new("RGB", (img_size, img_size))
-    img.putdata(pixel_data[: img_size * img_size])
-
-    # Quantize to max_colors - 1 (reserve index 0 for transparency)
-    quantized = img.quantize(colors=max_colors - 1, method=Image.Quantize.MEDIANCUT)
-    raw_palette = quantized.getpalette()
-
-    if raw_palette is None:
-        # Fallback: use most frequent colors (already snapped if snap_to_snes)
-        palette = [(0, 0, 0)]
-        for color, _count in sorted_colors[: max_colors - 1]:
-            palette.append(color)
-        while len(palette) < max_colors:
-            palette.append((0, 0, 0))
-        return palette
-
-    # Extract palette colors from quantization result
-    palette = [(0, 0, 0)]  # Index 0 = transparent
-    for i in range(max_colors - 1):
-        r = raw_palette[i * 3]
-        g = raw_palette[i * 3 + 1]
-        b = raw_palette[i * 3 + 2]
-        color = (r, g, b)
-        # Snap quantized colors to SNES-valid values
-        if snap_to_snes:
-            color = snap_to_snes_color(color)
-        palette.append(color)
-
-    return palette
