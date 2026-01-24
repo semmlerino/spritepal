@@ -7,7 +7,7 @@ simplified dialog with proper tab integration and signal coordination.
 This dialog provides:
 - Working slider that updates offset
 - Preview widget display
-- Two functional tabs (Browse, Smart)
+- Browse tab for navigation
 - Sidebar for Nearby and Bookmarks
 - Proper signals (offset_changed, sprite_found)
 - Methods needed by ROM extraction panel
@@ -35,7 +35,6 @@ from PySide6.QtCore import (
     QPoint,
     Qt,
     QThread,
-    QTimer,
     Signal,
 )
 
@@ -56,7 +55,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.common import SpriteSearchCoordinator, WorkerManager
+from ui.common import SpriteSearchCoordinator
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.common.spacing_constants import SPACING_SMALL, SPACING_STANDARD
@@ -74,8 +73,6 @@ from ui.components.panels import StatusPanel
 from ui.components.visualization.rom_map_widget import ROMMapWidget
 from ui.dialogs.paged_tile_view_dialog import PagedTileViewDialog
 from ui.dialogs.services import BookmarkManager, CacheStatusController, ViewStateManager
-from ui.rom_extraction.workers import SpritePreviewWorker
-from ui.tabs.sprite_gallery_tab import SpriteGalleryTab
 from ui.widgets.sprite_preview_widget import SpritePreviewWidget
 from utils.constants import ROM_SIZE_2MB, ROM_SIZE_4MB, normalize_address, parse_address_string
 from utils.logging_config import get_logger
@@ -91,7 +88,7 @@ _MIN_MINI_MAP_HEIGHT = 40
 from ui.common.signal_utils import is_valid_qt as _is_valid_qt, safe_disconnect as _safe_disconnect
 
 # Import tab widgets from the new module
-from ui.tabs.manual_offset import SimpleBrowseTab, SimpleSmartTab
+from ui.tabs.manual_offset import SimpleBrowseTab
 
 
 class UnifiedManualOffsetDialog(CleanupDialog):
@@ -124,8 +121,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # UI Components - declare BEFORE super().__init__()
         self.tab_widget: QTabWidget | None = None
         self.browse_tab: SimpleBrowseTab | None = None
-        self.smart_tab: SimpleSmartTab | None = None
-        self.gallery_tab: SpriteGalleryTab | None = None
         self.preview_widget: SpritePreviewWidget | None = None
         self.status_panel: StatusPanel | None = None
         self.status_collapsible: CollapsibleGroupBox | None = None
@@ -173,15 +168,10 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Note: _cache_controller and _search_coordinator are created after super().__init__() below
 
-        # Worker references (preview worker still managed here)
-        self.preview_worker: SpritePreviewWorker | None = None
         # Note: search_worker, _sprite_scan_worker, _scan_progress_dialog now managed by SpriteSearchCoordinator
 
         # Preview coordinator handles preview generation (created in _setup_smart_preview_coordinator)
         self._smart_preview_coordinator: SmartPreviewCoordinator | None = None
-
-        # Preview update timer (legacy - kept for compatibility)
-        self._preview_timer: QTimer | None = None
 
         # Debug ID for tracking
         self._debug_id = f"dialog_{int(time.time() * 1000)}"
@@ -220,7 +210,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         # Note: _setup_ui() is called by DialogBase.__init__() automatically
         self._setup_smart_preview_coordinator()
-        self._setup_preview_timer()
         self._connect_signals()
 
     @override
@@ -318,12 +307,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         # Use simpler styling for footer integration if needed, but standard panel is fine
         self._setup_cache_context_menu()
         layout.addWidget(self.status_panel, 0)
-
-        # Hidden tabs (legacy/sidebar moved)
-        self.smart_tab = SimpleSmartTab()
-        self.smart_tab.hide()
-        self.gallery_tab = SpriteGalleryTab()
-        self.gallery_tab.hide()
 
         # Remove unused refs
         self.status_collapsible = None
@@ -478,12 +461,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         self._smart_preview_coordinator.preview_cached.connect(self._on_cache_hit)
 
         logger.debug("Smart preview coordinator setup complete")
-
-    def _setup_preview_timer(self) -> None:
-        """Set up preview update timer."""
-        self._preview_timer = QTimer(self)
-        self._preview_timer.setSingleShot(True)
-        self._preview_timer.timeout.connect(self._update_preview)
 
     def _connect_signals(self) -> None:
         """Connect internal signals for the new single-panel + sidebar layout."""
@@ -688,55 +665,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         """
         self.set_offset(offset)
 
-    def _request_preview_update(self, delay_ms: int = 100) -> None:
-        """Request preview update with debouncing."""
-        if self._preview_timer is not None:
-            self._preview_timer.stop()
-            self._preview_timer.start(delay_ms)
-
-    def _update_preview(self) -> None:
-        """Update sprite preview."""
-        if not self._has_rom_data() or self.browse_tab is None:
-            return
-
-        current_offset = self.browse_tab.get_current_offset()
-        self._update_status(f"Loading preview for 0x{current_offset:06X}...")
-
-        # Clean up existing preview worker
-        WorkerManager.cleanup_worker_attr(self, "preview_worker", timeout=1000)
-
-        # Create new preview worker
-        with QMutexLocker(self._manager_mutex):
-            extractor = self.rom_extractor
-            if extractor is not None:
-                sprite_name = f"manual_0x{current_offset:X}"
-                self.preview_worker = SpritePreviewWorker(
-                    self.rom_path, current_offset, sprite_name, extractor, None, parent=self
-                )
-                self.preview_worker.preview_ready.connect(self._on_preview_ready)
-                self.preview_worker.preview_error.connect(self._on_preview_error)
-                self.preview_worker.start()
-
-    def _on_preview_ready(
-        self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int
-    ) -> None:
-        """Handle preview ready."""
-        if self.preview_widget is not None:
-            self.preview_widget.load_sprite_from_4bpp(tile_data, width, height, sprite_name)
-
-        current_offset = self.get_current_offset()
-        self._update_status(f"Sprite found at 0x{current_offset:06X} (size: {compressed_size} bytes)")
-
-    def _on_preview_error(self, error_msg: str) -> None:
-        """Handle preview error."""
-        # Don't clear the preview widget on errors - keep the last valid preview visible
-        # This prevents black flashing when rapidly moving the slider
-        if self.preview_widget is not None and self.preview_widget.info_label:
-            self.preview_widget.info_label.setText("No sprite found")
-
-        current_offset = self.get_current_offset()
-        self._update_status(f"No sprite at 0x{current_offset:06X}")
-
     def _apply_offset(self) -> None:
         """Apply current offset to the editor.
 
@@ -768,14 +696,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
     @override
     def _cleanup_workers(self) -> None:
         """Clean up worker threads."""
-        WorkerManager.cleanup_worker_attr(self, "preview_worker", timeout=2000)
-
         # Search workers now managed by SpriteSearchCoordinator
         if self._search_coordinator is not None:
             self._search_coordinator.cleanup()
-
-        if self._preview_timer is not None:
-            self._preview_timer.stop()
 
         # Clean up preview coordinator (we always own it)
         if self._smart_preview_coordinator is not None:
@@ -793,8 +716,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         """
         widgets = [
             self.browse_tab,
-            self.smart_tab,
-            self.gallery_tab,
             self.preview_widget,
         ]
         for widget in widgets:
@@ -827,9 +748,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             _safe_disconnect(self.browse_tab.find_next_clicked)
             _safe_disconnect(self.browse_tab.find_prev_clicked)
             _safe_disconnect(self.browse_tab.find_sprites_requested)
-
-        if self.gallery_tab is not None and _is_valid_qt(self.gallery_tab):
-            _safe_disconnect(self.gallery_tab.sprite_selected)
 
         # Disconnect preview widget signals
         if self.preview_widget is not None and _is_valid_qt(self.preview_widget):
@@ -892,10 +810,6 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                     self.browse_tab.set_mapping_type(header.mapping_type)
                 except Exception as e:
                     logger.warning(f"Failed to read ROM header for offset config: {e}")
-
-        # Update gallery tab with ROM data
-        if self.gallery_tab is not None and self.rom_extractor is not None:
-            self.gallery_tab.set_rom_data(rom_path, rom_size, self.rom_extractor)
 
         # Update mini ROM map
         if self.mini_rom_map is not None:

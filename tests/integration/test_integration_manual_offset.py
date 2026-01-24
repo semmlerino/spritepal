@@ -19,7 +19,6 @@ def get_extraction_manager():
 @pytest.mark.integration
 @pytest.mark.gui
 @pytest.mark.parallel_unsafe
-@pytest.mark.skip_thread_cleanup(reason="Dialog uses background workers for preview generation")
 class TestManualOffsetDialog:
     """Test manual offset dialog with real ROM data and preview generation."""
 
@@ -33,7 +32,6 @@ class TestManualOffsetDialog:
 
         # Verify main components exist
         assert dialog.browse_tab is not None
-        assert dialog.smart_tab is not None
         assert dialog.preview_widget is not None
 
         # Verify browse tab components
@@ -364,7 +362,6 @@ class TestSpriteScanDialog:
 
 @pytest.mark.integration
 @pytest.mark.gui
-@pytest.mark.skip_thread_cleanup(reason="Dialog uses background workers for preview generation")
 class TestDialogIntegrationWithPanel:
     """Test manual offset dialog integration with ROM extraction panel."""
 
