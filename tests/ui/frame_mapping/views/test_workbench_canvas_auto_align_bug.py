@@ -299,9 +299,8 @@ class TestAutoAlignWithTransforms:
         """
         from PIL import ImageDraw
 
-        from ui.frame_mapping.views.workbench_canvas import DISPLAY_SCALE
-
         canvas = WorkbenchCanvas()
+        display_scale = canvas._display_scale  # Use instance variable instead of constant
         qtbot.addWidget(canvas)
 
         # Create AI image with content NOT at origin (centered at 100, 100)
@@ -355,10 +354,10 @@ class TestAutoAlignWithTransforms:
         # Logical offset should be 20 - 50 = -30
         ai_pos = canvas._ai_frame_item.pos()
 
-        # Position is in display coordinates (logical * DISPLAY_SCALE)
+        # Position is in display coordinates (logical * display_scale)
         expected_logical_offset = -30
-        expected_display_x = expected_logical_offset * DISPLAY_SCALE
-        expected_display_y = expected_logical_offset * DISPLAY_SCALE
+        expected_display_x = expected_logical_offset * display_scale
+        expected_display_y = expected_logical_offset * display_scale
 
         assert abs(ai_pos.x() - expected_display_x) < 2, (
             f"Expected display offset_x ~{expected_display_x}, got {ai_pos.x()}. "
@@ -377,9 +376,8 @@ class TestAutoAlignWithTransforms:
         """
         from PIL import ImageDraw
 
-        from ui.frame_mapping.views.workbench_canvas import DISPLAY_SCALE
-
         canvas = WorkbenchCanvas()
+        display_scale = canvas._display_scale  # Use instance variable instead of constant
         qtbot.addWidget(canvas)
 
         # Create AI image with content on the LEFT side
@@ -432,8 +430,8 @@ class TestAutoAlignWithTransforms:
 
         expected_logical_x = -60  # 20 - 80 (flipped center)
         expected_logical_y = -30  # 20 - 50 (unchanged)
-        expected_display_x = expected_logical_x * DISPLAY_SCALE
-        expected_display_y = expected_logical_y * DISPLAY_SCALE
+        expected_display_x = expected_logical_x * display_scale
+        expected_display_y = expected_logical_y * display_scale
 
         # Allow small rounding tolerance (int conversion in offset calculation)
         assert abs(ai_pos.x() - expected_display_x) < 4, (

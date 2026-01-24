@@ -46,6 +46,7 @@ from PySide6.QtWidgets import (
 from core.frame_mapping_project import AIFrame, GameFrame
 from core.services.sprite_compositor import SpriteCompositor, TransformParams
 from core.services.tile_sampling_service import TileSamplingService
+from ui.frame_mapping.services.canvas_config_service import CanvasConfig
 from ui.frame_mapping.views.workbench_items import (
     AIFrameItem,
     GameFrameItem,
@@ -60,18 +61,6 @@ if TYPE_CHECKING:
     from core.mesen_integration.click_extractor import CaptureResult
 
 logger = get_logger(__name__)
-
-# Display scale for the canvas (2x)
-DISPLAY_SCALE = 2
-# Canvas size
-CANVAS_SIZE = 300
-# Debounce delay for tile touch calculation (ms)
-TILE_CALC_DEBOUNCE_MS = 100
-# Debounce delay for preview generation (ms)
-PREVIEW_DEBOUNCE_MS = 150
-# Debounce delay for pixel hover updates (ms)
-PIXEL_HOVER_DEBOUNCE_MS = 50
-PIXEL_HIGHLIGHT_DEBOUNCE_MS = 100  # Debounce for mask generation when hovering palette
 
 
 class WorkbenchGraphicsView(QGraphicsView):
@@ -90,7 +79,7 @@ class WorkbenchGraphicsView(QGraphicsView):
     scene_mouse_left = Signal()
     scene_clicked = Signal(float, float)  # scene_x, scene_y
 
-    def __init__(self, scene: QGraphicsScene, parent: QWidget | None = None) -> None:
+    def __init__(self, scene: QGraphicsScene, canvas_size: int, parent: QWidget | None = None) -> None:
         super().__init__(scene, parent)
         self.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
@@ -98,7 +87,7 @@ class WorkbenchGraphicsView(QGraphicsView):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setBackgroundBrush(QBrush(QColor(26, 26, 26)))
-        self.setMinimumSize(CANVAS_SIZE, CANVAS_SIZE)
+        self.setMinimumSize(canvas_size, canvas_size)
         self.setStyleSheet("border: 1px solid #444;")
 
         # Enable mouse tracking for hover detection
@@ -223,8 +212,22 @@ class WorkbenchCanvas(QWidget):
     pixel_left = Signal()  # mouse left the canvas
     eyedropper_picked = Signal(object, int)  # rgb (tuple), palette_index
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, config: CanvasConfig | None = None) -> None:
         super().__init__(parent)
+
+        # Configuration (with defaults if not provided)
+        if config is None:
+            config = CanvasConfig(
+                size=300,
+                display_scale=2,
+                tile_calc_debounce_ms=100,
+                preview_debounce_ms=150,
+                pixel_hover_debounce_ms=50,
+                pixel_highlight_debounce_ms=100,
+            )
+        self._config = config
+        self._display_scale = config.display_scale
+
         self._current_ai_frame: AIFrame | None = None
         self._current_game_frame: GameFrame | None = None
         self._capture_result: CaptureResult | None = None
@@ -339,7 +342,7 @@ class WorkbenchCanvas(QWidget):
 
         # Graphics scene and view
         self._scene = QGraphicsScene(self)
-        self._view = WorkbenchGraphicsView(self._scene, self)
+        self._view = WorkbenchGraphicsView(self._scene, self._config.size, self)
         layout.addWidget(self._view, 1)
 
         # Create scene items
@@ -588,8 +591,8 @@ class WorkbenchCanvas(QWidget):
         if self._game_pixmap is not None:
             # Scale for display
             scaled = self._game_pixmap.scaled(
-                self._game_pixmap.width() * DISPLAY_SCALE,
-                self._game_pixmap.height() * DISPLAY_SCALE,
+                self._game_pixmap.width() * self._display_scale,
+                self._game_pixmap.height() * self._display_scale,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.FastTransformation,
             )
@@ -684,8 +687,8 @@ class WorkbenchCanvas(QWidget):
         if self._ai_pixmap is not None:
             # Scale for display
             scaled = self._ai_pixmap.scaled(
-                self._ai_pixmap.width() * DISPLAY_SCALE,
-                self._ai_pixmap.height() * DISPLAY_SCALE,
+                self._ai_pixmap.width() * self._display_scale,
+                self._ai_pixmap.height() * self._display_scale,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.FastTransformation,
             )
@@ -723,7 +726,7 @@ class WorkbenchCanvas(QWidget):
 
         try:
             # Update AI frame item position (scaled for display)
-            self._ai_frame_item.setPos(offset_x * DISPLAY_SCALE, offset_y * DISPLAY_SCALE)
+            self._ai_frame_item.setPos(offset_x * self._display_scale, offset_y * self._display_scale)
             self._ai_frame_item.set_scale_factor(scale)
             self._ai_frame_item.set_flip(flip_h, flip_v)
 
@@ -781,8 +784,8 @@ class WorkbenchCanvas(QWidget):
         """
         pos = self._ai_frame_item.pos()
         # Convert from display scale to actual coordinates
-        offset_x = int(pos.x() / DISPLAY_SCALE)
-        offset_y = int(pos.y() / DISPLAY_SCALE)
+        offset_x = int(pos.x() / self._display_scale)
+        offset_y = int(pos.y() / self._display_scale)
         return (
             offset_x,
             offset_y,
@@ -890,13 +893,13 @@ class WorkbenchCanvas(QWidget):
 
         for entry in self._capture_result.entries:
             # Calculate relative position within the sprite bounds
-            rel_x = (entry.x - bbox.x) * DISPLAY_SCALE
-            rel_y = (entry.y - bbox.y) * DISPLAY_SCALE
-            width = entry.width * DISPLAY_SCALE
-            height = entry.height * DISPLAY_SCALE
+            rel_x = (entry.x - bbox.x) * self._display_scale
+            rel_y = (entry.y - bbox.y) * self._display_scale
+            width = entry.width * self._display_scale
+            height = entry.height * self._display_scale
 
             # For larger sprites (16x16 or 32x32), break into 8x8 tiles
-            tile_size = 8 * DISPLAY_SCALE
+            tile_size = 8 * self._display_scale
             for ty in range(0, height, tile_size):
                 for tx in range(0, width, tile_size):
                     tile_rects.append(
@@ -918,11 +921,11 @@ class WorkbenchCanvas(QWidget):
         """
         # Capture snapshot at schedule time (not fire time)
         pos = self._ai_frame_item.pos()
-        offset_x = int(pos.x() / DISPLAY_SCALE)
-        offset_y = int(pos.y() / DISPLAY_SCALE)
+        offset_x = int(pos.x() / self._display_scale)
+        offset_y = int(pos.y() / self._display_scale)
         scale = self._ai_frame_item.scale_factor()
         self._tile_calc_snapshot = (offset_x, offset_y, scale)
-        self._tile_calc_timer.start(TILE_CALC_DEBOUNCE_MS)
+        self._tile_calc_timer.start(self._config.tile_calc_debounce_ms)
 
     def _update_tile_touch_status(self) -> None:
         """Update which tiles are touched by the AI frame overlay.
@@ -940,8 +943,8 @@ class WorkbenchCanvas(QWidget):
         else:
             # Fallback to current values (for direct calls in tests)
             pos = self._ai_frame_item.pos()
-            offset_x = int(pos.x() / DISPLAY_SCALE)
-            offset_y = int(pos.y() / DISPLAY_SCALE)
+            offset_x = int(pos.x() / self._display_scale)
+            offset_y = int(pos.y() / self._display_scale)
             scale = self._ai_frame_item.scale_factor()
 
         # Build tile rects in actual coordinates
@@ -1102,13 +1105,13 @@ class WorkbenchCanvas(QWidget):
             return
         # Capture snapshot at schedule time (not fire time)
         pos = self._ai_frame_item.pos()
-        offset_x = int(pos.x() / DISPLAY_SCALE)
-        offset_y = int(pos.y() / DISPLAY_SCALE)
+        offset_x = int(pos.x() / self._display_scale)
+        offset_y = int(pos.y() / self._display_scale)
         flip_h = self._flip_h_checkbox.isChecked()
         flip_v = self._flip_v_checkbox.isChecked()
         scale = self._ai_frame_item.scale_factor()
         self._preview_snapshot = (offset_x, offset_y, flip_h, flip_v, scale)
-        self._preview_timer.start(PREVIEW_DEBOUNCE_MS)
+        self._preview_timer.start(self._config.preview_debounce_ms)
 
     def _generate_preview(self) -> None:
         """Generate the in-game preview image.
@@ -1135,8 +1138,8 @@ class WorkbenchCanvas(QWidget):
         else:
             # Fallback to current values (for direct calls in tests)
             pos = self._ai_frame_item.pos()
-            offset_x = int(pos.x() / DISPLAY_SCALE)
-            offset_y = int(pos.y() / DISPLAY_SCALE)
+            offset_x = int(pos.x() / self._display_scale)
+            offset_y = int(pos.y() / self._display_scale)
             flip_h = self._flip_h_checkbox.isChecked()
             flip_v = self._flip_v_checkbox.isChecked()
             scale = self._ai_frame_item.scale_factor()
@@ -1181,8 +1184,8 @@ class WorkbenchCanvas(QWidget):
 
             # Scale for display
             scaled_pixmap = QPixmap.fromImage(qimage).scaled(
-                preview_img.width * DISPLAY_SCALE,
-                preview_img.height * DISPLAY_SCALE,
+                preview_img.width * self._display_scale,
+                preview_img.height * self._display_scale,
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.FastTransformation,
             )
@@ -1289,8 +1292,8 @@ class WorkbenchCanvas(QWidget):
         # Convert from display scale to actual coordinates
         # Use int() for truncation toward zero (not floor division)
         # This ensures consistent behavior for negative offsets
-        actual_x = int(offset_x / DISPLAY_SCALE)
-        actual_y = int(offset_y / DISPLAY_SCALE)
+        actual_x = int(offset_x / self._display_scale)
+        actual_y = int(offset_y / self._display_scale)
 
         # Update UI
         self._offset_label.setText(f"Offset: ({actual_x}, {actual_y})")
@@ -1378,7 +1381,7 @@ class WorkbenchCanvas(QWidget):
         Uses debouncing to avoid excessive updates on rapid mouse movement.
         """
         self._pending_hover_pos = (scene_x, scene_y)
-        self._pixel_hover_timer.start(PIXEL_HOVER_DEBOUNCE_MS)
+        self._pixel_hover_timer.start(self._config.pixel_hover_debounce_ms)
 
     def _on_scene_mouse_left(self) -> None:
         """Handle mouse leaving the canvas."""
@@ -1431,8 +1434,8 @@ class WorkbenchCanvas(QWidget):
         local_x = scene_x - frame_pos.x()
         local_y = scene_y - frame_pos.y()
 
-        # Divide by total scale (DISPLAY_SCALE * user_scale) to get original image coords
-        total_scale = DISPLAY_SCALE * user_scale
+        # Divide by total scale (self._display_scale * user_scale) to get original image coords
+        total_scale = self._display_scale * user_scale
         img_x = int(local_x / total_scale)
         img_y = int(local_y / total_scale)
 
@@ -1597,7 +1600,7 @@ class WorkbenchCanvas(QWidget):
 
         # Debounce the mask generation
         self._pending_highlight_index = index
-        self._pixel_highlight_timer.start(PIXEL_HIGHLIGHT_DEBOUNCE_MS)
+        self._pixel_highlight_timer.start(self._config.pixel_highlight_debounce_ms)
 
     def _generate_pixel_highlight_mask(self) -> None:
         """Generate and display the pixel highlight mask for the pending index."""
@@ -1656,8 +1659,8 @@ class WorkbenchCanvas(QWidget):
             if flip_v:
                 mask = mask.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
-            # Scale to display size (DISPLAY_SCALE * user_scale)
-            total_scale = DISPLAY_SCALE * user_scale
+            # Scale to display size (self._display_scale * user_scale)
+            total_scale = self._display_scale * user_scale
             scaled_width = int(width * total_scale)
             scaled_height = int(height * total_scale)
             scaled_mask = mask.resize((scaled_width, scaled_height), Image.Resampling.NEAREST)

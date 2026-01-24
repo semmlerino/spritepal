@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.frame_mapping.services.canvas_config_service import CanvasConfig
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -30,10 +31,6 @@ logger = get_logger(__name__)
 
 # Preview display size
 PREVIEW_SIZE = 256
-
-# Overlay canvas constants
-OVERLAY_CANVAS_SIZE = 350
-OVERLAY_DISPLAY_SCALE = 4
 
 
 class FramePreview(QFrame):
@@ -152,8 +149,10 @@ class InlineOverlayCanvas(QWidget):
 
     alignment_edit_requested = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, canvas_size: int, display_scale: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._canvas_size = canvas_size
+        self._display_scale = display_scale
         self._game_pixmap: QPixmap | None = None
         self._ai_pixmap: QPixmap | None = None
         self._offset_x = 0
@@ -162,7 +161,7 @@ class InlineOverlayCanvas(QWidget):
         self._flip_v = False
         self._opacity = 0.5
 
-        self.setMinimumSize(OVERLAY_CANVAS_SIZE, OVERLAY_CANVAS_SIZE)
+        self.setMinimumSize(canvas_size, canvas_size)
         self.setStyleSheet("background-color: #1a1a1a;")
 
     def set_game_frame(self, pixmap: QPixmap | None) -> None:
@@ -225,8 +224,8 @@ class InlineOverlayCanvas(QWidget):
         else:
             return
 
-        scaled_width = frame_width * OVERLAY_DISPLAY_SCALE
-        scaled_height = frame_height * OVERLAY_DISPLAY_SCALE
+        scaled_width = frame_width * self._display_scale
+        scaled_height = frame_height * self._display_scale
 
         x_start = canvas_center_x - scaled_width // 2
         y_start = canvas_center_y - scaled_height // 2
@@ -250,8 +249,8 @@ class InlineOverlayCanvas(QWidget):
                 transform.scale(-1 if self._flip_h else 1, -1 if self._flip_v else 1)
                 ai_pixmap = ai_pixmap.transformed(transform)
 
-            ai_scaled_width = ai_pixmap.width() * OVERLAY_DISPLAY_SCALE
-            ai_scaled_height = ai_pixmap.height() * OVERLAY_DISPLAY_SCALE
+            ai_scaled_width = ai_pixmap.width() * self._display_scale
+            ai_scaled_height = ai_pixmap.height() * self._display_scale
             scaled_ai = ai_pixmap.scaled(
                 ai_scaled_width,
                 ai_scaled_height,
@@ -259,8 +258,8 @@ class InlineOverlayCanvas(QWidget):
                 Qt.TransformationMode.FastTransformation,
             )
 
-            offset_x_scaled = self._offset_x * OVERLAY_DISPLAY_SCALE
-            offset_y_scaled = self._offset_y * OVERLAY_DISPLAY_SCALE
+            offset_x_scaled = self._offset_x * self._display_scale
+            offset_y_scaled = self._offset_y * self._display_scale
 
             painter.setOpacity(self._opacity)
             painter.drawPixmap(x_start + offset_x_scaled, y_start + offset_y_scaled, scaled_ai)
@@ -297,8 +296,14 @@ class ComparisonPanel(QWidget):
 
     alignment_edit_requested = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, config: CanvasConfig | None = None) -> None:
         super().__init__(parent)
+
+        # Configuration (with defaults if not provided)
+        if config is None:
+            config = CanvasConfig(size=350, display_scale=4)
+        self._config = config
+
         self._current_game_frame: GameFrame | None = None
         self._current_ai_frame: AIFrame | None = None
         self._game_pixmap: QPixmap | None = None
@@ -369,7 +374,7 @@ class ComparisonPanel(QWidget):
         # Overlay canvas (centered, double-click to edit alignment)
         canvas_container = QHBoxLayout()
         canvas_container.addStretch()
-        self._overlay_canvas = InlineOverlayCanvas()
+        self._overlay_canvas = InlineOverlayCanvas(self._config.size, self._config.display_scale)
         self._overlay_canvas.alignment_edit_requested.connect(self.alignment_edit_requested.emit)
         canvas_container.addWidget(self._overlay_canvas)
         canvas_container.addStretch()

@@ -16,16 +16,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.frame_mapping.services.canvas_config_service import CanvasConfig
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import AIFrame, GameFrame
 
 logger = get_logger(__name__)
-
-# Canvas display constants
-CANVAS_SIZE = 320
-DISPLAY_SCALE = 4
 
 
 class OverlayCanvasWidget(QWidget):
@@ -40,8 +37,10 @@ class OverlayCanvasWidget(QWidget):
 
     offset_changed = Signal(int, int)  # new offset_x, offset_y
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, canvas_size: int, display_scale: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._canvas_size = canvas_size
+        self._display_scale = display_scale
         self._game_pixmap: QPixmap | None = None
         self._ai_pixmap: QPixmap | None = None
         self._offset_x = 0
@@ -50,7 +49,7 @@ class OverlayCanvasWidget(QWidget):
         self._flip_v = False
         self._opacity = 0.5
 
-        self.setMinimumSize(CANVAS_SIZE, CANVAS_SIZE)
+        self.setMinimumSize(canvas_size, canvas_size)
         self.setStyleSheet("background-color: #1a1a1a;")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -138,8 +137,8 @@ class OverlayCanvasWidget(QWidget):
         else:
             return
 
-        scaled_width = frame_width * DISPLAY_SCALE
-        scaled_height = frame_height * DISPLAY_SCALE
+        scaled_width = frame_width * self._display_scale
+        scaled_height = frame_height * self._display_scale
 
         x_start = canvas_center_x - scaled_width // 2
         y_start = canvas_center_y - scaled_height // 2
@@ -163,8 +162,8 @@ class OverlayCanvasWidget(QWidget):
                 transform.scale(-1 if self._flip_h else 1, -1 if self._flip_v else 1)
                 ai_pixmap = ai_pixmap.transformed(transform)
 
-            ai_scaled_width = ai_pixmap.width() * DISPLAY_SCALE
-            ai_scaled_height = ai_pixmap.height() * DISPLAY_SCALE
+            ai_scaled_width = ai_pixmap.width() * self._display_scale
+            ai_scaled_height = ai_pixmap.height() * self._display_scale
             scaled_ai = ai_pixmap.scaled(
                 ai_scaled_width,
                 ai_scaled_height,
@@ -172,8 +171,8 @@ class OverlayCanvasWidget(QWidget):
                 Qt.TransformationMode.FastTransformation,
             )
 
-            offset_x_scaled = self._offset_x * DISPLAY_SCALE
-            offset_y_scaled = self._offset_y * DISPLAY_SCALE
+            offset_x_scaled = self._offset_x * self._display_scale
+            offset_y_scaled = self._offset_y * self._display_scale
 
             painter.setOpacity(self._opacity)
             painter.drawPixmap(x_start + offset_x_scaled, y_start + offset_y_scaled, scaled_ai)
@@ -217,8 +216,14 @@ class AlignmentCanvas(QWidget):
     alignment_changed = Signal(int, int, bool, bool)  # offset_x, offset_y, flip_h, flip_v
     focus_lost = Signal()
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, config: CanvasConfig | None = None) -> None:
         super().__init__(parent)
+
+        # Configuration (with defaults if not provided)
+        if config is None:
+            config = CanvasConfig(size=320, display_scale=4)
+        self._config = config
+
         self._current_ai_frame: AIFrame | None = None
         self._current_game_frame: GameFrame | None = None
         self._game_pixmap: QPixmap | None = None
@@ -251,7 +256,7 @@ class AlignmentCanvas(QWidget):
         # Canvas (centered)
         canvas_layout = QHBoxLayout()
         canvas_layout.addStretch()
-        self._canvas = OverlayCanvasWidget()
+        self._canvas = OverlayCanvasWidget(self._config.size, self._config.display_scale)
         canvas_layout.addWidget(self._canvas)
         canvas_layout.addStretch()
         layout.addLayout(canvas_layout, 1)
