@@ -3,6 +3,8 @@
 Verifies that get_capture_result_for_game_frame respects the stored
 selected_entry_ids when returning capture results. Also verifies that
 inject_mapping uses the same filtering and applies scale transforms.
+
+Also tests headless controller usage (without Qt parent or workspace).
 """
 
 from __future__ import annotations
@@ -2231,3 +2233,210 @@ class TestUpdateMappingAlignmentEmitsSaveRequested:
         assert result is True
         assert alignment_updated_received == ["frame_002.png"]
         assert save_requested_received == [True]
+
+
+class TestHeadlessControllerUsage:
+    """Tests for using controller without Qt parent or workspace.
+
+    These tests verify that the controller can be used in headless
+    mode for CLI tools or batch processing.
+    """
+
+    def test_create_controller_without_parent(self, qtbot) -> None:
+        """Controller can be created without parent."""
+        controller = FrameMappingController(parent=None)
+
+        # Verify controller exists and has no parent
+        assert controller is not None
+        assert controller.parent() is None
+
+    def test_new_project_without_parent(self, qtbot) -> None:
+        """Can create new project without parent."""
+        controller = FrameMappingController(parent=None)
+
+        # Create project
+        controller.new_project("headless_test")
+
+        # Verify project created
+        assert controller.has_project
+        assert controller.project is not None
+        assert controller.project.name == "headless_test"
+
+    def test_load_ai_frames_without_parent(self, tmp_path: Path, qtbot) -> None:
+        """Can load AI frames without parent."""
+        # Create test images
+        img = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
+        frame1 = tmp_path / "frame_001.png"
+        frame2 = tmp_path / "frame_002.png"
+        img.save(frame1)
+        img.save(frame2)
+
+        # Create headless controller
+        controller = FrameMappingController(parent=None)
+
+        # Load AI frames
+        count = controller.load_ai_frames_from_directory(tmp_path)
+
+        # Verify loaded
+        assert count == 2
+        assert controller.has_project
+        assert len(controller.get_ai_frames()) == 2
+
+    def test_signals_work_without_parent(self, qtbot) -> None:
+        """Signals work without parent."""
+        controller = FrameMappingController(parent=None)
+
+        # Connect to signal
+        signal_received = []
+        controller.project_changed.connect(lambda: signal_received.append(True))
+
+        # Emit signal via action
+        controller.new_project("test")
+
+        # Verify signal received
+        assert signal_received == [True]
+
+    def test_save_load_project_without_parent(self, tmp_path: Path, qtbot) -> None:
+        """Can save and load project without parent."""
+        # Create test images
+        img = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
+        frame1 = tmp_path / "frame_001.png"
+        img.save(frame1)
+
+        # Create and populate project
+        controller = FrameMappingController(parent=None)
+        controller.load_ai_frames_from_directory(tmp_path)
+
+        # Save project
+        project_path = tmp_path / "test.spritepal-mapping.json"
+        success = controller.save_project(project_path)
+        assert success
+        assert project_path.exists()
+
+        # Load in new controller
+        controller2 = FrameMappingController(parent=None)
+        success = controller2.load_project(project_path)
+        assert success
+        assert controller2.has_project
+        assert len(controller2.get_ai_frames()) == 1
+
+    def test_create_mapping_without_parent(self, tmp_path: Path, qtbot) -> None:
+        """Can create mappings without parent."""
+        # Create minimal AI frame and game frame
+        img = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
+        ai_frame_path = tmp_path / "frame_001.png"
+        img.save(ai_frame_path)
+
+        # Create minimal capture
+        capture_data = create_test_capture([0, 1])
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create headless controller
+        controller = FrameMappingController(parent=None)
+
+        # Create project manually
+        project = FrameMappingProject(name="test")
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="G001",
+                rom_offsets=[0x1000],
+                capture_path=capture_path,
+                selected_entry_ids=[0, 1],
+            )
+        )
+        project._rebuild_indices()
+        controller._project = project
+
+        # Create mapping
+        success = controller.create_mapping("frame_001.png", "G001")
+
+        # Verify mapping created
+        assert success
+        assert len(controller.project.mappings) == 1
+
+    def test_alignment_update_without_parent(self, tmp_path: Path, qtbot) -> None:
+        """Can update alignment without parent."""
+        # Setup project with mapping
+        img = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
+        ai_frame_path = tmp_path / "frame_001.png"
+        img.save(ai_frame_path)
+
+        capture_data = create_test_capture([0])
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        controller = FrameMappingController(parent=None)
+        project = FrameMappingProject(name="test")
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="G001",
+                rom_offsets=[0x1000],
+                capture_path=capture_path,
+                selected_entry_ids=[0],
+            )
+        )
+        project.mappings.append(FrameMapping(ai_frame_id="frame_001.png", game_frame_id="G001"))
+        project._rebuild_indices()
+        controller._project = project
+
+        # Update alignment
+        success = controller.update_mapping_alignment(
+            ai_frame_id="frame_001.png",
+            offset_x=10,
+            offset_y=20,
+            flip_h=True,
+            flip_v=False,
+            scale=0.5,
+        )
+
+        # Verify updated
+        assert success
+        mapping = project.get_mapping_for_ai_frame("frame_001.png")
+        assert mapping is not None
+        assert mapping.offset_x == 10
+        assert mapping.offset_y == 20
+        assert mapping.flip_h is True
+        assert mapping.flip_v is False
+        assert mapping.scale == 0.5
+
+    def test_undo_redo_without_parent(self, tmp_path: Path, qtbot) -> None:
+        """Undo/redo works without parent."""
+        # Setup project with mapping
+        img = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
+        ai_frame_path = tmp_path / "frame_001.png"
+        img.save(ai_frame_path)
+
+        capture_data = create_test_capture([0])
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        controller = FrameMappingController(parent=None)
+        project = FrameMappingProject(name="test")
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="G001",
+                rom_offsets=[0x1000],
+                capture_path=capture_path,
+                selected_entry_ids=[0],
+            )
+        )
+        project._rebuild_indices()
+        controller._project = project
+
+        # Create mapping
+        controller.create_mapping("frame_001.png", "G001")
+        assert len(project.mappings) == 1
+
+        # Undo
+        desc = controller.undo()
+        assert desc is not None
+        assert len(project.mappings) == 0
+
+        # Redo
+        desc = controller.redo()
+        assert desc is not None
+        assert len(project.mappings) == 1

@@ -78,6 +78,7 @@ class FrameMappingWorkspace(QWidget):
         parent: QWidget | None = None,
         *,
         message_service: StatusBarManager | None = None,
+        controller: FrameMappingController | None = None,
     ) -> None:
         super().__init__(parent)
         self._message_service = message_service
@@ -91,8 +92,8 @@ class FrameMappingWorkspace(QWidget):
         # Dialog coordinator for capture imports and confirmations
         self._dialog_coordinator = DialogCoordinator(self)
 
-        # Create controller
-        self._controller = FrameMappingController(self)
+        # Create or inject controller
+        self._controller = controller or self._create_default_controller()
 
         self._setup_ui()
         self._connect_signals()
@@ -120,6 +121,14 @@ class FrameMappingWorkspace(QWidget):
             logger.info("FrameMapping ROM path updated: %s", rom_path)
             self._state.rom_path = rom_path
             self._state.modified_rom_path = None
+
+    def _create_default_controller(self) -> FrameMappingController:
+        """Create controller with workspace as parent for Qt ownership.
+
+        Returns:
+            FrameMappingController instance
+        """
+        return FrameMappingController(parent=self)
 
     def _validate_rom_path(self) -> bool:
         """Validate that the current ROM path is valid and exists.
@@ -267,7 +276,10 @@ class FrameMappingWorkspace(QWidget):
         return header
 
     def _connect_signals(self) -> None:
-        """Connect signals between components."""
+        """Connect signals between components.
+
+        Signal flow documentation: docs/frame_mapping_signals.md
+        """
         # Controller signals
         self._controller.project_changed.connect(self._on_project_changed)
         self._controller.ai_frames_loaded.connect(self._on_ai_frames_loaded)
