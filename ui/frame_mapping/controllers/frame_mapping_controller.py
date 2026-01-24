@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PIL import Image
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QImage, QPixmap
 
@@ -31,10 +30,10 @@ from core.mesen_integration.click_extractor import (
     MesenCaptureParser,
     OAMEntry,
 )
-from core.palette_utils import snes_palette_to_rgb
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
+from ui.frame_mapping.services.palette_service import PaletteService
 from ui.frame_mapping.services.preview_service import PreviewService
 from ui.frame_mapping.undo import (
     CreateMappingCommand,
@@ -98,6 +97,9 @@ class FrameMappingController(QObject):
         self._preview_service = PreviewService(parent=self)
         self._preview_service.preview_cache_invalidated.connect(self.preview_cache_invalidated)
         self._preview_service.stale_entries_warning.connect(self.stale_entries_warning)
+        # Palette service for palette management
+        self._palette_service = PaletteService(parent=self)
+        self._palette_service.sheet_palette_changed.connect(self.sheet_palette_changed)
         # Injection orchestrator for frame injection pipeline
         self._injection_orchestrator = InjectionOrchestrator()
         # Undo/Redo stack
@@ -778,9 +780,7 @@ class FrameMappingController(QObject):
         Returns:
             SheetPalette if defined, None otherwise
         """
-        if self._project is None:
-            return None
-        return self._project.sheet_palette
+        return self._palette_service.get_sheet_palette(self._project)
 
     def set_sheet_palette(self, palette: SheetPalette | None) -> None:
         """Set the sheet palette for the project.
@@ -788,17 +788,8 @@ class FrameMappingController(QObject):
         Args:
             palette: SheetPalette to set, or None to clear
         """
-        if self._project is None:
-            logger.warning("set_sheet_palette: No project loaded")
-            return
-
-        self._project.sheet_palette = palette
-        self.sheet_palette_changed.emit()
+        self._palette_service.set_sheet_palette(self._project, palette)
         self.project_changed.emit()
-        if palette is not None:
-            logger.info("Set sheet palette with %d color mappings", len(palette.color_mappings))
-        else:
-            logger.info("Cleared sheet palette")
 
     def set_sheet_palette_color(self, index: int, rgb: tuple[int, int, int]) -> None:
         """Update a single color in the sheet palette.
@@ -807,43 +798,8 @@ class FrameMappingController(QObject):
             index: Palette index (0-15)
             rgb: New RGB color tuple
         """
-        if self._project is None:
-            logger.warning("set_sheet_palette_color: No project loaded")
-            return
-
-        if self._project.sheet_palette is None:
-            logger.warning("set_sheet_palette_color: No sheet palette defined")
-            return
-
-        if not 0 <= index < 16:
-            logger.warning("set_sheet_palette_color: Invalid index %d", index)
-            return
-
-        # Update the palette color
-        palette = self._project.sheet_palette
-        colors = list(palette.colors)
-        if index < len(colors):
-            colors[index] = rgb
-        else:
-            # Extend if needed
-            while len(colors) <= index:
-                colors.append((0, 0, 0))
-            colors[index] = rgb
-
-        # Update color_mappings: keep existing mappings unchanged
-        updated_mappings = dict(palette.color_mappings)
-
-        # Create new palette with updated colors
-        from core.frame_mapping_project import SheetPalette
-
-        self._project.sheet_palette = SheetPalette(
-            colors=colors,
-            color_mappings=updated_mappings,
-        )
-
-        self.sheet_palette_changed.emit()
+        self._palette_service.set_sheet_palette_color(self._project, index, rgb)
         self.project_changed.emit()
-        logger.info("Updated sheet palette color [%d] to RGB%s", index, rgb)
 
     def extract_sheet_colors(self) -> dict[tuple[int, int, int], int]:
         """Extract unique colors from all AI frames in the project.
@@ -851,28 +807,7 @@ class FrameMappingController(QObject):
         Returns:
             Dict mapping RGB tuples to pixel counts
         """
-        from core.palette_utils import extract_unique_colors
-
-        if self._project is None:
-            return {}
-
-        all_colors: dict[tuple[int, int, int], int] = {}
-
-        for ai_frame in self._project.ai_frames:
-            if not ai_frame.path.exists():
-                continue
-
-            try:
-                with Image.open(ai_frame.path) as img:
-                    frame_colors = extract_unique_colors(img, ignore_transparent=True)
-                    # Merge with totals
-                    for color, count in frame_colors.items():
-                        all_colors[color] = all_colors.get(color, 0) + count
-            except Exception as e:
-                logger.warning("Failed to extract colors from %s: %s", ai_frame.path, e)
-
-        logger.info("Extracted %d unique colors from %d AI frames", len(all_colors), len(self._project.ai_frames))
-        return all_colors
+        return self._palette_service.extract_sheet_colors(self._project)
 
     def generate_sheet_palette_from_colors(
         self,
@@ -886,23 +821,7 @@ class FrameMappingController(QObject):
         Returns:
             Generated SheetPalette with auto-mapped colors
         """
-        from core.palette_utils import (
-            find_nearest_palette_index,
-            quantize_colors_to_palette,
-        )
-
-        if colors is None:
-            colors = self.extract_sheet_colors()
-
-        # Generate 16-color palette
-        palette_colors = quantize_colors_to_palette(colors, max_colors=16, snap_to_snes=True)
-
-        # Auto-map all colors to nearest palette colors
-        color_mappings: dict[tuple[int, int, int], int] = {}
-        for color in colors:
-            color_mappings[color] = find_nearest_palette_index(color, palette_colors)
-
-        return SheetPalette(colors=palette_colors, color_mappings=color_mappings)
+        return self._palette_service.generate_sheet_palette_from_colors(self._project, colors)
 
     def copy_game_palette_to_sheet(self, game_frame_id: str) -> SheetPalette | None:
         """Create a SheetPalette from a game frame's palette.
@@ -913,46 +832,7 @@ class FrameMappingController(QObject):
         Returns:
             SheetPalette with the game frame's colors, or None if not found
         """
-        from core.palette_utils import find_nearest_palette_index
-
-        if self._project is None:
-            return None
-
-        game_frame = self._project.get_game_frame_by_id(game_frame_id)
-        if game_frame is None or game_frame.capture_path is None:
-            return None
-
-        # Parse capture to get palette
-        try:
-            parser = MesenCaptureParser()
-            capture_result = parser.parse_file(game_frame.capture_path)
-            palette_index = game_frame.palette_index
-            snes_palette = capture_result.palettes.get(palette_index, [])
-
-            if not snes_palette:
-                logger.warning("No palette found for game frame %s", game_frame_id)
-                return None
-
-            # Convert to RGB
-            palette_rgb = snes_palette_to_rgb(snes_palette)
-
-            # Ensure 16 colors
-            while len(palette_rgb) < 16:
-                palette_rgb.append((0, 0, 0))
-            palette_rgb = palette_rgb[:16]
-
-            # Auto-map sheet colors to this palette
-            sheet_colors = self.extract_sheet_colors()
-            color_mappings: dict[tuple[int, int, int], int] = {}
-            for color in sheet_colors:
-                color_mappings[color] = find_nearest_palette_index(color, palette_rgb)
-
-            logger.info("Copied palette from game frame %s", game_frame_id)
-            return SheetPalette(colors=palette_rgb, color_mappings=color_mappings)
-
-        except Exception as e:
-            logger.exception("Failed to copy game palette from %s: %s", game_frame_id, e)
-            return None
+        return self._palette_service.copy_game_palette_to_sheet(self._project, game_frame_id)
 
     def get_game_palettes(self) -> dict[str, list[tuple[int, int, int]]]:
         """Get palettes from all game frames.
@@ -960,27 +840,7 @@ class FrameMappingController(QObject):
         Returns:
             Dict mapping game frame IDs to their RGB palettes
         """
-        if self._project is None:
-            return {}
-
-        result: dict[str, list[tuple[int, int, int]]] = {}
-
-        for game_frame in self._project.game_frames:
-            if game_frame.capture_path is None or not game_frame.capture_path.exists():
-                continue
-
-            try:
-                parser = MesenCaptureParser()
-                capture_result = parser.parse_file(game_frame.capture_path)
-                palette_index = game_frame.palette_index
-                snes_palette = capture_result.palettes.get(palette_index, [])
-
-                if snes_palette:
-                    result[game_frame.id] = snes_palette_to_rgb(snes_palette)
-            except Exception as e:
-                logger.debug("Could not load palette for %s: %s", game_frame.id, e)
-
-        return result
+        return self._palette_service.get_game_palettes(self._project)
 
     def remove_game_frame(self, frame_id: str) -> bool:
         """Remove a game frame from the project.
