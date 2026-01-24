@@ -35,6 +35,15 @@ from core.palette_utils import snes_palette_to_rgb
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
+from ui.frame_mapping.undo import (
+    CreateMappingCommand,
+    RemoveMappingCommand,
+    RenameAIFrameCommand,
+    RenameCaptureCommand,
+    ToggleFrameTagCommand,
+    UndoRedoStack,
+    UpdateAlignmentCommand,
+)
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -77,6 +86,9 @@ class FrameMappingController(QObject):
     preview_cache_invalidated = Signal(str)  # game_frame_id - preview was regenerated
     # Capture import signal - emitted when capture parsed, workspace shows dialog
     capture_import_requested = Signal(object, object)  # (CaptureResult, capture_path: Path)
+    # Undo/Redo signals
+    can_undo_changed = Signal(bool)
+    can_redo_changed = Signal(bool)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -85,6 +97,10 @@ class FrameMappingController(QObject):
         self._game_frame_previews: dict[str, tuple[QPixmap, float, tuple[int, ...]]] = {}
         # Injection orchestrator for frame injection pipeline
         self._injection_orchestrator = InjectionOrchestrator()
+        # Undo/Redo stack
+        self._undo_stack = UndoRedoStack(parent=self)
+        self._undo_stack.can_undo_changed.connect(self.can_undo_changed)
+        self._undo_stack.can_redo_changed.connect(self.can_redo_changed)
 
     @property
     def project(self) -> FrameMappingProject | None:
@@ -96,6 +112,46 @@ class FrameMappingController(QObject):
         """Check if a project is loaded."""
         return self._project is not None
 
+    # ─── Undo/Redo Public API ──────────────────────────────────────────────────
+
+    def undo(self) -> str | None:
+        """Undo the last command.
+
+        Returns:
+            Description of the undone command, or None if nothing to undo
+        """
+        desc = self._undo_stack.undo()
+        if desc:
+            logger.info("Undo: %s", desc)
+            self.project_changed.emit()
+            self.save_requested.emit()
+        return desc
+
+    def redo(self) -> str | None:
+        """Redo the last undone command.
+
+        Returns:
+            Description of the redone command, or None if nothing to redo
+        """
+        desc = self._undo_stack.redo()
+        if desc:
+            logger.info("Redo: %s", desc)
+            self.project_changed.emit()
+            self.save_requested.emit()
+        return desc
+
+    def clear_undo_history(self) -> None:
+        """Clear all undo/redo history."""
+        self._undo_stack.clear()
+
+    def can_undo(self) -> bool:
+        """Check if undo is available."""
+        return self._undo_stack.can_undo()
+
+    def can_redo(self) -> bool:
+        """Check if redo is available."""
+        return self._undo_stack.can_redo()
+
     def new_project(self, name: str = "Untitled") -> None:
         """Create a new empty project.
 
@@ -104,6 +160,7 @@ class FrameMappingController(QObject):
         """
         self._project = FrameMappingProject(name=name)
         self._game_frame_previews.clear()
+        self._undo_stack.clear()  # Clear history on new project
         self.project_changed.emit()
         logger.info("Created new frame mapping project: %s", name)
 
@@ -144,6 +201,7 @@ class FrameMappingController(QObject):
         try:
             self._project = FrameMappingProject.load(path)
             self._game_frame_previews.clear()
+            self._undo_stack.clear()  # Clear history on project load
             self.project_changed.emit()
             logger.info("Loaded frame mapping project from %s", path)
             return True
@@ -408,13 +466,55 @@ class FrameMappingController(QObject):
             self.error_occurred.emit(f"Game frame {game_frame_id} not found")
             return False
 
-        # Use ID-based mapping (stable across reloads)
-        self._project.create_mapping(ai_frame_id, game_frame_id)
+        # Capture previous state for undo
+        prev_ai_mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
+        prev_game_mapping = self._project.get_mapping_for_game_frame(game_frame_id)
+
+        prev_ai_game_id = prev_ai_mapping.game_frame_id if prev_ai_mapping else None
+        prev_game_ai_id = prev_game_mapping.ai_frame_id if prev_game_mapping else None
+        prev_ai_alignment = None
+        prev_game_alignment = None
+
+        if prev_ai_mapping:
+            prev_ai_alignment = (
+                prev_ai_mapping.offset_x,
+                prev_ai_mapping.offset_y,
+                prev_ai_mapping.flip_h,
+                prev_ai_mapping.flip_v,
+                prev_ai_mapping.scale,
+            )
+        if prev_game_mapping and prev_game_ai_id != ai_frame_id:
+            prev_game_alignment = (
+                prev_game_mapping.offset_x,
+                prev_game_mapping.offset_y,
+                prev_game_mapping.flip_h,
+                prev_game_mapping.flip_v,
+                prev_game_mapping.scale,
+            )
+
+        # Create and execute command via undo stack
+        command = CreateMappingCommand(
+            controller=self,
+            ai_frame_id=ai_frame_id,
+            game_frame_id=game_frame_id,
+            prev_ai_mapping_game_id=prev_ai_game_id,
+            prev_game_mapping_ai_id=prev_game_ai_id,
+            prev_ai_mapping_alignment=prev_ai_alignment,
+            prev_game_mapping_alignment=prev_game_alignment,
+        )
+        self._undo_stack.push(command)
+
         self.mapping_created.emit(ai_frame_id, game_frame_id)
         self.project_changed.emit()
         self.save_requested.emit()
         logger.info("Created mapping: AI frame %s -> Game frame %s", ai_frame_id, game_frame_id)
         return True
+
+    def _create_mapping_no_history(self, ai_frame_id: str, game_frame_id: str) -> None:
+        """Internal: Create mapping without undo history (for command execution)."""
+        if self._project is None:
+            return
+        self._project.create_mapping(ai_frame_id, game_frame_id)
 
     def get_existing_link_for_game_frame(self, game_frame_id: str) -> str | None:
         """Get the AI frame ID currently linked to a game frame.
@@ -455,13 +555,42 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        if self._project.remove_mapping_for_ai_frame(ai_frame_id):
-            self.mapping_removed.emit(ai_frame_id)
-            self.project_changed.emit()
-            self.save_requested.emit()
-            logger.info("Removed mapping for AI frame %s", ai_frame_id)
-            return True
-        return False
+        # Capture state for undo
+        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
+        if mapping is None:
+            return False
+
+        removed_game_id = mapping.game_frame_id
+        removed_alignment = (
+            mapping.offset_x,
+            mapping.offset_y,
+            mapping.flip_h,
+            mapping.flip_v,
+            mapping.scale,
+        )
+        removed_status = mapping.status
+
+        # Create and execute command via undo stack
+        command = RemoveMappingCommand(
+            controller=self,
+            ai_frame_id=ai_frame_id,
+            removed_game_frame_id=removed_game_id,
+            removed_alignment=removed_alignment,
+            removed_status=removed_status,
+        )
+        self._undo_stack.push(command)
+
+        self.mapping_removed.emit(ai_frame_id)
+        self.project_changed.emit()
+        self.save_requested.emit()
+        logger.info("Removed mapping for AI frame %s", ai_frame_id)
+        return True
+
+    def _remove_mapping_no_history(self, ai_frame_id: str) -> bool:
+        """Internal: Remove mapping without undo history (for command execution)."""
+        if self._project is None:
+            return False
+        return self._project.remove_mapping_for_ai_frame(ai_frame_id)
 
     def update_mapping_alignment(
         self,
@@ -491,21 +620,74 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        if self._project.update_mapping_alignment(ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, set_edited):
-            # Use targeted signal to avoid full UI refresh (which blanks canvas)
-            self.alignment_updated.emit(ai_frame_id)
-            self.save_requested.emit()
-            logger.info(
-                "Updated alignment for AI frame %s: offset=(%d, %d), flip=(%s, %s), scale=%.2f",
-                ai_frame_id,
-                offset_x,
-                offset_y,
-                flip_h,
-                flip_v,
-                scale,
+        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
+        if mapping is None:
+            return False
+
+        # Only record undo for explicit user edits, not auto-centering
+        if set_edited:
+            # Capture previous state for undo
+            command = UpdateAlignmentCommand(
+                controller=self,
+                ai_frame_id=ai_frame_id,
+                new_offset_x=offset_x,
+                new_offset_y=offset_y,
+                new_flip_h=flip_h,
+                new_flip_v=flip_v,
+                new_scale=scale,
+                old_offset_x=mapping.offset_x,
+                old_offset_y=mapping.offset_y,
+                old_flip_h=mapping.flip_h,
+                old_flip_v=mapping.flip_v,
+                old_scale=mapping.scale,
+                old_status=mapping.status,
             )
-            return True
-        return False
+            self._undo_stack.push(command)
+        else:
+            # Auto-centering - update directly without history
+            self._project.update_mapping_alignment(
+                ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, set_edited
+            )
+
+        # Use targeted signal to avoid full UI refresh (which blanks canvas)
+        self.alignment_updated.emit(ai_frame_id)
+        self.save_requested.emit()
+        logger.info(
+            "Updated alignment for AI frame %s: offset=(%d, %d), flip=(%s, %s), scale=%.2f",
+            ai_frame_id,
+            offset_x,
+            offset_y,
+            flip_h,
+            flip_v,
+            scale,
+        )
+        return True
+
+    def _update_alignment_no_history(
+        self,
+        ai_frame_id: str,
+        offset_x: int,
+        offset_y: int,
+        flip_h: bool,
+        flip_v: bool,
+        scale: float,
+    ) -> bool:
+        """Internal: Update alignment without undo history (for command execution)."""
+        if self._project is None:
+            return False
+        return self._project.update_mapping_alignment(
+            ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, set_edited=True
+        )
+
+    def _set_mapping_status_no_history(self, ai_frame_id: str, status: str) -> bool:
+        """Internal: Set mapping status without undo history (for command execution)."""
+        if self._project is None:
+            return False
+        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
+        if mapping is None:
+            return False
+        mapping.status = status
+        return True
 
     def apply_transforms_to_all_mappings(
         self,
@@ -1155,11 +1337,33 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return False
-        result = self._project.set_frame_display_name(frame_id, display_name)
-        if result:
-            logger.info("Renamed frame '%s' to '%s'", frame_id, display_name or "(cleared)")
-            self.frame_renamed.emit(frame_id)
-        return result
+
+        frame = self._project.get_ai_frame_by_id(frame_id)
+        if frame is None:
+            return False
+
+        # Capture previous state for undo
+        old_name = frame.display_name
+
+        # Create and execute command via undo stack
+        command = RenameAIFrameCommand(
+            controller=self,
+            frame_id=frame_id,
+            new_name=display_name,
+            old_name=old_name,
+        )
+        self._undo_stack.push(command)
+
+        logger.info("Renamed frame '%s' to '%s'", frame_id, display_name or "(cleared)")
+        self.frame_renamed.emit(frame_id)
+        self.save_requested.emit()
+        return True
+
+    def _rename_frame_no_history(self, frame_id: str, display_name: str | None) -> bool:
+        """Internal: Rename frame without undo history (for command execution)."""
+        if self._project is None:
+            return False
+        return self._project.set_frame_display_name(frame_id, display_name)
 
     def add_frame_tag(self, frame_id: str, tag: str) -> bool:
         """Add a tag to an AI frame.
@@ -1207,10 +1411,32 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return False
-        result = self._project.toggle_frame_tag(frame_id, tag)
-        if result:
-            self.frame_tags_changed.emit(frame_id)
-        return result
+
+        frame = self._project.get_ai_frame_by_id(frame_id)
+        if frame is None:
+            return False
+
+        # Capture previous state for undo
+        was_present = tag in frame.tags
+
+        # Create and execute command via undo stack
+        command = ToggleFrameTagCommand(
+            controller=self,
+            frame_id=frame_id,
+            tag=tag,
+            was_present=was_present,
+        )
+        self._undo_stack.push(command)
+
+        self.frame_tags_changed.emit(frame_id)
+        self.save_requested.emit()
+        return True
+
+    def _toggle_frame_tag_no_history(self, frame_id: str, tag: str) -> bool:
+        """Internal: Toggle frame tag without undo history (for command execution)."""
+        if self._project is None:
+            return False
+        return self._project.toggle_frame_tag(frame_id, tag)
 
     def set_frame_tags(self, frame_id: str, tags: frozenset[str]) -> bool:
         """Set all tags for an AI frame (replace existing).
@@ -1297,15 +1523,37 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return False
+
+        frame = self._project.get_game_frame_by_id(game_frame_id)
+        if frame is None:
+            return False
+
         # Normalize empty string to None
         display_name = new_name.strip() if new_name else None
         if display_name == "":
             display_name = None
-        if self._project.set_capture_display_name(game_frame_id, display_name):
-            self.capture_renamed.emit(game_frame_id)
-            self.save_requested.emit()
-            return True
-        return False
+
+        # Capture previous state for undo
+        old_name = frame.display_name
+
+        # Create and execute command via undo stack
+        command = RenameCaptureCommand(
+            controller=self,
+            game_frame_id=game_frame_id,
+            new_name=display_name,
+            old_name=old_name,
+        )
+        self._undo_stack.push(command)
+
+        self.capture_renamed.emit(game_frame_id)
+        self.save_requested.emit()
+        return True
+
+    def _rename_capture_no_history(self, game_frame_id: str, display_name: str | None) -> bool:
+        """Internal: Rename capture without undo history (for command execution)."""
+        if self._project is None:
+            return False
+        return self._project.set_capture_display_name(game_frame_id, display_name)
 
     def get_capture_display_name(self, game_frame_id: str) -> str | None:
         """Get display name for a game frame (capture).

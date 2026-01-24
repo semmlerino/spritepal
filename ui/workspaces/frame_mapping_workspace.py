@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, cast
 
 from PIL import Image
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -119,6 +119,7 @@ class FrameMappingWorkspace(QWidget):
 
         self._setup_ui()
         self._connect_signals()
+        self._setup_shortcuts()
 
         # Auto-load last project if available
         self._auto_load_last_project()
@@ -351,6 +352,42 @@ class FrameMappingWorkspace(QWidget):
         self._alignment_canvas.alignment_changed.connect(self._on_alignment_changed)
         self._alignment_canvas.compression_type_changed.connect(self._on_compression_type_changed)
         self._alignment_canvas.apply_transforms_to_all_requested.connect(self._on_apply_transforms_to_all)
+
+    def _setup_shortcuts(self) -> None:
+        """Setup keyboard shortcuts for undo/redo."""
+        # Undo: Ctrl+Z
+        undo_shortcut = QShortcut(QKeySequence.StandardKey.Undo, self)
+        undo_shortcut.activated.connect(self._on_undo)
+
+        # Redo: Ctrl+Y / Ctrl+Shift+Z
+        redo_shortcut = QShortcut(QKeySequence.StandardKey.Redo, self)
+        redo_shortcut.activated.connect(self._on_redo)
+
+    def _on_undo(self) -> None:
+        """Handle Ctrl+Z - undo last action."""
+        desc = self._controller.undo()
+        if desc:
+            if self._message_service:
+                self._message_service.show_message(f"Undo: {desc}", 2000)
+            # Refresh UI after undo
+            self._refresh_mapping_status()
+            self._refresh_game_frame_link_status()
+            self._update_mapping_panel_previews()
+        elif self._message_service:
+            self._message_service.show_message("Nothing to undo", 1500)
+
+    def _on_redo(self) -> None:
+        """Handle Ctrl+Y - redo last undone action."""
+        desc = self._controller.redo()
+        if desc:
+            if self._message_service:
+                self._message_service.show_message(f"Redo: {desc}", 2000)
+            # Refresh UI after redo
+            self._refresh_mapping_status()
+            self._refresh_game_frame_link_status()
+            self._update_mapping_panel_previews()
+        elif self._message_service:
+            self._message_service.show_message("Nothing to redo", 1500)
 
     # -------------------------------------------------------------------------
     # Event Handlers
