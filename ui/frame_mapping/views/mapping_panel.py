@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from PIL import Image
 from PySide6.QtCore import QPoint, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragMoveEvent, QDropEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
@@ -20,11 +22,17 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.palette_utils import (
+    QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    quantize_to_palette,
+    quantize_with_mappings,
+)
+from core.services.image_utils import pil_to_qpixmap
 from ui.common.mime_constants import MIME_GAME_FRAME
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.frame_mapping_project import FrameMappingProject
+    from core.frame_mapping_project import FrameMappingProject, SheetPalette
 
 logger = get_logger(__name__)
 
@@ -74,6 +82,8 @@ class MappingPanel(QWidget):
         # Track user-toggled checkbox state by AI frame ID (stable across reloads)
         # None = use default (checked if mapped), set = explicit user choices
         self._user_checked_ai_frame_ids: set[str] | None = None
+        # Sheet palette for quantized AI frame thumbnails
+        self._sheet_palette: SheetPalette | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -232,6 +242,75 @@ class MappingPanel(QWidget):
         self._game_frame_previews[frame_id] = preview
         self.refresh()
 
+    def set_sheet_palette(self, palette: SheetPalette | None) -> None:
+        """Set the sheet palette for quantized AI frame thumbnails.
+
+        When set, AI frame thumbnails will be quantized to show how they'll
+        look when injected with this palette.
+
+        Args:
+            palette: SheetPalette to use, or None to show original colors
+        """
+        self._sheet_palette = palette
+        # Refresh to apply new palette to thumbnails
+        self.refresh()
+
+    def _create_quantized_thumbnail(self, frame_path: Path) -> QPixmap | None:
+        """Create a palette-quantized thumbnail for an AI frame.
+
+        If a sheet palette is defined, quantizes the frame image to show
+        how it will look when injected with that palette.
+
+        Args:
+            frame_path: Path to the AI frame image
+
+        Returns:
+            Scaled QPixmap suitable for table cell, or None if loading fails
+        """
+        if not frame_path.exists():
+            return None
+
+        try:
+            pil_image = Image.open(frame_path)
+        except Exception:
+            logger.debug("Failed to load image for quantization: %s", frame_path)
+            return None
+
+        # Apply palette quantization if palette is set
+        if self._sheet_palette is not None:
+            try:
+                # Ensure RGBA for quantization
+                if pil_image.mode != "RGBA":
+                    pil_image = pil_image.convert("RGBA")
+
+                # Quantize using mappings if available
+                if self._sheet_palette.color_mappings:
+                    indexed = quantize_with_mappings(
+                        pil_image,
+                        self._sheet_palette.colors,
+                        self._sheet_palette.color_mappings,
+                        transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+                    )
+                else:
+                    indexed = quantize_to_palette(pil_image, self._sheet_palette.colors)
+
+                # Convert indexed back to RGBA for display (preserves palette colors)
+                pil_image = indexed.convert("RGBA")
+            except Exception:
+                logger.debug("Quantization failed for %s, using original", frame_path)
+
+        # Convert to QPixmap and scale for thumbnail
+        pixmap = pil_to_qpixmap(pil_image)
+        if pixmap is None or pixmap.isNull():
+            return None
+
+        return pixmap.scaled(
+            THUMBNAIL_SIZE,
+            THUMBNAIL_SIZE,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+
     def refresh(self) -> None:
         """Refresh the mapping table from the current project."""
         # Store current selection by ID (stable across reordering)
@@ -296,17 +375,10 @@ class MappingPanel(QWidget):
                 ai_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
                 # Also store AI frame ID for ID-based lookups
                 ai_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
-                # Load thumbnail
-                if ai_frame.path.exists():
-                    pixmap = QPixmap(str(ai_frame.path))
-                    if not pixmap.isNull():
-                        scaled = pixmap.scaled(
-                            THUMBNAIL_SIZE,
-                            THUMBNAIL_SIZE,
-                            Qt.AspectRatioMode.KeepAspectRatio,
-                            Qt.TransformationMode.SmoothTransformation,
-                        )
-                        ai_item.setIcon(QIcon(scaled))
+                # Load thumbnail (palette-quantized if sheet palette is set)
+                thumbnail = self._create_quantized_thumbnail(ai_frame.path)
+                if thumbnail is not None:
+                    ai_item.setIcon(QIcon(thumbnail))
                 self._table.setItem(row, 2, ai_item)
 
                 # Game Frame column - column 3

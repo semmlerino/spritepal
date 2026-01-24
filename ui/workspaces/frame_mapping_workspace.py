@@ -401,6 +401,8 @@ class FrameMappingWorkspace(QWidget):
             self._refresh_mapping_status()
             self._refresh_game_frame_link_status()
             self._update_mapping_panel_previews()
+            # Sync canvas alignment with restored model state
+            self._sync_canvas_alignment_from_model()
         elif self._message_service:
             self._message_service.show_message("Nothing to undo", 1500)
 
@@ -414,6 +416,8 @@ class FrameMappingWorkspace(QWidget):
             self._refresh_mapping_status()
             self._refresh_game_frame_link_status()
             self._update_mapping_panel_previews()
+            # Sync canvas alignment with restored model state
+            self._sync_canvas_alignment_from_model()
         elif self._message_service:
             self._message_service.show_message("Nothing to redo", 1500)
 
@@ -450,6 +454,7 @@ class FrameMappingWorkspace(QWidget):
             self._ai_frames_pane.clear()
             self._captures_pane.clear()
             self._mapping_panel.set_project(None)
+            self._mapping_panel.set_sheet_palette(None)  # Clear mapping panel palette
             self._alignment_canvas.clear()
             self._alignment_canvas.set_sheet_palette(None)  # Clear canvas palette
             self._update_map_button_state()
@@ -464,6 +469,7 @@ class FrameMappingWorkspace(QWidget):
         self._alignment_canvas.set_sheet_palette(project.sheet_palette)  # Sync canvas palette
         self._captures_pane.set_game_frames(project.game_frames)
         self._mapping_panel.set_project(project)
+        self._mapping_panel.set_sheet_palette(project.sheet_palette)  # Sync mapping panel palette
         self._update_map_button_state()
         self._refresh_mapping_status()
         self._refresh_game_frame_link_status()
@@ -630,15 +636,19 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_map_selected(self) -> None:
         """Handle map button click in AI frames pane."""
-        if self._state.selected_ai_frame_id is None:
+        # Query fresh selection state from panes (source of truth)
+        ai_frame_id = self._get_selected_ai_frame_id()
+        game_id = self._get_selected_game_id()
+
+        if ai_frame_id is None:
             QMessageBox.information(self, "Map Frames", "Please select an AI frame first.")
             return
 
-        if self._state.selected_game_id is None:
+        if game_id is None:
             QMessageBox.information(self, "Map Frames", "Please select a game frame first.")
             return
 
-        self._attempt_link(self._state.selected_ai_frame_id, self._state.selected_game_id)
+        self._attempt_link(ai_frame_id, game_id)
 
     def _on_drop_game_frame(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Handle game frame dropped onto drawer row.
@@ -656,14 +666,16 @@ class FrameMappingWorkspace(QWidget):
         game frame as the existing mapping. This prevents accidental edits when
         the user is previewing a different capture.
         """
-        if self._state.selected_ai_frame_id is None:
+        # Query fresh selection state from pane (source of truth)
+        ai_frame_id = self._get_selected_ai_frame_id()
+        if ai_frame_id is None:
             return
 
         project = self._controller.project
         if project is None:
             return
 
-        mapping = project.get_mapping_for_ai_frame(self._state.selected_ai_frame_id)
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         if mapping is None:
             return
 
@@ -684,7 +696,7 @@ class FrameMappingWorkspace(QWidget):
         # Update alignment in controller (includes scale)
         # This emits alignment_updated signal which triggers _on_alignment_updated()
         # which handles updating the mapping panel row
-        self._controller.update_mapping_alignment(self._state.selected_ai_frame_id, x, y, flip_h, flip_v, scale)
+        self._controller.update_mapping_alignment(ai_frame_id, x, y, flip_h, flip_v, scale)
 
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.
@@ -975,13 +987,17 @@ class FrameMappingWorkspace(QWidget):
 
         # Remove the game frame (also removes any associated mapping)
         if self._controller.remove_game_frame(frame_id):
-            # Phase 3b fix: Clear selection if deleted frame was selected
+            # Clear selection if deleted frame was selected
             if self._state.selected_game_id == frame_id:
                 self._state.selected_game_id = None
+                self._update_map_button_state()
+
+            # Clear canvas if deleted frame was currently displayed
+            # (may be displayed without being selected, e.g., during preview)
+            if self._state.current_canvas_game_id == frame_id:
                 self._state.current_canvas_game_id = None
                 self._alignment_canvas.set_game_frame(None)
                 self._alignment_canvas.clear_alignment()
-                self._update_map_button_state()
 
             if self._message_service:
                 self._message_service.show_message(f"Deleted capture: {frame_id}")
@@ -1038,11 +1054,12 @@ class FrameMappingWorkspace(QWidget):
 
         # Remove the AI frame (also removes mapping)
         if self._controller.remove_ai_frame(ai_frame_id):
-            # Clear selection if deleted frame was selected
+            # Clear canvas and selection if deleted frame was selected
             if self._state.selected_ai_frame_id == ai_frame_id:
                 self._state.selected_ai_frame_id = None
                 self._state.current_canvas_game_id = None
                 self._alignment_canvas.set_ai_frame(None)
+                self._alignment_canvas.set_game_frame(None)  # Also clear game frame since context is lost
                 self._alignment_canvas.clear_alignment()
                 self._update_map_button_state()
 
@@ -1462,6 +1479,8 @@ class FrameMappingWorkspace(QWidget):
         self._ai_frames_pane.set_sheet_palette(palette)
         # Also update the workbench canvas for pixel inspection
         self._alignment_canvas.set_sheet_palette(palette)
+        # Also update mapping panel to show quantized AI frame thumbnails
+        self._mapping_panel.set_sheet_palette(palette)
 
     def _on_pixel_hovered(self, x: int, y: int, rgb: object, palette_index: int) -> None:
         """Handle pixel hover on workbench - highlight palette swatch."""
@@ -1623,7 +1642,10 @@ class FrameMappingWorkspace(QWidget):
 
     def _update_map_button_state(self) -> None:
         """Update the Map Selected button enabled state."""
-        both_selected = self._state.selected_ai_frame_id is not None and self._state.selected_game_id is not None
+        # Query fresh selection state from panes (source of truth)
+        ai_frame_id = self._get_selected_ai_frame_id()
+        game_id = self._get_selected_game_id()
+        both_selected = ai_frame_id is not None and game_id is not None
         self._ai_frames_pane.set_map_button_enabled(both_selected)
 
     def _refresh_mapping_status(self) -> None:
@@ -1680,6 +1702,45 @@ class FrameMappingWorkspace(QWidget):
 
         # Also update captures pane with previews for thumbnails
         self._captures_pane.set_game_frame_previews(previews)
+
+    def _sync_canvas_alignment_from_model(self) -> None:
+        """Sync the canvas alignment display with the current model state.
+
+        Called after undo/redo to ensure the canvas reflects restored values.
+        Queries the current AI frame's mapping and updates the canvas if a mapping exists.
+        """
+        ai_frame_id = self._get_selected_ai_frame_id()
+        if ai_frame_id is None:
+            return
+
+        project = self._controller.project
+        if project is None:
+            return
+
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
+        if mapping is not None:
+            # Update canvas with restored alignment values
+            self._alignment_canvas.set_alignment(
+                mapping.offset_x,
+                mapping.offset_y,
+                mapping.flip_h,
+                mapping.flip_v,
+                mapping.scale,
+                has_mapping=True,
+            )
+            # Ensure canvas is showing the mapped game frame
+            if self._state.current_canvas_game_id != mapping.game_frame_id:
+                game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
+                if game_frame:
+                    preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
+                    capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(
+                        mapping.game_frame_id
+                    )
+                    self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
+                    self._state.current_canvas_game_id = mapping.game_frame_id
+        else:
+            # No mapping - clear alignment
+            self._alignment_canvas.clear_alignment()
 
     def _on_preview_cache_invalidated(self, frame_id: str) -> None:
         """Handle preview cache invalidation for a specific game frame.
