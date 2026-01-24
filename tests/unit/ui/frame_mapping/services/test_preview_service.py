@@ -152,14 +152,18 @@ class TestPreviewServiceCaching:
                     mock_pil_to_qpixmap.return_value = mock_pixmap
 
                     # First call - cache miss
-                    with qtbot.waitSignal(preview_service.preview_cache_invalidated, timeout=signal_timeout(), raising=False):
+                    with qtbot.waitSignal(
+                        preview_service.preview_cache_invalidated, timeout=signal_timeout(), raising=False
+                    ):
                         preview_service.get_preview("frame1", project)
 
                     # Modify file (change mtime)
                     capture_path.write_text('{"frame": 101}')
 
                     # Second call - cache invalidated due to mtime change
-                    with qtbot.waitSignal(preview_service.preview_cache_invalidated, timeout=signal_timeout()) as blocker:
+                    with qtbot.waitSignal(
+                        preview_service.preview_cache_invalidated, timeout=signal_timeout()
+                    ) as blocker:
                         preview_service.get_preview("frame1", project)
 
                     assert blocker.signal_triggered
@@ -192,7 +196,9 @@ class TestPreviewServiceCaching:
                     game_frame.selected_entry_ids = [1, 2]  # Changed from [1, 2, 3]
 
                     # Second call - cache invalidated due to entry ID change
-                    with qtbot.waitSignal(preview_service.preview_cache_invalidated, timeout=signal_timeout()) as blocker:
+                    with qtbot.waitSignal(
+                        preview_service.preview_cache_invalidated, timeout=signal_timeout()
+                    ) as blocker:
                         preview_service.get_preview("frame1", project)
 
                     assert blocker.signal_triggered

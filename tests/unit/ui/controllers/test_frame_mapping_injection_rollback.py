@@ -112,7 +112,7 @@ class TestInjectionRollback:
                 offset_y=0,
             )
         )
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -141,22 +141,20 @@ class TestInjectionRollback:
             corrections={},
         )
 
-        with (
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-            patch(
-                "ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService"
-            ) as mock_verifier_class,
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.side_effect = mock_inject
+        controller._injection_orchestrator._rom_injector = mock_injector
+
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+
+        with patch(
+            "core.services.injection_orchestrator.ROMVerificationService",
+            return_value=mock_verifier,
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.side_effect = mock_inject
-            mock_injector_class.return_value = mock_injector
-
-            mock_verifier = MagicMock()
-            mock_verifier.verify_offsets.return_value = mock_verification
-            mock_verifier_class.return_value = mock_verifier
-
-            result = controller.inject_mapping(0, rom_path)
+            result = controller.inject_mapping("ai_frame.png", rom_path)
 
         # Injection should have failed
         assert result is False
@@ -206,7 +204,7 @@ class TestInjectionRollback:
                 offset_y=0,
             )
         )
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -220,22 +218,20 @@ class TestInjectionRollback:
             corrections={},
         )
 
-        with (
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-            patch(
-                "ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService"
-            ) as mock_verifier_class,
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.return_value = (False, "Simulated failure")
+        controller._injection_orchestrator._rom_injector = mock_injector
+
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+
+        with patch(
+            "core.services.injection_orchestrator.ROMVerificationService",
+            return_value=mock_verifier,
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.return_value = (False, "Simulated failure")
-            mock_injector_class.return_value = mock_injector
-
-            mock_verifier = MagicMock()
-            mock_verifier.verify_offsets.return_value = mock_verification
-            mock_verifier_class.return_value = mock_verifier
-
-            controller.inject_mapping(0, rom_path)
+            controller.inject_mapping("ai_frame.png", rom_path)
 
         # No staging files should remain
         staging_files = list(tmp_path.glob("*.staging"))
@@ -278,7 +274,7 @@ class TestInjectionRollback:
                 offset_y=0,
             )
         )
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -307,22 +303,20 @@ class TestInjectionRollback:
             corrections={},
         )
 
-        with (
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-            patch(
-                "ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService"
-            ) as mock_verifier_class,
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.side_effect = mock_inject
+        controller._injection_orchestrator._rom_injector = mock_injector
+
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+
+        with patch(
+            "core.services.injection_orchestrator.ROMVerificationService",
+            return_value=mock_verifier,
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.side_effect = mock_inject
-            mock_injector_class.return_value = mock_injector
-
-            mock_verifier = MagicMock()
-            mock_verifier.verify_offsets.return_value = mock_verification
-            mock_verifier_class.return_value = mock_verifier
-
-            result = controller.inject_mapping(0, rom_path)
+            result = controller.inject_mapping("ai_frame.png", rom_path)
 
         # Injection should succeed
         assert result is True

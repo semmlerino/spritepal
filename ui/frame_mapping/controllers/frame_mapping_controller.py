@@ -52,6 +52,8 @@ class FrameMappingController(QObject):
 
     Manages the data model and coordinates view updates.
 
+    Signal flow documentation: docs/frame_mapping_signals.md
+
     Signals:
         project_changed: Emitted when project is loaded/created/modified (structural changes)
         ai_frames_loaded: Emitted when AI frames are loaded (count)

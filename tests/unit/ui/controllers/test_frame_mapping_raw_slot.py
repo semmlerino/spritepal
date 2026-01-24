@@ -75,7 +75,7 @@ class TestRawSlotDetection:
         rom_data = tile_data * 3 + padding + b"\xff" * 1000
 
         # Offset 0, no SMC header
-        detected = controller._detect_raw_slot_size(rom_data, 0)
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_data, 0)
 
         assert detected == 3, f"Expected 3 tiles, got {detected}"
 
@@ -89,7 +89,7 @@ class TestRawSlotDetection:
         rom_data = tile_data * 5 + padding
 
         # Offset 0, no SMC header
-        detected = controller._detect_raw_slot_size(rom_data, 0)
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_data, 0)
 
         assert detected == 5, f"Expected 5 tiles, got {detected}"
 
@@ -113,7 +113,7 @@ class TestRawSlotDetection:
 
         # Offset 0 (file offset, not accounting for header yet)
         # The method should add 512 for the SMC header and find tiles at actual offset 512
-        detected = controller._detect_raw_slot_size(rom_data, 0)
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_data, 0)
 
         assert detected == 4, f"Expected 4 tiles, got {detected}"
 
@@ -125,7 +125,7 @@ class TestRawSlotDetection:
         tile_data = b"\x12\x34" * 16  # Non-zero tile (32 bytes)
         rom_data = tile_data * 300  # More than default max_tiles (256)
 
-        detected = controller._detect_raw_slot_size(rom_data, 0, max_tiles=10)
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_data, 0, max_tiles=10)
 
         assert detected is None, "Should return None when no boundary found"
 
@@ -136,7 +136,7 @@ class TestRawSlotDetection:
         rom_data = b"\x12" * 1000
 
         # Offset past end of ROM
-        detected = controller._detect_raw_slot_size(rom_data, 0x100000)
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_data, 0x100000)
 
         assert detected is None, "Should return None for invalid offset"
 
@@ -196,13 +196,13 @@ class TestRawInjectionSlotRespect:
                 offset_y=0,
             )
         )
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
 
         # Verify slot detection works correctly
-        detected = controller._detect_raw_slot_size(rom_content, rom_offset)
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_content, rom_offset)
         assert detected == 3, f"Slot detection should find 3 tiles, got {detected}"
 
         def mock_inject(
@@ -224,22 +224,20 @@ class TestRawInjectionSlotRespect:
             corrections={},
         )
 
-        with (
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-            patch(
-                "ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService"
-            ) as mock_verifier_class,
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.side_effect = mock_inject
+        controller._injection_orchestrator._rom_injector = mock_injector
+
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+
+        with patch(
+            "core.services.injection_orchestrator.ROMVerificationService",
+            return_value=mock_verifier,
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.side_effect = mock_inject
-            mock_injector_class.return_value = mock_injector
-
-            mock_verifier = MagicMock()
-            mock_verifier.verify_offsets.return_value = mock_verification
-            mock_verifier_class.return_value = mock_verifier
-
-            result = controller.inject_mapping(0, rom_path, force_raw=True)
+            result = controller.inject_mapping("ai_frame.png", rom_path)
 
         # Injection should succeed
         assert result is True
@@ -292,13 +290,13 @@ class TestRawInjectionSlotRespect:
                 offset_y=0,
             )
         )
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
 
         # Verify no boundary is detected
-        detected = controller._detect_raw_slot_size(rom_content, rom_offset)
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_content, rom_offset)
         assert detected is None, "Should not detect boundary in continuous data"
 
         def mock_inject(
@@ -319,21 +317,19 @@ class TestRawInjectionSlotRespect:
             corrections={},
         )
 
-        with (
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-            patch(
-                "ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService"
-            ) as mock_verifier_class,
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.side_effect = mock_inject
+        controller._injection_orchestrator._rom_injector = mock_injector
+
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+
+        with patch(
+            "core.services.injection_orchestrator.ROMVerificationService",
+            return_value=mock_verifier,
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.side_effect = mock_inject
-            mock_injector_class.return_value = mock_injector
-
-            mock_verifier = MagicMock()
-            mock_verifier.verify_offsets.return_value = mock_verification
-            mock_verifier_class.return_value = mock_verifier
-
-            result = controller.inject_mapping(0, rom_path, force_raw=True)
+            result = controller.inject_mapping("ai_frame.png", rom_path)
 
         assert result is True
