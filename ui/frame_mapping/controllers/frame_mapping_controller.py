@@ -845,11 +845,11 @@ class FrameMappingController(QObject):
                 continue
 
             try:
-                img = Image.open(ai_frame.path)
-                frame_colors = extract_unique_colors(img, ignore_transparent=True)
-                # Merge with totals
-                for color, count in frame_colors.items():
-                    all_colors[color] = all_colors.get(color, 0) + count
+                with Image.open(ai_frame.path) as img:
+                    frame_colors = extract_unique_colors(img, ignore_transparent=True)
+                    # Merge with totals
+                    for color, count in frame_colors.items():
+                        all_colors[color] = all_colors.get(color, 0) + count
             except Exception as e:
                 logger.warning("Failed to extract colors from %s: %s", ai_frame.path, e)
 
@@ -1347,8 +1347,9 @@ class FrameMappingController(QObject):
 
         # 3. Load and Prepare Images using SpriteCompositor
         try:
-            # Load AI image
-            ai_img = Image.open(ai_frame.path).convert("RGBA")
+            # Load AI image (use context manager to close file handle, then convert)
+            with Image.open(ai_frame.path) as opened_img:
+                ai_img = opened_img.convert("RGBA")
 
             # Re-parse capture to get tile layout
             parser = MesenCaptureParser()
