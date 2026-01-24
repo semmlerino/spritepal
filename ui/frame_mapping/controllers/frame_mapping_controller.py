@@ -35,6 +35,7 @@ from core.palette_utils import snes_palette_to_rgb
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
+from ui.frame_mapping.services.preview_service import PreviewService
 from ui.frame_mapping.undo import (
     CreateMappingCommand,
     RemoveMappingCommand,
@@ -93,8 +94,10 @@ class FrameMappingController(QObject):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._project: FrameMappingProject | None = None
-        # Cache stores (pixmap, mtime, selected_entry_ids) for invalidation on change
-        self._game_frame_previews: dict[str, tuple[QPixmap, float, tuple[int, ...]]] = {}
+        # Preview service for game frame preview cache
+        self._preview_service = PreviewService(parent=self)
+        self._preview_service.preview_cache_invalidated.connect(self.preview_cache_invalidated)
+        self._preview_service.stale_entries_warning.connect(self.stale_entries_warning)
         # Injection orchestrator for frame injection pipeline
         self._injection_orchestrator = InjectionOrchestrator()
         # Undo/Redo stack
@@ -159,7 +162,7 @@ class FrameMappingController(QObject):
             name: Project name
         """
         self._project = FrameMappingProject(name=name)
-        self._game_frame_previews.clear()
+        self._preview_service.invalidate_all()
         self._undo_stack.clear()  # Clear history on new project
         self.project_changed.emit()
         logger.info("Created new frame mapping project: %s", name)
@@ -200,7 +203,7 @@ class FrameMappingController(QObject):
         """
         try:
             self._project = FrameMappingProject.load(path)
-            self._game_frame_previews.clear()
+            self._preview_service.invalidate_all()
             self._undo_stack.clear()  # Clear history on project load
             self.project_changed.emit()
             logger.info("Loaded frame mapping project from %s", path)
@@ -370,7 +373,7 @@ class FrameMappingController(QObject):
             pixmap = pil_to_qpixmap(preview_img)
             mtime = capture_path.stat().st_mtime if capture_path.exists() else 0.0
             entry_ids = tuple(entry.id for entry in selected_entries)
-            self._game_frame_previews[frame_id] = (pixmap, mtime, entry_ids)
+            self._preview_service.set_preview_cache(frame_id, pixmap, mtime, entry_ids)
 
             # Infer palette from selected entries (use first entry's palette if all same)
             palette_idx = 0
@@ -645,9 +648,7 @@ class FrameMappingController(QObject):
             self._undo_stack.push(command)
         else:
             # Auto-centering - update directly without history
-            self._project.update_mapping_alignment(
-                ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, set_edited
-            )
+            self._project.update_mapping_alignment(ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, set_edited)
 
         # Use targeted signal to avoid full UI refresh (which blanks canvas)
         self.alignment_updated.emit(ai_frame_id)
@@ -732,13 +733,7 @@ class FrameMappingController(QObject):
     def get_game_frame_preview(self, frame_id: str) -> QPixmap | None:
         """Get the rendered preview pixmap for a game frame.
 
-        If the preview is not cached but the capture file exists, attempts to
-        regenerate the preview from the capture file. Respects selected_entry_ids
-        filtering to show only the selected entries in the preview.
-
-        Cache key includes (mtime, selected_entry_ids) to invalidate when either changes.
-        Emits preview_cache_invalidated when a cached preview is regenerated due to
-        mtime or entry ID changes.
+        Delegates to preview service for caching and rendering.
 
         Args:
             frame_id: Game frame ID
@@ -746,76 +741,12 @@ class FrameMappingController(QObject):
         Returns:
             QPixmap preview or None if not available
         """
-        cache_was_invalidated = False
-
-        # Check cache first
-        if frame_id in self._game_frame_previews:
-            cached_pixmap, cached_mtime, cached_entries = self._game_frame_previews[frame_id]
-
-            # Get game frame to validate cache
-            game_frame = self._project.get_game_frame_by_id(frame_id) if self._project else None
-            if game_frame:
-                current_entries = tuple(game_frame.selected_entry_ids)
-
-                # If file exists, check both mtime and entries
-                if game_frame.capture_path and game_frame.capture_path.exists():
-                    current_mtime = game_frame.capture_path.stat().st_mtime
-                    if current_mtime != cached_mtime or current_entries != cached_entries:
-                        cache_was_invalidated = True
-                    else:
-                        return cached_pixmap
-                else:
-                    # File missing: return cached preview
-                    # This allows previews to persist if the source file is temporarily
-                    # unavailable or deleted, providing a "last known good" view.
-                    return cached_pixmap
-            else:
-                # No project/game_frame - invalidate stale cache entry
-                del self._game_frame_previews[frame_id]
-                return None
-
-        # Try to regenerate from capture file (with filtering applied)
-        capture_result, _ = self.get_capture_result_for_game_frame(frame_id)
-        if capture_result is None or not capture_result.has_entries:
-            return None
-
-        try:
-            renderer = CaptureRenderer(capture_result)
-            preview_img = renderer.render_selection()
-
-            # Convert PIL Image to QPixmap and cache with mtime + entry IDs
-            pixmap = pil_to_qpixmap(preview_img)
-            current_mtime = 0.0
-            current_entries: tuple[int, ...] = ()
-            if self._project is not None:
-                game_frame = self._project.get_game_frame_by_id(frame_id)
-                if game_frame:
-                    current_entries = tuple(game_frame.selected_entry_ids)
-                    if game_frame.capture_path and game_frame.capture_path.exists():
-                        current_mtime = game_frame.capture_path.stat().st_mtime
-
-            self._game_frame_previews[frame_id] = (pixmap, current_mtime, current_entries)
-
-            # Notify if this was a cache invalidation (not first-time generation)
-            if cache_was_invalidated:
-                self.preview_cache_invalidated.emit(frame_id)
-
-            return pixmap
-
-        except Exception as e:
-            logger.warning("Failed to regenerate preview for game frame %s: %s", frame_id, e)
-            return None
+        return self._preview_service.get_preview(frame_id, self._project)
 
     def get_capture_result_for_game_frame(self, frame_id: str) -> tuple[CaptureResult | None, bool]:
         """Get the CaptureResult for a game frame.
 
-        Parses the capture file associated with the game frame and returns
-        the CaptureResult needed for preview generation. If the game frame
-        has stored selected entry IDs, only those entries are returned.
-
-        If stored entry IDs no longer exist in the capture file (stale),
-        falls back to rom_offset filtering (mirrors injection behavior) and
-        emits stale_entries_warning signal.
+        Delegates to preview service for capture parsing and filtering.
 
         Args:
             frame_id: Game frame ID
@@ -825,70 +756,7 @@ class FrameMappingController(QObject):
             used_fallback is True if the stored entry IDs were stale and
             rom_offset filtering was used instead.
         """
-        if self._project is None:
-            return (None, False)
-
-        game_frame = self._project.get_game_frame_by_id(frame_id)
-        if game_frame is None or game_frame.capture_path is None:
-            return (None, False)
-
-        capture_path = game_frame.capture_path
-        if not capture_path.exists():
-            logger.warning("Capture file not found for game frame %s: %s", frame_id, capture_path)
-            return (None, False)
-
-        try:
-            parser = MesenCaptureParser()
-            capture_result = parser.parse_file(capture_path)
-            used_fallback = False
-
-            if not capture_result.has_entries:
-                return (None, False)
-
-            # Apply selection filter if stored (preserves import-time selection)
-            if game_frame.selected_entry_ids:
-                selected_ids = set(game_frame.selected_entry_ids)
-                filtered_entries = [entry for entry in capture_result.entries if entry.id in selected_ids]
-
-                if not filtered_entries:
-                    # Stale entry IDs - fall back to rom_offset filtering (mirrors injection)
-                    logger.warning(
-                        "Stored entry IDs %s not found in capture %s. Using rom_offset fallback.",
-                        game_frame.selected_entry_ids,
-                        capture_path,
-                    )
-                    self.stale_entries_warning.emit(frame_id)
-                    used_fallback = True
-                    # Fallback to rom_offset filtering (mirrors inject_mapping behavior)
-                    filtered_entries = [
-                        entry for entry in capture_result.entries if entry.rom_offset in game_frame.rom_offsets
-                    ]
-                    if filtered_entries:
-                        capture_result = CaptureResult(
-                            frame=capture_result.frame,
-                            visible_count=len(filtered_entries),
-                            obsel=capture_result.obsel,
-                            entries=filtered_entries,
-                            palettes=capture_result.palettes,
-                            timestamp=capture_result.timestamp,
-                        )
-                    # If still no entries, return unfiltered as last resort
-                else:
-                    # Create filtered CaptureResult with only selected entries
-                    capture_result = CaptureResult(
-                        frame=capture_result.frame,
-                        visible_count=len(filtered_entries),
-                        obsel=capture_result.obsel,
-                        entries=filtered_entries,
-                        palettes=capture_result.palettes,
-                        timestamp=capture_result.timestamp,
-                    )
-
-            return (capture_result, used_fallback)
-
-        except Exception as e:
-            logger.warning("Failed to get capture result for game frame %s: %s", frame_id, e)
-            return (None, False)
+        return self._preview_service.get_capture_result_for_game_frame(frame_id, self._project)
 
     def get_ai_frames(self) -> list[AIFrame]:
         """Get all AI frames from the current project."""
@@ -1129,8 +997,7 @@ class FrameMappingController(QObject):
             return False
 
         # Clear preview cache for this frame
-        if frame_id in self._game_frame_previews:
-            del self._game_frame_previews[frame_id]
+        self._preview_service.invalidate(frame_id)
 
         if self._project.remove_game_frame(frame_id):
             self.game_frame_removed.emit(frame_id)

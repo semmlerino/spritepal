@@ -253,7 +253,7 @@ class TestInjectMappingEntryFiltering:
                 offset_y=0,
             )
         )
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -274,8 +274,8 @@ class TestInjectMappingEntryFiltering:
                 "core.mesen_integration.capture_renderer.CaptureRenderer.render_selection",
                 mock_render_selection,
             ),
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+            patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("core.services.injection_orchestrator.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
             mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
@@ -289,7 +289,7 @@ class TestInjectMappingEntryFiltering:
 
             # This should use ONLY entry 10 (via selected_entry_ids)
             # BUG: Currently uses ALL entries matching rom_offset (both 10 AND 20)
-            controller.inject_mapping(0, rom_path)
+            controller.inject_mapping("ai_frame.png", rom_path)
 
         # Should only have processed entry 10
         # BUG: Will have both [10, 20] because filtering uses rom_offset
@@ -445,7 +445,7 @@ class TestInjectMappingFlipHandling:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -475,12 +475,12 @@ class TestInjectMappingFlipHandling:
 
         with (
             patch.object(Image.Image, "paste", track_paste),
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
             patch(
-                "ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService",
+                "core.services.injection_orchestrator.ROMVerificationService",
                 return_value=mock_verifier,
             ),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+            patch("core.services.injection_orchestrator.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
             mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 128, 128)
@@ -491,7 +491,7 @@ class TestInjectMappingFlipHandling:
             rom_path.write_bytes(b"\x00" * 0x200000)
             (tmp_path / "out.sfc").write_bytes(b"\x00" * 0x200000)
 
-            controller.inject_mapping(0, rom_path)
+            controller.inject_mapping("ai_frame.png", rom_path)
 
         # Find tiles pasted during chunk assembly (after the AI paste and mask paste)
         # The chunk paste happens AFTER render_selection paste operations
@@ -560,7 +560,7 @@ class TestInjectMappingFlipHandling:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -589,12 +589,12 @@ class TestInjectMappingFlipHandling:
 
         with (
             patch.object(Image.Image, "save", track_save),
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
             patch(
-                "ui.frame_mapping.controllers.frame_mapping_controller.ROMVerificationService",
+                "core.services.injection_orchestrator.ROMVerificationService",
                 return_value=mock_verifier,
             ),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+            patch("core.services.injection_orchestrator.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
             mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
@@ -605,7 +605,7 @@ class TestInjectMappingFlipHandling:
             rom_path.write_bytes(b"\x00" * 0x200000)
             (tmp_path / "out.sfc").write_bytes(b"\x00" * 0x200000)
 
-            controller.inject_mapping(0, rom_path)
+            controller.inject_mapping("ai_frame.png", rom_path)
 
         # Find the chunk image (should be 8x8 for single tile)
         chunk_images = [img for img in saved_tile_images if img.size == (8, 8)]
@@ -685,7 +685,7 @@ class TestInjectMappingScale:
                 scale=0.5,  # Scale to 50% (16x16 -> 8x8)
             )
         )
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -713,8 +713,8 @@ class TestInjectMappingScale:
 
         with (
             patch.object(Image.Image, "paste", track_paste),
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+            patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("core.services.injection_orchestrator.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
             mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
@@ -726,7 +726,7 @@ class TestInjectMappingScale:
             rom_path.write_bytes(b"\x00" * 0x200000)
             (tmp_path / "out.sfc").write_bytes(b"\x00" * 0x200000)
 
-            controller.inject_mapping(0, rom_path)
+            controller.inject_mapping("frame_001.png", rom_path)
 
         # Find the AI image paste - should be the first paste that's not from CaptureRenderer tiles
         # CaptureRenderer pastes 8x8 tiles, the AI image is 16x16 (or 8x8 if correctly scaled)
@@ -827,7 +827,7 @@ class TestRomOffsetCorrection:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -835,22 +835,20 @@ class TestRomOffsetCorrection:
         # Track which offset is used for injection
         injected_offsets: list[int] = []
 
-        with (
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-        ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.side_effect = Exception("Not HAL compressed")
-            mock_injector.inject_sprite_to_rom.side_effect = (
-                lambda sprite_path, rom_path, output_path, sprite_offset, **kw: (
-                    injected_offsets.append(sprite_offset),
-                    (True, "Success"),
-                )[-1]
-            )
-            mock_injector_class.return_value = mock_injector
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.side_effect = Exception("Not HAL compressed")
+        mock_injector.inject_sprite_to_rom.side_effect = (
+            lambda sprite_path, rom_path, output_path, sprite_offset, **kw: (
+                injected_offsets.append(sprite_offset),
+                (True, "Success"),
+            )[-1]
+        )
+        controller._injection_orchestrator._rom_injector = mock_injector
 
+        with patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"):
             (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
-            controller.inject_mapping(0, rom_path)
+            controller.inject_mapping("ai_frame.png", rom_path)
 
         # Should have corrected to the actual offset where tile exists
         assert len(injected_offsets) == 1, f"Expected 1 injection, got {len(injected_offsets)}"
@@ -899,7 +897,7 @@ class TestRomOffsetCorrection:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -907,22 +905,20 @@ class TestRomOffsetCorrection:
         # Track which offset is used for injection
         injected_offsets: list[int] = []
 
-        with (
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-        ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.side_effect = Exception("Not HAL compressed")
-            mock_injector.inject_sprite_to_rom.side_effect = (
-                lambda sprite_path, rom_path, output_path, sprite_offset, **kw: (
-                    injected_offsets.append(sprite_offset),
-                    (True, "Success"),
-                )[-1]
-            )
-            mock_injector_class.return_value = mock_injector
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.side_effect = Exception("Not HAL compressed")
+        mock_injector.inject_sprite_to_rom.side_effect = (
+            lambda sprite_path, rom_path, output_path, sprite_offset, **kw: (
+                injected_offsets.append(sprite_offset),
+                (True, "Success"),
+            )[-1]
+        )
+        controller._injection_orchestrator._rom_injector = mock_injector
 
+        with patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"):
             (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
-            controller.inject_mapping(0, rom_path)
+            controller.inject_mapping("ai_frame.png", rom_path)
 
         # Should use original offset since tile is found there
         assert len(injected_offsets) == 1
@@ -966,7 +962,7 @@ class TestRomOffsetCorrection:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -976,14 +972,14 @@ class TestRomOffsetCorrection:
         controller.error_occurred.connect(errors.append)
 
         with (
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+            patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("core.services.injection_orchestrator.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
             mock_injector_class.return_value = mock_injector
 
             (tmp_path / "out.sfc").write_bytes(rom_data)
-            result = controller.inject_mapping(0, rom_path)
+            result = controller.inject_mapping("ai_frame.png", rom_path)
 
         # Should have failed with error
         assert result is False, "Expected injection to fail when no tiles found"
@@ -1070,15 +1066,15 @@ class TestRomOffsetCorrection:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
 
         with (
             caplog.at_level(logging.INFO),
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+            patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
+            patch("core.services.injection_orchestrator.ROMInjector") as mock_injector_class,
         ):
             mock_injector = MagicMock()
             mock_injector.find_compressed_sprite.side_effect = Exception("Not HAL")
@@ -1086,7 +1082,7 @@ class TestRomOffsetCorrection:
             mock_injector_class.return_value = mock_injector
 
             (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
-            controller.inject_mapping(0, rom_path)
+            controller.inject_mapping("ai_frame.png", rom_path)
 
         # Check that verification statistics were logged
         # New format from ROMVerificationService: "ROM offset verification: N tiles, N HAL, N raw, N not found"
@@ -1328,7 +1324,7 @@ class TestAIFramesLoadingPrunesMappings:
         controller._project.mappings.append(FrameMapping(ai_frame_id="frame_000.png", game_frame_id="G1"))
         controller._project.mappings.append(FrameMapping(ai_frame_id="frame_002.png", game_frame_id="G2"))
         controller._project.mappings.append(FrameMapping(ai_frame_id="frame_004.png", game_frame_id="G3"))
-        controller._project._invalidate_mapping_index()
+        controller._project._rebuild_indices()
 
         # Now reload with only 3 frames (filenames frame_000, frame_001, frame_002)
         ai_dir2 = tmp_path / "ai_frames2"
@@ -1369,7 +1365,7 @@ class TestAIFramesLoadingPrunesMappings:
         controller._project.game_frames.append(GameFrame(id="G2", rom_offsets=[0x2000]))
         controller._project.mappings.append(FrameMapping(ai_frame_id="frame_000.png", game_frame_id="G1"))
         controller._project.mappings.append(FrameMapping(ai_frame_id="frame_002.png", game_frame_id="G2"))
-        controller._project._invalidate_mapping_index()
+        controller._project._rebuild_indices()
 
         # Reload same directory - all mappings should remain (filenames match)
         controller.load_ai_frames_from_directory(ai_dir)
@@ -1487,12 +1483,12 @@ class TestPreviewCacheInvalidation:
         )
         controller._project = project
 
-        # Manually add a preview to the cache using internal format (pixmap, mtime, entry_ids)
+        # Manually add a preview to the cache via service
         from PySide6.QtGui import QPixmap
 
         cached_pixmap = QPixmap(10, 10)
         # Cache stores (pixmap, mtime, entry_ids) - use 0.0 mtime and empty tuple for no-file case
-        controller._game_frame_previews["F001"] = (cached_pixmap, 0.0, ())
+        controller._preview_service.set_preview_cache("F001", cached_pixmap, 0.0, ())
 
         # Should return cached even with no file to compare
         preview = controller.get_game_frame_preview("F001")
@@ -1649,7 +1645,7 @@ class TestStaleEntryIdsFallback:
                 offset_y=0,
             )
         )
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -1668,24 +1664,24 @@ class TestStaleEntryIdsFallback:
                 captured_entries.append(entry.id)
             return Image.new("RGBA", (8, 8), (0, 0, 0, 255))
 
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
+        controller._injection_orchestrator._rom_injector = mock_injector
+
         with (
             patch(
                 "core.mesen_integration.capture_renderer.CaptureRenderer.render_selection",
                 mock_render_selection,
             ),
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
+            patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
-            mock_injector_class.return_value = mock_injector
-
             rom_path = tmp_path / "test.sfc"
             rom_path.write_bytes(b"\x00" * 0x200000)
             (tmp_path / "out.sfc").write_bytes(b"\x00" * 0x200000)
 
-            result = controller.inject_mapping(0, rom_path)
+            result = controller.inject_mapping("ai_frame.png", rom_path)
 
         assert result is True
         assert captured_entries == [10], f"Expected [10], got {captured_entries}"
@@ -1734,7 +1730,7 @@ class TestCompressionTypeSelection:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -1743,21 +1739,19 @@ class TestCompressionTypeSelection:
 
         injected_compression: list[CompressionType] = []
 
-        with (
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-        ):
-            mock_injector = MagicMock()
-            mock_injector.inject_sprite_to_rom.side_effect = (
-                lambda sprite_path, rom_path, output_path, sprite_offset, compression_type, **kw: (
-                    injected_compression.append(compression_type),
-                    (True, "Success"),
-                )[-1]
-            )
-            mock_injector_class.return_value = mock_injector
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.inject_sprite_to_rom.side_effect = (
+            lambda sprite_path, rom_path, output_path, sprite_offset, compression_type, **kw: (
+                injected_compression.append(compression_type),
+                (True, "Success"),
+            )[-1]
+        )
+        controller._injection_orchestrator._rom_injector = mock_injector
 
+        with patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"):
             (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
-            result = controller.inject_mapping(0, rom_path)
+            result = controller.inject_mapping("ai_frame.png", rom_path)
 
         assert result is True
         assert len(injected_compression) == 1
@@ -1799,7 +1793,7 @@ class TestCompressionTypeSelection:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -1808,22 +1802,20 @@ class TestCompressionTypeSelection:
 
         injected_compression: list[CompressionType] = []
 
-        with (
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-        ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.side_effect = (
-                lambda sprite_path, rom_path, output_path, sprite_offset, compression_type, **kw: (
-                    injected_compression.append(compression_type),
-                    (True, "Success"),
-                )[-1]
-            )
-            mock_injector_class.return_value = mock_injector
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.side_effect = (
+            lambda sprite_path, rom_path, output_path, sprite_offset, compression_type, **kw: (
+                injected_compression.append(compression_type),
+                (True, "Success"),
+            )[-1]
+        )
+        controller._injection_orchestrator._rom_injector = mock_injector
 
+        with patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"):
             (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
-            result = controller.inject_mapping(0, rom_path)
+            result = controller.inject_mapping("ai_frame.png", rom_path)
 
         assert result is True
         assert len(injected_compression) == 1
@@ -1866,7 +1858,7 @@ class TestCompressionTypeSelection:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -1875,21 +1867,19 @@ class TestCompressionTypeSelection:
 
         injected_compression: list[CompressionType] = []
 
-        with (
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-        ):
-            mock_injector = MagicMock()
-            mock_injector.inject_sprite_to_rom.side_effect = (
-                lambda sprite_path, rom_path, output_path, sprite_offset, compression_type, **kw: (
-                    injected_compression.append(compression_type),
-                    (True, "Success"),
-                )[-1]
-            )
-            mock_injector_class.return_value = mock_injector
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.inject_sprite_to_rom.side_effect = (
+            lambda sprite_path, rom_path, output_path, sprite_offset, compression_type, **kw: (
+                injected_compression.append(compression_type),
+                (True, "Success"),
+            )[-1]
+        )
+        controller._injection_orchestrator._rom_injector = mock_injector
 
+        with patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"):
             (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
-            result = controller.inject_mapping(0, rom_path)
+            result = controller.inject_mapping("ai_frame.png", rom_path)
 
         assert result is True
         assert len(injected_compression) == 1
@@ -1934,7 +1924,7 @@ class TestAllowFallbackParameter:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -1945,7 +1935,7 @@ class TestAllowFallbackParameter:
 
         # Injection should abort and emit stale_entries_warning + error_occurred
         with qtbot.waitSignal(controller.stale_entries_warning, timeout=1000):
-            result = controller.inject_mapping(0, rom_path, allow_fallback=False)
+            result = controller.inject_mapping("ai_frame.png", rom_path, allow_fallback=False)
 
         # Should return False (aborted)
         assert result is False
@@ -1986,7 +1976,7 @@ class TestAllowFallbackParameter:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -1998,24 +1988,25 @@ class TestAllowFallbackParameter:
                 captured_entries.append(entry.id)
             return Image.new("RGBA", (8, 8), (0, 0, 0, 255))
 
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
+        controller._injection_orchestrator._rom_injector = mock_injector
+
         with (
             patch(
                 "core.mesen_integration.capture_renderer.CaptureRenderer.render_selection",
                 mock_render_selection,
             ),
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-            qtbot.waitSignal(controller.stale_entries_warning, timeout=1000),
+            patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
-            mock_injector_class.return_value = mock_injector
-
             (tmp_path / "out.sfc").write_bytes(bytes(rom_data))
 
             # With allow_fallback=True, injection should proceed using rom_offset filtering
-            result = controller.inject_mapping(0, rom_path, allow_fallback=True)
+            # Note: stale_entries_warning is NOT emitted when allow_fallback=True because
+            # the fallback is explicitly allowed and doesn't need user confirmation
+            result = controller.inject_mapping("ai_frame.png", rom_path, allow_fallback=True)
 
         assert result is True
         # Should have used entry 10 via rom_offset fallback
@@ -2068,28 +2059,26 @@ class TestPreserveExistingParameter:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
 
         preserve_existing_values: list[bool] = []
 
-        with (
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-        ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
 
-            def capture_preserve_existing(**kwargs):
-                preserve_existing_values.append(kwargs.get("preserve_existing", False))
-                return (True, "Success")
+        def capture_preserve_existing(**kwargs):
+            preserve_existing_values.append(kwargs.get("preserve_existing", False))
+            return (True, "Success")
 
-            mock_injector.inject_sprite_to_rom.side_effect = capture_preserve_existing
-            mock_injector_class.return_value = mock_injector
+        mock_injector.inject_sprite_to_rom.side_effect = capture_preserve_existing
+        controller._injection_orchestrator._rom_injector = mock_injector
 
-            # Inject with existing output_path (simulates "Reuse ROM")
-            result = controller.inject_mapping(0, rom_path, output_path=output_rom_path)
+        # Inject with existing output_path (simulates "Reuse ROM")
+        result = controller.inject_mapping("ai_frame.png", rom_path, output_path=output_rom_path)
 
         assert result is True
         # Since output_path exists, preserve_existing should be True
@@ -2131,33 +2120,31 @@ class TestPreserveExistingParameter:
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
 
         preserve_existing_values: list[bool] = []
 
-        with (
-            patch.object(controller, "_create_injection_copy", return_value=tmp_path / "new_output.sfc"),
-            patch("ui.frame_mapping.controllers.frame_mapping_controller.ROMInjector") as mock_injector_class,
-        ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
 
-            def capture_preserve_existing(**kwargs):
-                preserve_existing_values.append(kwargs.get("preserve_existing", False))
-                return (True, "Success")
+        def capture_preserve_existing(**kwargs):
+            preserve_existing_values.append(kwargs.get("preserve_existing", False))
+            return (True, "Success")
 
-            mock_injector.inject_sprite_to_rom.side_effect = capture_preserve_existing
-            mock_injector_class.return_value = mock_injector
+        mock_injector.inject_sprite_to_rom.side_effect = capture_preserve_existing
+        controller._injection_orchestrator._rom_injector = mock_injector
 
-            # Need to create the output file since _create_injection_copy is mocked
+        with patch.object(controller, "create_injection_copy", return_value=tmp_path / "new_output.sfc"):
+            # Need to create the output file since create_injection_copy is mocked
             (tmp_path / "new_output.sfc").write_bytes(bytes(rom_data))
 
             # Inject without existing output_path (creates new copy)
             # Note: output_path=None means controller creates a fresh copy
-            result = controller.inject_mapping(0, rom_path, output_path=None)
+            result = controller.inject_mapping("ai_frame.png", rom_path, output_path=None)
 
         assert result is True
         # Since a fresh copy was created, preserve_existing should be False
@@ -2188,7 +2175,7 @@ class TestUpdateMappingAlignmentEmitsSaveRequested:
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
         project.game_frames.append(GameFrame(id="G001", rom_offsets=[0x1000], selected_entry_ids=[]))
         project.mappings.append(FrameMapping(ai_frame_id="frame_001.png", game_frame_id="G001"))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
@@ -2220,7 +2207,7 @@ class TestUpdateMappingAlignmentEmitsSaveRequested:
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
         project.game_frames.append(GameFrame(id="G002", rom_offsets=[0x2000], selected_entry_ids=[]))
         project.mappings.append(FrameMapping(ai_frame_id="frame_002.png", game_frame_id="G002"))
-        project._invalidate_mapping_index()
+        project._rebuild_indices()
 
         controller = FrameMappingController()
         controller._project = project
