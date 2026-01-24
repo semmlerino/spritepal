@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 
 from core.frame_mapping_project import AIFrame, FrameMappingProject
+from core.repositories.frame_mapping_repository import FrameMappingRepository
 
 
 def test_project_portability_repro(tmp_path):
@@ -18,7 +19,7 @@ def test_project_portability_repro(tmp_path):
     project_path = project_dir / "project.spritepal-mapping.json"
     project = FrameMappingProject(name="Test Project", ai_frames_dir=ai_dir)
     project.ai_frames.append(AIFrame(path=ai_path, index=0))
-    project.save(project_path)
+    FrameMappingRepository.save(project, project_path)
 
     # Verify relative paths are stored
     with open(project_path) as f:
@@ -40,7 +41,7 @@ def test_project_portability_repro(tmp_path):
     shutil.rmtree(project_dir)
 
     # Load from new location
-    loaded_project = FrameMappingProject.load(new_project_path)
+    loaded_project = FrameMappingRepository.load(new_project_path)
 
     assert loaded_project.ai_frames_dir.exists(), (
         f"Path {loaded_project.ai_frames_dir} should exist but it points to old location"

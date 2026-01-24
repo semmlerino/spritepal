@@ -29,6 +29,7 @@ from core.mesen_integration.click_extractor import (
     MesenCaptureParser,
     OAMEntry,
 )
+from core.repositories.frame_mapping_repository import FrameMappingRepository
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
@@ -206,7 +207,7 @@ class FrameMappingController(QObject):
             True if loaded successfully
         """
         try:
-            self._project = FrameMappingProject.load(path)
+            self._project = FrameMappingRepository.load(path)
             self._preview_service.invalidate_all()
             self._undo_stack.clear()  # Clear history on project load
             self.project_changed.emit()
@@ -231,7 +232,7 @@ class FrameMappingController(QObject):
             return False
 
         try:
-            self._project.save(path)
+            FrameMappingRepository.save(self._project, path)
             logger.info("Saved frame mapping project to %s", path)
             return True
         except Exception as e:

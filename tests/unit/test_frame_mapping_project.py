@@ -415,6 +415,7 @@ class TestFrameMappingProjectOrganization:
     def test_organization_persists_through_save_load(self, tmp_path: Path) -> None:
         """display_name and tags survive save/load cycle."""
         from core.frame_mapping_project import FrameMappingProject
+        from core.repositories.frame_mapping_repository import FrameMappingRepository
 
         project = FrameMappingProject(name="test")
         project.ai_frames = [
@@ -429,9 +430,9 @@ class TestFrameMappingProjectOrganization:
         project._rebuild_indices()
 
         save_path = tmp_path / "test.spritepal-mapping.json"
-        project.save(save_path)
+        FrameMappingRepository.save(project, save_path)
 
-        loaded = FrameMappingProject.load(save_path)
+        loaded = FrameMappingRepository.load(save_path)
 
         frame1 = loaded.get_ai_frame_by_id("frame_001.png")
         assert frame1 is not None
@@ -655,6 +656,7 @@ class TestFrameMappingProjectCaptureOrganization:
     def test_capture_organization_persists_through_save_load(self, tmp_path: Path) -> None:
         """Capture display names persist through save/load cycle."""
         from core.frame_mapping_project import FrameMappingProject
+        from core.repositories.frame_mapping_repository import FrameMappingRepository
 
         project = FrameMappingProject(name="test")
         project.game_frames = [
@@ -663,9 +665,9 @@ class TestFrameMappingProjectCaptureOrganization:
         ]
 
         save_path = tmp_path / "test.spritepal-mapping.json"
-        project.save(save_path)
+        FrameMappingRepository.save(project, save_path)
 
-        loaded = FrameMappingProject.load(save_path)
+        loaded = FrameMappingRepository.load(save_path)
 
         frame1 = loaded.get_game_frame_by_id("F001")
         assert frame1 is not None
@@ -744,6 +746,7 @@ class TestFrameMappingProjectAlignment:
     def test_alignment_persists_through_save_load(self, tmp_path: Path) -> None:
         """Alignment values survive save/load cycle."""
         from core.frame_mapping_project import FrameMappingProject
+        from core.repositories.frame_mapping_repository import FrameMappingRepository
 
         # Create project with AI frame and game frame
         project = FrameMappingProject(name="test")
@@ -762,10 +765,10 @@ class TestFrameMappingProjectAlignment:
 
         # Save
         save_path = tmp_path / "test.spritepal-mapping.json"
-        project.save(save_path)
+        FrameMappingRepository.save(project, save_path)
 
         # Load
-        loaded = FrameMappingProject.load(save_path)
+        loaded = FrameMappingRepository.load(save_path)
 
         mapping = loaded.get_mapping_for_ai_frame("frame_001.png")
         assert mapping is not None
@@ -792,6 +795,7 @@ class TestFrameMappingProjectStableIDs:
     def test_mapping_survives_frame_reorder(self, tmp_path: Path) -> None:
         """Mappings survive AI frame reload/reorder."""
         from core.frame_mapping_project import FrameMappingProject
+        from core.repositories.frame_mapping_repository import FrameMappingRepository
 
         # Create project with AI frames in order A, B, C and a game frame
         project = FrameMappingProject(name="test")
@@ -808,7 +812,7 @@ class TestFrameMappingProjectStableIDs:
 
         # Save
         save_path = tmp_path / "test.spritepal-mapping.json"
-        project.save(save_path)
+        FrameMappingRepository.save(project, save_path)
 
         # Modify saved project to simulate different frame order on load
         # (Normally this would happen because files on disk got renamed/reordered)
@@ -827,7 +831,7 @@ class TestFrameMappingProjectStableIDs:
             json.dump(data, f)
 
         # Load
-        loaded = FrameMappingProject.load(save_path)
+        loaded = FrameMappingRepository.load(save_path)
 
         # Mapping should still reference "b.png" by ID, not index
         mapping = loaded.get_mapping_for_ai_frame("b.png")
@@ -840,6 +844,7 @@ class TestFrameMappingProjectStableIDs:
         import json
 
         from core.frame_mapping_project import FrameMappingProject
+        from core.repositories.frame_mapping_repository import FrameMappingRepository
 
         # Create a V1 project file manually
         v1_data = {
@@ -872,7 +877,7 @@ class TestFrameMappingProjectStableIDs:
             json.dump(v1_data, f)
 
         # Load - should migrate
-        project = FrameMappingProject.load(save_path)
+        project = FrameMappingRepository.load(save_path)
 
         # Mapping should now use ai_frame_id
         assert len(project.mappings) == 1
@@ -884,74 +889,23 @@ class TestFrameMappingProjectStableIDs:
 
 
 class TestFrameMappingProjectAtomicSave:
-    """Tests for atomic save functionality (Issue #3 fix)."""
+    """Tests for atomic save functionality (Issue #3 fix).
 
-    def test_save_creates_valid_json(self, tmp_path: Path) -> None:
-        """Save creates a valid JSON file."""
-        import json
+    Note: These tests moved to test_frame_mapping_repository.py.
+    Keeping this class for backward compatibility marker.
+    """
 
-        from core.frame_mapping_project import FrameMappingProject
-
-        project = FrameMappingProject(name="test")
-        save_path = tmp_path / "test.spritepal-mapping.json"
-        project.save(save_path)
-
-        # Should be valid JSON
-        with open(save_path) as f:
-            data = json.load(f)
-
-        assert data["name"] == "test"
-        from core.frame_mapping_project import CURRENT_VERSION
-
-        assert data["version"] == CURRENT_VERSION
-
-    def test_save_uses_current_format(self, tmp_path: Path) -> None:
-        """Save uses current format version with ai_frame_id."""
-        import json
-
-        from core.frame_mapping_project import CURRENT_VERSION, FrameMappingProject
-
-        project = FrameMappingProject(name="test")
-        project.create_mapping(ai_frame_id="sprite.png", game_frame_id="G001")
-
-        save_path = tmp_path / "test.spritepal-mapping.json"
-        project.save(save_path)
-
-        with open(save_path) as f:
-            data = json.load(f)
-
-        assert data["version"] == CURRENT_VERSION
-        assert len(data["mappings"]) == 1
-        assert data["mappings"][0]["ai_frame_id"] == "sprite.png"
-        assert "ai_frame_index" not in data["mappings"][0]
+    pass
 
 
 class TestFrameMappingProjectVersionValidation:
-    """Tests for version validation (Issue #4 fix)."""
+    """Tests for version validation (Issue #4 fix).
 
-    def test_load_rejects_unsupported_version(self, tmp_path: Path) -> None:
-        """Load rejects project files with unsupported versions."""
-        import json
+    Note: These tests moved to test_frame_mapping_repository.py.
+    Keeping this class for backward compatibility marker.
+    """
 
-        import pytest
-
-        from core.frame_mapping_project import FrameMappingProject
-
-        # Create a project file with unsupported version
-        bad_data = {
-            "version": 99,  # Unsupported
-            "name": "test",
-            "ai_frames": [],
-            "game_frames": [],
-            "mappings": [],
-        }
-
-        save_path = tmp_path / "bad.spritepal-mapping.json"
-        with open(save_path, "w") as f:
-            json.dump(bad_data, f)
-
-        with pytest.raises(ValueError, match="Unsupported project version"):
-            FrameMappingProject.load(save_path)
+    pass
 
 
 class TestFrameMappingProjectPerformance:
