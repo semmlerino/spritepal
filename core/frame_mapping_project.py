@@ -625,26 +625,6 @@ class FrameMappingProject:
         """
         return self._mapping_index_by_ai.get(ai_frame_id)
 
-    def get_mapping_for_ai_frame_index(self, ai_frame_index: int) -> FrameMapping | None:
-        """Get mapping for a specific AI frame by index.
-
-        .. deprecated::
-            Use get_mapping_for_ai_frame(ai_frame_id) instead. Index-based
-            lookups are fragile across project reloads and frame reordering.
-
-        Converts index to ID internally.
-
-        Args:
-            ai_frame_index: The AI frame index
-
-        Returns:
-            FrameMapping if found, None otherwise
-        """
-        frame = self.get_ai_frame_by_index(ai_frame_index)
-        if frame is None:
-            return None
-        return self.get_mapping_for_ai_frame(frame.id)
-
     def get_mapping_for_game_frame(self, game_frame_id: str) -> FrameMapping | None:
         """Get mapping for a specific game frame.
 
@@ -665,26 +645,6 @@ class FrameMappingProject:
         if mapping is not None:
             return mapping.ai_frame_id
         return None
-
-    def get_ai_frame_index_linked_to_game_frame(self, game_frame_id: str) -> int | None:
-        """Get the AI frame index linked to a specific game frame.
-
-        .. deprecated::
-            Use get_ai_frame_linked_to_game_frame(game_frame_id) to get the
-            AI frame ID instead. Index-based lookups are fragile across
-            project reloads.
-
-        Args:
-            game_frame_id: ID of the game frame
-
-        Returns:
-            AI frame index if game frame is linked, None otherwise
-        """
-        ai_frame_id = self.get_ai_frame_linked_to_game_frame(game_frame_id)
-        if ai_frame_id is None:
-            return None
-        ai_frame = self.get_ai_frame_by_id(ai_frame_id)
-        return ai_frame.index if ai_frame else None
 
     def get_ai_frame_by_id(self, ai_frame_id: str) -> AIFrame | None:
         """Get AI frame by ID (filename).
@@ -725,20 +685,6 @@ class FrameMappingProject:
 
         logger.info("Updated AI frame path: %s -> %s (new ID: %s)", old_id, new_path, new_id)
         return new_id
-
-    def get_ai_frame_by_index(self, index: int) -> AIFrame | None:
-        """Get AI frame by index.
-
-        .. deprecated::
-            Use get_ai_frame_by_id(ai_frame_id) instead. Index-based lookups
-            are O(n) and fragile across project reloads.
-
-        O(n) lookup - prefer get_ai_frame_by_id when possible.
-        """
-        for frame in self.ai_frames:
-            if frame.index == index:
-                return frame
-        return None
 
     def get_game_frame_by_id(self, frame_id: str) -> GameFrame | None:
         """Get game frame by ID."""
@@ -820,25 +766,6 @@ class FrameMappingProject:
         self._invalidate_mapping_index()
         return mapping
 
-    def create_mapping_by_index(self, ai_frame_index: int, game_frame_id: str) -> FrameMapping | None:
-        """Create a new mapping using AI frame index.
-
-        .. deprecated::
-            Use create_mapping(ai_frame_id, game_frame_id) instead. Index-based
-            APIs are fragile across project reloads and frame reordering.
-
-        Args:
-            ai_frame_index: Index of the AI frame
-            game_frame_id: ID of the game frame
-
-        Returns:
-            The created mapping, or None if AI frame not found
-        """
-        ai_frame = self.get_ai_frame_by_index(ai_frame_index)
-        if ai_frame is None:
-            return None
-        return self.create_mapping(ai_frame.id, game_frame_id)
-
     def update_mapping_alignment(
         self,
         ai_frame_id: str,
@@ -880,27 +807,6 @@ class FrameMappingProject:
 
         return True
 
-    def update_mapping_alignment_by_index(
-        self,
-        ai_frame_index: int,
-        offset_x: int,
-        offset_y: int,
-        flip_h: bool,
-        flip_v: bool,
-        scale: float = 1.0,
-        set_edited: bool = True,
-    ) -> bool:
-        """Update alignment for a mapping using AI frame index.
-
-        .. deprecated::
-            Use update_mapping_alignment(ai_frame_id, ...) instead. Index-based
-            APIs are fragile across project reloads and frame reordering.
-        """
-        frame = self.get_ai_frame_by_index(ai_frame_index)
-        if frame is None:
-            return False
-        return self.update_mapping_alignment(frame.id, offset_x, offset_y, flip_h, flip_v, scale, set_edited)
-
     def remove_mapping_for_ai_frame(self, ai_frame_id: str) -> bool:
         """Remove mapping for an AI frame.
 
@@ -916,24 +822,6 @@ class FrameMappingProject:
             self._invalidate_mapping_index()
             return True
         return False
-
-    def remove_mapping_for_ai_frame_index(self, ai_frame_index: int) -> bool:
-        """Remove mapping for an AI frame using index.
-
-        .. deprecated::
-            Use remove_mapping_for_ai_frame(ai_frame_id) instead. Index-based
-            APIs are fragile across project reloads and frame reordering.
-
-        Args:
-            ai_frame_index: Index of the AI frame
-
-        Returns:
-            True if a mapping was removed, False if none existed
-        """
-        frame = self.get_ai_frame_by_index(ai_frame_index)
-        if frame is None:
-            return False
-        return self.remove_mapping_for_ai_frame(frame.id)
 
     @property
     def mapped_count(self) -> int:

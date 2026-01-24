@@ -87,10 +87,7 @@ class FrameMappingWorkspace(QWidget):
         self._modified_rom_path: Path | None = None
         self._last_injected_rom: Path | None = None  # Track last injection target for reuse
 
-        # Selection tracking
-        # Index-based selection (legacy - for backwards compatibility)
-        self._selected_ai_index: int | None = None
-        # ID-based selection (stable across reloads - preferred)
+        # Selection tracking (ID-based - stable across reloads)
         self._selected_ai_frame_id: str | None = None
         self._selected_game_id: str | None = None
         # Canvas display tracking - what the canvas is actually showing
@@ -374,7 +371,6 @@ class FrameMappingWorkspace(QWidget):
             self._alignment_canvas.clear()
 
         if project is None:
-            self._selected_ai_index = None
             self._selected_ai_frame_id = None
             self._selected_game_id = None
             self._project_label.setText("")
@@ -439,7 +435,6 @@ class FrameMappingWorkspace(QWidget):
         # Guard against cleared selection
         if not frame_id:
             self._selected_ai_frame_id = None
-            self._selected_ai_index = None
             self._update_map_button_state()
             self._alignment_canvas.set_ai_frame(None)
             self._alignment_canvas.clear_alignment()
@@ -455,10 +450,8 @@ class FrameMappingWorkspace(QWidget):
         # Sync drawer selection by ID
         self._mapping_panel.select_row_by_ai_id(frame_id)
 
-        # Load AI frame into canvas and derive index for backward compatibility
+        # Load AI frame into canvas
         frame = project.get_ai_frame_by_id(frame_id)
-        if frame:
-            self._selected_ai_index = frame.index
         self._alignment_canvas.set_ai_frame(frame)
 
         # Check for mapping using ID-based lookup (O(1))
@@ -527,16 +520,13 @@ class FrameMappingWorkspace(QWidget):
         if project is None:
             return
 
-        # Get AI frame by ID and derive index for legacy components
+        # Get AI frame by ID
         ai_frame = project.get_ai_frame_by_id(ai_frame_id)
         if ai_frame is None:
             return
 
-        ai_frame_index = ai_frame.index
-
-        # Sync AI frames pane (still uses index)
-        self._ai_frames_pane.select_frame(ai_frame_index)
-        self._selected_ai_index = ai_frame_index
+        # Sync AI frames pane (uses index for scroll/selection)
+        self._ai_frames_pane.select_frame(ai_frame.index)
         self._selected_ai_frame_id = ai_frame_id
 
         # Load into canvas
@@ -575,16 +565,7 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(self, "Map Frames", "Please select a game frame first.")
             return
 
-        # Derive index for _attempt_link which still uses index-based API
-        project = self._controller.project
-        if project is None:
-            return
-
-        ai_frame = project.get_ai_frame_by_id(self._selected_ai_frame_id)
-        if ai_frame is None:
-            return
-
-        self._attempt_link(ai_frame.index, self._selected_game_id)
+        self._attempt_link(self._selected_ai_frame_id, self._selected_game_id)
 
     def _on_drop_game_frame(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Handle game frame dropped onto drawer row.
@@ -593,15 +574,7 @@ class FrameMappingWorkspace(QWidget):
             ai_frame_id: AI frame ID (filename)
             game_frame_id: Game frame ID
         """
-        project = self._controller.project
-        if project is None:
-            return
-
-        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
-        if ai_frame is None:
-            return
-
-        self._attempt_link(ai_frame.index, game_frame_id)
+        self._attempt_link(ai_frame_id, game_frame_id)
 
     def _on_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
         """Handle alignment change from canvas (auto-save).
@@ -630,16 +603,10 @@ class FrameMappingWorkspace(QWidget):
             )
             return
 
-        # Derive index for methods that still use index-based API
-        ai_frame = project.get_ai_frame_by_id(self._selected_ai_frame_id)
-        if ai_frame is None:
-            return
-        ai_index = ai_frame.index
-
         # Update alignment in controller (includes scale)
         # This emits alignment_updated signal which triggers _on_alignment_updated()
         # which handles updating the mapping panel row
-        self._controller.update_mapping_alignment(ai_index, x, y, flip_h, flip_v, scale)
+        self._controller.update_mapping_alignment(self._selected_ai_frame_id, x, y, flip_h, flip_v, scale)
 
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.
@@ -762,10 +729,10 @@ class FrameMappingWorkspace(QWidget):
         if game_frame is None:
             return
 
-        # Find if there's a linked AI frame (use index-based method)
-        linked_ai_idx = project.get_ai_frame_index_linked_to_game_frame(frame_id)
-        if linked_ai_idx is not None:
-            ai_frame = project.get_ai_frame_by_index(linked_ai_idx)
+        # Find if there's a linked AI frame (use ID-based method)
+        linked_ai_id = project.get_ai_frame_linked_to_game_frame(frame_id)
+        if linked_ai_id is not None:
+            ai_frame = project.get_ai_frame_by_id(linked_ai_id)
             if ai_frame:
                 self.edit_in_sprite_editor_requested.emit(ai_frame.path, game_frame.rom_offsets)
                 return
@@ -909,15 +876,15 @@ class FrameMappingWorkspace(QWidget):
         if project is None:
             return
 
-        # Check if linked (use index-based method)
-        linked_ai_idx = project.get_ai_frame_index_linked_to_game_frame(frame_id)
-        if linked_ai_idx is not None:
+        # Check if linked (use ID-based method)
+        linked_ai_id = project.get_ai_frame_linked_to_game_frame(frame_id)
+        if linked_ai_id is not None:
+            ai_frame = project.get_ai_frame_by_id(linked_ai_id)
+            ai_name = ai_frame.name if ai_frame else linked_ai_id
             reply = QMessageBox.question(
                 self,
                 "Delete Capture",
-                f"This capture is linked to AI frame #{linked_ai_idx}.\n"
-                "Deleting will also remove the mapping.\n\n"
-                "Continue?",
+                f"This capture is linked to AI frame '{ai_name}'.\nDeleting will also remove the mapping.\n\nContinue?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -992,7 +959,6 @@ class FrameMappingWorkspace(QWidget):
             # Clear selection if deleted frame was selected
             if self._selected_ai_frame_id == ai_frame_id:
                 self._selected_ai_frame_id = None
-                self._selected_ai_index = None
                 self._current_canvas_game_id = None
                 self._alignment_canvas.set_ai_frame(None)
                 self._alignment_canvas.clear_alignment()
@@ -1007,7 +973,7 @@ class FrameMappingWorkspace(QWidget):
         Args:
             ai_frame_id: AI frame ID (filename)
         """
-        self._controller.remove_mapping_by_id(ai_frame_id)
+        self._controller.remove_mapping(ai_frame_id)
         self._refresh_mapping_status()
         self._refresh_game_frame_link_status()
         self._mapping_panel.refresh()  # Refresh table after mapping removal
@@ -1029,12 +995,6 @@ class FrameMappingWorkspace(QWidget):
         project = self._controller.project
         if project is None:
             return
-
-        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
-        if ai_frame is None:
-            return
-
-        ai_frame_index = ai_frame.index
 
         if not project.get_mapping_for_ai_frame(ai_frame_id):
             QMessageBox.information(self, "Inject Frame", "Selected frame is not mapped.")
@@ -1085,8 +1045,7 @@ class FrameMappingWorkspace(QWidget):
                 return
 
         # Try injection with strict entry validation (no fallback)
-        # inject_mapping still uses index internally
-        success = self._controller.inject_mapping(ai_frame_index, rom_path, output_path=target_rom)
+        success = self._controller.inject_mapping(ai_frame_id, rom_path, output_path=target_rom)
 
         # If injection failed due to stale entries, offer to retry with fallback
         if not success and self._stale_entry_frame_id is not None:
@@ -1104,7 +1063,7 @@ class FrameMappingWorkspace(QWidget):
             if retry_reply == QMessageBox.StandardButton.Yes:
                 # Retry with allow_fallback=True
                 success = self._controller.inject_mapping(
-                    ai_frame_index, rom_path, output_path=target_rom, allow_fallback=True
+                    ai_frame_id, rom_path, output_path=target_rom, allow_fallback=True
                 )
 
         # Track the successfully used ROM for future reuse
@@ -1113,9 +1072,9 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_inject_selected(self) -> None:
         """Handle inject selected frames request from mapping panel."""
-        selected_indices = self._mapping_panel.get_selected_for_injection()
+        selected_ids = self._mapping_panel.get_selected_for_injection()
 
-        if not selected_indices:
+        if not selected_ids:
             QMessageBox.information(self, "Inject Selected", "No frames selected for injection.")
             return
 
@@ -1129,7 +1088,7 @@ class FrameMappingWorkspace(QWidget):
         reuse_enabled = self._reuse_rom_checkbox.isChecked()
         can_reuse = reuse_enabled and self._last_injected_rom is not None and self._last_injected_rom.exists()
 
-        frame_count = len(selected_indices)
+        frame_count = len(selected_ids)
         if can_reuse:
             target_rom = cast(Path, self._last_injected_rom)
             reply = QMessageBox.question(
@@ -1168,9 +1127,11 @@ class FrameMappingWorkspace(QWidget):
         # Use emit_project_changed=False to avoid N emissions, emit once after batch
         success_count = 0
         failed_due_to_stale = 0
-        for ai_index in selected_indices:
+        for ai_frame_id in selected_ids:
             self._stale_entry_frame_id = None  # Reset for each frame
-            if self._controller.inject_mapping(ai_index, rom_path, output_path=target_rom, emit_project_changed=False):
+            if self._controller.inject_mapping(
+                ai_frame_id, rom_path, output_path=target_rom, emit_project_changed=False
+            ):
                 success_count += 1
             elif self._stale_entry_frame_id is not None:
                 failed_due_to_stale += 1
@@ -1248,7 +1209,7 @@ class FrameMappingWorkspace(QWidget):
                 self._stale_entry_frame_id = None  # Reset for each frame
                 # Pass the created copy as output_path to avoid creating new copies
                 if self._controller.inject_mapping(
-                    ai_frame.index, rom_path, output_path=target_rom, emit_project_changed=False
+                    ai_frame.id, rom_path, output_path=target_rom, emit_project_changed=False
                 ):
                     success_count += 1
                 elif self._stale_entry_frame_id is not None:
@@ -1441,21 +1402,25 @@ class FrameMappingWorkspace(QWidget):
     # Helper Methods
     # -------------------------------------------------------------------------
 
-    def _attempt_link(self, ai_index: int, game_frame_id: str) -> None:
+    def _attempt_link(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Attempt to link an AI frame to a game frame.
 
         Handles existing link confirmation (for both AI and game frames) and auto-advance.
         Preserves alignment if mapping already exists for the same pair.
+
+        Args:
+            ai_frame_id: AI frame ID (filename)
+            game_frame_id: Game frame ID
         """
         project = self._controller.project
         if project is None:
             return
 
-        ai_frame = project.get_ai_frame_by_index(ai_index)
-        ai_name = ai_frame.path.name if ai_frame else f"AI Frame {ai_index}"
+        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
+        ai_name = ai_frame.path.name if ai_frame else ai_frame_id
 
         # Check if AI frame is already linked to a different game frame
-        existing_game_link = self._controller.get_existing_link_for_ai_frame(ai_index)
+        existing_game_link = self._controller.get_existing_link_for_ai_frame(ai_frame_id)
         if existing_game_link is not None:
             if existing_game_link == game_frame_id:
                 # Same pair - no-op, preserve existing alignment
@@ -1469,15 +1434,15 @@ class FrameMappingWorkspace(QWidget):
 
         # Check if game frame is already linked to a different AI frame
         existing_ai_link = self._controller.get_existing_link_for_game_frame(game_frame_id)
-        if existing_ai_link is not None and existing_ai_link != ai_index:
-            existing_ai = project.get_ai_frame_by_index(existing_ai_link)
-            existing_name = existing_ai.path.name if existing_ai else f"AI Frame {existing_ai_link}"
+        if existing_ai_link is not None and existing_ai_link != ai_frame_id:
+            existing_ai = project.get_ai_frame_by_id(existing_ai_link)
+            existing_name = existing_ai.path.name if existing_ai else existing_ai_link
 
             if not confirm_replace_link(self, game_frame_id, existing_name, ai_name):
                 return
 
         # Create the mapping
-        self._controller.create_mapping(ai_index, game_frame_id)
+        self._controller.create_mapping(ai_frame_id, game_frame_id)
 
         # Auto-align using bounding box alignment (center AI content over game content)
         if ai_frame and ai_frame.path.exists():
@@ -1490,7 +1455,7 @@ class FrameMappingWorkspace(QWidget):
                     # (not the screen-relative capture coordinates)
                     offset_x, offset_y = calculate_auto_alignment(ai_pil, 0, 0, bbox.width, bbox.height)
                     self._controller.update_mapping_alignment(
-                        ai_index, offset_x, offset_y, False, False, set_edited=False
+                        ai_frame_id, offset_x, offset_y, False, False, set_edited=False
                     )
                 except Exception as e:
                     logger.warning("Auto-alignment failed, using center: %s", e)
@@ -1502,7 +1467,7 @@ class FrameMappingWorkspace(QWidget):
                             center_x = (game_preview.width() - ai_pixmap.width()) // 2
                             center_y = (game_preview.height() - ai_pixmap.height()) // 2
                             self._controller.update_mapping_alignment(
-                                ai_index, center_x, center_y, False, False, set_edited=False
+                                ai_frame_id, center_x, center_y, False, False, set_edited=False
                             )
             else:
                 # No capture result - fallback to simple centering
@@ -1513,7 +1478,7 @@ class FrameMappingWorkspace(QWidget):
                         center_x = (game_preview.width() - ai_pixmap.width()) // 2
                         center_y = (game_preview.height() - ai_pixmap.height()) // 2
                         self._controller.update_mapping_alignment(
-                            ai_index, center_x, center_y, False, False, set_edited=False
+                            ai_frame_id, center_x, center_y, False, False, set_edited=False
                         )
 
         self._refresh_mapping_status()
@@ -1521,7 +1486,7 @@ class FrameMappingWorkspace(QWidget):
         self._update_mapping_panel_previews()
 
         # Update canvas with alignment using ID-based lookup (O(1))
-        mapping = project.get_mapping_for_ai_frame(ai_frame.id) if ai_frame else None
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         if mapping:
             self._alignment_canvas.set_alignment(
                 mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
@@ -1531,16 +1496,23 @@ class FrameMappingWorkspace(QWidget):
             self._message_service.show_message(f"Linked '{ai_name}' to '{game_frame_id}'", 3000)
 
         # Auto-advance if enabled
-        if self._auto_advance_enabled:
-            next_unmapped_index = self._find_next_unmapped_ai_frame(ai_index)
-            if next_unmapped_index is not None:
-                next_frame = project.get_ai_frame_by_index(next_unmapped_index)
+        if self._auto_advance_enabled and ai_frame:
+            next_unmapped_id = self._find_next_unmapped_ai_frame(ai_frame.index)
+            if next_unmapped_id is not None:
+                next_frame = project.get_ai_frame_by_id(next_unmapped_id)
                 if next_frame:
-                    self._ai_frames_pane.select_frame(next_unmapped_index)
-                    self._on_ai_frame_selected(next_frame.id)
+                    self._ai_frames_pane.select_frame(next_frame.index)
+                    self._on_ai_frame_selected(next_unmapped_id)
 
-    def _find_next_unmapped_ai_frame(self, current_index: int) -> int | None:
-        """Find the next unmapped AI frame after the given index."""
+    def _find_next_unmapped_ai_frame(self, current_index: int) -> str | None:
+        """Find the next unmapped AI frame after the given index.
+
+        Args:
+            current_index: Current AI frame index
+
+        Returns:
+            AI frame ID of the next unmapped frame, or None if all are mapped
+        """
         project = self._controller.project
         if project is None:
             return None
@@ -1552,9 +1524,12 @@ class FrameMappingWorkspace(QWidget):
 
         for i in range(1, total):
             check_index = (current_index + i) % total
-            check_frame = project.get_ai_frame_by_index(check_index)
-            if check_frame and project.get_mapping_for_ai_frame(check_frame.id) is None:
-                return check_index
+            # Find frame at this index
+            for frame in ai_frames:
+                if frame.index == check_index:
+                    if project.get_mapping_for_ai_frame(frame.id) is None:
+                        return frame.id
+                    break
 
         return None
 
@@ -1593,10 +1568,10 @@ class FrameMappingWorkspace(QWidget):
             self._captures_pane.set_link_status({})
             return
 
-        link_status: dict[str, int | None] = {}
+        link_status: dict[str, str | None] = {}
         for game_frame in project.game_frames:
-            linked_ai_idx = project.get_ai_frame_index_linked_to_game_frame(game_frame.id)
-            link_status[game_frame.id] = linked_ai_idx
+            linked_ai_id = project.get_ai_frame_linked_to_game_frame(game_frame.id)
+            link_status[game_frame.id] = linked_ai_id
 
         self._captures_pane.set_link_status(link_status)
 

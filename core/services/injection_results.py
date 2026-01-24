@@ -19,7 +19,7 @@ class InjectionRequest:
     UI context and passed to the orchestrator.
 
     Attributes:
-        ai_frame_index: Index of the AI frame to inject.
+        ai_frame_id: ID of the AI frame to inject (filename).
         rom_path: Path to the source ROM file.
         output_path: Explicit output path, or None to auto-generate.
         create_backup: Whether to create backup before injection.
@@ -29,7 +29,7 @@ class InjectionRequest:
         emit_project_changed: Whether to emit project_changed signal after success.
     """
 
-    ai_frame_index: int
+    ai_frame_id: str
     rom_path: Path
     output_path: Path | None = None
     create_backup: bool = True

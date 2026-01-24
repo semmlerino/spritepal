@@ -7,6 +7,8 @@ These tests verify behavior through public APIs and observable state.
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QImage
@@ -71,11 +73,16 @@ class TestPagedTileViewWidget:
         # Create 3 pages worth
         return bytes(range(256)) * 1000  # 256000 bytes
 
-    def test_set_rom_data(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test setting ROM data enables navigation for multi-page ROM."""
+    @pytest.fixture
+    def widget(self, qtbot) -> Generator[PagedTileViewWidget, None, None]:
+        """Fixture to provide a widget instance with automatic cleanup."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
+        yield widget
+        widget.cleanup()
 
+    def test_set_rom_data(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
+        """Test setting ROM data enables navigation for multi-page ROM."""
         widget.set_rom_data(sample_rom_data)
 
         # Multi-page ROM: next should be enabled, prev disabled (first page)
@@ -84,10 +91,8 @@ class TestPagedTileViewWidget:
         # Current offset starts at 0
         assert widget.get_current_offset() == 0
 
-    def test_set_palette(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_set_palette(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test setting palette enables palette checkbox."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Initially no palette - checkbox disabled
@@ -99,10 +104,8 @@ class TestPagedTileViewWidget:
         widget.set_palette(palette)
         assert widget.is_palette_checkbox_enabled()
 
-    def test_set_grid_dimensions(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_set_grid_dimensions(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test changing grid dimensions updates navigation."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Change to smaller grid (20x20 vs default 50x50)
@@ -113,10 +116,8 @@ class TestPagedTileViewWidget:
         assert widget.get_current_offset() == 0
         assert widget.can_go_next()
 
-    def test_go_to_page(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_go_to_page(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test navigating to a specific page emits signal and updates offset."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         page_signals: list[int] = []
@@ -133,10 +134,8 @@ class TestPagedTileViewWidget:
         # Prev should now be possible
         assert widget.can_go_prev()
 
-    def test_go_to_offset(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_go_to_offset(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test navigating to a specific offset updates navigation."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Navigate to an offset in the second page (256KB ROM, 80KB per page)
@@ -149,10 +148,8 @@ class TestPagedTileViewWidget:
         # Current offset should be page-aligned to target's page
         assert widget.get_current_offset() > 0
 
-    def test_get_current_offset(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_get_current_offset(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test getting current page offset."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         assert widget.get_current_offset() == 0
@@ -164,11 +161,8 @@ class TestPagedTileViewWidget:
             bytes_per_page = cols * rows * BYTES_PER_TILE
             assert widget.get_current_offset() == bytes_per_page
 
-    def test_navigation_buttons_state(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_navigation_buttons_state(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test navigation button enable/disable state via public API."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Load ROM data
         widget.set_rom_data(sample_rom_data)
 
@@ -188,10 +182,8 @@ class TestPagedTileViewWidget:
             # Prev should be possible
             assert widget.can_go_prev()
 
-    def test_tile_clicked_signal(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_tile_clicked_signal(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test tile_clicked signal emission."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         offsets: list[int] = []
@@ -207,10 +199,8 @@ class TestPagedTileViewWidget:
         assert len(offsets) == 1
         assert offsets[0] == expected_offset
 
-    def test_grid_preset_change(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_grid_preset_change(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test changing grid size via combo box updates navigation."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Change to small grid preset (index 0)
@@ -221,10 +211,8 @@ class TestPagedTileViewWidget:
         # Navigation should still work
         assert widget.can_go_next()
 
-    def test_goto_offset_hex_with_prefix(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_goto_offset_hex_with_prefix(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test go-to-offset with 0x hex prefix navigates correctly."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Navigate to offset past first page (100KB)
@@ -234,10 +222,8 @@ class TestPagedTileViewWidget:
         assert widget.can_go_prev()
         assert widget.get_current_offset() > 0
 
-    def test_goto_offset_hex_without_prefix(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_goto_offset_hex_without_prefix(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test go-to-offset with plain hex navigates correctly."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Navigate to offset past first page (100KB = 0x18000)
@@ -247,30 +233,24 @@ class TestPagedTileViewWidget:
         assert widget.can_go_prev()
         assert widget.get_current_offset() > 0
 
-    def test_goto_offset_clears_input(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_goto_offset_clears_input(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test that go-to-offset clears the input field after success."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         widget.navigate_to_offset_text("0x1000")
 
         assert widget.get_offset_input_text() == ""
 
-    def test_goto_offset_invalid_format(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_goto_offset_invalid_format(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test go-to-offset with invalid format shows error."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         widget.navigate_to_offset_text("not_a_number")
 
         assert "Invalid offset format" in widget.get_status_text()
 
-    def test_goto_offset_exceeds_rom(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_goto_offset_exceeds_rom(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test go-to-offset with offset beyond ROM size shows error."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Try offset way beyond ROM size
@@ -278,18 +258,13 @@ class TestPagedTileViewWidget:
 
         assert "exceeds ROM size" in widget.get_status_text()
 
-    def test_palette_checkbox_default_state(self, qtbot) -> None:
+    def test_palette_checkbox_default_state(self, widget: PagedTileViewWidget) -> None:
         """Test palette checkbox is checked by default."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         assert widget.is_palette_checked()
         assert widget.is_palette_enabled()
 
-    def test_palette_toggle_disables_palette(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_palette_toggle_disables_palette(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test unchecking palette checkbox disables palette rendering."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Set a palette
@@ -302,10 +277,8 @@ class TestPagedTileViewWidget:
 
         assert not widget.is_palette_enabled()
 
-    def test_palette_toggle_enables_palette(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_palette_toggle_enables_palette(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test checking palette checkbox enables palette rendering."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Set a palette and disable it
@@ -319,22 +292,16 @@ class TestPagedTileViewWidget:
 
         assert widget.is_palette_enabled()
 
-    def test_palette_checkbox_disabled_when_no_palette(self, qtbot) -> None:
+    def test_palette_checkbox_disabled_when_no_palette(self, widget: PagedTileViewWidget) -> None:
         """Test palette checkbox is disabled when no palette is set."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Set palette to None
         widget.set_palette(None)
 
         assert not widget.is_palette_checkbox_enabled()
         assert not widget.is_palette_checked()
 
-    def test_palette_checkbox_enabled_when_palette_set(self, qtbot) -> None:
+    def test_palette_checkbox_enabled_when_palette_set(self, widget: PagedTileViewWidget) -> None:
         """Test palette checkbox is enabled when a palette is set."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # First set to None to disable
         widget.set_palette(None)
         assert not widget.is_palette_checkbox_enabled()
@@ -346,19 +313,13 @@ class TestPagedTileViewWidget:
         # Checkbox should be enabled (but may not be checked due to previous None)
         assert widget.is_palette_checkbox_enabled()
 
-    def test_palette_dropdown_default_has_grayscale(self, qtbot) -> None:
+    def test_palette_dropdown_default_has_grayscale(self, widget: PagedTileViewWidget) -> None:
         """Test palette dropdown has Grayscale option by default."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         assert widget.palette_count() == 1
         assert widget.get_palette_names()[0] == "Grayscale"
 
-    def test_add_palette_option(self, qtbot) -> None:
+    def test_add_palette_option(self, widget: PagedTileViewWidget) -> None:
         """Test adding a palette option to the dropdown."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         palette = [[i * 16, i * 16, i * 16] for i in range(16)]
         widget.add_palette_option("Test Palette", palette)
 
@@ -366,21 +327,16 @@ class TestPagedTileViewWidget:
         assert widget.get_palette_names()[1] == "Test Palette"
         assert widget.has_palette_option("Test Palette")
 
-    def test_set_palette_with_name(self, qtbot) -> None:
+    def test_set_palette_with_name(self, widget: PagedTileViewWidget) -> None:
         """Test setting palette with a custom name."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         palette = [[255, 0, 0]] + [[i * 16, i * 16, i * 16] for i in range(1, 16)]
         widget.set_palette(palette, name="Red Palette")
 
         assert widget.get_selected_palette_name() == "Red Palette"
         assert widget.get_palette() == palette
 
-    def test_select_palette_by_name(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_select_palette_by_name(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test selecting a palette by name."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Add two palettes
@@ -394,19 +350,13 @@ class TestPagedTileViewWidget:
         assert result is True
         assert widget.get_selected_palette_name() == "Green"
 
-    def test_select_nonexistent_palette(self, qtbot) -> None:
+    def test_select_nonexistent_palette(self, widget: PagedTileViewWidget) -> None:
         """Test selecting a palette that doesn't exist."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         result = widget.select_palette("Nonexistent")
         assert result is False
 
-    def test_clear_palette_options(self, qtbot) -> None:
+    def test_clear_palette_options(self, widget: PagedTileViewWidget) -> None:
         """Test clearing all palette options."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Add some palettes
         palette1 = [[255, 0, 0] for _ in range(16)]
         palette2 = [[0, 255, 0] for _ in range(16)]
@@ -422,10 +372,8 @@ class TestPagedTileViewWidget:
         assert widget.get_selected_palette_name() == "Grayscale"
         assert widget.get_palette() is None
 
-    def test_palette_selection_updates_state(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_palette_selection_updates_state(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test that selecting a palette updates checkbox and internal state."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Add a palette and select it
@@ -446,11 +394,8 @@ class TestPagedTileViewWidget:
         assert not widget.is_palette_checked()
         assert not widget.is_palette_enabled()
 
-    def test_user_palette_tracking(self, qtbot) -> None:
+    def test_user_palette_tracking(self, widget: PagedTileViewWidget) -> None:
         """Test that user palettes are tracked separately from built-in ones."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Add built-in palette (default behavior)
         palette1 = [[255, 0, 0] for _ in range(16)]
         widget.add_palette_option("Built-in", palette1)
@@ -461,11 +406,8 @@ class TestPagedTileViewWidget:
         widget.add_palette_option("User Palette", palette2, is_user_palette=True)
         assert widget.is_user_palette("User Palette")
 
-    def test_get_user_palettes(self, qtbot) -> None:
+    def test_get_user_palettes(self, widget: PagedTileViewWidget) -> None:
         """Test retrieving user palettes for persistence."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Add mix of built-in and user palettes
         palette1 = [[255, 0, 0] for _ in range(16)]
         palette2 = [[0, 255, 0] for _ in range(16)]
@@ -484,11 +426,8 @@ class TestPagedTileViewWidget:
         assert user_palettes["User1"] == palette2
         assert user_palettes["User2"] == palette3
 
-    def test_load_user_palettes(self, qtbot) -> None:
+    def test_load_user_palettes(self, widget: PagedTileViewWidget) -> None:
         """Test loading user palettes from saved data."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         palette1 = [[255, 0, 0] for _ in range(16)]
         palette2 = [[0, 255, 0] for _ in range(16)]
 
@@ -505,11 +444,8 @@ class TestPagedTileViewWidget:
         assert widget.is_user_palette("Saved2")
         assert widget.palette_count() == 3  # Grayscale + 2 loaded
 
-    def test_clear_palette_options_clears_user_palettes(self, qtbot) -> None:
+    def test_clear_palette_options_clears_user_palettes(self, widget: PagedTileViewWidget) -> None:
         """Test that clear_palette_options also clears user palette tracking."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Add user palette
         palette = [[255, 0, 0] for _ in range(16)]
         widget.add_palette_option("User Palette", palette, is_user_palette=True)
@@ -520,30 +456,21 @@ class TestPagedTileViewWidget:
         # After clear, no user palettes should remain
         assert widget.get_user_palettes() == {}
 
-    def test_palette_menu_actions_exist(self, qtbot) -> None:
+    def test_palette_menu_actions_exist(self, widget: PagedTileViewWidget) -> None:
         """Test that palette management actions are functional."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Can query rename/delete state (functionality verified via these APIs)
         # For built-in Grayscale, should not be able to rename/delete
         assert not widget.can_rename_selected_palette()
         assert not widget.can_delete_selected_palette()
 
-    def test_rename_delete_disabled_for_builtin(self, qtbot) -> None:
+    def test_rename_delete_disabled_for_builtin(self, widget: PagedTileViewWidget) -> None:
         """Test that rename/delete are disabled for built-in palettes."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Grayscale is selected by default
         assert not widget.can_rename_selected_palette()
         assert not widget.can_delete_selected_palette()
 
-    def test_rename_delete_enabled_for_user_palette(self, qtbot) -> None:
+    def test_rename_delete_enabled_for_user_palette(self, widget: PagedTileViewWidget) -> None:
         """Test that rename/delete are enabled for user palettes."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Add and select user palette
         palette = [[255, 0, 0] for _ in range(16)]
         widget.add_palette_option("User Palette", palette, is_user_palette=True)
@@ -552,11 +479,8 @@ class TestPagedTileViewWidget:
         assert widget.can_rename_selected_palette()
         assert widget.can_delete_selected_palette()
 
-    def test_load_palette_file_valid(self, qtbot, tmp_path) -> None:
+    def test_load_palette_file_valid(self, widget: PagedTileViewWidget, tmp_path) -> None:
         """Test loading a valid palette file."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Create a test palette file
         palette_data = {
             "name": "Test Palette",
@@ -572,11 +496,8 @@ class TestPagedTileViewWidget:
         assert len(result["colors"]) == 16
         assert result["colors"][0] == [255, 0, 0]
 
-    def test_load_palette_file_missing_colors(self, qtbot, tmp_path) -> None:
+    def test_load_palette_file_missing_colors(self, widget: PagedTileViewWidget, tmp_path) -> None:
         """Test loading a palette file without colors field."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Create an invalid palette file
         palette_data = {"name": "Invalid Palette"}
         palette_file = tmp_path / "invalid.pal.json"
@@ -587,11 +508,8 @@ class TestPagedTileViewWidget:
         with pytest.raises(ValueError, match="Missing 'colors' field"):
             widget.load_palette_file(palette_file)
 
-    def test_load_palette_file_uses_filename_if_no_name(self, qtbot, tmp_path) -> None:
+    def test_load_palette_file_uses_filename_if_no_name(self, widget: PagedTileViewWidget, tmp_path) -> None:
         """Test that palette name defaults to filename if not in file."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
-
         # Create a palette file without name
         palette_data = {
             "colors": [[255, 0, 0] for _ in range(16)],
@@ -613,10 +531,16 @@ class TestTileGridHighlight:
         """Create sample ROM data for testing."""
         return bytes(range(256)) * 1000  # 256000 bytes
 
-    def test_set_highlight_creates_rect(self, qtbot, sample_rom_data: bytes) -> None:
-        """Test that setting a highlight stores the offset."""
+    @pytest.fixture
+    def widget(self, qtbot) -> Generator[PagedTileViewWidget, None, None]:
+        """Fixture to provide a widget instance with automatic cleanup."""
         widget = PagedTileViewWidget()
         qtbot.addWidget(widget)
+        yield widget
+        widget.cleanup()
+
+    def test_set_highlight_creates_rect(self, widget: PagedTileViewWidget, qtbot, sample_rom_data: bytes) -> None:
+        """Test that setting a highlight stores the offset."""
         widget.set_rom_data(sample_rom_data)
 
         # Wait for page render to complete
@@ -628,10 +552,8 @@ class TestTileGridHighlight:
         # Verify highlight offset is stored via public API
         assert widget.get_highlight_offset() == 0x1000
 
-    def test_set_highlight_none_clears_rect(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_set_highlight_none_clears_rect(self, widget: PagedTileViewWidget, qtbot, sample_rom_data: bytes) -> None:
         """Test that setting highlight to None clears it."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Wait for page render to complete
@@ -644,10 +566,8 @@ class TestTileGridHighlight:
         widget.set_highlight(None)
         assert widget.get_highlight_offset() is None
 
-    def test_goto_offset_sets_highlight(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_goto_offset_sets_highlight(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test that go-to-offset sets the highlight."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Use go-to-offset via public API
@@ -655,10 +575,8 @@ class TestTileGridHighlight:
 
         assert widget.get_highlight_offset() == 0x1000
 
-    def test_tile_click_clears_highlight(self, qtbot, sample_rom_data: bytes) -> None:
+    def test_tile_click_clears_highlight(self, widget: PagedTileViewWidget, sample_rom_data: bytes) -> None:
         """Test that clicking a tile clears the highlight."""
-        widget = PagedTileViewWidget()
-        qtbot.addWidget(widget)
         widget.set_rom_data(sample_rom_data)
 
         # Set highlight

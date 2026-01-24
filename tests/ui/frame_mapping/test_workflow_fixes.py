@@ -169,7 +169,7 @@ class TestBatchInjectionSignalCoalescing:
         # (It will fail due to no capture file, but the signal behavior is what we're testing)
         with patch.object(controller, "_project", project):
             controller.inject_mapping(
-                ai_frame_index=0,
+                ai_frame_id="frame_0.png",
                 rom_path=tmp_path / "nonexistent.sfc",
                 emit_project_changed=False,
             )
@@ -206,8 +206,9 @@ class TestAutoSaveAfterStructuralChanges:
         save_emissions: list[None] = []
         controller.save_requested.connect(lambda: save_emissions.append(None))
 
-        # Create mapping
-        controller.create_mapping(0, "test_game")
+        # Create mapping - use AI frame ID
+        ai_frame_id = project.ai_frames[0].id
+        controller.create_mapping(ai_frame_id, "test_game")
 
         assert len(save_emissions) == 1, (
             f"Expected 1 save_requested emission after create_mapping, got {len(save_emissions)}"
@@ -238,8 +239,9 @@ class TestAutoSaveAfterStructuralChanges:
         save_emissions: list[None] = []
         controller.save_requested.connect(lambda: save_emissions.append(None))
 
-        # Remove mapping
-        controller.remove_mapping(0)
+        # Remove mapping - use AI frame ID
+        ai_frame_id = project.ai_frames[0].id
+        controller.remove_mapping(ai_frame_id)
 
         assert len(save_emissions) == 1, (
             f"Expected 1 save_requested emission after remove_mapping, got {len(save_emissions)}"

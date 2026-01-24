@@ -261,8 +261,9 @@ class TestAutoAlignCoordinates:
             mock_project = MagicMock()
             mock_ai_frame = MagicMock()
             mock_ai_frame.path = ai_image_path
-            mock_ai_frame.id = "ai_frame_001"
-            mock_project.get_ai_frame_by_index.return_value = mock_ai_frame
+            mock_ai_frame.id = "frame0.png"
+            mock_ai_frame.index = 0
+            mock_project.get_ai_frame_by_id.return_value = mock_ai_frame
             mock_project.get_mapping_for_ai_frame.return_value = None
             workspace._controller.project = mock_project
             workspace._controller.get_existing_link_for_ai_frame.return_value = None
@@ -278,7 +279,7 @@ class TestAutoAlignCoordinates:
             workspace._controller.get_capture_result_for_game_frame.return_value = (mock_capture, False)
 
             # Call the real _attempt_link method
-            FrameMappingWorkspace._attempt_link(workspace, ai_index=0, game_frame_id="frame1")
+            FrameMappingWorkspace._attempt_link(workspace, ai_frame_id="frame0.png", game_frame_id="frame1")
 
         # ASSERTION: Should be called with (0, 0) for canvas-relative alignment
         # BUG: Currently called with (120, 80) from capture screen position

@@ -1,54 +1,78 @@
-# Test Suite Audit Report - January 22, 2026
+# Test Suite Audit Report
+
+**Date:** January 24, 2026
+**Status:** Diagnostic Complete
 
 ## Executive Summary
-The test suite is comprehensive but suffers from fragmentation and redundancy, particularly in ROM injection and UI workflow testing. "Zombie" integration tests (heavy mocking, low signal) coexist with modern, real-component integration tests. Consolidating these will reduce maintenance burden and improve test discovery.
+The `spritepal` test suite is comprehensive but exhibits signs of fragmentation and redundancy, particularly in the "Sprite Finding" and "HAL Compression" domains. While recent efforts have consolidated palette tests (`test_palette_workflow.py`), similar consolidation is needed for core logic tests. There is also a proliferation of specific "repro" tests in the UI suite that should be grouped into feature-based regression suites.
 
-## 1. ROM Injection Redundancy
-**Findings:**
-- `tests/integration/test_rom_injection.py` is a low-value test file. It claims to be an integration test but relies heavily on mocks (`mock_hal`, mocked `sprite_config_loader`) and tests internal `ROMInjector` methods (`read_rom_header`, `calculate_checksum`) that are better suited for unit tests.
-- `tests/unit/core/test_rom_injector_boundaries.py` tests `ROMInjector` logic but is narrowly focused on boundary conditions.
-- `tests/integration/test_injection_manager.py` tests the actual injection workflow with real components, making `test_rom_injection.py`'s workflow tests redundant.
+## 1. Redundancy & Consolidation Candidates
 
-**Recommendation:**
-- **Action:** **Delete** `tests/integration/test_rom_injection.py`.
-- **Action:** **Move** the `read_rom_header` and `checksum_calculation` tests from the deleted file into `tests/unit/core/test_rom_injector_boundaries.py`.
-- **Action:** **Rename** `tests/unit/core/test_rom_injector_boundaries.py` to `tests/unit/core/test_rom_injector.py` to reflect its broadened scope as the primary unit test for `ROMInjector` logic.
+### A. Sprite Finder Logic
+**Current State:**
+- `tests/unit/test_sprite_finder.py`: Mocked unit tests for `SpriteFinder`.
+- `tests/integration/test_integration_sprite_finder.py`: Tests `SpriteFinder` with real components, but also re-tests HAL compression and ROM extraction.
+- `tests/integration/test_parallel_sprite_finder.py`: Tests `ParallelSpriteFinder` wrapper.
 
-## 2. UI Workflow Test Fragmentation
-**Findings:**
-- `ROMWorkflowController` is tested in two separate locations:
-    - `tests/ui/integration/test_rom_workflow_integration.py`: Tests state transitions and signal flow (High Value).
-    - `tests/ui/rom_extraction/test_rom_workflow_controller.py`: Tests specific regression scenarios (Mesen captures, thumbnails).
-- The split between `ui/integration` and `ui/rom_extraction` is arbitrary and confusing.
+**Recommendation:** **MERGE & PRUNE**
+1.  **Remove** the `TestHALCompression` and `TestROMExtractor` classes from `tests/integration/test_integration_sprite_finder.py`. These behaviors are already covered in dedicated test files.
+2.  **Rename** `tests/integration/test_integration_sprite_finder.py` to `tests/integration/test_sprite_discovery.py` and focus it strictly on the *integration* of the finder with the file system and real ROM data.
+3.  **Keep** `tests/unit/test_sprite_finder.py` for logic/edge case testing (confidence thresholds, metric parsing).
 
-**Recommendation:**
-- **Action:** **Merge** `tests/ui/rom_extraction/test_rom_workflow_controller.py` into `tests/ui/integration/test_rom_workflow_integration.py`.
-- **Action:** **Delete** the now-empty `tests/ui/rom_extraction` directory if possible.
+### B. HAL Compression
+**Current State:**
+- `tests/integration/test_hal_compression.py`: Main integration test.
+- `tests/unit/test_hal_golden.py`: Golden file testing.
+- `tests/unit/test_hal_parsing.py`: Unit testing parsing logic.
+- `tests/integration/test_integration_sprite_finder.py`: *Redundant* HAL cycle tests.
 
-## 3. Regression Test "Barnacles"
-**Findings:**
-- `tests/ui/test_shared_controller_bug.py` is a single-test file validating a fixed bug in `EditingController`.
-- `tests/ui/integration/test_editing_controller_integration.py` is the main integration test for `EditingController`.
+**Recommendation:** **REMOVE REDUNDANCY**
+- As mentioned above, remove HAL tests from the sprite finder integration suite. The dedicated files (`test_hal_compression.py` and `test_hal_golden.py`) provide better, more focused coverage.
 
-**Recommendation:**
-- **Action:** **Merge** the test case from `tests/ui/test_shared_controller_bug.py` into `tests/ui/integration/test_editing_controller_integration.py` (rename it to `test_shared_controller_multiple_views`).
-- **Action:** **Delete** `tests/ui/test_shared_controller_bug.py`.
+### C. UI Regression Tests ("Repro" Bloat)
+**Current State:**
+The `tests/ui` directory contains numerous single-issue reproduction tests:
+- `test_finding_1_repro.py`
+- `test_finding_2_repro.py`
+- `test_finding_4_repro.py`
+- `test_batch_injection_performance_repro.py`
+- `test_mode_switch_repro.py`
 
-## 4. Manager Test Overlap
-**Findings:**
-- `tests/integration/test_manager_integration.py` tests the "Extraction -> Injection" round-trip workflow (System Test).
-- `tests/integration/test_injection_manager.py` tests the "Injection" workflow in isolation (Component Integration Test).
-- Both test the "happy path" of injection.
+**Recommendation:** **CONSOLIDATE**
+- Group these into feature-specific regression suites.
+    - `test_finding_*_repro.py` -> `tests/ui/integration/test_finding_regressions.py`
+    - `test_batch_injection_performance_repro.py` -> Move to `tests/performance/` or `tests/integration/test_injection_performance.py`.
 
-**Recommendation:**
-- **Action:** **Retain both**, but ensure `test_injection_manager.py` focuses on *injection-specific* edge cases (metadata validation, negative offsets, file permissions) rather than just repeating the happy path workflow covered by the system integration test.
+## 2. High-Value vs. Low-Signal Tests
 
-## Summary of Operations
+| Test Category | Signal Level | Notes | Action |
+| :--- | :--- | :--- | :--- |
+| **Core/Unit (Mocks)** | High | Good for logic verification (e.g. `test_sprite_finder.py`). | **Keep** |
+| **UI Integration** | High | `test_palette_workflow.py` is a model for how these should be structured. | **Keep & Emulate** |
+| **Mixed Integration** | Low | `test_integration_sprite_finder.py` is noisy because it tests too many things (HAL, ROM, Finder). | **Refactor** |
+| **Repro Scripts** | Medium | High signal for specific bugs, but high maintenance cost as separate files. | **Merge** |
 
-| Target File | Action | Destination / Notes |
-| :--- | :--- | :--- |
-| `tests/integration/test_rom_injection.py` | **DELETE** | Move logic tests to `tests/unit/core/test_rom_injector.py`. |
-| `tests/unit/core/test_rom_injector_boundaries.py` | **RENAME** | Rename to `test_rom_injector.py` and expand scope. |
-| `tests/ui/rom_extraction/test_rom_workflow_controller.py` | **MERGE** | Merge into `tests/ui/integration/test_rom_workflow_integration.py`. |
-| `tests/ui/test_shared_controller_bug.py` | **MERGE** | Merge into `tests/ui/integration/test_editing_controller_integration.py`. |
-| `tests/integration/test_rom_extractor.py` | **KEEP** | This is the Gold Standard for extraction testing. |
+## 3. Coverage Gaps & Risks
+
+- **Controller Logic:** While `EditingController` is heavily tested via UI integration tests, other controllers like `ROMWorkflowController` rely on complex interactions that might be better tested with dedicated "headless" controller tests (mocking the View) to ensure state transitions are correct without the overhead of `qtbot`.
+- **Palette Persistence:** We have `test_palette_persistence.py` (settings) and `test_palette_load_sync.py` (runtime). Ensure there is a test that bridges the gap: "Application starts, loads last palette, AND the canvas correctly renders with it" (combining persistence and sync).
+
+## 4. Action Plan
+
+1.  **Immediate:** Strip `tests/integration/test_integration_sprite_finder.py` of HAL and ROM Extractor tests.
+2.  **Short Term:** Create `tests/ui/regressions/` folder and move/merge loose `repro` tests there.
+3.  **Long Term:** Audit `tests/integration` to ensure every file has a clear, single responsibility (e.g., "Testing the database layer", "Testing the HAL bridge") rather than "Testing everything related to Sprites".
+
+## 5. Mapping Behaviors to Tests
+
+- **Behavior:** "Find sprites in a ROM"
+  - *Primary Test:* `tests/integration/test_sprite_discovery.py` (Renamed from `test_integration_sprite_finder.py`)
+  - *Logic Test:* `tests/unit/test_sprite_finder.py`
+
+- **Behavior:** "Compress/Decompress HAL"
+  - *Primary Test:* `tests/integration/test_hal_compression.py`
+  - *Golden Test:* `tests/unit/test_hal_golden.py`
+
+- **Behavior:** "Edit Palette"
+  - *Primary Test:* `tests/ui/integration/test_palette_workflow.py`
+  - *Sync Test:* `tests/ui/integration/test_palette_load_sync.py`

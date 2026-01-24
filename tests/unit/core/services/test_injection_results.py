@@ -19,16 +19,16 @@ class TestInjectionRequest:
     def test_required_fields(self, tmp_path: Path) -> None:
         """Required fields must be provided."""
         request = InjectionRequest(
-            ai_frame_index=5,
+            ai_frame_id="frame_5.png",
             rom_path=tmp_path / "game.sfc",
         )
-        assert request.ai_frame_index == 5
+        assert request.ai_frame_id == "frame_5.png"
         assert request.rom_path == tmp_path / "game.sfc"
 
     def test_default_values(self, tmp_path: Path) -> None:
         """Default values are applied."""
         request = InjectionRequest(
-            ai_frame_index=0,
+            ai_frame_id="frame_0.png",
             rom_path=tmp_path / "game.sfc",
         )
         assert request.output_path is None
@@ -41,11 +41,11 @@ class TestInjectionRequest:
     def test_frozen(self, tmp_path: Path) -> None:
         """Request is immutable."""
         request = InjectionRequest(
-            ai_frame_index=0,
+            ai_frame_id="frame_0.png",
             rom_path=tmp_path / "game.sfc",
         )
         with pytest.raises(AttributeError):
-            request.ai_frame_index = 10  # type: ignore[misc]
+            request.ai_frame_id = "other.png"  # type: ignore[misc]
 
 
 class TestTileInjectionResult:

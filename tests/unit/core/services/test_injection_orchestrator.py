@@ -49,10 +49,10 @@ class TestInjectionOrchestratorValidation:
 
         # Mock project with no mapping
         project = MagicMock()
-        project.get_mapping_for_ai_frame_index.return_value = None
+        project.get_mapping_for_ai_frame.return_value = None
 
         orchestrator = InjectionOrchestrator()
-        request = InjectionRequest(ai_frame_index=5, rom_path=rom_path)
+        request = InjectionRequest(ai_frame_id="frame_5.png", rom_path=rom_path)
 
         result = orchestrator.execute(request, project)
 
@@ -66,12 +66,12 @@ class TestInjectionOrchestratorValidation:
 
         # Mock project with mapping but missing AI frame
         project = MagicMock()
-        project.get_mapping_for_ai_frame_index.return_value = MagicMock()
-        project.get_ai_frame_by_index.return_value = None
+        project.get_mapping_for_ai_frame.return_value = MagicMock()
+        project.get_ai_frame_by_id.return_value = None
         project.get_game_frame_by_id.return_value = MagicMock()
 
         orchestrator = InjectionOrchestrator()
-        request = InjectionRequest(ai_frame_index=0, rom_path=rom_path)
+        request = InjectionRequest(ai_frame_id="frame_0.png", rom_path=rom_path)
 
         result = orchestrator.execute(request, project)
 
@@ -84,12 +84,12 @@ class TestInjectionOrchestratorValidation:
         rom_path.write_bytes(b"ROM")
 
         project = MagicMock()
-        project.get_mapping_for_ai_frame_index.return_value = MagicMock()
-        project.get_ai_frame_by_index.return_value = MagicMock()
+        project.get_mapping_for_ai_frame.return_value = MagicMock()
+        project.get_ai_frame_by_id.return_value = MagicMock()
         project.get_game_frame_by_id.return_value = None
 
         orchestrator = InjectionOrchestrator()
-        request = InjectionRequest(ai_frame_index=0, rom_path=rom_path)
+        request = InjectionRequest(ai_frame_id="frame_0.png", rom_path=rom_path)
 
         result = orchestrator.execute(request, project)
 
@@ -101,17 +101,17 @@ class TestInjectionOrchestratorValidation:
         nonexistent_rom = tmp_path / "nonexistent.sfc"
 
         project = MagicMock()
-        project.get_mapping_for_ai_frame_index.return_value = MagicMock()
+        project.get_mapping_for_ai_frame.return_value = MagicMock()
         ai_frame = MagicMock()
         ai_frame.path.exists.return_value = True
-        project.get_ai_frame_by_index.return_value = ai_frame
+        project.get_ai_frame_by_id.return_value = ai_frame
         game_frame = MagicMock()
         game_frame.rom_offsets = [0x10000]
         game_frame.capture_path = tmp_path / "capture.json"
         project.get_game_frame_by_id.return_value = game_frame
 
         orchestrator = InjectionOrchestrator()
-        request = InjectionRequest(ai_frame_index=0, rom_path=nonexistent_rom)
+        request = InjectionRequest(ai_frame_id="frame_0.png", rom_path=nonexistent_rom)
 
         result = orchestrator.execute(request, project)
 
@@ -124,16 +124,16 @@ class TestInjectionOrchestratorValidation:
         rom_path.write_bytes(b"ROM")
 
         project = MagicMock()
-        project.get_mapping_for_ai_frame_index.return_value = MagicMock()
+        project.get_mapping_for_ai_frame.return_value = MagicMock()
         ai_frame = MagicMock()
         ai_frame.path.exists.return_value = True
-        project.get_ai_frame_by_index.return_value = ai_frame
+        project.get_ai_frame_by_id.return_value = ai_frame
         game_frame = MagicMock()
         game_frame.rom_offsets = []  # Empty
         project.get_game_frame_by_id.return_value = game_frame
 
         orchestrator = InjectionOrchestrator()
-        request = InjectionRequest(ai_frame_index=0, rom_path=rom_path)
+        request = InjectionRequest(ai_frame_id="frame_0.png", rom_path=rom_path)
 
         result = orchestrator.execute(request, project)
 
@@ -148,17 +148,17 @@ class TestInjectionOrchestratorValidation:
         ai_frame_path.write_bytes(b"PNG")
 
         project = MagicMock()
-        project.get_mapping_for_ai_frame_index.return_value = MagicMock()
+        project.get_mapping_for_ai_frame.return_value = MagicMock()
         ai_frame = MagicMock()
         ai_frame.path = ai_frame_path
-        project.get_ai_frame_by_index.return_value = ai_frame
+        project.get_ai_frame_by_id.return_value = ai_frame
         game_frame = MagicMock()
         game_frame.rom_offsets = [0x10000]
         game_frame.capture_path = tmp_path / "nonexistent_capture.json"
         project.get_game_frame_by_id.return_value = game_frame
 
         orchestrator = InjectionOrchestrator()
-        request = InjectionRequest(ai_frame_index=0, rom_path=rom_path)
+        request = InjectionRequest(ai_frame_id="frame_0.png", rom_path=rom_path)
 
         result = orchestrator.execute(request, project)
 
@@ -176,7 +176,7 @@ class TestInjectionOrchestratorProgressCallback:
 
         # Mock project that fails validation (simplest path)
         project = MagicMock()
-        project.get_mapping_for_ai_frame_index.return_value = None
+        project.get_mapping_for_ai_frame.return_value = None
 
         progress_messages: list[str] = []
 
@@ -184,7 +184,7 @@ class TestInjectionOrchestratorProgressCallback:
             progress_messages.append(msg)
 
         orchestrator = InjectionOrchestrator()
-        request = InjectionRequest(ai_frame_index=0, rom_path=rom_path)
+        request = InjectionRequest(ai_frame_id="frame_0.png", rom_path=rom_path)
 
         orchestrator.execute(request, project, on_progress=track_progress)
 
@@ -213,11 +213,11 @@ class TestInjectionOrchestratorStaleEntries:
         mapping.flip_h = False
         mapping.flip_v = False
         mapping.scale = 1.0
-        project.get_mapping_for_ai_frame_index.return_value = mapping
+        project.get_mapping_for_ai_frame.return_value = mapping
 
         ai_frame = MagicMock()
         ai_frame.path = ai_frame_path
-        project.get_ai_frame_by_index.return_value = ai_frame
+        project.get_ai_frame_by_id.return_value = ai_frame
 
         game_frame = MagicMock()
         game_frame.id = "test_frame"
@@ -228,7 +228,7 @@ class TestInjectionOrchestratorStaleEntries:
 
         orchestrator = InjectionOrchestrator()
         request = InjectionRequest(
-            ai_frame_index=0,
+            ai_frame_id="frame_0.png",
             rom_path=rom_path,
             allow_fallback=False,  # Don't allow fallback
         )
@@ -250,10 +250,10 @@ class TestInjectionOrchestratorROMCopyCreation:
 
         # Mock project that fails validation early
         project = MagicMock()
-        project.get_mapping_for_ai_frame_index.return_value = None
+        project.get_mapping_for_ai_frame.return_value = None
 
         orchestrator = InjectionOrchestrator()
-        request = InjectionRequest(ai_frame_index=0, rom_path=rom_path)
+        request = InjectionRequest(ai_frame_id="frame_0.png", rom_path=rom_path)
 
         # This will fail at validation, before ROM copy
         result = orchestrator.execute(request, project)

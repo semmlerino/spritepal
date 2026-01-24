@@ -63,7 +63,7 @@ class CapturesLibraryPane(QWidget):
         super().__init__(parent)
         self._game_frames: list[GameFrame] = []
         self._game_frame_previews: dict[str, QPixmap] = {}  # game_frame_id -> preview pixmap
-        self._link_status: dict[str, int | None] = {}  # game_frame_id -> ai_index or None
+        self._link_status: dict[str, str | None] = {}  # game_frame_id -> ai_frame_id or None
         self._show_unlinked_only = False
         self._search_text: str = ""
 
@@ -135,11 +135,11 @@ class CapturesLibraryPane(QWidget):
         self._game_frames = frames
         self._refresh_list()
 
-    def set_link_status(self, link_status: dict[str, int | None]) -> None:
+    def set_link_status(self, link_status: dict[str, str | None]) -> None:
         """Set the link status for game frames.
 
         Args:
-            link_status: Mapping of game_frame_id -> ai_frame_index (or None if unlinked)
+            link_status: Mapping of game_frame_id -> ai_frame_id (or None if unlinked)
         """
         self._link_status = link_status
         self._refresh_list()

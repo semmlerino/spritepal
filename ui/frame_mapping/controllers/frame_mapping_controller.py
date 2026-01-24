@@ -74,6 +74,8 @@ class FrameMappingController(QObject):
     capture_renamed = Signal(str)  # game_frame_id - display name changed
     # Preview cache signal - emitted when a preview is regenerated (mtime/entries changed)
     preview_cache_invalidated = Signal(str)  # game_frame_id - preview was regenerated
+    # Capture import signal - emitted when capture parsed, workspace shows dialog
+    capture_import_requested = Signal(object, object)  # (CaptureResult, capture_path: Path)
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -371,11 +373,11 @@ class FrameMappingController(QObject):
         logger.info("Imported %d captures from %s", imported, directory)
         return imported
 
-    def create_mapping(self, ai_frame_index: int, game_frame_id: str) -> bool:
+    def create_mapping(self, ai_frame_id: str, game_frame_id: str) -> bool:
         """Create a mapping between an AI frame and a game frame.
 
         Args:
-            ai_frame_index: Index of the AI frame
+            ai_frame_id: ID of the AI frame (filename)
             game_frame_id: ID of the game frame
 
         Returns:
@@ -386,9 +388,9 @@ class FrameMappingController(QObject):
             return False
 
         # Verify both frames exist
-        ai_frame = self._project.get_ai_frame_by_index(ai_frame_index)
+        ai_frame = self._project.get_ai_frame_by_id(ai_frame_id)
         if ai_frame is None:
-            self.error_occurred.emit(f"AI frame {ai_frame_index} not found")
+            self.error_occurred.emit(f"AI frame {ai_frame_id} not found")
             return False
 
         game_frame = self._project.get_game_frame_by_id(game_frame_id)
@@ -397,72 +399,45 @@ class FrameMappingController(QObject):
             return False
 
         # Use ID-based mapping (stable across reloads)
-        self._project.create_mapping(ai_frame.id, game_frame_id)
-        self.mapping_created.emit(ai_frame.id, game_frame_id)
+        self._project.create_mapping(ai_frame_id, game_frame_id)
+        self.mapping_created.emit(ai_frame_id, game_frame_id)
         self.project_changed.emit()
         self.save_requested.emit()
-        logger.info(
-            "Created mapping: AI frame %s (idx %d) -> Game frame %s", ai_frame.id, ai_frame_index, game_frame_id
-        )
+        logger.info("Created mapping: AI frame %s -> Game frame %s", ai_frame_id, game_frame_id)
         return True
 
-    def get_existing_link_for_game_frame(self, game_frame_id: str) -> int | None:
-        """Get the AI frame index currently linked to a game frame.
+    def get_existing_link_for_game_frame(self, game_frame_id: str) -> str | None:
+        """Get the AI frame ID currently linked to a game frame.
 
         Args:
             game_frame_id: ID of the game frame to check
 
         Returns:
-            AI frame index if game frame is linked, None otherwise
+            AI frame ID if game frame is linked, None otherwise
         """
         if self._project is None:
             return None
-        return self._project.get_ai_frame_index_linked_to_game_frame(game_frame_id)
+        return self._project.get_ai_frame_linked_to_game_frame(game_frame_id)
 
-    def get_existing_link_for_ai_frame(self, ai_frame_index: int) -> str | None:
+    def get_existing_link_for_ai_frame(self, ai_frame_id: str) -> str | None:
         """Get the game frame ID currently linked to an AI frame.
 
         Args:
-            ai_frame_index: Index of the AI frame to check
+            ai_frame_id: ID of the AI frame to check
 
         Returns:
             Game frame ID if AI frame is linked, None otherwise
         """
         if self._project is None:
             return None
-        mapping = self._project.get_mapping_for_ai_frame_index(ai_frame_index)
+        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
         return mapping.game_frame_id if mapping else None
 
-    def remove_mapping(self, ai_frame_index: int) -> bool:
+    def remove_mapping(self, ai_frame_id: str) -> bool:
         """Remove a mapping for an AI frame.
 
         Args:
-            ai_frame_index: Index of the AI frame
-
-        Returns:
-            True if a mapping was removed
-        """
-        if self._project is None:
-            return False
-
-        # Get the AI frame ID before removing (for signal emission)
-        ai_frame = self._project.get_ai_frame_by_index(ai_frame_index)
-        if ai_frame is None:
-            return False
-
-        if self._project.remove_mapping_for_ai_frame_index(ai_frame_index):
-            self.mapping_removed.emit(ai_frame.id)
-            self.project_changed.emit()
-            self.save_requested.emit()
-            logger.info("Removed mapping for AI frame %s (idx %d)", ai_frame.id, ai_frame_index)
-            return True
-        return False
-
-    def remove_mapping_by_id(self, ai_frame_id: str) -> bool:
-        """Remove a mapping for an AI frame using ID.
-
-        Args:
-            ai_frame_id: AI frame ID (filename)
+            ai_frame_id: ID of the AI frame (filename)
 
         Returns:
             True if a mapping was removed
@@ -480,7 +455,7 @@ class FrameMappingController(QObject):
 
     def update_mapping_alignment(
         self,
-        ai_frame_index: int,
+        ai_frame_id: str,
         offset_x: int,
         offset_y: int,
         flip_h: bool,
@@ -491,7 +466,7 @@ class FrameMappingController(QObject):
         """Update alignment for a mapping.
 
         Args:
-            ai_frame_index: Index of the AI frame
+            ai_frame_id: ID of the AI frame (filename)
             offset_x: X offset for alignment
             offset_y: Y offset for alignment
             flip_h: Horizontal flip state
@@ -506,20 +481,12 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        # Get AI frame for ID-based signal emission
-        ai_frame = self._project.get_ai_frame_by_index(ai_frame_index)
-        if ai_frame is None:
-            return False
-
-        if self._project.update_mapping_alignment_by_index(
-            ai_frame_index, offset_x, offset_y, flip_h, flip_v, scale, set_edited
-        ):
+        if self._project.update_mapping_alignment(ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, set_edited):
             # Use targeted signal to avoid full UI refresh (which blanks canvas)
-            self.alignment_updated.emit(ai_frame.id)
+            self.alignment_updated.emit(ai_frame_id)
             logger.info(
-                "Updated alignment for AI frame %s (idx %d): offset=(%d, %d), flip=(%s, %s), scale=%.2f",
-                ai_frame.id,
-                ai_frame_index,
+                "Updated alignment for AI frame %s: offset=(%d, %d), flip=(%s, %s), scale=%.2f",
+                ai_frame_id,
                 offset_x,
                 offset_y,
                 flip_h,
@@ -1055,7 +1022,7 @@ class FrameMappingController(QObject):
 
     def inject_mapping(
         self,
-        ai_frame_index: int,
+        ai_frame_id: str,
         rom_path: Path,
         output_path: Path | None = None,
         create_backup: bool = True,
@@ -1070,7 +1037,7 @@ class FrameMappingController(QObject):
         Delegates to InjectionOrchestrator for the actual injection pipeline.
 
         Args:
-            ai_frame_index: Index of the AI frame to inject
+            ai_frame_id: ID of the AI frame to inject (filename)
             rom_path: Path to the input ROM
             output_path: Path for the output ROM (default: same as input)
             create_backup: Whether to create a backup before injection
@@ -1089,8 +1056,8 @@ class FrameMappingController(QObject):
             True if injection was successful
         """
         logger.info(
-            "inject_mapping() called: ai_frame_index=%d, rom_path=%s",
-            ai_frame_index,
+            "inject_mapping() called: ai_frame_id=%s, rom_path=%s",
+            ai_frame_id,
             rom_path,
         )
 
@@ -1101,7 +1068,7 @@ class FrameMappingController(QObject):
 
         # Build injection request
         request = InjectionRequest(
-            ai_frame_index=ai_frame_index,
+            ai_frame_id=ai_frame_id,
             rom_path=rom_path,
             output_path=output_path,
             create_backup=create_backup,
@@ -1145,14 +1112,11 @@ class FrameMappingController(QObject):
         # Handle result
         if result.success:
             # Update mapping status
-            mapping = self._project.get_mapping_for_ai_frame_index(ai_frame_index)
+            mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
             if mapping is not None and result.new_mapping_status:
                 mapping.status = result.new_mapping_status
 
-            # Get AI frame for signal emission
-            ai_frame = self._project.get_ai_frame_by_index(ai_frame_index)
-            if ai_frame is not None:
-                self.mapping_injected.emit(ai_frame.id, "\n".join(result.messages))
+            self.mapping_injected.emit(ai_frame_id, "\n".join(result.messages))
 
             # Emit project changed and save requested
             if emit_project_changed:

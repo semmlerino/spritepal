@@ -794,22 +794,21 @@ class MappingPanel(QWidget):
         else:
             self._inject_selected_btn.setText("Inject Selected")
 
-    def get_selected_for_injection(self) -> list[int]:
-        """Get list of AI frame indices that are checked and mapped.
+    def get_selected_for_injection(self) -> list[str]:
+        """Get list of AI frame IDs that are checked and mapped.
 
         Returns:
-            List of AI frame indices selected for injection.
+            List of AI frame IDs selected for injection.
         """
         if self._project is None:
             return []
 
-        selected: list[int] = []
+        selected: list[str] = []
         for row in range(self._table.rowCount()):
             checkbox_item = self._table.item(row, 0)
             if checkbox_item and checkbox_item.checkState() == Qt.CheckState.Checked:
-                ai_index = checkbox_item.data(Qt.ItemDataRole.UserRole)
                 ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
                 # Only include if actually mapped (use ID-based lookup)
                 if ai_frame_id and self._project.get_mapping_for_ai_frame(ai_frame_id):
-                    selected.append(ai_index)
+                    selected.append(ai_frame_id)
         return selected

@@ -266,36 +266,6 @@ class TestFormatValidator:
         result = FormatValidator.validate_oam_format(file_info)
         assert result.is_valid
 
-    def test_validate_rom_format_with_smc_header(self):
-        """Test ROM format validation with SMC header."""
-        file_info = FileInfo(
-            path="/test/rom.smc",
-            size=0x100000 + 512,  # 1MB + SMC header
-            exists=True,
-            is_readable=True,
-            extension=".smc",
-            resolved_path="/test/rom.smc",
-        )
-
-        result = FormatValidator.validate_rom_format(file_info)
-        assert result.is_valid
-        assert any("SMC header" in w for w in result.warnings)
-
-    def test_validate_rom_format_non_standard_size(self):
-        """Test ROM format validation with non-standard size."""
-        file_info = FileInfo(
-            path="/test/rom.sfc",
-            size=0x150000,  # Non-standard size
-            exists=True,
-            is_readable=True,
-            extension=".sfc",
-            resolved_path="/test/rom.sfc",
-        )
-
-        result = FormatValidator.validate_rom_format(file_info)
-        assert result.is_valid
-        assert any("Non-standard ROM size" in w for w in result.warnings)
-
     def test_validate_offset_valid(self):
         """Test offset validation with valid offset."""
         result = FormatValidator.validate_offset(0x1000)

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Extract sprites from spritesheet, removing green background and limiting to 15 colors."""
 
-from pathlib import Path
-from PIL import Image
-import numpy as np
 from collections import Counter
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
 
 
 def get_background_color(img: Image.Image) -> tuple[int, int, int]:
@@ -105,12 +106,11 @@ def find_sprite_bounds(img: Image.Image) -> list[tuple[int, int, int, int]]:
                     in_sprite = True
                     sprite_start = x
                 gap_count = 0
-            else:
-                if in_sprite:
-                    gap_count += 1
-                    if gap_count >= min_gap:
-                        sprites.append((sprite_start, row_start, x - gap_count + 1, row_end))
-                        in_sprite = False
+            elif in_sprite:
+                gap_count += 1
+                if gap_count >= min_gap:
+                    sprites.append((sprite_start, row_start, x - gap_count + 1, row_end))
+                    in_sprite = False
 
         if in_sprite:
             sprites.append((sprite_start, row_start, len(cols_with_content), row_end))
@@ -201,10 +201,10 @@ def remove_remaining_green_from_palette(img: Image.Image) -> Image.Image:
 
         # Replace in image
         mask = (
-            (data[:, :, 0] == green_color[0]) &
-            (data[:, :, 1] == green_color[1]) &
-            (data[:, :, 2] == green_color[2]) &
-            (alpha > 0)
+            (data[:, :, 0] == green_color[0])
+            & (data[:, :, 1] == green_color[1])
+            & (data[:, :, 2] == green_color[2])
+            & (alpha > 0)
         )
         data[mask, 0] = nearest_color[0]
         data[mask, 1] = nearest_color[1]
@@ -233,7 +233,7 @@ def extract_sprites(input_path: Path, output_dir: Path, max_colors: int = 15):
     for i, (x1, y1, x2, y2) in enumerate(bounds):
         sprite = img_no_bg.crop((x1, y1, x2, y2))
 
-        print(f"Processing sprite {i:02d} ({x2-x1}x{y2-y1})...")
+        print(f"Processing sprite {i:02d} ({x2 - x1}x{y2 - y1})...")
 
         # Reduce colors
         sprite_reduced = reduce_colors(sprite, max_colors)

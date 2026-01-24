@@ -122,8 +122,8 @@ class TestFilterClearsSelectionSignal:
         frame_b = GameFrame(id="F002", rom_offsets=[0x2000])
         pane.set_game_frames([frame_a, frame_b])
 
-        # Mark F001 as linked (has ai_frame_index), F002 as unlinked
-        pane.set_link_status({"F001": 0, "F002": None})
+        # Mark F001 as linked (has ai_frame_id), F002 as unlinked
+        pane.set_link_status({"F001": "frame_0.png", "F002": None})
 
         # Select the linked frame
         pane.select_frame("F001")

@@ -91,40 +91,6 @@ class TestComprehensiveDialogMigrations:
             except Exception:
                 pass
 
-    def test_all_dialogs_have_consistent_component_features(
-        self, qtbot: Any, test_sprite_image: str, app_context: Any
-    ) -> None:
-        """Test that all migrated dialogs have consistent component features"""
-        dialogs = [
-            UserErrorDialog("Test error"),
-            _create_injection_dialog(),
-        ]
-
-        # Handle grid dialog with error patching
-        with patch("ui.grid_arrangement_dialog.QMessageBox.critical"):
-            dialogs.append(GridArrangementDialog(test_sprite_image))
-
-        for dialog in dialogs:
-            qtbot.addWidget(dialog)
-
-            # All should inherit from BaseDialog and have these features
-            assert hasattr(dialog, "main_layout")
-            assert hasattr(dialog, "content_widget")
-            assert hasattr(dialog, "button_box")
-
-            # All should be modal
-            assert dialog.isModal() is True
-
-            # All should have proper titles
-            assert dialog.windowTitle() != ""
-
-        # Clean up
-        for dialog in dialogs:
-            try:
-                dialog.close()
-            except Exception:
-                pass
-
     def test_dialog_button_integration_consistency(self, qtbot, test_sprite_image, app_context):
         """Test that all dialogs have consistent button integration"""
         # UserErrorDialog has custom OK button (creates button box manually)

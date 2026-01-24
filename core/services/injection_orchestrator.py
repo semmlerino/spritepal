@@ -122,8 +122,8 @@ class InjectionOrchestrator:
                 on_progress(msg)
 
         logger.info(
-            "InjectionOrchestrator.execute: ai_frame_index=%d, rom_path=%s",
-            request.ai_frame_index,
+            "InjectionOrchestrator.execute: ai_frame_id=%s, rom_path=%s",
+            request.ai_frame_id,
             request.rom_path,
         )
 
@@ -132,8 +132,8 @@ class InjectionOrchestrator:
         if validation_result is not None:
             return validation_result
 
-        mapping = project.get_mapping_for_ai_frame_index(request.ai_frame_index)
-        ai_frame = project.get_ai_frame_by_index(request.ai_frame_index)
+        mapping = project.get_mapping_for_ai_frame(request.ai_frame_id)
+        ai_frame = project.get_ai_frame_by_id(request.ai_frame_id)
         game_frame = project.get_game_frame_by_id(mapping.game_frame_id)  # type: ignore[union-attr]
 
         # Type narrowing - validation ensures these are not None
@@ -153,7 +153,7 @@ class InjectionOrchestrator:
 
         debug.log_canvas_info(
             ai_frame_name=ai_frame.path.name,
-            ai_frame_index=request.ai_frame_index,
+            ai_frame_index=ai_frame.index,  # Use actual index from frame
             game_frame_id=game_frame.id,
             rom_offsets=list(game_frame.rom_offsets),
             canvas_width=0,  # Will be updated after compositing
@@ -245,12 +245,12 @@ class InjectionOrchestrator:
 
         Returns InjectionResult on failure, None if valid.
         """
-        mapping = project.get_mapping_for_ai_frame_index(request.ai_frame_index)
+        mapping = project.get_mapping_for_ai_frame(request.ai_frame_id)
         if mapping is None:
-            logger.warning("AI frame %d is not mapped", request.ai_frame_index)
-            return InjectionResult.failure(f"AI frame {request.ai_frame_index} is not mapped")
+            logger.warning("AI frame %s is not mapped", request.ai_frame_id)
+            return InjectionResult.failure(f"AI frame {request.ai_frame_id} is not mapped")
 
-        ai_frame = project.get_ai_frame_by_index(request.ai_frame_index)
+        ai_frame = project.get_ai_frame_by_id(request.ai_frame_id)
         game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
 
         if ai_frame is None or game_frame is None:

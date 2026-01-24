@@ -84,3 +84,6 @@ import_analysis_report.json
 init_order_issues.json
 .venv/
 archive_obsolete_*/
+
+# Project-specific working directories (not part of SpritePal)
+M/
