@@ -191,9 +191,7 @@ class EditorStatusBar(QWidget):
 
         self._update_color_preview()
 
-    def update_color_with_index(
-        self, color: tuple[int, int, int], index: int | None
-    ) -> None:
+    def update_color_with_index(self, color: tuple[int, int, int], index: int | None) -> None:
         """Update the color preview display with palette index.
 
         Args:

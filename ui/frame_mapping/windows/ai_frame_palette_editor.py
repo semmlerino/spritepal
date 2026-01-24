@@ -124,11 +124,13 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         self._coord_label = QLabel("(-, -)")
         self._index_label = QLabel("Index: -")
+        self._selection_mode_label = QLabel("Mode: Replace")
         self._tool_label = QLabel("Tool: Pencil")
         self._dirty_label = QLabel("")
 
         self._status_bar.addWidget(self._coord_label)
         self._status_bar.addWidget(self._index_label)
+        self._status_bar.addWidget(self._selection_mode_label)
         self._status_bar.addPermanentWidget(self._tool_label)
         self._status_bar.addPermanentWidget(self._dirty_label)
 
@@ -205,6 +207,20 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._tool_buttons[EditorTool.PENCIL].setChecked(True)
 
         layout.addSpacing(16)
+
+        # Selection actions header
+        actions_label = QLabel("Selection")
+        actions_label.setStyleSheet("font-weight: bold; color: #AAA;")
+        layout.addWidget(actions_label)
+
+        # Fill Selection button
+        self._fill_selection_btn = QPushButton("Fill Sel [Shift+F]")
+        self._fill_selection_btn.setToolTip("Fill selected pixels with active color (Shift+F)")
+        self._fill_selection_btn.setFixedHeight(28)
+        self._fill_selection_btn.clicked.connect(self._controller.paint_selection)
+        layout.addWidget(self._fill_selection_btn)
+
+        layout.addSpacing(8)
 
         # Grid toggle
         self._grid_btn = QPushButton("Grid")
@@ -329,6 +345,9 @@ class AIFramePaletteEditorWindow(QMainWindow):
             shortcut = QShortcut(QKeySequence(key), self)
             shortcut.activated.connect(lambda index=idx: self._select_index(index))
 
+        # Selection action shortcuts
+        QShortcut(QKeySequence("Shift+F"), self).activated.connect(self._controller.paint_selection)
+
         # Brush size shortcuts (Ctrl+Plus/Minus)
         QShortcut(QKeySequence("Ctrl+-"), self).activated.connect(self._decrease_brush)
         QShortcut(QKeySequence("Ctrl+="), self).activated.connect(self._increase_brush)
@@ -348,6 +367,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._controller.pixel_info.connect(self._on_pixel_info)
         self._controller.dirty_changed.connect(self._on_dirty_changed)
         self._controller.active_index_changed.connect(self._on_active_index_changed)
+        self._controller.color_mapping_report.connect(self._on_color_mapping_report)
 
         # Canvas signals
         self._canvas.pixel_clicked.connect(self._on_canvas_clicked)
@@ -441,6 +461,25 @@ class AIFramePaletteEditorWindow(QMainWindow):
         # Highlight the corresponding palette swatch
         self._palette_panel.highlight_index(index)
 
+    def _update_selection_mode_display(self, modifiers: Qt.KeyboardModifier | int) -> None:
+        """Update the selection mode indicator based on keyboard modifiers.
+
+        Args:
+            modifiers: Current keyboard modifiers (Qt.KeyboardModifier flags)
+        """
+        # Convert to Qt.KeyboardModifier if int
+        if isinstance(modifiers, int):
+            modifiers = Qt.KeyboardModifier(modifiers)
+
+        if modifiers & Qt.KeyboardModifier.ShiftModifier:
+            mode_text = "Add"
+        elif modifiers & Qt.KeyboardModifier.ControlModifier:
+            mode_text = "Subtract"
+        else:
+            mode_text = "Replace"
+
+        self._selection_mode_label.setText(f"Mode: {mode_text}")
+
     def _on_dirty_changed(self, is_dirty: bool) -> None:
         """Handle dirty state change."""
         self._dirty_label.setText("*" if is_dirty else "")
@@ -455,11 +494,43 @@ class AIFramePaletteEditorWindow(QMainWindow):
         # Update canvas highlight to show all pixels using this index
         self._canvas.set_highlight_index(index)
 
+    def _on_color_mapping_report(self, report: dict[str, object]) -> None:
+        """Handle color mapping analysis report after image load.
+
+        Shows an informational dialog if there were colors requiring
+        nearest-neighbor fallback during RGB→indexed conversion.
+        """
+        unmapped_count = report.get("unmapped_count", 0)
+        exact_count = report.get("exact_count", 0)
+        distance_stats = report.get("distance_stats", {})
+
+        # Only show dialog if there were fallback matches
+        if unmapped_count and isinstance(unmapped_count, int) and unmapped_count > 0:
+            avg_dist = 0.0
+            max_dist = 0.0
+            if isinstance(distance_stats, dict):
+                avg_dist = float(distance_stats.get("avg", 0))
+                max_dist = float(distance_stats.get("max", 0))
+
+            # Show informational message in status bar
+            msg = f"Color mapping: {exact_count} exact, {unmapped_count} nearest-neighbor (avg dist: {avg_dist:.1f})"
+            self._status_bar.showMessage(msg, 5000)  # Show for 5 seconds
+
+            # Log details
+            logger.info(
+                "Color mapping report: %d exact matches, %d fallbacks (avg: %.1f, max: %.1f)",
+                exact_count,
+                unmapped_count,
+                avg_dist,
+                max_dist,
+            )
+
     def _on_canvas_clicked(self, x: int, y: int, button: int) -> None:
         """Handle canvas click."""
         from PySide6.QtWidgets import QApplication
 
         modifiers = QApplication.keyboardModifiers().value
+        self._update_selection_mode_display(modifiers)
         self._controller.handle_pixel_click(x, y, button, modifiers)
 
     def _on_canvas_dragged(self, x: int, y: int) -> None:
@@ -468,6 +539,11 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _on_canvas_hovered(self, x: int, y: int) -> None:
         """Handle canvas hover."""
+        from PySide6.QtWidgets import QApplication
+
+        # Update selection mode display based on current modifiers
+        modifiers = QApplication.keyboardModifiers().value
+        self._update_selection_mode_display(modifiers)
         self._controller.handle_pixel_hover(x, y)
 
     def _on_canvas_left(self) -> None:

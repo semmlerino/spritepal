@@ -1,4 +1,4 @@
--- sprite_capture_with_attribution.lua v1
+-- sprite_capture_with_attribution.lua v2
 -- Combined script: SA-1 attribution tracking + full sprite capture
 --
 -- Merges functionality from:
@@ -7,12 +7,19 @@
 --
 -- Output: JSON capture with per-tile rom_offset for direct import into SpritePal Frame Mapping
 --
+-- v2 changes:
+--   - Added ROM content-based search fallback when DMA attribution unavailable
+--   - Tiles not in vram_owner_map are now searched in known sprite ROM regions
+--   - Caches search results for performance
+--   - Added "attrib_method" field to show how each tile was attributed
+--
 -- Press F9 to capture full dump with ROM offsets to JSON
 -- Press F10 to capture raw binary dumps (OAM.dmp, VRAM.dmp, CGRAM.dmp)
 -- Press E to export VRAM attribution map (vram_attribution.json)
 --
 -- Workflow: Just run this script, play game until sprites appear, press F9.
--- Each tile in the capture JSON will have rom_offset if attribution was tracked.
+-- Each tile in the capture JSON will have rom_offset if attribution was tracked
+-- OR if the tile bytes match a known sprite region in ROM.
 
 --------------------------------------------------------------------------------
 -- Strict mode: catch accidental globals at runtime
@@ -723,6 +730,103 @@ local function get_rom_offset_for_vram(vram_word)
 end
 
 --------------------------------------------------------------------------------
+-- Content-Based ROM Search (Fallback when attribution unavailable)
+-- Searches known sprite regions in ROM for matching 32-byte tile patterns
+--------------------------------------------------------------------------------
+
+-- Known sprite data regions in Kirby Super Star (file offsets)
+-- These are approximate ranges containing uncompressed sprite data
+local SPRITE_SEARCH_REGIONS = {
+    -- Kirby sprites (various animation banks)
+    {start = 0x2D6800, stop = 0x2E8000},  -- ~70KB sprite data
+    {start = 0x2E2000, stop = 0x2F0000},  -- Additional sprite bank
+    -- Character sprites (Dedede, Meta Knight, etc.)
+    {start = 0x250000, stop = 0x280000},  -- ~192KB
+    -- Common sprite data
+    {start = 0x200000, stop = 0x250000},  -- Lower range
+}
+
+-- Cache for ROM tile searches to avoid repeated scanning
+local rom_search_cache = {}  -- Key: hex string of tile bytes, Value: ROM offset
+local rom_search_misses = {}  -- Track tiles we've already failed to find
+
+-- Search ROM for a 32-byte tile pattern
+-- Returns: file_offset or nil
+local function search_rom_for_tile(tile_bytes)
+    -- Build hex key for caching
+    local hex_key = ""
+    for i = 1, 32 do
+        hex_key = hex_key .. string.format("%02X", tile_bytes[i] or 0)
+    end
+
+    -- Check cache first
+    if rom_search_cache[hex_key] then
+        return rom_search_cache[hex_key]
+    end
+
+    -- Check miss cache to avoid re-scanning
+    if rom_search_misses[hex_key] then
+        return nil
+    end
+
+    -- Skip all-zero tiles (transparent/empty)
+    local all_zero = true
+    for i = 1, 32 do
+        if tile_bytes[i] ~= 0 then
+            all_zero = false
+            break
+        end
+    end
+    if all_zero then
+        rom_search_misses[hex_key] = true
+        return nil
+    end
+
+    -- Search known sprite regions
+    for _, region in ipairs(SPRITE_SEARCH_REGIONS) do
+        for offset = region.start, region.stop - 32, 32 do  -- Step by tile size
+            local match = true
+            for i = 0, 31 do
+                local rom_byte = emu.read(offset + i, emu.memType.prgRom)
+                if rom_byte ~= tile_bytes[i + 1] then
+                    match = false
+                    break
+                end
+            end
+            if match then
+                rom_search_cache[hex_key] = offset
+                log(string.format("ROM search: Found tile at 0x%X", offset))
+                return offset
+            end
+        end
+    end
+
+    -- Mark as miss to avoid repeated searches
+    rom_search_misses[hex_key] = true
+    return nil
+end
+
+-- Extended get_rom_offset that falls back to ROM search
+-- Returns: rom_offset, tile_index_in_block, search_method ("vram_map" or "rom_search")
+local function get_rom_offset_with_fallback(vram_word, tile_bytes)
+    -- First try vram_owner_map (fast path)
+    local owner = vram_owner_map[vram_word]
+    if owner and owner.file_offset then
+        return owner.file_offset, owner.tile_index_in_block, "vram_map"
+    end
+
+    -- Fallback: search ROM for matching bytes
+    if tile_bytes then
+        local rom_offset = search_rom_for_tile(tile_bytes)
+        if rom_offset then
+            return rom_offset, nil, "rom_search"
+        end
+    end
+
+    return nil, nil, nil
+end
+
+--------------------------------------------------------------------------------
 -- Read Complete OAM with ROM Attribution
 --------------------------------------------------------------------------------
 local function read_full_oam_with_attribution(obsel)
@@ -796,8 +900,8 @@ local function read_full_oam_with_attribution(obsel)
                     tile_bytes[b + 1] = emu.read(byte_addr + b, MEM.vram)
                 end
 
-                -- Look up ROM offset and tile index from attribution map
-                local rom_offset, tile_index_in_block = get_rom_offset_for_vram(word_addr)
+                -- Look up ROM offset: first from vram_owner_map, then fallback to ROM search
+                local rom_offset, tile_index_in_block, search_method = get_rom_offset_with_fallback(word_addr, tile_bytes)
 
                 -- Track first tile's offset for entry-level attribution
                 if ty == 0 and tx == 0 and rom_offset then
@@ -812,6 +916,7 @@ local function read_full_oam_with_attribution(obsel)
                     data_hex = bytes_to_hex(tile_bytes),
                     rom_offset = rom_offset,  -- ROM offset for this tile
                     tile_index_in_block = tile_index_in_block,  -- Position within compressed block
+                    attrib_method = search_method,  -- "vram_map" or "rom_search" or nil
                 })
             end
         end
@@ -929,9 +1034,11 @@ local function capture_full_json()
     local entries = read_full_oam_with_attribution(obsel)
     local palettes = read_sprite_palettes()
 
-    -- Count visible sprites and tiles with attribution
+    -- Count visible sprites and tiles with attribution (by method)
     local visible_count = 0
     local tiles_with_offset = 0
+    local tiles_from_vram_map = 0
+    local tiles_from_rom_search = 0
     local total_tiles = 0
     for _, e in ipairs(entries) do
         if e.y < 224 or e.y >= 240 then
@@ -941,6 +1048,11 @@ local function capture_full_json()
             total_tiles = total_tiles + 1
             if t.rom_offset then
                 tiles_with_offset = tiles_with_offset + 1
+                if t.attrib_method == "vram_map" then
+                    tiles_from_vram_map = tiles_from_vram_map + 1
+                elseif t.attrib_method == "rom_search" then
+                    tiles_from_rom_search = tiles_from_rom_search + 1
+                end
             end
         end
     end
@@ -1005,6 +1117,9 @@ local function capture_full_json()
             if t.tile_index_in_block then
                 f:write(string.format('          "tile_index_in_block": %d,\n', t.tile_index_in_block))
             end
+            if t.attrib_method then
+                f:write(string.format('          "attrib_method": "%s",\n', t.attrib_method))
+            end
             f:write(string.format('          "data_hex": "%s"\n', t.data_hex))
             if j < #e.tiles then
                 f:write('        },\n')
@@ -1044,8 +1159,10 @@ local function capture_full_json()
 
     log(string.format("Saved capture to %s (%d entries, %d/%d tiles with ROM offsets)",
         filename, 128, tiles_with_offset, total_tiles))
-    emu.displayMessage("Capture", string.format("Saved %d entries, %d/%d tiles attributed",
-        128, tiles_with_offset, total_tiles))
+    log(string.format("  Attribution breakdown: %d from DMA tracking, %d from ROM search",
+        tiles_from_vram_map, tiles_from_rom_search))
+    emu.displayMessage("Capture", string.format("%d/%d tiles: %d DMA + %d search",
+        tiles_with_offset, total_tiles, tiles_from_vram_map, tiles_from_rom_search))
 end
 
 --------------------------------------------------------------------------------
@@ -1153,8 +1270,9 @@ local safe_on_frame = make_safe_callback(on_frame, "on_frame")
 -- Callback Registration
 --------------------------------------------------------------------------------
 log("========================================")
-log("sprite_capture_with_attribution.lua v1")
+log("sprite_capture_with_attribution.lua v2")
 log("Combined SA-1 attribution + full capture")
+log("v2: ROM content search fallback for untracked DMAs")
 log("F9 = Capture JSON with per-tile ROM offsets")
 log("F10 = Binary dumps (OAM/VRAM/CGRAM)")
 log("E = Export VRAM attribution map")

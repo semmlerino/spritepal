@@ -175,6 +175,7 @@ class GameFrame:
     width: int = 0
     height: int = 0
     selected_entry_ids: list[int] = field(default_factory=list)  # OAM entry IDs selected during import
+    # Stored per-ROM offset, but UI enforces a single compression type per game frame.
     compression_types: dict[int, str] = field(default_factory=dict)  # ROM offset -> "hal" | "raw"
     display_name: str | None = None  # Optional user-defined display name
 

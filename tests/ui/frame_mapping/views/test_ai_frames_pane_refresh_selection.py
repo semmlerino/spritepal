@@ -92,13 +92,15 @@ class TestFilterClearsSelectionSignal:
         pane.set_ai_frames(frames)
 
         # Mark frame 2 as mapped (use AI frame IDs as keys)
-        pane.set_mapping_status({
-            "frame_000.png": "unmapped",
-            "frame_001.png": "unmapped",
-            "frame_002.png": "mapped",
-            "frame_003.png": "unmapped",
-            "frame_004.png": "unmapped",
-        })
+        pane.set_mapping_status(
+            {
+                "frame_000.png": "unmapped",
+                "frame_001.png": "unmapped",
+                "frame_002.png": "mapped",
+                "frame_003.png": "unmapped",
+                "frame_004.png": "unmapped",
+            }
+        )
 
         # Select the mapped frame
         pane.select_frame(2)
@@ -147,13 +149,15 @@ class TestFilterClearsSelectionSignal:
         pane.set_ai_frames(frames)
 
         # Mark all as unmapped except frame 3 (use AI frame IDs as keys)
-        pane.set_mapping_status({
-            "frame_000.png": "unmapped",
-            "frame_001.png": "unmapped",
-            "frame_002.png": "unmapped",
-            "frame_003.png": "mapped",
-            "frame_004.png": "unmapped",
-        })
+        pane.set_mapping_status(
+            {
+                "frame_000.png": "unmapped",
+                "frame_001.png": "unmapped",
+                "frame_002.png": "unmapped",
+                "frame_003.png": "mapped",
+                "frame_004.png": "unmapped",
+            }
+        )
 
         # Select an unmapped frame
         pane.select_frame(0)

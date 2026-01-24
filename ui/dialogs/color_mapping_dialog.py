@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.components.base.dialog_base import DialogBase
+from utils.color_distance import perceptual_distance_sq
 
 if TYPE_CHECKING:
     from PIL import Image
@@ -25,9 +26,12 @@ if TYPE_CHECKING:
     from ui.row_arrangement.overlay_layer import OverlayLayer
 
 
-def _color_distance_sq(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> int:
-    """Calculate squared Euclidean distance between two RGB colors."""
-    return (c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2 + (c1[2] - c2[2]) ** 2
+def _color_distance_sq(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float:
+    """Calculate squared perceptual distance between two RGB colors using CIELAB.
+
+    This provides better matching for human perception than RGB Euclidean distance.
+    """
+    return perceptual_distance_sq(c1, c2)
 
 
 def snap_to_snes_color(color: tuple[int, int, int]) -> tuple[int, int, int]:

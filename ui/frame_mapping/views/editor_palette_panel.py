@@ -87,6 +87,16 @@ class ColorSwatch(QFrame):
         """Check if this slot is marked as free."""
         return self._is_free
 
+    def get_display_text(self) -> str:
+        """Get the text to display on this swatch.
+
+        Returns:
+            'T' for index 0 (transparent), otherwise the index number.
+        """
+        if self._index == 0:
+            return "T"
+        return str(self._index)
+
     def _update_style(self) -> None:
         """Update widget style based on state."""
         r, g, b = self._color
@@ -192,7 +202,7 @@ class ColorSwatch(QFrame):
 
     @override
     def paintEvent(self, event: object) -> None:
-        """Paint with index number overlay."""
+        """Paint with index number/transparency overlay."""
         super().paintEvent(event)  # type: ignore[arg-type]
 
         painter = QPainter(self)
@@ -208,8 +218,8 @@ class ColorSwatch(QFrame):
         font.setBold(self._is_selected)
         painter.setFont(font)
 
-        # Draw index in bottom-right corner
-        text = str(self._index)
+        # Draw index/transparency indicator in bottom-right corner
+        text = self.get_display_text()
         rect = self.rect().adjusted(2, 2, -3, -3)
         painter.drawText(rect, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight, text)
 
@@ -273,6 +283,12 @@ class EditorPalettePanel(QWidget):
             grid.addWidget(swatch, row, col)
 
         layout.addWidget(grid_widget)
+
+        # Transparency note
+        self._transparency_note = QLabel("Index 0 (T) = Transparent")
+        self._transparency_note.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._transparency_note.setStyleSheet("color: #666; font-size: 9px; font-style: italic;")
+        layout.addWidget(self._transparency_note)
 
         # Active index label
         self._active_label = QLabel("Active: 1")

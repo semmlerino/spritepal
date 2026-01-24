@@ -25,6 +25,7 @@ from core.editing import (
     UndoManager,
 )
 from core.services.rgb_to_indexed import (
+    analyze_color_usage,
     convert_indexed_to_pil_indexed,
     convert_rgb_to_indexed,
 )
@@ -81,6 +82,7 @@ class PaletteEditorController(QObject):
     preview_requested = Signal(np.ndarray)  # indexed data for preview
     dirty_changed = Signal(bool)  # is_dirty
     active_index_changed = Signal(int)  # new active palette index
+    color_mapping_report = Signal(dict)  # RGB→indexed conversion analysis
 
     PREVIEW_DEBOUNCE_MS = 100
 
@@ -126,9 +128,16 @@ class PaletteEditorController(QObject):
 
         Returns:
             True if loaded successfully
+
+        Emits:
+            color_mapping_report: Analysis of RGB→indexed conversion quality
         """
         try:
             pil_image = Image.open(image_path)
+
+            # Analyze color usage before conversion
+            report = analyze_color_usage(pil_image, palette)
+
             indexed_data = convert_rgb_to_indexed(pil_image, palette)
 
             self._image_model = IndexedImageModel()
@@ -149,6 +158,9 @@ class PaletteEditorController(QObject):
             self.image_changed.emit()
             self.selection_changed.emit()
             self.dirty_changed.emit(False)
+
+            # Emit color mapping report
+            self.color_mapping_report.emit(report)
 
             logger.info("Loaded image %s (%dx%d)", image_path, width, height)
             return True

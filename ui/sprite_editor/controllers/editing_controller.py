@@ -681,7 +681,10 @@ class EditingController(QObject):
             QMessageBox.critical(parent, "Error", f"Failed to save palette: {e}")
 
     def handle_edit_color(self) -> None:
-        """Handle edit color button click."""
+        """Handle edit color button click.
+
+        Shows confirmation dialog if pixels will be affected by the change.
+        """
         from PySide6.QtGui import QColor
         from PySide6.QtWidgets import QColorDialog, QMessageBox
 
@@ -695,6 +698,22 @@ class EditingController(QObject):
             color = QColorDialog.getColor(qcolor, parent, "Edit Color")
             if color.isValid():
                 new_rgb = (color.red(), color.green(), color.blue())
+
+                # Check how many pixels use this index
+                pixel_count = self.count_pixels_using_index(self._selected_color)
+                if pixel_count > 0:
+                    # Show confirmation dialog
+                    result = QMessageBox.question(
+                        parent,
+                        "Confirm Color Change",
+                        f"This will affect {pixel_count} pixel(s) using index {self._selected_color}.\n\n"
+                        "Do you want to continue?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.Yes,
+                    )
+                    if result != QMessageBox.StandardButton.Yes:
+                        return  # User declined
+
                 self.palette_model.set_color(self._selected_color, new_rgb)
                 self._current_palette_source = None
                 self.paletteChanged.emit()
@@ -743,6 +762,17 @@ class EditingController(QObject):
     def get_image_data(self) -> np.ndarray | None:
         """Get the current image data."""
         return self.image_model.data
+
+    def count_pixels_using_index(self, index: int) -> int:
+        """Count the number of pixels using a specific palette index.
+
+        Args:
+            index: The palette index to count (0-15).
+
+        Returns:
+            Number of pixels using that index.
+        """
+        return int(np.sum(self.image_model.data == index))
 
     def get_flat_palette(self) -> list[int]:
         """Get the palette as a flat list for PIL."""
