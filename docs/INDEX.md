@@ -96,4 +96,4 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
 ---
 
-*Last updated: January 22, 2026 (Updated Mesen integration links after extraction to mesen2/architecture.md)*
+*Last updated: January 24, 2026 (Test directory structure consolidated)*

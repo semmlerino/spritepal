@@ -1205,6 +1205,6 @@ QT_QPA_PLATFORM=offscreen pytest tests/
 - Cache consistency
 
 ---
-*Last Updated: January 14, 2026 | SpritePal Testing Reference - DO NOT DELETE*
+*Last Updated: January 24, 2026 | SpritePal Testing Reference - DO NOT DELETE*
 
 **Critical**: ThreadSafeTestImage implementation required to prevent Qt threading violations that cause "Fatal Python error: Aborted" crashes in worker tests.

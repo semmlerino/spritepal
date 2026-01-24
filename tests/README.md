@@ -62,10 +62,10 @@ tests/
     └── timeouts.py         # Semantic timeout functions
 ```
 
-**Additional Test Location:**
-- `ui/sprite_editor/tests/` - Subsystem-specific tests for the sprite editor (125+ tests)
-  - Automatically collected by pytest via `testpaths = ["tests", "ui/sprite_editor/tests"]` in `pyproject.toml`
-  - Run with: `uv run pytest ui/sprite_editor/tests/`
+**Sprite Editor Tests:**
+- `tests/ui/sprite_editor/` - Subsystem-specific tests for the sprite editor (125+ tests)
+  - Consolidated from former `ui/sprite_editor/tests/` location (January 2026)
+  - Run with: `uv run pytest tests/ui/sprite_editor/`
 
 ### Where Does My Test Go?
 
@@ -531,4 +531,4 @@ def test_with_workers(app_context, isolated_data_repository):
 
 ---
 
-*Last updated: January 12, 2026 (Added UI Integration Tests section with signal-driven testing patterns)*
+*Last updated: January 24, 2026 (Updated test directory structure - consolidated ui/sprite_editor/tests/ to tests/ui/sprite_editor/)*

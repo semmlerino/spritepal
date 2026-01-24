@@ -1,6 +1,6 @@
 # SpritePal Development Guidelines
 
-**Last updated: January 21, 2026 — Recent updates: Frame Mapping Workspace (4-zone UI), Workbench Canvas with zoom/pan, in-game preview toggle, contiguous tile grouping** | See [Table of Contents](#table-of-contents) below
+**Last updated: January 24, 2026 — Recent updates: Test directory consolidation (single root), Frame Mapping Workspace (4-zone UI), Workbench Canvas with zoom/pan** | See [Table of Contents](#table-of-contents) below
 
 ---
 
@@ -430,7 +430,12 @@ spritepal/
 │   ├── dialogs/           # Dialog windows
 │   ├── workers/           # Background threads
 │   └── *.py
-├── tests/
+├── tests/                 # All tests (consolidated January 2026)
+│   ├── unit/              # Pure logic tests (no Qt)
+│   ├── integration/       # Multi-component tests
+│   ├── ui/                # UI-specific tests
+│   │   ├── integration/   # UI integration tests
+│   │   └── sprite_editor/ # Sprite editor subsystem tests (125+)
 │   ├── fixtures/          # Test fixtures (app_context, qtbot, etc.)
 │   └── infrastructure/    # Mocks, factories, test utilities
 ├── utils/                 # Stdlib-only utilities
