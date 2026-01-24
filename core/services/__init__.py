@@ -9,6 +9,10 @@ used by both core and UI layers. Services in this package:
 - rom_cache.py: ROMCache for ROM scan result caching
 - path_suggestion_service.py: Path suggestion functions (validate_path, find_vram_path, etc.)
 - extraction_results.py: Result dataclasses for extraction operations
+- injection_debug_context.py: Context manager for injection debug mode
+- rom_staging_manager.py: Atomic ROM file operations with staging
+- injection_results.py: Result dataclasses for injection operations
+- injection_orchestrator.py: UI-independent injection pipeline coordinator
 
 Settings management is now consolidated in ApplicationStateManager (core/managers/).
 

@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.frame_mapping_project import AIFrame, GameFrame
+from core.services.injection_results import InjectionResult, TileInjectionResult
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 
 # =============================================================================
@@ -67,24 +68,29 @@ class TestBatchInjectionSignalStorm:
         Reproduces the issue where inject_mapping emits project_changed for every single frame,
         causing massive UI thrashing during batch operations.
         """
-        # Mock the internal injection logic to succeed immediately
-        with (
-            patch.object(mock_controller, "_create_injection_copy", return_value=Path("test.sfc")),
-            patch.object(mock_controller, "_create_staging_copy", return_value=Path("staging.sfc")),
-            patch.object(mock_controller, "_commit_staging", return_value=True),
-            patch("core.rom_injector.ROMInjector") as MockInjector,
-            patch("core.services.rom_verification_service.ROMVerificationService") as MockVerifier,
-            patch("PIL.Image.open"),
+        # Create a successful injection result
+        success_result = InjectionResult(
+            success=True,
+            tile_results=(
+                TileInjectionResult(
+                    rom_offset=0x1000,
+                    tile_count=4,
+                    compression_used="HAL",
+                    success=True,
+                    message="Injected 4 tiles at 0x1000",
+                ),
+            ),
+            output_rom_path=tmp_path / "out.sfc",
+            messages=("Injection successful",),
+            new_mapping_status="injected",
+        )
+
+        # Mock the orchestrator's execute method to return success
+        with patch.object(
+            mock_controller._injection_orchestrator,
+            "execute",
+            return_value=success_result,
         ):
-            # Setup mocks
-            injector_instance = MockInjector.return_value
-            injector_instance.inject_sprite_to_rom.return_value = (True, "Success")
-
-            verifier_instance = MockVerifier.return_value
-            verifier_instance.verify_offsets.return_value.all_found = True
-            verifier_instance.verify_offsets.return_value.has_corrections = False
-            verifier_instance.verify_offsets.return_value.total = 1
-
             # Track signal emissions
             signal_spy = MagicMock()
             mock_controller.project_changed.connect(signal_spy)
