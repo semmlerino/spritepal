@@ -888,8 +888,8 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         hal_succeeded: bool = True,
     ) -> None:
         """Handle preview ready from smart coordinator with guaranteed UI updates."""
-        logger.info("[PREVIEW_READY] ========== START ===========")
-        logger.info(
+        logger.debug("[PREVIEW_READY] ========== START ===========")
+        logger.debug(
             f"[PREVIEW_READY] data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}, compressed_size={compressed_size}, actual_offset=0x{actual_offset:06X}"
         )
         logger.debug(f"[PREVIEW_READY] tile_data first 20 bytes: {tile_data[:20].hex() if tile_data else 'None'}")
@@ -906,7 +906,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             return
 
         if self.preview_widget is not None:
-            logger.info("[PREVIEW_READY] Preview widget exists")
+            logger.debug("[PREVIEW_READY] Preview widget exists")
             logger.debug(f"[PREVIEW_READY] Preview widget type: {type(self.preview_widget)}")
             logger.debug(f"[PREVIEW_READY] Preview widget visible: {self.preview_widget.isVisible()}")
 
@@ -914,9 +914,9 @@ class UnifiedManualOffsetDialog(CleanupDialog):
             logger.debug("[PREVIEW_READY] Acquiring mutex...")
             try:
                 with QMutexLocker(self._preview_update_mutex):
-                    logger.info("[PREVIEW_READY] Calling load_sprite_from_4bpp...")
+                    logger.debug("[PREVIEW_READY] Calling load_sprite_from_4bpp...")
                     self.preview_widget.load_sprite_from_4bpp(tile_data, width, height, sprite_name)
-                    logger.info("[PREVIEW_READY] load_sprite_from_4bpp returned successfully")
+                    logger.debug("[PREVIEW_READY] load_sprite_from_4bpp returned successfully")
 
                     # Force immediate widget update
                     logger.debug("[PREVIEW_READY] Calling widget.update()...")
@@ -926,14 +926,14 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                 logger.exception(f"[PREVIEW_READY] EXCEPTION in preview update: {e}")
                 raise
 
-            logger.info("[PREVIEW_READY] Mutex released, updates completed")
+            logger.debug("[PREVIEW_READY] Mutex released, updates completed")
 
             # Log pixmap state after loading for debugging
             try:
                 if hasattr(self.preview_widget, "preview_label") and self.preview_widget.preview_label:
                     pixmap = self.preview_widget.preview_label.pixmap()
                     # QLabel.pixmap() always returns a QPixmap, check if it's null/empty instead
-                    logger.info(f"[PREVIEW_READY] Final pixmap state: null={pixmap.isNull()}")
+                    logger.debug(f"[PREVIEW_READY] Final pixmap state: null={pixmap.isNull()}")
                     if not pixmap.isNull():
                         logger.debug(f"[PREVIEW_READY] Pixmap size: {pixmap.width()}x{pixmap.height()}")
             except Exception as e:
@@ -949,7 +949,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
             # Sync browse tab if offset was adjusted during alignment
             if actual_offset not in (-1, current_offset):
-                logger.info(f"[PREVIEW_READY] Offset adjusted from 0x{current_offset:06X} to 0x{actual_offset:06X}")
+                logger.debug(f"[PREVIEW_READY] Offset adjusted from 0x{current_offset:06X} to 0x{actual_offset:06X}")
                 self.set_offset(actual_offset)
 
             cache_status = self._get_cache_status_text()
@@ -957,7 +957,7 @@ class UnifiedManualOffsetDialog(CleanupDialog):
         except Exception as e:
             logger.error(f"[PREVIEW_READY] Error updating status: {e}")
 
-        logger.info("[PREVIEW_READY] ========== END ===========")
+        logger.debug("[PREVIEW_READY] ========== END ===========")
 
     def _on_smart_preview_cached(
         self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int

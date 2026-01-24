@@ -1150,7 +1150,7 @@ class HALCompressor:
         Raises:
             HALCompressionError: If decompressed size exceeds max_decompressed_size
         """
-        logger.info(f"Decompressing from ROM: {rom_path} at offset 0x{offset:X}")
+        logger.debug(f"Decompressing from ROM: {rom_path} at offset 0x{offset:X}")
 
         # Validate offset before subprocess/pool operations
         if offset < 0:
@@ -1172,7 +1172,7 @@ class HALCompressor:
             result = self._pool.submit_request(request)
 
             if result.success and result.data:
-                logger.info(f"Successfully decompressed {len(result.data)} bytes using pool")
+                logger.debug(f"Successfully decompressed {len(result.data)} bytes using pool")
                 # Save to output file if specified
                 if output_path:
                     Path(output_path).write_bytes(result.data)
@@ -1229,7 +1229,7 @@ class HALCompressor:
             # Size is safe - read the file into memory
             data = output_file.read_bytes()
 
-            logger.info(f"Successfully decompressed {len(data)} bytes from ROM offset 0x{offset:X}")
+            logger.debug(f"Successfully decompressed {len(data)} bytes from ROM offset 0x{offset:X}")
             return data
 
         finally:
@@ -1250,7 +1250,7 @@ class HALCompressor:
         Returns:
             Size of compressed data
         """
-        logger.info(f"Compressing {len(input_data)} bytes to file: {output_path}")
+        logger.debug(f"Compressing {len(input_data)} bytes to file: {output_path}")
 
         # Check size limit
         if len(input_data) > DATA_SIZE:
@@ -1286,7 +1286,7 @@ class HALCompressor:
             # Get compressed size
             compressed_size = Path(output_path).stat().st_size
             compression_ratio = (len(input_data) - compressed_size) / len(input_data) * 100
-            logger.info(f"Compressed to {compressed_size} bytes ({compression_ratio:.1f}% reduction)")
+            logger.debug(f"Compressed to {compressed_size} bytes ({compression_ratio:.1f}% reduction)")
             return compressed_size
 
         finally:
@@ -1310,7 +1310,7 @@ class HALCompressor:
         Returns:
             Tuple of (success, message)
         """
-        logger.info(f"Compressing {len(input_data)} bytes to ROM: {rom_path} at offset 0x{offset:X}")
+        logger.debug(f"Compressing {len(input_data)} bytes to ROM: {rom_path} at offset 0x{offset:X}")
 
         # Check size limit
         if len(input_data) > DATA_SIZE:
@@ -1370,7 +1370,7 @@ class HALCompressor:
                 if match:
                     compressed_size = match.group(1)
 
-            logger.info(f"Successfully injected compressed data ({compressed_size} bytes) at offset 0x{offset:X}")
+            logger.debug(f"Successfully injected compressed data ({compressed_size} bytes) at offset 0x{offset:X}")
             return (True, f"Successfully injected compressed data ({compressed_size} bytes) at offset 0x{offset:X}")
 
         finally:
@@ -1455,7 +1455,7 @@ class HALCompressor:
         ]
 
         # Submit batch to pool
-        logger.info(f"Processing batch of {len(requests)} decompression requests using pool")
+        logger.debug(f"Processing batch of {len(requests)} decompression requests using pool")
         hal_results = self._pool.submit_batch(hal_requests)
 
         # Convert results
@@ -1505,7 +1505,7 @@ class HALCompressor:
         ]
 
         # Submit batch to pool
-        logger.info(f"Processing batch of {len(requests)} compression requests using pool")
+        logger.debug(f"Processing batch of {len(requests)} compression requests using pool")
         hal_results = self._pool.submit_batch(hal_requests)
 
         # Convert results

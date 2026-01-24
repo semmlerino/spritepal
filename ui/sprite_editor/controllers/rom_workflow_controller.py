@@ -2943,7 +2943,7 @@ class ROMWorkflowController(QObject):
 
                 # Warn user about raw sprites (they can still edit/inject but without compression)
                 if not hal_succeeded:
-                    logger.info(f"[PREVIEW] Raw sprite at 0x{actual_offset:06X}, allowing edit")
+                    logger.debug(f"[PREVIEW] Raw sprite at 0x{actual_offset:06X}, allowing edit")
                     if self._message_service:
                         self._message_service.show_message(
                             f"Opening raw sprite at 0x{actual_offset:06X} (will be injected without compression)"

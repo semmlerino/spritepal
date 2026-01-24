@@ -298,7 +298,7 @@ class ROMExtractor:
             # Adjust offset: ROM offset -> file offset
             file_offset = sprite_offset + smc_offset
             if smc_offset > 0:
-                logger.info(f"Adjusting for {smc_offset}-byte SMC header: 0x{sprite_offset:X} -> 0x{file_offset:X}")
+                logger.debug(f"Adjusting for {smc_offset}-byte SMC header: 0x{sprite_offset:X} -> 0x{file_offset:X}")
 
             # Try to decompress the data at the adjusted offset
             decompressed_data = self.hal_compressor.decompress_from_rom(rom_path, file_offset)
@@ -344,7 +344,7 @@ class ROMExtractor:
             try:
                 decompressed_data = self.hal_compressor.decompress_from_rom(rom_path, file_offset)
                 if decompressed_data:
-                    logger.info(f"HAL decompression succeeded: {len(decompressed_data)} bytes")
+                    logger.debug(f"HAL decompression succeeded: {len(decompressed_data)} bytes")
                     return decompressed_data, CompressionType.HAL
             except Exception as hal_error:
                 logger.info(f"HAL decompression failed at 0x{sprite_offset:X}: {hal_error}")
@@ -430,7 +430,7 @@ class ROMExtractor:
             Tuple of (output_png_path, extraction_info)
         """
         logger.info("=" * 60)
-        logger.info(f"Starting ROM sprite extraction: offset=0x{sprite_offset:X}, sprite={sprite_name or 'unnamed'}")
+        logger.debug(f"Starting ROM sprite extraction: offset=0x{sprite_offset:X}, sprite={sprite_name or 'unnamed'}")
         logger.debug(f"ROM path: {rom_path}")
         logger.debug(f"Output base: {output_base}")
 
@@ -448,7 +448,7 @@ class ROMExtractor:
 
             # Stage 4: Convert to PNG
             output_path = f"{output_base}.png"
-            logger.info(f"Converting decompressed data to PNG: {output_path}")
+            logger.debug(f"Converting decompressed data to PNG: {output_path}")
             tile_count = self._convert_4bpp_to_png(sprite_data, output_path)
 
             # Stage 5: Extract palettes (ROM or default)
@@ -487,7 +487,7 @@ class ROMExtractor:
             logger.exception(f"Unexpected error during ROM extraction: {e}")
             raise
         else:
-            logger.info("ROM extraction completed successfully")
+            logger.debug("ROM extraction completed successfully")
             logger.info(f"Output: {output_path} ({tile_count} tiles)")
             logger.info(f"Palettes: {len(palette_files)} files")
             logger.info("=" * 60)
@@ -758,7 +758,7 @@ class ROMExtractor:
         img_width = tiles_per_row * TILE_WIDTH
         img_height = ((num_tiles + tiles_per_row - 1) // tiles_per_row) * TILE_HEIGHT
 
-        logger.info(f"Converting 4bpp data: {len(tile_data)} bytes -> {num_tiles} tiles")
+        logger.debug(f"Converting 4bpp data: {len(tile_data)} bytes -> {num_tiles} tiles")
         logger.debug(f"Tiles per row: {tiles_per_row}")
         logger.debug(f"Image dimensions: {img_width}x{img_height} pixels")
 
@@ -802,7 +802,7 @@ class ROMExtractor:
         # Save as indexed PNG
         img.save(output_path, "PNG")
 
-        logger.info(f"Saved PNG: {output_path} ({img.width}x{img.height} pixels, {num_tiles} tiles)")
+        logger.debug(f"Saved PNG: {output_path} ({img.width}x{img.height} pixels, {num_tiles} tiles)")
         return num_tiles
 
     def get_known_sprite_locations(self, rom_path: str) -> dict[str, SpritePointer]:

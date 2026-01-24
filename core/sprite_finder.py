@@ -582,7 +582,7 @@ class SpriteFinder:
 
                     if is_valid and confidence >= min_confidence:
                         # Found a candidate!
-                        logger.info(f"Found sprite candidate at 0x{offset:06X} with confidence {confidence:.3f}")
+                        logger.debug(f"Found sprite candidate at 0x{offset:06X} with confidence {confidence:.3f}")
 
                         # Save preview if requested
                         preview_path = None
