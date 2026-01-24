@@ -113,15 +113,15 @@ class TestUnmappedRowClearsGameSelection:
 
         # Step 1: Select mapped row 0 -> should set _selected_game_id
         workspace._on_mapping_selected(frame_0_id)
-        assert workspace._selected_game_id == "game_frame_a", (
+        assert workspace._state.selected_game_id == "game_frame_a", (
             "Expected _selected_game_id to be 'game_frame_a' after selecting mapped row 0"
         )
 
         # Step 2: Select unmapped row 1 -> should CLEAR _selected_game_id
         workspace._on_mapping_selected(frame_1_id)
-        assert workspace._selected_game_id is None, (
+        assert workspace._state.selected_game_id is None, (
             "BUG: _selected_game_id should be None after selecting unmapped row, "
-            f"but was {workspace._selected_game_id!r}. "
+            f"but was {workspace._state.selected_game_id!r}. "
             "This allows 'Map Selected' to link to a stale capture."
         )
 
@@ -153,13 +153,13 @@ class TestUnmappedRowClearsGameSelection:
 
         # Select mapped row 0 to set _selected_game_id
         workspace._on_mapping_selected(frame_0_id)
-        assert workspace._selected_game_id == "game_frame_a"
+        assert workspace._state.selected_game_id == "game_frame_a"
 
         # Select unmapped row 1
         workspace._on_mapping_selected(frame_1_id)
 
         # Map Selected should NOT be able to link (no game frame selected)
         # Verify by checking the state that _on_map_selected uses
-        assert workspace._selected_game_id is None, (
+        assert workspace._state.selected_game_id is None, (
             "BUG: _selected_game_id should be cleared after selecting unmapped row"
         )

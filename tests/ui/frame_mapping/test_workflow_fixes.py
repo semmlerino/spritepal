@@ -341,9 +341,10 @@ class TestCanvasStatePreservation:
         workspace = FrameMappingWorkspace()
         qtbot.addWidget(workspace)
 
-        # Verify _previous_project_id attribute exists after fix
-        assert hasattr(workspace, "_previous_project_id"), (
-            "Workspace should track previous project ID for canvas state preservation"
+        # Verify previous_project_id is tracked in state manager after fix
+        assert hasattr(workspace, "_state"), "Workspace should have state manager"
+        assert hasattr(workspace._state, "previous_project_id"), (
+            "State manager should track previous project ID for canvas state preservation"
         )
 
 
@@ -408,9 +409,9 @@ class TestSplitBrainFixes:
         # Simulate: AI frame mapped to capture_a, but canvas shows capture_b
         ai_frame_id = project.ai_frames[0].id
         project.create_mapping(ai_frame_id, "capture_a")
-        workspace._selected_ai_frame_id = ai_frame_id
-        workspace._selected_game_id = "capture_a"  # What was linked
-        workspace._current_canvas_game_id = "capture_b"  # What canvas displays (user previewing)
+        workspace._state.selected_ai_frame_id = ai_frame_id
+        workspace._state.selected_game_id = "capture_a"  # What was linked
+        workspace._state.current_canvas_game_id = "capture_b"  # What canvas displays (user previewing)
 
         # User changes compression type via canvas
         workspace._on_compression_type_changed("hal")
@@ -473,9 +474,9 @@ class TestSplitBrainFixes:
         # Create mapping AI frame -> capture_a
         ai_frame_id = project.ai_frames[0].id
         project.create_mapping(ai_frame_id, "capture_a")
-        workspace._selected_ai_frame_id = ai_frame_id
-        workspace._selected_game_id = "capture_a"
-        workspace._current_canvas_game_id = "capture_b"  # Canvas shows different frame
+        workspace._state.selected_ai_frame_id = ai_frame_id
+        workspace._state.selected_game_id = "capture_a"
+        workspace._state.current_canvas_game_id = "capture_b"  # Canvas shows different frame
 
         # User tries to adjust alignment
         workspace._on_alignment_changed(10, 20, False, False, 1.0)

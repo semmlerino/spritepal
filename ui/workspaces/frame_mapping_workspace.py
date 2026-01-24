@@ -55,6 +55,7 @@ from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 from ui.frame_mapping.windows import AIFramePaletteEditorWindow
+from ui.frame_mapping.workspace_state_manager import WorkspaceStateManager
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -81,34 +82,12 @@ class FrameMappingWorkspace(QWidget):
     ) -> None:
         super().__init__(parent)
         self._message_service = message_service
-        self._last_ai_dir: Path | None = None
-        self._last_capture_dir: Path | None = None
-        self._project_path: Path | None = None
 
-        # ROM tracking for injection (synced from sprite editor)
-        self._rom_path: Path | None = None
-        self._modified_rom_path: Path | None = None
-        self._last_injected_rom: Path | None = None  # Track last injection target for reuse
-
-        # Selection tracking (ID-based - stable across reloads)
-        self._selected_ai_frame_id: str | None = None
-        self._selected_game_id: str | None = None
-        # Canvas display tracking - what the canvas is actually showing
-        # May differ from _selected_game_id when user clicks a different capture
-        self._current_canvas_game_id: str | None = None
-
-        # Auto-advance toggle state (default: OFF per UX spec)
-        self._auto_advance_enabled = False
-
-        # Track stale entry warnings during injection (for retry with fallback)
-        self._stale_entry_frame_id: str | None = None
+        # State manager for UI state
+        self._state = WorkspaceStateManager()
 
         # Track open palette editor windows (frame_id -> editor window)
         self._palette_editors: dict[str, AIFramePaletteEditorWindow] = {}
-
-        # Track project identity for canvas state preservation
-        # Only clear canvas when project identity changes (new/load), not on content updates
-        self._previous_project_id: int | None = None
 
         # Queue for pending capture imports (for directory imports with sequential dialogs)
         self._pending_captures: list[tuple[CaptureResult, Path]] = []
@@ -139,10 +118,10 @@ class FrameMappingWorkspace(QWidget):
         Args:
             rom_path: Path to the ROM file, or None to clear.
         """
-        if rom_path != self._rom_path:
+        if rom_path != self._state.rom_path:
             logger.info("FrameMapping ROM path updated: %s", rom_path)
-            self._rom_path = rom_path
-            self._modified_rom_path = None
+            self._state.rom_path = rom_path
+            self._state.modified_rom_path = None
 
     def _validate_rom_path(self) -> bool:
         """Validate that the current ROM path is valid and exists.
@@ -150,7 +129,7 @@ class FrameMappingWorkspace(QWidget):
         Returns:
             True if valid, False otherwise.
         """
-        if self._rom_path is None:
+        if self._state.rom_path is None:
             QMessageBox.information(
                 self,
                 "Injection Requirement",
@@ -158,11 +137,11 @@ class FrameMappingWorkspace(QWidget):
             )
             return False
 
-        if not self._rom_path.exists():
+        if not self._state.is_rom_valid():
             QMessageBox.warning(
                 self,
                 "ROM Not Found",
-                f"The ROM file from Sprite Editor no longer exists:\n{self._rom_path}\n\n"
+                f"The ROM file from Sprite Editor no longer exists:\n{self._state.rom_path}\n\n"
                 "Please reload the ROM in the Sprite Editor workspace.",
             )
             return False
@@ -395,7 +374,7 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_auto_advance_changed(self, enabled: bool) -> None:
         """Handle auto-advance toggle change."""
-        self._auto_advance_enabled = enabled
+        self._state.auto_advance_enabled = enabled
         logger.debug("Auto-advance %s", "enabled" if enabled else "disabled")
 
     def _on_project_changed(self) -> None:
@@ -408,16 +387,16 @@ class FrameMappingWorkspace(QWidget):
 
         # Check if project identity changed (new project loaded vs content update)
         current_project_id = id(project) if project is not None else None
-        project_identity_changed = current_project_id != self._previous_project_id
-        self._previous_project_id = current_project_id
+        project_identity_changed = current_project_id != self._state.previous_project_id
+        self._state.previous_project_id = current_project_id
 
         # Only clear canvas on actual project change, not content updates
         if project_identity_changed:
             self._alignment_canvas.clear()
 
         if project is None:
-            self._selected_ai_frame_id = None
-            self._selected_game_id = None
+            self._state.selected_ai_frame_id = None
+            self._state.selected_game_id = None
             self._project_label.setText("")
             self._ai_frames_pane.clear()
             self._captures_pane.clear()
@@ -479,17 +458,17 @@ class FrameMappingWorkspace(QWidget):
 
         # Guard against cleared selection
         if not frame_id:
-            self._selected_ai_frame_id = None
+            self._state.selected_ai_frame_id = None
             self._update_map_button_state()
             self._alignment_canvas.set_ai_frame(None)
             self._alignment_canvas.clear_alignment()
             self._mapping_panel.clear_selection()
             self._captures_pane.clear_selection()
-            self._selected_game_id = None
-            self._current_canvas_game_id = None
+            self._state.selected_game_id = None
+            self._state.current_canvas_game_id = None
             return
 
-        self._selected_ai_frame_id = frame_id
+        self._state.selected_ai_frame_id = frame_id
         self._update_map_button_state()
 
         # Sync drawer selection by ID
@@ -511,14 +490,14 @@ class FrameMappingWorkspace(QWidget):
             )
             # Sync captures selection and track canvas state
             self._captures_pane.select_frame(mapping.game_frame_id)
-            self._selected_game_id = mapping.game_frame_id
-            self._current_canvas_game_id = mapping.game_frame_id
+            self._state.selected_game_id = mapping.game_frame_id
+            self._state.current_canvas_game_id = mapping.game_frame_id
         else:
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
             self._captures_pane.clear_selection()
-            self._selected_game_id = None
-            self._current_canvas_game_id = None
+            self._state.selected_game_id = None
+            self._state.current_canvas_game_id = None
 
         self._update_map_button_state()
 
@@ -534,24 +513,24 @@ class FrameMappingWorkspace(QWidget):
 
         # Guard against invalid selections
         if not frame_id:
-            self._selected_game_id = None
-            self._current_canvas_game_id = None
+            self._state.selected_game_id = None
+            self._state.current_canvas_game_id = None
             # Phase 3a fix: Clear canvas state
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
             self._update_map_button_state()
             return
 
-        self._selected_game_id = frame_id
+        self._state.selected_game_id = frame_id
         self._update_map_button_state()
 
         # Show preview in canvas if AI frame is selected
-        if self._selected_ai_frame_id is not None:
+        if self._state.selected_ai_frame_id is not None:
             game_frame = project.get_game_frame_by_id(frame_id)
             preview = self._controller.get_game_frame_preview(frame_id)
             capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
-            self._current_canvas_game_id = frame_id
+            self._state.current_canvas_game_id = frame_id
 
     def _on_mapping_selected(self, ai_frame_id: str) -> None:
         """Handle mapping row selection in drawer.
@@ -572,7 +551,7 @@ class FrameMappingWorkspace(QWidget):
 
         # Sync AI frames pane (uses index for scroll/selection)
         self._ai_frames_pane.select_frame(ai_frame.index)
-        self._selected_ai_frame_id = ai_frame_id
+        self._state.selected_ai_frame_id = ai_frame_id
 
         # Load into canvas
         self._alignment_canvas.set_ai_frame(ai_frame)
@@ -589,28 +568,28 @@ class FrameMappingWorkspace(QWidget):
             )
             # Sync captures selection
             self._captures_pane.select_frame(mapping.game_frame_id)
-            self._selected_game_id = mapping.game_frame_id
-            self._current_canvas_game_id = mapping.game_frame_id
+            self._state.selected_game_id = mapping.game_frame_id
+            self._state.current_canvas_game_id = mapping.game_frame_id
         else:
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
             self._captures_pane.clear_selection()
-            self._selected_game_id = None
-            self._current_canvas_game_id = None
+            self._state.selected_game_id = None
+            self._state.current_canvas_game_id = None
 
         self._update_map_button_state()
 
     def _on_map_selected(self) -> None:
         """Handle map button click in AI frames pane."""
-        if self._selected_ai_frame_id is None:
+        if self._state.selected_ai_frame_id is None:
             QMessageBox.information(self, "Map Frames", "Please select an AI frame first.")
             return
 
-        if self._selected_game_id is None:
+        if self._state.selected_game_id is None:
             QMessageBox.information(self, "Map Frames", "Please select a game frame first.")
             return
 
-        self._attempt_link(self._selected_ai_frame_id, self._selected_game_id)
+        self._attempt_link(self._state.selected_ai_frame_id, self._state.selected_game_id)
 
     def _on_drop_game_frame(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Handle game frame dropped onto drawer row.
@@ -628,22 +607,22 @@ class FrameMappingWorkspace(QWidget):
         game frame as the existing mapping. This prevents accidental edits when
         the user is previewing a different capture.
         """
-        if self._selected_ai_frame_id is None:
+        if self._state.selected_ai_frame_id is None:
             return
 
         project = self._controller.project
         if project is None:
             return
 
-        mapping = project.get_mapping_for_ai_frame(self._selected_ai_frame_id)
+        mapping = project.get_mapping_for_ai_frame(self._state.selected_ai_frame_id)
         if mapping is None:
             return
 
         # Block alignment edit if canvas is showing a different game frame than the mapping
         # This prevents accidentally modifying the mapping when previewing other captures
-        if self._current_canvas_game_id != mapping.game_frame_id:
+        if self._state.current_canvas_game_id != mapping.game_frame_id:
             logger.debug(
-                f"Blocking alignment change: canvas shows {self._current_canvas_game_id}, "
+                f"Blocking alignment change: canvas shows {self._state.current_canvas_game_id}, "
                 f"mapping points to {mapping.game_frame_id}"
             )
             # Provide user feedback about why the edit was blocked
@@ -656,7 +635,7 @@ class FrameMappingWorkspace(QWidget):
         # Update alignment in controller (includes scale)
         # This emits alignment_updated signal which triggers _on_alignment_updated()
         # which handles updating the mapping panel row
-        self._controller.update_mapping_alignment(self._selected_ai_frame_id, x, y, flip_h, flip_v, scale)
+        self._controller.update_mapping_alignment(self._state.selected_ai_frame_id, x, y, flip_h, flip_v, scale)
 
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.
@@ -668,11 +647,11 @@ class FrameMappingWorkspace(QWidget):
         _selected_game_id (what user clicked in library), because the user
         is editing what they see on the canvas.
         """
-        if self._current_canvas_game_id is None:
+        if self._state.current_canvas_game_id is None:
             return
 
         # Route through controller for proper signal emission and auto-save
-        self._controller.update_game_frame_compression(self._current_canvas_game_id, compression_type)
+        self._controller.update_game_frame_compression(self._state.current_canvas_game_id, compression_type)
 
     def _on_apply_transforms_to_all(self, offset_x: int, offset_y: int, scale: float) -> None:
         """Handle apply transformations to all request from canvas.
@@ -881,8 +860,8 @@ class FrameMappingWorkspace(QWidget):
                 self._palette_editors[new_id] = editor
 
             # Update selection tracking
-            if self._selected_ai_frame_id == ai_frame_id:
-                self._selected_ai_frame_id = new_id
+            if self._state.selected_ai_frame_id == ai_frame_id:
+                self._state.selected_ai_frame_id = new_id
 
         # Mark project as modified (will auto-save on next operation)
         self._controller.project_changed.emit()
@@ -894,7 +873,7 @@ class FrameMappingWorkspace(QWidget):
         self._mapping_panel.refresh()
 
         # Update workbench if this frame is selected
-        if self._selected_ai_frame_id == new_id:
+        if self._state.selected_ai_frame_id == new_id:
             self._on_ai_frame_selected(new_id)
 
         if self._message_service:
@@ -948,9 +927,9 @@ class FrameMappingWorkspace(QWidget):
         # Remove the game frame (also removes any associated mapping)
         if self._controller.remove_game_frame(frame_id):
             # Phase 3b fix: Clear selection if deleted frame was selected
-            if self._selected_game_id == frame_id:
-                self._selected_game_id = None
-                self._current_canvas_game_id = None
+            if self._state.selected_game_id == frame_id:
+                self._state.selected_game_id = None
+                self._state.current_canvas_game_id = None
                 self._alignment_canvas.set_game_frame(None)
                 self._alignment_canvas.clear_alignment()
                 self._update_map_button_state()
@@ -1011,9 +990,9 @@ class FrameMappingWorkspace(QWidget):
         # Remove the AI frame (also removes mapping)
         if self._controller.remove_ai_frame(ai_frame_id):
             # Clear selection if deleted frame was selected
-            if self._selected_ai_frame_id == ai_frame_id:
-                self._selected_ai_frame_id = None
-                self._current_canvas_game_id = None
+            if self._state.selected_ai_frame_id == ai_frame_id:
+                self._state.selected_ai_frame_id = None
+                self._state.current_canvas_game_id = None
                 self._alignment_canvas.set_ai_frame(None)
                 self._alignment_canvas.clear_alignment()
                 self._update_map_button_state()
@@ -1036,8 +1015,8 @@ class FrameMappingWorkspace(QWidget):
         self._alignment_canvas.set_game_frame(None)
         self._captures_pane.clear_selection()
         # Phase 3c fix: Clear selected game ID and update Map button
-        self._selected_game_id = None
-        self._current_canvas_game_id = None
+        self._state.selected_game_id = None
+        self._state.current_canvas_game_id = None
         self._update_map_button_state()
 
     def _on_inject_single(self, ai_frame_id: str) -> None:
@@ -1057,15 +1036,17 @@ class FrameMappingWorkspace(QWidget):
         if not self._validate_rom_path():
             return
 
-        # At this point self._rom_path is guaranteed not None and exists
-        rom_path = cast(Path, self._rom_path)
+        # At this point self._state.rom_path is guaranteed not None and exists
+        rom_path = cast(Path, self._state.rom_path)
 
         # Check if we should reuse the last injected ROM
         reuse_enabled = self._reuse_rom_checkbox.isChecked()
-        can_reuse = reuse_enabled and self._last_injected_rom is not None and self._last_injected_rom.exists()
+        can_reuse = (
+            reuse_enabled and self._state.last_injected_rom is not None and self._state.last_injected_rom.exists()
+        )
 
         if can_reuse:
-            target_rom = cast(Path, self._last_injected_rom)
+            target_rom = cast(Path, self._state.last_injected_rom)
             reply = QMessageBox.question(
                 self,
                 "Confirm Injection",
@@ -1086,11 +1067,11 @@ class FrameMappingWorkspace(QWidget):
             return
 
         # Clear stale entry tracking before injection
-        self._stale_entry_frame_id = None
+        self._state.stale_entry_frame_id = None
 
         # Either reuse existing ROM or let inject_mapping create a new copy
         if can_reuse:
-            target_rom = cast(Path, self._last_injected_rom)
+            target_rom = cast(Path, self._state.last_injected_rom)
         else:
             # Create a new copy for injection
             target_rom = self._controller.create_injection_copy(rom_path)
@@ -1102,11 +1083,11 @@ class FrameMappingWorkspace(QWidget):
         success = self._controller.inject_mapping(ai_frame_id, rom_path, output_path=target_rom)
 
         # If injection failed due to stale entries, offer to retry with fallback
-        if not success and self._stale_entry_frame_id is not None:
+        if not success and self._state.stale_entry_frame_id is not None:
             retry_reply = QMessageBox.question(
                 self,
                 "Entry Selection Outdated",
-                f"The stored entry selection for '{self._stale_entry_frame_id}' no longer "
+                f"The stored entry selection for '{self._state.stale_entry_frame_id}' no longer "
                 f"matches the capture file.\n\n"
                 f"Would you like to inject using ROM offset filtering instead?\n\n"
                 f"Note: This may include unintended sprite entries. "
@@ -1122,7 +1103,7 @@ class FrameMappingWorkspace(QWidget):
 
         # Track the successfully used ROM for future reuse
         if success:
-            self._last_injected_rom = target_rom
+            self._state.last_injected_rom = target_rom
 
     def _on_inject_selected(self) -> None:
         """Handle inject selected frames request from mapping panel."""
@@ -1135,16 +1116,18 @@ class FrameMappingWorkspace(QWidget):
         if not self._validate_rom_path():
             return
 
-        # At this point self._rom_path is guaranteed not None and exists
-        rom_path = cast(Path, self._rom_path)
+        # At this point self._state.rom_path is guaranteed not None and exists
+        rom_path = cast(Path, self._state.rom_path)
 
         # Check if we should reuse the last injected ROM
         reuse_enabled = self._reuse_rom_checkbox.isChecked()
-        can_reuse = reuse_enabled and self._last_injected_rom is not None and self._last_injected_rom.exists()
+        can_reuse = (
+            reuse_enabled and self._state.last_injected_rom is not None and self._state.last_injected_rom.exists()
+        )
 
         frame_count = len(selected_ids)
         if can_reuse:
-            target_rom = cast(Path, self._last_injected_rom)
+            target_rom = cast(Path, self._state.last_injected_rom)
             reply = QMessageBox.question(
                 self,
                 "Confirm Injection",
@@ -1167,7 +1150,7 @@ class FrameMappingWorkspace(QWidget):
 
         # Either reuse existing ROM or create a new copy
         if can_reuse:
-            target_rom = cast(Path, self._last_injected_rom)
+            target_rom = cast(Path, self._state.last_injected_rom)
         else:
             target_rom = self._controller.create_injection_copy(rom_path)
             if target_rom is None:
@@ -1175,25 +1158,25 @@ class FrameMappingWorkspace(QWidget):
                 return
 
         # Clear stale entry tracking before batch injection
-        self._stale_entry_frame_id = None
+        self._state.stale_entry_frame_id = None
 
         # Inject selected frames into the same copy
         # Use emit_project_changed=False to avoid N emissions, emit once after batch
         success_count = 0
         failed_due_to_stale = 0
         for ai_frame_id in selected_ids:
-            self._stale_entry_frame_id = None  # Reset for each frame
+            self._state.stale_entry_frame_id = None  # Reset for each frame
             if self._controller.inject_mapping(
                 ai_frame_id, rom_path, output_path=target_rom, emit_project_changed=False
             ):
                 success_count += 1
-            elif self._stale_entry_frame_id is not None:
+            elif self._state.stale_entry_frame_id is not None:
                 failed_due_to_stale += 1
 
         # Emit project_changed once for the entire batch if any succeeded
         if success_count > 0:
             self._controller.project_changed.emit()
-            self._last_injected_rom = target_rom
+            self._state.last_injected_rom = target_rom
 
         # Report results
         msg = f"Injected {success_count}/{frame_count} selected frames into {target_rom.name}"
@@ -1212,15 +1195,17 @@ class FrameMappingWorkspace(QWidget):
         if not self._validate_rom_path():
             return
 
-        # At this point self._rom_path is guaranteed not None and exists
-        rom_path = cast(Path, self._rom_path)
+        # At this point self._state.rom_path is guaranteed not None and exists
+        rom_path = cast(Path, self._state.rom_path)
 
         # Check if we should reuse the last injected ROM
         reuse_enabled = self._reuse_rom_checkbox.isChecked()
-        can_reuse = reuse_enabled and self._last_injected_rom is not None and self._last_injected_rom.exists()
+        can_reuse = (
+            reuse_enabled and self._state.last_injected_rom is not None and self._state.last_injected_rom.exists()
+        )
 
         if can_reuse:
-            target_rom = cast(Path, self._last_injected_rom)
+            target_rom = cast(Path, self._state.last_injected_rom)
             reply = QMessageBox.question(
                 self,
                 "Confirm Injection",
@@ -1243,7 +1228,7 @@ class FrameMappingWorkspace(QWidget):
 
         # Either reuse existing ROM or create a new copy
         if can_reuse:
-            target_rom = cast(Path, self._last_injected_rom)
+            target_rom = cast(Path, self._state.last_injected_rom)
         else:
             target_rom = self._controller.create_injection_copy(rom_path)
             if target_rom is None:
@@ -1251,7 +1236,7 @@ class FrameMappingWorkspace(QWidget):
                 return
 
         # Clear stale entry tracking before batch injection
-        self._stale_entry_frame_id = None
+        self._state.stale_entry_frame_id = None
 
         # Inject all mapped frames into the same copy
         # Use emit_project_changed=False to avoid N emissions, emit once after batch
@@ -1260,19 +1245,19 @@ class FrameMappingWorkspace(QWidget):
         for ai_frame in project.ai_frames:
             mapping = project.get_mapping_for_ai_frame(ai_frame.id)
             if mapping:
-                self._stale_entry_frame_id = None  # Reset for each frame
+                self._state.stale_entry_frame_id = None  # Reset for each frame
                 # Pass the created copy as output_path to avoid creating new copies
                 if self._controller.inject_mapping(
                     ai_frame.id, rom_path, output_path=target_rom, emit_project_changed=False
                 ):
                     success_count += 1
-                elif self._stale_entry_frame_id is not None:
+                elif self._state.stale_entry_frame_id is not None:
                     failed_due_to_stale += 1
 
         # Emit project_changed once for the entire batch if any succeeded
         if success_count > 0:
             self._controller.project_changed.emit()
-            self._last_injected_rom = target_rom
+            self._state.last_injected_rom = target_rom
 
         # Report results
         msg = f"Injected {success_count}/{project.mapped_count} frames into {target_rom.name}"
@@ -1295,15 +1280,15 @@ class FrameMappingWorkspace(QWidget):
 
         Saves the project to the correct project file path (not ai_frames_dir).
         """
-        if not self._project_path:
+        if not self._state.project_path:
             logger.warning("Cannot auto-save: no project path set")
             return
 
         try:
-            self._controller.save_project(self._project_path)
+            self._controller.save_project(self._state.project_path)
             if self._message_service:
                 self._message_service.show_message("Project auto-saved", 2000)
-            logger.info("Auto-saved project to %s", self._project_path)
+            logger.info("Auto-saved project to %s", self._state.project_path)
         except Exception as e:
             logger.exception("Failed to auto-save project after injection")
             QMessageBox.warning(
@@ -1321,10 +1306,10 @@ class FrameMappingWorkspace(QWidget):
         Also updates the canvas warning label if the frame matches the current selection.
         """
         logger.info("Stale entries detected for frame '%s'", frame_id)
-        self._stale_entry_frame_id = frame_id
+        self._state.stale_entry_frame_id = frame_id
 
         # Update canvas warning label if this is the currently selected game frame
-        if self._selected_game_id == frame_id:
+        if self._state.selected_game_id == frame_id:
             self._alignment_canvas.set_stale_entries_warning_visible(True)
 
     def _on_alignment_updated(self, ai_frame_id: str) -> None:
@@ -1550,7 +1535,7 @@ class FrameMappingWorkspace(QWidget):
             self._message_service.show_message(f"Linked '{ai_name}' to '{game_frame_id}'", 3000)
 
         # Auto-advance if enabled
-        if self._auto_advance_enabled and ai_frame:
+        if self._state.auto_advance_enabled and ai_frame:
             next_unmapped_id = self._find_next_unmapped_ai_frame(ai_frame.index)
             if next_unmapped_id is not None:
                 next_frame = project.get_ai_frame_by_id(next_unmapped_id)
@@ -1589,7 +1574,7 @@ class FrameMappingWorkspace(QWidget):
 
     def _update_map_button_state(self) -> None:
         """Update the Map Selected button enabled state."""
-        both_selected = self._selected_ai_frame_id is not None and self._selected_game_id is not None
+        both_selected = self._state.selected_ai_frame_id is not None and self._state.selected_game_id is not None
         self._ai_frames_pane.set_map_button_enabled(both_selected)
 
     def _refresh_mapping_status(self) -> None:
@@ -1664,7 +1649,7 @@ class FrameMappingWorkspace(QWidget):
             self._captures_pane.update_frame_preview(frame_id, preview)
 
             # Also update workbench canvas if this frame is currently displayed
-            if self._current_canvas_game_id == frame_id:
+            if self._state.current_canvas_game_id == frame_id:
                 project = self._controller.project
                 if project:
                     game_frame = project.get_game_frame_by_id(frame_id)
@@ -1731,7 +1716,7 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_load_ai_frames(self) -> None:
         """Handle load AI frames button click."""
-        start_dir = str(self._last_ai_dir) if self._last_ai_dir else ""
+        start_dir = str(self._state.last_ai_dir) if self._state.last_ai_dir else ""
         directory = QFileDialog.getExistingDirectory(
             self,
             "Select AI Frames Directory",
@@ -1739,7 +1724,7 @@ class FrameMappingWorkspace(QWidget):
         )
         if directory:
             path = Path(directory)
-            self._last_ai_dir = path
+            self._state.last_ai_dir = path
             # Update the current tab to associate with this folder
             self._ai_frames_pane.set_current_tab_folder(path)
             self._controller.load_ai_frames_from_directory(path)
@@ -1752,7 +1737,7 @@ class FrameMappingWorkspace(QWidget):
         """
         if not isinstance(path, Path) or not path.is_dir():
             return
-        self._last_ai_dir = path
+        self._state.last_ai_dir = path
 
         # If current tab is empty, update it; otherwise add new tab
         if self._ai_frames_pane.get_current_tab_folder() is None:
@@ -1771,7 +1756,7 @@ class FrameMappingWorkspace(QWidget):
             path: Path | None (typed as object due to Signal limitation)
         """
         if path is not None and isinstance(path, Path) and path.is_dir():
-            self._last_ai_dir = path
+            self._state.last_ai_dir = path
             self._controller.load_ai_frames_from_directory(path)
         elif self._controller.project is not None:
             # Empty tab - clear frames and orphaned mappings
@@ -1826,7 +1811,7 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_import_capture(self) -> None:
         """Handle import capture button click."""
-        start_dir = str(self._last_capture_dir) if self._last_capture_dir else ""
+        start_dir = str(self._state.last_capture_dir) if self._state.last_capture_dir else ""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select Mesen 2 Capture",
@@ -1835,13 +1820,13 @@ class FrameMappingWorkspace(QWidget):
         )
         if file_path:
             path = Path(file_path)
-            self._last_capture_dir = path.parent
+            self._state.last_capture_dir = path.parent
             # Controller will emit capture_import_requested, handled by _on_capture_import_requested
             self._controller.import_mesen_capture(path)
 
     def _on_import_capture_dir(self) -> None:
         """Handle import capture directory button click."""
-        start_dir = str(self._last_capture_dir) if self._last_capture_dir else ""
+        start_dir = str(self._state.last_capture_dir) if self._state.last_capture_dir else ""
         directory = QFileDialog.getExistingDirectory(
             self,
             "Select Captures Directory",
@@ -1849,7 +1834,7 @@ class FrameMappingWorkspace(QWidget):
         )
         if directory:
             path = Path(directory)
-            self._last_capture_dir = path
+            self._state.last_capture_dir = path
             # Reset import counter for this batch
             self._import_count = 0
             # Controller will emit capture_import_requested for each capture
@@ -1867,7 +1852,7 @@ class FrameMappingWorkspace(QWidget):
         if file_path:
             path = Path(file_path)
             if self._controller.load_project(path):
-                self._project_path = path
+                self._state.project_path = path
                 self._set_last_project_path(path)
 
     def _on_save_project(self) -> None:
@@ -1876,7 +1861,7 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(self, "Save Project", "No project to save.")
             return
 
-        path_to_save = self._project_path
+        path_to_save = self._state.project_path
 
         if not path_to_save:
             file_path, _ = QFileDialog.getSaveFileName(
@@ -1890,7 +1875,7 @@ class FrameMappingWorkspace(QWidget):
 
         if path_to_save:
             if self._controller.save_project(path_to_save):
-                self._project_path = path_to_save
+                self._state.project_path = path_to_save
                 self._set_last_project_path(path_to_save)
                 if self._message_service:
                     self._message_service.show_message(f"Project saved to {path_to_save.name}")
@@ -1905,7 +1890,7 @@ class FrameMappingWorkspace(QWidget):
         if last_path and last_path.exists():
             logger.info("Auto-loading last project: %s", last_path)
             if self._controller.load_project(last_path):
-                self._project_path = last_path
+                self._state.project_path = last_path
             else:
                 logger.warning("Failed to auto-load last project")
 

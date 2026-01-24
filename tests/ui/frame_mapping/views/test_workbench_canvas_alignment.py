@@ -254,8 +254,10 @@ class TestAutoAlignCoordinates:
             workspace = MagicMock(spec=FrameMappingWorkspace)
             workspace._controller = MagicMock()
             workspace._message_service = None
-            workspace._auto_advance_enabled = False
             workspace._alignment_canvas = MagicMock()
+            # Mock the state manager
+            workspace._state = MagicMock()
+            workspace._state.auto_advance_enabled = False
 
             # Setup project with AI frame
             mock_project = MagicMock()
