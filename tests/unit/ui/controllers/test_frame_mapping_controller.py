@@ -2163,3 +2163,84 @@ class TestPreserveExistingParameter:
         # Since a fresh copy was created, preserve_existing should be False
         assert len(preserve_existing_values) == 1
         assert preserve_existing_values[0] is False
+
+
+class TestUpdateMappingAlignmentEmitsSaveRequested:
+    """Test that update_mapping_alignment emits save_requested for auto-save.
+
+    Bug: Alignment changes (drag/nudge on canvas) were lost on app close because
+    update_mapping_alignment only emitted alignment_updated but NOT save_requested.
+    """
+
+    def test_update_mapping_alignment_emits_save_requested(self, tmp_path: Path, qtbot) -> None:
+        """Verify alignment changes trigger auto-save signal."""
+        # Create minimal project with a mapping
+        ai_frame_path = tmp_path / "frame_001.png"
+        ai_frame_path.write_bytes(
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+            b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+            b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(GameFrame(id="G001", rom_offsets=[0x1000], selected_entry_ids=[]))
+        project.mappings.append(FrameMapping(ai_frame_id="frame_001.png", game_frame_id="G001"))
+        project._invalidate_mapping_index()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Verify save_requested is emitted when alignment is updated
+        with qtbot.waitSignal(controller.save_requested, timeout=1000):
+            result = controller.update_mapping_alignment(
+                ai_frame_id="frame_001.png",
+                offset_x=10,
+                offset_y=20,
+                flip_h=False,
+                flip_v=False,
+            )
+
+        assert result is True
+
+    def test_update_mapping_alignment_emits_both_signals(self, tmp_path: Path, qtbot) -> None:
+        """Verify both alignment_updated and save_requested are emitted."""
+        ai_frame_path = tmp_path / "frame_002.png"
+        ai_frame_path.write_bytes(
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+            b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+            b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(GameFrame(id="G002", rom_offsets=[0x2000], selected_entry_ids=[]))
+        project.mappings.append(FrameMapping(ai_frame_id="frame_002.png", game_frame_id="G002"))
+        project._invalidate_mapping_index()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Track both signals
+        alignment_updated_received = []
+        save_requested_received = []
+
+        controller.alignment_updated.connect(lambda x: alignment_updated_received.append(x))
+        controller.save_requested.connect(lambda: save_requested_received.append(True))
+
+        result = controller.update_mapping_alignment(
+            ai_frame_id="frame_002.png",
+            offset_x=5,
+            offset_y=-10,
+            flip_h=True,
+            flip_v=False,
+            scale=0.8,
+        )
+
+        assert result is True
+        assert alignment_updated_received == ["frame_002.png"]
+        assert save_requested_received == [True]

@@ -494,6 +494,7 @@ class FrameMappingController(QObject):
         if self._project.update_mapping_alignment(ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, set_edited):
             # Use targeted signal to avoid full UI refresh (which blanks canvas)
             self.alignment_updated.emit(ai_frame_id)
+            self.save_requested.emit()
             logger.info(
                 "Updated alignment for AI frame %s: offset=(%d, %d), flip=(%s, %s), scale=%.2f",
                 ai_frame_id,
