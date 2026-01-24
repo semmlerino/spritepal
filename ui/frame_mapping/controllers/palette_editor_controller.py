@@ -333,6 +333,58 @@ class PaletteEditorController(QObject):
         self._schedule_preview()
         return True
 
+    def replace_index(self, from_index: int, to_index: int) -> int:
+        """Replace all pixels of one index with another.
+
+        Unlike merge_palette_indices, this does NOT mark the source slot as free.
+        Both palette colors remain valid - this only changes which pixels use which index.
+
+        Args:
+            from_index: The index to replace (pixels will change FROM this)
+            to_index: The index to use instead (pixels will change TO this)
+
+        Returns:
+            Number of pixels replaced, or -1 if invalid
+        """
+        if self._image_model is None:
+            return -1
+
+        # Validate indices (allow 0 for both, unlike merge)
+        if not 0 <= from_index < 16:
+            return -1
+        if not 0 <= to_index < 16:
+            return -1
+        if from_index == to_index:
+            return 0
+
+        data = self._image_model.data
+
+        # Find all pixels with from_index
+        mask = data == from_index
+        pixel_count = int(np.sum(mask))
+
+        if pixel_count == 0:
+            return 0
+
+        # Create undo command batch for all changed pixels
+        batch = BatchCommand()
+        ys, xs = np.where(mask)
+        for y, x in zip(ys, xs, strict=False):
+            cmd = DrawPixelCommand(x=int(x), y=int(y), old_color=from_index, new_color=to_index)
+            cmd.execute(self._image_model)
+            batch.add_command(cmd)
+
+        # Record the batch for undo
+        self._undo_manager.record_command(batch)
+
+        logger.info(f"Replaced {pixel_count} pixels from index {from_index} to {to_index}")
+
+        self._mark_dirty()
+        self._emit_undo_state()
+        self.image_changed.emit()
+        self._schedule_preview()
+        return pixel_count
+
     # --- Pixel Operations ---
 
     def handle_pixel_click(

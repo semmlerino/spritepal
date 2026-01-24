@@ -161,6 +161,8 @@ class ColorPaletteWidget(QWidget):
             tooltip = f"External Palette: {self.palette_source}\nRight-click to reset to default"
         else:
             tooltip = "Default Editor Palette\n16 colors for sprite editing"
+        # Add transparency hint
+        tooltip += "\n\nIndex 0 is always transparent (checkerboard pattern)"
         self.setToolTip(tooltip)
 
     def _show_context_menu(self, position: QPoint) -> None:

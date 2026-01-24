@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, override
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPen
 from PySide6.QtWidgets import (
+    QCheckBox,
     QColorDialog,
     QFrame,
     QGridLayout,
@@ -54,15 +55,18 @@ class ColorSwatch(QFrame):
         self._is_highlighted = False
         self._is_merge_target = False
         self._is_free = False
+        self._is_locked = False  # Palette lock state from parent
 
         self.setFixedSize(SWATCH_SIZE, SWATCH_SIZE)
         self.setMouseTracking(True)
         self._update_style()
+        self._update_tooltip()
 
     def set_color(self, color: tuple[int, int, int]) -> None:
         """Set the swatch color."""
         self._color = color
         self._update_style()
+        self._update_tooltip()
 
     def set_selected(self, selected: bool) -> None:
         """Set selection state."""
@@ -83,6 +87,12 @@ class ColorSwatch(QFrame):
         """Set free slot state (after merge, slot becomes unused)."""
         self._is_free = is_free
         self._update_style()
+        self._update_tooltip()
+
+    def set_locked(self, locked: bool) -> None:
+        """Set locked state (prevents color editing)."""
+        self._is_locked = locked
+        self._update_tooltip()
 
     def is_free(self) -> bool:
         """Check if this slot is marked as free."""
@@ -154,6 +164,26 @@ class ColorSwatch(QFrame):
         else:
             self.setStyleSheet(style % (r, g, b, border_color))
 
+    def _update_tooltip(self) -> None:
+        """Update tooltip based on swatch state."""
+        if self._index == 0:
+            self.setToolTip("Index 0: Transparent\nPixels with this index are fully transparent.\nCannot be edited.")
+        elif self._is_locked:
+            r, g, b = self._color
+            self.setToolTip(f"Index {self._index}: RGB({r}, {g}, {b})\n🔒 Palette is locked\nClick: Select as active")
+        elif self._is_free:
+            self.setToolTip(
+                f"Index {self._index}: Free slot\nThis slot is unused after merge.\nRight-click to assign a new color."
+            )
+        else:
+            r, g, b = self._color
+            self.setToolTip(
+                f"Index {self._index}: RGB({r}, {g}, {b})\n"
+                "Click: Select as active\n"
+                "Ctrl+Click: Merge into active\n"
+                "Right-click: Change color"
+            )
+
     @override
     def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle click to select color, Ctrl+click for merge, right-click to change color."""
@@ -171,6 +201,10 @@ class ColorSwatch(QFrame):
         """Show color picker dialog to change this swatch's color."""
         # Don't allow changing index 0 (transparent)
         if self._index == 0:
+            return
+
+        # Don't allow changing when locked
+        if self._is_locked:
             return
 
         r, g, b = self._color
@@ -248,6 +282,7 @@ class EditorPalettePanel(QWidget):
         self._active_index = 1
         self._merge_target_index: int | None = None
         self._free_slots: set[int] = set()
+        self._palette_locked = False
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -302,6 +337,15 @@ class EditorPalettePanel(QWidget):
         self._hover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._hover_label.setStyleSheet("color: #666; font-size: 10px;")
         layout.addWidget(self._hover_label)
+
+        # Lock palette checkbox
+        self._lock_checkbox = QCheckBox("Lock Palette")
+        self._lock_checkbox.setToolTip(
+            "When locked, palette colors cannot be changed.\nPrevents accidental edits via right-click or merge."
+        )
+        self._lock_checkbox.setStyleSheet("color: #888; font-size: 10px;")
+        self._lock_checkbox.toggled.connect(self._on_lock_toggled)
+        layout.addWidget(self._lock_checkbox)
 
         layout.addStretch()
 
@@ -375,8 +419,18 @@ class EditorPalettePanel(QWidget):
         - If same as active: do nothing
         - If no active selection: do nothing
         - If index 0: do nothing (can't merge with transparent)
+        - If palette is locked: do nothing
         - Otherwise: show confirmation and emit merge_requested signal
         """
+        # Can't merge if palette is locked
+        if self._palette_locked:
+            QMessageBox.information(
+                self,
+                "Palette Locked",
+                "Cannot merge indices while palette is locked.\nUncheck 'Lock Palette' to enable merging.",
+            )
+            return
+
         # Can't merge with transparent
         if index == 0:
             return
@@ -458,8 +512,40 @@ class EditorPalettePanel(QWidget):
                 self._hover_label.setText(f"{index}: RGB({r}, {g}, {b})")
         self.index_hovered.emit(index)
 
+    def _on_lock_toggled(self, locked: bool) -> None:
+        """Handle lock checkbox toggle."""
+        self._palette_locked = locked
+        # Propagate lock state to all swatches for tooltip updates
+        for swatch in self._swatches:
+            swatch.set_locked(locked)
+
+    def is_palette_locked(self) -> bool:
+        """Check if palette editing is locked."""
+        return self._palette_locked
+
+    def set_palette_locked(self, locked: bool) -> None:
+        """Set the palette lock state.
+
+        Args:
+            locked: True to lock palette editing
+        """
+        self._palette_locked = locked
+        self._lock_checkbox.setChecked(locked)
+        # Propagate lock state to all swatches
+        for swatch in self._swatches:
+            swatch.set_locked(locked)
+
     def _on_color_change_requested(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle color change from right-click."""
+        # Check lock state
+        if self._palette_locked:
+            QMessageBox.information(
+                self,
+                "Palette Locked",
+                "Cannot change colors while palette is locked.\nUncheck 'Lock Palette' to enable editing.",
+            )
+            return
+
         if 0 < index < len(self._swatches):
             self._swatches[index].set_color(color)
             self.color_changed.emit(index, color)

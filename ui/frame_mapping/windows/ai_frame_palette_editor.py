@@ -15,12 +15,16 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
     QPushButton,
     QSizePolicy,
+    QSpinBox,
     QStatusBar,
     QToolButton,
     QVBoxLayout,
@@ -124,12 +128,14 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         self._coord_label = QLabel("(-, -)")
         self._index_label = QLabel("Index: -")
+        self._selection_count_label = QLabel("Selected: 0")
         self._selection_mode_label = QLabel("Mode: Replace")
         self._tool_label = QLabel("Tool: Pencil")
         self._dirty_label = QLabel("")
 
         self._status_bar.addWidget(self._coord_label)
         self._status_bar.addWidget(self._index_label)
+        self._status_bar.addWidget(self._selection_count_label)
         self._status_bar.addWidget(self._selection_mode_label)
         self._status_bar.addPermanentWidget(self._tool_label)
         self._status_bar.addPermanentWidget(self._dirty_label)
@@ -316,6 +322,13 @@ class AIFramePaletteEditorWindow(QMainWindow):
         erase_sel.triggered.connect(self._controller.erase_selection)
         edit_menu.addAction(erase_sel)
 
+        edit_menu.addSeparator()
+
+        replace_index = QAction("&Replace Index...", self)
+        replace_index.setShortcut("Ctrl+R")
+        replace_index.triggered.connect(self._show_replace_index_dialog)
+        edit_menu.addAction(replace_index)
+
     def _setup_shortcuts(self) -> None:
         """Set up keyboard shortcuts."""
         # Tool shortcuts
@@ -447,7 +460,11 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _on_selection_changed(self) -> None:
         """Handle selection change."""
-        self._canvas.set_selection_mask(self._controller.selection_mask)
+        mask = self._controller.selection_mask
+        self._canvas.set_selection_mask(mask)
+        # Update selection count in status bar
+        count = mask.get_selection_count() if mask is not None else 0
+        self._selection_count_label.setText(f"Selected: {count}")
 
     def _on_undo_state_changed(self, can_undo: bool, can_redo: bool) -> None:
         """Handle undo/redo state change."""
@@ -607,6 +624,72 @@ class AIFramePaletteEditorWindow(QMainWindow):
             # Mark the merged slot as free in the palette panel
             self._palette_panel.mark_slot_free(merge_index)
             logger.info(f"Merged palette index {merge_index} into {primary_index}")
+
+    def _show_replace_index_dialog(self) -> None:
+        """Show dialog to replace all pixels of one index with another.
+
+        Unlike merge, this does not mark the source slot as free.
+        Both palette colors remain valid.
+        """
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Replace Index")
+        dialog.setMinimumWidth(250)
+
+        layout = QVBoxLayout(dialog)
+
+        # Instructions
+        info = QLabel(
+            "Replace all pixels using one palette index with another.\nBoth palette colors will remain valid."
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("color: #888;")
+        layout.addWidget(info)
+
+        # Form for from/to indices
+        form = QFormLayout()
+
+        from_spin = QSpinBox()
+        from_spin.setRange(0, 15)
+        from_spin.setValue(self._controller.active_index)
+        form.addRow("Replace index:", from_spin)
+
+        to_spin = QSpinBox()
+        to_spin.setRange(0, 15)
+        to_spin.setValue(1 if self._controller.active_index == 0 else 0)
+        form.addRow("With index:", to_spin)
+
+        layout.addLayout(form)
+
+        # Buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            from_index = from_spin.value()
+            to_index = to_spin.value()
+
+            if from_index == to_index:
+                QMessageBox.information(
+                    self,
+                    "No Change",
+                    "Source and target indices are the same.",
+                )
+                return
+
+            result = self._controller.replace_index(from_index, to_index)
+            if result > 0:
+                self._status_bar.showMessage(
+                    f"Replaced {result} pixel(s): index {from_index} → {to_index}",
+                    5000,
+                )
+            elif result == 0:
+                QMessageBox.information(
+                    self,
+                    "No Pixels Found",
+                    f"No pixels were using index {from_index}.",
+                )
 
     def _on_save(self) -> None:
         """Handle save action."""
