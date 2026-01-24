@@ -54,7 +54,16 @@ def workflow_controller(qtbot, mock_editing_controller):
         ctrl.cleanup()
 
 
-def test_load_rom_emits_info(qtbot, workflow_controller):
+@pytest.fixture
+def test_rom_file(tmp_path) -> str:
+    """Create a minimal 1KB test ROM file."""
+    rom_path = tmp_path / "test_rom.sfc"
+    rom_data = b"SNES" + b"\x00" * (1024 - 4)
+    rom_path.write_bytes(rom_data)
+    return str(rom_path)
+
+
+def test_load_rom_emits_info(qtbot, workflow_controller, test_rom_file):
     """
     Test that loading a valid ROM emits rom_info_updated signal.
     """
@@ -65,10 +74,8 @@ def test_load_rom_emits_info(qtbot, workflow_controller):
         patch("core.rom_validator.ROMValidator.validate_rom_file", return_value=(True, "")),
         patch("core.rom_validator.ROMValidator.validate_rom_header", return_value=(mock_header, None)),
         patch("core.rom_validator.ROMValidator.verify_rom_checksum", return_value=True),
-        patch("pathlib.Path.exists", return_value=True),
-        patch("pathlib.Path.stat", return_value=Mock(st_size=1024)),
     ):
-        workflow_controller.load_rom("dummy.sfc")
+        workflow_controller.load_rom(test_rom_file)
 
         assert spy_info.count() == 1
         assert spy_info.at(0)[0] == "Kirby Test"
@@ -200,28 +207,31 @@ class TestROMWorkflowControllerRegression:
         yield ctrl
         ctrl.cleanup()
 
+    @pytest.fixture
+    def regression_test_rom_file(self, tmp_path) -> str:
+        """Create a 1MB test ROM file for regression tests."""
+        rom_path = tmp_path / "test_rom.sfc"
+        rom_data = b"SNES" + b"\x00" * (1024 * 1024 - 4)
+        rom_path.write_bytes(rom_data)
+        return str(rom_path)
+
     @patch("core.rom_validator.ROMValidator.validate_rom_file")
     @patch("core.rom_validator.ROMValidator.validate_rom_header")
     @patch("core.rom_validator.ROMValidator.verify_rom_checksum")
-    @patch("pathlib.Path.exists")
-    @patch("pathlib.Path.stat")
     def test_mesen_captures_lost_on_rom_load(
         self,
-        mock_stat,
-        mock_exists,
         mock_verify_checksum,
         mock_validate_header,
         mock_validate_file,
         controller,
         mock_view,
         mock_log_watcher,
+        regression_test_rom_file,
     ):
         """
         Reproduction test for UI-logic desync:
         Mesen captures are re-populated after loading a new ROM.
         """
-        mock_exists.return_value = True
-        mock_stat.return_value.st_size = 1024 * 1024
         mock_validate_file.return_value = (True, "")
         mock_verify_checksum.return_value = True
         mock_header = MagicMock()
@@ -242,8 +252,8 @@ class TestROMWorkflowControllerRegression:
         mock_view.add_mesen_capture.assert_called_with(ANY, 0x123456, frame=123, update_if_exists=False)
         mock_view.add_mesen_capture.reset_mock()
 
-        # Load a new ROM
-        controller.load_rom("test.sfc")
+        # Load a new ROM (using real test file)
+        controller.load_rom(regression_test_rom_file)
 
         # Verify re-population
         mock_view.add_mesen_capture.assert_called_with(ANY, 0x123456, frame=123, update_if_exists=False)

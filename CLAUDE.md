@@ -21,6 +21,7 @@
 | Mock at wrong location | `@patch('spritepal.ui.panel.Dialog')` not `...dialogs.Dialog` |
 | Multiple `QApplication` instances | Let pytest-qt manage via `qtbot`/`qapp` fixtures |
 | `if pos:` for QPoint checks | Use `if pos is not None:` (QPoint(0,0) is falsy!) |
+| `gc.collect()` in Qt cleanup paths | Skip gc.collect(); use deleteLater() + processEvents() |
 
 **3. Testing** (when running tests):
 - Default: serial for fast TDD iteration
@@ -506,6 +507,24 @@ app.exec()
 ```
 
 **Debug widget boundaries:** `widget.setStyleSheet('QWidget { border: 1px solid red; }')`
+
+### Qt Thread Cleanup (gc.collect() Hazard)
+
+**NEVER call gc.collect() during Qt worker cleanup.** Causes segfaults.
+
+**Why:** gc.collect() triggers finalization of PySide6/Qt objects while background threads
+are still running, causing "Fatal Python error: Aborted".
+
+**Safe cleanup sequence:**
+```python
+worker.requestInterruption()
+worker.quit()
+worker.wait(5000)
+worker.deleteLater()
+QApplication.processEvents()
+```
+
+**Existing implementations:** See `tests/infrastructure/real_component_factory.py:411-415`.
 
 ### Documentation Pointers
 

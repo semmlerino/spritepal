@@ -113,6 +113,7 @@ pytest_plugins = [
     "tests.fixtures.hal_fixtures",
     "tests.fixtures.xdist_fixtures",  # Parallel test execution support
     "tests.fixtures.test_data_fixtures",  # Consolidated ROM/VRAM test data
+    "tests.fixtures.dialog_fixtures",  # QMessageBox mock consolidation
 ]
 
 

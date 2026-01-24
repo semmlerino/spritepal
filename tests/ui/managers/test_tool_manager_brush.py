@@ -34,9 +34,15 @@ def test_brush_size_3_is_centered():
 
     # Check all expected pixels for a centered 3x3 brush
     expected = [
-        (4, 4), (5, 4), (6, 4),  # top row
-        (4, 5), (5, 5), (6, 5),  # middle row
-        (4, 6), (5, 6), (6, 6),  # bottom row
+        (4, 4),
+        (5, 4),
+        (6, 4),  # top row
+        (4, 5),
+        (5, 5),
+        (6, 5),  # middle row
+        (4, 6),
+        (5, 6),
+        (6, 6),  # bottom row
     ]
     assert set(pixels) == set(expected)
 
@@ -55,7 +61,7 @@ def test_brush_size_5_is_centered():
     assert (10, 10) in pixels
 
     # Check corners of the 5x5 grid
-    assert (8, 8) in pixels   # top-left
+    assert (8, 8) in pixels  # top-left
     assert (12, 8) in pixels  # top-right
     assert (8, 12) in pixels  # bottom-left
     assert (12, 12) in pixels  # bottom-right
@@ -76,8 +82,10 @@ def test_brush_size_2_standard_offset():
     # end = half = 1 (since 2 % 2 == 0)
     # range(-1, 1) = [-1, 0]
     expected = [
-        (4, 4), (5, 4),  # top row
-        (4, 5), (5, 5),  # bottom row
+        (4, 4),
+        (5, 4),  # top row
+        (4, 5),
+        (5, 5),  # bottom row
     ]
     assert set(pixels) == set(expected)
 

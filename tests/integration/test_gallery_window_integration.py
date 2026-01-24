@@ -430,9 +430,8 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             mock_viewer.set_sprite_data.assert_called_once()
             mock_viewer.show.assert_called_once()
 
-    @patch("ui.windows.detached_gallery_window.QMessageBox")
     def test_sprite_extraction_workflow(
-        self, mock_msgbox, mock_extraction_manager, mock_settings_manager, mock_rom_cache, tmp_path
+        self, mock_extraction_manager, mock_settings_manager, mock_rom_cache, tmp_path, mock_dialogs
     ):
         """Test sprite extraction workflow."""
         self.window = DetachedGalleryWindow(
@@ -457,17 +456,16 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             "test_rom.sfc", 0x10000, expected_output_base, sprite_name=""
         )
 
-    @patch("ui.windows.detached_gallery_window.QMessageBox")
     @patch("ui.windows.detached_gallery_window.SpriteScanWorker")
     def test_scan_timeout_handling(
         self,
         mock_scan_worker_class,
-        mock_msgbox,
         mock_extraction_manager,
         mock_settings_manager,
         mock_rom_cache,
         mock_scan_worker_running,
         test_rom_file,
+        mock_dialogs,
     ):
         """Test scan timeout handling prevents infinite scanning."""
         mock_scan_worker_class.return_value = mock_scan_worker_running

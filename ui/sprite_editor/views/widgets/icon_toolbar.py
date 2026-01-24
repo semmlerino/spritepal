@@ -167,9 +167,7 @@ class IconToolbar(QWidget):
         self.palette_preview_btn.setChecked(True)  # Start with palette preview enabled
         self._apply_icon(self.palette_preview_btn, "palette")
         self.palette_preview_btn.setToolTip(
-            "Color View (C)\n"
-            "ON: Show actual palette colors\n"
-            "OFF: Show index values (greyscale)"
+            "Color View (C)\nON: Show actual palette colors\nOFF: Show index values (greyscale)"
         )
         self.palette_preview_btn.setIconSize(self._get_icon_size())
         self.palette_preview_btn.clicked.connect(self._on_palette_preview_toggled)

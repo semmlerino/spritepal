@@ -12,12 +12,11 @@ These tests trace a single tile's identity from ROM offset through:
 Also includes regression test for the "Apply + Rearrange = Silent Data Loss" bug.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 from PIL import Image
-from PySide6.QtWidgets import QMessageBox
 
 from core.tile_utils import decode_4bpp_tile, encode_4bpp_tile
 from ui.grid_arrangement_dialog import GridArrangementDialog
@@ -106,10 +105,8 @@ def mock_4bpp_tile_data():
 class TestTileIdentityEndToEnd:
     """Verify tile identity is preserved through the complete workflow."""
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_tile_identity_preserved_through_overlay_workflow(
-        self, mock_info, mock_warning, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay
+        self, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay, mock_dialogs
     ):
         """
         Trace TilePosition(1, 2) through the entire workflow:
@@ -200,10 +197,8 @@ class TestTileIdentityEndToEnd:
                 "This would indicate the canvas position leaked into tile identity."
             )
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_byte_offset_calculation_matches_rom_layout(
-        self, mock_info, mock_warning, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay, mock_4bpp_tile_data
+        self, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay, mock_4bpp_tile_data, mock_dialogs
     ):
         """
         Verify that _update_tile_data_from_modified_tiles patches the correct byte offset.
@@ -274,10 +269,8 @@ class TestTileIdentityEndToEnd:
 class TestApplyThenRearrangeDataLoss:
     """Test that overlay changes survive arrangement changes (regression tests)."""
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_rearrange_after_apply_preserves_modified_tiles(
-        self, mock_info, mock_warning, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay
+        self, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay, mock_dialogs
     ):
         """
         Verify that rearranging tiles after applying overlay does NOT lose the changes.
@@ -330,10 +323,8 @@ class TestApplyThenRearrangeDataLoss:
         # Verify the modified tile is in the result
         assert TilePosition(0, 0) in result.modified_tiles, "The modified tile should be in the result"
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_add_tile_after_apply_preserves_modified_tiles(
-        self, mock_info, mock_warning, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay
+        self, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay, mock_dialogs
     ):
         """
         Verify that adding a tile after applying overlay does NOT lose the changes.
@@ -366,10 +357,8 @@ class TestApplyThenRearrangeDataLoss:
         # modified_tiles MUST be present after Apply + Add Tile + Accept
         assert result.modified_tiles is not None, "Adding a tile after apply caused modified_tiles to be lost!"
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_remove_tile_after_apply_preserves_modified_tiles(
-        self, mock_info, mock_warning, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay
+        self, qapp, qtbot, sprite_4x2_tiles, distinctive_overlay, mock_dialogs
     ):
         """
         Verify that removing a tile after applying overlay does NOT lose the changes.

@@ -27,7 +27,7 @@ from PIL import Image
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QGraphicsPixmapItem, QMessageBox
+from PySide6.QtWidgets import QGraphicsPixmapItem
 
 from core.apply_operation import ApplyOperation
 from ui.grid_arrangement_dialog import GridArrangementDialog
@@ -216,11 +216,7 @@ class TestAcceptPathBug:
 
         dialog.close()
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
-    def test_arrangement_result_set_after_direct_accept(
-        self, mock_info, mock_warning, qapp, simple_sprite, white_overlay
-    ):
+    def test_arrangement_result_set_after_direct_accept(self, qapp, simple_sprite, white_overlay, mock_dialogs):
         """arrangement_result should be set when accept() is called directly.
 
         This simulates clicking the OK button (which calls accept() directly).
@@ -245,9 +241,7 @@ class TestAcceptPathBug:
         )
         assert dialog.arrangement_result.modified_tiles is not None
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
-    def test_modified_tiles_preserved_through_accept(self, mock_info, mock_warning, qapp, simple_sprite, white_overlay):
+    def test_modified_tiles_preserved_through_accept(self, qapp, simple_sprite, white_overlay, mock_dialogs):
         """Modified tiles should be accessible after accept()."""
         dialog = GridArrangementDialog(simple_sprite, tiles_per_row=2)
         dialog.show()
@@ -280,10 +274,8 @@ class TestPaletteCacheBug:
     Source: test_overlay_apply_bugs.py::TestPaletteCacheBug
     """
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_colorizer_cache_cleared_during_apply(
-        self, mock_info, mock_warning, qtbot, simple_sprite, white_overlay, sample_palette
+        self, qtbot, simple_sprite, white_overlay, sample_palette, mock_dialogs
     ):
         """Colorizer cache should be cleared when overlay is applied.
 
@@ -369,10 +361,8 @@ class TestOverlayCanvasFixes:
         assert np.all(output_array[0:8, 0:8] == 0), "Tile (0,0) was duplicated at its original position!"
         assert np.all(output_array[0:8, 16:24] == 10), "Tile (0,0) was not moved to (0,2)!"
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_keep_layout_false_preserves_physical_canvas(
-        self, mock_info, mock_warning, qtbot, test_sprite_canvas, test_overlay_canvas
+        self, qtbot, test_sprite_canvas, test_overlay_canvas, mock_dialogs
     ):
         """Test the workflow where keep_arrangement=False means we should revert to physical layout."""
         dialog = GridArrangementDialog(test_sprite_canvas, tiles_per_row=2)
@@ -456,10 +446,8 @@ class TestCheckboxDefaults:
             "When checked, arrangement grid dimensions leak to sprite editor canvas."
         )
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_overlay_apply_without_keep_layout_returns_false(
-        self, mock_info, mock_warning, qtbot, test_sprite_canvas, test_overlay_canvas
+        self, qtbot, test_sprite_canvas, test_overlay_canvas, mock_dialogs
     ):
         """Result should have keep_arrangement=False when checkbox is unchecked (default)."""
         dialog = GridArrangementDialog(test_sprite_canvas, tiles_per_row=2)
@@ -491,10 +479,8 @@ class TestDelayedVisualFeedback:
     Source: test_overlay_canvas_no_expand.py::TestDelayedVisualFeedback
     """
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_apply_overlay_modifies_tiles_immediately(
-        self, mock_info, mock_warning, qtbot, test_sprite_canvas, test_overlay_canvas
+        self, qtbot, test_sprite_canvas, test_overlay_canvas, mock_dialogs
     ):
         """Tiles should be updated before success message is shown."""
         dialog = GridArrangementDialog(test_sprite_canvas, tiles_per_row=2)
@@ -519,10 +505,8 @@ class TestDelayedVisualFeedback:
 
         qtbot.wait(10)
 
-    @patch.object(QMessageBox, "warning", return_value=QMessageBox.StandardButton.Yes)
-    @patch.object(QMessageBox, "information", return_value=QMessageBox.StandardButton.Ok)
     def test_arrangement_canvas_shows_modified_tiles_after_apply(
-        self, mock_info, mock_warning, qtbot, test_sprite_canvas, test_overlay_canvas
+        self, qtbot, test_sprite_canvas, test_overlay_canvas, mock_dialogs
     ):
         """Arrangement canvas should display the modified tiles after overlay apply.
 

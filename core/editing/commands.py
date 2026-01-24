@@ -477,9 +477,7 @@ class PaletteColorCommand(UndoCommand):
         """No need to clear primitive types."""
 
     @override
-    def _restore_from_compressed(
-        self, data: tuple[int, tuple[int, int, int], tuple[int, int, int]]
-    ) -> None:
+    def _restore_from_compressed(self, data: tuple[int, tuple[int, int, int], tuple[int, int, int]]) -> None:
         """Restore palette data from compressed format."""
         self.palette_index, self.old_color, self.new_color = data
 
