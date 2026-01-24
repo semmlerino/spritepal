@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
 
 from core.frame_mapping_project import (
-    FRAME_TAGS,
     AIFrame,
     FrameMappingProject,
     GameFrame,
@@ -33,14 +32,12 @@ from core.mesen_integration.click_extractor import (
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
+from ui.frame_mapping.services.organization_service import OrganizationService
 from ui.frame_mapping.services.palette_service import PaletteService
 from ui.frame_mapping.services.preview_service import PreviewService
 from ui.frame_mapping.undo import (
     CreateMappingCommand,
     RemoveMappingCommand,
-    RenameAIFrameCommand,
-    RenameCaptureCommand,
-    ToggleFrameTagCommand,
     UndoRedoStack,
     UpdateAlignmentCommand,
 )
@@ -100,6 +97,11 @@ class FrameMappingController(QObject):
         # Palette service for palette management
         self._palette_service = PaletteService(parent=self)
         self._palette_service.sheet_palette_changed.connect(self.sheet_palette_changed)
+        # Organization service for frame/capture renaming and tagging
+        self._organization_service = OrganizationService(parent=self)
+        self._organization_service.frame_renamed.connect(self.frame_renamed)
+        self._organization_service.frame_tags_changed.connect(self.frame_tags_changed)
+        self._organization_service.capture_renamed.connect(self.capture_renamed)
         # Injection orchestrator for frame injection pipeline
         self._injection_orchestrator = InjectionOrchestrator()
         # Undo/Redo stack
@@ -1065,32 +1067,24 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        frame = self._project.get_ai_frame_by_id(frame_id)
-        if frame is None:
-            return False
-
-        # Capture previous state for undo
-        old_name = frame.display_name
-
-        # Create and execute command via undo stack
-        command = RenameAIFrameCommand(
+        result = self._organization_service.rename_frame(
+            project=self._project,
+            undo_stack=self._undo_stack,
             controller=self,
             frame_id=frame_id,
-            new_name=display_name,
-            old_name=old_name,
+            display_name=display_name,
         )
-        self._undo_stack.push(command)
-
-        logger.info("Renamed frame '%s' to '%s'", frame_id, display_name or "(cleared)")
-        self.frame_renamed.emit(frame_id)
-        self.save_requested.emit()
-        return True
+        if result:
+            self.save_requested.emit()
+        return result
 
     def _rename_frame_no_history(self, frame_id: str, display_name: str | None) -> bool:
         """Internal: Rename frame without undo history (for command execution)."""
         if self._project is None:
             return False
-        return self._project.set_frame_display_name(frame_id, display_name)
+        return self._organization_service._rename_frame_no_history(
+            project=self._project, frame_id=frame_id, display_name=display_name
+        )
 
     def add_frame_tag(self, frame_id: str, tag: str) -> bool:
         """Add a tag to an AI frame.
@@ -1104,10 +1098,7 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return False
-        result = self._project.add_frame_tag(frame_id, tag)
-        if result:
-            self.frame_tags_changed.emit(frame_id)
-        return result
+        return self._organization_service.add_frame_tag(project=self._project, frame_id=frame_id, tag=tag)
 
     def remove_frame_tag(self, frame_id: str, tag: str) -> bool:
         """Remove a tag from an AI frame.
@@ -1121,10 +1112,7 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return False
-        result = self._project.remove_frame_tag(frame_id, tag)
-        if result:
-            self.frame_tags_changed.emit(frame_id)
-        return result
+        return self._organization_service.remove_frame_tag(project=self._project, frame_id=frame_id, tag=tag)
 
     def toggle_frame_tag(self, frame_id: str, tag: str) -> bool:
         """Toggle a tag on an AI frame.
@@ -1139,31 +1127,24 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        frame = self._project.get_ai_frame_by_id(frame_id)
-        if frame is None:
-            return False
-
-        # Capture previous state for undo
-        was_present = tag in frame.tags
-
-        # Create and execute command via undo stack
-        command = ToggleFrameTagCommand(
+        result = self._organization_service.toggle_frame_tag(
+            project=self._project,
+            undo_stack=self._undo_stack,
             controller=self,
             frame_id=frame_id,
             tag=tag,
-            was_present=was_present,
         )
-        self._undo_stack.push(command)
-
-        self.frame_tags_changed.emit(frame_id)
-        self.save_requested.emit()
-        return True
+        if result:
+            self.save_requested.emit()
+        return result
 
     def _toggle_frame_tag_no_history(self, frame_id: str, tag: str) -> bool:
         """Internal: Toggle frame tag without undo history (for command execution)."""
         if self._project is None:
             return False
-        return self._project.toggle_frame_tag(frame_id, tag)
+        return self._organization_service._toggle_frame_tag_no_history(
+            project=self._project, frame_id=frame_id, tag=tag
+        )
 
     def set_frame_tags(self, frame_id: str, tags: frozenset[str]) -> bool:
         """Set all tags for an AI frame (replace existing).
@@ -1177,10 +1158,7 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return False
-        result = self._project.set_frame_tags(frame_id, tags)
-        if result:
-            self.frame_tags_changed.emit(frame_id)
-        return result
+        return self._organization_service.set_frame_tags(project=self._project, frame_id=frame_id, tags=tags)
 
     def get_frame_tags(self, frame_id: str) -> frozenset[str]:
         """Get tags for an AI frame.
@@ -1193,10 +1171,7 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return frozenset()
-        frame = self._project.get_ai_frame_by_id(frame_id)
-        if frame is None:
-            return frozenset()
-        return frame.tags
+        return self._organization_service.get_frame_tags(project=self._project, frame_id=frame_id)
 
     def get_frame_display_name(self, frame_id: str) -> str | None:
         """Get display name for an AI frame.
@@ -1209,10 +1184,7 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return None
-        frame = self._project.get_ai_frame_by_id(frame_id)
-        if frame is None:
-            return None
-        return frame.display_name
+        return self._organization_service.get_frame_display_name(project=self._project, frame_id=frame_id)
 
     def get_frames_with_tag(self, tag: str) -> list[AIFrame]:
         """Get all AI frames with a specific tag.
@@ -1225,7 +1197,7 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return []
-        return self._project.get_frames_with_tag(tag)
+        return self._organization_service.get_frames_with_tag(project=self._project, tag=tag)
 
     @staticmethod
     def get_available_tags() -> frozenset[str]:
@@ -1234,7 +1206,7 @@ class FrameMappingController(QObject):
         Returns:
             Set of valid tag names
         """
-        return FRAME_TAGS
+        return OrganizationService.get_available_tags()
 
     # ─── Capture (GameFrame) Organization ──────────────────────────────────────
 
@@ -1251,36 +1223,24 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        frame = self._project.get_game_frame_by_id(game_frame_id)
-        if frame is None:
-            return False
-
-        # Normalize empty string to None
-        display_name = new_name.strip() if new_name else None
-        if display_name == "":
-            display_name = None
-
-        # Capture previous state for undo
-        old_name = frame.display_name
-
-        # Create and execute command via undo stack
-        command = RenameCaptureCommand(
+        result = self._organization_service.rename_capture(
+            project=self._project,
+            undo_stack=self._undo_stack,
             controller=self,
             game_frame_id=game_frame_id,
-            new_name=display_name,
-            old_name=old_name,
+            new_name=new_name,
         )
-        self._undo_stack.push(command)
-
-        self.capture_renamed.emit(game_frame_id)
-        self.save_requested.emit()
-        return True
+        if result:
+            self.save_requested.emit()
+        return result
 
     def _rename_capture_no_history(self, game_frame_id: str, display_name: str | None) -> bool:
         """Internal: Rename capture without undo history (for command execution)."""
         if self._project is None:
             return False
-        return self._project.set_capture_display_name(game_frame_id, display_name)
+        return self._organization_service._rename_capture_no_history(
+            project=self._project, game_frame_id=game_frame_id, display_name=display_name
+        )
 
     def get_capture_display_name(self, game_frame_id: str) -> str | None:
         """Get display name for a game frame (capture).
@@ -1293,7 +1253,4 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             return None
-        frame = self._project.get_game_frame_by_id(game_frame_id)
-        if frame is None:
-            return None
-        return frame.display_name
+        return self._organization_service.get_capture_display_name(project=self._project, game_frame_id=game_frame_id)
