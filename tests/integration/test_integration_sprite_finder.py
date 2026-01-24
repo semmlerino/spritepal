@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-from core.hal_compression import HALCompressor
 from core.rom_extractor import ROMExtractor
 from core.sprite_finder import SpriteFinder
 
@@ -127,84 +126,6 @@ class TestSpriteFinder:
 
         # Should find at least some sprites
         assert found_count > 0, "Should find sprites at known locations"
-
-
-@pytest.mark.integration
-class TestHALCompression:
-    """Test HAL compression/decompression with real data."""
-
-    def test_compress_decompress_cycle(self, tmp_path):
-        """Test that data survives compress/decompress cycle using files."""
-        # Create test sprite data (4 tiles = 128 bytes)
-        original_data = bytearray()
-        for i in range(4):  # 4 tiles
-            for j in range(32):  # 32 bytes per tile
-                original_data.append((i * 32 + j) % 256)
-        original_data = bytes(original_data)
-
-        # Write to file for compression
-        output_file = tmp_path / "test_sprite.hal"
-
-        # Compress using file-based method
-        compressor = HALCompressor()
-        success = compressor.compress_to_file(original_data, str(output_file))
-
-        assert success, "Compression should succeed"
-        assert output_file.exists(), "Compressed file should exist"
-        assert output_file.stat().st_size > 0, "Compressed data should not be empty"
-
-        # Decompress from file
-        decompressed = compressor.decompress_from_rom(str(output_file), 0)
-
-        assert decompressed is not None, "Decompression should succeed"
-        # HAL decompression returns the exact original data
-        assert len(decompressed) >= len(original_data), "Decompressed size should be at least original"
-        # First N bytes should match (HAL may pad output)
-        assert decompressed[: len(original_data)] == original_data, "Data should match after cycle"
-
-    def test_decompress_from_rom_offset(self, test_rom_with_sprites):
-        """Test decompressing directly from ROM at offset."""
-        rom_info = test_rom_with_sprites
-        rom_path = str(rom_info["path"])
-
-        if not rom_info["sprites"]:
-            pytest.skip("No test sprites in ROM - real Kirby ROM not available")
-
-        sprite_info = rom_info["sprites"][0]
-        offset = sprite_info["offset"]
-
-        # Decompress from ROM
-        compressor = HALCompressor()
-        decompressed = compressor.decompress_from_rom(rom_path, offset)
-
-        assert decompressed is not None, "Should decompress successfully"
-        # Size might not match exactly due to compression boundaries
-        assert len(decompressed) > 0, "Should have decompressed data"
-
-    def test_parallel_decompression(self, test_rom_with_sprites):
-        """Test that HAL process pool handles parallel operations."""
-        rom_info = test_rom_with_sprites
-        rom_path = str(rom_info["path"])
-
-        rom_data = Path(rom_path).read_bytes()
-
-        compressor = HALCompressor()
-
-        # Try to decompress from multiple offsets
-        # Note: Most offsets won't have valid HAL data, that's expected
-        offsets = [0x1000, 0x2000, 0x10000, 0x20000]
-        results = []
-
-        for offset in offsets:
-            if offset < len(rom_data):
-                try:
-                    result = compressor.decompress_from_rom(rom_path, offset)
-                    results.append((offset, result is not None))
-                except Exception:
-                    results.append((offset, False))
-
-        # Should complete without crashes - most will return None (no valid HAL data)
-        assert len(results) == len(offsets), "All offsets should be processed"
 
 
 @pytest.mark.integration

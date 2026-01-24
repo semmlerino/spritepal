@@ -227,6 +227,47 @@ class TestModeSwitchIntegration:
         recorder.assert_emitted("mode_changed", times=0)
 
 
+# =============================================================================
+# Edit Workspace Mode Tests
+# Source: tests/ui/test_edit_workspace_modes.py
+# =============================================================================
+
+
+class TestEditWorkspaceModes:
+    """Tests for EditWorkspace workflow mode button visibility.
+
+    Source: tests/ui/test_edit_workspace_modes.py
+    """
+
+    def test_edit_workspace_modes(self, qtbot):
+        """Verify that setting workflow mode updates button visibility correctly."""
+        from ui.sprite_editor.views.workspaces.edit_workspace import EditWorkspace
+
+        workspace = EditWorkspace()
+        qtbot.addWidget(workspace)
+        workspace.show()
+
+        # Test VRAM Mode
+        # - Ready for Inject: Visible (switch to inject tab)
+        # - Save to ROM: Hidden (not applicable)
+        # - Export PNG: Visible
+        workspace.set_workflow_mode("vram")
+
+        assert workspace.is_inject_button_visible is True
+        assert workspace.save_export_panel.save_to_rom_btn.isVisible() is False
+        assert workspace.save_export_panel.export_png_btn.isVisible() is True
+
+        # Test ROM Mode
+        # - Ready for Inject: Hidden (stay in same view)
+        # - Save to ROM: Visible (direct injection)
+        # - Export PNG: Visible
+        workspace.set_workflow_mode("rom")
+
+        assert workspace.is_inject_button_visible is False
+        assert workspace.save_export_panel.save_to_rom_btn.isVisible() is True
+        assert workspace.save_export_panel.export_png_btn.isVisible() is True
+
+
 class TestLoadRomModeSwitch:
     """
     Integration tests for ROM loading and automatic mode switching.
@@ -303,3 +344,92 @@ class TestLoadRomModeSwitch:
         recorder.assert_emitted("mode_changed", times=0)
         # Should still emit rom_info_updated
         recorder.assert_emitted("rom_info_updated", times=1)
+
+
+# =============================================================================
+# Edit Workspace Shortcuts Tests
+# Source: tests/ui/test_edit_workspace_shortcuts.py
+# =============================================================================
+
+
+class TestEditWorkspaceShortcuts:
+    """Tests for EditWorkspace keyboard shortcuts and toolbar buttons.
+
+    Source: tests/ui/test_edit_workspace_shortcuts.py
+    """
+
+    @pytest.fixture
+    def workspace_with_controller(self, qtbot):
+        """Create an EditWorkspace with a controller."""
+        from ui.sprite_editor.controllers.editing_controller import EditingController
+        from ui.sprite_editor.views.workspaces.edit_workspace import EditWorkspace
+
+        workspace = EditWorkspace()
+        qtbot.addWidget(workspace)
+        controller = EditingController()
+        workspace.set_controller(controller)
+        return workspace
+
+    def test_shortcuts_exist(self, workspace_with_controller):
+        """Verify QShortcut objects are created for key tools."""
+        workspace = workspace_with_controller
+
+        # QShortcut objects are children of the workspace
+        from PySide6.QtGui import QShortcut
+
+        shortcuts = [c for c in workspace.children() if isinstance(c, QShortcut)]
+
+        keys = [s.key().toString() for s in shortcuts]
+
+        # Tool shortcuts (P, B, K, E) are commented out in EditWorkspace._setup_shortcuts()
+        # Only grid/zoom shortcuts are active
+        assert "G" in keys
+        assert "T" in keys
+        assert "C" in keys
+        assert "+" in keys or "=" in keys
+        assert "Ctrl+0" in keys
+        assert "F" in keys
+
+    def test_eraser_shortcut_triggers_eraser_tool(self, workspace_with_controller, qtbot):
+        """Test that pressing E selects the eraser tool."""
+        from PySide6.QtCore import Qt
+
+        workspace = workspace_with_controller
+        workspace.show()  # Must be visible for shortcuts?
+        # Actually QShortcut requires window to be active usually.
+        # We can try simulate click.
+
+        # Check initial tool
+        assert workspace.controller.get_current_tool_name() == "pencil"
+
+        # We can't easily robustly test QShortcut activation in headless without focus.
+        # Instead, let's verify that the Eraser button in toolbar works.
+
+        eraser_btn = workspace.icon_toolbar.tool_buttons["eraser"]
+        qtbot.mouseClick(eraser_btn, Qt.MouseButton.LeftButton)
+
+        assert workspace.controller.get_current_tool_name() == "eraser"
+
+    def test_tile_grid_toggle(self, workspace_with_controller, qtbot):
+        """Test that T button toggles tile grid."""
+        from PySide6.QtCore import Qt
+
+        workspace = workspace_with_controller
+
+        # Initial state
+        canvas = workspace.get_canvas()
+        assert canvas.tile_grid_visible is False
+
+        # Find button
+        btn = workspace.icon_toolbar.tile_grid_btn
+        assert btn is not None
+
+        # Click it
+        qtbot.mouseClick(btn, Qt.MouseButton.LeftButton)
+
+        assert canvas.tile_grid_visible is True
+
+        # Click again
+        qtbot.mouseClick(btn, Qt.MouseButton.LeftButton)
+
+        assert canvas.tile_grid_visible is False

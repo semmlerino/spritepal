@@ -680,5 +680,150 @@ class TestROMPaletteWorkflow:
             mock_view.clear_rom_palette_sources.assert_called_once()
 
 
+# =============================================================================
+# MULTI-PALETTE ERROR ROUTING TESTS
+# Source: tests/ui/test_multi_palette_error_routing.py
+# =============================================================================
+
+
+# =============================================================================
+# MANUAL PALETTE SELECTION RESTORE TESTS
+# Source: tests/ui/test_manual_palette_selection_restore.py
+# =============================================================================
+
+
+class TestManualPaletteSelectionRestore:
+    """Tests for restoring selection after manual palette action.
+
+    Source: tests/ui/test_manual_palette_selection_restore.py
+
+    Bug context: When "Manual Palette Offset..." is selected, the dropdown
+    reverts to "Default" instead of restoring the previous selection.
+    This causes UI desync when the user cancels the manual palette dialog.
+    """
+
+    @pytest.fixture
+    def selector(self, qtbot):
+        """Create a PaletteSourceSelector widget."""
+        from ui.sprite_editor.views.widgets.palette_source_selector import (
+            PaletteSourceSelector,
+        )
+
+        widget = PaletteSourceSelector()
+        qtbot.addWidget(widget)
+        return widget
+
+    def test_manual_palette_emits_signal(self, selector, qtbot) -> None:
+        """Selecting 'Manual Palette Offset...' should emit manualPaletteRequested."""
+        from PySide6.QtTest import QSignalSpy
+
+        spy = QSignalSpy(selector.manualPaletteRequested)
+
+        # Find the manual palette entry (last item)
+        combo = selector.findChild(QComboBox)
+        manual_index = combo.count() - 1
+
+        combo.setCurrentIndex(manual_index)
+
+        assert spy.count() == 1
+
+    def test_manual_palette_restores_previous_selection_not_default(self, selector, qtbot) -> None:
+        """
+        BUG REPRODUCTION: After selecting 'Manual Palette Offset...',
+        dropdown should restore to PREVIOUS selection, not 'Default'.
+
+        This test will FAIL before the fix is applied.
+        """
+        # Add a ROM palette source
+        selector.add_palette_source("ROM Palette 8", "rom", 8)
+
+        # Select the ROM palette
+        selector.set_selected_source("rom", 8)
+        assert selector.get_selected_source() == ("rom", 8)
+
+        # Find and select manual palette entry
+        combo = selector.findChild(QComboBox)
+        manual_index = combo.count() - 1
+
+        # This triggers manual palette selection which should restore previous
+        combo.setCurrentIndex(manual_index)
+
+        # Should restore to previous selection (rom, 8), NOT default
+        current_source = selector.get_selected_source()
+        assert current_source == ("rom", 8), (
+            f"Expected ('rom', 8), got {current_source}. "
+            "Manual palette selection should restore previous selection, not Default."
+        )
+
+    def test_manual_palette_does_not_emit_source_changed(self, selector, qtbot) -> None:
+        """Manual palette selection should NOT emit sourceChanged signal."""
+        from PySide6.QtTest import QSignalSpy
+
+        # Add and select a ROM palette
+        selector.add_palette_source("ROM Palette 8", "rom", 8)
+        selector.set_selected_source("rom", 8)
+
+        # Spy on sourceChanged
+        spy = QSignalSpy(selector.sourceChanged)
+
+        # Select manual palette
+        combo = selector.findChild(QComboBox)
+        manual_index = combo.count() - 1
+        combo.setCurrentIndex(manual_index)
+
+        # Should not emit sourceChanged (only manualPaletteRequested)
+        assert spy.count() == 0, (
+            f"sourceChanged emitted {spy.count()} times, expected 0. "
+            "Manual palette selection should not change the active source."
+        )
+
+    def test_manual_palette_restores_default_when_no_previous_selection(self, selector, qtbot) -> None:
+        """When no previous selection exists, should restore to Default (index 0)."""
+        # Don't add any palette sources, start from default state
+
+        # Find and select manual palette entry
+        combo = selector.findChild(QComboBox)
+        manual_index = combo.count() - 1
+
+        combo.setCurrentIndex(manual_index)
+
+        # Should restore to Default (the only previous state)
+        current_source = selector.get_selected_source()
+        assert current_source == ("default", 0), (
+            f"Expected ('default', 0), got {current_source}. With no previous selection, should restore to Default."
+        )
+
+
+class TestMultiPaletteErrorRouting:
+    """Tests for multi-palette error routing to correct tab.
+
+    Source: tests/ui/test_multi_palette_error_routing.py
+    """
+
+    def test_multi_palette_missing_inputs_report_in_multi_tab(self, qtbot, app_context):
+        """
+        Contract: Multi-palette preview errors appear in MultiPaletteTab output.
+        Fails today: error is appended to ExtractTab only.
+        """
+        from ui.sprite_editor.controllers.extraction_controller import ExtractionController
+        from ui.sprite_editor.views.tabs.extract_tab import ExtractTab
+        from ui.sprite_editor.views.tabs.multi_palette_tab import MultiPaletteTab
+
+        controller = ExtractionController()
+        extract_tab = ExtractTab()
+        multi_tab = MultiPaletteTab()
+        qtbot.addWidget(extract_tab)
+        qtbot.addWidget(multi_tab)
+
+        controller.set_view(extract_tab)
+        controller.set_multi_palette_view(multi_tab)
+
+        with qtbot.waitSignal(controller.extraction_failed) as blocker:
+            controller.generate_multi_palette_preview(64)
+
+        assert "VRAM and CGRAM files required" in blocker.args[0]  # source-of-truth
+        assert "VRAM and CGRAM files required" in multi_tab.output_area.toPlainText()  # UI reflection
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
