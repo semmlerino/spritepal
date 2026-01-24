@@ -609,6 +609,11 @@ class FrameMappingWorkspace(QWidget):
                 f"Blocking alignment change: canvas shows {self._current_canvas_game_id}, "
                 f"mapping points to {mapping.game_frame_id}"
             )
+            # Provide user feedback about why the edit was blocked
+            if self._message_service:
+                self._message_service.show_message(
+                    "Alignment not saved - canvas shows a different capture than the mapping"
+                )
             return
 
         # Update alignment in controller (includes scale)
@@ -621,12 +626,16 @@ class FrameMappingWorkspace(QWidget):
 
         Routes compression changes through the controller instead of
         directly mutating game frame state.
+
+        Uses _current_canvas_game_id (what canvas displays) rather than
+        _selected_game_id (what user clicked in library), because the user
+        is editing what they see on the canvas.
         """
-        if self._selected_game_id is None:
+        if self._current_canvas_game_id is None:
             return
 
         # Route through controller for proper signal emission and auto-save
-        self._controller.update_game_frame_compression(self._selected_game_id, compression_type)
+        self._controller.update_game_frame_compression(self._current_canvas_game_id, compression_type)
 
     def _on_apply_transforms_to_all(self, offset_x: int, offset_y: int, scale: float) -> None:
         """Handle apply transformations to all request from canvas.

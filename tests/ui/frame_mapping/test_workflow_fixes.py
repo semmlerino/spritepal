@@ -345,3 +345,150 @@ class TestCanvasStatePreservation:
         assert hasattr(workspace, "_previous_project_id"), (
             "Workspace should track previous project ID for canvas state preservation"
         )
+
+
+class TestSplitBrainFixes:
+    """Step 6: Verify canvas/selection split brain fixes.
+
+    The workspace tracks two distinct IDs:
+    - _selected_game_id: What user last clicked in the captures library
+    - _current_canvas_game_id: What the canvas is actually displaying
+
+    These can differ when previewing captures. The fixes ensure:
+    1. Compression changes apply to the displayed frame (canvas), not selected
+    2. Blocked alignment edits show user feedback
+    """
+
+    def test_compression_type_applied_to_canvas_frame_not_selected(
+        self, qtbot: QtBot, tmp_path: Path, app_context: object
+    ) -> None:
+        """Compression changes should apply to canvas frame, not selected frame.
+
+        Scenario:
+        1. AI frame mapped to capture_a (selected_game_id = capture_a)
+        2. User clicks capture_b to preview (canvas shows capture_b)
+        3. User changes compression type
+        4. Compression should apply to capture_b (what canvas shows), not capture_a
+
+        Bug: _on_compression_type_changed used _selected_game_id instead of
+        _current_canvas_game_id, causing compression to apply to the wrong frame.
+        """
+        from ui.workspaces.frame_mapping_workspace import FrameMappingWorkspace
+
+        workspace = FrameMappingWorkspace()
+        qtbot.addWidget(workspace)
+
+        # Create project with AI frame and two game frames
+        project = create_test_project(tmp_path, num_frames=1)
+
+        capture_a = GameFrame(
+            id="capture_a",
+            rom_offsets=[0x1000],
+            capture_path=None,
+            palette_index=0,
+            width=8,
+            height=8,
+            selected_entry_ids=[],
+            compression_types={0x1000: "raw"},
+        )
+        capture_b = GameFrame(
+            id="capture_b",
+            rom_offsets=[0x2000],
+            capture_path=None,
+            palette_index=0,
+            width=8,
+            height=8,
+            selected_entry_ids=[],
+            compression_types={0x2000: "raw"},
+        )
+        project.add_game_frame(capture_a)
+        project.add_game_frame(capture_b)
+        workspace._controller._project = project
+
+        # Simulate: AI frame mapped to capture_a, but canvas shows capture_b
+        ai_frame_id = project.ai_frames[0].id
+        project.create_mapping(ai_frame_id, "capture_a")
+        workspace._selected_ai_frame_id = ai_frame_id
+        workspace._selected_game_id = "capture_a"  # What was linked
+        workspace._current_canvas_game_id = "capture_b"  # What canvas displays (user previewing)
+
+        # User changes compression type via canvas
+        workspace._on_compression_type_changed("hal")
+
+        # Compression should be applied to capture_b (what canvas shows),
+        # NOT capture_a (what was selected for linking)
+        assert capture_b.compression_types[0x2000] == "hal", (
+            "Compression should apply to canvas frame (capture_b), not selected frame (capture_a)"
+        )
+        assert capture_a.compression_types[0x1000] == "raw", "Selected frame (capture_a) should remain unchanged"
+
+    def test_alignment_blocked_shows_user_feedback(self, qtbot: QtBot, tmp_path: Path, app_context: object) -> None:
+        """When alignment edit is blocked, user should get status bar feedback.
+
+        Scenario:
+        1. AI frame mapped to capture_a
+        2. User clicks capture_b to preview (canvas shows capture_b)
+        3. User drags AI frame to adjust alignment
+        4. Alignment edit should be blocked AND user should see a message
+
+        Bug: Alignment was silently blocked with no user feedback, causing
+        confusion when users tried to adjust alignment.
+        """
+        from ui.workspaces.frame_mapping_workspace import FrameMappingWorkspace
+
+        workspace = FrameMappingWorkspace()
+        qtbot.addWidget(workspace)
+
+        # Create mock message service to track feedback
+        mock_message_service = MagicMock()
+        workspace._message_service = mock_message_service
+
+        # Create project with AI frame and two game frames
+        project = create_test_project(tmp_path, num_frames=1)
+
+        capture_a = GameFrame(
+            id="capture_a",
+            rom_offsets=[0x1000],
+            capture_path=None,
+            palette_index=0,
+            width=8,
+            height=8,
+            selected_entry_ids=[],
+            compression_types={0x1000: "raw"},
+        )
+        capture_b = GameFrame(
+            id="capture_b",
+            rom_offsets=[0x2000],
+            capture_path=None,
+            palette_index=0,
+            width=8,
+            height=8,
+            selected_entry_ids=[],
+            compression_types={0x2000: "raw"},
+        )
+        project.add_game_frame(capture_a)
+        project.add_game_frame(capture_b)
+        workspace._controller._project = project
+
+        # Create mapping AI frame -> capture_a
+        ai_frame_id = project.ai_frames[0].id
+        project.create_mapping(ai_frame_id, "capture_a")
+        workspace._selected_ai_frame_id = ai_frame_id
+        workspace._selected_game_id = "capture_a"
+        workspace._current_canvas_game_id = "capture_b"  # Canvas shows different frame
+
+        # User tries to adjust alignment
+        workspace._on_alignment_changed(10, 20, False, False, 1.0)
+
+        # Alignment should be blocked (no change to mapping)
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
+        assert mapping is not None
+        assert mapping.offset_x == 0, "Alignment should NOT be applied"
+        assert mapping.offset_y == 0, "Alignment should NOT be applied"
+
+        # User should receive feedback about the blocked edit
+        mock_message_service.show_message.assert_called()
+        # Find the call with the warning message (may have other show_message calls)
+        calls = mock_message_service.show_message.call_args_list
+        warning_calls = [c for c in calls if "not saved" in c[0][0].lower() or "different" in c[0][0].lower()]
+        assert len(warning_calls) >= 1, f"Expected a message explaining why alignment was blocked. Got calls: {calls}"
