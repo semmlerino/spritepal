@@ -256,7 +256,9 @@ class IndexedCanvasView(QGraphicsView):
         if 0 <= img_x < self._image_width and 0 <= img_y < self._image_height:
             button = 0 if event.button() == Qt.MouseButton.LeftButton else 1
             self.pixel_clicked.emit(img_x, img_y, button)
-            self._is_dragging = True
+            # Only enable dragging for left button (paint) - right button is sample only
+            if event.button() == Qt.MouseButton.LeftButton:
+                self._is_dragging = True
             event.accept()
         else:
             super().mousePressEvent(event)

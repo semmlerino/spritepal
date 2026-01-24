@@ -257,12 +257,26 @@ class ToolManager(QObject):
         return self.current_brush_size
 
     def get_brush_pixels(self, center_x: int, center_y: int) -> list[tuple[int, int]]:
-        """Calculate pixels affected by brush at given position."""
+        """Calculate pixels affected by brush centered at given position.
+
+        Args:
+            center_x: X coordinate of brush center
+            center_y: Y coordinate of brush center
+
+        Returns:
+            List of (x, y) pixel coordinates affected by the brush.
+            For odd sizes: symmetric around center.
+            For even sizes: slight offset toward top-left (standard convention).
+        """
         pixels: list[tuple[int, int]] = []
         size = self.current_brush_size
+        half = size // 2
+        # For odd sizes: symmetric around center (-1, 0, 1) for size 3
+        # For even sizes: slight offset toward top-left (-1, 0) for size 2
+        end = half + 1 if size % 2 == 1 else half
 
-        for dy in range(size):
-            for dx in range(size):
+        for dy in range(-half, end):
+            for dx in range(-half, end):
                 pixels.append((center_x + dx, center_y + dy))
 
         return pixels

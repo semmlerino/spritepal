@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QLabel,
+    QMessageBox,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -374,7 +375,7 @@ class EditorPalettePanel(QWidget):
         - If same as active: do nothing
         - If no active selection: do nothing
         - If index 0: do nothing (can't merge with transparent)
-        - Otherwise: emit merge_requested signal
+        - Otherwise: show confirmation and emit merge_requested signal
         """
         # Can't merge with transparent
         if index == 0:
@@ -390,6 +391,20 @@ class EditorPalettePanel(QWidget):
 
         # Can't merge if primary is free
         if self._active_index in self._free_slots:
+            return
+
+        # Show confirmation dialog
+        result = QMessageBox.question(
+            self,
+            "Merge Palette Indices",
+            f"Merge index {index} into index {self._active_index}?\n\n"
+            f"All pixels using index {index} will be changed to index {self._active_index}.\n"
+            f"This action can be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if result != QMessageBox.StandardButton.Yes:
             return
 
         # Set as merge target and emit signal

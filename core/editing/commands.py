@@ -421,6 +421,86 @@ class SelectionPaintCommand(UndoCommand):
         return cmd
 
 
+@dataclass
+class PaletteColorCommand(UndoCommand):
+    """Command for palette color changes.
+
+    Supports undo/redo of individual palette color modifications.
+    Note: This command stores palette reference separately and doesn't use IndexedImageModel.
+    """
+
+    palette_index: int = 0
+    old_color: tuple[int, int, int] = (0, 0, 0)
+    new_color: tuple[int, int, int] = (0, 0, 0)
+    # Palette reference is not serialized - must be set before execute/unexecute
+    _palette_colors: list[tuple[int, int, int]] | None = field(default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        """Initialize parent class after dataclass initialization."""
+        super().__init__()
+
+    def set_palette(self, colors: list[tuple[int, int, int]]) -> None:
+        """Set the palette reference for execution.
+
+        Args:
+            colors: List of RGB tuples representing the palette colors.
+        """
+        self._palette_colors = colors
+
+    @override
+    def execute(self, model: IndexedImageModel) -> None:
+        """Apply new color to palette. Model parameter unused for palette commands."""
+        if self._palette_colors is not None and 0 < self.palette_index < len(self._palette_colors):
+            self._palette_colors[self.palette_index] = self.new_color
+
+    @override
+    def unexecute(self, model: IndexedImageModel) -> None:
+        """Restore original color to palette. Model parameter unused for palette commands."""
+        if self._palette_colors is not None and 0 < self.palette_index < len(self._palette_colors):
+            self._palette_colors[self.palette_index] = self.old_color
+
+    @override
+    def get_memory_size(self) -> int:
+        """Calculate memory usage."""
+        if self.compressed and self._compressed_data:
+            return len(self._compressed_data) + 64
+        # 1 int + 2 tuples of 3 ints each
+        return 4 + 24 + 64
+
+    @override
+    def _get_compress_data(self) -> tuple[int, tuple[int, int, int], tuple[int, int, int]]:
+        """Get palette data for compression."""
+        return (self.palette_index, self.old_color, self.new_color)
+
+    @override
+    def _clear_uncompressed_data(self) -> None:
+        """No need to clear primitive types."""
+
+    @override
+    def _restore_from_compressed(
+        self, data: tuple[int, tuple[int, int, int], tuple[int, int, int]]
+    ) -> None:
+        """Restore palette data from compressed format."""
+        self.palette_index, self.old_color, self.new_color = data
+
+    @classmethod
+    @override
+    def from_dict(cls, data: dict[str, Any]) -> PaletteColorCommand:  # type: ignore[reportExplicitAny]
+        """Create command from dictionary."""
+        cmd = cls()
+        cmd.timestamp = datetime.fromisoformat(data["timestamp"])
+        cmd.compressed = data["compressed"]
+
+        if data["compressed"]:
+            cmd._compressed_data = bytes.fromhex(data["compressed_data"])
+        else:
+            cmd.palette_index, old_color, new_color = data["data"]
+            cmd.old_color = tuple(old_color)
+            cmd.new_color = tuple(new_color)
+
+        return cmd
+
+
 class BatchCommand(UndoCommand):
     """Groups multiple commands executed together."""
 
@@ -504,6 +584,8 @@ class BatchCommand(UndoCommand):
                     cmd.commands.append(FloodFillCommand.from_dict(cmd_data))
                 elif cmd_type == "SelectionPaintCommand":
                     cmd.commands.append(SelectionPaintCommand.from_dict(cmd_data))
+                elif cmd_type == "PaletteColorCommand":
+                    cmd.commands.append(PaletteColorCommand.from_dict(cmd_data))
                 elif cmd_type == "BatchCommand":
                     cmd.commands.append(BatchCommand.from_dict(cmd_data))
 

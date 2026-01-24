@@ -58,7 +58,7 @@ class IconToolbar(QWidget):
         "zoom_out": ("zoom-out", "-", "Zoom Out"),
         "grid": ("view-grid", "#", "Show Pixel Grid"),
         "tile_grid": ("view-split-left-right", "T", "Show Tile Grid"),
-        "palette": ("preferences-desktop-color", "C", "Toggle Palette Preview"),
+        "palette": ("preferences-desktop-color", "C", "Color View"),
         "background": ("format-fill-color", "B", "Background"),
         "revert": ("view-refresh", "↺", "Revert"),
         "import": ("document-import", "↓", "Import"),
@@ -166,7 +166,11 @@ class IconToolbar(QWidget):
         self.palette_preview_btn.setCheckable(True)
         self.palette_preview_btn.setChecked(True)  # Start with palette preview enabled
         self._apply_icon(self.palette_preview_btn, "palette")
-        self.palette_preview_btn.setToolTip("Toggle Palette Preview (C)")
+        self.palette_preview_btn.setToolTip(
+            "Color View (C)\n"
+            "ON: Show actual palette colors\n"
+            "OFF: Show index values (greyscale)"
+        )
         self.palette_preview_btn.setIconSize(self._get_icon_size())
         self.palette_preview_btn.clicked.connect(self._on_palette_preview_toggled)
         layout.addWidget(self.palette_preview_btn)

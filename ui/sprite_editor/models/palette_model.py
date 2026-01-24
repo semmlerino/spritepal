@@ -116,6 +116,6 @@ class PaletteModel:
         return (0, 0, 0)
 
     def set_color(self, index: int, rgb: tuple[int, int, int]) -> None:
-        """Set RGB color at index."""
-        if 0 <= index < len(self.colors):
+        """Set RGB color at index. Index 0 (transparent) cannot be modified."""
+        if 0 < index < len(self.colors):  # Index 0 is protected (transparent)
             self.colors[index] = rgb
