@@ -29,7 +29,6 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
-    QDialog,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -45,11 +44,11 @@ from PySide6.QtWidgets import (
 from core.app_context import get_app_context
 from core.services.tile_sampling_service import calculate_auto_alignment
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
+from ui.frame_mapping.dialog_coordinator import DialogCoordinator
 from ui.frame_mapping.dialogs.replace_link_dialog import (
     confirm_replace_ai_frame_link,
     confirm_replace_link,
 )
-from ui.frame_mapping.dialogs.sprite_selection_dialog import SpriteSelectionDialog
 from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
@@ -89,9 +88,8 @@ class FrameMappingWorkspace(QWidget):
         # Track open palette editor windows (frame_id -> editor window)
         self._palette_editors: dict[str, AIFramePaletteEditorWindow] = {}
 
-        # Queue for pending capture imports (for directory imports with sequential dialogs)
-        self._pending_captures: list[tuple[CaptureResult, Path]] = []
-        self._import_count: int = 0  # Track successful imports for directory import feedback
+        # Dialog coordinator for capture imports and confirmations
+        self._dialog_coordinator = DialogCoordinator(self)
 
         # Create controller
         self._controller = FrameMappingController(self)
@@ -282,6 +280,9 @@ class FrameMappingWorkspace(QWidget):
         self._controller.alignment_updated.connect(self._on_alignment_updated)
         self._controller.preview_cache_invalidated.connect(self._on_preview_cache_invalidated)
         self._controller.capture_import_requested.connect(self._on_capture_import_requested)
+
+        # Dialog coordinator signals
+        self._dialog_coordinator.queue_processing_finished.connect(self._on_capture_queue_finished)
 
         # AI Frames Pane signals
         self._ai_frames_pane.ai_frame_selected.connect(self._on_ai_frame_selected)
@@ -1664,7 +1665,7 @@ class FrameMappingWorkspace(QWidget):
     # -------------------------------------------------------------------------
 
     def _on_capture_import_requested(self, capture_result: CaptureResult, capture_path: object) -> None:
-        """Handle capture import request - show sprite selection dialog.
+        """Handle capture import request - delegate to dialog coordinator.
 
         For single imports, shows dialog immediately.
         For directory imports, queues the capture and processes sequentially.
@@ -1676,39 +1677,21 @@ class FrameMappingWorkspace(QWidget):
         if not isinstance(capture_path, Path):
             return
 
-        # Queue the capture for processing
-        self._pending_captures.append((capture_result, capture_path))
+        # Queue the capture via dialog coordinator
+        self._dialog_coordinator.queue_capture_import(capture_result, capture_path)
 
         # If this is the only pending capture, process it immediately
-        if len(self._pending_captures) == 1:
-            self._process_next_capture()
+        if self._dialog_coordinator.get_queue_size() == 1:
+            self._dialog_coordinator.process_capture_import_queue(self, self._controller)
 
-    def _process_next_capture(self) -> None:
-        """Process the next capture in the queue by showing the selection dialog."""
-        if not self._pending_captures:
-            # Queue empty - show final count if any imports were done
-            if self._import_count > 0:
-                if self._message_service:
-                    self._message_service.show_message(f"Imported {self._import_count} captures")
-                self._import_count = 0
-            return
+    def _on_capture_queue_finished(self, import_count: int) -> None:
+        """Handle completion of capture import queue.
 
-        capture_result, capture_path = self._pending_captures[0]
-
-        # Show sprite selection dialog
-        dialog = SpriteSelectionDialog(capture_result, parent=self)
-
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            selected_entries = dialog.selected_entries
-            if selected_entries:
-                # Complete the import via controller
-                frame = self._controller.complete_capture_import(capture_path, capture_result, selected_entries)
-                if frame is not None:
-                    self._import_count += 1
-
-        # Remove processed capture and continue to next
-        self._pending_captures.pop(0)
-        self._process_next_capture()
+        Args:
+            import_count: Number of successfully imported captures
+        """
+        if self._message_service and import_count > 0:
+            self._message_service.show_message(f"Imported {import_count} captures")
 
     # -------------------------------------------------------------------------
     # File Operations
@@ -1835,10 +1818,10 @@ class FrameMappingWorkspace(QWidget):
         if directory:
             path = Path(directory)
             self._state.last_capture_dir = path
-            # Reset import counter for this batch
-            self._import_count = 0
+            # Clear queue for this batch
+            self._dialog_coordinator.clear_queue()
             # Controller will emit capture_import_requested for each capture
-            # _on_capture_import_requested queues them and _process_next_capture shows dialogs
+            # _on_capture_import_requested queues them via dialog coordinator
             self._controller.import_capture_directory(path)
 
     def _on_load_project(self) -> None:
