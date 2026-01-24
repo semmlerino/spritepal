@@ -12,6 +12,8 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from core.palette_utils import QUANTIZATION_TRANSPARENCY_THRESHOLD
+
 
 @dataclass
 class QuantizationResult:
@@ -38,13 +40,13 @@ class ColorQuantizer:
     def __init__(
         self,
         dither: bool = True,
-        transparency_threshold: int = 127,
+        transparency_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD,
     ) -> None:
         """Initialize the quantizer.
 
         Args:
             dither: Whether to apply Floyd-Steinberg dithering
-            transparency_threshold: Alpha values below this are transparent
+            transparency_threshold: Alpha values below this are transparent (default: 128)
         """
         self._dither = dither
         self._transparency_threshold = transparency_threshold

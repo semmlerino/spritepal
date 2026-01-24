@@ -714,7 +714,7 @@ class WorkbenchCanvas(QWidget):
             offset_y: Y offset for the AI frame.
             flip_h: Horizontal flip state.
             flip_v: Vertical flip state.
-            scale: Scale factor (0.1 - 10.0).
+            scale: Scale factor (0.1 - 1.0).
             has_mapping: Whether this represents a valid mapping (affects control state).
         """
         self._has_mapping = has_mapping

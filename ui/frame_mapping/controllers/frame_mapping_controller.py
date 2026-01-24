@@ -506,7 +506,7 @@ class FrameMappingController(QObject):
             offset_y: Y offset for alignment
             flip_h: Horizontal flip state
             flip_v: Vertical flip state
-            scale: Scale factor (0.1 - 10.0)
+            scale: Scale factor (0.1 - 1.0)
             set_edited: If True and status is not 'injected', set status to 'edited'.
                         Use False for auto-centering during initial link creation.
 

@@ -4,6 +4,7 @@ Verifies that:
 1. Preview and injection use the same transparency threshold (WYSIWYG)
 2. Semi-transparent pixels (alpha 1-127) are treated as transparent
 3. All quantization paths use perceptual LAB distance
+4. ColorQuantizer uses the centralized threshold constant
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 from PIL import Image
 
+from core.color_quantization import ColorQuantizer
 from core.palette_utils import (
     QUANTIZATION_TRANSPARENCY_THRESHOLD,
     SNES_PALETTE_SIZE,
@@ -154,3 +156,50 @@ class TestQuantizeWithMappingsParity:
         result_array = np.array(result)
         # All pixels should be mapped to index 2
         assert np.all(result_array == 2), "Opaque red should map to index 2"
+
+
+class TestColorQuantizerThresholdParity:
+    """Tests that ColorQuantizer uses the centralized threshold constant."""
+
+    def test_default_threshold_matches_constant(self) -> None:
+        """ColorQuantizer default threshold should match QUANTIZATION_TRANSPARENCY_THRESHOLD."""
+        quantizer = ColorQuantizer()
+        assert quantizer._transparency_threshold == QUANTIZATION_TRANSPARENCY_THRESHOLD
+
+    def test_semi_transparent_pixels_become_transparent(self) -> None:
+        """ColorQuantizer should treat alpha 1-127 as transparent."""
+        quantizer = ColorQuantizer(dither=False)
+
+        # Create image with semi-transparent red (alpha=64)
+        img = Image.new("RGBA", (4, 4), (255, 0, 0, 64))
+
+        result = quantizer.quantize(img)
+
+        # All pixels should be marked as transparent
+        assert result.transparency_mask is not None
+        assert np.all(result.transparency_mask), "Alpha 64 should be transparent"
+
+    def test_opaque_pixels_quantized(self) -> None:
+        """ColorQuantizer should treat alpha >= 128 as opaque."""
+        quantizer = ColorQuantizer(dither=False)
+
+        # Create image with opaque red (alpha=200)
+        img = Image.new("RGBA", (4, 4), (255, 0, 0, 200))
+
+        result = quantizer.quantize(img)
+
+        # No pixels should be marked as transparent
+        if result.transparency_mask is not None:
+            assert not np.all(result.transparency_mask), "Alpha 200 should be opaque"
+
+    def test_threshold_boundary_at_128(self) -> None:
+        """Alpha at 128 should be opaque (threshold is exclusive)."""
+        quantizer = ColorQuantizer(dither=False)
+
+        img = Image.new("RGBA", (2, 2), (255, 0, 0, 128))
+
+        result = quantizer.quantize(img)
+
+        # Alpha 128 should NOT be fully transparent
+        if result.transparency_mask is not None:
+            assert not np.all(result.transparency_mask), "Alpha 128 should be opaque"

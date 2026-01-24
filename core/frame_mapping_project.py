@@ -857,7 +857,7 @@ class FrameMappingProject:
             offset_y: Y offset for alignment
             flip_h: Horizontal flip state
             flip_v: Vertical flip state
-            scale: Scale factor (0.1 - 10.0)
+            scale: Scale factor (0.1 - 1.0)
             set_edited: If True, set status to 'edited' (clears 'injected' status).
                         Use False for auto-centering during initial link creation.
 
