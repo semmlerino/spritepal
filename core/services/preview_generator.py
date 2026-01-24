@@ -31,7 +31,6 @@ but this module requires Qt).
 from __future__ import annotations
 
 import hashlib
-import struct
 import threading
 import time
 import weakref
@@ -43,6 +42,8 @@ from typing import TYPE_CHECKING, override
 import numpy as np
 from PIL import Image
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QTimer, Signal
+
+from core.palette_utils import bgr555_to_rgb
 
 if TYPE_CHECKING:
     from PySide6.QtGui import QPixmap
@@ -528,13 +529,11 @@ class PreviewGenerator(QObject):
         if request.palette:
             palette_data = request.palette.data
 
-            # Convert SNES BGR555 palette to RGB888
+            # Convert SNES BGR555 palette to RGB888 using shared utility
             for i in range(0, min(len(palette_data), 32), 2):
                 if i + 1 < len(palette_data):
-                    color = struct.unpack("<H", palette_data[i : i + 2])[0]
-                    r = ((color & 0x001F) << 3) | ((color & 0x001F) >> 2)
-                    g = ((color & 0x03E0) >> 2) | ((color & 0x03E0) >> 7)
-                    b = ((color & 0x7C00) >> 7) | ((color & 0x7C00) >> 12)
+                    color = palette_data[i] | (palette_data[i + 1] << 8)
+                    r, g, b = bgr555_to_rgb(color)
                     palette.extend([r, g, b])
 
             thread_id = threading.current_thread().ident

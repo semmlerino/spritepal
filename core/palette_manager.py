@@ -10,15 +10,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from core.palette_utils import bgr555_to_rgb
 from core.services.extraction_results import PaletteExtractionResult
 from utils.constants import (
     BYTES_PER_TILE,
     CGRAM_EXPECTED_SIZE,
-    COLOR_MASK_BLUE,
-    COLOR_MASK_GREEN,
-    COLOR_MASK_RED,
-    COLOR_SHIFT_BLUE,
-    COLOR_SHIFT_GREEN,
     COLORS_PER_PALETTE,
     OAM_Y_VISIBLE_THRESHOLD,
     PALETTE_ATTR_MASK,
@@ -67,17 +63,8 @@ class PaletteManager:
                     color_high = self.cgram_data[offset + 1]
                     snes_color = (color_high << 8) | color_low
 
-                    # Convert BGR555 to RGB888 (proper 5-bit to 8-bit conversion)
-                    # Use bit shifting for accurate conversion: (value << 3) | (value >> 2)
-                    b = (snes_color & COLOR_MASK_BLUE) >> COLOR_SHIFT_BLUE
-                    g = (snes_color & COLOR_MASK_GREEN) >> COLOR_SHIFT_GREEN
-                    r = snes_color & COLOR_MASK_RED
-
-                    # Convert 5-bit to 8-bit values (0-31 to 0-255)
-                    b = (b << 3) | (b >> 2)
-                    g = (g << 3) | (g >> 2)
-                    r = (r << 3) | (r >> 2)
-
+                    # Convert BGR555 to RGB888 using shared utility
+                    r, g, b = bgr555_to_rgb(snes_color)
                     colors.append([r, g, b])
                 else:
                     colors.append([0, 0, 0])

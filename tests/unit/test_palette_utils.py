@@ -9,6 +9,7 @@ from PIL import Image
 from core.palette_utils import (
     QUANTIZATION_TRANSPARENCY_THRESHOLD,
     SNES_PALETTE_SIZE,
+    bgr555_to_rgb,
     extract_unique_colors,
     find_nearest_palette_index,
     quantize_colors_to_palette,
@@ -22,18 +23,28 @@ from core.palette_utils import (
 class TestSnesPaletteToRgb:
     """Tests for snes_palette_to_rgb function."""
 
-    def test_converts_bgr555_to_rgb(self) -> None:
-        """SNES BGR555 format should convert correctly to RGB."""
+    def test_converts_bgr555_to_rgb_full_8bit_range(self) -> None:
+        """BGR555 max value (31) should produce full 8-bit value (255), not 248.
+
+        The correct 5-bit to 8-bit conversion is: (value << 3) | (value >> 2)
+        This scales 31 (max 5-bit) to 255 (max 8-bit), not 248.
+        Example: 31 << 3 = 248, 31 >> 2 = 7, 248 | 7 = 255
+
+        Bug impact: Incomplete scaling produces muted colors (248 instead of 255).
+        """
         # SNES BGR555: 0bbbbbgggggrrrrr (15-bit)
-        # Red = 0x001F (r=31, g=0, b=0) -> RGB (248, 0, 0)
-        # Green = 0x03E0 (r=0, g=31, b=0) -> RGB (0, 248, 0)
-        # Blue = 0x7C00 (r=0, g=0, b=31) -> RGB (0, 0, 248)
-        snes_colors = [0x001F, 0x03E0, 0x7C00]
+        # Max values in each channel should produce 255, not 248
+        snes_colors = [0x001F, 0x03E0, 0x7C00, 0x7FFF]
         result = snes_palette_to_rgb(snes_colors)
 
-        assert result[0] == (248, 0, 0), "Red channel conversion"
-        assert result[1] == (0, 248, 0), "Green channel conversion"
-        assert result[2] == (0, 0, 248), "Blue channel conversion"
+        # Full red (r=31, g=0, b=0) -> RGB (255, 0, 0)
+        assert result[0] == (255, 0, 0), f"Red channel: expected (255, 0, 0), got {result[0]}"
+        # Full green (r=0, g=31, b=0) -> RGB (0, 255, 0)
+        assert result[1] == (0, 255, 0), f"Green channel: expected (0, 255, 0), got {result[1]}"
+        # Full blue (r=0, g=0, b=31) -> RGB (0, 0, 255)
+        assert result[2] == (0, 0, 255), f"Blue channel: expected (0, 0, 255), got {result[2]}"
+        # White (r=31, g=31, b=31) -> RGB (255, 255, 255)
+        assert result[3] == (255, 255, 255), f"White: expected (255, 255, 255), got {result[3]}"
 
     def test_passes_through_rgb_triplets(self) -> None:
         """RGB triplets (list format) should pass through unchanged."""
@@ -45,11 +56,11 @@ class TestSnesPaletteToRgb:
 
     def test_handles_mixed_formats(self) -> None:
         """Should handle mixed BGR555 integers and RGB triplets."""
-        # White in BGR555 = 0x7FFF
+        # White in BGR555 = 0x7FFF (r=31, g=31, b=31 -> 255, 255, 255)
         snes_colors: list[int | list[int]] = [0x7FFF, [0, 0, 0]]
         result = snes_palette_to_rgb(snes_colors)
 
-        assert result[0] == (248, 248, 248), "BGR555 white"
+        assert result[0] == (255, 255, 255), "BGR555 white"
         assert result[1] == (0, 0, 0), "RGB black"
 
     def test_black_is_zero(self) -> None:
@@ -61,6 +72,40 @@ class TestSnesPaletteToRgb:
         """Empty palette should return empty list."""
         result = snes_palette_to_rgb([])
         assert result == []
+
+
+class TestBgr555ToRgb:
+    """Tests for bgr555_to_rgb utility function."""
+
+    def test_full_values_scale_to_255(self) -> None:
+        """Max 5-bit values (31) should scale to max 8-bit (255)."""
+        assert bgr555_to_rgb(0x001F) == (255, 0, 0)  # Full red
+        assert bgr555_to_rgb(0x03E0) == (0, 255, 0)  # Full green
+        assert bgr555_to_rgb(0x7C00) == (0, 0, 255)  # Full blue
+        assert bgr555_to_rgb(0x7FFF) == (255, 255, 255)  # Full white
+
+    def test_zero_values(self) -> None:
+        """Zero values should stay zero."""
+        assert bgr555_to_rgb(0x0000) == (0, 0, 0)
+
+    def test_mid_values(self) -> None:
+        """Mid-range 5-bit values (16) should scale correctly.
+
+        16 << 3 = 128, 16 >> 2 = 4, 128 | 4 = 132
+        """
+        # r=16, g=0, b=0 -> 0x0010
+        assert bgr555_to_rgb(0x0010) == (132, 0, 0)
+        # r=0, g=16, b=0 -> 0x0200
+        assert bgr555_to_rgb(0x0200) == (0, 132, 0)
+        # r=0, g=0, b=16 -> 0x4000
+        assert bgr555_to_rgb(0x4000) == (0, 0, 132)
+
+    def test_low_values(self) -> None:
+        """Low 5-bit value (1) should scale correctly.
+
+        1 << 3 = 8, 1 >> 2 = 0, 8 | 0 = 8
+        """
+        assert bgr555_to_rgb(0x0001) == (8, 0, 0)
 
 
 class TestQuantizeToPalette:

@@ -634,8 +634,9 @@ class TestSheetPaletteQuantization:
         # The result should be quantized to the capture palette (green)
         pixel = composited.getpixel((4, 4))
         # Should be green since that's the only color in capture palette
-        # SNES green (31 in 5-bit) expands to 248 in 8-bit (31 << 3)
-        assert pixel[:3] == (0, 248, 0), (
-            f"Expected green (0,248,0) from capture palette (SNES 5-bit scaled), "
+        # SNES green (31 in 5-bit) expands to 255 in 8-bit using full scaling:
+        # (31 << 3) | (31 >> 2) = 248 | 7 = 255
+        assert pixel[:3] == (0, 255, 0), (
+            f"Expected green (0,255,0) from capture palette (SNES 5-bit fully scaled), "
             f"but got {pixel[:3]}. Should fall back to capture palette."
         )

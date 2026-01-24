@@ -84,6 +84,38 @@ def _rgb_array_to_lab(rgb: NDArray[np.int32]) -> NDArray[np.float64]:
     return np.stack([L, a, b_val], axis=-1)
 
 
+def bgr555_to_rgb(bgr555: int) -> tuple[int, int, int]:
+    """Convert single SNES BGR555 color to RGB888 with full 8-bit scaling.
+
+    SNES uses 15-bit color (5 bits per channel, 0-31 range). To convert to
+    8-bit (0-255 range), we use: (value << 3) | (value >> 2)
+
+    This properly scales 31 (max 5-bit) to 255 (max 8-bit):
+        31 << 3 = 248
+        31 >> 2 = 7
+        248 | 7 = 255
+
+    Simply shifting left by 3 only produces 248, which causes slightly muted colors.
+
+    Args:
+        bgr555: SNES BGR555 format color (0bbbbbgggggrrrrr)
+
+    Returns:
+        RGB tuple with full 8-bit range (0-255)
+    """
+    # Extract 5-bit components
+    r5 = bgr555 & 0x001F
+    g5 = (bgr555 >> 5) & 0x001F
+    b5 = (bgr555 >> 10) & 0x001F
+
+    # Scale from 5-bit to 8-bit using proper formula
+    r = (r5 << 3) | (r5 >> 2)
+    g = (g5 << 3) | (g5 >> 2)
+    b = (b5 << 3) | (b5 >> 2)
+
+    return (r, g, b)
+
+
 def snes_palette_to_rgb(snes_colors: list[int | list[int]]) -> list[tuple[int, int, int]]:
     """Convert SNES BGR555 palette to RGB tuples.
 
@@ -101,11 +133,8 @@ def snes_palette_to_rgb(snes_colors: list[int | list[int]]) -> list[tuple[int, i
             # Already RGB triplet
             result.append((color[0], color[1], color[2]))
         else:
-            # SNES BGR555 format: 0bbbbbgggggrrrrr
-            r = (color & 0x1F) << 3
-            g = ((color >> 5) & 0x1F) << 3
-            b = ((color >> 10) & 0x1F) << 3
-            result.append((r, g, b))
+            # Convert BGR555 to RGB888 using shared utility
+            result.append(bgr555_to_rgb(color))
     return result
 
 

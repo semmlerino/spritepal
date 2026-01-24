@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from core.palette_utils import bgr555_to_rgb
 from core.types import RGBColor
 from utils.logging_config import get_logger
 from utils.rom_utils import detect_smc_offset_from_size
@@ -115,20 +116,10 @@ class ROMPaletteExtractor:
             if offset + 1 < len(palette_data):
                 low_byte = palette_data[offset]
                 high_byte = palette_data[offset + 1]
-                bgr555 = (high_byte << 8) | low_byte
+                bgr555_value = (high_byte << 8) | low_byte
 
-                # Convert BGR555 to RGB888
-                b = (bgr555 & 0x7C00) >> 10
-                g = (bgr555 & 0x03E0) >> 5
-                r = bgr555 & 0x001F
-
-                # Scale from 5-bit to 8-bit using standard SNES formula
-                # This gives 248 for max value (31), not 255, but is the standard
-                r = (r << 3) | (r >> 2)
-                g = (g << 3) | (g >> 2)
-                b = (b << 3) | (b >> 2)
-
-                colors.append((r, g, b))
+                # Convert BGR555 to RGB888 using shared utility
+                colors.append(bgr555_to_rgb(bgr555_value))
             else:
                 # Default to black if data is missing
                 colors.append((0, 0, 0))
