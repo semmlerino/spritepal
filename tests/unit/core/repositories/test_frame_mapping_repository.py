@@ -158,8 +158,10 @@ class TestFrameMappingRepositoryVersionDetection:
             FrameMappingRepository.load(save_path)
 
 
-class TestFrameMappingRepositoryV1Migration:
-    """Tests for v1 to v2 migration (ai_frame_index -> ai_frame_id)."""
+class TestRepositoryMigrations:
+    """Tests for version migrations (v1 -> v2 -> v3 -> current)."""
+
+    # V1 -> V2 migration: ai_frame_index -> ai_frame_id
 
     def test_load_v1_file_migrates_to_current(self, tmp_path: Path) -> None:
         """V1 project files load and migrate to current version."""
@@ -221,9 +223,7 @@ class TestFrameMappingRepositoryV1Migration:
         # Orphaned mapping should be pruned
         assert len(loaded.mappings) == 0
 
-
-class TestFrameMappingRepositoryV2Migration:
-    """Tests for v2 to v3 migration (adding sheet_palette)."""
+    # V2 -> V3 migration: adding sheet_palette
 
     def test_load_v2_file_adds_sheet_palette_field(self, tmp_path: Path) -> None:
         """V2 files load with sheet_palette=None."""
@@ -243,9 +243,7 @@ class TestFrameMappingRepositoryV2Migration:
 
         assert loaded.sheet_palette is None  # Default for v2
 
-
-class TestFrameMappingRepositoryV3Migration:
-    """Tests for v3 to v4 migration (adding display_name and tags)."""
+    # V3 -> V4 migration: adding display_name and tags
 
     def test_load_v3_file_adds_organization_fields(self, tmp_path: Path) -> None:
         """V3 files load with display_name=None and tags=[]."""
@@ -325,8 +323,8 @@ class TestFrameMappingRepositoryPathResolution:
         assert loaded.ai_frames[0].path.is_absolute()
 
 
-class TestFrameMappingRepositoryErrorHandling:
-    """Tests for error handling and edge cases."""
+class TestRepositoryErrorHandling:
+    """Tests for error handling, edge cases, and forward compatibility."""
 
     def test_load_missing_required_field_raises_error(self, tmp_path: Path) -> None:
         """Load raises KeyError if required field is missing."""
@@ -393,12 +391,8 @@ class TestFrameMappingRepositoryErrorHandling:
         assert loaded.sheet_palette is not None
         assert loaded.sheet_palette.color_mappings.get((255, 0, 0)) == 1
 
-
-class TestFrameMappingRepositoryForwardCompatibility:
-    """Tests for forward compatibility (unknown fields)."""
-
     def test_load_preserves_unknown_top_level_fields(self, tmp_path: Path) -> None:
-        """Unknown top-level fields don't cause load to fail."""
+        """Unknown top-level fields don't cause load to fail (forward compat)."""
         data = {
             "version": CURRENT_VERSION,
             "name": "test",

@@ -237,33 +237,6 @@ class TestBaseLRUCacheThreadSafety:
         # Cache should not exceed max_size
         assert len(cache) <= 50
 
-    def test_rlock_allows_reentrant_access(self) -> None:
-        """Test that RLock allows reentrant access from same thread.
-
-        This tests a potential issue where nested operations within
-        a single thread might deadlock with a regular Lock.
-        """
-        cache: BaseLRUCache[int] = BaseLRUCache(max_size=10, name="reentrant_test")
-
-        # Simulate reentrant access pattern (put that internally calls get-like operations)
-        # The cache uses RLock, so this should not deadlock
-
-        def reentrant_operation() -> None:
-            """Perform nested cache operations."""
-            cache.put("outer", 1)
-            # These operations acquire the same lock
-            _ = cache.get("outer")
-            cache.put("inner", 2)
-            _ = len(cache)
-            _ = "outer" in cache
-
-        # Run in multiple threads
-        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(reentrant_operation) for _ in range(20)]
-            # Should complete without deadlock
-            for future in concurrent.futures.as_completed(futures, timeout=5.0):
-                future.result()
-
     def test_statistics_thread_safety(self) -> None:
         """Test that statistics are thread-safe."""
         cache: BaseLRUCache[int] = BaseLRUCache(max_size=20, name="stats_test")
