@@ -153,8 +153,7 @@ class TestCanvasPaletteLoadSync:
         # Check that non-transparent colors (indices 1-15) are red
         for i in range(1, 16):
             assert colors[i] == (255, 0, 0), (
-                f"BUG: Color index {i} is {colors[i]}, expected (255, 0, 0). "
-                "Canvas would render with wrong colors."
+                f"BUG: Color index {i} is {colors[i]}, expected (255, 0, 0). Canvas would render with wrong colors."
             )
 
     def test_controller_palette_colors_match_loaded_file(
@@ -298,6 +297,5 @@ class TestScaledImageCacheInvalidation:
         colors = controller.get_current_colors()
         for i in range(1, 16):
             assert colors[i] == (255, 0, 0), (
-                f"BUG: Color index {i} is {colors[i]}, expected (255, 0, 0). "
-                "Scaled rendering would show wrong colors."
+                f"BUG: Color index {i} is {colors[i]}, expected (255, 0, 0). Scaled rendering would show wrong colors."
             )

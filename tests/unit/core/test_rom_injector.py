@@ -535,7 +535,7 @@ class TestROMInjectorIntegration:
 
         # Modify some data
         modified_data = bytearray(rom_data)
-        modified_data[0x1000 : 0x1010] = bytes([0xFF] * 16)
+        modified_data[0x1000:0x1010] = bytes([0xFF] * 16)
 
         # Recalculate checksum
         injector.header = header
@@ -586,8 +586,7 @@ class TestROMInjectorIntegration:
         for original, slack, max_usage, expected_limit in test_cases:
             effective_limit = original + min(slack, max_usage)
             assert effective_limit == expected_limit, (
-                f"Failed for original={original}, slack={slack}: "
-                f"expected {expected_limit}, got {effective_limit}"
+                f"Failed for original={original}, slack={slack}: expected {expected_limit}, got {effective_limit}"
             )
 
     def test_copy_rom_creates_independent_file(self, tmp_path) -> None:
@@ -617,12 +616,12 @@ class TestROMInjectorIntegration:
 
         # Modify output
         output_data = bytearray(output_path.read_bytes())
-        output_data[0x1000 : 0x1010] = bytes([0xFF] * 16)
+        output_data[0x1000:0x1010] = bytes([0xFF] * 16)
         output_path.write_bytes(bytes(output_data))
 
         # Verify source is unchanged
-        assert source_path.read_bytes()[0x1000 : 0x1010] == bytes([0x00] * 16)
-        assert output_path.read_bytes()[0x1000 : 0x1010] == bytes([0xFF] * 16)
+        assert source_path.read_bytes()[0x1000:0x1010] == bytes([0x00] * 16)
+        assert output_path.read_bytes()[0x1000:0x1010] == bytes([0xFF] * 16)
 
     def test_zero_padding_slack_detection(self, tmp_path) -> None:
         """Verify 0x00 padding is correctly detected as slack space.

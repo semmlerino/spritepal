@@ -273,6 +273,9 @@ class WorkbenchCanvas(QWidget):
         self._pending_highlight_index: int | None = None
         self._pixel_highlight_item: QGraphicsPixmapItem | None = None
 
+        # Browsing mode indicator (when viewing different capture than mapping)
+        self._browsing_mode = False
+
         self._setup_ui()
         self._connect_signals()
 
@@ -339,6 +342,14 @@ class WorkbenchCanvas(QWidget):
         )
         self._stale_entries_warning_label.setVisible(False)
         layout.addWidget(self._stale_entries_warning_label)
+
+        # Browsing mode banner (viewing different capture than what's in the mapping)
+        self._browsing_banner = QLabel("👁 Browsing: Alignment edits disabled (viewing different capture than mapping)")
+        self._browsing_banner.setStyleSheet(
+            "background-color: #CCE5FF; color: #004085; padding: 6px 8px; border-radius: 4px; font-size: 11px;"
+        )
+        self._browsing_banner.setVisible(False)
+        layout.addWidget(self._browsing_banner)
 
         # Graphics scene and view
         self._scene = QGraphicsScene(self)
@@ -773,8 +784,39 @@ class WorkbenchCanvas(QWidget):
         self._ai_frame_item.set_pixmap(None)
         self._tile_overlay_item.set_tile_rects([])
 
+        # Disable browsing mode on clear
+        self.set_browsing_mode(False)
+
         self.clear_alignment()
         self._update_status()
+
+    def set_browsing_mode(self, enabled: bool, message: str | None = None) -> None:
+        """Set the browsing mode indicator.
+
+        When enabled, shows a banner indicating that alignment edits are disabled
+        because the canvas is displaying a different capture than what's in the mapping.
+
+        Args:
+            enabled: True to show browsing mode, False to hide
+            message: Optional custom message for the banner
+        """
+        self._browsing_mode = enabled
+        if enabled:
+            if message:
+                self._browsing_banner.setText(f"👁 Browsing: {message}")
+            else:
+                self._browsing_banner.setText(
+                    "👁 Browsing: Alignment edits disabled (viewing different capture than mapping)"
+                )
+        self._browsing_banner.setVisible(enabled)
+
+    def is_browsing_mode(self) -> bool:
+        """Check if browsing mode is active.
+
+        Returns:
+            True if canvas is showing a different capture than the mapping.
+        """
+        return self._browsing_mode
 
     def get_alignment(self) -> tuple[int, int, bool, bool, float]:
         """Get current alignment values.
@@ -1457,7 +1499,7 @@ class WorkbenchCanvas(QWidget):
         try:
             pixel_raw = self._ai_image.getpixel((img_x, img_y))
             # Cast to tuple for type safety (PIL returns various types)
-            if isinstance(pixel_raw, (int, float)):
+            if isinstance(pixel_raw, int | float):
                 return None  # Grayscale single value - not supported
             if not isinstance(pixel_raw, tuple):
                 return None
@@ -1635,7 +1677,7 @@ class WorkbenchCanvas(QWidget):
             for y in range(height):
                 for x in range(width):
                     pixel_raw = ai_pixels[x, y]
-                    if isinstance(pixel_raw, (int, float)):
+                    if isinstance(pixel_raw, int | float):
                         continue  # Grayscale, skip
 
                     # At this point pixel_raw is a tuple - check length
