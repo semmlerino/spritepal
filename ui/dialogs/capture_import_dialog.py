@@ -342,3 +342,110 @@ class CaptureImportDialog(DialogBase):
         self._filter_garbage_tiles = self._garbage_checkbox.isChecked()
 
         super().accept()
+
+    # ============= Public Facades for Testing =============
+
+    def get_cluster_count(self) -> int:
+        """Get the number of sprite clusters available for selection.
+
+        Returns:
+            Number of clusters in the list.
+        """
+        if self._cluster_list is None:
+            return 0
+        return self._cluster_list.count()
+
+    def get_selected_cluster_indices(self) -> list[int]:
+        """Get indices of currently selected clusters.
+
+        Returns:
+            List of selected cluster indices.
+        """
+        if self._cluster_list is None:
+            return []
+        return [i for i in range(self._cluster_list.count()) if self._cluster_list.item(i).isSelected()]
+
+    def is_cluster_selected(self, index: int) -> bool:
+        """Check if a cluster at given index is selected.
+
+        Args:
+            index: Cluster index.
+
+        Returns:
+            True if selected, False otherwise.
+        """
+        if self._cluster_list is None or index < 0 or index >= self._cluster_list.count():
+            return False
+        item = self._cluster_list.item(index)
+        return item.isSelected() if item else False
+
+    def get_cluster_text(self, index: int) -> str:
+        """Get the display text for a cluster at given index.
+
+        Args:
+            index: Cluster index.
+
+        Returns:
+            Cluster display text or empty string if invalid.
+        """
+        if self._cluster_list is None or index < 0 or index >= self._cluster_list.count():
+            return ""
+        item = self._cluster_list.item(index)
+        return item.text() if item else ""
+
+    def is_filter_garbage_enabled(self) -> bool:
+        """Check if the garbage filter checkbox is currently enabled.
+
+        Returns:
+            True if garbage filter is checked.
+        """
+        return self._garbage_checkbox.isChecked()
+
+    def set_filter_garbage_enabled(self, enabled: bool) -> None:
+        """Set the garbage filter checkbox state.
+
+        Args:
+            enabled: Whether to enable garbage filtering.
+        """
+        self._garbage_checkbox.setChecked(enabled)
+
+    def select_all_clusters(self) -> None:
+        """Select all clusters in the list."""
+        self._select_all_clusters()
+
+    def deselect_all_clusters(self) -> None:
+        """Deselect all clusters in the list."""
+        self._select_no_clusters()
+
+    def get_preview_text(self) -> str:
+        """Get the current preview label text.
+
+        Returns:
+            Preview text or empty string if pixmap is displayed.
+        """
+        if self._preview_label is None:
+            return ""
+        return self._preview_label.text()
+
+    def has_preview_pixmap(self) -> bool:
+        """Check if the preview is showing a pixmap (vs text).
+
+        Returns:
+            True if a pixmap is displayed.
+        """
+        if self._preview_label is None:
+            return False
+        pm = self._preview_label.pixmap()
+        return not pm.isNull()
+
+    def get_capture_frame(self) -> int:
+        """Get the frame number from the capture.
+
+        Returns:
+            Frame number.
+        """
+        return self._capture.frame
+
+    def refresh_preview(self) -> None:
+        """Trigger a preview update."""
+        self._update_preview()

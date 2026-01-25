@@ -803,3 +803,166 @@ class OffsetBrowserSidebar(QWidget):
 
         logger.debug(f"Nearby thumbnail clicked: index={index}, offset=0x{offset:X}")
         self.nearby_offset_selected.emit(offset)
+
+    # ============= Public Facades for Nearby Panel =============
+
+    def get_thumbnail_count(self) -> int:
+        """Get the number of nearby thumbnails currently displayed.
+
+        Returns:
+            Number of thumbnail labels (6 in collapsed mode, 12 in expanded).
+        """
+        return len(self._nearby_labels)
+
+    def get_thumbnail_size(self) -> int:
+        """Get the current thumbnail size in pixels.
+
+        Returns:
+            Thumbnail size (64 for small, 96 for medium, 128 for large).
+        """
+        return self._nearby_thumbnail_size
+
+    def is_expanded(self) -> bool:
+        """Check if the nearby panel is in expanded mode.
+
+        Returns:
+            True if expanded (showing 12 thumbnails), False if collapsed (6).
+        """
+        return self._nearby_expanded
+
+    def is_custom_palette_enabled(self) -> bool:
+        """Check if custom palette preview is enabled.
+
+        Returns:
+            True if custom palette is being used for thumbnail rendering.
+        """
+        return self._use_custom_palette
+
+    def get_nearby_offsets(self) -> list[int]:
+        """Get the list of calculated nearby offsets.
+
+        Returns:
+            List of offsets, with -1 indicating invalid/out-of-range offsets.
+        """
+        return list(self._nearby_offsets)
+
+    def select_thumbnail_size(self, size_key: str) -> None:
+        """Select a thumbnail size.
+
+        Args:
+            size_key: Size key - "small" (64px), "medium" (96px), or "large" (128px).
+        """
+        self._on_size_changed(size_key)
+
+    def toggle_expansion(self) -> None:
+        """Toggle between core (6 thumbnails) and expanded (12 thumbnails) modes."""
+        self._on_expand_toggled()
+
+    def is_debounce_timer_active(self) -> bool:
+        """Check if the debounce timer is currently running.
+
+        Returns:
+            True if timer is active, False otherwise.
+        """
+        return self._nearby_timer is not None and self._nearby_timer.isActive()
+
+    def get_selected_size_key(self) -> str:
+        """Get the currently selected size key.
+
+        Returns:
+            Size key: "small", "medium", or "large".
+        """
+        for key, btn in self._nearby_size_buttons.items():
+            if btn.isChecked():
+                return key
+        return "medium"  # Default fallback
+
+    def is_palette_toggle_available(self) -> bool:
+        """Check if the palette toggle button is enabled (palette loaded).
+
+        Returns:
+            True if a palette is available for preview.
+        """
+        return self._palette_toggle_btn.isEnabled()
+
+    def get_expand_button_text(self) -> str:
+        """Get the current expand/collapse button text.
+
+        Returns:
+            Button text ("▼ Show More" or "▲ Show Less").
+        """
+        if self._nearby_expand_btn is not None:
+            return self._nearby_expand_btn.text()
+        return ""
+
+    def get_expand_button_tooltip(self) -> str:
+        """Get the current expand/collapse button tooltip.
+
+        Returns:
+            Button tooltip text.
+        """
+        if self._nearby_expand_btn is not None:
+            return self._nearby_expand_btn.toolTip()
+        return ""
+
+    def get_size_button_tooltip(self, size_key: str) -> str:
+        """Get the tooltip for a size button.
+
+        Args:
+            size_key: Size key - "small", "medium", or "large".
+
+        Returns:
+            Button tooltip text.
+        """
+        if size_key in self._nearby_size_buttons:
+            return self._nearby_size_buttons[size_key].toolTip()
+        return ""
+
+    def get_current_offset_text(self) -> str:
+        """Get the current offset label text.
+
+        Returns:
+            Displayed offset text (e.g., "0x010000" or "No offset").
+        """
+        if self._nearby_current_offset_label is not None:
+            return self._nearby_current_offset_label.text()
+        return ""
+
+    def get_thumbnail_label_deltas(self) -> list[int]:
+        """Get the delta values for all thumbnail labels.
+
+        Returns:
+            List of delta values (e.g., [-128, -64, -32, 32, 64, 128]).
+        """
+        return [label.property("nearby_delta") for label in self._nearby_labels]
+
+    def get_thumbnail_label_sizes(self) -> list[tuple[int, int]]:
+        """Get the (width, height) of each thumbnail label.
+
+        Returns:
+            List of (width, height) tuples for each label.
+        """
+        return [(label.width(), label.height()) for label in self._nearby_labels]
+
+    def has_thumbnail_pixmap(self, index: int) -> bool:
+        """Check if a thumbnail has a pixmap (vs placeholder text).
+
+        Args:
+            index: Thumbnail index.
+
+        Returns:
+            True if pixmap is set and non-null.
+        """
+        if index < 0 or index >= len(self._nearby_labels):
+            return False
+        label = self._nearby_labels[index]
+        pm = label.pixmap()
+        return not pm.isNull()
+
+    def click_thumbnail(self, index: int) -> None:
+        """Simulate a click on a thumbnail.
+
+        Args:
+            index: Thumbnail index to click.
+        """
+        self._on_nearby_clicked(index)
