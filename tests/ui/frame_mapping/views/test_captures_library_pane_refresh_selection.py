@@ -110,11 +110,21 @@ class TestRefreshPreservesSelection:
         assert pane.get_selected_id() == "F001"
 
 
-class TestFilterClearsSelectionSignal:
-    """Tests for Bug #1: selection state desync when filter hides selected item."""
+class TestFilterDoesNotClearExternalSelection:
+    """Tests for correct behavior: filter hiding selection should NOT emit deselection.
 
-    def test_filter_hides_selected_item_emits_deselection_signal(self, qtbot: QtBot) -> None:
-        """When unlinked filter hides a linked (selected) frame, signal must emit ''."""
+    The workspace state manager is the source of truth for selection, not the pane.
+    When a filter hides the selected item, the pane should NOT emit "" because
+    that would incorrectly clear the workspace selection state. This matches
+    AIFramesPane behavior (see ai_frames_pane.py:636-638).
+    """
+
+    def test_filter_hides_selected_item_does_not_emit_signal(self, qtbot: QtBot) -> None:
+        """When unlinked filter hides a linked (selected) frame, no signal should emit.
+
+        The workspace state manager maintains the selection even when the pane
+        can't display it. Emitting "" would incorrectly clear external state.
+        """
         pane = CapturesLibraryPane()
         qtbot.addWidget(pane)
 
@@ -136,12 +146,16 @@ class TestFilterClearsSelectionSignal:
         # Enable "show unlinked only" filter - should hide F001
         pane._unlinked_filter.setChecked(True)
 
-        # Selection should be cleared and signal should emit ""
+        # Pane returns None because item is hidden, but NO signal should be emitted
         assert pane.get_selected_id() is None
-        assert signal_emissions == [""], f"Expected [''], got {signal_emissions}"
+        assert signal_emissions == [], f"Expected no signal, got {signal_emissions}"
 
-    def test_search_hides_selected_item_emits_deselection_signal(self, qtbot: QtBot) -> None:
-        """When search filter hides selected frame, signal must emit ''."""
+    def test_search_hides_selected_item_does_not_emit_signal(self, qtbot: QtBot) -> None:
+        """When search filter hides selected frame, no signal should emit.
+
+        The workspace state manager maintains the selection even when the pane
+        can't display it. Emitting "" would incorrectly clear external state.
+        """
         pane = CapturesLibraryPane()
         qtbot.addWidget(pane)
 
@@ -160,9 +174,9 @@ class TestFilterClearsSelectionSignal:
         # Search for "F002" - should hide F001
         pane._search_box.setText("F002")
 
-        # Selection should be cleared and signal should emit ""
+        # Pane returns None because item is hidden, but NO signal should be emitted
         assert pane.get_selected_id() is None
-        assert signal_emissions == [""], f"Expected [''], got {signal_emissions}"
+        assert signal_emissions == [], f"Expected no signal, got {signal_emissions}"
 
     def test_no_signal_when_selection_preserved_after_filter(self, qtbot: QtBot) -> None:
         """No deselection signal when filter doesn't hide the selected item."""

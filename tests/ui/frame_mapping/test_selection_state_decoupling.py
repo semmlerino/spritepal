@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from core.frame_mapping_project import AIFrame, FrameMappingProject
+from core.frame_mapping_project import AIFrame, FrameMappingProject, GameFrame
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
@@ -171,3 +171,51 @@ class TestSelectionGetterBehavior:
             # The method should return state manager value, not pane value
             result = workspace._get_selected_game_id()
             assert result == "game_capture_001"
+
+
+class TestCapturesLibraryPaneFilterBehavior:
+    """Tests for CapturesLibraryPane filter signal behavior matching AIFramesPane."""
+
+    def test_captures_filter_does_not_clear_workspace_selection(self, qtbot: QtBot) -> None:
+        """Filtering should NOT emit empty selection signal (matches AIFramesPane).
+
+        When the "Unlinked Only" filter hides the currently selected game frame,
+        the pane should NOT emit game_frame_selected("") to clear the workspace
+        selection. This matches how AIFramesPane behaves and keeps the state
+        manager as the source of truth.
+        """
+        from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
+
+        pane = CapturesLibraryPane()
+        qtbot.addWidget(pane)
+        pane.show()
+        qtbot.wait(20)
+
+        # Create frames - one linked, one unlinked
+        frame_linked = GameFrame(id="F001", rom_offsets=[0x1000])
+        frame_unlinked = GameFrame(id="F002", rom_offsets=[0x2000])
+        pane.set_game_frames([frame_linked, frame_unlinked])
+
+        # Select the linked frame
+        pane.select_frame("F001")
+        assert pane.get_selected_id() == "F001"
+
+        # Mark first frame as linked (has AI frame index 0)
+        pane.set_link_status({"F001": 0, "F002": None})
+
+        # Track signal emissions
+        emissions: list[str] = []
+        pane.game_frame_selected.connect(lambda fid: emissions.append(fid))
+
+        # Apply "unlinked only" filter - this hides F001 (the selected frame)
+        pane._show_unlinked_only = True
+        pane._refresh_list()
+
+        # Verify: The pane should NOT emit an empty string to clear selection
+        # It should either emit nothing, or emit the ID of the newly visible selection
+        empty_emissions = [e for e in emissions if e == ""]
+        assert len(empty_emissions) == 0, (
+            f"CapturesLibraryPane emitted empty string {len(empty_emissions)} time(s) when "
+            "filter hid selected frame. This incorrectly clears workspace selection state. "
+            "The pane should match AIFramesPane behavior and not clear external state."
+        )

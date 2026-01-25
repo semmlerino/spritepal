@@ -1,6 +1,8 @@
 # SpritePal Development Guidelines
 
-**Last updated: January 24, 2026 — Recent updates: Test directory consolidation (single root), Frame Mapping Workspace (4-zone UI), Workbench Canvas with zoom/pan** | See [Table of Contents](#table-of-contents) below
+**Last updated: January 25, 2026** | See [Table of Contents](#table-of-contents) below
+
+**What is SpritePal?** A PySide6 desktop app for editing SNES sprite graphics. Key workflows: Extract sprites from ROM → Edit in pixel editor → Inject back. Also supports AI-assisted frame mapping for sprite animation replacement.
 
 ---
 
@@ -43,7 +45,11 @@
 **6. Bug Reports → Test First** (⚠️ MANDATORY):
 - **When user reports a bug:** Write a failing test BEFORE fixing it
 - **Workflow:** Reproduce bug → Write failing test → Verify it fails → Fix code → Test passes
-- **Why:** Prevents regressions, documents the bug, proves the fix works
+
+**7. Launch App:**
+```bash
+uv run python launch_spritepal.py
+```
 
 **→ For full details, jump to relevant section below**
 
@@ -52,45 +58,32 @@
 ## Table of Contents
 
 1. [Core Principles](#core-principles) — Philosophy behind the codebase
-2. [Critical Rules](#critical-rules-read-first) — Will cause crashes/failures if violated
-3. [Development Workflow](#development-workflow) — Day-to-day commands and checks
-4. [Testing Guide](#testing-guide) — Running, writing, and debugging tests
-5. [Code Patterns & Architecture](#code-patterns--architecture) — Design patterns and import rules
-6. [Reference](#reference) — Key files, managers, fixtures
-7. [Mesen 2 Integration](#mesen-2-integration) — Sprite capture tool (quick start only)
+2. [Development Workflow](#development-workflow) — Day-to-day commands and checks
+3. [Testing Guide](#testing-guide) — Running, writing, and debugging tests
+4. [Code Patterns & Architecture](#code-patterns--architecture) — Design patterns and import rules
+5. [Reference](#reference) — Key files, managers, fixtures
+6. [Mesen 2 Integration](#mesen-2-integration) — Sprite capture tool (quick start only)
+7. [Known Limitations](#known-limitations) — Documented constraints and workarounds
 8. [Advanced Topics](#advanced-topics) — Detailed debugging, type checking, UI screenshots
 
 ---
 
 ## Core Principles
 
-1. **🚨 Bug reports → failing test FIRST** - When the user reports a bug, you MUST write a failing test that reproduces it BEFORE attempting any fix. This is not optional. The workflow is:
-   1. Understand and reproduce the bug
-   2. Write a test that fails due to the bug
-   3. Run the test and verify it fails for the right reason
-   4. Fix the bug in the implementation
-   5. Run the test and verify it now passes
+1. **🚨 Bug reports → failing test FIRST** - When the user reports a bug, write a failing test that reproduces it BEFORE attempting any fix. Workflow: understand bug → write failing test → verify it fails correctly → fix code → test passes. Skipping this has repeatedly led to "fixes" that don't actually address the bug.
 
-   **Why mandatory:** Skipping this step has repeatedly led to fixes that don't actually address the bug, or fixes that break later because there's no regression test. A failing test proves you understand the bug and proves your fix works.
-
-2. **Fix bugs, not tests** - Bias toward fixing actual defects in the implementation, not making tests pass by dilution. Do not relax, delete, or rewrite tests unless they are demonstrably incorrect or asserting non-contractual implementation details. Any test change must be explicitly justified by a mismatch with intended external behavior. When uncertain: run the test in isolation, trace actual vs expected values, and verify whether the test's expectation matches documented/intended behavior.
+2. **Fix bugs, not tests** - Bias toward fixing defects in implementation, not making tests pass by dilution. Don't relax, delete, or rewrite tests unless demonstrably incorrect. When uncertain: run test in isolation, trace actual vs expected, verify expectation matches intended behavior.
 
 3. **Test logic more than widgets** - Put business logic in plain Python classes so tests stay fast and stable. Keep widget tests focused on wiring, signals, and basic interactions.
 
-4. **Parallel by default** - With 2400+ tests, serial runs take 15+ minutes. Tests run parallel via `-n auto`. Mark tests that need isolation with `@pytest.mark.parallel_unsafe` or use `app_context` fixture (which provides clean state per-test).
+4. **Tests: serial for TDD, parallel for full suite** - Default (`pytest`) runs serial for fast iteration. Full suite (`pytest -n auto --dist=loadscope`) runs parallel. With 2400+ tests, parallel cuts 15+ minutes to ~3 minutes.
 
 5. **Prefer boring determinism** - The fastest dev loop is: small change → run checks → commit.
 
----
-
-## Critical Rules (Read First)
-
-⚠️ **See the table in [TL;DR](#tldr---essential-rules-read-this-first) above.** These cause crashes (💥) or test failures (🔴).
-
-**Additional context:**
-- `QPixmap` crash: Qt GUI objects aren't thread-safe. The error "Fatal Python error: Aborted" with no stack trace is the giveaway.
+**Critical "Don'ts" explained** (from TL;DR table):
+- `QPixmap` crash: Qt GUI objects aren't thread-safe. "Fatal Python error: Aborted" with no stack trace = this.
 - `waitSignal()` race: Without context manager, signal may emit before wait starts. Always `with qtbot.waitSignal(...):`.
-- Mock location: Python patches at import site, not definition site. Trace where the code `from X import Y` to find patch target.
+- Mock location: Python patches at import site, not definition site. Trace where `from X import Y` happens.
 
 ---
 
@@ -112,55 +105,20 @@ uv run pytest                    # Run tests (serial, fast for TDD)
 
 **No silent behavior changes:** If a change affects threading, signals, IO, persistence, or settings → add/adjust tests.
 
-### Definition of Done
+### Definition of Done & Committing
 
-A task is complete **only when**:
-1. All checks pass: `ruff check . && ruff format . && basedpyright && pytest`
-2. Changes are committed: `git add <files> && git commit -m "..."`
-3. `git status` shows clean working directory
+A task is complete **only when** all checks pass AND changes are committed. Uncommitted changes = incomplete task.
 
-**Do not consider work "done" until committed.** Uncommitted changes = incomplete task.
+**Commit workflow:**
+1. Run all checks: `ruff check . && ruff format . && basedpyright core ui utils && pytest`
+2. Review: `git status` / `git diff`
+3. Stage: `git add <specific files>` (avoid `git add .`)
+4. Commit: `/commit` or `git commit -m "fix: description"`
+5. Verify: `git status` shows clean working directory
 
-**Commit triggers:** After each logical task completion when all checks pass. Use conventional commits (`fix:`, `feat:`, `refactor:`, etc.).
+**Conventional commit prefixes:** `fix:`, `feat:`, `refactor:`, `chore:`, `test:`, `docs:`
 
-### Committing After Quality Checks
-
-**Always commit after completing changes.** When all checks pass, create a commit immediately—don't leave work uncommitted.
-
-**After all checks pass:**
-1. `git status` / `git diff` to review changes
-2. `git add <files>` to stage
-3. `/commit` (or `git commit -m "fix: description"`) — use conventional commits: `fix:`, `feat:`, `refactor:`, `chore:`, `test:`, `docs:`
-4. Example: `fix: resolve race condition in palette sync`
-
-**Never commit if:** checks fail, tests are flaky (verify with `-n 0`), or behavior changed without tests.
-
-### Committing Facade & Law of Demeter Refactoring
-
-When committing changes that add facade methods or remove reach-through access patterns:
-
-1. **Verify facade completeness:**
-   - Check that all direct reach-through access in callers is now replaced with facade method calls
-   - Confirm new facade methods follow naming convention: `get_*()` for reads, `set_*()` for writes, `clear_*()` for cleanup
-   - Ensure docstrings document the purpose of each facade method
-
-2. **Verify reach-through patterns eliminated:**
-   ```bash
-   # Search for remaining violations (adjust patterns as needed)
-   grep -rn "\.tool_manager\." ui/sprite_editor/views/
-   grep -rn "\.undo_manager\." ui/sprite_editor/controllers/
-   grep -rn "\.asset_browser\.tree" ui/sprite_editor/
-   ```
-   All results should return nothing if refactoring is complete.
-
-3. **Use conventional commit message:**
-   - For new facades: `refactor: add Law of Demeter facade methods in X`
-   - For reach-through elimination: `refactor: eliminate reach-through access to X.Y`
-   - Example: `refactor: add SpriteAssetBrowser facades to encapsulate tree structure`
-
-4. **Update documentation if needed:**
-   - If public API changed significantly, update the subsystem's CLAUDE.md
-   - If design patterns changed, consider updating docs/architecture.md
+**Never commit if:** checks fail, tests are flaky (verify with `pytest -n 0`), or behavior changed without test coverage.
 
 ### Environment Setup
 
@@ -247,16 +205,16 @@ from tests.infrastructure.real_component_factory import RealComponentFactory
 - **`tmp_path`** - Always for file operations. Never hardcode paths.
 - **`qtbot`** - For Qt signal/widget testing.
 
-### Parallel Execution (Opt-In)
+### Parallel Execution
 
-Tests run serial by default for fast TDD iteration. For full suite runs, use parallel:
+Default `pytest` runs serial (fast TDD iteration). Full suite uses parallel:
 
 ```bash
-pytest -n auto --dist=loadscope   # Parallel execution
+pytest -n auto --dist=loadscope   # Parallel execution (~3 min vs 15+ serial)
 ```
 
-- **Config:** `--dist=loadscope` groups by module; `xdist_group("serial")` co-locates marked tests
-- **Not truly serial:** These only prevent parallel workers from running them, but don't guarantee exclusivity
+- `--dist=loadscope` groups tests by module
+- `@pytest.mark.parallel_unsafe` or `xdist_group("serial")` for tests needing isolation (note: only prevents concurrent execution, doesn't guarantee true isolation)
 
 ### Custom CLI Options (in conftest.py)
 
@@ -464,36 +422,26 @@ spritepal/
 
 ### Extracting Palettes from CGRAM Dumps
 
-When you have a CGRAM dump file (e.g., from Mesen2's Debug → Memory Viewer → CGRAM → Export):
+CGRAM structure: 512 bytes, sprite palettes at $100-$1FF (8 palettes × 16 colors × 2 bytes in BGR555).
 
-1. **CGRAM structure:** 512 bytes total, 256 colors in BGR555 format (2 bytes/color)
-2. **Sprite palettes:** Located at $100-$1FF (upper 256 bytes), 8 palettes of 16 colors each
-3. **Palette offsets:** Palette N starts at offset `0x100 + (N * 32)`
+For extraction details and code, see `docs/mesen2/02_DATA_CONTRACTS.md`.
 
-**Extract to SpritePal JSON format:**
-```python
-import json
+---
 
-with open("CGRAMdump.dmp", "rb") as f:
-    data = f.read()
+## Known Limitations
 
-palette_num = 7  # Sprite palette 0-7
-offset = 0x100 + (palette_num * 32)
-palette_data = data[offset:offset + 32]
+### Palette Index Painting Limitation
 
-colors = []
-for i in range(0, 32, 2):
-    bgr = palette_data[i] | (palette_data[i+1] << 8)
-    r = (bgr & 0x1F) << 3
-    g = ((bgr >> 5) & 0x1F) << 3
-    b = ((bgr >> 10) & 0x1F) << 3
-    colors.append([r, g, b])
+The injection pipeline converts images to RGBA for compositing (`core/services/injection_orchestrator.py:293`).
+Palette indices are lost and re-quantized using RGB color matching. If your palette has duplicate
+colors, pixels of those colors will all map to the same index. Index painting only works when
+all palette colors are unique. The Palette Editor shows a warning banner when duplicates are detected
+(see `ui/frame_mapping/windows/ai_frame_palette_editor.py:137-147`).
 
-with open("output/my_palette.pal.json", "w") as f:
-    json.dump({"name": "My Palette", "colors": colors}, f, indent=2)
-```
+**Workaround:** Ensure all colors in your palette are unique (even slightly different shades work).
 
-**OAM palette mapping:** The sprite's OAM attribute byte bits 1-3 specify palette 0-7, which maps to CGRAM $100+N*32.
+**Future consideration:** If needed, investigate index-preserving pipeline that skips RGBA conversion
+when no transforms are needed (scale=1.0, no flip) or passes a parallel "index map" through compositor.
 
 ---
 

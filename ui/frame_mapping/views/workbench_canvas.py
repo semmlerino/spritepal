@@ -795,6 +795,8 @@ class WorkbenchCanvas(QWidget):
 
         When enabled, shows a banner indicating that alignment edits are disabled
         because the canvas is displaying a different capture than what's in the mapping.
+        Also disables alignment controls to prevent confusing UX where user can
+        interact with controls but edits are silently blocked.
 
         Args:
             enabled: True to show browsing mode, False to hide
@@ -808,6 +810,11 @@ class WorkbenchCanvas(QWidget):
                 self._browsing_banner.setText(
                     "👁 Browsing: Alignment edits disabled (viewing different capture than mapping)"
                 )
+            # Disable alignment controls in browsing mode
+            self._set_controls_enabled(False)
+        else:
+            # Re-enable controls only if we have a mapping
+            self._set_controls_enabled(self._has_mapping)
         self._browsing_banner.setVisible(enabled)
 
     def is_browsing_mode(self) -> bool:

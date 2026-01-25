@@ -380,10 +380,10 @@ class CapturesLibraryPane(QWidget):
         finally:
             self._list.blockSignals(False)
 
-        # Bug #1 fix: If there was a selection and it's now gone (filtered out),
-        # explicitly notify listeners that selection was cleared
-        if current_selection is not None and not selection_restored:
-            self.game_frame_selected.emit("")
+        # NOTE: Do NOT emit empty string when selection is lost due to filtering.
+        # The workspace state manager is the source of truth for selection,
+        # and panes should not clear external state when filters hide items.
+        # This matches AIFramesPane behavior (see ai_frames_pane.py:636-638).
 
     def _show_rename_dialog(self, frame_id: str, current_name: str) -> None:
         """Show dialog to rename a capture.

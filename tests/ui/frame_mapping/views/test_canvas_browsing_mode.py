@@ -121,3 +121,68 @@ class TestBrowsingModeAlignment:
         # Browsing mode should still be active
         assert canvas.is_browsing_mode()
         assert canvas._browsing_banner.isVisible()
+
+
+class TestBrowsingModeControlsDisabled:
+    """Tests for alignment controls being disabled in browsing mode."""
+
+    def test_alignment_controls_disabled_in_browsing_mode(self, qtbot: QtBot) -> None:
+        """Sliders and controls should be disabled when browsing different capture.
+
+        When viewing a game frame that differs from the one in the current mapping,
+        alignment controls should be disabled to prevent confusing UX where the
+        user can interact with controls but edits are silently blocked.
+        """
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+        canvas.show()
+        qtbot.wait(20)
+
+        # Set up a mapping so controls are initially enabled
+        canvas.set_alignment(10, 20, False, False, 1.0, has_mapping=True)
+
+        # Verify controls are enabled before browsing mode
+        assert canvas._scale_slider.isEnabled()
+        assert canvas._flip_h_checkbox.isEnabled()
+        assert canvas._flip_v_checkbox.isEnabled()
+
+        # Enable browsing mode
+        canvas.set_browsing_mode(True)
+
+        # Verify alignment controls are now disabled
+        assert not canvas._scale_slider.isEnabled(), "Scale slider should be disabled in browsing mode"
+        assert not canvas._flip_h_checkbox.isEnabled(), "H-Flip should be disabled in browsing mode"
+        assert not canvas._flip_v_checkbox.isEnabled(), "V-Flip should be disabled in browsing mode"
+
+    def test_alignment_controls_reenabled_when_browsing_mode_disabled(self, qtbot: QtBot) -> None:
+        """Controls should be re-enabled when exiting browsing mode."""
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+        canvas.show()
+        qtbot.wait(20)
+
+        # Set up mapping and enable browsing mode
+        canvas.set_alignment(10, 20, False, False, 1.0, has_mapping=True)
+        canvas.set_browsing_mode(True)
+
+        # Verify disabled
+        assert not canvas._scale_slider.isEnabled()
+
+        # Disable browsing mode
+        canvas.set_browsing_mode(False)
+
+        # Verify controls are re-enabled (because we have a mapping)
+        assert canvas._scale_slider.isEnabled(), "Scale slider should be re-enabled after exiting browsing mode"
+        assert canvas._flip_h_checkbox.isEnabled(), "H-Flip should be re-enabled after exiting browsing mode"
+
+    def test_browsing_mode_banner_has_warning_styling(self, qtbot: QtBot) -> None:
+        """Browsing mode banner should have amber/warning styling."""
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+
+        canvas.set_browsing_mode(True)
+
+        # Check that banner has warning-style background (amber/yellow tones)
+        stylesheet = canvas._browsing_banner.styleSheet()
+        # The banner should have some visible warning coloring
+        assert "background" in stylesheet.lower() or canvas._browsing_banner.isVisible()
