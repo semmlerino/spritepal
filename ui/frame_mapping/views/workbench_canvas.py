@@ -825,6 +825,46 @@ class WorkbenchCanvas(QWidget):
         """
         return self._browsing_mode
 
+    def set_preview_enabled(self, enabled: bool) -> None:
+        """Enable or disable preview mode.
+
+        Args:
+            enabled: True to enable preview, False to disable.
+        """
+        self._preview_checkbox.setChecked(enabled)
+
+    def is_preview_enabled(self) -> bool:
+        """Check if preview mode is enabled.
+
+        Returns:
+            True if preview mode is enabled.
+        """
+        return self._preview_enabled
+
+    def is_preview_visible(self) -> bool:
+        """Check if the preview item is visible.
+
+        Returns:
+            True if the preview item is currently visible.
+        """
+        return self._preview_item.isVisible()
+
+    def is_ai_frame_in_ghost_mode(self) -> bool:
+        """Check if AI frame is in ghost mode.
+
+        Returns:
+            True if AI frame is displaying as ghost (outline only).
+        """
+        return self._ai_frame_item._ghost_mode
+
+    def is_preview_update_pending(self) -> bool:
+        """Check if a preview update is scheduled.
+
+        Returns:
+            True if the preview timer is active (update pending).
+        """
+        return self._preview_timer.isActive()
+
     def get_alignment(self) -> tuple[int, int, bool, bool, float]:
         """Get current alignment values.
 

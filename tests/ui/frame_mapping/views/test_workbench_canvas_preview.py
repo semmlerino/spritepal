@@ -23,36 +23,34 @@ if TYPE_CHECKING:
 class TestPreviewToggle:
     """Tests for the preview toggle checkbox and visibility."""
 
-    def test_preview_checkbox_exists(self, qtbot: QtBot) -> None:
-        """WorkbenchCanvas should have a preview checkbox."""
+    def test_preview_disabled_by_default(self, qtbot: QtBot) -> None:
+        """WorkbenchCanvas should have preview disabled by default."""
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        assert hasattr(canvas, "_preview_checkbox")
-        assert canvas._preview_checkbox is not None
-        assert not canvas._preview_checkbox.isChecked()  # Off by default
+        # Preview is off by default
+        assert not canvas.is_preview_enabled()
 
-    def test_preview_item_exists_and_hidden_by_default(self, qtbot: QtBot) -> None:
-        """WorkbenchCanvas should have a preview item that's hidden by default."""
+    def test_preview_item_hidden_by_default(self, qtbot: QtBot) -> None:
+        """WorkbenchCanvas should have preview item hidden by default."""
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        assert hasattr(canvas, "_preview_item")
-        assert canvas._preview_item is not None
-        assert not canvas._preview_item.isVisible()
+        # Preview item is hidden by default
+        assert not canvas.is_preview_visible()
 
     def test_preview_toggle_updates_enabled_state(self, qtbot: QtBot) -> None:
-        """Toggling preview checkbox should update _preview_enabled state."""
+        """Toggling preview should update enabled state."""
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        assert not canvas._preview_enabled
+        assert not canvas.is_preview_enabled()
 
-        canvas._preview_checkbox.setChecked(True)
-        assert canvas._preview_enabled
+        canvas.set_preview_enabled(True)
+        assert canvas.is_preview_enabled()
 
-        canvas._preview_checkbox.setChecked(False)
-        assert not canvas._preview_enabled
+        canvas.set_preview_enabled(False)
+        assert not canvas.is_preview_enabled()
 
     def test_preview_disabled_hides_item(self, qtbot: QtBot) -> None:
         """Disabling preview should hide the preview item."""
@@ -60,29 +58,26 @@ class TestPreviewToggle:
         qtbot.addWidget(canvas)
 
         # Enable then disable
-        canvas._preview_checkbox.setChecked(True)
-        canvas._preview_checkbox.setChecked(False)
+        canvas.set_preview_enabled(True)
+        canvas.set_preview_enabled(False)
 
-        assert not canvas._preview_item.isVisible()
+        assert not canvas.is_preview_visible()
 
-    def test_preview_enabled_hides_ai_frame(self, qtbot: QtBot) -> None:
-        """Enabling preview should hide the AI frame item."""
+    def test_preview_enabled_puts_ai_frame_in_ghost_mode(self, qtbot: QtBot) -> None:
+        """Enabling preview should put AI frame in ghost mode."""
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        # AI frame should be visible and not in ghost mode by default
-        assert canvas._ai_frame_item.isVisible()
-        assert not canvas._ai_frame_item._ghost_mode
+        # AI frame should not be in ghost mode by default
+        assert not canvas.is_ai_frame_in_ghost_mode()
 
         # Enable preview - AI frame should enter ghost mode (still visible, but outline only)
-        canvas._preview_checkbox.setChecked(True)
-        assert canvas._ai_frame_item.isVisible()
-        assert canvas._ai_frame_item._ghost_mode
+        canvas.set_preview_enabled(True)
+        assert canvas.is_ai_frame_in_ghost_mode()
 
         # Disable preview - AI frame should exit ghost mode
-        canvas._preview_checkbox.setChecked(False)
-        assert canvas._ai_frame_item.isVisible()
-        assert not canvas._ai_frame_item._ghost_mode
+        canvas.set_preview_enabled(False)
+        assert not canvas.is_ai_frame_in_ghost_mode()
 
 
 class TestPreviewGeneration:
@@ -93,40 +88,40 @@ class TestPreviewGeneration:
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        canvas._preview_enabled = True
+        canvas.set_preview_enabled(True)
         canvas._generate_preview()
 
-        assert not canvas._preview_item.isVisible()
+        assert not canvas.is_preview_visible()
 
     def test_generate_preview_with_disabled_hides_item(self, qtbot: QtBot) -> None:
         """Preview generation when disabled should hide preview item."""
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        canvas._preview_enabled = False
+        canvas.set_preview_enabled(False)
         canvas._generate_preview()
 
-        assert not canvas._preview_item.isVisible()
+        assert not canvas.is_preview_visible()
 
     def test_schedule_preview_update_does_nothing_when_disabled(self, qtbot: QtBot) -> None:
         """Scheduling preview update when disabled should not start timer."""
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        canvas._preview_enabled = False
+        # Preview disabled by default, schedule update does nothing
         canvas._schedule_preview_update()
 
-        assert not canvas._preview_timer.isActive()
+        assert not canvas.is_preview_update_pending()
 
     def test_schedule_preview_update_starts_timer_when_enabled(self, qtbot: QtBot) -> None:
         """Scheduling preview update when enabled should start debounce timer."""
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        canvas._preview_enabled = True
+        canvas.set_preview_enabled(True)
         canvas._schedule_preview_update()
 
-        assert canvas._preview_timer.isActive()
+        assert canvas.is_preview_update_pending()
 
 
 class TestPreviewWithMockData:
@@ -137,7 +132,7 @@ class TestPreviewWithMockData:
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        # Create mock AI image
+        # Create mock AI image (test data setup - internal access acceptable)
         ai_img = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
         canvas._ai_image = ai_img
 
@@ -154,7 +149,7 @@ class TestPreviewWithMockData:
         mock_capture.palettes = {}
         canvas._capture_result = mock_capture
 
-        canvas._preview_enabled = True
+        canvas.set_preview_enabled(True)
 
         # Mock the CaptureRenderer to return a simple image
         with patch("core.mesen_integration.capture_renderer.CaptureRenderer") as mock_renderer_cls:
@@ -164,14 +159,14 @@ class TestPreviewWithMockData:
 
             canvas._generate_preview()
 
-        assert canvas._preview_item.isVisible()
+        assert canvas.is_preview_visible()
 
     def test_preview_with_palette_quantizes_colors(self, qtbot: QtBot) -> None:
         """Preview with palette should quantize to SNES colors."""
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        # Create mock AI image with specific color
+        # Create mock AI image with specific color (test data setup)
         ai_img = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
         canvas._ai_image = ai_img
 
@@ -189,7 +184,7 @@ class TestPreviewWithMockData:
         mock_capture.palettes = {0: [(0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)] + [(128, 128, 128)] * 12}
         canvas._capture_result = mock_capture
 
-        canvas._preview_enabled = True
+        canvas.set_preview_enabled(True)
 
         with patch("core.mesen_integration.capture_renderer.CaptureRenderer") as mock_renderer_cls:
             mock_renderer = MagicMock()
@@ -199,7 +194,7 @@ class TestPreviewWithMockData:
             canvas._generate_preview()
 
         # Should still be visible even with palette quantization
-        assert canvas._preview_item.isVisible()
+        assert canvas.is_preview_visible()
 
 
 class TestPreviewUpdatesOnTransformChange:
@@ -210,23 +205,23 @@ class TestPreviewUpdatesOnTransformChange:
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        canvas._preview_enabled = True
+        canvas.set_preview_enabled(True)
 
-        # Change flip
+        # Change flip (using internal checkbox as this is an input trigger)
         canvas._flip_h_checkbox.setChecked(True)
 
         # Timer should be active (debouncing)
-        assert canvas._preview_timer.isActive()
+        assert canvas.is_preview_update_pending()
 
     def test_ai_frame_transform_schedules_preview_update(self, qtbot: QtBot) -> None:
         """AI frame transform change should schedule preview update."""
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        canvas._preview_enabled = True
+        canvas.set_preview_enabled(True)
 
         # Simulate transform change
         canvas._on_ai_frame_transform_changed(10, 10, 1.0)
 
         # Timer should be active
-        assert canvas._preview_timer.isActive()
+        assert canvas.is_preview_update_pending()
