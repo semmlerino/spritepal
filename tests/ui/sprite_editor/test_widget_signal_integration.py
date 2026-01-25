@@ -243,8 +243,8 @@ class TestPaletteSourceIntegration:
         signal_spy = Mock()
         selector.sourceChanged.connect(signal_spy)
 
-        # Change selection
-        selector._combo_box.setCurrentIndex(1)
+        # Change selection using public API
+        selector.set_selected_source("mesen", 2)
         QCoreApplication.processEvents()
 
         # Verify signal chain
@@ -271,10 +271,9 @@ class TestContextualPreviewIntegration:
         preview.update_preview(image)
         QCoreApplication.processEvents()
 
-        # Verify image stored
-        assert preview._current_image is not None
-        assert preview._current_image.width() == 16
-        assert preview._current_image.height() == 16
+        # Verify image stored using public API
+        assert preview.has_preview()
+        assert preview.get_preview_size() == (16, 16)
 
 
 class TestSaveExportPanelIntegration:
@@ -341,7 +340,7 @@ class TestEditorStatusBarIntegration:
         assert "12" in status_bar.cursor_label.text()
         assert "2A" in status_bar.tile_label.text().upper()
         assert "284000" in status_bar.address_label.text().upper()
-        assert status_bar._current_color == (255, 128, 64)
+        assert status_bar.get_current_color() == (255, 128, 64)
 
 
 class TestEditTabPanelAccess:

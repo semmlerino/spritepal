@@ -215,6 +215,20 @@ class ContextualPreview(QWidget):
             "QLabel { border: 1px solid #808080; background-color: #404040; color: #C0C0C0; }"
         )
 
+    def has_preview(self) -> bool:
+        """Check if a preview image is currently loaded."""
+        return self._current_image is not None and not self._current_image.isNull()
+
+    def get_preview_size(self) -> tuple[int, int] | None:
+        """Get the size of the current preview image.
+
+        Returns:
+            Tuple of (width, height) or None if no preview is loaded.
+        """
+        if self._current_image is None or self._current_image.isNull():
+            return None
+        return (self._current_image.width(), self._current_image.height())
+
     @override
     def resizeEvent(self, event: QResizeEvent) -> None:
         """Handle resize events to update the preview."""

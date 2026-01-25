@@ -220,3 +220,11 @@ class EditorStatusBar(QWidget):
         """
         if self.cursor_label is not None:
             self.cursor_label.setText("Cursor: --")
+
+    def get_current_color(self) -> tuple[int, int, int]:
+        """Get the currently displayed color.
+
+        Returns:
+            RGB tuple (r, g, b) with values 0-255.
+        """
+        return self._current_color
