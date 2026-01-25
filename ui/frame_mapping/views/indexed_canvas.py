@@ -425,6 +425,19 @@ class IndexedCanvas(QWidget):
         self._view.mouse_left.connect(self.mouse_left)
         self._view.brush_size_changed.connect(self.brush_size_changed)
 
+        # Auto-hide highlight while painting
+        self._view.pixel_clicked.connect(self._on_pixel_pressed)
+        self._view.drag_ended.connect(self._on_paint_finished)
+
+    def _on_pixel_pressed(self, x: int, y: int, button: int) -> None:
+        """Hide highlight overlay when starting to paint (Left Click)."""
+        if button == 0:  # Left button
+            self._highlight_item.setVisible(False)
+
+    def _on_paint_finished(self) -> None:
+        """Restore highlight overlay when painting ends."""
+        self._highlight_item.setVisible(True)
+
     def set_image(self, indexed_data: np.ndarray, palette: SheetPalette) -> None:
         """Set the indexed image data and palette.
 
