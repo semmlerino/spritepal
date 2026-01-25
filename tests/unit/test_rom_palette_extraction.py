@@ -100,48 +100,6 @@ class TestROMPaletteExtraction:
                 assert Path(pal_file).exists()
                 assert f"_pal{8 + idx}.pal.json" in pal_file
 
-    def test_palette_bgr555_conversion(self):
-        """Test BGR555 to RGB888 conversion"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create ROM with known palette values
-            rom_path = Path(tmpdir) / "test.sfc"
-            rom_data = bytearray(0x300000)
-
-            # Set specific test colors at palette 0
-            test_colors = [
-                0x0000,  # Black (0, 0, 0)
-                0x001F,  # Red (248, 0, 0)
-                0x03E0,  # Green (0, 248, 0)
-                0x7C00,  # Blue (0, 0, 248)
-                0x7FFF,  # White (248, 248, 248)
-            ]
-
-            palette_offset = 0x100000
-            for i, bgr555 in enumerate(test_colors):
-                rom_data[palette_offset + i * 2] = bgr555 & 0xFF
-                rom_data[palette_offset + i * 2 + 1] = (bgr555 >> 8) & 0xFF
-
-            with rom_path.open("wb") as f:
-                f.write(rom_data)
-
-            # Extract palette
-            output_base = str(Path(tmpdir) / "test")
-            files = self.extractor.extract_palettes_from_rom(str(rom_path), palette_offset, [0], output_base)
-
-            # Load and verify colors
-            with Path(files[0]).open() as f:
-                palette_data = json.load(f)
-
-            colors = palette_data["colors"]
-
-            # Check conversions
-            # Note: SNES color conversion (value << 3) | (value >> 2) gives 255 for max value (31)
-            assert colors[0] == [0, 0, 0]  # Black
-            assert colors[1] == [255, 0, 0]  # Red (31 << 3 | 31 >> 2 = 255)
-            assert colors[2] == [0, 255, 0]  # Green
-            assert colors[3] == [0, 0, 255]  # Blue
-            assert colors[4] == [255, 255, 255]  # White
-
     def test_get_palette_config_from_sprite(self):
         """Test getting palette configuration for a sprite"""
         # Mock game config

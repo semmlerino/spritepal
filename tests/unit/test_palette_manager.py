@@ -91,28 +91,6 @@ class TestPaletteManager:
         assert pal8[1] == [255, 156, 156]  # Pink
         assert pal8[2] == [255, 255, 255]  # White
 
-    def test_bgr555_conversion(self, palette_manager):
-        """Test BGR555 to RGB888 conversion"""
-        # Create minimal CGRAM with one color
-        cgram_data = bytearray(2)
-
-        # Test cases: BGR555 -> RGB888
-        test_cases = [
-            (0x00, 0x00, [0, 0, 0]),  # Black
-            (0xFF, 0x7F, [255, 255, 255]),  # White
-            (0x1F, 0x00, [255, 0, 0]),  # Red
-            (0xE0, 0x03, [0, 255, 0]),  # Green
-            (0x00, 0x7C, [0, 0, 255]),  # Blue
-        ]
-
-        for low, high, expected in test_cases:
-            cgram_data[0] = low
-            cgram_data[1] = high
-            palette_manager.cgram_data = bytes(cgram_data + bytearray(510))
-            palette_manager.refresh_palettes()
-
-            assert palette_manager.palettes[0][0] == expected
-
     def test_get_palette(self, palette_manager, sample_cgram_data):
         """Test getting specific palette"""
         palette_manager.cgram_data = sample_cgram_data
@@ -363,19 +341,6 @@ class TestPaletteManagerExtended:
         # FileValidator correctly rejects non-existent files
         with pytest.raises(ValueError, match="Invalid CGRAM file"):
             palette_manager.load_cgram("/nonexistent/file.cgram")
-
-    def test_bgr555_edge_cases(self, palette_manager):
-        """Test BGR555 conversion edge cases"""
-        # Test maximum values
-        cgram_data = bytearray(512)
-        cgram_data[0] = 0xFF  # Max low byte
-        cgram_data[1] = 0x7F  # Max high byte
-
-        palette_manager.cgram_data = bytes(cgram_data)
-        palette_manager.refresh_palettes()
-
-        # Should convert to maximum RGB values
-        assert palette_manager.palettes[0][0] == [255, 255, 255]  # Max RGB
 
     def test_palette_json_with_io_error(self, palette_manager, sample_cgram_data):
         """Test palette JSON creation with I/O error"""

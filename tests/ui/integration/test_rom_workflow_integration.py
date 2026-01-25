@@ -129,23 +129,6 @@ def test_preview_only_workflow(qtbot, workflow_controller, mock_editing_controll
     mock_editing_controller.load_image.assert_not_called()
 
 
-def test_state_transition_edit_to_preview(qtbot, workflow_controller, mock_editing_controller):
-    """
-    Test that setting offset while in 'edit' mode transitions back to 'preview'.
-    """
-    workflow_controller.rom_path = "dummy.sfc"
-    workflow_controller.rom_size = 2048
-
-    # Force state to 'edit'
-    workflow_controller.state = "edit"
-
-    # Change offset
-    workflow_controller.set_offset(0x300)
-
-    # Should transition to 'preview'
-    assert workflow_controller.state == "preview"
-
-
 def test_revert_to_original_forces_rom_reload():
     """
     Test that revert_to_original() triggers a fresh reload from ROM

@@ -359,6 +359,54 @@ class TestQuantizeWithMappings:
         assert pixels[3] == 3, "Explicitly mapped red should be index 3"
 
 
+class TestBgr555RoundtripConversion:
+    """Tests for BGR555 roundtrip conversion (RGB -> BGR555 -> RGB)."""
+
+    def test_roundtrip_conversion(self) -> None:
+        """Test that extraction and injection are approximately inverse operations.
+
+        Note: Due to 8-bit to 5-bit quantization, exact roundtrip is not possible.
+        The tolerance is +-7 (since 255/31 ≈ 8.2, values can vary by up to 7).
+        """
+        from core.rom_palette_injector import ROMPaletteInjector
+
+        # Create test colors
+        test_colors = [
+            (0, 0, 0),
+            (255, 255, 255),
+            (128, 128, 128),
+            (200, 100, 50),
+        ]
+
+        for r, g, b in test_colors:
+            # Convert to BGR555
+            bgr555 = ROMPaletteInjector.rgb888_to_bgr555(r, g, b)
+
+            # Extract back using bgr555_to_rgb
+            r8, g8, b8 = bgr555_to_rgb(bgr555)
+
+            # Check within tolerance (quantization can cause +-7 difference)
+            assert abs(r - r8) <= 7, f"Red mismatch: {r} -> {r8}"
+            assert abs(g - g8) <= 7, f"Green mismatch: {g} -> {g8}"
+            assert abs(b - b8) <= 7, f"Blue mismatch: {b} -> {b8}"
+
+    def test_clamping_overflow(self) -> None:
+        """Test that values > 255 are clamped in RGB to BGR555 conversion."""
+        from core.rom_palette_injector import ROMPaletteInjector
+
+        result = ROMPaletteInjector.rgb888_to_bgr555(300, 400, 500)
+        # All should be clamped to 255, which gives r5=31, g5=31, b5=31
+        assert result == 0x7FFF
+
+    def test_clamping_underflow(self) -> None:
+        """Test that values < 0 are clamped in RGB to BGR555 conversion."""
+        from core.rom_palette_injector import ROMPaletteInjector
+
+        result = ROMPaletteInjector.rgb888_to_bgr555(-10, -20, -30)
+        # All should be clamped to 0
+        assert result == 0x0000
+
+
 class TestSnapToSnesColor:
     """Tests for snap_to_snes_color function."""
 
