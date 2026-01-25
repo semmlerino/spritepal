@@ -5,6 +5,11 @@ selected_entry_ids when returning capture results. Also verifies that
 inject_mapping uses the same filtering and applies scale transforms.
 
 Also tests headless controller usage (without Qt parent or workspace).
+
+Includes merged tests from:
+- test_frame_mapping_entry_fallback.py (TestEntryFallbackFlag)
+- test_frame_mapping_raw_slot.py (TestRawSlotDetection, TestRawInjectionSlotRespect)
+- test_frame_mapping_injection_rollback.py (TestInjectionRollback)
 """
 
 from __future__ import annotations
@@ -18,57 +23,10 @@ from PIL import Image
 
 from core.frame_mapping_project import AIFrame, FrameMapping, FrameMappingProject, GameFrame
 from core.services.rom_verification_service import ROMVerificationResult
+from tests.fixtures.frame_mapping_helpers import create_test_capture
 from ui.frame_mapping.controllers.frame_mapping_controller import (
     FrameMappingController,
 )
-
-
-def create_test_capture(
-    entry_ids: list[int],
-    rom_offsets: list[int] | None = None,
-) -> dict:
-    """Create a minimal capture with entries having the given IDs.
-
-    Args:
-        entry_ids: List of entry IDs to create
-        rom_offsets: Optional list of ROM offsets per entry. If not provided,
-                     each entry gets a unique offset based on its index.
-    """
-    entries = []
-    if rom_offsets is None:
-        rom_offsets = [0x100000 + i * 0x100 for i in range(len(entry_ids))]
-
-    for i, entry_id in enumerate(entry_ids):
-        rom_offset = rom_offsets[i] if i < len(rom_offsets) else 0x100000 + i * 0x100
-        entries.append(
-            {
-                "id": entry_id,
-                "x": 50 + i * 10,  # Small offset to stay within [-256, 255]
-                "y": 100,
-                "tile": i,
-                "width": 8,  # Use 8x8 sprites to match single tile
-                "height": 8,
-                "palette": 7,
-                "rom_offset": rom_offset,
-                "tiles": [
-                    {
-                        "tile_index": 0,
-                        "vram_addr": 0x1000 + i * 0x20,
-                        "pos_x": 0,
-                        "pos_y": 0,
-                        "data_hex": "00" * 32,
-                        "rom_offset": rom_offset,
-                        "tile_index_in_block": 0,
-                    }
-                ],
-            }
-        )
-    return {
-        "frame": 1,
-        "obsel": {},
-        "entries": entries,
-        "palettes": {7: [[0, 0, 0]] * 16},
-    }
 
 
 class TestGetCaptureResultFiltering:
@@ -2440,3 +2398,716 @@ class TestHeadlessControllerUsage:
         desc = controller.redo()
         assert desc is not None
         assert len(project.mappings) == 1
+
+
+# =============================================================================
+# Merged tests from test_frame_mapping_entry_fallback.py
+# =============================================================================
+
+
+class TestEntryFallbackFlag:
+    """Tests for entry ID fallback flag in get_capture_result_for_game_frame."""
+
+    def test_returns_false_when_entry_ids_match(self, tmp_path: Path, qtbot) -> None:
+        """Returns used_fallback=False when stored entry IDs exist in capture.
+
+        Scenario: Game frame has selected_entry_ids [1, 2] and capture has entries 1, 2.
+        Expected: used_fallback is False (no fallback needed).
+        """
+        # Create capture with entries 1 and 2
+        capture_data = create_test_capture(entry_ids=[1, 2])
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create project with game frame storing those entry IDs
+        project = FrameMappingProject(name="test")
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[0x100000, 0x100100],
+                selected_entry_ids=[1, 2],
+            )
+        )
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        result, used_fallback = controller.get_capture_result_for_game_frame("F001")
+
+        assert result is not None
+        assert used_fallback is False, "Should not use fallback when entry IDs match"
+        assert len(result.entries) == 2
+
+    def test_returns_true_when_entry_ids_stale(self, tmp_path: Path, qtbot) -> None:
+        """Returns used_fallback=True when stored entry IDs don't exist in capture.
+
+        Scenario: Game frame has selected_entry_ids [1, 2] but capture has entries 10, 20.
+        Expected: used_fallback is True and falls back to rom_offset filtering.
+        """
+        # Create capture with DIFFERENT entry IDs (10, 20)
+        rom_offsets = [0x100000, 0x100100]
+        capture_data = create_test_capture(entry_ids=[10, 20], rom_offsets=rom_offsets)
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create project with game frame storing OLD entry IDs (1, 2)
+        project = FrameMappingProject(name="test")
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=rom_offsets,  # Same ROM offsets
+                selected_entry_ids=[1, 2],  # Stale entry IDs
+            )
+        )
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        result, used_fallback = controller.get_capture_result_for_game_frame("F001")
+
+        assert result is not None
+        assert used_fallback is True, "Should use fallback when entry IDs are stale"
+        # Should still get entries via rom_offset fallback
+        assert len(result.entries) == 2
+
+    def test_emits_stale_warning_signal_on_fallback(self, tmp_path: Path, qtbot) -> None:
+        """Emits stale_entries_warning signal when fallback is used.
+
+        Scenario: Entry IDs are stale, triggering fallback.
+        Expected: stale_entries_warning signal is emitted with frame_id.
+        """
+        # Create capture with different entry IDs than stored
+        rom_offsets = [0x100000]
+        capture_data = create_test_capture(entry_ids=[99], rom_offsets=rom_offsets)
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        project = FrameMappingProject(name="test")
+        project.game_frames.append(
+            GameFrame(
+                id="F002",
+                capture_path=capture_path,
+                rom_offsets=rom_offsets,
+                selected_entry_ids=[1],  # Stale
+            )
+        )
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Track signal emission
+        signal_received: list[str] = []
+        controller.stale_entries_warning.connect(lambda fid: signal_received.append(fid))
+
+        controller.get_capture_result_for_game_frame("F002")
+
+        assert len(signal_received) == 1
+        assert signal_received[0] == "F002"
+
+    def test_returns_false_when_no_selected_entry_ids(self, tmp_path: Path, qtbot) -> None:
+        """Returns used_fallback=False when game frame has no stored selection.
+
+        Scenario: Game frame has empty selected_entry_ids (no filtering applied).
+        Expected: used_fallback is False, all entries returned.
+        """
+        capture_data = create_test_capture(entry_ids=[1, 2, 3])
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        project = FrameMappingProject(name="test")
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[0x100000],
+                selected_entry_ids=[],  # No selection stored
+            )
+        )
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        result, used_fallback = controller.get_capture_result_for_game_frame("F001")
+
+        assert result is not None
+        assert used_fallback is False
+        # All entries should be returned when no selection filter
+        assert len(result.entries) == 3
+
+    def test_returns_none_for_missing_game_frame(self, qtbot) -> None:
+        """Returns (None, False) for non-existent game frame ID."""
+        project = FrameMappingProject(name="test")
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        result, used_fallback = controller.get_capture_result_for_game_frame("NONEXISTENT")
+
+        assert result is None
+        assert used_fallback is False
+
+    def test_returns_none_when_no_project(self, qtbot) -> None:
+        """Returns (None, False) when no project is loaded."""
+        controller = FrameMappingController()
+        # No project set
+
+        result, used_fallback = controller.get_capture_result_for_game_frame("F001")
+
+        assert result is None
+        assert used_fallback is False
+
+
+# =============================================================================
+# Merged tests from test_frame_mapping_raw_slot.py
+# =============================================================================
+
+
+class TestRawSlotDetection:
+    """Tests for RAW slot size detection."""
+
+    def test_raw_slot_detection_finds_padding_boundary(self, qtbot) -> None:
+        """Detects slot size by finding all-zero padding after tiles."""
+        controller = FrameMappingController()
+
+        # Create ROM data: 3 tiles of real data, then zero padding
+        tile_data = b"\x12\x34" * 16  # Non-zero tile (32 bytes)
+        padding = b"\x00" * 32  # Zero padding (32 bytes)
+        rom_data = tile_data * 3 + padding + b"\xff" * 1000
+
+        # Offset 0, no SMC header
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_data, 0)
+
+        assert detected == 3, f"Expected 3 tiles, got {detected}"
+
+    def test_raw_slot_detection_finds_ff_padding(self, qtbot) -> None:
+        """Detects slot size by finding all-0xFF padding after tiles."""
+        controller = FrameMappingController()
+
+        # Create ROM data: 5 tiles of real data, then 0xFF padding
+        tile_data = b"\xab\xcd" * 16  # Non-zero, non-FF tile (32 bytes)
+        padding = b"\xff" * 32  # 0xFF padding (32 bytes)
+        rom_data = tile_data * 5 + padding
+
+        # Offset 0, no SMC header
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_data, 0)
+
+        assert detected == 5, f"Expected 5 tiles, got {detected}"
+
+    def test_raw_slot_detection_accounts_for_smc_header(self, qtbot) -> None:
+        """Accounts for 512-byte SMC header when present."""
+        controller = FrameMappingController()
+
+        # Create ROM with SMC header: total size must be N * 0x8000 + 512
+        # SMC header detection: len(rom_data) % 0x8000 == 512
+        smc_header = b"\x00" * 512
+        tile_data = b"\x12\x34" * 16  # Non-zero tile (32 bytes)
+        padding = b"\x00" * 32
+
+        # Make data portion so total = 32768 + 512 = 33280 (= 0x8200)
+        # data_portion needs to be 32768 bytes
+        data_portion = tile_data * 4 + padding + b"\xff" * (32768 - 4 * 32 - 32)
+        rom_data = smc_header + data_portion
+
+        assert len(rom_data) == 33280, f"ROM should be 33280 bytes, got {len(rom_data)}"
+        assert len(rom_data) % 0x8000 == 512, "ROM should have SMC header"
+
+        # Offset 0 (file offset, not accounting for header yet)
+        # The method should add 512 for the SMC header and find tiles at actual offset 512
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_data, 0)
+
+        assert detected == 4, f"Expected 4 tiles, got {detected}"
+
+    def test_raw_slot_detection_returns_none_when_no_boundary(self, qtbot) -> None:
+        """Returns None when no padding boundary is found within max_tiles."""
+        controller = FrameMappingController()
+
+        # Create ROM data: all non-zero, non-FF data
+        tile_data = b"\x12\x34" * 16  # Non-zero tile (32 bytes)
+        rom_data = tile_data * 300  # More than default max_tiles (256)
+
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_data, 0, max_tiles=10)
+
+        assert detected is None, "Should return None when no boundary found"
+
+    def test_raw_slot_detection_returns_none_for_invalid_offset(self, qtbot) -> None:
+        """Returns None for out-of-bounds offset."""
+        controller = FrameMappingController()
+
+        rom_data = b"\x12" * 1000
+
+        # Offset past end of ROM
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_data, 0x100000)
+
+        assert detected is None, "Should return None for invalid offset"
+
+
+class TestRawInjectionSlotRespect:
+    """Tests that RAW injection respects detected slot size."""
+
+    def test_raw_injection_respects_detected_slot_size(self, tmp_path: Path, qtbot) -> None:
+        """RAW injection limits tiles to detected slot size.
+
+        Scenario: Capture has 5 tiles, ROM slot only has room for 3.
+        Expected: Only 3 tiles worth of data extracted from canvas.
+
+        Note: The grid layout may use 2x2=4 slots for 3 tiles, but only
+        3 vram_addrs are processed (the 4th slot is empty/transparent).
+        """
+        # Create capture with 5 entries (5 tiles)
+        rom_offset = 0x100000
+        capture_data = create_test_capture(
+            entry_ids=[1, 2, 3, 4, 5],
+            rom_offsets=[rom_offset] * 5,
+        )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create AI frame image (larger than slot)
+        ai_frame_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (40, 8), (255, 0, 0, 255))  # 5 tiles wide
+        ai_img.save(ai_frame_path)
+
+        # Create ROM with 3-tile slot (then padding)
+        tile_data = b"\x12\x34" * 16  # 32 bytes per tile
+        padding = b"\x00" * 32
+        # Ensure no SMC header for simplicity
+        rom_content = b"\xff" * rom_offset + tile_data * 3 + padding + b"\xff" * 0x100000
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(rom_content)
+
+        # Create project
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[rom_offset],
+                selected_entry_ids=[1, 2, 3, 4, 5],
+                compression_types={rom_offset: "raw"},  # Force RAW
+            )
+        )
+        project.mappings.append(
+            FrameMapping(
+                ai_frame_id="ai_frame.png",
+                game_frame_id="F001",
+                offset_x=0,
+                offset_y=0,
+            )
+        )
+        project._rebuild_indices()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Verify slot detection works correctly
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_content, rom_offset)
+        assert detected == 3, f"Slot detection should find 3 tiles, got {detected}"
+
+        def mock_inject(
+            sprite_path,
+            rom_path,
+            output_path,
+            sprite_offset,
+            **kwargs,
+        ):
+            Path(output_path).write_bytes(Path(rom_path).read_bytes())
+            return (True, "Success")
+
+        # Mock verification to pass
+        mock_verification = ROMVerificationResult(
+            total=5,
+            matched_hal=0,
+            matched_raw=5,
+            not_found=0,
+            corrections={},
+        )
+
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.side_effect = mock_inject
+        controller._injection_orchestrator._rom_injector = mock_injector
+
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+
+        with patch(
+            "core.services.injection_orchestrator.ROMVerificationService",
+            return_value=mock_verifier,
+        ):
+            result = controller.inject_mapping("ai_frame.png", rom_path)
+
+        # Injection should succeed
+        assert result is True
+
+    def test_raw_fallback_when_no_boundary_detected(self, tmp_path: Path, qtbot) -> None:
+        """RAW injection uses captured count when no boundary detected.
+
+        Scenario: ROM has no padding boundary (continuous data).
+        Expected: All captured tiles are injected (fallback behavior).
+        """
+        # Create capture with 3 tiles
+        rom_offset = 0x100000
+        capture_data = create_test_capture(
+            entry_ids=[1, 2, 3],
+            rom_offsets=[rom_offset] * 3,
+        )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create AI frame image
+        ai_frame_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (24, 8), (255, 0, 0, 255))  # 3 tiles wide
+        ai_img.save(ai_frame_path)
+
+        # Create ROM with NO padding (continuous non-zero data)
+        tile_data = b"\x12\x34" * 16  # 32 bytes per tile
+        # No padding - continuous data
+        rom_content = b"\x12\x34" * (rom_offset // 2) + tile_data * 1000
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(rom_content)
+
+        # Create project
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[rom_offset],
+                selected_entry_ids=[1, 2, 3],
+                compression_types={rom_offset: "raw"},
+            )
+        )
+        project.mappings.append(
+            FrameMapping(
+                ai_frame_id="ai_frame.png",
+                game_frame_id="F001",
+                offset_x=0,
+                offset_y=0,
+            )
+        )
+        project._rebuild_indices()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Verify no boundary is detected
+        detected = controller._injection_orchestrator._staging_manager.detect_raw_slot_size(rom_content, rom_offset)
+        assert detected is None, "Should not detect boundary in continuous data"
+
+        def mock_inject(
+            sprite_path,
+            rom_path,
+            output_path,
+            sprite_offset,
+            **kwargs,
+        ):
+            Path(output_path).write_bytes(Path(rom_path).read_bytes())
+            return (True, "Success")
+
+        mock_verification = ROMVerificationResult(
+            total=3,
+            matched_hal=0,
+            matched_raw=3,
+            not_found=0,
+            corrections={},
+        )
+
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.side_effect = mock_inject
+        controller._injection_orchestrator._rom_injector = mock_injector
+
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+
+        with patch(
+            "core.services.injection_orchestrator.ROMVerificationService",
+            return_value=mock_verifier,
+        ):
+            result = controller.inject_mapping("ai_frame.png", rom_path)
+
+        assert result is True
+
+
+# =============================================================================
+# Merged tests from test_frame_mapping_injection_rollback.py
+# =============================================================================
+
+
+class TestInjectionRollback:
+    """Tests for injection rollback mechanism preventing ROM corruption."""
+
+    def test_partial_injection_failure_preserves_original_rom(self, tmp_path: Path, qtbot) -> None:
+        """When injection fails mid-loop, original ROM is unchanged.
+
+        Scenario: Inject to 3 ROM offsets, second offset fails.
+        Expected: Original ROM bytes unchanged (staging was rolled back).
+        """
+        # Create capture with 3 different ROM offsets
+        rom_offsets = [0x100000, 0x100100, 0x100200]
+        capture_data = create_test_capture(
+            entry_ids=[1, 2, 3],
+            rom_offsets=rom_offsets,
+        )
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create AI frame image
+        ai_frame_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (24, 8), (255, 0, 0, 255))
+        ai_img.save(ai_frame_path)
+
+        # Create ROM with known content
+        original_content = b"\xaa" * 0x200000
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(original_content)
+
+        # Create project
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=rom_offsets,
+                selected_entry_ids=[1, 2, 3],
+            )
+        )
+        project.mappings.append(
+            FrameMapping(
+                ai_frame_id="ai_frame.png",
+                game_frame_id="F001",
+                offset_x=0,
+                offset_y=0,
+            )
+        )
+        project._rebuild_indices()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Track injection calls and fail on second offset
+        injection_call_count = [0]
+
+        def mock_inject(
+            sprite_path,
+            rom_path,
+            output_path,
+            sprite_offset,
+            **kwargs,
+        ):
+            injection_call_count[0] += 1
+            if sprite_offset == 0x100100:  # Fail on second offset
+                return (False, "Simulated failure")
+            return (True, "Success")
+
+        # Mock verification to pass (we're testing injection rollback, not verification)
+        mock_verification = ROMVerificationResult(
+            total=3,
+            matched_hal=0,
+            matched_raw=3,
+            not_found=0,
+            corrections={},
+        )
+
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.side_effect = mock_inject
+        controller._injection_orchestrator._rom_injector = mock_injector
+
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+
+        with patch(
+            "core.services.injection_orchestrator.ROMVerificationService",
+            return_value=mock_verifier,
+        ):
+            result = controller.inject_mapping("ai_frame.png", rom_path)
+
+        # Injection should have failed
+        assert result is False
+
+        # At least one offset was attempted before failure
+        assert injection_call_count[0] >= 1
+
+        # Original ROM should be UNCHANGED (staging was rolled back)
+        final_content = rom_path.read_bytes()
+        assert final_content == original_content, (
+            "Original ROM was modified despite injection failure. Staging rollback did not work correctly."
+        )
+
+    def test_partial_injection_cleans_staging_file(self, tmp_path: Path, qtbot) -> None:
+        """Staging file is deleted after injection failure."""
+        # Create minimal capture
+        capture_data = create_test_capture([1], rom_offsets=[0x100000])
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create AI frame
+        ai_frame_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (8, 8), (255, 0, 0, 255))
+        ai_img.save(ai_frame_path)
+
+        # Create ROM
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(b"\x00" * 0x200000)
+
+        # Create project
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[0x100000],
+                selected_entry_ids=[1],
+            )
+        )
+        project.mappings.append(
+            FrameMapping(
+                ai_frame_id="ai_frame.png",
+                game_frame_id="F001",
+                offset_x=0,
+                offset_y=0,
+            )
+        )
+        project._rebuild_indices()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Mock verification to pass
+        mock_verification = ROMVerificationResult(
+            total=1,
+            matched_hal=0,
+            matched_raw=1,
+            not_found=0,
+            corrections={},
+        )
+
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.return_value = (False, "Simulated failure")
+        controller._injection_orchestrator._rom_injector = mock_injector
+
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+
+        with patch(
+            "core.services.injection_orchestrator.ROMVerificationService",
+            return_value=mock_verifier,
+        ):
+            controller.inject_mapping("ai_frame.png", rom_path)
+
+        # No staging files should remain
+        staging_files = list(tmp_path.glob("*.staging"))
+        assert len(staging_files) == 0, f"Staging file(s) not cleaned up: {staging_files}"
+
+    def test_successful_injection_commits_staging(self, tmp_path: Path, qtbot) -> None:
+        """Successful injection commits staging and updates ROM."""
+        # Create minimal capture
+        capture_data = create_test_capture([1], rom_offsets=[0x100000])
+        capture_path = tmp_path / "capture.json"
+        capture_path.write_text(json.dumps(capture_data))
+
+        # Create AI frame
+        ai_frame_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (8, 8), (255, 0, 0, 255))
+        ai_img.save(ai_frame_path)
+
+        # Create ROM with known content
+        original_content = b"\xaa" * 0x200000
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(original_content)
+
+        # Create project
+        project = FrameMappingProject(name="test")
+        project.ai_frames_dir = tmp_path
+        project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
+        project.game_frames.append(
+            GameFrame(
+                id="F001",
+                capture_path=capture_path,
+                rom_offsets=[0x100000],
+                selected_entry_ids=[1],
+            )
+        )
+        project.mappings.append(
+            FrameMapping(
+                ai_frame_id="ai_frame.png",
+                game_frame_id="F001",
+                offset_x=0,
+                offset_y=0,
+            )
+        )
+        project._rebuild_indices()
+
+        controller = FrameMappingController()
+        controller._project = project
+
+        # Track which files are written to
+        written_paths: list[str] = []
+
+        def mock_inject(
+            sprite_path,
+            rom_path,
+            output_path,
+            sprite_offset,
+            **kwargs,
+        ):
+            # Simulate writing to the output path
+            written_paths.append(output_path)
+            Path(output_path).write_bytes(b"\xbb" * 0x200000)
+            return (True, "Success")
+
+        # Mock verification to pass
+        mock_verification = ROMVerificationResult(
+            total=1,
+            matched_hal=0,
+            matched_raw=1,
+            not_found=0,
+            corrections={},
+        )
+
+        # Create mock injector and set it on the controller's orchestrator
+        mock_injector = MagicMock()
+        mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
+        mock_injector.inject_sprite_to_rom.side_effect = mock_inject
+        controller._injection_orchestrator._rom_injector = mock_injector
+
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+
+        with patch(
+            "core.services.injection_orchestrator.ROMVerificationService",
+            return_value=mock_verifier,
+        ):
+            result = controller.inject_mapping("ai_frame.png", rom_path)
+
+        # Injection should succeed
+        assert result is True
+
+        # Writes should have gone to staging file (not the injection copy directly)
+        assert len(written_paths) >= 1
+        assert any(".staging" in p for p in written_paths), f"Expected writes to staging file, got: {written_paths}"
+
+        # No staging files should remain after commit
+        staging_files = list(tmp_path.glob("*.staging"))
+        assert len(staging_files) == 0, f"Staging file(s) not cleaned up after commit: {staging_files}"
+
+        # The injection output file should exist and contain the modified data
+        injected_files = list(tmp_path.glob("*_injected_*.sfc"))
+        assert len(injected_files) == 1
+        assert injected_files[0].read_bytes() == b"\xbb" * 0x200000

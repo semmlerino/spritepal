@@ -17,46 +17,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.frame_mapping_project import AIFrame, FrameMappingProject, GameFrame
+from tests.fixtures.frame_mapping_helpers import create_test_project
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.views.mapping_panel import MappingPanel
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
-
-
-def create_test_project(tmp_path: Path, num_frames: int = 5) -> FrameMappingProject:
-    """Create a test project with multiple AI frames.
-
-    Args:
-        tmp_path: Temporary directory for test files
-        num_frames: Number of AI frames to create
-
-    Returns:
-        FrameMappingProject with the specified number of frames
-    """
-    ai_frames_dir = tmp_path / "ai_frames"
-    ai_frames_dir.mkdir()
-
-    # Create dummy AI frame image files
-    ai_frames: list[AIFrame] = []
-    for i in range(num_frames):
-        frame_path = ai_frames_dir / f"frame_{i:03d}.png"
-        # Create a minimal PNG file (1x1 transparent pixel)
-        frame_path.write_bytes(
-            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
-            b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
-            b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
-            b"\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
-        )
-        ai_frames.append(AIFrame(path=frame_path, index=i, width=1, height=1))
-
-    return FrameMappingProject(
-        name="test_project",
-        ai_frames_dir=ai_frames_dir,
-        ai_frames=ai_frames,
-        game_frames=[],
-        mappings=[],
-    )
 
 
 class TestDoubleRefreshPrevention:
