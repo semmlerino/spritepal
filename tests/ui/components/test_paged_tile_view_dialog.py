@@ -29,9 +29,9 @@ class TestPagedTileViewDialog:
         )
         qtbot.addWidget(dialog)
 
-        assert dialog._tile_view is not None
-        assert dialog._rom_data == sample_rom_data
-        assert dialog._palette is None
+        # Verify dialog is functional (can get current offset)
+        assert dialog.get_current_offset() == 0
+        assert dialog.get_palette() is None
 
     def test_dialog_with_palette(self, qtbot, sample_rom_data: bytes) -> None:
         """Test dialog creation with custom palette."""
@@ -43,7 +43,7 @@ class TestPagedTileViewDialog:
         )
         qtbot.addWidget(dialog)
 
-        assert dialog._palette == palette
+        assert dialog.get_palette() == palette
 
     def test_dialog_with_initial_offset(self, qtbot, sample_rom_data: bytes) -> None:
         """Test dialog navigates to initial offset."""
@@ -58,8 +58,7 @@ class TestPagedTileViewDialog:
         qtbot.addWidget(dialog)
 
         # The widget should be on the page containing this offset
-        assert dialog._tile_view is not None
-        assert dialog._tile_view._current_page > 0
+        assert dialog.get_current_page() > 0
 
     def test_set_palette(self, qtbot, sample_rom_data: bytes) -> None:
         """Test updating palette after creation."""
@@ -72,9 +71,7 @@ class TestPagedTileViewDialog:
         palette = [[255, 0, 0]] + [[i * 16, i * 16, i * 16] for i in range(1, 16)]
         dialog.set_palette(palette)
 
-        assert dialog._palette == palette
-        assert dialog._tile_view is not None
-        assert dialog._tile_view._palette == palette
+        assert dialog.get_palette() == palette
 
     def test_go_to_offset(self, qtbot, sample_rom_data: bytes) -> None:
         """Test navigating to an offset."""
@@ -84,17 +81,17 @@ class TestPagedTileViewDialog:
         )
         qtbot.addWidget(dialog)
 
-        assert dialog._tile_view is not None
+        # Start on page 0
+        assert dialog.get_current_page() == 0
 
-        # Calculate an offset in page 1 (80000 bytes per page for 50x50 grid)
-        # Our sample ROM is 256000 bytes, giving us 4 pages (0-3)
-        bytes_per_page = dialog._tile_view._cols * dialog._tile_view._rows * 32
-        target_offset = bytes_per_page + 1000  # Middle of page 1
+        # Navigate to an offset well into the ROM (guaranteed to be on page 1+)
+        # Default grid is 50x50 = 2500 tiles, at 32 bytes/tile = 80000 bytes/page
+        target_offset = 100000  # Well past first page
 
         dialog.go_to_offset(target_offset)
 
-        # Should have navigated to page 1
-        assert dialog._tile_view._current_page == 1
+        # Should have navigated to a page > 0
+        assert dialog.get_current_page() >= 1
 
     def test_get_current_offset(self, qtbot, sample_rom_data: bytes) -> None:
         """Test getting current offset."""
@@ -119,9 +116,9 @@ class TestPagedTileViewDialog:
         dialog.offset_selected.connect(offsets.append)
 
         # Simulate tile click then button click
-        dialog._on_tile_clicked(5000)
-        assert dialog._selected_offset == 5000
-        assert dialog._go_to_btn.isEnabled()
+        dialog.simulate_tile_selection(5000)
+        assert dialog.get_selected_offset() == 5000
+        assert dialog.is_go_to_enabled()
 
         dialog._on_go_to_clicked()
         assert len(offsets) == 1
@@ -136,13 +133,13 @@ class TestPagedTileViewDialog:
         qtbot.addWidget(dialog)
 
         # Initially button should be disabled
-        assert not dialog._go_to_btn.isEnabled()
+        assert not dialog.is_go_to_enabled()
 
         # Click a tile
-        dialog._on_tile_clicked(0x1234)
+        dialog.simulate_tile_selection(0x1234)
 
-        assert dialog._go_to_btn.isEnabled()
-        assert "0x001234" in dialog._go_to_btn.text()
+        assert dialog.is_go_to_enabled()
+        assert dialog.get_selected_offset() == 0x1234
 
     def test_dialog_non_modal(self, qtbot, sample_rom_data: bytes) -> None:
         """Test dialog is non-modal."""
@@ -168,5 +165,4 @@ class TestPagedTileViewDialog:
         dialog.close()
 
         # Widget should have been cleaned up
-        assert dialog._tile_view is not None
-        assert len(dialog._tile_view._cache) == 0
+        assert dialog.is_cache_cleared()

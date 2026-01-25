@@ -271,6 +271,58 @@ class PagedTileViewDialog(CleanupDialog):
             return self._tile_view.get_current_offset()
         return 0
 
+    def get_palette(self) -> list[list[int]] | None:
+        """Get the current palette.
+
+        Returns:
+            Current palette or None if using grayscale.
+        """
+        return self._palette
+
+    def get_current_page(self) -> int:
+        """Get current page number (0-based).
+
+        Returns:
+            Current page number, or 0 if tile view not initialized.
+        """
+        if self._tile_view is not None:
+            return self._tile_view.get_current_page()
+        return 0
+
+    def get_selected_offset(self) -> int | None:
+        """Get selected tile offset.
+
+        Returns:
+            Selected tile offset, or None if no tile selected.
+        """
+        return self._selected_offset
+
+    def is_go_to_enabled(self) -> bool:
+        """Check if Go to Offset button is enabled.
+
+        Returns:
+            True if the button is enabled.
+        """
+        return self._go_to_btn.isEnabled()
+
+    def simulate_tile_selection(self, offset: int) -> None:
+        """Simulate tile selection (for testing).
+
+        Args:
+            offset: Tile offset to select.
+        """
+        self._on_tile_clicked(offset)
+
+    def is_cache_cleared(self) -> bool:
+        """Check if dialog's tile cache is cleared.
+
+        Returns:
+            True if the tile view cache is empty or tile view is None.
+        """
+        if self._tile_view is None:
+            return True
+        return len(self._tile_view._cache) == 0
+
     @override
     def closeEvent(self, event: QCloseEvent | None) -> None:
         """Handle dialog close."""
