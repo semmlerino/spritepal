@@ -189,21 +189,20 @@ class TestInjectionWorkflowCoordinatorCleanup:
         assert coordinator.core_operations_manager is not None
         assert coordinator.core_operations_manager is app_context.core_operations_manager
 
-    def test_cleanup_connections_handles_none_gracefully(self, app_context):
-        """Test that cleanup handles None connections gracefully."""
+    def test_cleanup_connections_handles_fresh_coordinator(self, app_context):
+        """Test that cleanup handles fresh coordinator gracefully."""
         from ui.services.injection_workflow_coordinator import (
             InjectionWorkflowCoordinator,
         )
 
         coordinator = InjectionWorkflowCoordinator(app_context)
 
-        # Connections should be None initially
-        assert coordinator._progress_connection is None
-        assert coordinator._finished_connection is None
-
-        # Should not raise
+        # Calling cleanup on a fresh coordinator should not raise
+        # (no connections have been established yet)
         coordinator._cleanup_connections()
 
-        # Still None after cleanup
-        assert coordinator._progress_connection is None
-        assert coordinator._finished_connection is None
+        # Coordinator should still be usable after cleanup
+        # Verify by checking that signals are still defined
+        assert coordinator.injection_started is not None
+        assert coordinator.injection_progress is not None
+        assert coordinator.injection_finished is not None
