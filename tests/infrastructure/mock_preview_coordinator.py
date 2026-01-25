@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import QObject, Signal
 
+from core.services.signal_payloads import PreviewData
+
 
 class MockPreviewCoordinator(QObject):
     """
@@ -21,10 +23,8 @@ class MockPreviewCoordinator(QObject):
     """
 
     # Signal signatures match SmartPreviewCoordinator
-    preview_ready = Signal(
-        bytes, int, int, str, int, int, int, bool, bytes
-    )  # tile_data, width, height, name, compressed_size, slack_size, actual_offset, hal_succeeded, header_bytes
-    preview_cached = Signal(bytes, int, int, str, int, int, int, bool, bytes)  # Same as preview_ready
+    preview_ready = Signal(object)  # PreviewData
+    preview_cached = Signal(object)  # PreviewData
     preview_error = Signal(str)  # Error message
 
     def __init__(self, parent: QObject | None = None) -> None:
@@ -99,15 +99,17 @@ class MockPreviewCoordinator(QObject):
             tile_data = b"\x00" * (width * height * 32)
 
         self.preview_ready.emit(
-            tile_data,
-            width,
-            height,
-            sprite_name,
-            compressed_size,
-            slack_size,
-            offset,
-            hal_succeeded,
-            header_bytes,
+            PreviewData(
+                tile_data=tile_data,
+                width=width,
+                height=height,
+                sprite_name=sprite_name,
+                compressed_size=compressed_size,
+                slack_size=slack_size,
+                actual_offset=offset,
+                hal_succeeded=hal_succeeded,
+                header_bytes=header_bytes,
+            )
         )
 
     def emit_error(self, message: str) -> None:

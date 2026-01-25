@@ -30,6 +30,7 @@ from collections.abc import Callable
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, cast
 
+from core.services.signal_payloads import PreviewData
 from core.types import CompressionType
 
 if TYPE_CHECKING:
@@ -117,12 +118,8 @@ class SmartPreviewCoordinator(QObject):
     """
 
     # Signals for preview updates
-    preview_ready = Signal(
-        bytes, int, int, str, int, int, int, bool, bytes
-    )  # tile_data, width, height, name, compressed_size, slack_size, actual_offset, hal_succeeded, header_bytes
-    preview_cached = Signal(
-        bytes, int, int, str, int, int, int, bool, bytes
-    )  # Cached preview displayed, with compressed_size, slack_size, actual_offset, hal_succeeded, header_bytes
+    preview_ready = Signal(object)  # PreviewData
+    preview_cached = Signal(object)  # PreviewData (cached preview displayed)
     preview_error = Signal(str)  # Error message
 
     def __init__(self, parent: QObject | None = None):
@@ -508,28 +505,19 @@ class SmartPreviewCoordinator(QObject):
                         with QMutexLocker(self._mutex):
                             self._pending_full_decompression = False
                     # Emit both signals: preview_cached for statistics, preview_ready for data consumers
-                    self.preview_cached.emit(
-                        tile_data,
-                        width,
-                        height,
-                        sprite_name or "",
-                        compressed_size,
-                        slack_size,
-                        actual_offset,
-                        hal_succeeded,
-                        header_bytes,
+                    preview_payload = PreviewData(
+                        tile_data=tile_data,
+                        width=width,
+                        height=height,
+                        sprite_name=sprite_name or "",
+                        compressed_size=compressed_size,
+                        slack_size=slack_size,
+                        actual_offset=actual_offset,
+                        hal_succeeded=hal_succeeded,
+                        header_bytes=header_bytes,
                     )
-                    self.preview_ready.emit(
-                        tile_data,
-                        width,
-                        height,
-                        sprite_name or "",
-                        compressed_size,
-                        slack_size,
-                        actual_offset,
-                        hal_succeeded,
-                        header_bytes,
-                    )
+                    self.preview_cached.emit(preview_payload)
+                    self.preview_ready.emit(preview_payload)
                     return True
 
                 # Remove invalid entry from cache
@@ -634,15 +622,17 @@ class SmartPreviewCoordinator(QObject):
                 if provider_result is None:
                     # Emit result even if caching fails
                     self.preview_ready.emit(
-                        tile_data,
-                        width,
-                        height,
-                        sprite_name,
-                        compressed_size,
-                        slack_size,
-                        actual_offset,
-                        hal_succeeded,
-                        header_bytes,
+                        PreviewData(
+                            tile_data=tile_data,
+                            width=width,
+                            height=height,
+                            sprite_name=sprite_name,
+                            compressed_size=compressed_size,
+                            slack_size=slack_size,
+                            actual_offset=actual_offset,
+                            hal_succeeded=hal_succeeded,
+                            header_bytes=header_bytes,
+                        )
                     )
                     return
                 rom_path, _ = provider_result
@@ -678,15 +668,17 @@ class SmartPreviewCoordinator(QObject):
 
         logger.debug(f"[COORD] Forwarding preview_ready: sprite_name={sprite_name}, hal_succeeded={hal_succeeded}")
         self.preview_ready.emit(
-            tile_data,
-            width,
-            height,
-            sprite_name,
-            compressed_size,
-            slack_size,
-            actual_offset,
-            hal_succeeded,
-            header_bytes,
+            PreviewData(
+                tile_data=tile_data,
+                width=width,
+                height=height,
+                sprite_name=sprite_name,
+                compressed_size=compressed_size,
+                slack_size=slack_size,
+                actual_offset=actual_offset,
+                hal_succeeded=hal_succeeded,
+                header_bytes=header_bytes,
+            )
         )
 
     def _on_worker_preview_error(self, request_id: int, error_msg: str) -> None:

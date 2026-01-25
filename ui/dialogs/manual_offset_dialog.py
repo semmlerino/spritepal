@@ -55,6 +55,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.services.signal_payloads import PreviewData
 from ui.common import SpriteSearchCoordinator
 from ui.common.collapsible_group_box import CollapsibleGroupBox
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
@@ -876,18 +877,20 @@ class UnifiedManualOffsetDialog(CleanupDialog):
                 return None
             return (self.rom_path, self.rom_extractor)
 
-    def _on_smart_preview_ready(
-        self,
-        tile_data: bytes,
-        width: int,
-        height: int,
-        sprite_name: str,
-        compressed_size: int,
-        slack_size: int = 0,
-        actual_offset: int = -1,
-        hal_succeeded: bool = True,
-    ) -> None:
-        """Handle preview ready from smart coordinator with guaranteed UI updates."""
+    def _on_smart_preview_ready(self, payload: PreviewData) -> None:
+        """Handle preview ready from smart coordinator with guaranteed UI updates.
+
+        Args:
+            payload: PreviewData with tile data and metadata
+        """
+        # Unpack payload for local use
+        tile_data = payload.tile_data
+        width = payload.width
+        height = payload.height
+        sprite_name = payload.sprite_name
+        compressed_size = payload.compressed_size
+        actual_offset = payload.actual_offset
+
         logger.debug("[PREVIEW_READY] ========== START ===========")
         logger.debug(
             f"[PREVIEW_READY] data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}, compressed_size={compressed_size}, actual_offset=0x{actual_offset:06X}"
@@ -959,10 +962,19 @@ class UnifiedManualOffsetDialog(CleanupDialog):
 
         logger.debug("[PREVIEW_READY] ========== END ===========")
 
-    def _on_smart_preview_cached(
-        self, tile_data: bytes, width: int, height: int, sprite_name: str, compressed_size: int
-    ) -> None:
-        """Handle cached preview from smart coordinator."""
+    def _on_smart_preview_cached(self, payload: PreviewData) -> None:
+        """Handle cached preview from smart coordinator.
+
+        Args:
+            payload: PreviewData with tile data and metadata
+        """
+        # Unpack payload for local use
+        tile_data = payload.tile_data
+        width = payload.width
+        height = payload.height
+        sprite_name = payload.sprite_name
+        compressed_size = payload.compressed_size
+
         logger.debug(
             f"[SIGNAL_RECEIVED] _on_smart_preview_cached called: data_len={len(tile_data) if tile_data else 0}, {width}x{height}, name={sprite_name}, compressed_size={compressed_size}"
         )

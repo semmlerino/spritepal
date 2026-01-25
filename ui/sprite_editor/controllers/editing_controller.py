@@ -13,6 +13,7 @@ import numpy as np
 from PySide6.QtCore import QObject, Signal
 
 from core.default_palette_loader import DefaultPaletteLoader
+from core.services.signal_payloads import PaletteSourcePayload
 from utils.logging_config import get_logger
 
 from ..commands.pixel_commands import BatchCommand, DrawPixelCommand, FloodFillCommand
@@ -40,7 +41,7 @@ class EditingController(QObject):
     toolChanged = Signal(str)
     colorChanged = Signal(int)
     undoStateChanged = Signal(bool, bool)  # can_undo, can_redo
-    paletteSourceAdded = Signal(str, str, int, object, bool)  # name, type, index, colors, is_active
+    paletteSourceAdded = Signal(object)  # PaletteSourcePayload
     paletteSourceSelected = Signal(str, int)  # source_type, palette_index
     # Signal to clear all palettes of a specific type from views
     paletteSourcesCleared = Signal(str)  # source_type ("rom", "mesen", or "all")
@@ -478,7 +479,15 @@ class EditingController(QObject):
         """
         key = (source_type, index)
         self._palette_sources[key] = (colors, name)
-        self.paletteSourceAdded.emit(name, source_type, index, colors, is_active)
+        self.paletteSourceAdded.emit(
+            PaletteSourcePayload(
+                name=name,
+                source_type=source_type,
+                index=index,
+                colors=colors,
+                is_active=is_active,
+            )
+        )
 
     def handle_palette_source_changed(self, source_type: str, index: int) -> None:
         """Handle palette source selection change."""

@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.services.signal_payloads import PaletteSourcePayload
 from ui.common.signal_utils import safe_disconnect
 from ui.common.spacing_constants import PANEL_PADDING, SPACING_MEDIUM, SPACING_SMALL
 
@@ -401,7 +402,7 @@ class EditWorkspace(QWidget):
         controller.toolChanged.connect(self._icon_toolbar.set_tool)
         controller.colorChanged.connect(self._palette_panel.set_selected_color)
         controller.paletteChanged.connect(self._update_palette)
-        controller.paletteSourceAdded.connect(self._palette_panel.add_palette_source)
+        controller.paletteSourceAdded.connect(self._on_palette_source_added)
         controller.paletteSourceSelected.connect(self._on_palette_source_selected)
         controller.paletteSourcesCleared.connect(self._palette_panel.clear_palette_sources)
         controller.validationChanged.connect(self._on_validation_changed)
@@ -440,6 +441,19 @@ class EditWorkspace(QWidget):
     def _on_image_changed(self) -> None:
         """Handle image change from controller."""
         self.set_image_loaded(True)
+
+    def _on_palette_source_added(self, payload: PaletteSourcePayload) -> None:
+        """Handle palette source added signal from controller.
+
+        Unpacks the typed payload and forwards to the palette panel.
+        """
+        self._palette_panel.add_palette_source(
+            payload.name,
+            payload.source_type,
+            payload.index,
+            payload.colors,
+            payload.is_active,
+        )
 
     def _on_palette_source_selected(self, source_type: str, palette_index: int) -> None:
         """Handle programmatic palette source selection from controller."""

@@ -24,6 +24,7 @@ import numpy as np
 import pytest
 from PySide6.QtWidgets import QComboBox
 
+from core.services.signal_payloads import PaletteSourcePayload
 from core.sprite_library import LibrarySprite
 from ui.sprite_editor import get_default_snes_palette
 from ui.sprite_editor.controllers.editing_controller import EditingController
@@ -360,7 +361,14 @@ class TestPaletteIntegration:
         workspace.set_controller(controller)
 
         test_colors = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
-        controller.paletteSourceAdded.emit("New Source", "mesen", 2, test_colors, True)
+        payload = PaletteSourcePayload(
+            name="New Source",
+            source_type="mesen",
+            index=2,
+            colors=test_colors,
+            is_active=True,
+        )
+        controller.paletteSourceAdded.emit(payload)
 
         workspace.palette_panel.add_palette_source.assert_called_with("New Source", "mesen", 2, test_colors, True)
 

@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
 
 from core.app_context import get_app_context
+from core.services.signal_payloads import PreviewData
 
 
 def get_extraction_manager():
@@ -238,14 +239,17 @@ class TestManualOffsetDialog:
         # Simulate preview aligning to a different offset
         actual_offset = 0x20001  # Preview found valid sprite at +1 byte
         dialog._on_smart_preview_ready(
-            tile_data=b"\x00" * 64,  # Minimal valid tile data
-            width=8,
-            height=8,
-            sprite_name="test_sprite",
-            compressed_size=32,
-            slack_size=0,
-            actual_offset=actual_offset,
-            hal_succeeded=True,
+            PreviewData(
+                tile_data=b"\x00" * 64,  # Minimal valid tile data
+                width=8,
+                height=8,
+                sprite_name="test_sprite",
+                compressed_size=32,
+                slack_size=0,
+                actual_offset=actual_offset,
+                hal_succeeded=True,
+                header_bytes=b"",
+            )
         )
 
         # Verify: Dialog should have synced to actual_offset

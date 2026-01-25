@@ -13,6 +13,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from core.services.signal_payloads import PreviewData
+
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
 
@@ -93,15 +95,17 @@ class TestControllerPreviewButtonSync:
 
             # Simulate preview ready callback
             controller._on_preview_ready(
-                tile_data=bytes(32),
-                width=8,
-                height=8,
-                sprite_name="Test",
-                compressed_size=32,
-                slack_size=0,
-                actual_offset=0x1000,
-                hal_succeeded=True,
-                header_bytes=b"",
+                PreviewData(
+                    tile_data=bytes(32),
+                    width=8,
+                    height=8,
+                    sprite_name="Test",
+                    compressed_size=32,
+                    slack_size=0,
+                    actual_offset=0x1000,
+                    hal_succeeded=True,
+                    header_bytes=b"",
+                )
             )
 
             # Verify set_action_enabled(True) was called

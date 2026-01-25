@@ -8,6 +8,8 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+from core.services.signal_payloads import PreviewData
+
 
 def _create_preview_emitter(coordinator):
     """Create a helper function that emits the preview_ready signal.
@@ -18,15 +20,17 @@ def _create_preview_emitter(coordinator):
 
     def emit_preview(offset: int) -> None:
         coordinator.preview_ready.emit(
-            b"\x00" * 64,  # tile_data
-            8,  # width
-            8,  # height
-            "test_sprite",  # sprite_name
-            32,  # compressed_size
-            0,  # slack_size
-            offset,  # actual_offset
-            True,  # hal_succeeded
-            b"",  # header_bytes
+            PreviewData(
+                tile_data=b"\x00" * 64,
+                width=8,
+                height=8,
+                sprite_name="test_sprite",
+                compressed_size=32,
+                slack_size=0,
+                actual_offset=offset,
+                hal_succeeded=True,
+                header_bytes=b"",
+            )
         )
 
     return emit_preview

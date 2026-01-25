@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from core.services.preview_generator import PreviewGenerator
+from core.services.signal_payloads import PreviewData
 
 pytestmark = [pytest.mark.integration, pytest.mark.no_manager_setup]
 
@@ -55,18 +56,8 @@ class TestBackgroundPreloadStalenessCheck:
         # Track if preview_ready is emitted (indicates result was processed)
         preview_received = []
 
-        def on_preview_ready(
-            tile_data,
-            width,
-            height,
-            sprite_name,
-            compressed_size,
-            slack_size,
-            actual_offset,
-            hal_succeeded,
-            header_bytes,
-        ):
-            preview_received.append((tile_data, actual_offset))
+        def on_preview_ready(payload: PreviewData):
+            preview_received.append((payload.tile_data, payload.actual_offset))
 
         coordinator.preview_ready.connect(on_preview_ready)
 
@@ -113,18 +104,8 @@ class TestBackgroundPreloadStalenessCheck:
 
         preview_received = []
 
-        def on_preview_ready(
-            tile_data,
-            width,
-            height,
-            sprite_name,
-            compressed_size,
-            slack_size,
-            actual_offset,
-            hal_succeeded,
-            header_bytes,
-        ):
-            preview_received.append(actual_offset)
+        def on_preview_ready(payload: PreviewData):
+            preview_received.append(payload.actual_offset)
 
         coordinator.preview_ready.connect(on_preview_ready)
 

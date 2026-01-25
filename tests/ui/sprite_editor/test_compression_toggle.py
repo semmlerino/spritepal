@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from core.services.signal_payloads import PreviewData
 from core.types import CompressionType
 from ui.sprite_editor.views.widgets.source_bar import SourceBar
 from ui.sprite_editor.views.workspaces.rom_workflow_page import ROMWorkflowPage
@@ -392,15 +393,17 @@ class TestROMWorkflowControllerCompressionToggle:
 
             # Simulate preview ready with HAL success
             controller._on_preview_ready(
-                tile_data=b"\x00" * 64,
-                width=8,
-                height=8,
-                sprite_name="test_sprite",
-                compressed_size=32,
-                slack_size=0,
-                actual_offset=0x1000,
-                hal_succeeded=True,
-                header_bytes=b"",
+                PreviewData(
+                    tile_data=b"\x00" * 64,
+                    width=8,
+                    height=8,
+                    sprite_name="test_sprite",
+                    compressed_size=32,
+                    slack_size=0,
+                    actual_offset=0x1000,
+                    hal_succeeded=True,
+                    header_bytes=b"",
+                )
             )
 
             # Verify dropdown was synced to HAL
@@ -408,15 +411,17 @@ class TestROMWorkflowControllerCompressionToggle:
 
             # Now simulate preview ready with RAW (HAL failed)
             controller._on_preview_ready(
-                tile_data=b"\x00" * 64,
-                width=8,
-                height=8,
-                sprite_name="test_sprite",
-                compressed_size=0,
-                slack_size=0,
-                actual_offset=0x2000,
-                hal_succeeded=False,
-                header_bytes=b"",
+                PreviewData(
+                    tile_data=b"\x00" * 64,
+                    width=8,
+                    height=8,
+                    sprite_name="test_sprite",
+                    compressed_size=0,
+                    slack_size=0,
+                    actual_offset=0x2000,
+                    hal_succeeded=False,
+                    header_bytes=b"",
+                )
             )
 
             # Verify dropdown was synced to RAW

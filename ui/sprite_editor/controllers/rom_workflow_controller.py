@@ -16,6 +16,7 @@ from shiboken6 import isValid
 from core.mesen_integration.log_watcher import CapturedOffset
 from core.services.library_service import LibraryService
 from core.services.mesen_capture_sync import MesenCaptureSync, ViewAssetBrowserAdapter
+from core.services.signal_payloads import PreviewData
 from core.types import CompressionType
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
@@ -2845,19 +2846,23 @@ class ROMWorkflowController(QObject):
             return None
         return (self.rom_path, self.rom_extractor)
 
-    def _on_preview_ready(
-        self,
-        tile_data: bytes,
-        width: int,
-        height: int,
-        sprite_name: str,
-        compressed_size: int,
-        slack_size: int = 0,
-        actual_offset: int = -1,
-        hal_succeeded: bool = True,
-        header_bytes: bytes = b"",
-    ) -> None:
-        """Handle preview ready from coordinator."""
+    def _on_preview_ready(self, payload: PreviewData) -> None:
+        """Handle preview ready from coordinator.
+
+        Args:
+            payload: PreviewData with tile data and metadata
+        """
+        # Unpack payload for local use
+        tile_data = payload.tile_data
+        width = payload.width
+        height = payload.height
+        sprite_name = payload.sprite_name
+        compressed_size = payload.compressed_size
+        slack_size = payload.slack_size
+        actual_offset = payload.actual_offset
+        hal_succeeded = payload.hal_succeeded
+        header_bytes = payload.header_bytes
+
         # Use current offset if actual_offset not provided
         if actual_offset == -1:
             actual_offset = self.current_offset
