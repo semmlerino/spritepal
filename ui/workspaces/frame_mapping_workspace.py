@@ -362,33 +362,23 @@ class FrameMappingWorkspace(QWidget):
     def _get_selected_ai_frame_id(self) -> str | None:
         """Get the currently selected AI frame ID.
 
-        Queries AIFramesPane first (source of truth), falls back to cached state.
-        Use this when you need fresh selection state.
+        Returns the state manager value directly. This ensures selection is
+        preserved even when filters hide the selected item in the pane.
 
         Returns:
             AI frame ID (filename) or None if no selection
         """
-        # Query pane (source of truth)
-        pane_selection = self._ai_frames_pane.get_selected_id()
-        if pane_selection is not None:
-            return pane_selection
-        # Fallback to cached state if pane not available or returns None
         return self._state.selected_ai_frame_id
 
     def _get_selected_game_id(self) -> str | None:
         """Get the currently selected game frame ID.
 
-        Queries CapturesLibraryPane first (source of truth), falls back to cached state.
-        Use this when you need fresh selection state.
+        Returns the state manager value directly. This ensures selection is
+        preserved even when filters hide the selected item in the pane.
 
         Returns:
             Game frame ID or None if no selection
         """
-        # Query pane (source of truth)
-        pane_selection = self._captures_pane.get_selected_id()
-        if pane_selection is not None:
-            return pane_selection
-        # Fallback to cached state if pane not available or returns None
         return self._state.selected_game_id
 
     def _on_undo(self) -> None:
@@ -547,12 +537,16 @@ class FrameMappingWorkspace(QWidget):
             self._captures_pane.select_frame(mapping.game_frame_id)
             self._state.selected_game_id = mapping.game_frame_id
             self._state.current_canvas_game_id = mapping.game_frame_id
+            # Clear browsing mode - canvas now shows the mapped capture
+            self._alignment_canvas.set_browsing_mode(False)
         else:
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
             self._captures_pane.clear_selection()
             self._state.selected_game_id = None
             self._state.current_canvas_game_id = None
+            # Clear browsing mode - no mapping exists
+            self._alignment_canvas.set_browsing_mode(False)
 
         self._update_map_button_state()
 
@@ -586,6 +580,11 @@ class FrameMappingWorkspace(QWidget):
             capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
             self._state.current_canvas_game_id = frame_id
+
+            # Check if we're browsing (viewing different capture than mapping)
+            mapping = project.get_mapping_for_ai_frame(self._state.selected_ai_frame_id)
+            is_browsing = mapping is not None and frame_id != mapping.game_frame_id
+            self._alignment_canvas.set_browsing_mode(is_browsing)
 
     def _on_mapping_selected(self, ai_frame_id: str) -> None:
         """Handle mapping row selection in drawer.

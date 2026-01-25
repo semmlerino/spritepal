@@ -45,6 +45,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _has_duplicate_colors(colors: list[tuple[int, int, int]]) -> bool:
+    """Check if a palette has duplicate colors (excluding index 0).
+
+    Index 0 is typically transparent, so we ignore it in duplicate detection.
+
+    Args:
+        colors: List of RGB tuples
+
+    Returns:
+        True if there are duplicate colors in indices 1-15
+    """
+    # Only check non-transparent colors (indices 1+)
+    non_transparent = colors[1:] if len(colors) > 1 else []
+    return len(non_transparent) != len(set(non_transparent))
+
+
 class AIFramePaletteEditorWindow(QMainWindow):
     """Modeless window for editing AI frame palette indices.
 
@@ -113,8 +129,26 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._tool_panel = self._create_tool_panel()
         main_layout.addWidget(self._tool_panel)
 
-        # Add canvas to layout
-        main_layout.addWidget(self._canvas, 1)
+        # Center section: Warning banner + Canvas
+        center_layout = QVBoxLayout()
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(4)
+
+        # Duplicate color warning banner
+        self._duplicate_warning_label = QLabel(
+            "⚠ Duplicate colors detected in palette. During injection, pixels with the same "
+            "color will be mapped to the same index, regardless of their original index."
+        )
+        self._duplicate_warning_label.setStyleSheet(
+            "background-color: #FFF3CD; color: #856404; padding: 6px 8px; border-radius: 4px; font-size: 11px;"
+        )
+        self._duplicate_warning_label.setWordWrap(True)
+        self._duplicate_warning_label.setVisible(False)
+        center_layout.addWidget(self._duplicate_warning_label)
+
+        # Add canvas to center layout
+        center_layout.addWidget(self._canvas, 1)
+        main_layout.addLayout(center_layout, 1)
 
         # Right: Palette panel
         self._palette_panel = EditorPalettePanel()
@@ -405,6 +439,9 @@ class AIFramePaletteEditorWindow(QMainWindow):
                 self._canvas.set_image(data, self._palette)
                 # Initialize brush cursor
                 self._canvas.set_brush_size(self._controller.brush_size)
+
+            # Check for duplicate colors in palette and show warning if found
+            self._update_duplicate_warning()
         else:
             QMessageBox.warning(
                 self,
@@ -412,6 +449,19 @@ class AIFramePaletteEditorWindow(QMainWindow):
                 f"Failed to load image: {path}",
             )
             self.close()
+
+    def _update_duplicate_warning(self) -> None:
+        """Update the duplicate color warning visibility based on palette."""
+        has_duplicates = _has_duplicate_colors(self._palette.colors)
+        self._duplicate_warning_label.setVisible(has_duplicates)
+
+    def has_duplicate_color_warning(self) -> bool:
+        """Check if the duplicate color warning is currently shown.
+
+        Returns:
+            True if the warning is visible (palette has duplicate colors)
+        """
+        return self._duplicate_warning_label.isVisible()
 
     # --- Event Handlers ---
 

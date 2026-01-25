@@ -1,7 +1,7 @@
-"""Tests for FrameMappingWorkspace pane query methods.
+"""Tests for FrameMappingWorkspace selection state management.
 
-Phase 3: State Duplication Elimination - panes are source of truth for selection.
-Workspace provides helper methods that query panes, with cached state as fallback.
+Selection state is managed by WorkspaceStateManager, not panes. This ensures
+selection is preserved even when filters hide items in the pane UI.
 """
 
 from __future__ import annotations
@@ -52,13 +52,13 @@ def create_test_project(tmp_path: Path) -> FrameMappingProject:
     )
 
 
-class TestPaneQueryMethods:
-    """Tests for _get_selected_ai_frame_id and _get_selected_game_id helpers."""
+class TestStateManagerAsSourceOfTruth:
+    """Tests verifying state manager is source of truth for selection."""
 
-    def test_get_selected_ai_frame_id_queries_pane_first(
+    def test_get_selected_ai_frame_id_returns_state_manager_value(
         self, app_context: AppContext, qtbot: QtBot, tmp_path: Path
     ) -> None:
-        """_get_selected_ai_frame_id should query AIFramesPane as source of truth."""
+        """_get_selected_ai_frame_id should return state manager value directly."""
         workspace = FrameMappingWorkspace()
         qtbot.addWidget(workspace)
 
@@ -73,20 +73,20 @@ class TestPaneQueryMethods:
         # Load project into UI
         workspace._ai_frames_pane.set_ai_frames(project.ai_frames)
 
-        # User selects a frame in the pane
-        workspace._ai_frames_pane.select_frame_by_id("frame_001.png")
+        # Set state manager directly
+        workspace._state.selected_ai_frame_id = "frame_001.png"
 
-        # Query method should return pane selection
+        # Query method should return state manager value
         assert workspace._get_selected_ai_frame_id() == "frame_001.png"
 
-        # Even if cached state is stale, pane is authoritative
-        workspace._state.selected_ai_frame_id = "frame_002.png"
+        # Even if pane has different selection, state manager is authoritative
+        workspace._ai_frames_pane.select_frame_by_id("frame_002.png")
         assert workspace._get_selected_ai_frame_id() == "frame_001.png"
 
-    def test_get_selected_ai_frame_id_falls_back_to_cached_state(
+    def test_get_selected_ai_frame_id_returns_none_when_no_state(
         self, app_context: AppContext, qtbot: QtBot, tmp_path: Path
     ) -> None:
-        """If pane has no selection, fall back to cached state."""
+        """If state manager has no selection, return None."""
         workspace = FrameMappingWorkspace()
         qtbot.addWidget(workspace)
 
@@ -96,19 +96,16 @@ class TestPaneQueryMethods:
         mock_controller.project = project
         workspace._controller = mock_controller
 
-        # Load project but don't select anything in pane
+        # Load project but don't set state
         workspace._ai_frames_pane.set_ai_frames(project.ai_frames)
 
-        # Set cached state
-        workspace._state.selected_ai_frame_id = "frame_002.png"
+        # Query should return None (no state set)
+        assert workspace._get_selected_ai_frame_id() is None
 
-        # Query should fall back to cached state when pane has no selection
-        assert workspace._get_selected_ai_frame_id() == "frame_002.png"
-
-    def test_get_selected_game_id_queries_pane_first(
+    def test_get_selected_game_id_returns_state_manager_value(
         self, app_context: AppContext, qtbot: QtBot, tmp_path: Path
     ) -> None:
-        """_get_selected_game_id should query CapturesLibraryPane as source of truth."""
+        """_get_selected_game_id should return state manager value directly."""
         workspace = FrameMappingWorkspace()
         qtbot.addWidget(workspace)
 
@@ -121,75 +118,37 @@ class TestPaneQueryMethods:
         # Load project into UI
         workspace._captures_pane.set_game_frames(project.game_frames)
 
-        # User selects a game frame in the pane
-        workspace._captures_pane.select_frame("game_b")
+        # Set state manager directly
+        workspace._state.selected_game_id = "game_b"
 
-        # Query method should return pane selection
+        # Query method should return state manager value
         assert workspace._get_selected_game_id() == "game_b"
 
-        # Even if cached state is stale, pane is authoritative
-        workspace._state.selected_game_id = "game_a"
-        assert workspace._get_selected_game_id() == "game_b"
-
-    def test_get_selected_game_id_falls_back_to_cached_state(
-        self, app_context: AppContext, qtbot: QtBot, tmp_path: Path
-    ) -> None:
-        """If pane has no selection, fall back to cached state."""
-        workspace = FrameMappingWorkspace()
-        qtbot.addWidget(workspace)
-
-        # Mock controller
-        mock_controller = MagicMock(spec=FrameMappingController)
-        project = create_test_project(tmp_path)
-        mock_controller.project = project
-        workspace._controller = mock_controller
-
-        # Load project but don't select anything in pane
-        workspace._captures_pane.set_game_frames(project.game_frames)
-
-        # Set cached state
-        workspace._state.selected_game_id = "game_a"
-
-        # Query should fall back to cached state when pane has no selection
-        assert workspace._get_selected_game_id() == "game_a"
-
-    def test_pane_query_reflects_user_selection_immediately(
-        self, app_context: AppContext, qtbot: QtBot, tmp_path: Path
-    ) -> None:
-        """Pane query should reflect user selection changes immediately."""
-        workspace = FrameMappingWorkspace()
-        qtbot.addWidget(workspace)
-
-        # Mock controller
-        mock_controller = MagicMock(spec=FrameMappingController)
-        project = create_test_project(tmp_path)
-        mock_controller.project = project
-        workspace._controller = mock_controller
-
-        # Load project
-        workspace._ai_frames_pane.set_ai_frames(project.ai_frames)
-        workspace._captures_pane.set_game_frames(project.game_frames)
-
-        # User selects AI frame
-        workspace._ai_frames_pane.select_frame_by_id("frame_000.png")
-        assert workspace._get_selected_ai_frame_id() == "frame_000.png"
-
-        # User changes selection
-        workspace._ai_frames_pane.select_frame_by_id("frame_001.png")
-        assert workspace._get_selected_ai_frame_id() == "frame_001.png"
-
-        # User selects game frame
+        # Even if pane has different selection, state manager is authoritative
         workspace._captures_pane.select_frame("game_a")
-        assert workspace._get_selected_game_id() == "game_a"
-
-        # User changes selection
-        workspace._captures_pane.select_frame("game_b")
         assert workspace._get_selected_game_id() == "game_b"
 
-    def test_cached_state_still_updated_for_backward_compatibility(
+    def test_get_selected_game_id_returns_none_when_no_state(
         self, app_context: AppContext, qtbot: QtBot, tmp_path: Path
     ) -> None:
-        """Cached state should still be updated via signal handlers for backward compat."""
+        """If state manager has no selection, return None."""
+        workspace = FrameMappingWorkspace()
+        qtbot.addWidget(workspace)
+
+        # Mock controller
+        mock_controller = MagicMock(spec=FrameMappingController)
+        project = create_test_project(tmp_path)
+        mock_controller.project = project
+        workspace._controller = mock_controller
+
+        # Load project but don't set state
+        workspace._captures_pane.set_game_frames(project.game_frames)
+
+        # Query should return None (no state set)
+        assert workspace._get_selected_game_id() is None
+
+    def test_signal_handler_updates_state_manager(self, app_context: AppContext, qtbot: QtBot, tmp_path: Path) -> None:
+        """Signal handlers should update state manager when selection changes."""
         workspace = FrameMappingWorkspace()
         qtbot.addWidget(workspace)
 
@@ -205,11 +164,41 @@ class TestPaneQueryMethods:
         workspace._ai_frames_pane.set_ai_frames(project.ai_frames)
         workspace._mapping_panel.set_project(project)
 
-        # Trigger signal handler that updates cached state
+        # Trigger signal handler that updates state manager
         workspace._on_ai_frame_selected("frame_001.png")
 
-        # Cached state should be updated
+        # State manager should be updated
         assert workspace._state.selected_ai_frame_id == "frame_001.png"
 
-        # Pane query should match
+        # Query method should reflect updated state
+        assert workspace._get_selected_ai_frame_id() == "frame_001.png"
+
+    def test_selection_preserved_when_filter_hides_item(
+        self, app_context: AppContext, qtbot: QtBot, tmp_path: Path
+    ) -> None:
+        """Selection should be preserved in state manager even when filter hides item."""
+        workspace = FrameMappingWorkspace()
+        qtbot.addWidget(workspace)
+
+        # Mock controller
+        mock_controller = MagicMock(spec=FrameMappingController)
+        project = create_test_project(tmp_path)
+        mock_controller.project = project
+        mock_controller.get_game_frame_preview.return_value = None
+        mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
+        workspace._controller = mock_controller
+
+        # Load project
+        workspace._ai_frames_pane.set_ai_frames(project.ai_frames)
+
+        # Select a frame via signal handler (simulating user click)
+        workspace._on_ai_frame_selected("frame_001.png")
+        assert workspace._get_selected_ai_frame_id() == "frame_001.png"
+
+        # Simulate filter hiding the selected item by clearing pane selection
+        # but keeping state manager intact
+        workspace._ai_frames_pane._list.clearSelection()
+
+        # State manager should still have the selection
+        assert workspace._state.selected_ai_frame_id == "frame_001.png"
         assert workspace._get_selected_ai_frame_id() == "frame_001.png"

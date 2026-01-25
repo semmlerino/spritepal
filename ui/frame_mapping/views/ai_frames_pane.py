@@ -633,9 +633,9 @@ class AIFramesPane(QWidget):
         # Phase 2 fix: Notify listeners if selection was silently restored during frame list change
         if is_frame_list_change and selection_restored and restored_id is not None:
             self.ai_frame_selected.emit(restored_id)
-        # Bug #1 fix: Always emit empty string when selection was lost (filter/search/reload)
-        elif current_selection_id is not None and not selection_restored:
-            self.ai_frame_selected.emit("")
+        # NOTE: Removed "Bug #1 fix" that emitted empty string when selection was lost.
+        # The workspace state manager is now the source of truth for selection,
+        # and panes should not clear external state when filters hide items.
 
     def _on_tag_filter_changed(self, index: int) -> None:
         """Handle tag filter combo box change."""

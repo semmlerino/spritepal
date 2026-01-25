@@ -63,10 +63,19 @@ class TestRefreshPreservesSelection:
 
 
 class TestFilterClearsSelectionSignal:
-    """Tests for Bug #1: selection state desync when filter hides selected item."""
+    """Tests for filter behavior when hiding selected items.
 
-    def test_filter_hides_selected_item_emits_deselection_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """When unmapped filter hides a mapped (selected) frame, signal must emit empty string."""
+    Design: Pane does NOT emit empty string when filter hides selection.
+    The workspace state manager is the source of truth for selection,
+    and panes should not clear external state when filters hide items.
+    """
+
+    def test_filter_hides_selected_item_does_not_emit_deselection(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """When filter hides selected frame, pane should NOT emit empty string.
+
+        Selection state is preserved in workspace state manager; pane just
+        hides the item visually without affecting external selection state.
+        """
         pane = AIFramesPane()
         qtbot.addWidget(pane)
 
@@ -95,12 +104,16 @@ class TestFilterClearsSelectionSignal:
         # Enable "show unmapped only" filter - should hide frame 2
         pane._unmapped_filter.setChecked(True)
 
-        # Selection should be cleared and signal should emit empty string
+        # Selection should be cleared in the pane (item hidden)
         assert pane.get_selected_index() is None
-        assert signal_emissions == [""], f"Expected [''], got {signal_emissions}"
+        # But NO signal should be emitted - workspace state manager retains selection
+        assert signal_emissions == [], f"Expected no emissions, got {signal_emissions}"
 
-    def test_search_hides_selected_item_emits_deselection_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """When search filter hides selected frame, signal must emit empty string."""
+    def test_search_hides_selected_item_does_not_emit_deselection(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """When search hides selected frame, pane should NOT emit empty string.
+
+        Selection state is preserved in workspace state manager.
+        """
         pane = AIFramesPane()
         qtbot.addWidget(pane)
 
@@ -118,9 +131,10 @@ class TestFilterClearsSelectionSignal:
         # Search for "frame_004" - should hide frame_002
         pane._search_box.setText("frame_004")
 
-        # Selection should be cleared and signal should emit empty string
+        # Selection should be cleared in the pane (item hidden)
         assert pane.get_selected_index() is None
-        assert signal_emissions == [""], f"Expected [''], got {signal_emissions}"
+        # But NO signal should be emitted - workspace state manager retains selection
+        assert signal_emissions == [], f"Expected no emissions, got {signal_emissions}"
 
     def test_no_signal_when_selection_preserved_after_filter(self, qtbot: QtBot, tmp_path: Path) -> None:
         """No deselection signal when filter doesn't hide the selected item."""
@@ -200,8 +214,13 @@ class TestProjectReloadSignaling:
             f"got {signal_emissions}. Canvas would show stale data from old project."
         )
 
-    def test_project_reload_without_selection_emits_clear_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """Reloading project that loses selection should emit empty string signal."""
+    def test_project_reload_without_selection_does_not_emit_clear_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Reloading project that loses selection should NOT emit empty string signal.
+
+        Selection state is managed by workspace state manager. The pane doesn't
+        emit empty strings to clear external state - the workspace is responsible
+        for detecting when a selected frame no longer exists.
+        """
         pane = AIFramesPane()
         qtbot.addWidget(pane)
 
@@ -218,13 +237,11 @@ class TestProjectReloadSignaling:
         frames_v2 = create_ai_frames(tmp_path / "v2", num_frames=2)  # Only 2 frames now
         pane.set_ai_frames(frames_v2)
 
-        # Selection should be cleared
+        # Selection should be cleared in pane (frame doesn't exist)
         assert pane.get_selected_index() is None
 
-        # Should emit empty string to notify workspace to clear mapping panel
-        assert signal_emissions == [""], (
-            f"Expected deselection signal [''] when reload loses selection, got {signal_emissions}"
-        )
+        # NO empty string should be emitted - workspace handles missing frames
+        assert signal_emissions == [], f"Expected no emissions when reload loses selection, got {signal_emissions}"
 
 
 class TestIDBasedSelectionMethods:
