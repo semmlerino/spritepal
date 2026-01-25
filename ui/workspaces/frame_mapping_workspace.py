@@ -780,9 +780,8 @@ class FrameMappingWorkspace(QWidget):
         if ai_frame is None:
             return
 
-        # Select the frame first (using index for backward-compat select_frame method)
-        self._ai_frames_pane.select_frame(ai_frame.index)
-        self._on_ai_frame_selected(ai_frame_id)
+        # Select the frame and trigger handler via signal (P2: unified signal pattern)
+        self._ai_frames_pane.select_frame(ai_frame.index, emit_signal=True)
 
         # Focus the canvas for keyboard input
         self._alignment_canvas.focus_canvas()
@@ -1382,7 +1381,8 @@ class FrameMappingWorkspace(QWidget):
         """Handle alignment-only update from controller.
 
         This is a targeted signal that avoids the full project_changed refresh,
-        which would blank the canvas. Only updates status indicators.
+        which would blank the canvas. Only updates status indicators and syncs
+        canvas if the modified frame is currently selected.
         """
         # Update mapping panel row (preserves checkbox state)
         project = self._controller.project
@@ -1395,6 +1395,12 @@ class FrameMappingWorkspace(QWidget):
             )
             # Also update the status column (alignment changes set status="edited")
             self._mapping_panel.update_row_status(ai_frame_id, mapping.status)
+
+        # Fix P1: Update canvas if the modified frame is currently selected
+        # This ensures programmatic alignment changes (not from user drag) are visible
+        if self._state.selected_ai_frame_id == ai_frame_id:
+            self._sync_canvas_alignment_from_model()
+
         # Refresh status indicators (doesn't touch canvas)
         self._refresh_mapping_status()
 
@@ -1602,14 +1608,13 @@ class FrameMappingWorkspace(QWidget):
         if self._message_service:
             self._message_service.show_message(f"Linked '{ai_name}' to '{game_frame_id}'", 3000)
 
-        # Auto-advance if enabled
+        # Auto-advance if enabled (P2: unified signal pattern)
         if self._state.auto_advance_enabled and ai_frame:
             next_unmapped_id = self._find_next_unmapped_ai_frame(ai_frame.index)
             if next_unmapped_id is not None:
                 next_frame = project.get_ai_frame_by_id(next_unmapped_id)
                 if next_frame:
-                    self._ai_frames_pane.select_frame(next_frame.index)
-                    self._on_ai_frame_selected(next_unmapped_id)
+                    self._ai_frames_pane.select_frame(next_frame.index, emit_signal=True)
 
     def _find_next_unmapped_ai_frame(self, current_index: int) -> str | None:
         """Find the next unmapped AI frame after the given index.

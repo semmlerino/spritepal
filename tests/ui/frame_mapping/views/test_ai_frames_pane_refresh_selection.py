@@ -298,3 +298,92 @@ class TestIDBasedSelectionMethods:
         pane._list.setCurrentRow(2)
 
         assert signal_emissions == ["frame_002.png"]
+
+
+class TestEmitSignalParameter:
+    """Tests for P2: Unified signal pattern with emit_signal parameter.
+
+    Bug: The signal-blocking pattern in workspace (block signals, then manually
+    call handler) is fragile and bypasses normal signal flow.
+
+    Fix: Add emit_signal parameter to select_frame() and select_frame_by_id()
+    that optionally emits the signal after selection.
+    """
+
+    def test_select_frame_with_emit_signal_true_emits(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """select_frame(emit_signal=True) should emit signal after selection."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        frames = create_ai_frames(tmp_path, num_frames=5)
+        pane.set_ai_frames(frames)
+
+        signal_emissions: list[str] = []
+        pane.ai_frame_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
+
+        pane.select_frame(2, emit_signal=True)
+
+        assert pane.get_selected_index() == 2
+        assert signal_emissions == ["frame_002.png"], (
+            f"Expected signal emission ['frame_002.png'], got {signal_emissions}. "
+            "emit_signal=True should emit the signal after selection."
+        )
+
+    def test_select_frame_by_id_with_emit_signal_true_emits(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """select_frame_by_id(emit_signal=True) should emit signal after selection."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        frames = create_ai_frames(tmp_path, num_frames=5)
+        pane.set_ai_frames(frames)
+
+        signal_emissions: list[str] = []
+        pane.ai_frame_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
+
+        pane.select_frame_by_id("frame_003.png", emit_signal=True)
+
+        assert pane.get_selected_id() == "frame_003.png"
+        assert signal_emissions == ["frame_003.png"], (
+            f"Expected signal emission ['frame_003.png'], got {signal_emissions}. "
+            "emit_signal=True should emit the signal after selection."
+        )
+
+    def test_select_frame_emit_signal_default_false(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Default emit_signal=False maintains backward compatibility."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        frames = create_ai_frames(tmp_path, num_frames=5)
+        pane.set_ai_frames(frames)
+
+        signal_emissions: list[str] = []
+        pane.ai_frame_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
+
+        # Without emit_signal parameter, should not emit (backward compatible)
+        pane.select_frame(2)
+
+        assert pane.get_selected_index() == 2
+        assert signal_emissions == [], (
+            f"Expected no signal emission, got {signal_emissions}. "
+            "Default behavior (emit_signal=False) should not emit."
+        )
+
+    def test_select_frame_by_id_emit_signal_default_false(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Default emit_signal=False maintains backward compatibility."""
+        pane = AIFramesPane()
+        qtbot.addWidget(pane)
+
+        frames = create_ai_frames(tmp_path, num_frames=5)
+        pane.set_ai_frames(frames)
+
+        signal_emissions: list[str] = []
+        pane.ai_frame_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
+
+        # Without emit_signal parameter, should not emit (backward compatible)
+        pane.select_frame_by_id("frame_003.png")
+
+        assert pane.get_selected_id() == "frame_003.png"
+        assert signal_emissions == [], (
+            f"Expected no signal emission, got {signal_emissions}. "
+            "Default behavior (emit_signal=False) should not emit."
+        )

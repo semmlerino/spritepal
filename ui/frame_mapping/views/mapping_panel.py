@@ -311,6 +311,69 @@ class MappingPanel(QWidget):
             Qt.TransformationMode.SmoothTransformation,
         )
 
+    def _quantize_game_frame_pixmap(self, pixmap: QPixmap) -> QPixmap:
+        """Quantize a game frame QPixmap to match the sheet palette.
+
+        When a sheet palette is set, game frame thumbnails should show
+        quantized colors to accurately preview how the sprite will look
+        when injected. This fixes the P3 desync bug where drawer thumbnails
+        showed raw capture colors instead of preview-accurate colors.
+
+        Args:
+            pixmap: The raw game frame preview QPixmap
+
+        Returns:
+            Quantized QPixmap if sheet palette is set, otherwise the original
+        """
+        if self._sheet_palette is None:
+            return pixmap
+
+        try:
+            # Convert QPixmap to PIL Image via QImage
+            qimage = pixmap.toImage()
+            if qimage.isNull():
+                return pixmap
+
+            width = qimage.width()
+            height = qimage.height()
+
+            # Ensure ARGB32 format for consistent byte layout
+            qimage = qimage.convertToFormat(qimage.Format.Format_ARGB32)
+
+            # Get raw bytes and convert to PIL
+            img_data = bytes(qimage.bits())
+            pil_image = Image.frombytes("RGBA", (width, height), img_data, "raw", "BGRA")
+
+            # Ensure RGBA for quantization
+            if pil_image.mode != "RGBA":
+                pil_image = pil_image.convert("RGBA")
+
+            # Quantize using mappings if available, otherwise nearest-color
+            if self._sheet_palette.color_mappings:
+                indexed = quantize_with_mappings(
+                    pil_image,
+                    self._sheet_palette.colors,
+                    self._sheet_palette.color_mappings,
+                    transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+                )
+            else:
+                indexed = quantize_to_palette(
+                    pil_image, self._sheet_palette.colors, QUANTIZATION_TRANSPARENCY_THRESHOLD
+                )
+
+            # Convert indexed back to RGBA for display
+            pil_image = indexed.convert("RGBA")
+
+            # Convert back to QPixmap
+            result = pil_to_qpixmap(pil_image)
+            if result is None or result.isNull():
+                return pixmap
+            return result
+
+        except Exception:
+            logger.debug("Game frame quantization failed, using original")
+            return pixmap
+
     def refresh(self) -> None:
         """Refresh the mapping table from the current project."""
         # Store current selection by ID (stable across reordering)
@@ -386,9 +449,11 @@ class MappingPanel(QWidget):
                     game_item = QTableWidgetItem(mapping.game_frame_id)
                     status = mapping.status
 
-                    # Load game frame thumbnail
+                    # Load game frame thumbnail (P3 fix: apply palette quantization)
                     if mapping.game_frame_id in self._game_frame_previews:
                         pixmap = self._game_frame_previews[mapping.game_frame_id]
+                        # Quantize to sheet palette if set (shows preview-accurate colors)
+                        pixmap = self._quantize_game_frame_pixmap(pixmap)
                         scaled = pixmap.scaled(
                             THUMBNAIL_SIZE,
                             THUMBNAIL_SIZE,

@@ -280,45 +280,61 @@ class AIFramesPane(QWidget):
             return None
         return current.data(Qt.ItemDataRole.UserRole)
 
-    def select_frame(self, index: int) -> None:
+    def select_frame(self, index: int, *, emit_signal: bool = False) -> None:
         """Programmatically select an AI frame by index.
 
-        Blocks signals to prevent feedback loops.
+        Blocks signals during selection to prevent feedback loops.
         Note: Prefer select_frame_by_id() for stable references across reloads.
 
         Args:
             index: The AI frame index to select
+            emit_signal: If True, emit ai_frame_selected after selection.
+                        This provides a unified pattern for callers that need
+                        the handler to run (instead of manually calling it).
         """
         self._list.blockSignals(True)
+        selected_id: str | None = None
         try:
             for row in range(self._list.count()):
                 item = self._list.item(row)
                 if item is not None and item.data(Qt.ItemDataRole.UserRole + 1) == index:  # type: ignore[reportUnnecessaryComparison]
                     self._list.setCurrentRow(row)
                     self._list.scrollToItem(item)
+                    selected_id = item.data(Qt.ItemDataRole.UserRole)
                     break
         finally:
             self._list.blockSignals(False)
 
-    def select_frame_by_id(self, frame_id: str) -> None:
+        if emit_signal and selected_id is not None:
+            self.ai_frame_selected.emit(selected_id)
+
+    def select_frame_by_id(self, frame_id: str, *, emit_signal: bool = False) -> None:
         """Programmatically select an AI frame by ID (filename).
 
-        Blocks signals to prevent feedback loops.
+        Blocks signals during selection to prevent feedback loops.
         This is the preferred method as IDs are stable across reloads/reordering.
 
         Args:
             frame_id: The AI frame ID (filename) to select
+            emit_signal: If True, emit ai_frame_selected after selection.
+                        This provides a unified pattern for callers that need
+                        the handler to run (instead of manually calling it).
         """
         self._list.blockSignals(True)
+        selected_id: str | None = None
         try:
             for row in range(self._list.count()):
                 item = self._list.item(row)
                 if item is not None and item.data(Qt.ItemDataRole.UserRole) == frame_id:  # type: ignore[reportUnnecessaryComparison]
                     self._list.setCurrentRow(row)
                     self._list.scrollToItem(item)
+                    selected_id = frame_id
                     break
         finally:
             self._list.blockSignals(False)
+
+        if emit_signal and selected_id is not None:
+            self.ai_frame_selected.emit(selected_id)
 
     def clear(self) -> None:
         """Clear all AI frames and reset tabs."""
