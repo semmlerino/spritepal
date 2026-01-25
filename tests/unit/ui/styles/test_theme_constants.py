@@ -1,44 +1,22 @@
 """
-Consolidated tests for dark theme UI styling, color constants, and accessibility.
+Unit tests for dark theme constants, CSS generation, and accessibility.
 
-This module combines tests from:
-- test_dark_theme_constants.py (color validation and accessibility)
-- test_dark_theme_widgets.py (CSS generation and Qt integration)
-
-All tests follow TDD principles and verify both headless CSS generation
-and real Qt widget integration.
+Headless validation tests that don't require Qt widgets.
+Split from tests/integration/test_ui_styling.py - Qt widget tests remain there.
 """
 
 from __future__ import annotations
 
-import os
 import re
-from unittest.mock import Mock, patch
 
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QPalette, QPixmap
-from PySide6.QtWidgets import (
-    QApplication,
-    QGroupBox,
-    QLabel,
-    QLineEdit,
-    QPushButton,
-    QVBoxLayout,
-    QWidget,
-)
 
 from ui.styles.components import (
     get_button_style,
-    get_dark_panel_style,
-    get_dark_preview_style,
-    get_dialog_button_box_style,
     get_input_style,
     get_panel_style,
-    get_preview_panel_style,
     get_progress_style,
     get_scroll_area_style,
-    get_slider_style,
     get_splitter_style,
     get_status_style,
     get_tab_style,
@@ -53,11 +31,9 @@ from ui.styles.theme import (
 )
 
 pytestmark = [
-    pytest.mark.skip_thread_cleanup(reason="UI tests may involve managers that spawn threads"),
-    pytest.mark.allows_registry_state(reason="UI tests may trigger Qt auto-registration"),
     pytest.mark.headless,
-    pytest.mark.integration,
 ]
+
 
 # =============================================================================
 # Utility Classes
@@ -196,67 +172,6 @@ class TestCSSGeneration:
         """CSS generation should be consistent across identical calls."""
         assert get_theme_style() == get_theme_style()
         assert get_button_style("primary") == get_button_style("primary")
-
-
-# =============================================================================
-# Qt Integration
-# =============================================================================
-
-
-class TestQtIntegration:
-    """Test theme application to real Qt widgets."""
-
-    @pytest.mark.gui
-    def test_theme_application_to_widgets(self, qtbot) -> None:
-        """Style sheets should be applicable to real widgets without errors."""
-        container = QWidget()
-        qtbot.addWidget(container)
-        layout = QVBoxLayout(container)
-
-        widgets = [
-            QPushButton("Button"),
-            QLineEdit("Input"),
-            QGroupBox("Panel"),
-        ]
-
-        for w in widgets:
-            layout.addWidget(w)
-
-        # Apply styles
-        container.setStyleSheet(get_theme_style())
-        widgets[0].setStyleSheet(get_button_style("primary"))
-        widgets[1].setStyleSheet(get_input_style("text"))
-        widgets[2].setStyleSheet(get_panel_style("default"))
-
-        container.show()
-        qtbot.waitExposed(container)
-
-        # Verify application
-        assert len(widgets[0].styleSheet()) > 0
-        assert COLORS["primary"] in widgets[0].styleSheet()
-
-    @pytest.mark.gui
-    def test_palette_integration(self) -> None:
-        """QPalette should be customizable with theme colors."""
-        palette = QPalette()
-        color = QColor(COLORS["primary"])
-        palette.setColor(QPalette.ColorRole.Highlight, color)
-        assert palette.color(QPalette.ColorRole.Highlight).name().lower() == COLORS["primary"].lower()
-
-    @pytest.mark.gui
-    def test_preview_label_styling(self, qtbot) -> None:
-        """Preview labels should accept dark preview styling."""
-        label = QLabel()
-        qtbot.addWidget(label)
-        pixmap = QPixmap(32, 32)
-        pixmap.fill(Qt.GlobalColor.red)
-        label.setPixmap(pixmap)
-
-        style = get_dark_preview_style()
-        label.setStyleSheet(style)
-
-        assert label.pixmap() is not None
-        assert COLORS["preview_background"] in label.styleSheet()
 
 
 # =============================================================================
