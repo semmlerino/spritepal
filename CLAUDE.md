@@ -2,7 +2,7 @@
 
 **Last updated: January 25, 2026** | See [Table of Contents](#table-of-contents) below
 
-**What is SpritePal?** A PySide6 desktop app for editing SNES sprite graphics. Key workflows: Extract sprites from ROM → Edit in pixel editor → Inject back. Also supports AI-assisted frame mapping for sprite animation replacement.
+**What is SpritePal?** A PySide6 desktop app for editing SNES sprite graphics. Key workflows: Extract sprites from ROM → Edit in pixel editor → Inject back. Also supports frame mapping of AI-generated frames for sprite animation replacement.
 
 ---
 
@@ -11,6 +11,7 @@
 **1. Environment:**
 - **Framework**: PySide6 | **Python**: 3.12+ | **Package Manager**: uv | **Config**: `pyproject.toml`
 - **Workflow**: `ruff check . && ruff format . && basedpyright core ui utils && pytest` → then **commit**
+- **⚠️ ALWAYS COMMIT** after checks pass. Uncommitted work = incomplete task. No exceptions.
 
 **2. Critical Don'ts** (⚠️ Will crash or fail tests):
 | ❌ Don't | ✅ Do Instead |
@@ -80,6 +81,8 @@ uv run python launch_spritepal.py
 
 5. **Prefer boring determinism** - The fastest dev loop is: small change → run checks → commit.
 
+6. **🚨 COMMIT after checks pass** - Every completed task ends with a git commit. Run checks → all pass → commit immediately. Don't ask permission, don't defer, don't leave uncommitted. Uncommitted work is unfinished work.
+
 **Critical "Don'ts" explained** (from TL;DR table):
 - `QPixmap` crash: Qt GUI objects aren't thread-safe. "Fatal Python error: Aborted" with no stack trace = this.
 - `waitSignal()` race: Without context manager, signal may emit before wait starts. Always `with qtbot.waitSignal(...):`.
@@ -107,7 +110,9 @@ uv run pytest                    # Run tests (serial, fast for TDD)
 
 ### Definition of Done & Committing
 
-A task is complete **only when** all checks pass AND changes are committed. Uncommitted changes = incomplete task.
+⚠️ **MANDATORY: A task is NOT complete until changes are committed.**
+
+Uncommitted changes = incomplete task. After all checks pass, you MUST commit before reporting task completion.
 
 **Commit workflow:**
 1. Run all checks: `ruff check . && ruff format . && basedpyright core ui utils && pytest`
@@ -119,6 +124,8 @@ A task is complete **only when** all checks pass AND changes are committed. Unco
 **Conventional commit prefixes:** `fix:`, `feat:`, `refactor:`, `chore:`, `test:`, `docs:`
 
 **Never commit if:** checks fail, tests are flaky (verify with `pytest -n 0`), or behavior changed without test coverage.
+
+**Never skip committing if:** checks pass. Don't leave work uncommitted "for later" or ask user if they want to commit.
 
 ### Environment Setup
 
