@@ -409,3 +409,68 @@ class TestRepositoryErrorHandling:
         # Should not raise
         loaded = FrameMappingRepository.load(save_path)
         assert loaded.name == "test"
+
+    def test_load_project_logs_stale_entries(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+        """Loading a project with stale entries should log a warning."""
+        # Create a capture file with entry IDs 3, 4
+        capture_path = tmp_path / "capture.json"
+        capture_data = {
+            "frame": 1234,
+            "obsel": {},
+            "entries": [
+                {
+                    "id": entry_id,
+                    "x": 100,
+                    "y": 100,
+                    "tile": 0,
+                    "width": 8,
+                    "height": 8,
+                    "palette": 0,
+                    "rom_offset": 0x80000 + (entry_id * 0x100),
+                    "tiles": [
+                        {
+                            "tile_index": 0,
+                            "vram_addr": 0x2000,
+                            "pos_x": 0,
+                            "pos_y": 0,
+                            "data_hex": "00" * 32,
+                        }
+                    ],
+                }
+                for entry_id in [3, 4]
+            ],
+            "palettes": {},
+        }
+        with open(capture_path, "w") as f:
+            json.dump(capture_data, f)
+
+        # Create a project with game frame referencing entry IDs 1, 2 (stale)
+        project = FrameMappingProject(name="test")
+        game_frame = GameFrame(
+            id="F1234",
+            rom_offsets=[0x80000, 0x80100],
+            capture_path=capture_path,
+            selected_entry_ids=[1, 2],  # Not in current capture - stale!
+        )
+        project.game_frames.append(game_frame)
+
+        # Save the project
+        save_path = tmp_path / "test.spritepal-mapping.json"
+        FrameMappingRepository.save(project, save_path)
+
+        # Modify the capture file to have different entry IDs (already done above)
+        # This simulates re-recording the capture after the project was created
+
+        # Load the project and check for warning
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            loaded = FrameMappingRepository.load(save_path)
+
+        # Should log a warning about stale entries
+        assert any("stale game frames" in record.message.lower() for record in caplog.records)
+        assert any("F1234" in record.message for record in caplog.records)
+
+        # Project should still load successfully
+        assert loaded.name == "test"
+        assert len(loaded.game_frames) == 1

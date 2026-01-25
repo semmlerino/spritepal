@@ -167,6 +167,17 @@ class FrameMappingRepository:
         # Prune orphaned mappings (referencing non-existent frames)
         project._prune_orphaned_mappings()
 
+        # Check for stale entries and log warnings
+        stale_frames = project.detect_stale_entries()
+        if stale_frames:
+            stale_ids = [fid for fid, is_stale in stale_frames.items() if is_stale]
+            logger.warning(
+                "Project loaded with %d stale game frames: %s. "
+                "Capture files may have been re-recorded. Preview/injection will fall back to ROM offsets.",
+                len(stale_ids),
+                stale_ids,
+            )
+
         logger.info("Loaded frame mapping project from %s (v%d)", path, version)
         return project
 

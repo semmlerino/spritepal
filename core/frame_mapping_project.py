@@ -837,3 +837,68 @@ class FrameMappingProject:
             return False
         object.__setattr__(frame, "display_name", display_name)
         return True
+
+    def detect_stale_entries(self) -> dict[str, bool]:
+        """Check all game frames for stale selected_entry_ids.
+
+        A game frame has "stale" entries when its `selected_entry_ids` no longer
+        match the IDs in the current capture file (e.g., after re-recording the capture).
+        When entries are stale, the system falls back to ROM offset filtering.
+
+        Returns:
+            Dictionary mapping game_frame_id -> is_stale (bool).
+            Only includes frames with selected_entry_ids (not ROM-only workflow).
+        """
+        from core.mesen_integration.click_extractor import MesenCaptureParser
+
+        stale_status: dict[str, bool] = {}
+
+        for game_frame in self.game_frames:
+            # Skip frames without selected_entry_ids (ROM-only workflow)
+            if not game_frame.selected_entry_ids:
+                continue
+
+            # Skip frames without capture path
+            if not game_frame.capture_path:
+                continue
+
+            # Check if capture file exists
+            if not game_frame.capture_path.exists():
+                logger.warning(
+                    "Capture file not found for frame '%s': %s",
+                    game_frame.id,
+                    game_frame.capture_path,
+                )
+                stale_status[game_frame.id] = True
+                continue
+
+            # Load the capture file and check if entry IDs are still valid
+            try:
+                parser = MesenCaptureParser()
+                capture_result = parser.parse_file(game_frame.capture_path)
+
+                # Get the IDs of all entries in the current capture
+                current_entry_ids = {entry.id for entry in capture_result.entries}
+
+                # Check if all selected_entry_ids are present
+                selected_ids_set = set(game_frame.selected_entry_ids)
+                is_stale = not selected_ids_set.issubset(current_entry_ids)
+
+                if is_stale:
+                    stale_status[game_frame.id] = True
+                    logger.debug(
+                        "Game frame '%s' has stale entries: %s not in current capture IDs %s",
+                        game_frame.id,
+                        selected_ids_set - current_entry_ids,
+                        current_entry_ids,
+                    )
+
+            except Exception as e:
+                logger.warning(
+                    "Failed to parse capture file for frame '%s': %s",
+                    game_frame.id,
+                    e,
+                )
+                stale_status[game_frame.id] = True
+
+        return stale_status

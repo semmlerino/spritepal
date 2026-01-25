@@ -289,6 +289,7 @@ class FrameMappingWorkspace(QWidget):
         self._controller.status_update.connect(self._on_status_update)
         self._controller.save_requested.connect(self._auto_save_after_injection)
         self._controller.stale_entries_warning.connect(self._on_stale_entries_warning)
+        self._controller.stale_entries_on_load.connect(self._on_stale_entries_detected_on_load)
         self._controller.alignment_updated.connect(self._on_alignment_updated)
         self._controller.preview_cache_invalidated.connect(self._on_preview_cache_invalidated)
         self._controller.capture_import_requested.connect(self._on_capture_import_requested)
@@ -1375,6 +1376,30 @@ class FrameMappingWorkspace(QWidget):
         # Update canvas warning label if this is the currently selected game frame
         if self._state.selected_game_id == frame_id:
             self._alignment_canvas.set_stale_entries_warning_visible(True)
+
+    def _on_stale_entries_detected_on_load(self, stale_frame_ids: list[str]) -> None:
+        """Show warning when project loads with stale capture entries.
+
+        Args:
+            stale_frame_ids: Game frame IDs with mismatched entry IDs
+        """
+        count = len(stale_frame_ids)
+        logger.warning("Project loaded with %d stale game frames: %s", count, stale_frame_ids)
+
+        # Show status bar message
+        if self._message_service:
+            self._message_service.show_message(
+                f"⚠ Stale entries detected in {count} frame(s) - preview/injection will use ROM offset fallback",
+                timeout=8000,
+            )
+
+        # Log detailed information
+        logger.info(
+            "Stale entries in frames: %s. "
+            "Capture files may have been re-recorded. "
+            "Preview and injection will fall back to ROM offset filtering.",
+            ", ".join(stale_frame_ids[:5]) + ("..." if count > 5 else ""),
+        )
 
     def _on_alignment_updated(self, ai_frame_id: str) -> None:
         """Handle alignment-only update from controller.

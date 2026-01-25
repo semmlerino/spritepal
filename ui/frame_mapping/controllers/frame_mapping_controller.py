@@ -75,6 +75,7 @@ class FrameMappingController(QObject):
     status_update = Signal(str)  # status message for UI feedback
     save_requested = Signal()  # Emitted when auto-save should occur (e.g., after injection)
     stale_entries_warning = Signal(str)  # frame_id - Emitted when stored entry IDs are stale
+    stale_entries_on_load = Signal(list)  # list[str] of game_frame_ids - Emitted when project loads with stale entries
     alignment_updated = Signal(str)  # ai_frame_id - Emitted when alignment changes (not structural)
     sheet_palette_changed = Signal()  # Emitted when sheet palette is set/cleared
     # AI Frame Organization signals (V4)
@@ -210,6 +211,13 @@ class FrameMappingController(QObject):
         """
         try:
             self._project = FrameMappingRepository.load(path)
+
+            # Check for stale entries proactively
+            stale_frames = self._project.detect_stale_entries()
+            stale_ids = [fid for fid, is_stale in stale_frames.items() if is_stale]
+            if stale_ids:
+                self.stale_entries_on_load.emit(stale_ids)  # UI can show dialog/banner
+
             self._preview_service.invalidate_all()
             self._undo_stack.clear()  # Clear history on project load
             self.project_changed.emit()
