@@ -257,7 +257,11 @@ class SpriteCompositor:
                 )
             else:
                 # Sheet palette without explicit mappings -> nearest color
-                indexed = quantize_to_palette(image, palette_rgb)
+                indexed = quantize_to_palette(
+                    image,
+                    palette_rgb,
+                    transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+                )
         else:
             # Fallback: capture palette (existing behavior)
             if not capture_result.entries or not capture_result.palettes:
@@ -270,7 +274,11 @@ class SpriteCompositor:
                 return image
 
             palette_rgb = snes_palette_to_rgb(snes_palette)
-            indexed = quantize_to_palette(image, palette_rgb)
+            indexed = quantize_to_palette(
+                image,
+                palette_rgb,
+                transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+            )
 
         # Convert back to RGBA for compositing
         quantized_rgba = indexed.convert("RGBA")

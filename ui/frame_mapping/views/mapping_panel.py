@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PIL import Image
 from PySide6.QtCore import QPoint, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragMoveEvent, QDropEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
@@ -22,13 +20,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.palette_utils import (
-    QUANTIZATION_TRANSPARENCY_THRESHOLD,
-    quantize_to_palette,
-    quantize_with_mappings,
-)
-from core.services.image_utils import pil_to_qpixmap
 from ui.common.mime_constants import MIME_GAME_FRAME
+from ui.frame_mapping.services.thumbnail_service import (
+    create_quantized_thumbnail,
+    quantize_qpixmap,
+)
+from ui.frame_mapping.views.status_colors import get_status_color
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -38,14 +35,6 @@ logger = get_logger(__name__)
 
 # Thumbnail size for table cells
 THUMBNAIL_SIZE = 64
-
-# Status colors
-STATUS_COLORS = {
-    "unmapped": QColor(128, 128, 128),  # Gray
-    "mapped": QColor(76, 175, 80),  # Green
-    "edited": QColor(33, 150, 243),  # Blue
-    "injected": QColor(156, 39, 176),  # Purple
-}
 
 
 class MappingPanel(QWidget):
@@ -255,125 +244,6 @@ class MappingPanel(QWidget):
         # Refresh to apply new palette to thumbnails
         self.refresh()
 
-    def _create_quantized_thumbnail(self, frame_path: Path) -> QPixmap | None:
-        """Create a palette-quantized thumbnail for an AI frame.
-
-        If a sheet palette is defined, quantizes the frame image to show
-        how it will look when injected with that palette.
-
-        Args:
-            frame_path: Path to the AI frame image
-
-        Returns:
-            Scaled QPixmap suitable for table cell, or None if loading fails
-        """
-        if not frame_path.exists():
-            return None
-
-        try:
-            pil_image = Image.open(frame_path)
-        except Exception:
-            logger.debug("Failed to load image for quantization: %s", frame_path)
-            return None
-
-        # Apply palette quantization if palette is set
-        if self._sheet_palette is not None:
-            try:
-                # Ensure RGBA for quantization
-                if pil_image.mode != "RGBA":
-                    pil_image = pil_image.convert("RGBA")
-
-                # Quantize using mappings if available
-                if self._sheet_palette.color_mappings:
-                    indexed = quantize_with_mappings(
-                        pil_image,
-                        self._sheet_palette.colors,
-                        self._sheet_palette.color_mappings,
-                        transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
-                    )
-                else:
-                    indexed = quantize_to_palette(pil_image, self._sheet_palette.colors)
-
-                # Convert indexed back to RGBA for display (preserves palette colors)
-                pil_image = indexed.convert("RGBA")
-            except Exception:
-                logger.debug("Quantization failed for %s, using original", frame_path)
-
-        # Convert to QPixmap and scale for thumbnail
-        pixmap = pil_to_qpixmap(pil_image)
-        if pixmap is None or pixmap.isNull():
-            return None
-
-        return pixmap.scaled(
-            THUMBNAIL_SIZE,
-            THUMBNAIL_SIZE,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-
-    def _quantize_game_frame_pixmap(self, pixmap: QPixmap) -> QPixmap:
-        """Quantize a game frame QPixmap to match the sheet palette.
-
-        When a sheet palette is set, game frame thumbnails should show
-        quantized colors to accurately preview how the sprite will look
-        when injected. This fixes the P3 desync bug where drawer thumbnails
-        showed raw capture colors instead of preview-accurate colors.
-
-        Args:
-            pixmap: The raw game frame preview QPixmap
-
-        Returns:
-            Quantized QPixmap if sheet palette is set, otherwise the original
-        """
-        if self._sheet_palette is None:
-            return pixmap
-
-        try:
-            # Convert QPixmap to PIL Image via QImage
-            qimage = pixmap.toImage()
-            if qimage.isNull():
-                return pixmap
-
-            width = qimage.width()
-            height = qimage.height()
-
-            # Ensure ARGB32 format for consistent byte layout
-            qimage = qimage.convertToFormat(qimage.Format.Format_ARGB32)
-
-            # Get raw bytes and convert to PIL
-            img_data = bytes(qimage.bits())
-            pil_image = Image.frombytes("RGBA", (width, height), img_data, "raw", "BGRA")
-
-            # Ensure RGBA for quantization
-            if pil_image.mode != "RGBA":
-                pil_image = pil_image.convert("RGBA")
-
-            # Quantize using mappings if available, otherwise nearest-color
-            if self._sheet_palette.color_mappings:
-                indexed = quantize_with_mappings(
-                    pil_image,
-                    self._sheet_palette.colors,
-                    self._sheet_palette.color_mappings,
-                    transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
-                )
-            else:
-                indexed = quantize_to_palette(
-                    pil_image, self._sheet_palette.colors, QUANTIZATION_TRANSPARENCY_THRESHOLD
-                )
-
-            # Convert indexed back to RGBA for display
-            pil_image = indexed.convert("RGBA")
-
-            # Convert back to QPixmap
-            result = pil_to_qpixmap(pil_image)
-            if result is None or result.isNull():
-                return pixmap
-            return result
-
-        except Exception:
-            logger.debug("Game frame quantization failed, using original")
-            return pixmap
-
     def refresh(self) -> None:
         """Refresh the mapping table from the current project."""
         # Store current selection by ID (stable across reordering)
@@ -439,7 +309,7 @@ class MappingPanel(QWidget):
                 # Also store AI frame ID for ID-based lookups
                 ai_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
                 # Load thumbnail (palette-quantized if sheet palette is set)
-                thumbnail = self._create_quantized_thumbnail(ai_frame.path)
+                thumbnail = create_quantized_thumbnail(ai_frame.path, self._sheet_palette, THUMBNAIL_SIZE)
                 if thumbnail is not None:
                     ai_item.setIcon(QIcon(thumbnail))
                 self._table.setItem(row, 2, ai_item)
@@ -453,7 +323,7 @@ class MappingPanel(QWidget):
                     if mapping.game_frame_id in self._game_frame_previews:
                         pixmap = self._game_frame_previews[mapping.game_frame_id]
                         # Quantize to sheet palette if set (shows preview-accurate colors)
-                        pixmap = self._quantize_game_frame_pixmap(pixmap)
+                        pixmap = quantize_qpixmap(pixmap, self._sheet_palette)
                         scaled = pixmap.scaled(
                             THUMBNAIL_SIZE,
                             THUMBNAIL_SIZE,
@@ -490,7 +360,7 @@ class MappingPanel(QWidget):
                 # Status column with color and indicator - column 6
                 status_indicator = "●" if status != "unmapped" else "○"
                 status_item = QTableWidgetItem(f"{status_indicator} {status.capitalize()}")
-                color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
+                color = get_status_color(status)
                 status_item.setForeground(QBrush(color))
                 self._table.setItem(row, 6, status_item)
 
@@ -642,7 +512,7 @@ class MappingPanel(QWidget):
                 status_item = self._table.item(row, 6)
                 if status_item is not None:
                     status_item.setText(f"{status_indicator} {status.capitalize()}")
-                    color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
+                    color = get_status_color(status)
                     status_item.setForeground(QBrush(color))
                 break
 

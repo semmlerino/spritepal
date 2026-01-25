@@ -9,12 +9,25 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import cast
 
-# Import here to avoid circular imports (palette_utils imports from here via TYPE_CHECKING)
-# Use lazy import in from_dict to avoid issues during module load
-SNES_PALETTE_SIZE = 16
+from core.palette_utils import SNES_PALETTE_SIZE
+
+
+class MappingStatus(str, Enum):
+    """Status of a frame mapping.
+
+    Uses str mixin for JSON serialization compatibility - enum values can be
+    serialized directly as strings and compared with string literals.
+    """
+
+    UNMAPPED = "unmapped"
+    MAPPED = "mapped"
+    EDITED = "edited"
+    INJECTED = "injected"
+
 
 logger = logging.getLogger(__name__)
 

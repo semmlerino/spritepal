@@ -5,9 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
-from PIL import Image
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QIcon, QPixmap
+from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -26,13 +25,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.palette_utils import (
-    QUANTIZATION_TRANSPARENCY_THRESHOLD,
-    quantize_to_palette,
-    quantize_with_mappings,
-)
-from core.services.image_utils import pil_to_qpixmap
+from ui.frame_mapping.services.thumbnail_service import create_quantized_thumbnail
 from ui.frame_mapping.views.sheet_palette_widget import SheetPaletteWidget
+from ui.frame_mapping.views.status_colors import get_status_color
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -44,14 +39,6 @@ logger = get_logger(__name__)
 
 # Thumbnail size for list items
 THUMBNAIL_SIZE = 64
-
-# Status colors for AI frame mapping status
-STATUS_COLORS = {
-    "unmapped": QColor(180, 180, 180),  # Light gray
-    "mapped": QColor(76, 175, 80),  # Green
-    "edited": QColor(33, 150, 243),  # Blue
-    "injected": QColor(156, 39, 176),  # Purple
-}
 
 # Tag colors for frame organization
 TAG_COLORS = {
@@ -410,66 +397,6 @@ class AIFramesPane(QWidget):
         self._show_unmapped_only = checked
         self._refresh_list()
 
-    def _create_quantized_thumbnail(self, frame_path: Path) -> QPixmap | None:
-        """Create a palette-quantized thumbnail for an AI frame.
-
-        If a sheet palette is defined, quantizes the frame image to show
-        WYSIWYG colors matching the workbench preview. Otherwise loads
-        the raw PNG.
-
-        Args:
-            frame_path: Path to the AI frame PNG file
-
-        Returns:
-            Scaled QPixmap ready for list item icon, or None on failure
-        """
-        if not frame_path.exists():
-            return None
-
-        # Load original image with PIL
-        try:
-            pil_image = Image.open(frame_path)
-        except Exception:
-            logger.warning("Failed to load image: %s", frame_path)
-            return None
-
-        # Apply palette quantization if palette is defined
-        if self._sheet_palette is not None:
-            try:
-                # Ensure RGBA for quantization
-                if pil_image.mode != "RGBA":
-                    pil_image = pil_image.convert("RGBA")
-
-                # Use color_mappings if defined, otherwise simple quantization
-                if self._sheet_palette.color_mappings:
-                    indexed = quantize_with_mappings(
-                        pil_image,
-                        self._sheet_palette.colors,
-                        self._sheet_palette.color_mappings,
-                        transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
-                    )
-                else:
-                    indexed = quantize_to_palette(pil_image, self._sheet_palette.colors)
-
-                # Convert indexed back to RGBA for display (preserves palette colors)
-                pil_image = indexed.convert("RGBA")
-            except Exception:
-                logger.warning("Failed to quantize image: %s", frame_path, exc_info=True)
-                # Fall through to use original image
-
-        # Convert to QPixmap
-        pixmap = pil_to_qpixmap(pil_image)
-        if pixmap is None or pixmap.isNull():
-            return None
-
-        # Scale to thumbnail size
-        return pixmap.scaled(
-            THUMBNAIL_SIZE,
-            THUMBNAIL_SIZE,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-
     def _on_selection_changed(self, row: int) -> None:
         """Handle AI frame selection change."""
         if row < 0:
@@ -597,11 +524,11 @@ class AIFramesPane(QWidget):
                 item.setData(Qt.ItemDataRole.UserRole + 1, frame.index)
 
                 # Apply status color
-                color = STATUS_COLORS.get(status, STATUS_COLORS["unmapped"])
+                color = get_status_color(status)
                 item.setForeground(QBrush(color))
 
                 # Load thumbnail (quantized if palette defined)
-                thumbnail = self._create_quantized_thumbnail(frame.path)
+                thumbnail = create_quantized_thumbnail(frame.path, self._sheet_palette, THUMBNAIL_SIZE)
                 if thumbnail is not None:
                     item.setIcon(QIcon(thumbnail))
 

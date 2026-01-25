@@ -73,17 +73,15 @@ class TestSetSheetPaletteViewportUpdate:
         frames = create_ai_frames(tmp_path, num_frames=3)
         pane.set_ai_frames(frames)
 
-        # Track thumbnail creation calls
+        # Track thumbnail creation calls by patching the module-level function
         thumbnail_calls: list[Path] = []
-        original_create = pane._create_quantized_thumbnail
 
-        def track_thumbnail(frame_path: Path):
+        def track_thumbnail(frame_path: Path, palette: object, size: int) -> None:
             thumbnail_calls.append(frame_path)
-            return original_create(frame_path)
 
         palette = create_test_palette()
 
-        with patch.object(pane, "_create_quantized_thumbnail", side_effect=track_thumbnail):
+        with patch("ui.frame_mapping.views.ai_frames_pane.create_quantized_thumbnail", side_effect=track_thumbnail):
             pane.set_sheet_palette(palette)
 
         # All 3 frames should have had thumbnails regenerated
@@ -103,17 +101,15 @@ class TestSetSheetPaletteViewportUpdate:
 
         # Track thumbnail creation for second palette call
         thumbnail_calls: list[Path] = []
-        original_create = pane._create_quantized_thumbnail
 
-        def track_thumbnail(frame_path: Path):
+        def track_thumbnail(frame_path: Path, palette: object, size: int) -> None:
             thumbnail_calls.append(frame_path)
-            return original_create(frame_path)
 
         # Second palette (simulating palette edit)
         palette2 = create_test_palette()
         palette2.colors = [(255, 255, 255), (128, 128, 128), (64, 64, 64), (0, 0, 0)]
 
-        with patch.object(pane, "_create_quantized_thumbnail", side_effect=track_thumbnail):
+        with patch("ui.frame_mapping.views.ai_frames_pane.create_quantized_thumbnail", side_effect=track_thumbnail):
             pane.set_sheet_palette(palette2)
 
         # All 3 frames should have had thumbnails regenerated again

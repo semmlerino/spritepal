@@ -141,7 +141,7 @@ def snes_palette_to_rgb(snes_colors: list[int | list[int]]) -> list[tuple[int, i
 def quantize_to_palette(
     img: Image.Image,
     palette_rgb: list[tuple[int, int, int]],
-    transparency_threshold: int = 1,
+    transparency_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD,
 ) -> Image.Image:
     """Quantize RGBA image to a fixed 16-color indexed palette.
 
@@ -231,7 +231,7 @@ def quantize_with_mappings(
     img: Image.Image,
     palette_rgb: list[tuple[int, int, int]],
     color_mappings: dict[tuple[int, int, int], int],
-    transparency_threshold: int = 1,
+    transparency_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD,
 ) -> Image.Image:
     """Quantize RGBA image using explicit color mappings with perceptual fallback.
 
