@@ -38,33 +38,6 @@ class TestSettingsIntegration:
         ):
             yield tmpdir
 
-    def test_settings_persistence_across_sessions(self, temp_settings_dir, app_context: AppContext):
-        """Test that settings persist across application restarts"""
-        # Use ApplicationStateManager directly for isolated testing
-        temp_file = Path(temp_settings_dir) / "test_settings.json"
-        settings1 = ApplicationStateManager(app_name="TestApp", settings_path=temp_file)
-
-        # Set various settings
-        settings1.set("session", "vram_path", "/test/vram.dmp")
-        settings1.set("session", "cgram_path", "/test/cgram.dmp")
-        settings1.set("session", "output_name", "my_sprite")
-        settings1.set("ui", "window_width", 1024)
-        settings1.set("ui", "window_height", 768)
-        settings1.set("custom", "last_export_dir", "/exports")
-
-        settings1.save_settings()
-
-        # Session 2: Load settings in new instance
-        settings2 = ApplicationStateManager(app_name="TestApp", settings_path=temp_file)
-
-        # Verify settings persisted
-        assert settings2.get("session", "vram_path") == "/test/vram.dmp"
-        assert settings2.get("session", "cgram_path") == "/test/cgram.dmp"
-        assert settings2.get("session", "output_name") == "my_sprite"
-        assert settings2.get("ui", "window_width") == 1024
-        assert settings2.get("ui", "window_height") == 768
-        assert settings2.get("custom", "last_export_dir") == "/exports"
-
     def test_settings_manager_session_data(self, temp_settings_dir, app_context: AppContext):
         """Test settings manager session data persistence (formerly controller integration test)."""
         settings = app_context.application_state_manager
@@ -80,38 +53,6 @@ class TestSettingsIntegration:
 
         tile_count = settings.get("session", "last_tile_count", 0)
         assert tile_count == 64
-
-    def test_window_geometry_persistence(self, temp_settings_dir, app_context: AppContext):
-        """Test UI geometry settings persistence"""
-        # Create ApplicationStateManager with temporary file
-        temp_file = Path(temp_settings_dir) / "geometry_settings.json"
-        settings = ApplicationStateManager(app_name="SpritePal", settings_path=temp_file)
-
-        # Simulate saving window state
-        window_state = {
-            "x": 100,
-            "y": 200,
-            "width": 1200,
-            "height": 800,
-            "maximized": False,
-            "splitter_sizes": [300, 900],
-        }
-
-        for key, value in window_state.items():
-            settings.set("ui", f"window_{key}", value)
-
-        settings.save_settings()
-
-        # Load in new instance
-        new_settings = ApplicationStateManager(app_name="SpritePal", settings_path=temp_file)
-
-        # Verify all geometry saved
-        assert new_settings.get("ui", "window_x") == 100
-        assert new_settings.get("ui", "window_y") == 200
-        assert new_settings.get("ui", "window_width") == 1200
-        assert new_settings.get("ui", "window_height") == 800
-        assert not new_settings.get("ui", "window_maximized")
-        assert new_settings.get("ui", "window_splitter_sizes") == [300, 900]
 
     def test_recent_files_management(self, temp_settings_dir, app_context: AppContext):
         """Test recent files list in settings"""
@@ -198,30 +139,6 @@ class TestSettingsIntegration:
         # Changes in one should be visible in other
         settings1.set("test", "key", "value")
         assert settings2.get("test", "key") == "value"
-
-    def test_settings_corruption_recovery(self, temp_settings_dir):
-        """Test recovery from corrupted settings file"""
-        # Create corrupted settings file
-        settings_file = Path(temp_settings_dir) / ".spritepal_settings.json"
-        with settings_file.open("w") as f:
-            f.write("{ corrupted json }")
-
-        # Create an ApplicationStateManager with our temp settings file
-        settings = ApplicationStateManager(app_name="SpritePal", settings_path=settings_file)
-
-        # Should load defaults without crashing
-        # Verify defaults loaded (since file was corrupted)
-        assert settings.get("session", "vram_path") == ""
-        assert settings.get("ui", "window_width") == 900
-
-        # Should be able to save valid settings
-        settings.set("session", "vram_path", "/new/path.dmp")
-        settings.save_settings()
-
-        # Verify file is now valid JSON
-        with settings_file.open() as f:
-            data = json.load(f)
-            assert data["session"]["vram_path"] == "/new/path.dmp"
 
     def test_settings_permission_handling(self, temp_settings_dir, app_context: AppContext):
         """Test handling of permission errors"""

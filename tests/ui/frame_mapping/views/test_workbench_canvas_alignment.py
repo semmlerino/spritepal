@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw
 from PySide6.QtGui import QPixmap
 
 from core.frame_mapping_project import AIFrame, GameFrame
+from tests.infrastructure.mesen_mocks import create_simple_capture
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 
 if TYPE_CHECKING:
@@ -104,16 +105,7 @@ class TestAutoAlignVisibility:
         game_preview.save(game_preview_path)
 
         # Mock capture result with 32x32 bbox
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 32
-            height = 32
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
+        mock_capture = create_simple_capture(width=32, height=32)
 
         # Create a proper GameFrame
         game_frame = GameFrame(id="test_frame", width=32, height=32)
@@ -122,7 +114,7 @@ class TestAutoAlignVisibility:
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
 
@@ -163,16 +155,7 @@ class TestAutoAlignVisibility:
         game_preview.save(game_preview_path)
 
         # Mock capture result with 32x32 bbox
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 32
-            height = 32
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
+        mock_capture = create_simple_capture(width=32, height=32)
 
         # Create a proper GameFrame
         game_frame = GameFrame(id="test_frame", width=32, height=32)
@@ -181,7 +164,7 @@ class TestAutoAlignVisibility:
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
 

@@ -14,6 +14,7 @@ from PIL import Image
 from PySide6.QtGui import QPixmap
 
 from core.frame_mapping_project import AIFrame, GameFrame
+from tests.infrastructure.mesen_mocks import create_simple_capture
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 
 if TYPE_CHECKING:
@@ -37,16 +38,7 @@ class TestAutoAlignFeedback:
         game_preview.save(game_preview_path)
 
         # Mock capture result
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 32
-            height = 32
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
+        mock_capture = create_simple_capture(width=32, height=32)
 
         game_frame = GameFrame(id="test_frame", width=32, height=32)
 
@@ -54,7 +46,7 @@ class TestAutoAlignFeedback:
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
 
         # Enable mapping but DON'T set AI frame - _ai_image will be None
@@ -109,16 +101,7 @@ class TestAutoAlignFeedback:
         game_preview.save(game_preview_path)
 
         # Mock capture result
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 32
-            height = 32
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
+        mock_capture = create_simple_capture(width=32, height=32)
 
         game_frame = GameFrame(id="test_frame", width=32, height=32)
 
@@ -126,7 +109,7 @@ class TestAutoAlignFeedback:
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
 
@@ -151,22 +134,13 @@ class TestAutoAlignFeedback:
         game_preview = Image.new("RGBA", (32, 32), (0, 255, 0, 255))
         game_preview.save(game_preview_path)
 
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 32
-            height = 32
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
+        mock_capture = create_simple_capture(width=32, height=32)
 
         game_frame = GameFrame(id="test_frame", width=32, height=32)
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
 
         # Enable mapping WITHOUT setting AI frame
@@ -200,22 +174,13 @@ class TestAutoAlignButtonStateOnFrameChanges:
         game_preview = Image.new("RGBA", (32, 32), (0, 255, 0, 255))
         game_preview.save(game_preview_path)
 
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 32
-            height = 32
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
+        mock_capture = create_simple_capture(width=32, height=32)
 
         game_frame = GameFrame(id="test_frame", width=32, height=32)
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
 
         # Enable mapping but no AI frame yet
@@ -250,22 +215,13 @@ class TestAutoAlignButtonStateOnFrameChanges:
         game_preview = Image.new("RGBA", (32, 32), (0, 255, 0, 255))
         game_preview.save(game_preview_path)
 
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 32
-            height = 32
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
+        mock_capture = create_simple_capture(width=32, height=32)
 
         game_frame = GameFrame(id="test_frame", width=32, height=32)
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
         canvas.set_alignment(0, 0, False, False, 1.0)
@@ -316,17 +272,7 @@ class TestAutoAlignWithTransforms:
         game_preview = Image.new("RGBA", (40, 40), (0, 255, 0, 255))
         game_preview.save(game_preview_path)
 
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 40
-            height = 40
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
-            has_entries = True
+        mock_capture = create_simple_capture(width=40, height=40)
 
         game_frame = GameFrame(id="test_frame", width=40, height=40)
 
@@ -334,7 +280,7 @@ class TestAutoAlignWithTransforms:
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
 
@@ -393,17 +339,7 @@ class TestAutoAlignWithTransforms:
         game_preview = Image.new("RGBA", (40, 40), (0, 255, 0, 255))
         game_preview.save(game_preview_path)
 
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 40
-            height = 40
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
-            has_entries = True
+        mock_capture = create_simple_capture(width=40, height=40)
 
         game_frame = GameFrame(id="test_frame", width=40, height=40)
 
@@ -411,7 +347,7 @@ class TestAutoAlignWithTransforms:
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
 

@@ -13,6 +13,13 @@ from __future__ import annotations
 
 from .data_repository import DataRepository
 from .environment_detection import get_environment_info, is_pyside6_available
+from .mesen_mocks import (
+    MockBoundingBox,
+    MockCaptureResult,
+    MockOAMEntry,
+    MockTileData,
+    create_simple_capture,
+)
 from .qt_pixmap_guard import install_qpixmap_guard
 from .test_signal import TestSignal, TestSignalBlocker
 
@@ -24,6 +31,12 @@ __all__ = [
     "is_pyside6_available",
     "TestSignal",
     "TestSignalBlocker",
+    # Mesen capture result mocks
+    "MockBoundingBox",
+    "MockCaptureResult",
+    "MockOAMEntry",
+    "MockTileData",
+    "create_simple_capture",
 ]
 
 # Conditional imports based on Qt availability

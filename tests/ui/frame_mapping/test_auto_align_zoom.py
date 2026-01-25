@@ -18,6 +18,7 @@ from PIL import Image, ImageDraw
 from PySide6.QtGui import QPixmap
 
 from core.frame_mapping_project import AIFrame, GameFrame
+from tests.infrastructure.mesen_mocks import create_simple_capture
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 
 if TYPE_CHECKING:
@@ -59,16 +60,7 @@ class TestAutoAlignZoomBehavior:
         ai_image.save(ai_image_path)
 
         # 3. Create mock capture result with known bbox
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 64
-            height = 64
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
+        mock_capture = create_simple_capture(width=64, height=64)
 
         # 4. Create game frame
         game_frame = GameFrame(id="test_extreme_offset", width=64, height=64)
@@ -77,7 +69,7 @@ class TestAutoAlignZoomBehavior:
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
 
@@ -144,23 +136,14 @@ class TestAutoAlignZoomBehavior:
         ai_image.save(ai_image_path)
 
         # Mock capture result
-        class MockBoundingBox:
-            x = 0
-            y = 0
-            width = 64
-            height = 64
-
-        class MockCaptureResult:
-            entries: list[object] = []
-            palettes: dict[int, object] = {}
-            bounding_box = MockBoundingBox()
+        mock_capture = create_simple_capture(width=64, height=64)
 
         game_frame = GameFrame(id="test_normal", width=64, height=64)
 
         canvas.set_game_frame(
             frame=game_frame,
             preview_pixmap=QPixmap(str(game_preview_path)),
-            capture_result=MockCaptureResult(),  # type: ignore[arg-type]
+            capture_result=mock_capture,  # type: ignore[arg-type]
         )
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
 
