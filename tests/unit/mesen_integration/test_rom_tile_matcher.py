@@ -576,3 +576,166 @@ class TestEdgeCases:
 
         matches = matcher.lookup_vram_tile(tile_data)
         assert len(matches) == 3
+
+
+# =============================================================================
+# Integration Tests (End-to-End Through Public API)
+# =============================================================================
+
+
+class TestROMTileMatcherIntegration:
+    """Integration tests verifying full tile matching workflow through public API.
+
+    These tests verify the complete pipeline:
+    1. Database construction with real tile data
+    2. Lookup through public API (lookup_vram_tile)
+    3. Flip variant matching
+    4. Save/load round-trip
+    """
+
+    def test_full_lookup_workflow_with_flip_variants(self, tmp_path: Path) -> None:
+        """Verify lookup finds tiles and their flip variants.
+
+        Integration test: Constructs database, looks up tile and flipped variants,
+        verifies correct locations are returned with flip indicators.
+        """
+        # Create a distinctive tile pattern (asymmetric so flips are different)
+        original_tile = bytes([0x80] + [0x00] * 31)  # One bit set in top-left
+        h_flipped = ROMTileMatcher._flip_h(original_tile)
+        v_flipped = ROMTileMatcher._flip_v(original_tile)
+        hv_flipped = ROMTileMatcher._flip_h(ROMTileMatcher._flip_v(original_tile))
+
+        # Pre-compute hashes
+        orig_hash = ROMTileMatcher._hash_tile(original_tile)
+        h_hash = ROMTileMatcher._hash_tile(h_flipped)
+        v_hash = ROMTileMatcher._hash_tile(v_flipped)
+        hv_hash = ROMTileMatcher._hash_tile(hv_flipped)
+
+        # Create matcher with all variants indexed
+        dummy_rom = tmp_path / "test.sfc"
+        dummy_rom.write_bytes(bytes(0x200))
+
+        matcher = create_test_rom_tile_matcher(
+            rom_path=dummy_rom,
+            hash_to_locations={
+                orig_hash: [TileLocation(0x1B0000, 0, "Kirby sprite", "")],
+                h_hash: [TileLocation(0x1B0000, 0, "Kirby sprite", "H")],
+                v_hash: [TileLocation(0x1B0000, 0, "Kirby sprite", "V")],
+                hv_hash: [TileLocation(0x1B0000, 0, "Kirby sprite", "HV")],
+            },
+            blocks=[ROMBlock(0x1B0000, "Kirby sprite", 320, 10)],
+            total_tiles=4,
+            unique_hashes=4,
+        )
+
+        # Look up original tile - should find direct match
+        matches = matcher.lookup_vram_tile(original_tile)
+        assert len(matches) == 1
+        assert matches[0].flip_variant == ""
+
+        # Look up H-flipped tile - should find with H indicator
+        matches = matcher.lookup_vram_tile(h_flipped)
+        assert len(matches) == 1
+        assert matches[0].flip_variant == "H"
+
+        # Look up V-flipped tile - should find with V indicator
+        matches = matcher.lookup_vram_tile(v_flipped)
+        assert len(matches) == 1
+        assert matches[0].flip_variant == "V"
+
+        # Look up HV-flipped tile - should find with HV indicator
+        matches = matcher.lookup_vram_tile(hv_flipped)
+        assert len(matches) == 1
+        assert matches[0].flip_variant == "HV"
+
+    def test_save_load_preserves_lookup_results(self, tmp_path: Path) -> None:
+        """Verify database save/load round-trip preserves lookup functionality.
+
+        Integration test: Creates database, saves to JSON, loads back,
+        verifies lookups still work correctly.
+        """
+        # Create test data
+        tile1 = bytes([0xAA] * BYTES_PER_TILE)
+        tile2 = bytes([0xBB] * BYTES_PER_TILE)
+        hash1 = ROMTileMatcher._hash_tile(tile1)
+        hash2 = ROMTileMatcher._hash_tile(tile2)
+
+        dummy_rom = tmp_path / "test.sfc"
+        dummy_rom.write_bytes(bytes(0x200))
+        db_path = tmp_path / "tile_db.json"
+
+        # Create and save matcher
+        original_matcher = create_test_rom_tile_matcher(
+            rom_path=dummy_rom,
+            hash_to_locations={
+                hash1: [TileLocation(0x1B0000, 0, "Sprite A")],
+                hash2: [TileLocation(0x1C0000, 5, "Sprite B")],
+            },
+            blocks=[
+                ROMBlock(0x1B0000, "Sprite A", 320, 10),
+                ROMBlock(0x1C0000, "Sprite B", 320, 10),
+            ],
+            total_tiles=20,
+            unique_hashes=2,
+        )
+
+        original_matcher.save_database(db_path)
+
+        # Load and verify
+        loaded_matcher = ROMTileMatcher.load_database(db_path, dummy_rom)
+
+        # Lookups should work the same
+        matches1 = loaded_matcher.lookup_vram_tile(tile1)
+        matches2 = loaded_matcher.lookup_vram_tile(tile2)
+
+        assert len(matches1) == 1
+        assert matches1[0].rom_offset == 0x1B0000
+        assert matches1[0].tile_index == 0
+
+        assert len(matches2) == 1
+        assert matches2[0].rom_offset == 0x1C0000
+        assert matches2[0].tile_index == 5
+
+        # Statistics should be preserved
+        stats = loaded_matcher.get_statistics()
+        assert stats["blocks_indexed"] == 2
+        assert stats["total_tiles"] == 20
+        assert stats["unique_hashes"] == 2
+
+    def test_batch_lookup_integration(self, tmp_path: Path) -> None:
+        """Verify batch lookup correctly processes multiple tiles at once.
+
+        Integration test: Submits multiple tiles to lookup_vram_tiles,
+        verifies all matches are returned with correct tile indices.
+        """
+        # Create tiles with known hashes
+        tiles = [bytes([i] * BYTES_PER_TILE) for i in range(5)]
+        hashes = [ROMTileMatcher._hash_tile(t) for t in tiles]
+
+        dummy_rom = tmp_path / "test.sfc"
+        dummy_rom.write_bytes(bytes(0x200))
+
+        # Only index tiles 0, 2, and 4 (not 1 and 3)
+        matcher = create_test_rom_tile_matcher(
+            rom_path=dummy_rom,
+            hash_to_locations={
+                hashes[0]: [TileLocation(0x1B0000, 0, "Found")],
+                hashes[2]: [TileLocation(0x1B0020, 1, "Found")],
+                hashes[4]: [TileLocation(0x1B0040, 2, "Found")],
+            },
+        )
+
+        # Batch lookup all 5 tiles
+        results = matcher.lookup_vram_tiles(tiles)
+
+        # Only indices 0, 2, 4 should have results
+        assert 0 in results
+        assert 1 not in results  # Not indexed
+        assert 2 in results
+        assert 3 not in results  # Not indexed
+        assert 4 in results
+
+        # Verify correct locations returned
+        assert results[0][0].rom_offset == 0x1B0000
+        assert results[2][0].rom_offset == 0x1B0020
+        assert results[4][0].rom_offset == 0x1B0040
