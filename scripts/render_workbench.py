@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
 from core.services.content_bounds_analyzer import ContentBoundsAnalyzer
+from core.services.tile_sampling_service import TileSamplingService
 
 
 def load_capture(capture_path: Path, selected_entry_ids: list[int] | None = None) -> CaptureResult:
@@ -121,6 +122,110 @@ def get_mapping_from_project(project: dict[str, Any], mapping_index: int, projec
         "game_frame_name": game_frame.get("display_name", game_frame_id),
         "ai_frame_name": Path(ai_frame_path_str).name,
     }
+
+
+def compute_tile_rects(capture_result: CaptureResult) -> list[tuple[int, int, int, int]]:
+    """Compute 8x8 tile rectangles from OAM entries in scene coordinates.
+
+    These are the actual tile regions that will receive injected pixel data.
+
+    Returns:
+        List of (x, y, width, height) tuples in scene coordinates (relative to bbox origin).
+    """
+    tile_rects: list[tuple[int, int, int, int]] = []
+    bbox = capture_result.bounding_box
+
+    for entry in capture_result.entries:
+        # Calculate relative position within the sprite bounds
+        rel_x = entry.x - bbox.x
+        rel_y = entry.y - bbox.y
+
+        # Break into 8x8 tiles
+        for ty in range(0, entry.height, 8):
+            for tx in range(0, entry.width, 8):
+                tile_rects.append((rel_x + tx, rel_y + ty, 8, 8))
+
+    return tile_rects
+
+
+def check_out_of_bounds(
+    ai_image: Image.Image,
+    tile_rects: list[tuple[int, int, int, int]],
+    offset_x: int,
+    offset_y: int,
+    scale: float,
+) -> tuple[bool, list[tuple[int, int, int, int]]]:
+    """Check if AI frame content extends outside tile regions.
+
+    Args:
+        ai_image: AI frame image
+        tile_rects: List of (x, y, w, h) tile rectangles in scene coordinates
+        offset_x: AI frame X offset
+        offset_y: AI frame Y offset
+        scale: AI frame scale factor
+
+    Returns:
+        Tuple of (has_overflow, overflow_rects) where overflow_rects are
+        (x, y, w, h) in scene coordinates.
+    """
+    service = TileSamplingService()
+    content_bbox = ai_image.getbbox()  # Non-transparent content bounds
+
+    return service.check_content_outside_tiles(
+        content_bbox,
+        tile_rects,
+        offset_x,
+        offset_y,
+        scale,
+    )
+
+
+def draw_overflow_regions(
+    draw: ImageDraw.ImageDraw,
+    overflow_rects: list[tuple[int, int, int, int]],
+    min_x: int,
+    min_y: int,
+    display_scale: int,
+) -> None:
+    """Draw overflow regions with red striped pattern.
+
+    Args:
+        draw: PIL ImageDraw object
+        overflow_rects: List of (x, y, w, h) rectangles in scene coordinates
+        min_x: Canvas origin X offset
+        min_y: Canvas origin Y offset
+        display_scale: Display magnification factor
+    """
+    for x, y, w, h in overflow_rects:
+        # Convert to canvas coordinates
+        x1 = (x - min_x) * display_scale
+        y1 = (y - min_y) * display_scale
+        x2 = x1 + w * display_scale
+        y2 = y1 + h * display_scale
+
+        # Draw red border
+        draw.rectangle([x1, y1, x2, y2], outline=(255, 0, 0, 200), width=2)
+
+        # Draw diagonal stripes (hatching pattern)
+        stripe_spacing = 8
+        for offset in range(-max(w, h) * display_scale, max(w, h) * display_scale, stripe_spacing):
+            # Diagonal lines from top-left to bottom-right
+            line_x1 = x1 + offset
+            line_y1 = y1
+            line_x2 = x1 + offset + h * display_scale
+            line_y2 = y2
+
+            # Clip to rectangle bounds
+            if line_x1 < x1:
+                line_y1 += x1 - line_x1
+                line_x1 = x1
+            if line_x2 > x2:
+                line_y2 -= line_x2 - x2
+                line_x2 = x2
+            if line_y1 < y1 or line_y2 > y2 or line_x1 > x2 or line_x2 < x1:
+                continue
+
+            draw.line([(line_x1, line_y1), (line_x2, line_y2)], fill=(255, 0, 0, 150), width=1)
 
 
 def compute_auto_align(
@@ -232,8 +337,9 @@ def render_workbench(
     display_scale: int = 4,
     show_markers: bool = True,
     show_tile_overlay: bool = False,
+    show_overflow: bool = False,
     opacity: float = 0.7,
-) -> Image.Image:
+) -> tuple[Image.Image, bool, list[tuple[int, int, int, int]]]:
     """Render workbench canvas view as an image.
 
     Args:
@@ -247,10 +353,11 @@ def render_workbench(
         display_scale: Multiplier for display (default 4x like app)
         show_markers: Whether to draw center markers
         show_tile_overlay: Whether to draw OAM tile boundaries
+        show_overflow: Whether to draw out-of-bounds regions
         opacity: AI frame opacity (0.0-1.0)
 
     Returns:
-        Rendered composite image
+        Tuple of (rendered_image, has_overflow, overflow_rects)
     """
     # Render game frame
     renderer = CaptureRenderer(capture_result)
@@ -357,7 +464,21 @@ def render_workbench(
                 width=2,
             )
 
-    return canvas
+    # Check for out-of-bounds content
+    tile_rects = compute_tile_rects(capture_result)
+    has_overflow, overflow_rects = check_out_of_bounds(
+        ai_image if not (flip_h or flip_v) else transformed_ai,
+        tile_rects,
+        offset_x,
+        offset_y,
+        scale,
+    )
+
+    # Draw overflow regions if requested
+    if show_overflow and has_overflow:
+        draw_overflow_regions(draw, overflow_rects, min_x, min_y, display_scale)
+
+    return canvas, has_overflow, overflow_rects
 
 
 def main() -> None:
@@ -426,6 +547,7 @@ Examples:
     parser.add_argument("--opacity", type=float, default=0.7, help="AI opacity (default: 0.7)")
     parser.add_argument("--no-markers", action="store_true", help="Hide center markers")
     parser.add_argument("--tile-overlay", action="store_true", help="Show OAM tile boundaries")
+    parser.add_argument("--show-overflow", action="store_true", help="Show out-of-bounds regions")
 
     args = parser.parse_args()
 
@@ -508,7 +630,7 @@ Examples:
 
     # Render
     print("Rendering...")
-    result = render_workbench(
+    result, has_overflow, overflow_rects = render_workbench(
         capture_result,
         ai_image,
         offset_x=offset_x,
@@ -519,11 +641,20 @@ Examples:
         display_scale=args.display_scale,
         show_markers=not args.no_markers,
         show_tile_overlay=args.tile_overlay,
+        show_overflow=args.show_overflow,
         opacity=args.opacity,
     )
 
     result.save(args.output)
     print(f"Saved to: {args.output}")
+
+    # Report out-of-bounds status
+    if has_overflow:
+        print("\n⚠️  OUT OF BOUNDS: AI frame content extends past tile area!")
+        print(f"   {len(overflow_rects)} overflow region(s) detected")
+        print("   Content outside tile area will NOT be injected.")
+    else:
+        print("\n✓ AI frame fits within tile area")
 
     # Print debug info
     game_centroid = ContentBoundsAnalyzer.compute_centroid(game_image)
