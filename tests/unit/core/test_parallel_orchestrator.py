@@ -1,8 +1,14 @@
 """
-Comprehensive tests for parallel sprite finder functionality.
+Unit tests for parallel sprite finder orchestration functionality.
 
-Tests both parallel vs linear performance, result accuracy, cancellation handling,
+Tests parallel vs linear performance, result accuracy, cancellation handling,
 adaptive step sizing, and proper mocking for unit tests.
+
+Note: These are unit tests that test the ParallelSpriteFinder orchestration
+logic with mocked SpriteFinder dependencies. Real HAL integration tests
+are in tests/integration/test_sprite_finding_system.py.
+
+Renamed from tests/integration/test_parallel_sprite_finder.py
 """
 
 from __future__ import annotations
@@ -27,7 +33,6 @@ from utils.constants import DEFAULT_SCAN_STEP
 logger = logging.getLogger(__name__)
 
 pytestmark = [
-    pytest.mark.integration,
     pytest.mark.skip_thread_cleanup(reason="Parallel finder tests create thread pools that take time to clean up"),
     pytest.mark.usefixtures("session_app_context", "mock_hal"),
     pytest.mark.shared_state_safe,

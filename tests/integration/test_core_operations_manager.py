@@ -645,19 +645,84 @@ class TestSignals:
 
 
 class TestROMInjectionSettings:
-    """Tests for ROM injection settings persistence."""
+    """Tests for ROM injection settings persistence.
 
-    def test_save_rom_injection_settings(self, manager):
-        """save_rom_injection_settings should save to session."""
+    Tests save/load round-trips for ROM injection dialog settings without
+    requiring dialog mocking - tests manager methods directly.
+
+    Note: The load function only returns input_rom if the file exists,
+    so tests must create actual files for path-based assertions.
+    """
+
+    def test_save_rom_injection_settings_persists_values(self, manager, tmp_path):
+        """save_rom_injection_settings should persist all values retrievable via load."""
+        # Create actual ROM file for persistence to work
+        rom_file = tmp_path / "rom.sfc"
+        rom_file.write_bytes(b"\x00" * 0x8000)
+
+        # Save settings
         manager.save_rom_injection_settings(
-            input_rom="/path/to/rom.sfc",
+            input_rom=str(rom_file),
             sprite_location_text="Test Sprite (0x1000)",
             custom_offset="0x2000",
             fast_compression=True,
         )
 
-        # Settings should be saved (no exception)
-        # Actual persistence depends on session manager
+        # Load defaults and verify saved values are returned
+        result = manager.load_rom_injection_defaults("")  # Empty path to get saved values
+
+        # input_rom only returned if file exists (which it does)
+        assert result["input_rom"] == str(rom_file)
+        assert result["custom_offset"] == "0x2000"
+        assert result["fast_compression"] is True
+
+    def test_save_rom_injection_settings_empty_values(self, manager):
+        """save_rom_injection_settings should handle empty string values."""
+        # Save with empty values
+        manager.save_rom_injection_settings(
+            input_rom="",
+            sprite_location_text="Select sprite location...",
+            custom_offset="",
+            fast_compression=False,
+        )
+
+        result = manager.load_rom_injection_defaults("")
+
+        # Empty strings should be preserved (or default to empty)
+        assert result["input_rom"] == ""
+        assert result["custom_offset"] == ""
+        assert result["fast_compression"] is False
+
+    def test_save_rom_injection_settings_overwrites_previous(self, manager, tmp_path):
+        """save_rom_injection_settings should overwrite previous settings."""
+        # Create actual ROM files
+        first_rom = tmp_path / "first.sfc"
+        first_rom.write_bytes(b"\x00" * 0x8000)
+        second_rom = tmp_path / "second.sfc"
+        second_rom.write_bytes(b"\x00" * 0x8000)
+
+        # Save initial settings
+        manager.save_rom_injection_settings(
+            input_rom=str(first_rom),
+            sprite_location_text="First Sprite",
+            custom_offset="0x1000",
+            fast_compression=False,
+        )
+
+        # Save new settings
+        manager.save_rom_injection_settings(
+            input_rom=str(second_rom),
+            sprite_location_text="Second Sprite",
+            custom_offset="0x2000",
+            fast_compression=True,
+        )
+
+        result = manager.load_rom_injection_defaults("")
+
+        # Should have new values, not old
+        assert result["input_rom"] == str(second_rom)
+        assert result["custom_offset"] == "0x2000"
+        assert result["fast_compression"] is True
 
     def test_load_rom_injection_defaults_empty(self, manager, tmp_path):
         """load_rom_injection_defaults should return defaults with no metadata."""
@@ -671,6 +736,41 @@ class TestROMInjectionSettings:
         assert "output_rom" in result
         assert "fast_compression" in result
 
+    def test_load_rom_injection_defaults_metadata_priority(self, manager, tmp_path):
+        """Metadata extraction info should take priority over saved session values."""
+        # Create actual ROM in sprite directory for metadata path to work
+        sprite_dir = tmp_path / "sprites"
+        sprite_dir.mkdir()
+        rom_file = sprite_dir / "metadata_rom.sfc"
+        rom_file.write_bytes(b"\x00" * 0x8000)
+        sprite_path = sprite_dir / "sprite.png"
+        sprite_path.touch()
+
+        # Save session settings with different values
+        session_rom = tmp_path / "session_rom.sfc"
+        session_rom.write_bytes(b"\x00" * 0x8000)
+        manager.save_rom_injection_settings(
+            input_rom=str(session_rom),
+            sprite_location_text="Session Sprite",
+            custom_offset="0x1000",
+            fast_compression=False,
+        )
+
+        # Provide metadata that should override session
+        # rom_source is relative to sprite_path's parent directory
+        metadata = {
+            "rom_extraction_info": {
+                "rom_source": "metadata_rom.sfc",  # Relative path
+                "rom_offset": "0x5000",
+            }
+        }
+
+        result = manager.load_rom_injection_defaults(str(sprite_path), metadata)
+
+        # Metadata ROM offset should be used when metadata ROM file exists
+        assert result["custom_offset"] == "0x5000"
+        assert result["input_rom"] == str(rom_file)
+
     def test_restore_saved_sprite_location(self, manager):
         """restore_saved_sprite_location should return dict."""
         locations = {"Kirby": 0x100000, "Waddle Dee": 0x200000}
@@ -681,6 +781,23 @@ class TestROMInjectionSettings:
         assert "sprite_location_name" in result
         assert "sprite_location_index" in result
         assert "custom_offset" in result
+
+    def test_restore_saved_sprite_location_matches_saved(self, manager):
+        """restore_saved_sprite_location should find matching saved location."""
+        # Save a sprite location
+        manager.save_rom_injection_settings(
+            input_rom="/path/to/rom.sfc",
+            sprite_location_text="Waddle Dee (0x200000)",
+            custom_offset="",
+            fast_compression=False,
+        )
+
+        locations = {"Kirby": 0x100000, "Waddle Dee": 0x200000}
+
+        result = manager.restore_saved_sprite_location(None, locations)
+
+        # Should find the matching location
+        assert result["sprite_location_name"] == "Waddle Dee"
 
 
 class TestRegressionFixes:
