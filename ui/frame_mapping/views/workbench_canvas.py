@@ -1368,14 +1368,171 @@ class WorkbenchCanvas(QWidget):
             logger.exception("Failed to generate preview")
             self._preview_item.setVisible(False)
 
+    def _compute_tile_rects(self) -> list[tuple[int, int, int, int]]:
+        """Compute 8x8 tile rectangles from OAM entries in scene coordinates.
+
+        Returns:
+            List of (x, y, width, height) tuples relative to game frame origin.
+        """
+        if self._capture_result is None:
+            return []
+
+        tile_rects: list[tuple[int, int, int, int]] = []
+        bbox = self._capture_result.bounding_box
+
+        for entry in self._capture_result.entries:
+            rel_x = entry.x - bbox.x
+            rel_y = entry.y - bbox.y
+
+            for ty in range(0, entry.height, 8):
+                for tx in range(0, entry.width, 8):
+                    tile_rects.append((rel_x + tx, rel_y + ty, 8, 8))
+
+        return tile_rects
+
+    def _compute_optimal_alignment(
+        self,
+        ai_bbox: tuple[int, int, int, int],
+        flip_h: bool,
+        flip_v: bool,
+    ) -> tuple[int, int, float]:
+        """Compute optimal alignment that maximizes AI size without overflow.
+
+        Uses binary search to find the largest scale where AI content fits
+        entirely within tile coverage, with position adjustment.
+
+        Args:
+            ai_bbox: AI content bounding box (left, top, right, bottom)
+            flip_h: Horizontal flip state
+            flip_v: Vertical flip state
+
+        Returns:
+            Tuple of (offset_x, offset_y, scale)
+        """
+        if self._ai_image is None or self._capture_result is None:
+            return (0, 0, 1.0)
+
+        tile_rects = self._compute_tile_rects()
+        if not tile_rects:
+            return (0, 0, 1.0)
+
+        # Get tile coverage bounds
+        tile_min_x = min(x for x, _, _, _ in tile_rects)
+        tile_min_y = min(y for _, y, _, _ in tile_rects)
+        tile_max_x = max(x + w for x, _, w, _ in tile_rects)
+        tile_max_y = max(y + h for _, y, _, h in tile_rects)
+        tile_width = tile_max_x - tile_min_x
+        tile_height = tile_max_y - tile_min_y
+
+        ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
+        ai_content_width = ai_x2 - ai_x
+        ai_content_height = ai_y2 - ai_y
+
+        if ai_content_width <= 0 or ai_content_height <= 0:
+            return (0, 0, 1.0)
+
+        # Initial scale estimate based on tile coverage
+        scale_x = tile_width / ai_content_width
+        scale_y = tile_height / ai_content_height
+        initial_scale = min(scale_x, scale_y)
+        initial_scale = max(0.1, min(1.0, initial_scale))
+
+        # Apply flips to bbox coordinates
+        if flip_h:
+            ai_x, ai_x2 = self._ai_image.width - ai_x2, self._ai_image.width - ai_x
+        if flip_v:
+            ai_y, ai_y2 = self._ai_image.height - ai_y2, self._ai_image.height - ai_y
+
+        service = TileSamplingService()
+
+        def find_valid_position(scale: float) -> tuple[bool, int, int]:
+            """Find a valid position for AI content at given scale."""
+            scaled_width = ai_content_width * scale
+            scaled_height = ai_content_height * scale
+
+            # Start with centered position
+            center_offset_x = int(tile_min_x + (tile_width - scaled_width) / 2 - ai_x * scale)
+            center_offset_y = int(tile_min_y + (tile_height - scaled_height) / 2 - ai_y * scale)
+
+            # Check if centered position works
+            has_overflow, _ = service.check_content_outside_tiles(
+                (ai_x, ai_y, ai_x2, ai_y2), tile_rects, center_offset_x, center_offset_y, scale
+            )
+            if not has_overflow:
+                return (True, center_offset_x, center_offset_y)
+
+            # Try adjusting position - search in a grid around center
+            max_shift_x = int(tile_width - scaled_width) // 2 + 4
+            max_shift_y = int(tile_height - scaled_height) // 2 + 4
+
+            for radius in range(1, max(max_shift_x, max_shift_y) + 1):
+                for dx in range(-radius, radius + 1):
+                    for dy in range(-radius, radius + 1):
+                        if abs(dx) != radius and abs(dy) != radius:
+                            continue
+
+                        test_x = center_offset_x + dx
+                        test_y = center_offset_y + dy
+
+                        has_overflow, _ = service.check_content_outside_tiles(
+                            (ai_x, ai_y, ai_x2, ai_y2), tile_rects, test_x, test_y, scale
+                        )
+                        if not has_overflow:
+                            return (True, test_x, test_y)
+
+            return (False, center_offset_x, center_offset_y)
+
+        # Binary search for maximum scale that fits
+        low = 0.1
+        high = min(initial_scale * 1.1, 1.0)
+        best_scale = low
+        best_offset_x = 0
+        best_offset_y = 0
+
+        # First check if initial scale already fits
+        fits, offset_x, offset_y = find_valid_position(initial_scale)
+        if fits:
+            low = initial_scale
+        else:
+            high = initial_scale
+
+        # Binary search
+        for _ in range(25):
+            mid = (low + high) / 2
+            fits, offset_x, offset_y = find_valid_position(mid)
+
+            if fits:
+                best_scale = mid
+                best_offset_x = offset_x
+                best_offset_y = offset_y
+                low = mid
+            else:
+                high = mid
+
+            if high - low < 0.0005:
+                break
+
+        # Verify final result
+        fits, final_x, final_y = find_valid_position(best_scale)
+        if fits:
+            logger.debug(
+                "Optimal alignment: scale=%.4f, offset=(%d, %d)",
+                best_scale,
+                final_x,
+                final_y,
+            )
+            return (final_x, final_y, best_scale)
+
+        return (best_offset_x, best_offset_y, best_scale)
+
     def _on_auto_align(self) -> None:
         """Handle auto-align button click.
 
         Calculates alignment offset that centers the AI frame content over the game
         frame, accounting for current flip and scale transforms.
 
-        If Match Scale is checked, also calculates scale to fit AI content within
-        game sprite bounds (using smaller dimension to fit within bounds).
+        If Match Scale is checked, uses optimal alignment algorithm that finds the
+        largest scale where AI content fits entirely within tile coverage.
         """
         if self._ai_image is None:
             logger.warning("Auto-align skipped: AI image not loaded (PIL load may have failed)")
@@ -1390,63 +1547,41 @@ class WorkbenchCanvas(QWidget):
         # Get AI content bounding box (non-transparent pixels)
         ai_bbox = self._ai_image.getbbox()
         if ai_bbox is None:
-            # No non-transparent pixels - use full image
             ai_bbox = (0, 0, self._ai_image.width, self._ai_image.height)
 
         ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
         ai_content_width = ai_x2 - ai_x
         ai_content_height = ai_y2 - ai_y
 
-        # Apply flip corrections (flip changes where content visually appears)
         flip_h = self._flip_h_checkbox.isChecked()
         flip_v = self._flip_v_checkbox.isChecked()
 
-        # Game frame bounding box
-        bbox = self._capture_result.bounding_box
-
-        # Calculate scale if Match Scale is checked
+        # Use optimal alignment when Match Scale is checked
         if self._match_scale_checkbox.isChecked() and ai_content_width > 0 and ai_content_height > 0:
-            # Calculate scale to fit AI content within game bounds
-            scale_x = bbox.width / ai_content_width
-            scale_y = bbox.height / ai_content_height
-            # Use smaller dimension to fit within bounds (preserves aspect ratio)
-            scale = min(scale_x, scale_y)
-            # Clamp to valid range
-            scale = max(0.1, min(1.0, scale))
-            logger.debug(
-                "Auto-align: Match Scale calculated scale=%.2f (scale_x=%.2f, scale_y=%.2f)",
-                scale,
-                scale_x,
-                scale_y,
-            )
+            offset_x, offset_y, scale = self._compute_optimal_alignment(ai_bbox, flip_h, flip_v)
         else:
+            # Keep current scale, just center on game frame centroid
             scale = self._ai_frame_item.scale_factor()
 
-        # Calculate AI content center in original image coordinates
-        ai_center_x = ai_x + ai_content_width / 2
-        ai_center_y = ai_y + ai_content_height / 2
+            ai_center_x = ai_x + ai_content_width / 2
+            ai_center_y = ai_y + ai_content_height / 2
 
-        if flip_h:
-            ai_center_x = self._ai_image.width - ai_center_x
-        if flip_v:
-            ai_center_y = self._ai_image.height - ai_center_y
+            if flip_h:
+                ai_center_x = self._ai_image.width - ai_center_x
+            if flip_v:
+                ai_center_y = self._ai_image.height - ai_center_y
 
-        # Apply scale to get visual content center
-        scaled_ai_center_x = ai_center_x * scale
-        scaled_ai_center_y = ai_center_y * scale
+            scaled_ai_center_x = ai_center_x * scale
+            scaled_ai_center_y = ai_center_y * scale
 
-        # Game frame center of mass (weighted by opaque pixels)
-        # This aligns to the visual mass rather than the bounding box center,
-        # which handles sprites with asymmetric protrusions (e.g., coat tails)
-        renderer = CaptureRenderer(self._capture_result)
-        game_image = renderer.render_selection()
-        game_center_x, game_center_y = ContentBoundsAnalyzer.compute_centroid(game_image)
+            renderer = CaptureRenderer(self._capture_result)
+            game_image = renderer.render_selection()
+            game_center_x, game_center_y = ContentBoundsAnalyzer.compute_centroid(game_image)
 
-        # Calculate offset to align centers
-        offset_x = int(game_center_x - scaled_ai_center_x)
-        offset_y = int(game_center_y - scaled_ai_center_y)
+            offset_x = int(game_center_x - scaled_ai_center_x)
+            offset_y = int(game_center_y - scaled_ai_center_y)
 
-        # Apply the alignment (with potentially updated scale)
+        # Apply the alignment
         self.set_alignment(
             offset_x,
             offset_y,
@@ -1455,7 +1590,6 @@ class WorkbenchCanvas(QWidget):
             scale,
         )
         self._emit_alignment_changed()
-        # Update scene rect and center view on aligned frames
         self._update_scene_for_alignment()
 
     def _on_drag_started(self) -> None:
