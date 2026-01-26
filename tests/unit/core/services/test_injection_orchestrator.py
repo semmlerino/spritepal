@@ -294,6 +294,10 @@ class TestInjectionOrchestratorTilePadding:
         """When captured tiles < original tiles, pads image to original size.
 
         This prevents VRAM "ghost" artifacts where old tile data isn't overwritten.
+
+        NOTE: Padding only applies to HAL-compressed blocks where multiple tiles
+        share one ROM offset. For RAW tiles (each at its own offset), no padding
+        is done to avoid overwriting adjacent tiles.
         """
         import math
 
@@ -310,8 +314,12 @@ class TestInjectionOrchestratorTilePadding:
         captured_tile_count = 4
         original_tile_count = 8
 
-        # Mock staging to report 8 tiles for RAW mode
-        staging.detect_raw_slot_size.return_value = original_tile_count
+        # Mock rom_injector.find_compressed_sprite to return original tile count for HAL
+        rom_injector.find_compressed_sprite.return_value = (
+            b"\x00" * 100,  # compressed data
+            b"\x00" * (original_tile_count * 32),  # decompressed: 8 tiles * 32 bytes
+            100,
+        )
 
         # Mock rom_injector.inject_sprite_to_rom to capture the image being injected
         injected_images: list[Path] = []
@@ -360,9 +368,9 @@ class TestInjectionOrchestratorTilePadding:
             colors=[(0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)] + [(0, 0, 0)] * 12,
         )
 
-        # Create minimal game frame
+        # Create minimal game frame with HAL compression
         game_frame = MagicMock()
-        game_frame.compression_types = {}  # Empty = use RAW
+        game_frame.compression_types = {0x50000: "hal"}  # Use HAL compression
 
         # Create debug context (disabled)
         debug = InjectionDebugContext(enabled=False)
@@ -378,7 +386,7 @@ class TestInjectionOrchestratorTilePadding:
             project=project,
             game_frame=game_frame,
             rom_data=b"\x00" * 0x100000,  # Dummy ROM data
-            force_raw=True,
+            force_raw=False,  # Use HAL compression for padding test
             current_rom_path=str(tmp_path / "output.sfc"),
             source_rom_path=str(tmp_path / "source.sfc"),
             create_backup=False,
@@ -403,10 +411,13 @@ class TestInjectionOrchestratorTilePadding:
         )
 
     def test_padded_tiles_preserve_position(self, tmp_path: Path) -> None:
-        """Tiles are placed at their tile_index_in_block, not sequential idx.
+        """HAL-compressed tiles are placed at their tile_index_in_block, not sequential idx.
 
         This prevents the "preserve_sprite leak" bug where AI tiles end up at
         wrong positions in padded slots, causing original sprite data to bleed through.
+
+        NOTE: This only applies to HAL-compressed blocks where multiple tiles share
+        one ROM offset. For RAW tiles (each at its own offset), sequential placement is used.
         """
         # Create orchestrator with mocked dependencies
         staging = MagicMock()
@@ -421,8 +432,13 @@ class TestInjectionOrchestratorTilePadding:
         # The tile should end up at grid position 2, NOT position 0
         original_tile_count = 3
 
-        # Mock staging to report 3 tiles for RAW mode
-        staging.detect_raw_slot_size.return_value = original_tile_count
+        # Mock rom_injector.find_compressed_sprite to return original tile count for HAL
+        # Returns: (compressed_data, decompressed_data, data_length)
+        rom_injector.find_compressed_sprite.return_value = (
+            b"\x00" * 100,  # compressed data (irrelevant)
+            b"\x00" * (original_tile_count * 32),  # decompressed: 3 tiles * 32 bytes
+            100,  # compressed length
+        )
 
         # Mock rom_injector to capture the injected image
         def capture_injection(
@@ -461,11 +477,12 @@ class TestInjectionOrchestratorTilePadding:
         )
 
         game_frame = MagicMock()
-        game_frame.compression_types = {}
+        # Mark this ROM offset as HAL compressed
+        game_frame.compression_types = {0x50000: "hal"}
 
         debug = InjectionDebugContext(enabled=False)
 
-        # Call the method
+        # Call the method with force_raw=False to use HAL compression
         result = orchestrator._inject_tile_group(
             rom_offset=0x50000,
             vram_tiles=vram_tiles,
@@ -475,7 +492,7 @@ class TestInjectionOrchestratorTilePadding:
             project=project,
             game_frame=game_frame,
             rom_data=b"\x00" * 0x100000,
-            force_raw=True,
+            force_raw=False,  # Use HAL compression
             current_rom_path=str(tmp_path / "output.sfc"),
             source_rom_path=str(tmp_path / "source.sfc"),
             create_backup=False,

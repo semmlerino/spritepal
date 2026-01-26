@@ -746,14 +746,22 @@ class InjectionOrchestrator:
         # When captured_tile_count < original_tile_count, we need to create a larger
         # image so the compressed data fully replaces the original. Extra slots stay
         # transparent, which compiles to transparent SNES tiles that clear VRAM.
-        padded_tile_count = max(tile_count, original_tile_count)
-        if tile_count < original_tile_count:
-            logger.info(
-                "ROM offset 0x%X: Padding from %d to %d tiles to clear VRAM",
-                rom_offset,
-                tile_count,
-                original_tile_count,
-            )
+        #
+        # IMPORTANT: Only pad for HAL-compressed blocks! For RAW tiles, each tile has
+        # its own ROM offset, so padding would overwrite adjacent tiles' data.
+        if is_raw:
+            # RAW: each tile is independent, no padding needed
+            padded_tile_count = tile_count
+        else:
+            # HAL: all tiles share one ROM offset, pad to clear unused slots
+            padded_tile_count = max(tile_count, original_tile_count)
+            if tile_count < original_tile_count:
+                logger.info(
+                    "ROM offset 0x%X: Padding from %d to %d tiles to clear VRAM",
+                    rom_offset,
+                    tile_count,
+                    original_tile_count,
+                )
 
         # Build tile image (sized for padded count, not captured count)
         grid_width = math.ceil(math.sqrt(padded_tile_count))
@@ -795,15 +803,15 @@ class InjectionOrchestrator:
             if debug.enabled and debug.debug_dir:
                 debug.save_debug_image(f"tile_0x{rom_offset:X}_v{vram_addr:X}_after", tile_img)
 
-            # FIX: Use tile_index_in_block for grid positioning (not enumeration idx)
-            # This ensures tiles are placed at their original slot position when padding
-            if tile_idx is not None and tile_idx < padded_tile_count:
-                # tile_idx is valid and within bounds
+            # FIX: Use tile_index_in_block for grid positioning ONLY for HAL-compressed blocks
+            # For HAL: multiple tiles share one ROM offset, tile_idx indicates position in decompressed data
+            # For RAW: each tile has its own ROM offset, tile_idx is irrelevant (always use sequential idx)
+            if not is_raw and tile_idx is not None and tile_idx < padded_tile_count:
+                # HAL compressed: tile_idx indicates position within decompressed block
                 grid_x = (tile_idx % grid_width) * 8
                 grid_y = (tile_idx // grid_width) * 8
             else:
-                # Fallback: sequential placement (legacy behavior for captures without tile_idx
-                # or if tile_idx exceeds the padded grid bounds)
+                # RAW tiles or fallback: sequential placement (each tile at its own ROM offset)
                 grid_x = (idx % grid_width) * 8
                 grid_y = (idx // grid_width) * 8
 
