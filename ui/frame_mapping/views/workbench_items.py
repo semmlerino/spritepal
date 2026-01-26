@@ -11,10 +11,11 @@ sprite alignment canvas:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import override
 
 from PySide6.QtCore import QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QPainter, QPen, QPixmap, QTransform
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QPixmap, QTransform
 from PySide6.QtWidgets import (
     QGraphicsItem,
     QGraphicsObject,
@@ -27,6 +28,20 @@ from PySide6.QtWidgets import (
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class TileMetadata:
+    """Metadata for a single tile in the overlay.
+
+    Attributes:
+        rect: The display rectangle for the tile.
+        rom_offset: Optional ROM file offset for the tile data.
+    """
+
+    rect: QRectF
+    rom_offset: int | None = None
+
 
 # Scale handle size in pixels
 HANDLE_SIZE = 12
@@ -431,24 +446,40 @@ class TileOverlayItem(QGraphicsItem):
     color-coded by whether the AI frame covers them:
     - Green: Touched (AI frame fully covers)
     - Gray: Untouched (not covered or partially covered)
+
+    Optionally displays ROM offset addresses on each tile.
     """
 
     def __init__(self, parent: QGraphicsItem | None = None) -> None:
         super().__init__(parent)
-        self._tile_rects: list[QRectF] = []
+        self._tiles: list[TileMetadata] = []
         self._touched_indices: set[int] = set()
         self._visible = True
+        self._show_addresses = False
         self._bounds = QRectF(0, 0, 64, 64)
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
 
-    def set_tile_rects(self, rects: list[QRectF]) -> None:
-        """Set the OAM tile rectangles."""
+    def set_tiles(self, tiles: list[TileMetadata]) -> None:
+        """Set the tile metadata list.
+
+        Args:
+            tiles: List of TileMetadata with rectangles and optional ROM offsets.
+        """
         self.prepareGeometryChange()
-        self._tile_rects = rects
+        self._tiles = tiles
         self._update_bounds()
         self.update()
+
+    def set_tile_rects(self, rects: list[QRectF]) -> None:
+        """Set the OAM tile rectangles (backward compatibility).
+
+        Args:
+            rects: List of QRectF tile rectangles.
+        """
+        tiles = [TileMetadata(rect=r) for r in rects]
+        self.set_tiles(tiles)
 
     def set_touched_indices(self, indices: set[int]) -> None:
         """Set which tiles are touched by the overlay."""
@@ -460,16 +491,21 @@ class TileOverlayItem(QGraphicsItem):
         self._visible = visible
         self.update()
 
+    def set_show_addresses(self, visible: bool) -> None:
+        """Show or hide tile address text."""
+        self._show_addresses = visible
+        self.update()
+
     def _update_bounds(self) -> None:
         """Update bounding rect from tile rects."""
-        if not self._tile_rects:
+        if not self._tiles:
             self._bounds = QRectF(0, 0, 64, 64)
             return
 
-        min_x = min(r.x() for r in self._tile_rects)
-        min_y = min(r.y() for r in self._tile_rects)
-        max_x = max(r.right() for r in self._tile_rects)
-        max_y = max(r.bottom() for r in self._tile_rects)
+        min_x = min(t.rect.x() for t in self._tiles)
+        min_y = min(t.rect.y() for t in self._tiles)
+        max_x = max(t.rect.right() for t in self._tiles)
+        max_y = max(t.rect.bottom() for t in self._tiles)
         self._bounds = QRectF(min_x, min_y, max_x - min_x, max_y - min_y)
 
     @override
@@ -484,8 +520,8 @@ class TileOverlayItem(QGraphicsItem):
         option: QStyleOptionGraphicsItem,
         widget: QWidget | None = None,
     ) -> None:
-        """Paint tile boundaries."""
-        if not self._visible or not self._tile_rects:
+        """Paint tile boundaries and optional address text."""
+        if not self._visible or not self._tiles:
             return
 
         touched_color = QColor(100, 200, 100, 80)
@@ -493,7 +529,8 @@ class TileOverlayItem(QGraphicsItem):
         untouched_color = QColor(150, 150, 150, 60)
         untouched_border = QColor(150, 150, 150, 150)
 
-        for i, rect in enumerate(self._tile_rects):
+        for i, tile in enumerate(self._tiles):
+            rect = tile.rect
             if i in self._touched_indices:
                 painter.setBrush(QBrush(touched_color))
                 painter.setPen(QPen(touched_border, 1))
@@ -501,6 +538,19 @@ class TileOverlayItem(QGraphicsItem):
                 painter.setBrush(QBrush(untouched_color))
                 painter.setPen(QPen(untouched_border, 1))
             painter.drawRect(rect)
+
+            # Draw address text if enabled and available
+            if self._show_addresses and tile.rom_offset is not None:
+                # Format: abbreviated hex (e.g., "1B000" for 0x1B0000)
+                text = f"{tile.rom_offset >> 4:X}"
+                painter.setFont(QFont("Monospace", 7))
+                painter.setPen(Qt.GlobalColor.white)
+                # Draw with slight offset from top-left corner
+                painter.drawText(
+                    rect.adjusted(1, 1, 0, 0),
+                    Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+                    text,
+                )
 
 
 class ClippingOverlayItem(QGraphicsItem):

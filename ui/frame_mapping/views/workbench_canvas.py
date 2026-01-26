@@ -55,6 +55,7 @@ from ui.frame_mapping.views.workbench_items import (
     GameFrameItem,
     GridOverlayItem,
     PreviewItem,
+    TileMetadata,
     TileOverlayItem,
 )
 from utils.logging_config import get_logger
@@ -464,6 +465,12 @@ class WorkbenchCanvas(QWidget):
         self._tile_overlay_checkbox.setChecked(True)
         controls2.addWidget(self._tile_overlay_checkbox)
 
+        # Tile addresses toggle
+        self._tile_addresses_checkbox = QCheckBox("Addresses")
+        self._tile_addresses_checkbox.setStyleSheet("font-size: 11px;")
+        self._tile_addresses_checkbox.setToolTip("Show ROM offset for each tile")
+        controls2.addWidget(self._tile_addresses_checkbox)
+
         # Grid toggle
         self._grid_checkbox = QCheckBox("Grid (8x8)")
         self._grid_checkbox.setStyleSheet("font-size: 11px;")
@@ -474,6 +481,13 @@ class WorkbenchCanvas(QWidget):
         self._preview_checkbox.setStyleSheet("font-size: 11px;")
         self._preview_checkbox.setToolTip("Show in-game preview (quantized, clipped to silhouette)")
         controls2.addWidget(self._preview_checkbox)
+
+        # AI Frame visibility toggle
+        self._ai_frame_checkbox = QCheckBox("AI Frame")
+        self._ai_frame_checkbox.setStyleSheet("font-size: 11px;")
+        self._ai_frame_checkbox.setChecked(True)  # Default: visible
+        self._ai_frame_checkbox.setToolTip("Show/hide AI frame overlay")
+        controls2.addWidget(self._ai_frame_checkbox)
 
         controls2.addWidget(self._create_separator())
 
@@ -559,8 +573,10 @@ class WorkbenchCanvas(QWidget):
         self._flip_h_checkbox.toggled.connect(self._on_flip_changed)
         self._flip_v_checkbox.toggled.connect(self._on_flip_changed)
         self._tile_overlay_checkbox.toggled.connect(self._on_tile_overlay_toggled)
+        self._tile_addresses_checkbox.toggled.connect(self._on_tile_addresses_toggled)
         self._grid_checkbox.toggled.connect(self._on_grid_toggled)
         self._preview_checkbox.toggled.connect(self._on_preview_toggled)
+        self._ai_frame_checkbox.toggled.connect(self._on_ai_frame_toggled)
         self._compression_combo.currentIndexChanged.connect(self._on_compression_changed)
         self._auto_align_btn.clicked.connect(self._on_auto_align)
         self._preserve_sprite_checkbox.toggled.connect(self._on_preserve_sprite_toggled)
@@ -937,7 +953,9 @@ class WorkbenchCanvas(QWidget):
         self._flip_h_checkbox.setEnabled(enabled)
         self._flip_v_checkbox.setEnabled(enabled)
         self._tile_overlay_checkbox.setEnabled(enabled)
+        self._tile_addresses_checkbox.setEnabled(enabled)
         self._grid_checkbox.setEnabled(enabled)
+        self._ai_frame_checkbox.setEnabled(enabled)
         self._compression_combo.setEnabled(enabled)
         self._match_scale_checkbox.setEnabled(enabled)
         self._preserve_sprite_checkbox.setEnabled(enabled)
@@ -997,8 +1015,8 @@ class WorkbenchCanvas(QWidget):
             self._tile_overlay_item.set_tile_rects([])
             return
 
-        # Build tile rectangles from OAM entries
-        tile_rects: list[QRectF] = []
+        # Build tile metadata from OAM entries
+        tiles: list[TileMetadata] = []
         bbox = self._capture_result.bounding_box
 
         for entry in self._capture_result.entries:
@@ -1010,18 +1028,27 @@ class WorkbenchCanvas(QWidget):
 
             # For larger sprites (16x16 or 32x32), break into 8x8 tiles
             tile_size = 8 * self._display_scale
+            tile_idx = 0
             for ty in range(0, height, tile_size):
                 for tx in range(0, width, tile_size):
-                    tile_rects.append(
-                        QRectF(
-                            rel_x + tx,
-                            rel_y + ty,
-                            tile_size,
-                            tile_size,
+                    # Get rom_offset from tile data if available
+                    rom_offset: int | None = None
+                    if tile_idx < len(entry.tiles):
+                        rom_offset = entry.tiles[tile_idx].rom_offset
+                    tiles.append(
+                        TileMetadata(
+                            rect=QRectF(
+                                rel_x + tx,
+                                rel_y + ty,
+                                tile_size,
+                                tile_size,
+                            ),
+                            rom_offset=rom_offset,
                         )
                     )
+                    tile_idx += 1
 
-        self._tile_overlay_item.set_tile_rects(tile_rects)
+        self._tile_overlay_item.set_tiles(tiles)
 
     def _schedule_tile_touch_update(self) -> None:
         """Schedule a debounced tile touch status update.
@@ -1199,6 +1226,10 @@ class WorkbenchCanvas(QWidget):
         """Handle tile overlay toggle."""
         self._tile_overlay_item.set_overlay_visible(checked)
 
+    def _on_tile_addresses_toggled(self, checked: bool) -> None:
+        """Handle tile addresses toggle."""
+        self._tile_overlay_item.set_show_addresses(checked)
+
     def _on_grid_toggled(self, checked: bool) -> None:
         """Handle grid toggle."""
         self._grid_overlay_item.set_grid_visible(checked)
@@ -1222,6 +1253,10 @@ class WorkbenchCanvas(QWidget):
             self._preview_item.setVisible(False)
         # Update game frame visibility based on preview + preserve sprite state
         self._update_game_frame_visibility()
+
+    def _on_ai_frame_toggled(self, checked: bool) -> None:
+        """Handle AI frame visibility toggle."""
+        self._ai_frame_item.setVisible(checked)
 
     def _on_compression_changed(self, index: int) -> None:
         """Handle compression type combo change."""
