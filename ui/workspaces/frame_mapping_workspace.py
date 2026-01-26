@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
 
 from core.app_context import get_app_context
 from core.services.tile_sampling_service import calculate_auto_alignment
+from ui.frame_mapping.auto_save_manager import AutoSaveManager
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.dialog_coordinator import DialogCoordinator
 from ui.frame_mapping.dialogs.replace_link_dialog import (
@@ -99,7 +100,15 @@ class FrameMappingWorkspace(QWidget):
         self._auto_save_timer = QTimer(self)
         self._auto_save_timer.setSingleShot(True)
         self._auto_save_timer.setInterval(500)
-        self._auto_save_timer.timeout.connect(self._perform_auto_save)
+
+        # Auto-save manager handles the save logic
+        self._auto_save_manager = AutoSaveManager(
+            timer=self._auto_save_timer,
+            get_project_path=lambda: self._state.project_path,
+            save_project=self._controller.save_project,
+            parent_widget=self,
+        )
+        self._auto_save_timer.timeout.connect(self._auto_save_manager.perform_save)
 
         self._setup_ui()
         self._connect_signals()
@@ -113,6 +122,7 @@ class FrameMappingWorkspace(QWidget):
     def set_message_service(self, service: StatusBarManager | None) -> None:
         """Set the message service for status updates."""
         self._message_service = service
+        self._auto_save_manager.set_message_service(service.show_message if service else None)
 
     def set_rom_path(self, rom_path: Path | None) -> None:
         """Set ROM path for injection.
@@ -293,7 +303,7 @@ class FrameMappingWorkspace(QWidget):
         self._controller.mapping_injected.connect(self._on_mapping_injected)
         self._controller.error_occurred.connect(self._on_error)
         self._controller.status_update.connect(self._on_status_update)
-        self._controller.save_requested.connect(self._auto_save_after_injection)
+        self._controller.save_requested.connect(self._auto_save_manager.schedule_save)
         self._controller.stale_entries_warning.connect(self._on_stale_entries_warning)
         self._controller.stale_entries_on_load.connect(self._on_stale_entries_detected_on_load)
         self._controller.alignment_updated.connect(self._on_alignment_updated)
@@ -1157,7 +1167,10 @@ class FrameMappingWorkspace(QWidget):
                 return
 
         # Try injection with strict entry validation (no fallback)
-        success = self._controller.inject_mapping(ai_frame_id, rom_path, output_path=target_rom)
+        preserve_sprite = self._alignment_canvas.get_preserve_sprite()
+        success = self._controller.inject_mapping(
+            ai_frame_id, rom_path, output_path=target_rom, preserve_sprite=preserve_sprite
+        )
 
         # If injection failed due to stale entries, offer to retry with fallback
         if not success and self._state.stale_entry_frame_id is not None:
@@ -1175,7 +1188,11 @@ class FrameMappingWorkspace(QWidget):
             if retry_reply == QMessageBox.StandardButton.Yes:
                 # Retry with allow_fallback=True
                 success = self._controller.inject_mapping(
-                    ai_frame_id, rom_path, output_path=target_rom, allow_fallback=True
+                    ai_frame_id,
+                    rom_path,
+                    output_path=target_rom,
+                    allow_fallback=True,
+                    preserve_sprite=preserve_sprite,
                 )
 
         # Track the successfully used ROM for future reuse
@@ -1241,10 +1258,16 @@ class FrameMappingWorkspace(QWidget):
         # Use emit_project_changed=False to avoid N emissions, emit once after batch
         success_count = 0
         failed_due_to_stale = 0
+        preserve_sprite = self._alignment_canvas.get_preserve_sprite()
+
         for ai_frame_id in selected_ids:
             self._state.stale_entry_frame_id = None  # Reset for each frame
             if self._controller.inject_mapping(
-                ai_frame_id, rom_path, output_path=target_rom, emit_project_changed=False
+                ai_frame_id,
+                rom_path,
+                output_path=target_rom,
+                emit_project_changed=False,
+                preserve_sprite=preserve_sprite,
             ):
                 success_count += 1
             elif self._state.stale_entry_frame_id is not None:
@@ -1319,13 +1342,19 @@ class FrameMappingWorkspace(QWidget):
         # Use emit_project_changed=False to avoid N emissions, emit once after batch
         success_count = 0
         failed_due_to_stale = 0
+        preserve_sprite = self._alignment_canvas.get_preserve_sprite()
+
         for ai_frame in project.ai_frames:
             mapping = project.get_mapping_for_ai_frame(ai_frame.id)
             if mapping:
                 self._state.stale_entry_frame_id = None  # Reset for each frame
                 # Pass the created copy as output_path to avoid creating new copies
                 if self._controller.inject_mapping(
-                    ai_frame.id, rom_path, output_path=target_rom, emit_project_changed=False
+                    ai_frame.id,
+                    rom_path,
+                    output_path=target_rom,
+                    emit_project_changed=False,
+                    preserve_sprite=preserve_sprite,
                 ):
                     success_count += 1
                 elif self._state.stale_entry_frame_id is not None:
@@ -1351,40 +1380,6 @@ class FrameMappingWorkspace(QWidget):
         self._refresh_mapping_status()
         self._mapping_panel.refresh()  # Refresh table to show updated status
         QMessageBox.information(self, "Injection Successful", message)
-
-    def _auto_save_after_injection(self) -> None:
-        """Schedule auto-save with debouncing.
-
-        Uses a 500ms debounce timer to avoid saving on every nudge operation.
-        Multiple rapid changes will only trigger one save after activity stops.
-        """
-        if not self._state.project_path:
-            logger.warning("Cannot auto-save: no project path set")
-            return
-
-        # (Re)start the debounce timer - will save 500ms after last change
-        self._auto_save_timer.start()
-
-    def _perform_auto_save(self) -> None:
-        """Actually perform the auto-save after debounce timer fires.
-
-        Saves the project to the correct project file path (not ai_frames_dir).
-        """
-        if not self._state.project_path:
-            return
-
-        try:
-            self._controller.save_project(self._state.project_path)
-            if self._message_service:
-                self._message_service.show_message("Project auto-saved", 2000)
-            logger.info("Auto-saved project to %s", self._state.project_path)
-        except Exception as e:
-            logger.exception("Failed to auto-save project after injection")
-            QMessageBox.warning(
-                self,
-                "Auto-Save Failed",
-                f"Failed to save project: {e}\n\nPlease save manually.",
-            )
 
     def _on_stale_entries_warning(self, frame_id: str) -> None:
         """Handle stale entry ID warning from controller.
