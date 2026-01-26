@@ -228,6 +228,25 @@ def draw_overflow_regions(
             draw.line([(line_x1, line_y1), (line_x2, line_y2)], fill=(255, 0, 0, 150), width=1)
 
 
+def compute_tile_coverage_bounds(
+    tile_rects: list[tuple[int, int, int, int]],
+) -> tuple[int, int, int, int]:
+    """Get bounding box of tile coverage area.
+
+    Returns:
+        (min_x, min_y, max_x, max_y) in scene coordinates
+    """
+    if not tile_rects:
+        return (0, 0, 0, 0)
+
+    min_x = min(x for x, y, w, h in tile_rects)
+    min_y = min(y for x, y, w, h in tile_rects)
+    max_x = max(x + w for x, y, w, h in tile_rects)
+    max_y = max(y + h for x, y, w, h in tile_rects)
+
+    return (min_x, min_y, max_x, max_y)
+
+
 def compute_auto_align(
     ai_image: Image.Image,
     capture_result: CaptureResult,
@@ -285,6 +304,143 @@ def compute_auto_align(
     offset_y = int(game_center_y - scaled_ai_center_y)
 
     return offset_x, offset_y, scale
+
+
+def compute_optimal_align(
+    ai_image: Image.Image,
+    capture_result: CaptureResult,
+    flip_h: bool = False,
+    flip_v: bool = False,
+) -> tuple[int, int, float]:
+    """Compute optimal alignment that maximizes AI size without overflow.
+
+    This algorithm:
+    1. Uses tile coverage bounds for scale estimation
+    2. Binary searches for the largest scale that fits
+    3. For each scale, searches for a valid position (with position adjustment)
+
+    Returns:
+        Tuple of (offset_x, offset_y, scale)
+    """
+    tile_rects = compute_tile_rects(capture_result)
+    if not tile_rects:
+        return (0, 0, 1.0)
+
+    # Get tile coverage bounds
+    tile_min_x, tile_min_y, tile_max_x, tile_max_y = compute_tile_coverage_bounds(tile_rects)
+    tile_width = tile_max_x - tile_min_x
+    tile_height = tile_max_y - tile_min_y
+
+    # Get AI content bbox
+    ai_bbox = ai_image.getbbox()
+    if ai_bbox is None:
+        ai_bbox = (0, 0, ai_image.width, ai_image.height)
+
+    ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
+    ai_content_width = ai_x2 - ai_x
+    ai_content_height = ai_y2 - ai_y
+
+    if ai_content_width <= 0 or ai_content_height <= 0:
+        return (0, 0, 1.0)
+
+    # Initial scale estimate based on tile coverage
+    scale_x = tile_width / ai_content_width
+    scale_y = tile_height / ai_content_height
+    initial_scale = min(scale_x, scale_y)
+    initial_scale = max(0.1, min(1.0, initial_scale))
+
+    # Apply flips to find content bbox corners
+    if flip_h:
+        ai_x, ai_x2 = ai_image.width - ai_x2, ai_image.width - ai_x
+    if flip_v:
+        ai_y, ai_y2 = ai_image.height - ai_y2, ai_image.height - ai_y
+
+    service = TileSamplingService()
+
+    def find_valid_position(scale: float) -> tuple[bool, int, int]:
+        """Find a valid position for AI content at given scale.
+
+        Tries centered position first, then adjusts to fit within tiles.
+
+        Returns:
+            (fits, offset_x, offset_y) - fits is True if a valid position found
+        """
+        # Scaled content dimensions
+        scaled_width = ai_content_width * scale
+        scaled_height = ai_content_height * scale
+
+        # Start with centered position
+        center_offset_x = int(tile_min_x + (tile_width - scaled_width) / 2 - ai_x * scale)
+        center_offset_y = int(tile_min_y + (tile_height - scaled_height) / 2 - ai_y * scale)
+
+        # Check if centered position works
+        has_overflow, _ = service.check_content_outside_tiles(
+            (ai_x, ai_y, ai_x2, ai_y2), tile_rects, center_offset_x, center_offset_y, scale
+        )
+        if not has_overflow:
+            return (True, center_offset_x, center_offset_y)
+
+        # Try adjusting position - search in a grid around center
+        # The search range is how far we can shift in each direction
+        max_shift_x = int(tile_width - scaled_width) // 2 + 4
+        max_shift_y = int(tile_height - scaled_height) // 2 + 4
+
+        # Start from center, spiral outward
+        for radius in range(1, max(max_shift_x, max_shift_y) + 1):
+            for dx in range(-radius, radius + 1):
+                for dy in range(-radius, radius + 1):
+                    if abs(dx) != radius and abs(dy) != radius:
+                        continue  # Only check perimeter of current radius
+
+                    test_x = center_offset_x + dx
+                    test_y = center_offset_y + dy
+
+                    has_overflow, _ = service.check_content_outside_tiles(
+                        (ai_x, ai_y, ai_x2, ai_y2), tile_rects, test_x, test_y, scale
+                    )
+                    if not has_overflow:
+                        return (True, test_x, test_y)
+
+        return (False, center_offset_x, center_offset_y)
+
+    # Binary search for maximum scale that fits
+    low = 0.1
+    high = initial_scale * 1.1  # Allow slight overshoot for search
+    high = min(high, 1.0)
+    best_scale = low
+    best_offset_x = 0
+    best_offset_y = 0
+
+    # First check if initial scale already fits
+    fits, offset_x, offset_y = find_valid_position(initial_scale)
+    if fits:
+        # Try to find even larger scale
+        low = initial_scale
+    else:
+        high = initial_scale
+
+    # Binary search
+    for _ in range(25):  # Enough iterations for good precision
+        mid = (low + high) / 2
+        fits, offset_x, offset_y = find_valid_position(mid)
+
+        if fits:
+            best_scale = mid
+            best_offset_x = offset_x
+            best_offset_y = offset_y
+            low = mid
+        else:
+            high = mid
+
+        if high - low < 0.0005:
+            break
+
+    # Verify final result
+    fits, final_x, final_y = find_valid_position(best_scale)
+    if fits:
+        return (final_x, final_y, best_scale)
+
+    return (best_offset_x, best_offset_y, best_scale)
 
 
 def draw_tile_overlay(
@@ -533,7 +689,8 @@ Examples:
     )
 
     # Alignment options
-    parser.add_argument("--auto-align", action="store_true", help="Apply auto-alignment")
+    parser.add_argument("--auto-align", action="store_true", help="Apply auto-alignment (current algorithm)")
+    parser.add_argument("--optimal-align", action="store_true", help="Apply optimal alignment (max size, no overflow)")
     parser.add_argument("--match-scale", action="store_true", help="Scale AI to match game frame")
     parser.add_argument("--flip-h", action="store_true", help="Flip horizontally")
     parser.add_argument("--flip-v", action="store_true", help="Flip vertically")
@@ -612,7 +769,15 @@ Examples:
     game_image = renderer.render_selection()
 
     # Determine alignment
-    if args.auto_align:
+    if args.optimal_align:
+        offset_x, offset_y, scale = compute_optimal_align(
+            ai_image,
+            capture_result,
+            flip_h=args.flip_h,
+            flip_v=args.flip_v,
+        )
+        print(f"Optimal-align: offset=({offset_x}, {offset_y}), scale={scale:.4f}")
+    elif args.auto_align:
         offset_x, offset_y, scale = compute_auto_align(
             ai_image,
             capture_result,
