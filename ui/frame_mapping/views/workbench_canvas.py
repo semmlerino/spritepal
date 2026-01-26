@@ -44,6 +44,8 @@ from PySide6.QtWidgets import (
 )
 
 from core.frame_mapping_project import AIFrame, GameFrame
+from core.mesen_integration.capture_renderer import CaptureRenderer
+from core.services.content_bounds_analyzer import ContentBoundsAnalyzer
 from core.services.sprite_compositor import SpriteCompositor, TransformParams
 from core.services.tile_sampling_service import TileSamplingService
 from ui.frame_mapping.services.canvas_config_service import CanvasConfig
@@ -1359,9 +1361,12 @@ class WorkbenchCanvas(QWidget):
         scaled_ai_center_x = ai_center_x * scale
         scaled_ai_center_y = ai_center_y * scale
 
-        # Game frame center (displayed at origin 0,0)
-        game_center_x = bbox.width / 2
-        game_center_y = bbox.height / 2
+        # Game frame center of mass (weighted by opaque pixels)
+        # This aligns to the visual mass rather than the bounding box center,
+        # which handles sprites with asymmetric protrusions (e.g., coat tails)
+        renderer = CaptureRenderer(self._capture_result)
+        game_image = renderer.render_selection()
+        game_center_x, game_center_y = ContentBoundsAnalyzer.compute_centroid(game_image)
 
         # Calculate offset to align centers
         offset_x = int(game_center_x - scaled_ai_center_x)
