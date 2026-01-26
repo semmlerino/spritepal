@@ -365,6 +365,11 @@ class InjectionOrchestrator:
 
         # Composite using SpriteCompositor
         uncovered_policy: Literal["transparent", "original"] = "original" if request.preserve_sprite else "transparent"
+        logger.info(
+            "Compositing with preserve_sprite=%s, uncovered_policy=%s",
+            request.preserve_sprite,
+            uncovered_policy,
+        )
         compositor = SpriteCompositor(uncovered_policy=uncovered_policy)
         transform = TransformParams(
             offset_x=mapping.offset_x,
@@ -493,7 +498,12 @@ class InjectionOrchestrator:
 
         # Verify ROM attribution
         verifier = ROMVerificationService(request.rom_path)
-        verification = verifier.verify_offsets(filtered_capture, game_frame.selected_entry_ids)
+        include_missing = not request.preserve_sprite
+        verification = verifier.verify_offsets(
+            filtered_capture,
+            game_frame.selected_entry_ids,
+            include_missing=include_missing,
+        )
 
         if verification.has_corrections:
             on_progress(
@@ -509,6 +519,16 @@ class InjectionOrchestrator:
 
         if verification.all_found and not verification.has_corrections and verification.total > 0:
             on_progress(f"ROM attribution verified: {verification.total} tiles matched")
+        if (
+            include_missing
+            and verification.missing_total > 0
+            and verification.missing_filled < verification.missing_total
+        ):
+            missing_unmatched = verification.missing_total - verification.missing_filled
+            on_progress(
+                f"WARNING: {missing_unmatched}/{verification.missing_total} tile offsets could not be matched; "
+                "original sprite data may remain"
+            )
 
         # Apply corrections
         for old_offset, new_offset in verification.corrections.items():
@@ -722,9 +742,22 @@ class InjectionOrchestrator:
 
         tile_count = len(sorted_vram_addrs)
 
-        # Build tile image
-        grid_width = math.ceil(math.sqrt(tile_count))
-        grid_height = math.ceil(tile_count / grid_width)
+        # FIX: Pad to original tile count to fully overwrite VRAM
+        # When captured_tile_count < original_tile_count, we need to create a larger
+        # image so the compressed data fully replaces the original. Extra slots stay
+        # transparent, which compiles to transparent SNES tiles that clear VRAM.
+        padded_tile_count = max(tile_count, original_tile_count)
+        if tile_count < original_tile_count:
+            logger.info(
+                "ROM offset 0x%X: Padding from %d to %d tiles to clear VRAM",
+                rom_offset,
+                tile_count,
+                original_tile_count,
+            )
+
+        # Build tile image (sized for padded count, not captured count)
+        grid_width = math.ceil(math.sqrt(padded_tile_count))
+        grid_height = math.ceil(padded_tile_count / grid_width)
 
         chunk_img = Image.new("RGBA", (grid_width * 8, grid_height * 8), (0, 0, 0, 0))
 

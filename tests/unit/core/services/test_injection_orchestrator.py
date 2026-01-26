@@ -7,11 +7,15 @@ Full integration tests are in tests/ui/integration/.
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 from PIL import Image
 
+from core.frame_mapping_project import SheetPalette
+from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest, InjectionResult
 from core.services.rom_staging_manager import ROMStagingManager
@@ -281,3 +285,119 @@ class TestInjectionOrchestratorResultFactory:
         assert result.needs_fallback_confirmation is True
         assert result.stale_frame_id == "frame_id"
         assert result.error == "Error message"
+
+
+class TestInjectionOrchestratorTilePadding:
+    """Tests for VRAM tile padding behavior."""
+
+    def test_inject_tile_group_pads_to_original_count(self, tmp_path: Path) -> None:
+        """When captured tiles < original tiles, pads image to original size.
+
+        This prevents VRAM "ghost" artifacts where old tile data isn't overwritten.
+        """
+        import math
+
+        # Create orchestrator with mocked dependencies
+        staging = MagicMock()
+        rom_injector = MagicMock()
+
+        orchestrator = InjectionOrchestrator(
+            staging_manager=staging,
+            rom_injector=rom_injector,
+        )
+
+        # Setup: 4 captured tiles, but ROM has 8 tiles originally
+        captured_tile_count = 4
+        original_tile_count = 8
+
+        # Mock staging to report 8 tiles for RAW mode
+        staging.detect_raw_slot_size.return_value = original_tile_count
+
+        # Mock rom_injector.inject_sprite_to_rom to capture the image being injected
+        injected_images: list[Path] = []
+
+        def capture_injection(
+            sprite_path: str,
+            rom_path: str,
+            output_path: str,
+            sprite_offset: int,
+            **kwargs: object,
+        ) -> tuple[bool, str]:
+            # Save the path for later inspection
+            injected_images.append(Path(sprite_path))
+            # Read and verify the image dimensions before it gets deleted
+            img = Image.open(sprite_path)
+            # Store dimensions on the mock for assertions
+            rom_injector._last_injected_size = img.size
+            rom_injector._last_injected_image = img.copy()
+            return (True, "Success")
+
+        rom_injector.inject_sprite_to_rom.side_effect = capture_injection
+
+        # Create 4 fake VRAM tiles at positions forming a 2x2 grid
+        vram_tiles: dict[int, tuple[int, int, int, int | None, bool, bool]] = {
+            0x1000: (0, 0, 0, 0, False, False),  # tile 0 at (0,0)
+            0x1020: (8, 0, 0, 1, False, False),  # tile 1 at (8,0)
+            0x1040: (0, 8, 0, 2, False, False),  # tile 2 at (0,8)
+            0x1060: (8, 8, 0, 3, False, False),  # tile 3 at (8,8)
+        }
+
+        # Create a 16x16 masked canvas with some visible content
+        masked_canvas = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
+
+        # Create minimal bounding box
+        bbox = SimpleNamespace(x=0, y=0, width=16, height=16)
+
+        # Create minimal filtered capture
+        filtered_capture = SimpleNamespace(
+            entries=[],
+            palettes={0: [(31, 0, 0)] * 16},  # Red palette
+        )
+
+        # Create minimal project with sheet palette
+        project = MagicMock()
+        project.sheet_palette = SheetPalette(
+            colors=[(0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)] + [(0, 0, 0)] * 12,
+        )
+
+        # Create minimal game frame
+        game_frame = MagicMock()
+        game_frame.compression_types = {}  # Empty = use RAW
+
+        # Create debug context (disabled)
+        debug = InjectionDebugContext(enabled=False)
+
+        # Call the method
+        rom_offset = 0x50000
+        result = orchestrator._inject_tile_group(
+            rom_offset=rom_offset,
+            vram_tiles=vram_tiles,
+            masked_canvas=masked_canvas,
+            filtered_capture=filtered_capture,
+            bbox=bbox,
+            project=project,
+            game_frame=game_frame,
+            rom_data=b"\x00" * 0x100000,  # Dummy ROM data
+            force_raw=True,
+            current_rom_path=str(tmp_path / "output.sfc"),
+            source_rom_path=str(tmp_path / "source.sfc"),
+            create_backup=False,
+            preserve_existing=False,
+            debug=debug,
+        )
+
+        # Verify result
+        assert result.success is True
+
+        # Key assertion: The injected image should be sized for 8 tiles, not 4
+        # Grid for 8 tiles: ceil(sqrt(8)) = 3 width, ceil(8/3) = 3 height = 3x3 grid
+        expected_grid_width = math.ceil(math.sqrt(original_tile_count))
+        expected_grid_height = math.ceil(original_tile_count / expected_grid_width)
+        expected_size = (expected_grid_width * 8, expected_grid_height * 8)
+
+        actual_size = rom_injector._last_injected_size
+        assert actual_size == expected_size, (
+            f"Image should be sized for {original_tile_count} tiles "
+            f"(expected {expected_size}), got {actual_size} "
+            f"(which is for {captured_tile_count} tiles)"
+        )
