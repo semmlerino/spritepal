@@ -242,7 +242,7 @@ class GridGraphicsView(QGraphicsView):
             for i in items
             if i.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable
             and i != self.pixmap_item
-            and not isinstance(i, (QGraphicsLineItem, QGraphicsRectItem))
+            and not isinstance(i, QGraphicsLineItem | QGraphicsRectItem)
         ]
 
         if interactive_items and event.button() == Qt.MouseButton.LeftButton:

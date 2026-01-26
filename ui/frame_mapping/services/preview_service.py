@@ -5,11 +5,13 @@ Manages preview pixmap generation and caching with mtime-based invalidation.
 
 from __future__ import annotations
 
+from json import JSONDecodeError
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 
+from core.frame_mapping_exceptions import CaptureParseError
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
 from ui.common.qt_image_utils import pil_to_qpixmap
@@ -119,7 +121,7 @@ class PreviewService(QObject):
 
             return pixmap
 
-        except Exception as e:
+        except (OSError, ValueError, CaptureParseError, Exception) as e:
             logger.warning("Failed to regenerate preview for game frame %s: %s", frame_id, e)
             return None
 
@@ -206,7 +208,7 @@ class PreviewService(QObject):
 
             return (capture_result, used_fallback)
 
-        except Exception as e:
+        except (OSError, JSONDecodeError, KeyError, ValueError, CaptureParseError, Exception) as e:
             logger.warning("Failed to get capture result for game frame %s: %s", frame_id, e)
             return (None, False)
 

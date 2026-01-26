@@ -49,25 +49,71 @@ def handle_exception(
 
 def apply_dark_theme(app: QApplication) -> None:
     """Apply a modern dark theme to the application."""
-    SpritePalApp._apply_dark_theme(app)  # type: ignore[arg-type]
+    _apply_dark_theme_to_app(app)
 
 
-class SpritePalApp(QApplication):
-    """Main application class for SpritePal"""
+def _apply_dark_theme_to_app(app: QApplication) -> None:
+    """Apply a modern dark theme to the given QApplication."""
+    # Create dark palette
+    dark_palette = QPalette()
 
-    def __init__(self, argv: list[str], context: AppContext) -> None:
-        super().__init__(argv)
+    # Window colors
+    dark_palette.setColor(QPalette.ColorRole.Window, QColor(45, 45, 48))
+    dark_palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
 
-        # Store context reference
+    # Base colors (for input widgets)
+    dark_palette.setColor(QPalette.ColorRole.Base, QColor(30, 30, 30))
+    dark_palette.setColor(QPalette.ColorRole.AlternateBase, QColor(50, 50, 52))
+
+    # Text colors
+    dark_palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+    dark_palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+
+    # Button colors
+    dark_palette.setColor(QPalette.ColorRole.Button, QColor(55, 55, 58))
+    dark_palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+
+    # Highlight colors
+    dark_palette.setColor(QPalette.ColorRole.Highlight, QColor(0, 122, 204))
+    dark_palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
+
+    # Other colors
+    dark_palette.setColor(QPalette.ColorRole.Link, QColor(0, 162, 232))
+    dark_palette.setColor(QPalette.ColorRole.LinkVisited, QColor(128, 128, 255))
+
+    # Disabled colors
+    dark_palette.setColor(
+        QPalette.ColorGroup.Disabled,
+        QPalette.ColorRole.WindowText,
+        QColor(127, 127, 127),
+    )
+    dark_palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(127, 127, 127))
+    dark_palette.setColor(
+        QPalette.ColorGroup.Disabled,
+        QPalette.ColorRole.ButtonText,
+        QColor(127, 127, 127),
+    )
+
+    app.setPalette(dark_palette)
+
+    # Set comprehensive dark theme stylesheet from theme service
+    app.setStyleSheet(get_theme_style())
+
+
+class SpritePalApp:
+    """Main application class for SpritePal - configures an existing QApplication"""
+
+    def __init__(self, app: QApplication, context: AppContext) -> None:
+        self._app = app
         self._context = context
 
         # Set application metadata
-        self.setApplicationName("SpritePal")
-        self.setOrganizationName("KirbySpriteTools")
-        self.setApplicationDisplayName("SpritePal - Sprite Extraction Tool")
+        app.setApplicationName("SpritePal")
+        app.setOrganizationName("KirbySpriteTools")
+        app.setApplicationDisplayName("SpritePal - Sprite Extraction Tool")
 
         # Apply modern dark theme
-        self._apply_dark_theme()
+        _apply_dark_theme_to_app(app)
 
         # Initialize accessibility features
         initialize_accessibility()
@@ -83,53 +129,6 @@ class SpritePalApp(QApplication):
             rom_extractor=context.rom_extractor,
             sprite_library=context.sprite_library,
         )
-
-    def _apply_dark_theme(self):
-        """Apply a modern dark theme to the application"""
-        # Create dark palette
-        dark_palette = QPalette()
-
-        # Window colors
-        dark_palette.setColor(QPalette.ColorRole.Window, QColor(45, 45, 48))
-        dark_palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
-
-        # Base colors (for input widgets)
-        dark_palette.setColor(QPalette.ColorRole.Base, QColor(30, 30, 30))
-        dark_palette.setColor(QPalette.ColorRole.AlternateBase, QColor(50, 50, 52))
-
-        # Text colors
-        dark_palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
-        dark_palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
-
-        # Button colors
-        dark_palette.setColor(QPalette.ColorRole.Button, QColor(55, 55, 58))
-        dark_palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
-
-        # Highlight colors
-        dark_palette.setColor(QPalette.ColorRole.Highlight, QColor(0, 122, 204))
-        dark_palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.white)
-
-        # Other colors
-        dark_palette.setColor(QPalette.ColorRole.Link, QColor(0, 162, 232))
-        dark_palette.setColor(QPalette.ColorRole.LinkVisited, QColor(128, 128, 255))
-
-        # Disabled colors
-        dark_palette.setColor(
-            QPalette.ColorGroup.Disabled,
-            QPalette.ColorRole.WindowText,
-            QColor(127, 127, 127),
-        )
-        dark_palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(127, 127, 127))
-        dark_palette.setColor(
-            QPalette.ColorGroup.Disabled,
-            QPalette.ColorRole.ButtonText,
-            QColor(127, 127, 127),
-        )
-
-        self.setPalette(dark_palette)
-
-        # Set comprehensive dark theme stylesheet from theme service
-        self.setStyleSheet(get_theme_style())
 
     def show(self):
         """Show the main window"""
@@ -157,7 +156,11 @@ def main():
     sys.excepthook = handle_exception
     logger.info("Global exception handler installed")
 
-    # Create app context with explicit wiring
+    # Create QApplication FIRST so managers can have Qt parent
+    # Note: We create a basic QApplication here, then configure it in SpritePalApp.__init__
+    app = QApplication(sys.argv)
+
+    # Create app context with explicit wiring (now QApplication exists)
     logger.info("Creating app context...")
     try:
         context = create_app_context(
@@ -192,11 +195,11 @@ def main():
             set_disabled_categories(set(disabled_categories))
             logger.info(f"Disabled log categories: {disabled_categories}")
 
-        # Create application with context
-        app = SpritePalApp(sys.argv, context=context)
+        # Configure application with context
+        spritepal = SpritePalApp(app, context=context)
 
         # Show main window
-        app.show()
+        spritepal.show()
 
         # Run event loop
         result = app.exec()

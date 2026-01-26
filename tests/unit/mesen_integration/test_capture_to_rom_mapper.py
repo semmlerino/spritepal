@@ -433,17 +433,17 @@ class TestConstants:
 
     def test_min_score(self) -> None:
         """MIN_SCORE is a positive float."""
-        assert isinstance(MIN_SCORE, (int, float))
+        assert isinstance(MIN_SCORE, int | float)
         assert MIN_SCORE > 0
 
     def test_ambiguity_ratio(self) -> None:
         """AMBIGUITY_RATIO is >= 1.0."""
-        assert isinstance(AMBIGUITY_RATIO, (int, float))
+        assert isinstance(AMBIGUITY_RATIO, int | float)
         assert AMBIGUITY_RATIO >= 1.0
 
     def test_ambiguity_gap(self) -> None:
         """AMBIGUITY_GAP is between 0 and 1."""
-        assert isinstance(AMBIGUITY_GAP, (int, float))
+        assert isinstance(AMBIGUITY_GAP, int | float)
         assert 0 <= AMBIGUITY_GAP <= 1
 
 

@@ -330,31 +330,31 @@
       "ai_frame_id": "sprite_01.png",
       "game_frame_id": "capture_1769108964",
       "status": "edited",
-      "offset_x": 4,
+      "offset_x": 65,
       "offset_y": 0,
       "flip_h": false,
       "flip_v": false,
-      "scale": 0.13
+      "scale": 0.1391304347826087
     },
     {
       "ai_frame_id": "sprite_01_edited.png",
       "game_frame_id": "capture_1769108962",
       "status": "edited",
-      "offset_x": 4,
+      "offset_x": 65,
       "offset_y": 0,
       "flip_h": false,
       "flip_v": false,
-      "scale": 0.13
+      "scale": 0.1391304347826087
     },
     {
       "ai_frame_id": "sprite_00_edited.png",
       "game_frame_id": "capture_1769108991",
-      "status": "mapped",
-      "offset_x": 0,
+      "status": "edited",
+      "offset_x": 1,
       "offset_y": 0,
       "flip_h": false,
       "flip_v": false,
-      "scale": 1.0
+      "scale": 0.1391304347826087
     }
   ],
   "sheet_palette": {

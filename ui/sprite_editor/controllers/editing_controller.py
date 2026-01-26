@@ -504,6 +504,10 @@ class EditingController(QObject):
                     self.set_palette(colors, name, source_type=source_type, source_index=index)
                 else:
                     logger.warning(f"Unknown palette source: {source_type} #{index}")
+            elif source_type == "":
+                # Empty string means "[Modified]" - palette was edited directly.
+                # No action needed; the palette is already set from the edit operation.
+                pass
             else:
                 logger.warning(f"Unknown palette source type: {source_type}")
         except Exception as e:

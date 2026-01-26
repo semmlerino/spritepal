@@ -12,7 +12,16 @@ from pathlib import Path
 _console_handler: logging.Handler | None = None
 
 # Track disabled logging categories (relative to spritepal.*, e.g., "core.rom_extractor")
-_disabled_categories: set[str] = set()
+_disabled_categories: set[str] = {
+    "core.rom_extractor",
+    "core.tile_renderer",
+    "ui.workers.batch_thumbnail_worker",
+    "core.mesen_integration.tile_hash_database",
+    "core.mesen_integration.rom_tile_matcher",
+    "core.hal_compression",
+    "core.rom_injector",
+    "ui.workers",
+}
 
 # Known noisy categories for UI display
 NOISY_CATEGORIES: dict[str, str] = {
@@ -20,8 +29,9 @@ NOISY_CATEGORIES: dict[str, str] = {
     "core.tile_renderer": "Tile Rendering",
     "ui.workers.batch_thumbnail_worker": "Thumbnail Worker",
     "core.mesen_integration.tile_hash_database": "Tile Hash Database",
-    "core.mesen_integration.rom_tile_matcher": "ROM Tile Matcher",
+    "core.rom_tile_matcher": "ROM Tile Matcher",
     "core.hal_compression": "HAL Compression",
+    "core.rom_injector": "ROM Injection",
     "ui.workers": "All UI Workers",
 }
 
@@ -58,7 +68,7 @@ def setup_logging(log_dir: Path | None = None, log_level: str = "INFO") -> loggi
     # Console handler - use detailed format if debug mode is enabled
     global _console_handler
     _console_handler = logging.StreamHandler()
-    _console_handler.setLevel(logging.DEBUG if debug_mode else logging.INFO)
+    _console_handler.setLevel(logging.DEBUG if debug_mode else logging.WARNING)
 
     if debug_mode:
         # Detailed format for debug mode (matches file format)
@@ -112,6 +122,11 @@ def setup_logging(log_dir: Path | None = None, log_level: str = "INFO") -> loggi
     # Log debug mode status if enabled
     if log_level == "DEBUG":
         logger.debug("Debug mode enabled via SPRITEPAL_DEBUG environment variable")
+
+    # Apply default disabled categories
+    for category in _disabled_categories:
+        full_name = f"spritepal.{category}"
+        logging.getLogger(full_name).setLevel(logging.CRITICAL + 1)
 
     return logger
 
@@ -168,7 +183,7 @@ def set_console_debug_mode(enabled: bool) -> None:
         return
 
     # Update console level
-    _console_handler.setLevel(logging.DEBUG if enabled else logging.INFO)
+    _console_handler.setLevel(logging.DEBUG if enabled else logging.WARNING)
 
     # Update console formatter
     if enabled:

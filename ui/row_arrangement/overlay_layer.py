@@ -404,18 +404,18 @@ class OverlayLayer(QObject):
             # Restore scale BEFORE position - set_scale adjusts position to maintain
             # visual center, so position must be set after scale
             scale = state.get("scale", 1.0)
-            if isinstance(scale, (int, float)):
+            if isinstance(scale, int | float):
                 self.set_scale(float(scale))
 
             # Restore position AFTER scale to avoid it being overwritten
             x = state.get("x", 0.0)
             y = state.get("y", 0.0)
-            if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+            if isinstance(x, int | float) and isinstance(y, int | float):
                 self.set_position(float(x), float(y))
 
             # Restore opacity
             opacity = state.get("opacity", 0.5)
-            if isinstance(opacity, (int, float)):
+            if isinstance(opacity, int | float):
                 self.set_opacity(float(opacity))
 
             # Restore visibility

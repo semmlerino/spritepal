@@ -6,6 +6,8 @@ palettes and game frame capture palettes.
 
 from __future__ import annotations
 
+from json import JSONDecodeError
+
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
 
@@ -152,7 +154,7 @@ class PaletteService(QObject):
                     # Merge with totals
                     for color, count in frame_colors.items():
                         all_colors[color] = all_colors.get(color, 0) + count
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 logger.warning("Failed to extract colors from %s: %s", ai_frame.path, e)
 
         logger.info("Extracted %d unique colors from %d AI frames", len(all_colors), len(project.ai_frames))
@@ -234,7 +236,7 @@ class PaletteService(QObject):
             logger.info("Copied palette from game frame %s", game_frame_id)
             return SheetPalette(colors=palette_rgb, color_mappings=color_mappings)
 
-        except Exception as e:
+        except (OSError, JSONDecodeError, KeyError, ValueError) as e:
             logger.exception("Failed to copy game palette from %s: %s", game_frame_id, e)
             return None
 
@@ -267,7 +269,7 @@ class PaletteService(QObject):
 
                 if snes_palette:
                     result[game_frame.id] = snes_palette_to_rgb(snes_palette)
-            except Exception as e:
+            except (OSError, JSONDecodeError, KeyError, ValueError) as e:
                 logger.debug("Could not load palette for %s: %s", game_frame.id, e)
 
         return result

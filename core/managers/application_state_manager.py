@@ -278,6 +278,18 @@ class ApplicationStateManager(BaseManager):
                 "rows": 50,
                 "last_page": 0,
             },
+            "logging": {
+                "disabled_categories": [
+                    "core.rom_extractor",
+                    "core.tile_renderer",
+                    "ui.workers.batch_thumbnail_worker",
+                    "core.mesen_integration.tile_hash_database",
+                    "core.mesen_integration.rom_tile_matcher",
+                    "core.hal_compression",
+                    "core.rom_injector",
+                    "ui.workers",
+                ],
+            },
         }
 
     def _merge_with_defaults(self, data: dict[str, dict[str, object]]) -> dict[str, dict[str, object]]:
