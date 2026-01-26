@@ -121,3 +121,108 @@ class TestFrameMappingWorkspaceDI:
         # Can still call methods
         controller.new_project("test")
         assert controller.has_project
+
+
+class TestEditorPaletteSyncOnPaletteChange:
+    """Tests for BUG-3 fix: palette editors sync when palette changes externally."""
+
+    def test_palette_editors_synced_when_palette_color_changes(self, app_context, qtbot) -> None:
+        """Open palette editors receive updates when palette color changes externally."""
+        from core.frame_mapping_project import SheetPalette
+
+        workspace = FrameMappingWorkspace()
+        qtbot.addWidget(workspace)
+
+        # Setup project with palette
+        workspace.controller.new_project("test")
+        colors = [(0, 0, 0)] * 16
+        palette = SheetPalette(colors=colors)
+        workspace.controller.set_sheet_palette(palette)
+
+        # Create mock editors to track updates
+        mock_editor1 = MagicMock()
+        mock_editor1._palette = palette
+        mock_editor1._palette_panel = MagicMock()
+        mock_editor1._update_duplicate_warning = MagicMock()
+        mock_editor1._controller = MagicMock()
+        mock_editor1._controller.get_indexed_data.return_value = MagicMock()  # Simulate having data
+        mock_editor1._canvas = MagicMock()
+
+        mock_editor2 = MagicMock()
+        mock_editor2._palette = palette
+        mock_editor2._palette_panel = MagicMock()
+        mock_editor2._update_duplicate_warning = MagicMock()
+        mock_editor2._controller = MagicMock()
+        mock_editor2._controller.get_indexed_data.return_value = MagicMock()
+        mock_editor2._canvas = MagicMock()
+
+        # Register mock editors
+        workspace._palette_editors["frame1.png"] = mock_editor1
+        workspace._palette_editors["frame2.png"] = mock_editor2
+
+        # Change palette color (this should trigger _on_sheet_palette_changed)
+        workspace.controller.set_sheet_palette_color(5, (255, 0, 0))
+
+        # Verify both editors were synced
+        mock_editor1._palette_panel.set_palette.assert_called()
+        mock_editor1._update_duplicate_warning.assert_called()
+        mock_editor1._canvas.set_image.assert_called()
+
+        mock_editor2._palette_panel.set_palette.assert_called()
+        mock_editor2._update_duplicate_warning.assert_called()
+        mock_editor2._canvas.set_image.assert_called()
+
+    def test_no_crash_when_no_editors_open(self, app_context, qtbot) -> None:
+        """Palette change doesn't crash when no editors are open."""
+        from core.frame_mapping_project import SheetPalette
+
+        workspace = FrameMappingWorkspace()
+        qtbot.addWidget(workspace)
+
+        # Setup project with palette
+        workspace.controller.new_project("test")
+        colors = [(0, 0, 0)] * 16
+        palette = SheetPalette(colors=colors)
+        workspace.controller.set_sheet_palette(palette)
+
+        # No editors registered (empty dict)
+        assert len(workspace._palette_editors) == 0
+
+        # Change palette color - should not crash
+        workspace.controller.set_sheet_palette_color(5, (255, 0, 0))
+
+    def test_editor_receives_new_palette_reference(self, app_context, qtbot) -> None:
+        """Editor's _palette is updated to match current palette from controller."""
+        from core.frame_mapping_project import SheetPalette
+
+        workspace = FrameMappingWorkspace()
+        qtbot.addWidget(workspace)
+
+        # Setup project with palette
+        workspace.controller.new_project("test")
+        colors = [(0, 0, 0)] * 16
+        palette = SheetPalette(colors=colors)
+        workspace.controller.set_sheet_palette(palette)
+
+        # Create mock editor with old palette reference
+        old_palette = SheetPalette(colors=[(128, 128, 128)] * 16)
+        mock_editor = MagicMock()
+        mock_editor._palette = old_palette  # Different palette object
+        mock_editor._palette_panel = MagicMock()
+        mock_editor._update_duplicate_warning = MagicMock()
+        mock_editor._controller = MagicMock()
+        mock_editor._controller.get_indexed_data.return_value = None  # No data
+        mock_editor._canvas = MagicMock()
+
+        workspace._palette_editors["frame1.png"] = mock_editor
+
+        # Change palette color (palette service may create new palette object)
+        workspace.controller.set_sheet_palette_color(5, (255, 0, 0))
+
+        # Editor's _palette should now reference the CURRENT palette from controller
+        # (not necessarily the original object, since palette service may create new objects)
+        current_palette = workspace.controller.get_sheet_palette()
+        assert mock_editor._palette is current_palette
+        # Verify the color was actually changed
+        assert current_palette is not None
+        assert current_palette.colors[5] == (255, 0, 0)

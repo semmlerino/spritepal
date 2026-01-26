@@ -6,6 +6,7 @@ between the view panels.
 
 from __future__ import annotations
 
+from json import JSONDecodeError
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -101,6 +102,8 @@ class FrameMappingController(QObject):
         # Palette service for palette management
         self._palette_service = PaletteService(parent=self)
         self._palette_service.sheet_palette_changed.connect(self.sheet_palette_changed)
+        # BUG-2 FIX: Invalidate preview cache when palette changes (previews are palette-dependent)
+        self._palette_service.sheet_palette_changed.connect(self._invalidate_previews_on_palette_change)
         # Organization service for frame/capture renaming and tagging
         self._organization_service = OrganizationService(parent=self)
         self._organization_service.frame_renamed.connect(self.frame_renamed)
@@ -223,9 +226,17 @@ class FrameMappingController(QObject):
             self.project_changed.emit()
             logger.info("Loaded frame mapping project from %s", path)
             return True
-        except Exception as e:
-            logger.exception("Failed to load project from %s", path)
-            self.error_occurred.emit(f"Failed to load project: {e}")
+        except FileNotFoundError:
+            logger.warning("Project file not found: %s", path)
+            self.error_occurred.emit(f"Project file not found: {path}")
+            return False
+        except (JSONDecodeError, KeyError, ValueError) as e:
+            logger.exception("Invalid project file format: %s", path)
+            self.error_occurred.emit(f"Invalid project file format: {e}")
+            return False
+        except OSError as e:
+            logger.exception("Failed to read project file: %s", path)
+            self.error_occurred.emit(f"Failed to read project: {e}")
             return False
 
     def save_project(self, path: Path) -> bool:
@@ -245,7 +256,11 @@ class FrameMappingController(QObject):
             FrameMappingRepository.save(self._project, path)
             logger.info("Saved frame mapping project to %s", path)
             return True
-        except Exception as e:
+        except PermissionError as e:
+            logger.exception("Permission denied saving project to %s", path)
+            self.error_occurred.emit(f"Permission denied: {e}")
+            return False
+        except OSError as e:
             logger.exception("Failed to save project to %s", path)
             self.error_occurred.emit(f"Failed to save project: {e}")
             return False
@@ -328,9 +343,18 @@ class FrameMappingController(QObject):
             # Emit signal for workspace to show sprite selection dialog
             self.capture_import_requested.emit(capture_result, capture_path)
 
-        except Exception as e:
-            logger.exception("Failed to parse capture from %s", capture_path)
-            self.error_occurred.emit(f"Failed to parse capture: {e}")
+        except FileNotFoundError:
+            logger.warning("Capture file not found: %s", capture_path)
+            self.error_occurred.emit(f"Capture file not found: {capture_path}")
+        except JSONDecodeError as e:
+            logger.exception("Invalid JSON in capture file: %s", capture_path)
+            self.error_occurred.emit(f"Invalid capture file format: {e}")
+        except (KeyError, ValueError) as e:
+            logger.exception("Malformed capture data in %s", capture_path)
+            self.error_occurred.emit(f"Malformed capture data: {e}")
+        except OSError as e:
+            logger.exception("Failed to read capture file: %s", capture_path)
+            self.error_occurred.emit(f"Failed to read capture: {e}")
 
     def complete_capture_import(
         self,
@@ -426,7 +450,12 @@ class FrameMappingController(QObject):
             )
             return frame
 
-        except Exception as e:
+        except ValueError as e:
+            # Duplicate frame ID, invalid data
+            logger.exception("Invalid capture data from %s: %s", capture_path, e)
+            self.error_occurred.emit(f"Invalid capture data: {e}")
+            return None
+        except OSError as e:
             logger.exception("Failed to import capture from %s", capture_path)
             self.error_occurred.emit(f"Failed to import capture: {e}")
             return None
@@ -813,6 +842,16 @@ class FrameMappingController(QObject):
         """
         self._palette_service.set_sheet_palette_color(self._project, index, rgb)
         self.project_changed.emit()
+
+    def _invalidate_previews_on_palette_change(self) -> None:
+        """Invalidate all previews when sheet palette changes.
+
+        BUG-2 FIX: Game frame previews may use the sheet palette for rendering.
+        When the palette changes, cached previews become stale and must be
+        regenerated to reflect the new colors.
+        """
+        logger.debug("Invalidating preview cache due to palette change")
+        self._preview_service.invalidate_all()
 
     def extract_sheet_colors(self) -> dict[tuple[int, int, int], int]:
         """Extract unique colors from all AI frames in the project.

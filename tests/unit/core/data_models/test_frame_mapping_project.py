@@ -2,7 +2,79 @@
 
 from pathlib import Path
 
-from core.frame_mapping_project import AIFrame, FrameMappingProject, GameFrame
+import pytest
+
+from core.frame_mapping_project import AIFrame, FrameMappingProject, GameFrame, SheetPalette
+
+
+class TestSheetPaletteVersionHash:
+    """Tests for SheetPalette.version_hash cache invalidation property."""
+
+    def test_version_hash_changes_when_color_modified(self) -> None:
+        """version_hash changes when a color is modified."""
+        colors = [(0, 0, 0)] * 16
+        palette = SheetPalette(colors=colors.copy())
+        original_hash = palette.version_hash
+
+        # Modify a color
+        palette.colors[5] = (255, 0, 0)
+        new_hash = palette.version_hash
+
+        assert new_hash != original_hash
+
+    def test_version_hash_same_for_equal_palettes(self) -> None:
+        """Two palettes with identical content have the same version_hash."""
+        colors = [(i * 16, i * 16, i * 16) for i in range(16)]
+        mappings = {(100, 100, 100): 5, (200, 200, 200): 10}
+
+        palette1 = SheetPalette(colors=colors.copy(), color_mappings=mappings.copy())
+        palette2 = SheetPalette(colors=colors.copy(), color_mappings=mappings.copy())
+
+        assert palette1.version_hash == palette2.version_hash
+
+    def test_version_hash_changes_when_mapping_added(self) -> None:
+        """version_hash changes when a color mapping is added."""
+        colors = [(0, 0, 0)] * 16
+        palette = SheetPalette(colors=colors)
+        original_hash = palette.version_hash
+
+        # Add a color mapping
+        palette.color_mappings[(128, 128, 128)] = 3
+        new_hash = palette.version_hash
+
+        assert new_hash != original_hash
+
+    def test_version_hash_changes_when_mapping_removed(self) -> None:
+        """version_hash changes when a color mapping is removed."""
+        colors = [(0, 0, 0)] * 16
+        mappings = {(100, 100, 100): 5}
+        palette = SheetPalette(colors=colors, color_mappings=mappings)
+        original_hash = palette.version_hash
+
+        # Remove mapping
+        del palette.color_mappings[(100, 100, 100)]
+        new_hash = palette.version_hash
+
+        assert new_hash != original_hash
+
+    def test_version_hash_differs_for_different_mapping_values(self) -> None:
+        """version_hash differs when mapping index changes."""
+        colors = [(0, 0, 0)] * 16
+        palette1 = SheetPalette(colors=colors.copy(), color_mappings={(100, 100, 100): 5})
+        palette2 = SheetPalette(colors=colors.copy(), color_mappings={(100, 100, 100): 7})
+
+        assert palette1.version_hash != palette2.version_hash
+
+    def test_version_hash_stable_across_repeated_calls(self) -> None:
+        """version_hash returns consistent value for unchanged palette."""
+        colors = [(i, i, i) for i in range(16)]
+        palette = SheetPalette(colors=colors, color_mappings={(50, 50, 50): 3})
+
+        hash1 = palette.version_hash
+        hash2 = palette.version_hash
+        hash3 = palette.version_hash
+
+        assert hash1 == hash2 == hash3
 
 
 class TestFrameMappingProjectOrganization:
@@ -687,3 +759,53 @@ class TestFacadeMethods:
 
         # Index should be updated (None lookup)
         assert project.get_mapping_for_game_frame("G001") is None
+
+
+class TestCreateMappingValidation:
+    """Tests for create_mapping input validation (P0-1 fix)."""
+
+    def test_create_mapping_rejects_empty_ai_frame_id(self) -> None:
+        """create_mapping raises ValueError for empty ai_frame_id."""
+        project = FrameMappingProject(name="test")
+
+        with pytest.raises(ValueError, match="ai_frame_id cannot be empty"):
+            project.create_mapping("", "G001")
+
+    def test_create_mapping_rejects_whitespace_ai_frame_id(self) -> None:
+        """create_mapping raises ValueError for whitespace-only ai_frame_id."""
+        project = FrameMappingProject(name="test")
+
+        with pytest.raises(ValueError, match="ai_frame_id cannot be empty"):
+            project.create_mapping("   ", "G001")
+
+    def test_create_mapping_rejects_empty_game_frame_id(self) -> None:
+        """create_mapping raises ValueError for empty game_frame_id."""
+        project = FrameMappingProject(name="test")
+
+        with pytest.raises(ValueError, match="game_frame_id cannot be empty"):
+            project.create_mapping("frame_001.png", "")
+
+    def test_create_mapping_rejects_whitespace_game_frame_id(self) -> None:
+        """create_mapping raises ValueError for whitespace-only game_frame_id."""
+        project = FrameMappingProject(name="test")
+
+        with pytest.raises(ValueError, match="game_frame_id cannot be empty"):
+            project.create_mapping("frame_001.png", "   ")
+
+    def test_create_mapping_accepts_valid_ids(self) -> None:
+        """create_mapping accepts valid non-empty IDs."""
+        project = FrameMappingProject(name="test")
+
+        mapping = project.create_mapping("frame_001.png", "G001")
+
+        assert mapping.ai_frame_id == "frame_001.png"
+        assert mapping.game_frame_id == "G001"
+
+    def test_create_mapping_accepts_ids_with_special_chars(self) -> None:
+        """create_mapping accepts IDs with special characters."""
+        project = FrameMappingProject(name="test")
+
+        mapping = project.create_mapping("sprite-001_v2.png", "G_001-test")
+
+        assert mapping.ai_frame_id == "sprite-001_v2.png"
+        assert mapping.game_frame_id == "G_001-test"

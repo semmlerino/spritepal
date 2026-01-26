@@ -1504,13 +1504,33 @@ class FrameMappingWorkspace(QWidget):
                 self._message_service.show_message("Sheet palette cleared")
 
     def _on_sheet_palette_changed(self) -> None:
-        """Handle sheet palette change from controller."""
+        """Handle sheet palette change from controller.
+
+        BUG-3 FIX: Must explicitly sync all open palette editors because the
+        editor's _on_external_palette_changed uses identity check (is not)
+        which fails when the same palette object is modified in-place.
+        """
         palette = self._controller.get_sheet_palette()
         self._ai_frames_pane.set_sheet_palette(palette)
         # Also update the workbench canvas for pixel inspection
         self._alignment_canvas.set_sheet_palette(palette)
         # Also update mapping panel to show quantized AI frame thumbnails
         self._mapping_panel.set_sheet_palette(palette)
+
+        # BUG-3 FIX: Explicitly sync ALL open palette editors
+        # This handles the case where palette colors changed in-place
+        # (same object reference, but different content)
+        if palette is not None:
+            for editor in self._palette_editors.values():
+                # Always update palette reference and refresh UI
+                # (regardless of identity check, since colors may have changed)
+                editor._palette = palette
+                editor._palette_panel.set_palette(palette)
+                editor._update_duplicate_warning()
+                # Refresh canvas with new palette colors
+                data = editor._controller.get_indexed_data()
+                if data is not None:
+                    editor._canvas.set_image(data, palette)
 
     def _on_pixel_hovered(self, x: int, y: int, rgb: object, palette_index: int) -> None:
         """Handle pixel hover on workbench - highlight palette swatch."""

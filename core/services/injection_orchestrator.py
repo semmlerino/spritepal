@@ -19,6 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+import numpy as np
 from PIL import Image
 
 from core.mesen_integration.capture_renderer import CaptureRenderer
@@ -36,6 +37,7 @@ from core.services.injection_results import (
     InjectionResult,
     TileInjectionResult,
 )
+from core.services.rgb_to_indexed import load_image_preserving_indices
 from core.services.rom_staging_manager import ROMStagingManager
 from core.services.rom_verification_service import ROMVerificationService
 from core.services.sprite_compositor import SpriteCompositor, TransformParams
@@ -171,7 +173,8 @@ class InjectionOrchestrator:
             if isinstance(composite_data, InjectionResult):
                 return composite_data
 
-            masked_canvas, filtered_capture, relevant_entries = composite_data
+            # BUG-1 FIX: Unpack index_map for index-preserving injection
+            masked_canvas, filtered_capture, relevant_entries, transformed_index_map = composite_data
 
         except Exception as e:
             logger.exception("Failed to prepare masked image")
@@ -212,6 +215,7 @@ class InjectionOrchestrator:
                 force_raw=force_raw,
                 debug=debug,
                 on_progress=progress,
+                transformed_index_map=transformed_index_map,  # BUG-1 FIX
             )
 
             if result.success:
@@ -283,15 +287,23 @@ class InjectionOrchestrator:
         project: FrameMappingProject,
         request: InjectionRequest,
         debug: InjectionDebugContext,
-    ) -> tuple[Image.Image, CaptureResult, list[OAMEntry]] | InjectionResult:
+    ) -> tuple[Image.Image, CaptureResult, list[OAMEntry], np.ndarray | None] | InjectionResult:
         """Load and composite images for injection.
 
-        Returns (masked_canvas, filtered_capture, relevant_entries) on success,
+        Returns (masked_canvas, filtered_capture, relevant_entries, ai_index_map) on success,
         or InjectionResult on failure.
+
+        BUG-1 FIX: Also returns ai_index_map (palette indices) if the AI frame is an
+        indexed PNG, enabling index-preserving injection that avoids re-quantization.
         """
-        # Load AI image
-        with Image.open(ai_frame.path) as opened_img:
-            ai_img = opened_img.convert("RGBA")
+        # Load AI image, preserving palette indices if indexed PNG
+        ai_index_map, ai_img = load_image_preserving_indices(ai_frame.path)
+        if ai_index_map is not None:
+            logger.debug(
+                "Loaded indexed PNG with preserved indices: %s (shape: %s)",
+                ai_frame.path.name,
+                ai_index_map.shape,
+            )
 
         # Parse capture for tile layout
         # Note: capture_path is validated in _validate_mapping before this is called
@@ -378,7 +390,85 @@ class InjectionOrchestrator:
             debug.save_debug_image("original_sprite_mask", original_sprite_img)
             debug.save_debug_image("masked_canvas", masked_canvas)
 
-        return masked_canvas, filtered_capture, relevant_entries
+        # BUG-1 FIX: Transform the index map to match the composited canvas coordinates
+        # This enables index-preserving injection (skipping re-quantization)
+        transformed_index_map: np.ndarray | None = None
+        if ai_index_map is not None:
+            transformed_index_map = self._transform_index_map(
+                ai_index_map,
+                mapping,
+                masked_canvas.size,
+            )
+
+        return masked_canvas, filtered_capture, relevant_entries, transformed_index_map
+
+    def _transform_index_map(
+        self,
+        index_map: np.ndarray,
+        mapping: FrameMapping,
+        canvas_size: tuple[int, int],
+    ) -> np.ndarray:
+        """Transform index map to match the composited canvas coordinates.
+
+        BUG-1 FIX: Applies the same transforms (flip, scale, offset) to the index map
+        that are applied to the RGBA image during compositing, using NEAREST interpolation
+        to preserve exact palette indices.
+
+        Args:
+            index_map: Original palette index array from AI frame
+            mapping: Frame mapping with transform parameters
+            canvas_size: Size of the composited canvas (width, height)
+
+        Returns:
+            Transformed index map at canvas coordinates, with 255 marking "no AI data"
+        """
+        from scipy.ndimage import zoom
+
+        canvas_w, canvas_h = canvas_size
+
+        # Start with "no data" marker (255 = outside AI frame area)
+        result = np.full((canvas_h, canvas_w), 255, dtype=np.uint8)
+
+        # Apply scale if needed (using NEAREST to preserve indices)
+        if mapping.scale != 1.0:
+            scaled: np.ndarray = np.asarray(zoom(index_map, mapping.scale, order=0), dtype=np.uint8)
+        else:
+            scaled = index_map
+
+        # Apply flips
+        if mapping.flip_h:
+            scaled = np.fliplr(scaled)
+        if mapping.flip_v:
+            scaled = np.flipud(scaled)
+
+        # Calculate placement in canvas (matching compositor logic)
+        scaled_h, scaled_w = int(scaled.shape[0]), int(scaled.shape[1])
+
+        # The AI frame is placed at offset relative to canvas center
+        # (matching SpriteCompositor's placement logic)
+        # Place at offset from canvas origin
+        start_x = mapping.offset_x
+        start_y = mapping.offset_y
+
+        # Calculate overlap region
+        src_x_start = max(0, -start_x)
+        src_y_start = max(0, -start_y)
+        dst_x_start = max(0, start_x)
+        dst_y_start = max(0, start_y)
+
+        copy_w = min(scaled_w - src_x_start, canvas_w - dst_x_start)
+        copy_h = min(scaled_h - src_y_start, canvas_h - dst_y_start)
+
+        if copy_w > 0 and copy_h > 0:
+            result[
+                dst_y_start : dst_y_start + copy_h,
+                dst_x_start : dst_x_start + copy_w,
+            ] = scaled[
+                src_y_start : src_y_start + copy_h,
+                src_x_start : src_x_start + copy_w,
+            ]
+
+        return result
 
     def _execute_injection(
         self,
@@ -396,6 +486,7 @@ class InjectionOrchestrator:
         force_raw: bool,
         debug: InjectionDebugContext,
         on_progress: Callable[[str], None],
+        transformed_index_map: np.ndarray | None = None,  # BUG-1 FIX
     ) -> InjectionResult:
         """Execute tile injection for all ROM offsets."""
         on_progress("Verifying ROM tile attribution...")
@@ -457,6 +548,7 @@ class InjectionOrchestrator:
                 create_backup=request.create_backup and first_tile_group,
                 preserve_existing=using_existing_output or not first_tile_group,
                 debug=debug,
+                transformed_index_map=transformed_index_map,  # BUG-1 FIX
             )
 
             tile_results.append(result)
@@ -560,6 +652,7 @@ class InjectionOrchestrator:
         create_backup: bool,
         preserve_existing: bool,
         debug: InjectionDebugContext,
+        transformed_index_map: np.ndarray | None = None,  # BUG-1 FIX
     ) -> TileInjectionResult:
         """Inject a single tile group at a ROM offset."""
 
@@ -635,6 +728,11 @@ class InjectionOrchestrator:
 
         chunk_img = Image.new("RGBA", (grid_width * 8, grid_height * 8), (0, 0, 0, 0))
 
+        # BUG-1 FIX: Also build index chunk for index-preserving injection
+        chunk_index_map: np.ndarray | None = None
+        if transformed_index_map is not None:
+            chunk_index_map = np.zeros((grid_height * 8, grid_width * 8), dtype=np.uint8)
+
         first_tile_info = vram_tiles[sorted_vram_addrs[0]]
         palette_index = first_tile_info[2]
 
@@ -671,10 +769,48 @@ class InjectionOrchestrator:
 
             chunk_img.paste(tile_img, (grid_x, grid_y))
 
+            # BUG-1 FIX: Also extract index tile from transformed_index_map
+            if chunk_index_map is not None and transformed_index_map is not None:
+                # Extract 8x8 index tile
+                canvas_h, canvas_w = transformed_index_map.shape
+                if 0 <= canvas_x < canvas_w - 7 and 0 <= canvas_y < canvas_h - 7:
+                    index_tile = transformed_index_map[canvas_y : canvas_y + 8, canvas_x : canvas_x + 8].copy()
+
+                    # Apply same flips to index tile
+                    if flip_h:
+                        index_tile = np.fliplr(index_tile)
+                    if flip_v:
+                        index_tile = np.flipud(index_tile)
+
+                    # Place in chunk index map
+                    chunk_index_map[grid_y : grid_y + 8, grid_x : grid_x + 8] = index_tile
+
         debug.save_debug_image(f"chunk_0x{rom_offset:X}_pre_quant", chunk_img)
 
-        # Quantize
-        if project.sheet_palette:
+        # BUG-1 FIX: Use index map directly if available (skips re-quantization)
+        use_index_passthrough = False
+        if chunk_index_map is not None and project.sheet_palette:
+            # Check if index map has valid data (no 255 markers = outside AI frame area)
+            if not np.any(chunk_index_map == 255):
+                use_index_passthrough = True
+                logger.debug(
+                    "ROM offset 0x%X: Using index passthrough (preserving palette indices)",
+                    rom_offset,
+                )
+
+        if use_index_passthrough and chunk_index_map is not None and project.sheet_palette:
+            # Create indexed image directly from index map (BUG-1 FIX)
+            sheet_palette = project.sheet_palette
+            palette_flat = []
+            for r, g, b in sheet_palette.colors:
+                palette_flat.extend([r, g, b])
+            # Pad to 256 colors (PIL requirement)
+            palette_flat.extend([0] * (768 - len(palette_flat)))
+
+            chunk_img = Image.fromarray(chunk_index_map, mode="P")
+            chunk_img.putpalette(palette_flat)
+        # Quantize (fallback when no index map or index map has invalid data)
+        elif project.sheet_palette:
             sheet_palette = project.sheet_palette
             palette_rgb = list(sheet_palette.colors)
             if sheet_palette.color_mappings:

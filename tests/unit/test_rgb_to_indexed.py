@@ -410,3 +410,102 @@ class TestAnalyzeColorUsage:
         assert "max" in stats
         assert "avg" in stats
         assert stats["min"] <= stats["avg"] <= stats["max"]
+
+
+class TestLoadImagePreservingIndices:
+    """Tests for load_image_preserving_indices function.
+
+    BUG-1 FIX: Tests for preserving palette indices when loading indexed PNGs.
+    """
+
+    def test_indexed_png_returns_index_map(self, tmp_path) -> None:
+        """Loading indexed PNG returns valid index map."""
+        from core.services.rgb_to_indexed import load_image_preserving_indices
+
+        # Create indexed PNG with specific indices
+        indexed_data = np.array(
+            [
+                [0, 1, 2, 3],
+                [4, 5, 6, 7],
+                [8, 9, 10, 11],
+                [12, 13, 14, 15],
+            ],
+            dtype=np.uint8,
+        )
+        palette_flat = [i * 16 for i in range(16)] * 3  # Grayscale palette
+        palette_flat.extend([0] * (768 - len(palette_flat)))
+
+        img = Image.fromarray(indexed_data, mode="P")
+        img.putpalette(palette_flat)
+
+        path = tmp_path / "indexed.png"
+        img.save(path)
+
+        # Load and verify
+        index_map, rgba_img = load_image_preserving_indices(path)
+
+        assert index_map is not None
+        assert index_map.shape == (4, 4)
+        np.testing.assert_array_equal(index_map, indexed_data)
+        assert rgba_img.mode == "RGBA"
+
+    def test_rgba_png_returns_none_index_map(self, tmp_path) -> None:
+        """Loading non-indexed PNG returns None for index map."""
+        from core.services.rgb_to_indexed import load_image_preserving_indices
+
+        # Create RGBA image
+        img = Image.new("RGBA", (4, 4), (255, 0, 0, 255))
+        path = tmp_path / "rgba.png"
+        img.save(path)
+
+        # Load and verify
+        index_map, rgba_img = load_image_preserving_indices(path)
+
+        assert index_map is None
+        assert rgba_img.mode == "RGBA"
+
+    def test_rgb_png_returns_none_index_map(self, tmp_path) -> None:
+        """Loading RGB PNG returns None for index map."""
+        from core.services.rgb_to_indexed import load_image_preserving_indices
+
+        # Create RGB image
+        img = Image.new("RGB", (4, 4), (0, 255, 0))
+        path = tmp_path / "rgb.png"
+        img.save(path)
+
+        # Load and verify
+        index_map, rgba_img = load_image_preserving_indices(path)
+
+        assert index_map is None
+        assert rgba_img.mode == "RGBA"
+
+    def test_preserved_indices_match_original(self, tmp_path) -> None:
+        """Preserved indices exactly match original indexed PNG."""
+        from core.services.rgb_to_indexed import load_image_preserving_indices
+
+        # Create indexed PNG with duplicate colors at different indices
+        # This is the scenario that causes BUG-1
+        indexed_data = np.array(
+            [
+                [3, 3, 7, 7],  # Index 3 and 7 might have same color
+                [3, 3, 7, 7],
+            ],
+            dtype=np.uint8,
+        )
+        # Set indices 3 and 7 to same color (red)
+        palette_flat = [0] * 768
+        palette_flat[3 * 3] = 255  # Index 3 = red
+        palette_flat[7 * 3] = 255  # Index 7 = red (same color!)
+
+        img = Image.fromarray(indexed_data, mode="P")
+        img.putpalette(palette_flat)
+
+        path = tmp_path / "duplicate_colors.png"
+        img.save(path)
+
+        # Load and verify indices are preserved (not remapped due to color match)
+        index_map, _ = load_image_preserving_indices(path)
+
+        assert index_map is not None
+        # Indices should be preserved exactly, even though colors are the same
+        np.testing.assert_array_equal(index_map, indexed_data)

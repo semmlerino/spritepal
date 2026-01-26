@@ -8,6 +8,7 @@ palette-based images (for SNES injection).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -288,3 +289,29 @@ def analyze_color_usage(
         "exact_count": len(exact_matches),
         "distance_stats": distance_stats,
     }
+
+
+def load_image_preserving_indices(path: Path) -> tuple[np.ndarray | None, Image.Image]:
+    """Load image, extracting palette indices if it's an indexed PNG.
+
+    BUG-1 FIX: When loading AI frames that were edited in the palette editor,
+    preserve the original palette indices to avoid re-quantization during
+    injection. This ensures that edited pixels maintain their exact palette
+    index assignment even when palette colors are duplicated.
+
+    Args:
+        path: Path to the image file
+
+    Returns:
+        Tuple of (index_map, rgba_image):
+        - index_map: numpy array of palette indices (uint8) if image is indexed PNG,
+          None if image is not indexed (RGB/RGBA)
+        - rgba_image: PIL Image converted to RGBA for compositing
+    """
+    with Image.open(path) as img:
+        if img.mode == "P":
+            # Indexed PNG - extract indices BEFORE converting
+            index_map = np.array(img, dtype=np.uint8)
+            return index_map, img.convert("RGBA")
+        # Non-indexed image - no indices to preserve
+        return None, img.convert("RGBA")

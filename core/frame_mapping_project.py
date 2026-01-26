@@ -47,6 +47,17 @@ class SheetPalette:
     colors: list[tuple[int, int, int]]  # 16 RGB colors (index 0 = transparent)
     color_mappings: dict[tuple[int, int, int], int] = field(default_factory=dict)
 
+    @property
+    def version_hash(self) -> int:
+        """Compute hash of current palette state for cache invalidation.
+
+        Returns a stable hash based on colors and color_mappings. Two palettes
+        with identical content will have the same version_hash.
+        """
+        colors_tuple = tuple(self.colors)
+        mappings_tuple = tuple(sorted(self.color_mappings.items()))
+        return hash((colors_tuple, mappings_tuple))
+
     def to_dict(self) -> dict[str, object]:
         """Serialize to dictionary for JSON storage."""
         # Convert tuple keys to strings for JSON compatibility
@@ -646,7 +657,16 @@ class FrameMappingProject:
 
         Returns:
             The created or updated mapping
+
+        Raises:
+            ValueError: If ai_frame_id or game_frame_id is empty
         """
+        # Validate inputs - empty IDs break downstream operations
+        if not ai_frame_id or not ai_frame_id.strip():
+            raise ValueError("ai_frame_id cannot be empty")
+        if not game_frame_id or not game_frame_id.strip():
+            raise ValueError("game_frame_id cannot be empty")
+
         # Remove existing mapping for this AI frame if any
         self.mappings = [m for m in self.mappings if m.ai_frame_id != ai_frame_id]
 
