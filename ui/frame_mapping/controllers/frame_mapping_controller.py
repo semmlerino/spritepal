@@ -648,6 +648,7 @@ class FrameMappingController(QObject):
         flip_v: bool,
         scale: float = 1.0,
         set_edited: bool = True,
+        drag_start_alignment: tuple[int, int, bool, bool, float] | None = None,
     ) -> bool:
         """Update alignment for a mapping.
 
@@ -660,6 +661,9 @@ class FrameMappingController(QObject):
             scale: Scale factor (0.1 - 1.0)
             set_edited: If True and status is not 'injected', set status to 'edited'.
                         Use False for auto-centering during initial link creation.
+            drag_start_alignment: If provided, use this as old state for undo command.
+                        This creates a single undo for an entire drag operation.
+                        Format: (offset_x, offset_y, flip_h, flip_v, scale)
 
         Returns:
             True if alignment was updated
@@ -673,6 +677,17 @@ class FrameMappingController(QObject):
 
         # Only record undo for explicit user edits, not auto-centering
         if set_edited:
+            # Use drag start alignment for undo if provided (creates single undo for entire drag)
+            # Otherwise use current mapping state (for keyboard nudge, etc.)
+            if drag_start_alignment is not None:
+                old_x, old_y, old_flip_h, old_flip_v, old_scale = drag_start_alignment
+            else:
+                old_x = mapping.offset_x
+                old_y = mapping.offset_y
+                old_flip_h = mapping.flip_h
+                old_flip_v = mapping.flip_v
+                old_scale = mapping.scale
+
             # Capture previous state for undo
             command = UpdateAlignmentCommand(
                 controller=self,
@@ -682,11 +697,11 @@ class FrameMappingController(QObject):
                 new_flip_h=flip_h,
                 new_flip_v=flip_v,
                 new_scale=scale,
-                old_offset_x=mapping.offset_x,
-                old_offset_y=mapping.offset_y,
-                old_flip_h=mapping.flip_h,
-                old_flip_v=mapping.flip_v,
-                old_scale=mapping.scale,
+                old_offset_x=old_x,
+                old_offset_y=old_y,
+                old_flip_h=old_flip_h,
+                old_flip_v=old_flip_v,
+                old_scale=old_scale,
                 old_status=mapping.status,
             )
             self._undo_stack.push(command)

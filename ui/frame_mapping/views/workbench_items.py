@@ -84,6 +84,9 @@ class ScaleHandle(QGraphicsRectItem):
         if isinstance(event, QGraphicsSceneMouseEvent):
             self._drag_start_pos = event.scenePos()
             self._drag_start_scale = self._ai_frame.scale_factor()
+            # Set parent drag state for performance optimization
+            pos = self._ai_frame.pos()
+            self._ai_frame.start_drag(int(pos.x()), int(pos.y()), self._drag_start_scale)
             event.accept()
 
     @override
@@ -125,6 +128,8 @@ class ScaleHandle(QGraphicsRectItem):
 
         if isinstance(event, QGraphicsSceneMouseEvent):
             self._drag_start_pos = None
+            # End parent drag state
+            self._ai_frame.end_drag()
             event.accept()
 
     @override
@@ -149,9 +154,13 @@ class AIFrameItem(QGraphicsObject):
     Signals:
         transform_changed: Emitted when position or scale changes.
             Args: (offset_x: int, offset_y: int, scale: float)
+        drag_started: Emitted when a drag operation begins.
+        drag_finished: Emitted when a drag operation ends.
     """
 
     transform_changed = Signal(int, int, float)  # offset_x, offset_y, scale
+    drag_started = Signal()
+    drag_finished = Signal()
 
     def __init__(self, parent: QGraphicsItem | None = None) -> None:
         super().__init__(parent)
@@ -161,6 +170,10 @@ class AIFrameItem(QGraphicsObject):
         self._flip_v = False
         self._opacity = 0.7
         self._ghost_mode = False
+
+        # Drag state tracking for performance optimization
+        self._is_dragging = False
+        self._drag_start_alignment: tuple[int, int, float] | None = None  # (x, y, scale)
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
@@ -222,6 +235,54 @@ class AIFrameItem(QGraphicsObject):
         """Update handle positions."""
         for handle in self._handles:
             handle.update_position()
+
+    @property
+    def is_dragging(self) -> bool:
+        """Return True if a drag operation is in progress."""
+        return self._is_dragging
+
+    def get_drag_start_alignment(self) -> tuple[int, int, float] | None:
+        """Return alignment at drag start, or None if not dragging."""
+        return self._drag_start_alignment
+
+    def start_drag(self, start_x: int, start_y: int, start_scale: float) -> None:
+        """Mark drag operation as started (called by ScaleHandle too).
+
+        Args:
+            start_x: X offset at drag start
+            start_y: Y offset at drag start
+            start_scale: Scale at drag start
+        """
+        if not self._is_dragging:
+            self._is_dragging = True
+            self._drag_start_alignment = (start_x, start_y, start_scale)
+            self.drag_started.emit()
+
+    def end_drag(self) -> None:
+        """Mark drag operation as ended (called by ScaleHandle too)."""
+        if self._is_dragging:
+            self._is_dragging = False
+            self.drag_finished.emit()
+            self._drag_start_alignment = None
+
+    @override
+    def mousePressEvent(self, event: object) -> None:
+        """Start drag tracking on mouse press."""
+        from PySide6.QtWidgets import QGraphicsSceneMouseEvent
+
+        if isinstance(event, QGraphicsSceneMouseEvent):
+            pos = self.pos()
+            self.start_drag(int(pos.x()), int(pos.y()), self._scale_factor)
+            super().mousePressEvent(event)
+
+    @override
+    def mouseReleaseEvent(self, event: object) -> None:
+        """End drag tracking on mouse release."""
+        from PySide6.QtWidgets import QGraphicsSceneMouseEvent
+
+        if isinstance(event, QGraphicsSceneMouseEvent):
+            self.end_drag()
+            super().mouseReleaseEvent(event)
 
     def _emit_transform(self) -> None:
         """Emit transform_changed signal with current values."""

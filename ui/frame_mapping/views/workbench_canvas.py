@@ -276,6 +276,10 @@ class WorkbenchCanvas(QWidget):
         # Browsing mode indicator (when viewing different capture than mapping)
         self._browsing_mode = False
 
+        # Drag state tracking for undo optimization
+        self._drag_in_progress = False
+        self._drag_start_alignment: tuple[int, int, bool, bool, float] | None = None
+
         self._setup_ui()
         self._connect_signals()
 
@@ -549,6 +553,8 @@ class WorkbenchCanvas(QWidget):
 
         # AI frame item signals
         self._ai_frame_item.transform_changed.connect(self._on_ai_frame_transform_changed)
+        self._ai_frame_item.drag_started.connect(self._on_drag_started)
+        self._ai_frame_item.drag_finished.connect(self._on_drag_finished)
 
         # View mouse signals for pixel inspection
         self._view.scene_mouse_moved.connect(self._on_scene_mouse_moved)
@@ -1373,6 +1379,31 @@ class WorkbenchCanvas(QWidget):
         # Update scene rect and center view on aligned frames
         self._update_scene_for_alignment()
 
+    def _on_drag_started(self) -> None:
+        """Handle drag start from AI frame item."""
+        self._drag_in_progress = True
+        # Capture current alignment for undo
+        self._drag_start_alignment = self.get_alignment()
+        logger.debug("Drag started, captured alignment: %s", self._drag_start_alignment)
+
+    def _on_drag_finished(self) -> None:
+        """Handle drag end from AI frame item."""
+        self._drag_in_progress = False
+        # Emit final alignment change now that drag is complete
+        self._emit_alignment_changed()
+        logger.debug("Drag finished, emitting final alignment")
+
+    def get_drag_start_alignment(self) -> tuple[int, int, bool, bool, float] | None:
+        """Return alignment at drag start, or None if not from drag.
+
+        Used by workspace to pass to controller for single undo command.
+        """
+        return self._drag_start_alignment
+
+    def clear_drag_start_alignment(self) -> None:
+        """Clear drag start alignment after it's been consumed for undo."""
+        self._drag_start_alignment = None
+
     def _on_ai_frame_transform_changed(self, offset_x: int, offset_y: int, scale: float) -> None:
         """Handle transform change from AI frame item."""
         if self._updating_from_external:
@@ -1384,21 +1415,24 @@ class WorkbenchCanvas(QWidget):
         actual_x = int(offset_x / self._display_scale)
         actual_y = int(offset_y / self._display_scale)
 
-        # Update UI
+        # Update UI (always update for visual feedback during drag)
         self._offset_label.setText(f"Offset: ({actual_x}, {actual_y})")
         self._scale_slider.blockSignals(True)
         self._scale_slider.setValue(int(scale * 100))
         self._scale_value.setText(f"{scale:.1f}x")
         self._scale_slider.blockSignals(False)
 
-        # Schedule tile touch update
+        # Schedule tile touch update (already debounced)
         self._schedule_tile_touch_update()
 
-        # Schedule preview update if enabled
+        # Schedule preview update if enabled (already debounced)
         self._schedule_preview_update()
 
-        # Emit signal
-        self._emit_alignment_changed()
+        # Only emit alignment_changed when NOT dragging
+        # During drag, we suppress this signal to prevent undo flooding
+        # The final alignment will be emitted in _on_drag_finished
+        if not self._drag_in_progress:
+            self._emit_alignment_changed()
 
     def _emit_alignment_changed(self) -> None:
         """Emit alignment_changed signal with current values."""

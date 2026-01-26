@@ -699,10 +699,16 @@ class FrameMappingWorkspace(QWidget):
                 )
             return
 
+        # Get drag start alignment for single undo command (if from drag operation)
+        drag_start = self._alignment_canvas.get_drag_start_alignment()
+        self._alignment_canvas.clear_drag_start_alignment()  # Consume it
+
         # Update alignment in controller (includes scale)
         # This emits alignment_updated signal which triggers _on_alignment_updated()
         # which handles updating the mapping panel row
-        self._controller.update_mapping_alignment(ai_frame_id, x, y, flip_h, flip_v, scale)
+        self._controller.update_mapping_alignment(
+            ai_frame_id, x, y, flip_h, flip_v, scale, drag_start_alignment=drag_start
+        )
 
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.
