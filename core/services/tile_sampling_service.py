@@ -255,22 +255,24 @@ class TileSamplingService:
     def check_content_outside_tiles(
         self,
         content_bbox: tuple[int, int, int, int] | None,
-        tile_union_rect: tuple[int, int, int, int],
+        tile_rects: list[tuple[int, int, int, int]],
         offset_x: int,
         offset_y: int,
         scale: float,
     ) -> tuple[bool, list[tuple[int, int, int, int]]]:
-        """Check if AI frame content extends outside the tile area.
+        """Check if AI frame content extends outside the actual tile positions.
 
         This detects regions of the AI frame that will be clipped during
-        injection because they extend beyond the game sprite's tile boundaries.
+        injection because they don't overlap with any game sprite tile.
+        Unlike a simple bounding box check, this handles non-rectangular
+        tile arrangements (e.g., sprites with coattails or irregular shapes).
 
         Args:
             content_bbox: Non-transparent content bounding box from PIL.Image.getbbox()
                 in format (left, top, right, bottom) in source image coordinates.
                 None if image is fully transparent.
-            tile_union_rect: Union bounding box of all game tiles in scene coordinates
-                (min_x, min_y, max_x, max_y).
+            tile_rects: List of (x, y, w, h) rectangles for each tile in scene
+                coordinates (relative to game frame origin).
             offset_x: X offset of AI frame in scene coordinates.
             offset_y: Y offset of AI frame in scene coordinates.
             scale: Scale factor applied to AI frame.
@@ -279,11 +281,21 @@ class TileSamplingService:
             Tuple of (has_overflow, overflow_rects) where:
             - has_overflow: True if any content extends outside tiles
             - overflow_rects: List of (x, y, w, h) rectangles in scene coordinates
-              showing the clipped regions (top, bottom, left, right strips)
+              showing the regions not covered by any tile
         """
         if content_bbox is None:
             # Fully transparent image - no overflow
             return (False, [])
+
+        if not tile_rects:
+            # No tiles - everything is overflow (return content as single rect)
+            scale = self.clamp_scale(scale)
+            src_left, src_top, src_right, src_bottom = content_bbox
+            scene_left = int(src_left * scale) + offset_x
+            scene_top = int(src_top * scale) + offset_y
+            scene_right = int(src_right * scale) + offset_x
+            scene_bottom = int(src_bottom * scale) + offset_y
+            return (True, [(scene_left, scene_top, scene_right - scene_left, scene_bottom - scene_top)])
 
         scale = self.clamp_scale(scale)
 
@@ -294,53 +306,163 @@ class TileSamplingService:
         scene_right = int(src_right * scale) + offset_x
         scene_bottom = int(src_bottom * scale) + offset_y
 
-        tile_min_x, tile_min_y, tile_max_x, tile_max_y = tile_union_rect
+        # Use 8x8 grid cells (matching tile size) to check coverage
+        # Check each cell within content bounds against all tiles
+        cell_size = 8
+        overflow_cells: set[tuple[int, int]] = set()
 
-        # Check if content is fully inside tiles
-        if (
-            scene_left >= tile_min_x
-            and scene_top >= tile_min_y
-            and scene_right <= tile_max_x
-            and scene_bottom <= tile_max_y
-        ):
+        # Round content bounds to cell grid for iteration
+        cell_start_x = scene_left // cell_size
+        cell_start_y = scene_top // cell_size
+        cell_end_x = (scene_right + cell_size - 1) // cell_size
+        cell_end_y = (scene_bottom + cell_size - 1) // cell_size
+
+        for cell_y in range(cell_start_y, cell_end_y):
+            for cell_x in range(cell_start_x, cell_end_x):
+                cell_rect_left = cell_x * cell_size
+                cell_rect_top = cell_y * cell_size
+                cell_rect_right = cell_rect_left + cell_size
+                cell_rect_bottom = cell_rect_top + cell_size
+
+                # Check if this cell actually overlaps with content
+                if (
+                    cell_rect_right <= scene_left
+                    or cell_rect_left >= scene_right
+                    or cell_rect_bottom <= scene_top
+                    or cell_rect_top >= scene_bottom
+                ):
+                    continue
+
+                # Check if this cell overlaps with any tile
+                cell_covered = False
+                for tile_x, tile_y, tile_w, tile_h in tile_rects:
+                    tile_right = tile_x + tile_w
+                    tile_bottom = tile_y + tile_h
+                    # Check for overlap
+                    if not (
+                        cell_rect_right <= tile_x
+                        or cell_rect_left >= tile_right
+                        or cell_rect_bottom <= tile_y
+                        or cell_rect_top >= tile_bottom
+                    ):
+                        cell_covered = True
+                        break
+
+                if not cell_covered:
+                    overflow_cells.add((cell_x, cell_y))
+
+        if not overflow_cells:
             return (False, [])
 
-        # Calculate overflow regions (strips that extend past tile bounds)
-        overflow_rects: list[tuple[int, int, int, int]] = []
-
-        # Top overflow
-        if scene_top < tile_min_y:
-            clip_top = scene_top
-            clip_bottom = min(scene_bottom, tile_min_y)
-            if clip_bottom > clip_top:
-                overflow_rects.append((scene_left, clip_top, scene_right - scene_left, clip_bottom - clip_top))
-
-        # Bottom overflow
-        if scene_bottom > tile_max_y:
-            clip_top = max(scene_top, tile_max_y)
-            clip_bottom = scene_bottom
-            if clip_bottom > clip_top:
-                overflow_rects.append((scene_left, clip_top, scene_right - scene_left, clip_bottom - clip_top))
-
-        # Left overflow (only the part not covered by top/bottom)
-        if scene_left < tile_min_x:
-            clip_left = scene_left
-            clip_right = min(scene_right, tile_min_x)
-            clip_top = max(scene_top, tile_min_y)
-            clip_bottom = min(scene_bottom, tile_max_y)
-            if clip_right > clip_left and clip_bottom > clip_top:
-                overflow_rects.append((clip_left, clip_top, clip_right - clip_left, clip_bottom - clip_top))
-
-        # Right overflow (only the part not covered by top/bottom)
-        if scene_right > tile_max_x:
-            clip_left = max(scene_left, tile_max_x)
-            clip_right = scene_right
-            clip_top = max(scene_top, tile_min_y)
-            clip_bottom = min(scene_bottom, tile_max_y)
-            if clip_right > clip_left and clip_bottom > clip_top:
-                overflow_rects.append((clip_left, clip_top, clip_right - clip_left, clip_bottom - clip_top))
+        # Merge adjacent overflow cells into rectangles (simple row-based merge)
+        overflow_rects = self._merge_overflow_cells(overflow_cells, cell_size, scene_left, scene_top, scene_right, scene_bottom)
 
         return (len(overflow_rects) > 0, overflow_rects)
+
+    def _merge_overflow_cells(
+        self,
+        cells: set[tuple[int, int]],
+        cell_size: int,
+        content_left: int,
+        content_top: int,
+        content_right: int,
+        content_bottom: int,
+    ) -> list[tuple[int, int, int, int]]:
+        """Merge adjacent overflow cells into rectangles.
+
+        Uses a simple row-based merge: cells in the same row with consecutive
+        x coordinates are merged into horizontal spans, then returned as rects.
+        Clips the resulting rects to the actual content bounds.
+
+        Args:
+            cells: Set of (cell_x, cell_y) grid coordinates that are overflow.
+            cell_size: Size of each cell (typically 8 for tiles).
+            content_left, content_top, content_right, content_bottom:
+                Content bounds to clip the final rectangles.
+
+        Returns:
+            List of (x, y, w, h) rectangles in scene coordinates.
+        """
+        if not cells:
+            return []
+
+        # Group cells by row (y coordinate)
+        rows: dict[int, list[int]] = {}
+        for cell_x, cell_y in cells:
+            if cell_y not in rows:
+                rows[cell_y] = []
+            rows[cell_y].append(cell_x)
+
+        # Sort each row and merge consecutive cells
+        overflow_rects: list[tuple[int, int, int, int]] = []
+
+        for cell_y, x_coords in rows.items():
+            x_coords.sort()
+            # Merge consecutive x coords into spans
+            span_start = x_coords[0]
+            span_end = x_coords[0]
+
+            for x in x_coords[1:]:
+                if x == span_end + 1:
+                    # Consecutive, extend span
+                    span_end = x
+                else:
+                    # Gap, emit current span and start new one
+                    rect = self._cell_span_to_rect(
+                        span_start, span_end, cell_y, cell_size,
+                        content_left, content_top, content_right, content_bottom
+                    )
+                    if rect:
+                        overflow_rects.append(rect)
+                    span_start = x
+                    span_end = x
+
+            # Emit final span
+            rect = self._cell_span_to_rect(
+                span_start, span_end, cell_y, cell_size,
+                content_left, content_top, content_right, content_bottom
+            )
+            if rect:
+                overflow_rects.append(rect)
+
+        return overflow_rects
+
+    def _cell_span_to_rect(
+        self,
+        span_start_x: int,
+        span_end_x: int,
+        cell_y: int,
+        cell_size: int,
+        content_left: int,
+        content_top: int,
+        content_right: int,
+        content_bottom: int,
+    ) -> tuple[int, int, int, int] | None:
+        """Convert a cell span to a rectangle, clipped to content bounds.
+
+        Args:
+            span_start_x, span_end_x: Cell x coordinates (inclusive).
+            cell_y: Cell y coordinate.
+            cell_size: Size of each cell.
+            content_*: Content bounds to clip against.
+
+        Returns:
+            (x, y, w, h) tuple or None if completely outside content.
+        """
+        rect_left = span_start_x * cell_size
+        rect_right = (span_end_x + 1) * cell_size
+        rect_top = cell_y * cell_size
+        rect_bottom = rect_top + cell_size
+
+        # Clip to content bounds
+        rect_left = max(rect_left, content_left)
+        rect_right = min(rect_right, content_right)
+        rect_top = max(rect_top, content_top)
+        rect_bottom = min(rect_bottom, content_bottom)
+
+        if rect_right > rect_left and rect_bottom > rect_top:
+            return (rect_left, rect_top, rect_right - rect_left, rect_bottom - rect_top)
+        return None
 
     def quantize_to_palette(self, image: Image.Image) -> Image.Image | None:
         """Quantize an image to the configured palette.

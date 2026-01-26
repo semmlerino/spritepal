@@ -1093,13 +1093,14 @@ class WorkbenchCanvas(QWidget):
 
         self._tile_overlay_item.set_touched_indices(touched)
 
-        # Check for content outside tile area
-        tile_union = self._compute_tile_union_rect(qt_rects)
+        # Check for content outside tile area using actual tile positions
+        # (not just the union bounding box - handles non-rectangular sprites)
         content_bbox = self._ai_image.getbbox()  # Non-transparent content bounds
+        tile_tuples = [(r.x(), r.y(), r.width(), r.height()) for r in qt_rects]
 
         has_overflow, overflow_rects = self._tile_sampling_service.check_content_outside_tiles(
             content_bbox,
-            tile_union,
+            tile_tuples,
             offset_x,
             offset_y,
             scale,
