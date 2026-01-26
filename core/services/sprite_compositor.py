@@ -143,14 +143,16 @@ class SpriteCompositor:
         # Apply compositing based on policy
         if self._uncovered_policy == "transparent":
             # Original sprite completely removed - only AI content remains
-            # BUT: AI content is masked to only appear where original sprite had tiles
-            # This prevents AI content from "leaking" into gaps between sprite tiles
+            # AI content is masked to tile bounds (not pixel-level opacity)
+            # This clips to the 8x8 tile grid areas, not the sprite's silhouette
             composited = ai_canvas.copy()
-            # Apply original sprite mask: keep AI alpha only where original was opaque
             ai_alpha = composited.split()[3]
-            # Use minimum of AI alpha and original mask - this preserves AI transparency
-            # while ensuring nothing appears outside sprite tile boundaries
-            masked_alpha = Image.fromarray(np.minimum(np.array(ai_alpha), np.array(original_mask)))
+
+            # Build tile-based mask from OAM entries
+            tile_mask = self._build_tile_mask(filtered_capture, canvas_w, canvas_h)
+
+            # Use minimum of AI alpha and tile mask - clips to tile bounds
+            masked_alpha = Image.fromarray(np.minimum(np.array(ai_alpha), np.array(tile_mask)))
             composited.putalpha(masked_alpha)
         else:
             # Original sprite preserved - AI composites on top
@@ -193,6 +195,47 @@ class SpriteCompositor:
             result = result.resize((new_w, new_h), Image.Resampling.NEAREST)
 
         return result
+
+    def _build_tile_mask(
+        self,
+        capture_result: CaptureResult,
+        canvas_w: int,
+        canvas_h: int,
+    ) -> Image.Image:
+        """Build a mask from tile bounds (8x8 grid rectangles).
+
+        Creates an alpha mask where all pixels within OAM entry tile bounds
+        are opaque (255) and pixels outside are transparent (0). This clips
+        to tile boundaries rather than the original sprite's pixel-level shape.
+
+        Args:
+            capture_result: Mesen capture with OAM entries.
+            canvas_w: Width of the canvas.
+            canvas_h: Height of the canvas.
+
+        Returns:
+            Grayscale image (mode 'L') usable as an alpha mask.
+        """
+        bbox = capture_result.bounding_box
+        mask = Image.new("L", (canvas_w, canvas_h), 0)
+
+        # Draw filled rectangles for each OAM entry's tile area
+        from PIL import ImageDraw
+
+        draw = ImageDraw.Draw(mask)
+
+        for entry in capture_result.entries:
+            # Position relative to bounding box origin
+            rel_x = entry.x - bbox.x
+            rel_y = entry.y - bbox.y
+
+            # Draw the full tile area (entry.width x entry.height)
+            draw.rectangle(
+                [rel_x, rel_y, rel_x + entry.width - 1, rel_y + entry.height - 1],
+                fill=255,
+            )
+
+        return mask
 
     def _filter_capture(
         self,

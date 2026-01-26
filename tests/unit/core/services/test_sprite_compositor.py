@@ -201,13 +201,15 @@ class TestTransparentPolicyMasking:
     """
 
     def test_ai_content_masked_to_sprite_tiles_only(self) -> None:
-        """AI content should only appear where original sprite has opaque pixels.
+        """AI content should only appear within tile bounds (not gaps between tiles).
 
         Creates a sprite with two 8x8 tiles separated by an 8-pixel gap.
         The bounding box is 24x8, but only pixels 0-7 and 16-23 have tiles.
         The AI image fills the entire box with red.
 
         Expected: Gap (pixels 8-15) should be transparent, not red.
+        Note: Within tile bounds, AI content fills the full 8x8 area regardless
+        of the original sprite's pixel-level transparency.
         """
         from dataclasses import dataclass, field
 
