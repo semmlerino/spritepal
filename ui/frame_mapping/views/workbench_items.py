@@ -503,6 +503,81 @@ class TileOverlayItem(QGraphicsItem):
             painter.drawRect(rect)
 
 
+class ClippingOverlayItem(QGraphicsItem):
+    """Shows regions of AI frame that are outside tile injection area.
+
+    Displays semi-transparent red overlays on parts of the AI frame
+    content that extend beyond the game sprite's tile boundaries.
+    These regions will be clipped (not injected) during ROM injection.
+    """
+
+    def __init__(self, parent: QGraphicsItem | None = None) -> None:
+        super().__init__(parent)
+        self._clipped_rects: list[QRectF] = []
+        self._visible = True
+        self._bounds = QRectF(0, 0, 0, 0)
+
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+        # Render above tile overlay but below grid
+        self.setZValue(50)
+
+    def set_clipped_rects(self, rects: list[QRectF]) -> None:
+        """Set the rectangles showing clipped content regions.
+
+        Args:
+            rects: List of QRectF in scene coordinates showing overflow areas.
+        """
+        self.prepareGeometryChange()
+        self._clipped_rects = rects
+        self._update_bounds()
+        self.update()
+
+    def set_overlay_visible(self, visible: bool) -> None:
+        """Show or hide the clipping overlay."""
+        self._visible = visible
+        self.update()
+
+    def _update_bounds(self) -> None:
+        """Update bounding rect from clipped rects."""
+        if not self._clipped_rects:
+            self._bounds = QRectF(0, 0, 0, 0)
+            return
+
+        min_x = min(r.x() for r in self._clipped_rects)
+        min_y = min(r.y() for r in self._clipped_rects)
+        max_x = max(r.right() for r in self._clipped_rects)
+        max_y = max(r.bottom() for r in self._clipped_rects)
+        self._bounds = QRectF(min_x, min_y, max_x - min_x, max_y - min_y)
+
+    @override
+    def boundingRect(self) -> QRectF:
+        """Return bounding rectangle."""
+        return self._bounds
+
+    @override
+    def paint(
+        self,
+        painter: QPainter,
+        option: QStyleOptionGraphicsItem,
+        widget: QWidget | None = None,
+    ) -> None:
+        """Paint clipped region overlays."""
+        if not self._visible or not self._clipped_rects:
+            return
+
+        # Semi-transparent red fill with red dashed border
+        fill_color = QColor(220, 53, 69, 77)  # rgba(220, 53, 69, 0.3)
+        border_color = QColor(220, 53, 69, 200)
+
+        painter.setBrush(QBrush(fill_color))
+        pen = QPen(border_color, 1, Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+
+        for rect in self._clipped_rects:
+            painter.drawRect(rect)
+
+
 class GridOverlayItem(QGraphicsItem):
     """Optional reference grid overlay (8x8 or 16x16).
 

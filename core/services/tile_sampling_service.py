@@ -252,6 +252,96 @@ class TileSamplingService:
 
         return touched, untouched
 
+    def check_content_outside_tiles(
+        self,
+        content_bbox: tuple[int, int, int, int] | None,
+        tile_union_rect: tuple[int, int, int, int],
+        offset_x: int,
+        offset_y: int,
+        scale: float,
+    ) -> tuple[bool, list[tuple[int, int, int, int]]]:
+        """Check if AI frame content extends outside the tile area.
+
+        This detects regions of the AI frame that will be clipped during
+        injection because they extend beyond the game sprite's tile boundaries.
+
+        Args:
+            content_bbox: Non-transparent content bounding box from PIL.Image.getbbox()
+                in format (left, top, right, bottom) in source image coordinates.
+                None if image is fully transparent.
+            tile_union_rect: Union bounding box of all game tiles in scene coordinates
+                (min_x, min_y, max_x, max_y).
+            offset_x: X offset of AI frame in scene coordinates.
+            offset_y: Y offset of AI frame in scene coordinates.
+            scale: Scale factor applied to AI frame.
+
+        Returns:
+            Tuple of (has_overflow, overflow_rects) where:
+            - has_overflow: True if any content extends outside tiles
+            - overflow_rects: List of (x, y, w, h) rectangles in scene coordinates
+              showing the clipped regions (top, bottom, left, right strips)
+        """
+        if content_bbox is None:
+            # Fully transparent image - no overflow
+            return (False, [])
+
+        scale = self.clamp_scale(scale)
+
+        # Transform content bbox to scene coordinates
+        src_left, src_top, src_right, src_bottom = content_bbox
+        scene_left = int(src_left * scale) + offset_x
+        scene_top = int(src_top * scale) + offset_y
+        scene_right = int(src_right * scale) + offset_x
+        scene_bottom = int(src_bottom * scale) + offset_y
+
+        tile_min_x, tile_min_y, tile_max_x, tile_max_y = tile_union_rect
+
+        # Check if content is fully inside tiles
+        if (
+            scene_left >= tile_min_x
+            and scene_top >= tile_min_y
+            and scene_right <= tile_max_x
+            and scene_bottom <= tile_max_y
+        ):
+            return (False, [])
+
+        # Calculate overflow regions (strips that extend past tile bounds)
+        overflow_rects: list[tuple[int, int, int, int]] = []
+
+        # Top overflow
+        if scene_top < tile_min_y:
+            clip_top = scene_top
+            clip_bottom = min(scene_bottom, tile_min_y)
+            if clip_bottom > clip_top:
+                overflow_rects.append((scene_left, clip_top, scene_right - scene_left, clip_bottom - clip_top))
+
+        # Bottom overflow
+        if scene_bottom > tile_max_y:
+            clip_top = max(scene_top, tile_max_y)
+            clip_bottom = scene_bottom
+            if clip_bottom > clip_top:
+                overflow_rects.append((scene_left, clip_top, scene_right - scene_left, clip_bottom - clip_top))
+
+        # Left overflow (only the part not covered by top/bottom)
+        if scene_left < tile_min_x:
+            clip_left = scene_left
+            clip_right = min(scene_right, tile_min_x)
+            clip_top = max(scene_top, tile_min_y)
+            clip_bottom = min(scene_bottom, tile_max_y)
+            if clip_right > clip_left and clip_bottom > clip_top:
+                overflow_rects.append((clip_left, clip_top, clip_right - clip_left, clip_bottom - clip_top))
+
+        # Right overflow (only the part not covered by top/bottom)
+        if scene_right > tile_max_x:
+            clip_left = max(scene_left, tile_max_x)
+            clip_right = scene_right
+            clip_top = max(scene_top, tile_min_y)
+            clip_bottom = min(scene_bottom, tile_max_y)
+            if clip_right > clip_left and clip_bottom > clip_top:
+                overflow_rects.append((clip_left, clip_top, clip_right - clip_left, clip_bottom - clip_top))
+
+        return (len(overflow_rects) > 0, overflow_rects)
+
     def quantize_to_palette(self, image: Image.Image) -> Image.Image | None:
         """Quantize an image to the configured palette.
 

@@ -51,6 +51,7 @@ from core.services.tile_sampling_service import TileSamplingService
 from ui.frame_mapping.services.canvas_config_service import CanvasConfig
 from ui.frame_mapping.views.workbench_items import (
     AIFrameItem,
+    ClippingOverlayItem,
     GameFrameItem,
     GridOverlayItem,
     PreviewItem,
@@ -257,6 +258,8 @@ class WorkbenchCanvas(QWidget):
         self._tile_sampling_service = TileSamplingService()
         self._multi_palette_warning_label: QLabel | None = None
         self._stale_entries_warning_label: QLabel | None = None
+        self._out_of_bounds_warning_label: QLabel | None = None
+        self._clipping_overlay_item: ClippingOverlayItem | None = None
 
         # Pixel hover tracking
         self._pixel_hover_timer = QTimer(self)
@@ -357,6 +360,14 @@ class WorkbenchCanvas(QWidget):
         self._browsing_banner.setVisible(False)
         layout.addWidget(self._browsing_banner)
 
+        # Out of bounds warning banner (AI frame content extends past tile area)
+        self._out_of_bounds_warning_label = QLabel("Content outside tile area will not be injected")
+        self._out_of_bounds_warning_label.setStyleSheet(
+            "background-color: #FFF3CD; color: #856404; padding: 6px 8px; border-radius: 4px; font-size: 11px;"
+        )
+        self._out_of_bounds_warning_label.setVisible(False)
+        layout.addWidget(self._out_of_bounds_warning_label)
+
         # Graphics scene and view
         self._scene = QGraphicsScene(self)
         self._view = WorkbenchGraphicsView(self._scene, self._config.size, self)
@@ -366,12 +377,14 @@ class WorkbenchCanvas(QWidget):
         self._game_frame_item = GameFrameItem()
         self._preview_item = PreviewItem()
         self._tile_overlay_item = TileOverlayItem()
+        self._clipping_overlay_item = ClippingOverlayItem()
         self._ai_frame_item = AIFrameItem()
         self._grid_overlay_item = GridOverlayItem()
 
         self._scene.addItem(self._game_frame_item)
         self._scene.addItem(self._preview_item)
         self._scene.addItem(self._tile_overlay_item)
+        self._scene.addItem(self._clipping_overlay_item)
         self._scene.addItem(self._ai_frame_item)
         self._scene.addItem(self._grid_overlay_item)
 
@@ -1028,10 +1041,12 @@ class WorkbenchCanvas(QWidget):
         """Update which tiles are touched by the AI frame overlay.
 
         Uses the alignment snapshot captured at schedule time if available,
-        otherwise falls back to current values.
+        otherwise falls back to current values. Also checks for content
+        extending outside the tile area and updates the warning indicator.
         """
         if self._ai_image is None or self._capture_result is None:
             self._tile_overlay_item.set_touched_indices(set())
+            self._hide_out_of_bounds_indicators()
             return
 
         # Use snapshot if available, otherwise use current values
@@ -1077,6 +1092,64 @@ class WorkbenchCanvas(QWidget):
         )
 
         self._tile_overlay_item.set_touched_indices(touched)
+
+        # Check for content outside tile area
+        tile_union = self._compute_tile_union_rect(qt_rects)
+        content_bbox = self._ai_image.getbbox()  # Non-transparent content bounds
+
+        has_overflow, overflow_rects = self._tile_sampling_service.check_content_outside_tiles(
+            content_bbox,
+            tile_union,
+            offset_x,
+            offset_y,
+            scale,
+        )
+
+        # Update warning banner
+        if self._out_of_bounds_warning_label is not None:
+            self._out_of_bounds_warning_label.setVisible(has_overflow)
+
+        # Update clipping overlay (scale rects for display)
+        if self._clipping_overlay_item is not None:
+            if has_overflow:
+                display_rects = [
+                    QRectF(
+                        r[0] * self._display_scale,
+                        r[1] * self._display_scale,
+                        r[2] * self._display_scale,
+                        r[3] * self._display_scale,
+                    )
+                    for r in overflow_rects
+                ]
+                self._clipping_overlay_item.set_clipped_rects(display_rects)
+            else:
+                self._clipping_overlay_item.set_clipped_rects([])
+
+    def _compute_tile_union_rect(self, tile_rects: list[QRect]) -> tuple[int, int, int, int]:
+        """Compute union bounding box of all tile rectangles.
+
+        Args:
+            tile_rects: List of QRect representing tile positions.
+
+        Returns:
+            Tuple of (min_x, min_y, max_x, max_y) representing the union bounds.
+            Returns (0, 0, 0, 0) if no tiles.
+        """
+        if not tile_rects:
+            return (0, 0, 0, 0)
+
+        min_x = min(r.x() for r in tile_rects)
+        min_y = min(r.y() for r in tile_rects)
+        max_x = max(r.x() + r.width() for r in tile_rects)
+        max_y = max(r.y() + r.height() for r in tile_rects)
+        return (min_x, min_y, max_x, max_y)
+
+    def _hide_out_of_bounds_indicators(self) -> None:
+        """Hide the out-of-bounds warning and overlay."""
+        if self._out_of_bounds_warning_label is not None:
+            self._out_of_bounds_warning_label.setVisible(False)
+        if self._clipping_overlay_item is not None:
+            self._clipping_overlay_item.set_clipped_rects([])
 
     def _on_opacity_changed(self, value: int) -> None:
         """Handle opacity slider change."""
