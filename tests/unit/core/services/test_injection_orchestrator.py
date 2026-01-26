@@ -401,3 +401,134 @@ class TestInjectionOrchestratorTilePadding:
             f"(expected {expected_size}), got {actual_size} "
             f"(which is for {captured_tile_count} tiles)"
         )
+
+    def test_padded_tiles_preserve_position(self, tmp_path: Path) -> None:
+        """Tiles are placed at their tile_index_in_block, not sequential idx.
+
+        This prevents the "preserve_sprite leak" bug where AI tiles end up at
+        wrong positions in padded slots, causing original sprite data to bleed through.
+        """
+        # Create orchestrator with mocked dependencies
+        staging = MagicMock()
+        rom_injector = MagicMock()
+
+        orchestrator = InjectionOrchestrator(
+            staging_manager=staging,
+            rom_injector=rom_injector,
+        )
+
+        # Setup: 1 captured tile at tile_index_in_block=2, but ROM has 3 tiles
+        # The tile should end up at grid position 2, NOT position 0
+        original_tile_count = 3
+
+        # Mock staging to report 3 tiles for RAW mode
+        staging.detect_raw_slot_size.return_value = original_tile_count
+
+        # Mock rom_injector to capture the injected image
+        def capture_injection(
+            sprite_path: str,
+            rom_path: str,
+            output_path: str,
+            sprite_offset: int,
+            **kwargs: object,
+        ) -> tuple[bool, str]:
+            img = Image.open(sprite_path)
+            rom_injector._last_injected_image = img.copy()
+            return (True, "Success")
+
+        rom_injector.inject_sprite_to_rom.side_effect = capture_injection
+
+        # Create 1 VRAM tile at tile_index_in_block=2 (third tile in slot)
+        # This simulates capturing only one tile from a 3-tile sprite
+        vram_tiles: dict[int, tuple[int, int, int, int | None, bool, bool]] = {
+            # (screen_x, screen_y, palette_idx, tile_index_in_block, flip_h, flip_v)
+            0x1000: (0, 0, 0, 2, False, False),  # tile at index 2
+        }
+
+        # Create a canvas with distinct red content at (0,0)
+        masked_canvas = Image.new("RGBA", (8, 8), (255, 0, 0, 255))
+
+        bbox = SimpleNamespace(x=0, y=0, width=8, height=8)
+
+        filtered_capture = SimpleNamespace(
+            entries=[],
+            palettes={0: [(31, 0, 0)] * 16},
+        )
+
+        project = MagicMock()
+        project.sheet_palette = SheetPalette(
+            colors=[(0, 0, 0), (255, 0, 0)] + [(0, 0, 0)] * 14,
+        )
+
+        game_frame = MagicMock()
+        game_frame.compression_types = {}
+
+        debug = InjectionDebugContext(enabled=False)
+
+        # Call the method
+        result = orchestrator._inject_tile_group(
+            rom_offset=0x50000,
+            vram_tiles=vram_tiles,
+            masked_canvas=masked_canvas,
+            filtered_capture=filtered_capture,
+            bbox=bbox,
+            project=project,
+            game_frame=game_frame,
+            rom_data=b"\x00" * 0x100000,
+            force_raw=True,
+            current_rom_path=str(tmp_path / "output.sfc"),
+            source_rom_path=str(tmp_path / "source.sfc"),
+            create_backup=False,
+            preserve_existing=False,
+            debug=debug,
+        )
+
+        assert result.success is True
+
+        # Get the injected image (should be a 2x2 grid for 3 tiles)
+        img = rom_injector._last_injected_image
+        # Grid for 3 tiles: ceil(sqrt(3))=2 width, ceil(3/2)=2 height = 16x16 pixels
+        assert img.size == (16, 16), f"Expected 16x16 for 3 tiles, got {img.size}"
+
+        # The key assertion: our red tile should be at position 2 (grid coords 0,8),
+        # NOT at position 0 (grid coords 0,0) which is where idx=0 would place it
+        #
+        # Grid layout for 3 tiles in 2x2 grid:
+        # | pos 0 (0,0) | pos 1 (8,0) |
+        # | pos 2 (0,8) | pos 3 (8,8) |
+        #
+        # For palette mode images, index 0 = black, index 1 = red
+        # Transparent areas get quantized to palette index 0 (black)
+        # Our red tile content should be palette index 1
+
+        if img.mode == "P":
+            # Check palette indices directly
+            pixel_idx_pos0 = img.getpixel((0, 0))  # Position 0 - should be transparent (index 0)
+            pixel_idx_pos2 = img.getpixel((0, 8))  # Position 2 - should be red (index 1)
+
+            assert pixel_idx_pos0 == 0, (
+                f"Position 0 should be transparent (palette index 0), but got index {pixel_idx_pos0}. "
+                "Bug: tile placed at idx position instead of tile_index_in_block"
+            )
+
+            assert pixel_idx_pos2 == 1, (
+                f"Position 2 should have red tile (palette index 1), but got index {pixel_idx_pos2}. "
+                "Bug: tile_index_in_block not used for placement"
+            )
+        else:
+            # RGBA mode - check colors directly
+            img_rgba = img.convert("RGBA") if img.mode != "RGBA" else img
+            pixel_pos0 = img_rgba.getpixel((0, 0))
+            pixel_pos2 = img_rgba.getpixel((0, 8))
+
+            # Position 0 should be transparent or black (not red)
+            assert pixel_pos0[0] < 128, (
+                f"Position 0 should not be red, but got {pixel_pos0}. "
+                "Bug: tile placed at idx position instead of tile_index_in_block"
+            )
+
+            # Position 2 should be red (our tile)
+            assert pixel_pos2[0] > 128, (
+                f"Position 2 should be red (our tile), but got {pixel_pos2}. "
+                "Bug: tile_index_in_block not used for placement"
+            )

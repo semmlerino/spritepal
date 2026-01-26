@@ -770,7 +770,7 @@ class InjectionOrchestrator:
         palette_index = first_tile_info[2]
 
         for idx, vram_addr in enumerate(sorted_vram_addrs):
-            screen_x, screen_y, _, _, flip_h, flip_v = vram_tiles[vram_addr]
+            screen_x, screen_y, _, tile_idx, flip_h, flip_v = vram_tiles[vram_addr]
 
             canvas_x = screen_x - bbox.x  # type: ignore[attr-defined]
             canvas_y = screen_y - bbox.y  # type: ignore[attr-defined]
@@ -795,8 +795,17 @@ class InjectionOrchestrator:
             if debug.enabled and debug.debug_dir:
                 debug.save_debug_image(f"tile_0x{rom_offset:X}_v{vram_addr:X}_after", tile_img)
 
-            grid_x = (idx % grid_width) * 8
-            grid_y = (idx // grid_width) * 8
+            # FIX: Use tile_index_in_block for grid positioning (not enumeration idx)
+            # This ensures tiles are placed at their original slot position when padding
+            if tile_idx is not None and tile_idx < padded_tile_count:
+                # tile_idx is valid and within bounds
+                grid_x = (tile_idx % grid_width) * 8
+                grid_y = (tile_idx // grid_width) * 8
+            else:
+                # Fallback: sequential placement (legacy behavior for captures without tile_idx
+                # or if tile_idx exceeds the padded grid bounds)
+                grid_x = (idx % grid_width) * 8
+                grid_y = (idx // grid_width) * 8
 
             debug.log_extraction_details(vram_addr, (canvas_x, canvas_y), flip_h, (grid_x, grid_y))
 
@@ -815,7 +824,7 @@ class InjectionOrchestrator:
                     if flip_v:
                         index_tile = np.flipud(index_tile)
 
-                    # Place in chunk index map
+                    # Place in chunk index map (using same grid position as RGBA tile)
                     chunk_index_map[grid_y : grid_y + 8, grid_x : grid_x + 8] = index_tile
 
         debug.save_debug_image(f"chunk_0x{rom_offset:X}_pre_quant", chunk_img)
