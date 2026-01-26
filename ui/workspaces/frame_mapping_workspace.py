@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from PIL import Image
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -94,6 +94,12 @@ class FrameMappingWorkspace(QWidget):
 
         # Create or inject controller
         self._controller = controller or self._create_default_controller()
+
+        # Auto-save debounce timer (500ms delay to avoid saving on every nudge)
+        self._auto_save_timer = QTimer(self)
+        self._auto_save_timer.setSingleShot(True)
+        self._auto_save_timer.setInterval(500)
+        self._auto_save_timer.timeout.connect(self._perform_auto_save)
 
         self._setup_ui()
         self._connect_signals()
@@ -1341,12 +1347,24 @@ class FrameMappingWorkspace(QWidget):
         QMessageBox.information(self, "Injection Successful", message)
 
     def _auto_save_after_injection(self) -> None:
-        """Handle auto-save request after successful injection.
+        """Schedule auto-save with debouncing.
+
+        Uses a 500ms debounce timer to avoid saving on every nudge operation.
+        Multiple rapid changes will only trigger one save after activity stops.
+        """
+        if not self._state.project_path:
+            logger.warning("Cannot auto-save: no project path set")
+            return
+
+        # (Re)start the debounce timer - will save 500ms after last change
+        self._auto_save_timer.start()
+
+    def _perform_auto_save(self) -> None:
+        """Actually perform the auto-save after debounce timer fires.
 
         Saves the project to the correct project file path (not ai_frames_dir).
         """
         if not self._state.project_path:
-            logger.warning("Cannot auto-save: no project path set")
             return
 
         try:

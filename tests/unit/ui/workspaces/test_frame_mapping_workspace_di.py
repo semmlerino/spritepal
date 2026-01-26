@@ -226,3 +226,86 @@ class TestEditorPaletteSyncOnPaletteChange:
         # Verify the color was actually changed
         assert current_palette is not None
         assert current_palette.colors[5] == (255, 0, 0)
+
+
+class TestAutoSaveDebouncing:
+    """Tests for auto-save debouncing to avoid slow nudge operations."""
+
+    def test_auto_save_timer_exists(self, app_context, qtbot) -> None:
+        """Workspace has auto-save debounce timer."""
+        workspace = FrameMappingWorkspace()
+        qtbot.addWidget(workspace)
+
+        assert hasattr(workspace, "_auto_save_timer")
+        assert workspace._auto_save_timer.isSingleShot()
+        assert workspace._auto_save_timer.interval() == 500
+
+    def test_save_debounced_on_rapid_changes(self, app_context, qtbot, tmp_path) -> None:
+        """Multiple rapid save requests result in single save after debounce."""
+        workspace = FrameMappingWorkspace()
+        qtbot.addWidget(workspace)
+
+        # Setup project with path
+        workspace.controller.new_project("test")
+        project_path = tmp_path / "test.spritepal"
+        workspace._state.project_path = project_path
+
+        # Track save calls
+        save_count = [0]
+        original_save = workspace._controller.save_project
+
+        def counting_save(path):
+            save_count[0] += 1
+            return original_save(path)
+
+        workspace._controller.save_project = counting_save
+
+        # Trigger multiple save requests (simulating rapid nudges)
+        for _ in range(10):
+            workspace._auto_save_after_injection()
+
+        # Save should not happen immediately
+        assert save_count[0] == 0
+
+        # Wait for debounce timer
+        qtbot.wait(600)  # Wait longer than 500ms debounce
+
+        # Only one save should have occurred
+        assert save_count[0] == 1
+
+    def test_timer_restarts_on_new_request(self, app_context, qtbot, tmp_path) -> None:
+        """New save request restarts debounce timer."""
+        workspace = FrameMappingWorkspace()
+        qtbot.addWidget(workspace)
+
+        # Setup project with path
+        workspace.controller.new_project("test")
+        project_path = tmp_path / "test.spritepal"
+        workspace._state.project_path = project_path
+
+        save_count = [0]
+        original_save = workspace._controller.save_project
+
+        def counting_save(path):
+            save_count[0] += 1
+            return original_save(path)
+
+        workspace._controller.save_project = counting_save
+
+        # First request
+        workspace._auto_save_after_injection()
+
+        # Wait 300ms (less than debounce)
+        qtbot.wait(300)
+        assert save_count[0] == 0  # Not saved yet
+
+        # Second request restarts timer
+        workspace._auto_save_after_injection()
+
+        # Wait another 300ms - total 600ms from first but only 300ms from second
+        qtbot.wait(300)
+        assert save_count[0] == 0  # Still not saved (timer restarted)
+
+        # Wait final 300ms - now 600ms from second request
+        qtbot.wait(300)
+        assert save_count[0] == 1  # Now saved
