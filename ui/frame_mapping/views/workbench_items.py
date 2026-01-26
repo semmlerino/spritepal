@@ -457,6 +457,7 @@ class TileOverlayItem(QGraphicsItem):
         self._visible = True
         self._show_addresses = False
         self._bounds = QRectF(0, 0, 64, 64)
+        self._selected_index: int | None = None
 
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
@@ -495,6 +496,25 @@ class TileOverlayItem(QGraphicsItem):
         """Show or hide tile address text."""
         self._show_addresses = visible
         self.update()
+
+    def set_selected_tile(self, index: int | None) -> None:
+        """Set the selected tile index for highlighting."""
+        if self._selected_index != index:
+            self._selected_index = index
+            self.update()
+
+    def get_tile_at_point(self, pos: QPointF) -> int | None:
+        """Get tile index at scene position, or None if outside all tiles."""
+        for i, tile in enumerate(self._tiles):
+            if tile.rect.contains(pos):
+                return i
+        return None
+
+    def get_tile_rom_offset(self, index: int) -> int | None:
+        """Get ROM offset for tile by index."""
+        if 0 <= index < len(self._tiles):
+            return self._tiles[index].rom_offset
+        return None
 
     def _update_bounds(self) -> None:
         """Update bounding rect from tile rects."""
@@ -539,10 +559,16 @@ class TileOverlayItem(QGraphicsItem):
                 painter.setPen(QPen(untouched_border, 1))
             painter.drawRect(rect)
 
+            # Draw selection highlight if this tile is selected
+            if self._selected_index == i:
+                painter.setPen(QPen(QColor(0, 200, 255), 2))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawRect(rect.adjusted(1, 1, -1, -1))
+
             # Draw address text if enabled and available
             if self._show_addresses and tile.rom_offset is not None:
-                # Format: abbreviated hex (e.g., "1B000" for 0x1B0000)
-                text = f"{tile.rom_offset >> 4:X}"
+                # Format: abbreviated hex (e.g., "1B0" for 0x1B0000)
+                text = f"{tile.rom_offset >> 8:X}"
                 painter.setFont(QFont("Monospace", 7))
                 painter.setPen(Qt.GlobalColor.white)
                 # Draw with slight offset from top-left corner

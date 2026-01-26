@@ -286,6 +286,9 @@ class WorkbenchCanvas(QWidget):
         self._drag_in_progress = False
         self._drag_start_alignment: tuple[int, int, bool, bool, float] | None = None
 
+        # Tile selection state
+        self._selected_tile_index: int | None = None
+
         self._setup_ui()
         self._connect_signals()
 
@@ -322,6 +325,22 @@ class WorkbenchCanvas(QWidget):
         self._pixel_info_label.setStyleSheet("font-size: 10px; font-family: monospace;")
         self._pixel_info_label.setMinimumWidth(200)
         pixel_inspector.addWidget(self._pixel_info_label)
+
+        # Separator
+        tile_separator = QFrame()
+        tile_separator.setFrameShape(QFrame.Shape.VLine)
+        tile_separator.setFrameShadow(QFrame.Shadow.Sunken)
+        pixel_inspector.addWidget(tile_separator)
+
+        # Tile address display
+        tile_label = QLabel("Tile:")
+        tile_label.setStyleSheet("font-size: 10px; color: #888;")
+        pixel_inspector.addWidget(tile_label)
+
+        self._selected_tile_label = QLabel("--")
+        self._selected_tile_label.setStyleSheet("font-size: 10px; font-family: monospace;")
+        self._selected_tile_label.setMinimumWidth(80)
+        pixel_inspector.addWidget(self._selected_tile_label)
 
         pixel_inspector.addStretch()
 
@@ -611,6 +630,9 @@ class WorkbenchCanvas(QWidget):
             capture_result: Optional CaptureResult for tile overlay.
             used_fallback: Whether fallback entry IDs were used (stale selection).
         """
+        # Clear tile selection when game frame changes
+        self._select_tile(None)
+
         self._current_game_frame = frame
         self._capture_result = capture_result
 
@@ -820,6 +842,9 @@ class WorkbenchCanvas(QWidget):
         self._game_frame_item.setPixmap(QPixmap())
         self._ai_frame_item.set_pixmap(None)
         self._tile_overlay_item.set_tile_rects([])
+
+        # Clear tile selection
+        self._select_tile(None)
 
         # Disable browsing mode on clear
         self.set_browsing_mode(False)
@@ -2059,25 +2084,50 @@ class WorkbenchCanvas(QWidget):
             self._pixel_highlight_item.setVisible(False)
 
     def _on_scene_clicked(self, scene_x: float, scene_y: float) -> None:
-        """Handle click on the scene - pick color if eyedropper mode is active.
+        """Handle click on the scene - pick color or select tile.
 
         Args:
             scene_x: Scene X coordinate
             scene_y: Scene Y coordinate
         """
-        if not self._eyedropper_mode:
+        if self._eyedropper_mode:
+            # Get pixel info at clicked position
+            result = self._get_pixel_at_scene_pos(scene_x, scene_y)
+            if result is None:
+                return
+
+            _img_x, _img_y, rgb, palette_index = result
+
+            # Emit the picked color and disable eyedropper mode (single-shot)
+            self.eyedropper_picked.emit(rgb, palette_index)
+
+            # Auto-disable eyedropper mode
+            self._eyedropper_btn.setChecked(False)
+            self.set_eyedropper_mode(False)
+        else:
+            # Tile selection
+            tile_index = self._get_tile_at_scene_pos(scene_x, scene_y)
+            self._select_tile(tile_index)
+
+    def _get_tile_at_scene_pos(self, scene_x: float, scene_y: float) -> int | None:
+        """Get tile index at scene position."""
+        pos = QPointF(scene_x, scene_y)
+        return self._tile_overlay_item.get_tile_at_point(pos)
+
+    def _select_tile(self, tile_index: int | None) -> None:
+        """Select a tile and update display."""
+        self._selected_tile_index = tile_index
+        self._tile_overlay_item.set_selected_tile(tile_index)
+        self._update_selected_tile_display()
+
+    def _update_selected_tile_display(self) -> None:
+        """Update the selected tile label."""
+        if self._selected_tile_index is None:
+            self._selected_tile_label.setText("--")
             return
 
-        # Get pixel info at clicked position
-        result = self._get_pixel_at_scene_pos(scene_x, scene_y)
-        if result is None:
-            return
-
-        _img_x, _img_y, rgb, palette_index = result
-
-        # Emit the picked color and disable eyedropper mode (single-shot)
-        self.eyedropper_picked.emit(rgb, palette_index)
-
-        # Auto-disable eyedropper mode
-        self._eyedropper_btn.setChecked(False)
-        self.set_eyedropper_mode(False)
+        rom_offset = self._tile_overlay_item.get_tile_rom_offset(self._selected_tile_index)
+        if rom_offset is not None:
+            self._selected_tile_label.setText(f"0x{rom_offset:06X}")
+        else:
+            self._selected_tile_label.setText(f"#{self._selected_tile_index}")
