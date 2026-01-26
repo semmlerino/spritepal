@@ -21,14 +21,27 @@ This replaces mock usage in dialog tests:
 NOTE: Uses REAL dialog instantiation which can be sensitive in Qt offscreen mode.
 If these tests fail in offscreen, use @pytest.mark.requires_display or adjust
 the dialog expectations to match headless behavior.
+
+Consolidated from:
+- test_real_dialog_initialization.py (dialog creation, lifecycle)
+- test_dialog_real_integration.py (manager integration, bug discovery)
 """
 
 from __future__ import annotations
 
+import contextlib
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from PIL import Image
+from PySide6.QtCore import Qt
+
+if TYPE_CHECKING:
+    from pytestqt.qtbot import QtBot
+
+    from core.app_context import AppContext
 
 # NOTE: pythonpath configured in pyproject.toml - no sys.path manipulation needed
 
@@ -69,12 +82,180 @@ def _create_injection_dialog(**kwargs) -> InjectionDialog:
 from PySide6.QtWidgets import QApplication
 
 from tests.infrastructure import RealComponentFactory
+from ui.components.dialogs.range_scan_dialog import RangeScanDialog
 from ui.dialogs import (
     SettingsDialog,
     UnifiedManualOffsetDialog as ManualOffsetDialog,
 )
+from ui.dialogs.advanced_search_dialog import AdvancedSearchDialog
+from ui.dialogs.resume_scan_dialog import ResumeScanDialog
+from ui.dialogs.similarity_results_dialog import SimilarityResultsDialog
+from ui.dialogs.user_error_dialog import UserErrorDialog
 from ui.grid_arrangement_dialog import GridArrangementDialog
 from ui.injection_dialog import InjectionDialog
+
+# =============================================================================
+# PARAMETRIZED DIALOG INITIALIZATION TESTS
+# (Consolidated from test_real_dialog_initialization.py)
+# =============================================================================
+
+
+class TestDialogInitialization:
+    """Parametrized tests verifying Qt dialogs can be created without crashes.
+
+    Tests real Qt widget instantiation and lifecycle rather than mocks. Validates:
+    - Real Qt widget creation works
+    - Dialog initialization order is correct
+    - No InitializationOrderError from attribute access before super().__init__()
+    - Dialogs have expected child widgets
+    """
+
+    @pytest.fixture
+    def test_image_path(self, tmp_path: Path) -> str:
+        """Create a minimal test image for dialogs that need it."""
+        test_image_path = tmp_path / "test_sprite.png"
+        test_image = Image.new("RGB", (16, 16), color="white")
+        test_image.save(test_image_path)
+        return str(test_image_path)
+
+    @pytest.fixture
+    def test_rom_path(self, tmp_path: Path) -> str:
+        """Create a dummy ROM file for dialogs that need it."""
+        rom_path = tmp_path / "test.sfc"
+        rom_path.write_bytes(b"\x00" * 1024)
+        return str(rom_path)
+
+    def test_settings_dialog_real(self, qtbot: QtBot, app_context: AppContext) -> None:
+        """Test SettingsDialog can be created with real Qt widgets."""
+        dialog = SettingsDialog(
+            settings_manager=app_context.application_state_manager,
+            rom_cache=app_context.rom_cache,
+        )
+        qtbot.addWidget(dialog)
+        assert dialog is not None
+        assert dialog.windowTitle()
+        dialog.close()
+
+    def test_user_error_dialog_real(self, qtbot: QtBot) -> None:
+        """Test UserErrorDialog can be created with real Qt widgets."""
+        dialog = UserErrorDialog(
+            error_message="Test error message",
+            technical_details="Detailed error information",
+        )
+        qtbot.addWidget(dialog)
+        assert dialog is not None
+        assert dialog.windowTitle()
+        dialog.close()
+
+    def test_resume_scan_dialog_real(self, qtbot: QtBot) -> None:
+        """Test ResumeScanDialog can be created with real Qt widgets."""
+        dialog = ResumeScanDialog(
+            scan_info={
+                "current_offset": 0x1000,
+                "total_found": 10,
+                "found_sprites": [],
+                "scan_range": {"start": 0, "end": 0x10000, "step": 0x100},
+                "completed": False,
+            }
+        )
+        qtbot.addWidget(dialog)
+        assert dialog is not None
+        dialog.close()
+
+    def test_range_scan_dialog_real(self, qtbot: QtBot) -> None:
+        """Test RangeScanDialog can be created with real Qt widgets."""
+        dialog = RangeScanDialog(rom_size=0x400000)
+        qtbot.addWidget(dialog)
+        assert dialog is not None
+        dialog.close()
+
+    def test_advanced_search_dialog_real(self, qtbot: QtBot, test_rom_path: str) -> None:
+        """Test AdvancedSearchDialog can be created with real Qt widgets."""
+        dialog = AdvancedSearchDialog(rom_path=test_rom_path)
+        qtbot.addWidget(dialog)
+        assert dialog is not None
+        dialog.close()
+
+    def test_manual_offset_dialog_real(self, qtbot: QtBot, app_context: AppContext) -> None:
+        """Test UnifiedManualOffsetDialog can be created with real Qt widgets."""
+        dialog = ManualOffsetDialog(
+            rom_cache=app_context.rom_cache,
+            settings_manager=app_context.application_state_manager,
+            extraction_manager=app_context.core_operations_manager,
+        )
+        qtbot.addWidget(dialog)
+        assert dialog is not None
+        # Check for expected child widgets (tab widget or sidebar depending on version)
+        if hasattr(dialog, "tab_widget") and dialog.tab_widget is not None:
+            assert dialog.tab_widget.count() >= 0
+        elif hasattr(dialog, "_sidebar"):
+            assert dialog._sidebar is not None
+        dialog.close()
+
+    def test_similarity_results_dialog_real(self, qtbot: QtBot) -> None:
+        """Test SimilarityResultsDialog can be created with real Qt widgets."""
+        dialog = SimilarityResultsDialog(matches=[], source_offset=0x1000)
+        qtbot.addWidget(dialog)
+        assert dialog is not None
+        dialog.close()
+
+    def test_grid_arrangement_dialog_real(self, qtbot: QtBot, test_image_path: str) -> None:
+        """Test GridArrangementDialog can be created with real Qt widgets."""
+        dialog = GridArrangementDialog(test_image_path, tiles_per_row=16)
+        qtbot.addWidget(dialog)
+        assert dialog is not None
+        assert dialog.sprite_path == test_image_path
+        assert dialog.tiles_per_row == 16
+        dialog.close()
+
+    def test_injection_dialog_real(self, qtbot: QtBot, app_context: AppContext) -> None:
+        """Test InjectionDialog can be created with real managers."""
+        dialog = InjectionDialog(
+            injection_manager=app_context.core_operations_manager,
+            settings_manager=app_context.application_state_manager,
+        )
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        qtbot.addWidget(dialog)
+        assert dialog is not None
+        if hasattr(dialog, "sprite_file_selector"):
+            assert dialog.sprite_file_selector is not None
+        dialog.close()
+
+
+class TestDialogLifecycle:
+    """Test dialog show/hide/close lifecycle with real widgets."""
+
+    def test_dialog_show_close_cycle(self, qtbot: QtBot, app_context: AppContext) -> None:
+        """Test that dialogs can be shown and closed without crashes."""
+        dialog = SettingsDialog(
+            settings_manager=app_context.application_state_manager,
+            rom_cache=app_context.rom_cache,
+        )
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        qtbot.addWidget(dialog)
+
+        dialog.show()
+        qtbot.waitExposed(dialog)
+        assert dialog.isVisible()
+
+        dialog.close()
+        assert not dialog.isVisible()
+
+    def test_dialog_accept_reject(self, qtbot: QtBot) -> None:
+        """Test dialog accept/reject methods work correctly."""
+        dialog = UserErrorDialog(error_message="Test message")
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        qtbot.addWidget(dialog)
+
+        dialog.show()
+        qtbot.waitExposed(dialog)
+        dialog.reject()
+        assert not dialog.isVisible()
+
+
+# =============================================================================
+# REAL DIALOG INTEGRATION TESTS
+# =============================================================================
 
 
 class TestRealDialogIntegration:
