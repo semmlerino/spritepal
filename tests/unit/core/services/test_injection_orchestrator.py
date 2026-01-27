@@ -575,8 +575,8 @@ class TestInjectionOrchestratorColorFidelity:
         # Capture the palette passed to quantize_to_palette
         captured_palettes: list[list[tuple[int, int, int]]] = []
 
-        # Patch quantize_to_palette to capture palette argument
-        with patch("core.services.injection_orchestrator.quantize_to_palette") as mock_quantize:
+        # Patch quantize_to_palette in quantization_strategies module (where it's called)
+        with patch("core.services.quantization_strategies.quantize_to_palette") as mock_quantize:
             # Return a valid indexed image
             indexed_img = Image.new("P", (8, 8))
             indexed_img.putpalette([0] * 768)

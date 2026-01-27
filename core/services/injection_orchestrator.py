@@ -26,18 +26,18 @@ from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
 from core.palette_utils import (
     QUANTIZATION_TRANSPARENCY_THRESHOLD,
-    quantize_to_palette,
-    quantize_with_mappings,
     snap_to_snes_color,
     snes_palette_to_rgb,
 )
 from core.rom_injector import ROMInjector
+from core.services.compression_strategies import get_compression_strategy
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_results import (
     InjectionRequest,
     InjectionResult,
     TileInjectionResult,
 )
+from core.services.quantization_strategies import select_quantization_strategy
 from core.services.rgb_to_indexed import load_image_preserving_indices
 from core.services.rom_staging_manager import ROMStagingManager
 from core.services.rom_verification_service import ROMVerificationService
@@ -639,40 +639,15 @@ class InjectionOrchestrator:
                 message=f"Offset 0x{rom_offset:X}: No tiles",
             )
 
-        # Determine compression type
+        # Select compression strategy
         stored_compression = game_frame.compression_types.get(rom_offset, "raw")
         is_raw = force_raw or stored_compression == "raw"
+        compression_strategy = get_compression_strategy(is_raw)
 
-        # Determine original tile count
-        if is_raw:
-            detected_slot_size = self._staging_manager.detect_raw_slot_size(rom_data, rom_offset)
-            if detected_slot_size is not None:
-                original_tile_count = detected_slot_size
-                logger.info(
-                    "ROM offset 0x%X: Using RAW (detected slot: %d tiles)",
-                    rom_offset,
-                    detected_slot_size,
-                )
-            else:
-                original_tile_count = captured_tile_count
-                logger.info(
-                    "ROM offset 0x%X: Using RAW (no boundary, using captured: %d tiles)",
-                    rom_offset,
-                    captured_tile_count,
-                )
-        else:
-            try:
-                _, original_data, _ = self._rom_injector.find_compressed_sprite(rom_data, rom_offset)
-                original_tile_count = len(original_data) // 32
-                if original_tile_count == 0:
-                    original_tile_count = captured_tile_count
-            except Exception:
-                original_tile_count = captured_tile_count
-            logger.info(
-                "ROM offset 0x%X: Using HAL (%d tiles in block)",
-                rom_offset,
-                original_tile_count,
-            )
+        # Detect original tile count using strategy
+        original_tile_count = compression_strategy.detect_original_tile_count(
+            rom_data, rom_offset, captured_tile_count, self._staging_manager, self._rom_injector
+        )
 
         # Limit to original count
         if captured_tile_count > original_tile_count:
@@ -686,18 +661,8 @@ class InjectionOrchestrator:
 
         tile_count = len(sorted_vram_addrs)
 
-        # FIX: Pad to original tile count to fully overwrite VRAM
-        # When captured_tile_count < original_tile_count, we need to create a larger
-        # image so the compressed data fully replaces the original. Extra slots stay
-        # transparent, which compiles to transparent SNES tiles that clear VRAM.
-        #
-        # IMPORTANT: Only pad for HAL-compressed blocks! For RAW tiles, each tile has
-        # its own ROM offset, so padding would overwrite adjacent tiles' data.
-        if is_raw:
-            # RAW: each tile is independent, no padding needed
-            padded_tile_count = tile_count
-        else:
-            # HAL: all tiles share one ROM offset, pad to clear unused slots
+        # Determine padded tile count using strategy
+        if compression_strategy.should_pad_tiles():
             padded_tile_count = max(tile_count, original_tile_count)
             if tile_count < original_tile_count:
                 logger.info(
@@ -706,14 +671,16 @@ class InjectionOrchestrator:
                     tile_count,
                     original_tile_count,
                 )
+        else:
+            padded_tile_count = tile_count
 
-        # Build tile image (sized for padded count, not captured count)
+        # Build tile image
         grid_width = math.ceil(math.sqrt(padded_tile_count))
         grid_height = math.ceil(padded_tile_count / grid_width)
 
         chunk_img = Image.new("RGBA", (grid_width * 8, grid_height * 8), (0, 0, 0, 0))
 
-        # BUG-1 FIX: Also build index chunk for index-preserving injection
+        # Build index chunk for index-preserving injection
         chunk_index_map: np.ndarray | None = None
         if transformed_index_map is not None:
             chunk_index_map = np.zeros((grid_height * 8, grid_width * 8), dtype=np.uint8)
@@ -747,95 +714,47 @@ class InjectionOrchestrator:
             if debug.enabled and debug.debug_dir:
                 debug.save_debug_image(f"tile_0x{rom_offset:X}_v{vram_addr:X}_after", tile_img)
 
-            # FIX: Use tile_index_in_block for grid positioning ONLY for HAL-compressed blocks
-            # For HAL: multiple tiles share one ROM offset, tile_idx indicates position in decompressed data
-            # For RAW: each tile has its own ROM offset, tile_idx is irrelevant (always use sequential idx)
-            if not is_raw and tile_idx is not None and tile_idx < padded_tile_count:
-                # HAL compressed: tile_idx indicates position within decompressed block
-                grid_x = (tile_idx % grid_width) * 8
-                grid_y = (tile_idx // grid_width) * 8
-            else:
-                # RAW tiles or fallback: sequential placement (each tile at its own ROM offset)
-                grid_x = (idx % grid_width) * 8
-                grid_y = (idx // grid_width) * 8
+            # Get grid position from strategy
+            grid_x, grid_y = compression_strategy.get_grid_position(tile_idx, idx, grid_width)
+            # Bounds check for HAL strategy with out-of-range tile_idx
+            if grid_y >= grid_height * 8:
+                grid_x, grid_y = (idx % grid_width) * 8, (idx // grid_width) * 8
 
             debug.log_extraction_details(vram_addr, (canvas_x, canvas_y), flip_h, (grid_x, grid_y))
 
             chunk_img.paste(tile_img, (grid_x, grid_y))
 
-            # BUG-1 FIX: Also extract index tile from transformed_index_map
+            # Extract index tile from transformed_index_map
             if chunk_index_map is not None and transformed_index_map is not None:
-                # Extract 8x8 index tile
                 canvas_h, canvas_w = transformed_index_map.shape
                 if 0 <= canvas_x < canvas_w - 7 and 0 <= canvas_y < canvas_h - 7:
                     index_tile = transformed_index_map[canvas_y : canvas_y + 8, canvas_x : canvas_x + 8].copy()
 
-                    # Apply same flips to index tile
                     if flip_h:
                         index_tile = np.fliplr(index_tile)
                     if flip_v:
                         index_tile = np.flipud(index_tile)
 
-                    # Place in chunk index map (using same grid position as RGBA tile)
                     chunk_index_map[grid_y : grid_y + 8, grid_x : grid_x + 8] = index_tile
 
         debug.save_debug_image(f"chunk_0x{rom_offset:X}_pre_quant", chunk_img)
 
-        # BUG-1 FIX: Use index map directly if available (skips re-quantization)
-        use_index_passthrough = False
-        if chunk_index_map is not None and project.sheet_palette:
-            # Check if index map has valid data (no 255 markers = outside AI frame area)
-            if not np.any(chunk_index_map == 255):
-                use_index_passthrough = True
-                logger.debug(
-                    "ROM offset 0x%X: Using index passthrough (preserving palette indices)",
-                    rom_offset,
-                )
-
-        if use_index_passthrough and chunk_index_map is not None and project.sheet_palette:
-            # Create indexed image directly from index map (BUG-1 FIX)
-            sheet_palette = project.sheet_palette
-            palette_flat = []
-            for r, g, b in sheet_palette.colors:
-                palette_flat.extend([r, g, b])
-            # Pad to 256 colors (PIL requirement)
-            palette_flat.extend([0] * (768 - len(palette_flat)))
-
-            chunk_img = Image.fromarray(chunk_index_map, mode="P")
-            chunk_img.putpalette(palette_flat)
-        # Quantize (fallback when no index map or index map has invalid data)
-        elif project.sheet_palette:
-            sheet_palette = project.sheet_palette
-            # FIX: Snap palette to SNES-valid colors (matches preview pipeline)
-            palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
-            if sheet_palette.color_mappings:
-                chunk_img = quantize_with_mappings(
-                    chunk_img,
-                    palette_rgb,
-                    sheet_palette.color_mappings,
-                    transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
-                )
-            else:
-                chunk_img = quantize_to_palette(
-                    chunk_img,
-                    palette_rgb,
-                    transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
-                )
-        else:
+        # Get capture palette for fallback (only convert when needed)
+        capture_palette_rgb: list[tuple[int, int, int]] | None = None
+        if project.sheet_palette is None:
             snes_palette = filtered_capture.palettes.get(palette_index, [])
-            if snes_palette:
-                palette_rgb = snes_palette_to_rgb(snes_palette)
-                chunk_img = quantize_to_palette(
-                    chunk_img,
-                    palette_rgb,
-                    transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
-                )
-            else:
-                logger.warning("No palette for index %d, using grayscale", palette_index)
+            capture_palette_rgb = snes_palette_to_rgb(snes_palette) if snes_palette else None
+
+        # Select and apply quantization strategy
+        quant_strategy = select_quantization_strategy(chunk_index_map, project.sheet_palette, capture_palette_rgb)
+        chunk_img = quant_strategy.quantize(
+            chunk_img, chunk_index_map, project.sheet_palette, capture_palette_rgb, rom_offset
+        )
 
         debug.save_debug_image(f"chunk_0x{rom_offset:X}_post_quant", chunk_img)
 
         # Inject via temp file
+        compression_type = compression_strategy.get_compression_type()
         compression_used: Literal["HAL", "RAW"] = "RAW" if is_raw else "HAL"
         chunk_path: Path | None = None
 
@@ -844,7 +763,26 @@ class InjectionOrchestrator:
                 chunk_path = Path(tmp.name)
                 chunk_img.save(chunk_path, "PNG")
 
-            if is_raw:
+            result, message = self._rom_injector.inject_sprite_to_rom(
+                sprite_path=str(chunk_path),
+                rom_path=source_rom_path,
+                output_path=current_rom_path,
+                sprite_offset=rom_offset,
+                fast_compression=(not is_raw),
+                create_backup=create_backup,
+                ignore_checksum=True,
+                force=False,
+                compression_type=compression_type,
+                preserve_existing=preserve_existing,
+            )
+
+            # Fallback to RAW if HAL failed
+            if not result and not is_raw and ("decompress" in message.lower() or "too large" in message.lower()):
+                compression_used = "RAW"
+                logger.info(
+                    "ROM offset 0x%X: HAL failed, retrying as RAW",
+                    rom_offset,
+                )
                 result, message = self._rom_injector.inject_sprite_to_rom(
                     sprite_path=str(chunk_path),
                     rom_path=source_rom_path,
@@ -857,39 +795,6 @@ class InjectionOrchestrator:
                     compression_type=CompressionType.RAW,
                     preserve_existing=preserve_existing,
                 )
-            else:
-                result, message = self._rom_injector.inject_sprite_to_rom(
-                    sprite_path=str(chunk_path),
-                    rom_path=source_rom_path,
-                    output_path=current_rom_path,
-                    sprite_offset=rom_offset,
-                    fast_compression=True,
-                    create_backup=create_backup,
-                    ignore_checksum=True,
-                    force=False,
-                    compression_type=CompressionType.HAL,
-                    preserve_existing=preserve_existing,
-                )
-
-                # Fallback to RAW if HAL failed
-                if not result and ("decompress" in message.lower() or "too large" in message.lower()):
-                    compression_used = "RAW"
-                    logger.info(
-                        "ROM offset 0x%X: HAL failed, retrying as RAW",
-                        rom_offset,
-                    )
-                    result, message = self._rom_injector.inject_sprite_to_rom(
-                        sprite_path=str(chunk_path),
-                        rom_path=source_rom_path,
-                        output_path=current_rom_path,
-                        sprite_offset=rom_offset,
-                        fast_compression=False,
-                        create_backup=create_backup,
-                        ignore_checksum=True,
-                        force=False,
-                        compression_type=CompressionType.RAW,
-                        preserve_existing=preserve_existing,
-                    )
         finally:
             if chunk_path is not None:
                 chunk_path.unlink(missing_ok=True)
