@@ -218,6 +218,7 @@ class TestSetAIFramesResponsiveness:
     """
 
     @pytest.mark.skip(reason="AsyncThumbnailLoader has Qt threading cleanup issues in tests - to be fixed separately")
+    @pytest.mark.allows_registry_state(reason="Skipped test triggers teardown check")
     def test_set_ai_frames_with_many_images_remains_responsive(self, qtbot: QtBot, tmp_path: Path) -> None:
         """Setting many AI frames should not block main thread excessively.
 

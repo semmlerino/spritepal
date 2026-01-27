@@ -309,9 +309,9 @@ class BatchThumbnailWorker(QObject):
                 qimage = self._generate_thumbnail(request)
 
                 if qimage and not qimage.isNull():
-                    logger.debug(
-                        f"Generated valid thumbnail for 0x{request.offset:06X} (size: {qimage.width()}x{qimage.height()})"
-                    )
+                    # logger.debug(
+                    #     f"Generated valid thumbnail for 0x{request.offset:06X} (size: {qimage.width()}x{qimage.height()})"
+                    # )
                     # Cache it
                     self._add_to_cache(cache_key, qimage)
 
@@ -542,13 +542,15 @@ class BatchThumbnailWorker(QObject):
                             original_len = len(decompressed_data)
                             decompressed_data = align_tile_data(decompressed_data)
                             if len(decompressed_data) != original_len:
-                                logger.debug(
-                                    f"Aligned HAL data: {original_len} -> {len(decompressed_data)} bytes "
-                                    f"(removed {original_len - len(decompressed_data)} header byte(s)) "
-                                    f"from 0x{try_offset:06X}"
-                                )
+                                # logger.debug(
+                                #     f"Aligned HAL data: {original_len} -> {len(decompressed_data)} bytes "
+                                #     f"(removed {original_len - len(decompressed_data)} header byte(s)) "
+                                #     f"from 0x{try_offset:06X}"
+                                # )
+                                pass
                             else:
-                                logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{try_offset:06X}")
+                                # logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{try_offset:06X}")
+                                pass
                             break
                         if has_nonzero_content(data):
                             # Non-primary offset: require visible content to prevent
@@ -567,13 +569,15 @@ class BatchThumbnailWorker(QObject):
                             original_len = len(decompressed_data)
                             decompressed_data = align_tile_data(decompressed_data)
                             if len(decompressed_data) != original_len:
-                                logger.debug(
-                                    f"Aligned HAL data: {original_len} -> {len(decompressed_data)} bytes "
-                                    f"(removed {original_len - len(decompressed_data)} header byte(s)) "
-                                    f"from 0x{try_offset:06X}"
-                                )
+                                # logger.debug(
+                                #     f"Aligned HAL data: {original_len} -> {len(decompressed_data)} bytes "
+                                #     f"(removed {original_len - len(decompressed_data)} header byte(s)) "
+                                #     f"from 0x{try_offset:06X}"
+                                # )
+                                pass
                             else:
-                                logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{try_offset:06X}")
+                                # logger.debug(f"HAL decompressed {len(decompressed_data)} bytes from 0x{try_offset:06X}")
+                                pass
                             break
                     except Exception as e:
                         if try_offset == request.offset:
@@ -586,7 +590,8 @@ class BatchThumbnailWorker(QObject):
                 max_size = 32 * 256  # 32 bytes per tile, max 256 tiles
                 decompressed_data = self._read_rom_chunk(request.offset, max_size)
                 if decompressed_data:
-                    logger.debug(f"Using raw data: {len(decompressed_data)} bytes from 0x{request.offset:06X}")
+                    # logger.debug(f"Using raw data: {len(decompressed_data)} bytes from 0x{request.offset:06X}")
+                    pass
 
             if not decompressed_data:
                 return None
@@ -600,7 +605,7 @@ class BatchThumbnailWorker(QObject):
             # Calculate dimensions (try to make roughly square)
             width_tiles = min(16, tile_count)
             height_tiles = (tile_count + width_tiles - 1) // width_tiles
-            logger.debug(f"Rendering {tile_count} tiles as {width_tiles}x{height_tiles} grid")
+            # logger.debug(f"Rendering {tile_count} tiles as {width_tiles}x{height_tiles} grid")
 
             # Render using tile renderer
             # Use palette_index=None for grayscale (will trigger grayscale fallback)

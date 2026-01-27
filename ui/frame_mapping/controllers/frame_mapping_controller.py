@@ -847,7 +847,7 @@ class FrameMappingController(QObject):
             # Update position and scale, preserve flip values
             mapping.offset_x = offset_x
             mapping.offset_y = offset_y
-            mapping.scale = max(0.01, min(1.0, scale))
+            mapping.scale = max(0.1, min(1.0, scale))
             mapping.status = "edited"
             updated_count += 1
 
