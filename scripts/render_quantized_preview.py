@@ -220,25 +220,23 @@ def main() -> None:
     # Scale up for display
     display_scale = args.display_scale
     if args.side_by_side:
-        # Apply transforms to original for fair comparison
+        # Apply flip transforms to original (but NOT scale - we want full detail)
         original = ai_image.copy()
         if flip_h:
             original = original.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
         if flip_v:
             original = original.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-        if scale != 1.0:
-            new_w = int(original.width * scale)
-            new_h = int(original.height * scale)
-            original = original.resize((new_w, new_h), Image.Resampling.NEAREST)
 
-        # Scale both for display
-        orig_scaled = original.resize(
-            (original.width * display_scale, original.height * display_scale),
-            Image.Resampling.NEAREST,
-        )
+        # Scale quantized up for display (NEAREST to show blocky pixels)
         quant_scaled = quantized.resize(
             (quantized.width * display_scale, quantized.height * display_scale),
             Image.Resampling.NEAREST,
+        )
+
+        # Scale original to match quantized display size (LANCZOS to preserve detail)
+        orig_scaled = original.resize(
+            (quant_scaled.width, quant_scaled.height),
+            Image.Resampling.LANCZOS,
         )
 
         # Create side-by-side canvas
@@ -251,7 +249,7 @@ def main() -> None:
         canvas.paste(orig_scaled, (0, 0), orig_scaled)
         canvas.paste(quant_scaled, (orig_scaled.width + gap, 0), quant_scaled)
         result = canvas
-        print("Created side-by-side comparison (original | quantized)")
+        print("Created side-by-side comparison (original full-detail | quantized SNES)")
     else:
         result = quantized.resize(
             (quantized.width * display_scale, quantized.height * display_scale),
