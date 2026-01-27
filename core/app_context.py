@@ -381,29 +381,15 @@ def create_app_context(
         )
         logger.debug("SpritePresetManager created")
 
-        # 4. Create shared stateless services (used by multiple components)
-        # These can be pre-created and passed in for session-scoped caching in tests
-        # Import locally to avoid shadowing parameter names
-        from core.default_palette_loader import DefaultPaletteLoader
-        from core.hal_compression import HALCompressor
-        from core.sprite_config_loader import SpriteConfigLoader
-
-        if hal_compressor is None:
-            hal_compressor = HALCompressor()
-            logger.debug("HALCompressor created (shared)")
-        else:
+        # 4. Shared stateless services are now lazy-initialized
+        # They can be pre-created and passed in for session-scoped caching in tests,
+        # otherwise they'll be created on first use by ROMExtractor or AppContext properties.
+        # This defers HALCompressor tool discovery (~200-500ms) until actually needed.
+        if hal_compressor is not None:
             logger.debug("HALCompressor provided (cached)")
-
-        if sprite_config_loader is None:
-            sprite_config_loader = SpriteConfigLoader()
-            logger.debug("SpriteConfigLoader created (shared)")
-        else:
+        if sprite_config_loader is not None:
             logger.debug("SpriteConfigLoader provided (cached)")
-
-        if default_palette_loader is None:
-            default_palette_loader = DefaultPaletteLoader()
-            logger.debug("DefaultPaletteLoader created (shared)")
-        else:
+        if default_palette_loader is not None:
             logger.debug("DefaultPaletteLoader provided (cached)")
 
         # 5. Create ROMCache and ROMExtractor (needed by CoreOperationsManager)

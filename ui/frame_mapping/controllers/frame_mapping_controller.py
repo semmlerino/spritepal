@@ -10,8 +10,9 @@ from json import JSONDecodeError
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from PIL import Image
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtGui import QImage, QPixmap
+from PySide6.QtGui import QPixmap
 
 from ui.common.qt_image_utils import pil_to_qpixmap
 
@@ -289,10 +290,12 @@ class FrameMappingController(QObject):
 
         frames: list[AIFrame] = []
         for idx, png_path in enumerate(png_files):
-            # Get image dimensions
-            img = QImage(str(png_path))
-            width = img.width() if not img.isNull() else 0
-            height = img.height() if not img.isNull() else 0
+            # Get image dimensions from header only (fast - reads ~100 bytes vs full decode)
+            try:
+                with Image.open(png_path) as img:
+                    width, height = img.size
+            except Exception:
+                width, height = 0, 0
 
             frame = AIFrame(
                 path=png_path,
@@ -335,10 +338,12 @@ class FrameMappingController(QObject):
             self.error_occurred.emit(f"Not a PNG file: {file_path}")
             return False
 
-        # Get image dimensions
-        img = QImage(str(file_path))
-        width = img.width() if not img.isNull() else 0
-        height = img.height() if not img.isNull() else 0
+        # Get image dimensions from header only (fast - reads ~100 bytes vs full decode)
+        try:
+            with Image.open(file_path) as img:
+                width, height = img.size
+        except Exception:
+            width, height = 0, 0
 
         # Check if frame already exists (by path)
         existing_frames = self._project.ai_frames if self._project else []
@@ -842,7 +847,7 @@ class FrameMappingController(QObject):
             # Update position and scale, preserve flip values
             mapping.offset_x = offset_x
             mapping.offset_y = offset_y
-            mapping.scale = max(0.1, min(1.0, scale))
+            mapping.scale = max(0.01, min(1.0, scale))
             mapping.status = "edited"
             updated_count += 1
 

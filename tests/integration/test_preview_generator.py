@@ -457,7 +457,7 @@ class TestPreviewGenerator:
 
             # Test async generation with signal
             with qtbot.waitSignal(generator.preview_ready, timeout=signal_timeout()) as blocker:
-                generator.generate_preview_async(request, use_debounce=False)
+                generator.request_debounced_preview(request, use_debounce=False)
 
             result = blocker.args[0]
             assert isinstance(result, PreviewResult)
@@ -476,7 +476,7 @@ class TestPreviewGenerator:
             # Make multiple rapid requests
             for i in range(5):
                 request = create_vram_preview_request("/path/to/vram.bin", 0x8000 + i * 0x100)
-                generator.generate_preview_async(request, use_debounce=True)
+                generator.request_debounced_preview(request, use_debounce=True)
 
             # Wait for debounce to settle
             from PySide6.QtWidgets import QApplication
@@ -491,7 +491,7 @@ class TestPreviewGenerator:
         request = create_vram_preview_request("/path/to/vram.bin", 0x8000)
 
         # Make a debounced request
-        generator.generate_preview_async(request, use_debounce=True)
+        generator.request_debounced_preview(request, use_debounce=True)
 
         # Cancel it - no exception means success
         generator.cancel_pending_requests()

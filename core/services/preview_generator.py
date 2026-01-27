@@ -254,8 +254,12 @@ class PreviewGenerator(QObject):
         with QMutexLocker(self._generation_mutex):
             return self._generate_preview_impl(request, progress_callback)
 
-    def generate_preview_async(self, request: PreviewRequest, use_debounce: bool = True) -> None:
-        """Generate preview asynchronously with optional debouncing.
+    def request_debounced_preview(self, request: PreviewRequest, use_debounce: bool = True) -> None:
+        """Request preview with debouncing (runs on main thread after debounce delay).
+
+        Note: Despite previous naming ("generate_preview_async"), this is NOT truly async.
+        The preview generation runs synchronously on the main thread after the debounce
+        timer fires. For true background processing, use AsyncPreviewService.
 
         Args:
             request: Preview generation request

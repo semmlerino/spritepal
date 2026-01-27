@@ -74,25 +74,77 @@ class ROMExtractor:
 
         Args:
             rom_cache: Required ROM cache for caching scan results and sprite data.
-            hal_compressor: HAL compressor instance (creates new if None for backward compat).
-            sprite_config_loader: Sprite config loader (creates new if None).
-            default_palette_loader: Default palette loader (creates new if None).
+            hal_compressor: HAL compressor instance (lazy-created on first use if None).
+            sprite_config_loader: Sprite config loader (lazy-created on first use if None).
+            default_palette_loader: Default palette loader (lazy-created on first use if None).
         """
         logger.debug("Initializing ROMExtractor")
 
-        # Use injected or create new (backward compatibility for tests)
-        self.hal_compressor = hal_compressor or HALCompressor()
-        self.sprite_config_loader = sprite_config_loader or SpriteConfigLoader()
-        self.default_palette_loader = default_palette_loader or DefaultPaletteLoader()
+        # Store injected instances or None for lazy initialization
+        self._hal_compressor = hal_compressor
+        self._sprite_config_loader = sprite_config_loader
+        self._default_palette_loader = default_palette_loader
 
-        # Share our instances with ROMInjector to avoid duplicate initialization
-        self.rom_injector = ROMInjector(
-            hal_compressor=self.hal_compressor,
-            sprite_config_loader=self.sprite_config_loader,
-        )
+        # ROMInjector, ROMPaletteExtractor created lazily via properties
+        self._rom_injector: ROMInjector | None = None
         self.rom_palette_extractor = ROMPaletteExtractor()
         self.rom_cache = rom_cache
-        logger.info("ROMExtractor initialized with HAL compression and palette extraction support")
+        logger.info("ROMExtractor initialized (HAL compression deferred until first use)")
+
+    @property
+    def hal_compressor(self) -> HALCompressor:
+        """Lazy-initialize HALCompressor on first access."""
+        if self._hal_compressor is None:
+            self._hal_compressor = HALCompressor()
+            logger.debug("HALCompressor created via lazy initialization")
+        return self._hal_compressor
+
+    @hal_compressor.setter
+    def hal_compressor(self, value: HALCompressor) -> None:
+        """Allow injection for testing."""
+        self._hal_compressor = value
+
+    @property
+    def sprite_config_loader(self) -> SpriteConfigLoader:
+        """Lazy-initialize SpriteConfigLoader on first access."""
+        if self._sprite_config_loader is None:
+            self._sprite_config_loader = SpriteConfigLoader()
+            logger.debug("SpriteConfigLoader created via lazy initialization")
+        return self._sprite_config_loader
+
+    @sprite_config_loader.setter
+    def sprite_config_loader(self, value: SpriteConfigLoader) -> None:
+        """Allow injection for testing."""
+        self._sprite_config_loader = value
+
+    @property
+    def default_palette_loader(self) -> DefaultPaletteLoader:
+        """Lazy-initialize DefaultPaletteLoader on first access."""
+        if self._default_palette_loader is None:
+            self._default_palette_loader = DefaultPaletteLoader()
+            logger.debug("DefaultPaletteLoader created via lazy initialization")
+        return self._default_palette_loader
+
+    @default_palette_loader.setter
+    def default_palette_loader(self, value: DefaultPaletteLoader) -> None:
+        """Allow injection for testing."""
+        self._default_palette_loader = value
+
+    @property
+    def rom_injector(self) -> ROMInjector:
+        """Lazy-initialize ROMInjector on first access."""
+        if self._rom_injector is None:
+            self._rom_injector = ROMInjector(
+                hal_compressor=self.hal_compressor,
+                sprite_config_loader=self.sprite_config_loader,
+            )
+            logger.debug("ROMInjector created via lazy initialization")
+        return self._rom_injector
+
+    @rom_injector.setter
+    def rom_injector(self, value: ROMInjector) -> None:
+        """Allow injection for testing."""
+        self._rom_injector = value
 
     # -------------------------------------------------------------------------
     # Facade methods - delegate to rom_injector to avoid reach-through access
