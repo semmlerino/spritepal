@@ -647,8 +647,10 @@ class FrameMappingController(QObject):
         flip_h: bool,
         flip_v: bool,
         scale: float = 1.0,
+        sharpen: float = 0.0,
+        resampling: str = "lanczos",
         set_edited: bool = True,
-        drag_start_alignment: tuple[int, int, bool, bool, float] | None = None,
+        drag_start_alignment: tuple[int, int, bool, bool, float, float, str] | None = None,
     ) -> bool:
         """Update alignment for a mapping.
 
@@ -659,11 +661,13 @@ class FrameMappingController(QObject):
             flip_h: Horizontal flip state
             flip_v: Vertical flip state
             scale: Scale factor (0.1 - 1.0)
+            sharpen: Pre-sharpening amount (0.0 - 4.0)
+            resampling: Resampling method ("lanczos" or "nearest")
             set_edited: If True and status is not 'injected', set status to 'edited'.
                         Use False for auto-centering during initial link creation.
             drag_start_alignment: If provided, use this as old state for undo command.
                         This creates a single undo for an entire drag operation.
-                        Format: (offset_x, offset_y, flip_h, flip_v, scale)
+                        Format: (offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling)
 
         Returns:
             True if alignment was updated
@@ -680,13 +684,15 @@ class FrameMappingController(QObject):
             # Use drag start alignment for undo if provided (creates single undo for entire drag)
             # Otherwise use current mapping state (for keyboard nudge, etc.)
             if drag_start_alignment is not None:
-                old_x, old_y, old_flip_h, old_flip_v, old_scale = drag_start_alignment
+                old_x, old_y, old_flip_h, old_flip_v, old_scale, old_sharpen, old_resampling = drag_start_alignment
             else:
                 old_x = mapping.offset_x
                 old_y = mapping.offset_y
                 old_flip_h = mapping.flip_h
                 old_flip_v = mapping.flip_v
                 old_scale = mapping.scale
+                old_sharpen = mapping.sharpen
+                old_resampling = mapping.resampling
 
             # Capture previous state for undo
             command = UpdateAlignmentCommand(
@@ -697,29 +703,37 @@ class FrameMappingController(QObject):
                 new_flip_h=flip_h,
                 new_flip_v=flip_v,
                 new_scale=scale,
+                new_sharpen=sharpen,
+                new_resampling=resampling,
                 old_offset_x=old_x,
                 old_offset_y=old_y,
                 old_flip_h=old_flip_h,
                 old_flip_v=old_flip_v,
                 old_scale=old_scale,
+                old_sharpen=old_sharpen,
+                old_resampling=old_resampling,
                 old_status=mapping.status,
             )
             self._undo_stack.push(command)
         else:
             # Auto-centering - update directly without history
-            self._project.update_mapping_alignment(ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, set_edited)
+            self._project.update_mapping_alignment(
+                ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling, set_edited
+            )
 
         # Use targeted signal to avoid full UI refresh (which blanks canvas)
         self.alignment_updated.emit(ai_frame_id)
         self.save_requested.emit()
         logger.info(
-            "Updated alignment for AI frame %s: offset=(%d, %d), flip=(%s, %s), scale=%.2f",
+            "Updated alignment for AI frame %s: offset=(%d, %d), flip=(%s, %s), scale=%.2f, sharpen=%.1f, resampling=%s",
             ai_frame_id,
             offset_x,
             offset_y,
             flip_h,
             flip_v,
             scale,
+            sharpen,
+            resampling,
         )
         return True
 
@@ -731,12 +745,14 @@ class FrameMappingController(QObject):
         flip_h: bool,
         flip_v: bool,
         scale: float,
+        sharpen: float = 0.0,
+        resampling: str = "lanczos",
     ) -> bool:
         """Internal: Update alignment without undo history (for command execution)."""
         if self._project is None:
             return False
         return self._project.update_mapping_alignment(
-            ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, set_edited=True
+            ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling, set_edited=True
         )
 
     def _set_mapping_status_no_history(self, ai_frame_id: str, status: str) -> bool:

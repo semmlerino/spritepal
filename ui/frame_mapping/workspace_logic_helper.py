@@ -252,6 +252,8 @@ class WorkspaceLogicHelper:
                 mapping.flip_h,
                 mapping.flip_v,
                 mapping.scale,
+                mapping.sharpen,
+                mapping.resampling,
             )
             # Sync captures selection and track canvas state
             self._captures_pane.select_frame(mapping.game_frame_id)
@@ -355,6 +357,8 @@ class WorkspaceLogicHelper:
                 mapping.flip_h,
                 mapping.flip_v,
                 mapping.scale,
+                mapping.sharpen,
+                mapping.resampling,
             )
             # Sync captures selection
             self._captures_pane.select_frame(mapping.game_frame_id)
@@ -476,6 +480,8 @@ class WorkspaceLogicHelper:
                 mapping.flip_h,
                 mapping.flip_v,
                 mapping.scale,
+                mapping.sharpen,
+                mapping.resampling,
             )
 
         if self._message_service:
@@ -563,7 +569,9 @@ class WorkspaceLogicHelper:
 
     # ===== Phase 2e: Alignment coordination =====
 
-    def handle_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> bool:
+    def handle_alignment_changed(
+        self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float, sharpen: float, resampling: str
+    ) -> bool:
         """Handle alignment change from canvas (auto-save).
 
         Alignment changes are only applied when the canvas is displaying the same
@@ -608,11 +616,11 @@ class WorkspaceLogicHelper:
         drag_start = self._alignment_canvas.get_drag_start_alignment()
         self._alignment_canvas.clear_drag_start_alignment()  # Consume it
 
-        # Update alignment in controller (includes scale)
+        # Update alignment in controller (includes scale, sharpen, resampling)
         # This emits alignment_updated signal which triggers _on_alignment_updated()
         # which handles updating the mapping panel row
         self._controller.update_mapping_alignment(
-            ai_frame_id, x, y, flip_h, flip_v, scale, drag_start_alignment=drag_start
+            ai_frame_id, x, y, flip_h, flip_v, scale, sharpen, resampling, drag_start_alignment=drag_start
         )
         return True
 
@@ -644,6 +652,8 @@ class WorkspaceLogicHelper:
                 mapping.flip_h,
                 mapping.flip_v,
                 mapping.scale,
+                mapping.sharpen,
+                mapping.resampling,
                 has_mapping=True,
             )
             # Ensure canvas is showing the mapped game frame

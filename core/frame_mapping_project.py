@@ -333,6 +333,10 @@ class FrameMapping:
     flip_v: bool = False
     scale: float = 1.0  # Uniform scale factor (0.1 - 1.0)
 
+    # Quantization quality options
+    sharpen: float = 0.0  # Pre-sharpening before scale (0.0-4.0)
+    resampling: str = "lanczos"  # "lanczos" or "nearest"
+
     def to_dict(self) -> dict[str, object]:
         """Serialize to dictionary for JSON storage."""
         return {
@@ -344,6 +348,8 @@ class FrameMapping:
             "flip_h": self.flip_h,
             "flip_v": self.flip_v,
             "scale": self.scale,
+            "sharpen": self.sharpen,
+            "resampling": self.resampling,
         }
 
     @classmethod
@@ -385,6 +391,8 @@ class FrameMapping:
             flip_h=cast(bool, data.get("flip_h", False)),
             flip_v=cast(bool, data.get("flip_v", False)),
             scale=float(cast(int | float, data.get("scale", 1.0))),
+            sharpen=float(cast(int | float, data.get("sharpen", 0.0))),
+            resampling=cast(str, data.get("resampling", "lanczos")),
         )
 
 
@@ -690,6 +698,8 @@ class FrameMappingProject:
         flip_h: bool,
         flip_v: bool,
         scale: float = 1.0,
+        sharpen: float = 0.0,
+        resampling: str = "lanczos",
         set_edited: bool = True,
     ) -> bool:
         """Update alignment for a mapping.
@@ -701,6 +711,8 @@ class FrameMappingProject:
             flip_h: Horizontal flip state
             flip_v: Vertical flip state
             scale: Scale factor (0.1 - 1.0)
+            sharpen: Pre-sharpening amount (0.0 - 4.0)
+            resampling: Resampling method ("lanczos" or "nearest")
             set_edited: If True, set status to 'edited' (clears 'injected' status).
                         Use False for auto-centering during initial link creation.
 
@@ -716,6 +728,8 @@ class FrameMappingProject:
         mapping.flip_h = flip_h
         mapping.flip_v = flip_v
         mapping.scale = max(0.1, min(1.0, scale))
+        mapping.sharpen = max(0.0, min(4.0, sharpen))
+        mapping.resampling = resampling if resampling in ("lanczos", "nearest") else "lanczos"
 
         # Phase 5 fix: Transition to "edited" when alignment changes (removed guard)
         if set_edited:

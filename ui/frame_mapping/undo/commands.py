@@ -102,12 +102,16 @@ class UpdateAlignmentCommand:
     new_flip_h: bool
     new_flip_v: bool
     new_scale: float
+    new_sharpen: float = 0.0
+    new_resampling: str = "lanczos"
     # Previous state for undo
     old_offset_x: int = 0
     old_offset_y: int = 0
     old_flip_h: bool = False
     old_flip_v: bool = False
     old_scale: float = 1.0
+    old_sharpen: float = 0.0
+    old_resampling: str = "lanczos"
     old_status: str = "mapped"
 
     @property
@@ -122,6 +126,8 @@ class UpdateAlignmentCommand:
             self.new_flip_h,
             self.new_flip_v,
             self.new_scale,
+            self.new_sharpen,
+            self.new_resampling,
         )
 
     def undo(self) -> None:
@@ -132,6 +138,8 @@ class UpdateAlignmentCommand:
             self.old_flip_h,
             self.old_flip_v,
             self.old_scale,
+            self.old_sharpen,
+            self.old_resampling,
         )
         # Restore original status
         self.controller._set_mapping_status_no_history(self.ai_frame_id, self.old_status)

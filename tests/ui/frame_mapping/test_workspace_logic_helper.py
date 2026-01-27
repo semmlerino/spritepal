@@ -275,7 +275,7 @@ class TestAlignmentCoordination:
         helper._state.current_canvas_game_id = "capture_1"  # type: ignore[union-attr]
         helper._alignment_canvas.get_drag_start_alignment.return_value = None  # type: ignore[union-attr]
 
-        result = helper.handle_alignment_changed(10, 20, False, True, 1.0)
+        result = helper.handle_alignment_changed(10, 20, False, True, 1.0, 0.0, "lanczos")
 
         assert result is True
         helper._controller.update_mapping_alignment.assert_called_once()  # type: ignore[union-attr]
@@ -290,7 +290,7 @@ class TestAlignmentCoordination:
         helper._state.selected_ai_frame_id = "frame_001.png"  # type: ignore[union-attr]
         helper._state.current_canvas_game_id = "capture_2"  # Different!  # type: ignore[union-attr]
 
-        result = helper.handle_alignment_changed(10, 20, False, True, 1.0)
+        result = helper.handle_alignment_changed(10, 20, False, True, 1.0, 0.0, "lanczos")
 
         assert result is False
         helper._controller.update_mapping_alignment.assert_not_called()  # type: ignore[union-attr]
@@ -305,6 +305,8 @@ class TestAlignmentCoordination:
         mapping.flip_h = True
         mapping.flip_v = False
         mapping.scale = 1.5
+        mapping.sharpen = 0.0
+        mapping.resampling = "lanczos"
         mapping.game_frame_id = "capture_1"
         project.get_mapping_for_ai_frame.return_value = mapping
         helper._controller.project = project  # type: ignore[union-attr]
@@ -314,7 +316,7 @@ class TestAlignmentCoordination:
         helper.sync_canvas_alignment_from_model()
 
         helper._alignment_canvas.set_alignment.assert_called_once_with(  # type: ignore[union-attr]
-            5, 10, True, False, 1.5, has_mapping=True
+            5, 10, True, False, 1.5, 0.0, "lanczos", has_mapping=True
         )
 
     def test_sync_canvas_alignment_from_model_clears_when_no_mapping(self, helper: WorkspaceLogicHelper) -> None:

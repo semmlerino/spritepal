@@ -205,12 +205,14 @@ class WorkbenchCanvas(QWidget):
 
     Signals:
         alignment_changed: Emitted when alignment values change.
-            Args: (offset_x: int, offset_y: int, flip_h: bool, flip_v: bool, scale: float)
+            Args: (offset_x: int, offset_y: int, flip_h: bool, flip_v: bool, scale: float,
+                   sharpen: float, resampling: str)
         compression_type_changed: Emitted when compression type selection changes.
             Args: (compression_type: str) - "raw" or "hal"
     """
 
-    alignment_changed = Signal(int, int, bool, bool, float)  # offset_x, offset_y, flip_h, flip_v, scale
+    # offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling
+    alignment_changed = Signal(int, int, bool, bool, float, float, str)
     compression_type_changed = Signal(str)  # "raw" or "hal"
     apply_transforms_to_all_requested = Signal(int, int, float)  # offset_x, offset_y, scale
     # Pixel inspection signals
@@ -256,8 +258,8 @@ class WorkbenchCanvas(QWidget):
         self._preview_timer.setSingleShot(True)
         self._preview_timer.timeout.connect(self._generate_preview)
         self._preview_enabled = False
-        # Snapshot: (offset_x, offset_y, flip_h, flip_v, scale) captured when scheduling
-        self._preview_snapshot: tuple[int, int, bool, bool, float] | None = None
+        # Snapshot: (offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling) captured when scheduling
+        self._preview_snapshot: tuple[int, int, bool, bool, float, float, str] | None = None
 
         self._tile_sampling_service = TileSamplingService()
         self._multi_palette_warning_label: QLabel | None = None
@@ -287,7 +289,7 @@ class WorkbenchCanvas(QWidget):
 
         # Drag state tracking for undo optimization
         self._drag_in_progress = False
-        self._drag_start_alignment: tuple[int, int, bool, bool, float] | None = None
+        self._drag_start_alignment: tuple[int, int, bool, bool, float, float, str] | None = None
 
         # Tile selection state
         self._selected_tile_index: int | None = None
@@ -562,6 +564,40 @@ class WorkbenchCanvas(QWidget):
         self._preserve_sprite_checkbox.setChecked(False)  # Default: remove original
         controls3.addWidget(self._preserve_sprite_checkbox)
 
+        controls3.addWidget(self._create_separator())
+
+        # Sharpen slider
+        sharpen_label = QLabel("Sharpen:")
+        sharpen_label.setStyleSheet("font-size: 11px;")
+        controls3.addWidget(sharpen_label)
+
+        self._sharpen_slider = QSlider(Qt.Orientation.Horizontal)
+        self._sharpen_slider.setRange(0, 40)  # 0.0 to 4.0 in 0.1 steps
+        self._sharpen_slider.setValue(0)
+        self._sharpen_slider.setMaximumWidth(60)
+        self._sharpen_slider.setToolTip("Pre-sharpening before scale (0=off, 2=subtle, 4=strong)")
+        controls3.addWidget(self._sharpen_slider)
+
+        self._sharpen_value = QLabel("0.0")
+        self._sharpen_value.setStyleSheet("font-size: 11px;")
+        self._sharpen_value.setMinimumWidth(25)
+        controls3.addWidget(self._sharpen_value)
+
+        controls3.addWidget(self._create_separator())
+
+        # Resampling combo
+        resample_label = QLabel("Resize:")
+        resample_label.setStyleSheet("font-size: 11px;")
+        controls3.addWidget(resample_label)
+
+        self._resampling_combo = QComboBox()
+        self._resampling_combo.addItem("Lanczos", "lanczos")
+        self._resampling_combo.addItem("Nearest", "nearest")
+        self._resampling_combo.setStyleSheet("font-size: 11px;")
+        self._resampling_combo.setToolTip("Lanczos=smooth detail, Nearest=blocky pixels")
+        self._resampling_combo.setMaximumWidth(70)
+        controls3.addWidget(self._resampling_combo)
+
         controls3.addStretch()
 
         # Apply Transformations to All button
@@ -603,6 +639,8 @@ class WorkbenchCanvas(QWidget):
         self._auto_align_btn.clicked.connect(self._on_auto_align)
         self._preserve_sprite_checkbox.toggled.connect(self._on_preserve_sprite_toggled)
         self._apply_transforms_all_btn.clicked.connect(self._on_apply_transforms_to_all)
+        self._sharpen_slider.valueChanged.connect(self._on_sharpen_changed)
+        self._resampling_combo.currentIndexChanged.connect(self._on_resampling_changed)
 
         # AI frame item signals
         self._ai_frame_item.transform_changed.connect(self._on_ai_frame_transform_changed)
@@ -789,6 +827,8 @@ class WorkbenchCanvas(QWidget):
         flip_h: bool,
         flip_v: bool,
         scale: float = 1.0,
+        sharpen: float = 0.0,
+        resampling: str = "lanczos",
         *,
         has_mapping: bool = True,
     ) -> None:
@@ -800,6 +840,8 @@ class WorkbenchCanvas(QWidget):
             flip_h: Horizontal flip state.
             flip_v: Vertical flip state.
             scale: Scale factor (0.1 - 1.0).
+            sharpen: Pre-sharpening amount (0.0 - 4.0).
+            resampling: Resampling method ("lanczos" or "nearest").
             has_mapping: Whether this represents a valid mapping (affects control state).
         """
         self._has_mapping = has_mapping
@@ -816,6 +858,8 @@ class WorkbenchCanvas(QWidget):
             self._flip_h_checkbox.blockSignals(True)
             self._flip_v_checkbox.blockSignals(True)
             self._scale_slider.blockSignals(True)
+            self._sharpen_slider.blockSignals(True)
+            self._resampling_combo.blockSignals(True)
 
             self._flip_h_checkbox.setChecked(flip_h)
             self._flip_v_checkbox.setChecked(flip_v)
@@ -823,9 +867,20 @@ class WorkbenchCanvas(QWidget):
             self._scale_value.setText(f"{scale:.1f}x")
             self._offset_label.setText(f"Offset: ({offset_x}, {offset_y})")
 
+            # Set sharpen slider (0-40 -> 0.0-4.0)
+            self._sharpen_slider.setValue(int(sharpen * 10))
+            self._sharpen_value.setText(f"{sharpen:.1f}")
+
+            # Set resampling combo
+            index = self._resampling_combo.findData(resampling)
+            if index >= 0:
+                self._resampling_combo.setCurrentIndex(index)
+
             self._flip_h_checkbox.blockSignals(False)
             self._flip_v_checkbox.blockSignals(False)
             self._scale_slider.blockSignals(False)
+            self._sharpen_slider.blockSignals(False)
+            self._resampling_combo.blockSignals(False)
 
             # Schedule tile touch status update
             self._schedule_tile_touch_update()
@@ -838,7 +893,7 @@ class WorkbenchCanvas(QWidget):
 
     def clear_alignment(self) -> None:
         """Clear alignment values (reset to defaults)."""
-        self.set_alignment(0, 0, False, False, 1.0, has_mapping=False)
+        self.set_alignment(0, 0, False, False, 1.0, 0.0, "lanczos", has_mapping=False)
 
     def clear(self) -> None:
         """Clear all content."""
@@ -939,22 +994,26 @@ class WorkbenchCanvas(QWidget):
         """
         return self._preview_timer.isActive()
 
-    def get_alignment(self) -> tuple[int, int, bool, bool, float]:
+    def get_alignment(self) -> tuple[int, int, bool, bool, float, float, str]:
         """Get current alignment values.
 
         Returns:
-            Tuple of (offset_x, offset_y, flip_h, flip_v, scale).
+            Tuple of (offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling).
         """
         pos = self._ai_frame_item.pos()
         # Convert from display scale to actual coordinates
         offset_x = int(pos.x() / self._display_scale)
         offset_y = int(pos.y() / self._display_scale)
+        sharpen = self._sharpen_slider.value() / 10.0
+        resampling = self._resampling_combo.currentData() or "lanczos"
         return (
             offset_x,
             offset_y,
             self._flip_h_checkbox.isChecked(),
             self._flip_v_checkbox.isChecked(),
             self._ai_frame_item.scale_factor(),
+            sharpen,
+            resampling,
         )
 
     def get_preserve_sprite(self) -> bool:
@@ -1311,6 +1370,22 @@ class WorkbenchCanvas(QWidget):
         # Update game frame visibility based on preview + preserve sprite state
         self._update_game_frame_visibility()
 
+    def _on_sharpen_changed(self, value: int) -> None:
+        """Handle sharpen slider value change."""
+        if self._updating_from_external:
+            return
+        sharpen = value / 10.0  # Convert 0-40 to 0.0-4.0
+        self._sharpen_value.setText(f"{sharpen:.1f}")
+        self._schedule_preview_update()
+        self._emit_alignment_changed()
+
+    def _on_resampling_changed(self, index: int) -> None:
+        """Handle resampling combo box change."""
+        if self._updating_from_external:
+            return
+        self._schedule_preview_update()
+        self._emit_alignment_changed()
+
     def _update_game_frame_visibility(self) -> None:
         """Update game frame item visibility based on preview and preserve sprite state.
 
@@ -1335,7 +1410,7 @@ class WorkbenchCanvas(QWidget):
         """
         if not self._has_mapping:
             return
-        offset_x, offset_y, _flip_h, _flip_v, scale = self.get_alignment()
+        offset_x, offset_y, _flip_h, _flip_v, scale, _sharpen, _resampling = self.get_alignment()
         self.apply_transforms_to_all_requested.emit(offset_x, offset_y, scale)
 
     def _schedule_preview_update(self) -> None:
@@ -1353,7 +1428,9 @@ class WorkbenchCanvas(QWidget):
         flip_h = self._flip_h_checkbox.isChecked()
         flip_v = self._flip_v_checkbox.isChecked()
         scale = self._ai_frame_item.scale_factor()
-        self._preview_snapshot = (offset_x, offset_y, flip_h, flip_v, scale)
+        sharpen = self._sharpen_slider.value() / 10.0
+        resampling = self._resampling_combo.currentData() or "lanczos"
+        self._preview_snapshot = (offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling)
         self._preview_timer.start(self._config.preview_debounce_ms)
 
     def _generate_preview(self) -> None:
@@ -1362,7 +1439,7 @@ class WorkbenchCanvas(QWidget):
         Uses SpriteCompositor with "original" policy so uncovered areas
         show original sprite pixels (WYSIWYG preview).
 
-        Transform order: flip -> scale (SNES-correct, matching injection)
+        Transform order: flip -> sharpen -> scale (matching injection)
 
         Uses the alignment snapshot captured at schedule time if available,
         otherwise falls back to current values.
@@ -1377,7 +1454,7 @@ class WorkbenchCanvas(QWidget):
 
         # Use snapshot if available, otherwise use current values
         if self._preview_snapshot is not None:
-            offset_x, offset_y, flip_h, flip_v, scale = self._preview_snapshot
+            offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling = self._preview_snapshot
         else:
             # Fallback to current values (for direct calls in tests)
             pos = self._ai_frame_item.pos()
@@ -1386,6 +1463,8 @@ class WorkbenchCanvas(QWidget):
             flip_h = self._flip_h_checkbox.isChecked()
             flip_v = self._flip_v_checkbox.isChecked()
             scale = self._ai_frame_item.scale_factor()
+            sharpen = self._sharpen_slider.value() / 10.0
+            resampling = self._resampling_combo.currentData() or "lanczos"
 
         try:
             # Use SpriteCompositor with policy based on "Preserve sprite" checkbox
@@ -1401,6 +1480,8 @@ class WorkbenchCanvas(QWidget):
                 flip_h=flip_h,
                 flip_v=flip_v,
                 scale=scale,
+                sharpen=sharpen,
+                resampling=resampling,
             )
 
             result = compositor.composite_frame(
@@ -1629,6 +1710,10 @@ class WorkbenchCanvas(QWidget):
         flip_h = self._flip_h_checkbox.isChecked()
         flip_v = self._flip_v_checkbox.isChecked()
 
+        # Preserve current sharpen and resampling
+        sharpen = self._sharpen_slider.value() / 10.0
+        resampling = self._resampling_combo.currentData() or "lanczos"
+
         # Use optimal alignment when Match Scale is checked
         if self._match_scale_checkbox.isChecked() and ai_content_width > 0 and ai_content_height > 0:
             offset_x, offset_y, scale = self._compute_optimal_alignment(ai_bbox, flip_h, flip_v)
@@ -1654,13 +1739,15 @@ class WorkbenchCanvas(QWidget):
             offset_x = int(game_center_x - scaled_ai_center_x)
             offset_y = int(game_center_y - scaled_ai_center_y)
 
-        # Apply the alignment
+        # Apply the alignment (preserving sharpen and resampling)
         self.set_alignment(
             offset_x,
             offset_y,
             flip_h,
             flip_v,
             scale,
+            sharpen,
+            resampling,
         )
         self._emit_alignment_changed()
         self._update_scene_for_alignment()
@@ -1679,7 +1766,7 @@ class WorkbenchCanvas(QWidget):
         self._emit_alignment_changed()
         logger.debug("Drag finished, emitting final alignment")
 
-    def get_drag_start_alignment(self) -> tuple[int, int, bool, bool, float] | None:
+    def get_drag_start_alignment(self) -> tuple[int, int, bool, bool, float, float, str] | None:
         """Return alignment at drag start, or None if not from drag.
 
         Used by workspace to pass to controller for single undo command.
@@ -1722,8 +1809,8 @@ class WorkbenchCanvas(QWidget):
 
     def _emit_alignment_changed(self) -> None:
         """Emit alignment_changed signal with current values."""
-        offset_x, offset_y, flip_h, flip_v, scale = self.get_alignment()
-        self.alignment_changed.emit(offset_x, offset_y, flip_h, flip_v, scale)
+        offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling = self.get_alignment()
+        self.alignment_changed.emit(offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling)
 
     def _update_scene_for_alignment(self) -> None:
         """Update scene rect and fit view to show both frames after alignment.

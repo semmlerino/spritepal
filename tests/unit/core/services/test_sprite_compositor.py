@@ -806,3 +806,199 @@ class TestTransparentPolicyNoOriginalSprite:
             "when preserve_sprite=False. The transparent policy should completely remove "
             "the original sprite."
         )
+
+
+class TestTransformParamsNewFields:
+    """Test new sharpen and resampling fields in TransformParams."""
+
+    def test_default_sharpen_and_resampling(self) -> None:
+        """TransformParams should have correct defaults for new fields."""
+        params = TransformParams()
+
+        assert params.sharpen == 0.0
+        assert params.resampling == "lanczos"
+
+    def test_custom_sharpen_and_resampling(self) -> None:
+        """TransformParams should accept custom sharpen and resampling values."""
+        params = TransformParams(
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
+            scale=0.5,
+            sharpen=2.5,
+            resampling="nearest",
+        )
+
+        assert params.sharpen == 2.5
+        assert params.resampling == "nearest"
+
+
+class TestSharpenPreservingAlpha:
+    """Test sharpening functionality preserves alpha channel."""
+
+    def test_sharpen_zero_is_noop(self) -> None:
+        """Zero sharpening should return image unchanged."""
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create test image with varying colors
+        img = Image.new("RGBA", (10, 10), (128, 64, 32, 200))
+
+        # Sharpen with amount 0 should be a no-op
+        result = compositor._sharpen_preserving_alpha(img, 0.0)
+
+        # Compare pixels - should be identical
+        for x in range(10):
+            for y in range(10):
+                orig = img.getpixel((x, y))
+                new = result.getpixel((x, y))
+                assert orig == new, f"Pixel ({x},{y}) changed with zero sharpening"
+
+    def test_sharpen_preserves_alpha_channel(self) -> None:
+        """Sharpening should not modify the alpha channel."""
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create test image with non-uniform alpha
+        img = Image.new("RGBA", (20, 20), (0, 0, 0, 0))
+        # Add opaque region in center
+        for x in range(5, 15):
+            for y in range(5, 15):
+                img.putpixel((x, y), (255, 128, 64, 255))
+        # Add semi-transparent border
+        for x in range(3, 17):
+            for y in [3, 4, 15, 16]:
+                img.putpixel((x, y), (128, 64, 32, 128))
+        for y in range(3, 17):
+            for x in [3, 4, 15, 16]:
+                img.putpixel((x, y), (128, 64, 32, 128))
+
+        # Apply strong sharpening
+        result = compositor._sharpen_preserving_alpha(img, 3.0)
+
+        # Check that alpha channel is preserved exactly
+        for x in range(20):
+            for y in range(20):
+                orig_alpha = img.getpixel((x, y))[3]
+                new_alpha = result.getpixel((x, y))[3]
+                assert orig_alpha == new_alpha, (
+                    f"Alpha at ({x},{y}) changed: {orig_alpha} -> {new_alpha}"
+                )
+
+    def test_sharpen_clamps_to_valid_range(self) -> None:
+        """Sharpening amount should be clamped to 0.0-4.0."""
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        img = Image.new("RGBA", (10, 10), (128, 128, 128, 255))
+
+        # Negative should be clamped to 0 (no-op)
+        result_neg = compositor._sharpen_preserving_alpha(img, -1.0)
+        assert result_neg.getpixel((5, 5)) == img.getpixel((5, 5))
+
+        # Values > 4.0 should be clamped (no crash)
+        result_high = compositor._sharpen_preserving_alpha(img, 10.0)
+        assert result_high.size == img.size  # Just verify it doesn't crash
+
+
+class TestResamplingModes:
+    """Test resampling mode affects scaling behavior."""
+
+    def test_lanczos_is_default(self) -> None:
+        """Lanczos should be the default resampling method."""
+        params = TransformParams(scale=0.5)
+        assert params.resampling == "lanczos"
+
+    def test_nearest_produces_blocky_result(self) -> None:
+        """Nearest neighbor should produce blocky, aliased result."""
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create a 2x2 checkerboard pattern
+        img = Image.new("RGBA", (4, 4), (0, 0, 0, 0))
+        img.putpixel((0, 0), (255, 0, 0, 255))
+        img.putpixel((1, 1), (255, 0, 0, 255))
+        img.putpixel((2, 2), (255, 0, 0, 255))
+        img.putpixel((3, 3), (255, 0, 0, 255))
+        img.putpixel((0, 1), (0, 255, 0, 255))
+        img.putpixel((1, 0), (0, 255, 0, 255))
+        img.putpixel((2, 3), (0, 255, 0, 255))
+        img.putpixel((3, 2), (0, 255, 0, 255))
+
+        # Scale up 2x with nearest - should preserve exact colors
+        transform = TransformParams(scale=2.0, resampling="nearest")
+        result = compositor._apply_transforms(img, transform)
+
+        assert result.size == (8, 8)
+        # Check that colors are exact (no blending)
+        pixel = result.getpixel((0, 0))
+        assert pixel[:3] == (255, 0, 0), f"Expected red, got {pixel[:3]}"
+
+    def test_lanczos_smooths_edges(self) -> None:
+        """Lanczos resampling should produce smoother transitions."""
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create sharp edge: left half red, right half green
+        img = Image.new("RGBA", (10, 10), (255, 0, 0, 255))
+        for x in range(5, 10):
+            for y in range(10):
+                img.putpixel((x, y), (0, 255, 0, 255))
+
+        # Scale down with lanczos
+        transform = TransformParams(scale=0.5, resampling="lanczos")
+        result = compositor._apply_transforms(img, transform)
+
+        assert result.size == (5, 5)
+        # Lanczos may introduce some intermediate colors at edges
+        # This test just verifies it runs without error and produces output
+
+
+class TestSharpenAndScaleTogether:
+    """Test sharpening and scaling work together correctly."""
+
+    def test_sharpen_before_scale_order(self) -> None:
+        """Sharpening should be applied before scaling."""
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create a small test image
+        img = Image.new("RGBA", (16, 16), (128, 128, 128, 255))
+        # Add a detail that sharpening would enhance
+        for x in range(6, 10):
+            for y in range(6, 10):
+                img.putpixel((x, y), (255, 255, 255, 255))
+
+        # Apply both sharpen and scale
+        transform = TransformParams(
+            scale=0.5,
+            sharpen=2.0,
+            resampling="lanczos",
+        )
+        result = compositor._apply_transforms(img, transform)
+
+        # Result should be scaled down
+        assert result.size == (8, 8)
+        # The test mainly verifies the order doesn't crash
+        # Sharpening on original preserves detail better than sharpen-after-scale
+
+    def test_flip_sharpen_scale_order(self) -> None:
+        """Full transform chain: flip -> sharpen -> scale."""
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create asymmetric image to verify flip
+        img = Image.new("RGBA", (20, 10), (100, 100, 100, 255))
+        # Red on left
+        for x in range(5):
+            for y in range(10):
+                img.putpixel((x, y), (255, 0, 0, 255))
+
+        transform = TransformParams(
+            flip_h=True,
+            sharpen=1.0,
+            scale=0.5,
+            resampling="lanczos",
+        )
+        result = compositor._apply_transforms(img, transform)
+
+        # Should be scaled down
+        assert result.size == (10, 5)
+        # After flip, red should be on the right
+        # Sample from right side of result
+        right_pixel = result.getpixel((8, 2))
+        # Should be reddish (exact color may vary due to sharpening/scaling)
+        assert right_pixel[0] > right_pixel[1], "Red channel should dominate on right after flip"

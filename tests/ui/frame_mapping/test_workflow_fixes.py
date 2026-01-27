@@ -445,7 +445,7 @@ class TestSplitBrainFixes:
         workspace._state.current_canvas_game_id = "capture_b"  # Canvas shows different frame
 
         # User tries to adjust alignment
-        workspace._on_alignment_changed(10, 20, False, False, 1.0)
+        workspace._on_alignment_changed(10, 20, False, False, 1.0, 0.0, "lanczos")
 
         # Alignment should be blocked (no change to mapping)
         mapping = project.get_mapping_for_ai_frame(ai_frame_id)

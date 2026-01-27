@@ -400,6 +400,182 @@ class TestFrameMappingProjectAlignment:
         assert mapping.flip_v is True
 
 
+class TestFrameMappingQuantizationOptions:
+    """Tests for FrameMapping sharpen and resampling fields."""
+
+    def test_frame_mapping_default_sharpen_resampling(self) -> None:
+        """FrameMapping should have sensible defaults for new fields."""
+        from core.frame_mapping_project import FrameMapping
+
+        mapping = FrameMapping(ai_frame_id="test.png", game_frame_id="G001")
+
+        assert mapping.sharpen == 0.0
+        assert mapping.resampling == "lanczos"
+
+    def test_frame_mapping_custom_sharpen_resampling(self) -> None:
+        """FrameMapping should accept custom sharpen and resampling values."""
+        from core.frame_mapping_project import FrameMapping
+
+        mapping = FrameMapping(
+            ai_frame_id="test.png",
+            game_frame_id="G001",
+            sharpen=2.5,
+            resampling="nearest",
+        )
+
+        assert mapping.sharpen == 2.5
+        assert mapping.resampling == "nearest"
+
+    def test_frame_mapping_to_dict_includes_new_fields(self) -> None:
+        """to_dict should include sharpen and resampling fields."""
+        from core.frame_mapping_project import FrameMapping
+
+        mapping = FrameMapping(
+            ai_frame_id="test.png",
+            game_frame_id="G001",
+            sharpen=1.5,
+            resampling="nearest",
+        )
+
+        data = mapping.to_dict()
+
+        assert "sharpen" in data
+        assert data["sharpen"] == 1.5
+        assert "resampling" in data
+        assert data["resampling"] == "nearest"
+
+    def test_frame_mapping_from_dict_reads_new_fields(self) -> None:
+        """from_dict should correctly deserialize sharpen and resampling."""
+        from core.frame_mapping_project import FrameMapping
+
+        data = {
+            "ai_frame_id": "test.png",
+            "game_frame_id": "G001",
+            "sharpen": 3.0,
+            "resampling": "nearest",
+        }
+
+        mapping = FrameMapping.from_dict(data)
+
+        assert mapping.sharpen == 3.0
+        assert mapping.resampling == "nearest"
+
+    def test_frame_mapping_from_dict_defaults_for_old_projects(self) -> None:
+        """from_dict should use defaults when fields are missing (backwards compatibility)."""
+        from core.frame_mapping_project import FrameMapping
+
+        # Simulate old project data without sharpen/resampling
+        data = {
+            "ai_frame_id": "test.png",
+            "game_frame_id": "G001",
+            "offset_x": 10,
+            "offset_y": 5,
+        }
+
+        mapping = FrameMapping.from_dict(data)
+
+        assert mapping.sharpen == 0.0
+        assert mapping.resampling == "lanczos"
+        # Verify other fields still work
+        assert mapping.offset_x == 10
+        assert mapping.offset_y == 5
+
+    def test_update_mapping_alignment_with_sharpen_resampling(self) -> None:
+        """update_mapping_alignment should update sharpen and resampling."""
+        project = FrameMappingProject(name="test")
+        project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
+
+        result = project.update_mapping_alignment(
+            ai_frame_id="frame_001.png",
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
+            scale=0.5,
+            sharpen=2.0,
+            resampling="nearest",
+        )
+
+        assert result is True
+        mapping = project.get_mapping_for_ai_frame("frame_001.png")
+        assert mapping is not None
+        assert mapping.sharpen == 2.0
+        assert mapping.resampling == "nearest"
+
+    def test_sharpen_resampling_persist_through_save_load(self, tmp_path: Path) -> None:
+        """Sharpen and resampling values survive save/load cycle."""
+        from core.repositories.frame_mapping_repository import FrameMappingRepository
+
+        # Create project with AI frame and game frame
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("/tmp/frame_001.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
+
+        project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
+        project.update_mapping_alignment(
+            ai_frame_id="frame_001.png",
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
+            scale=1.0,
+            sharpen=2.5,
+            resampling="nearest",
+        )
+
+        # Save
+        save_path = tmp_path / "test.spritepal-mapping.json"
+        FrameMappingRepository.save(project, save_path)
+
+        # Load
+        loaded = FrameMappingRepository.load(save_path)
+
+        mapping = loaded.get_mapping_for_ai_frame("frame_001.png")
+        assert mapping is not None
+        assert mapping.sharpen == 2.5
+        assert mapping.resampling == "nearest"
+
+    def test_sharpen_clamped_to_valid_range(self) -> None:
+        """update_mapping_alignment should clamp sharpen to 0.0-4.0."""
+        project = FrameMappingProject(name="test")
+        project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
+
+        # Test negative clamps to 0
+        project.update_mapping_alignment(
+            ai_frame_id="frame_001.png",
+            offset_x=0, offset_y=0, flip_h=False, flip_v=False,
+            sharpen=-1.0,
+        )
+        mapping = project.get_mapping_for_ai_frame("frame_001.png")
+        assert mapping is not None
+        assert mapping.sharpen == 0.0
+
+        # Test > 4.0 clamps to 4.0
+        project.update_mapping_alignment(
+            ai_frame_id="frame_001.png",
+            offset_x=0, offset_y=0, flip_h=False, flip_v=False,
+            sharpen=10.0,
+        )
+        mapping = project.get_mapping_for_ai_frame("frame_001.png")
+        assert mapping.sharpen == 4.0
+
+    def test_resampling_validated(self) -> None:
+        """update_mapping_alignment should validate resampling value."""
+        project = FrameMappingProject(name="test")
+        project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
+
+        # Invalid resampling should default to lanczos
+        project.update_mapping_alignment(
+            ai_frame_id="frame_001.png",
+            offset_x=0, offset_y=0, flip_h=False, flip_v=False,
+            resampling="invalid_value",
+        )
+        mapping = project.get_mapping_for_ai_frame("frame_001.png")
+        assert mapping is not None
+        assert mapping.resampling == "lanczos"
+
+
 class TestFrameMappingProjectStableIDs:
     """Tests for stable AI frame ID feature (Issue #1 fix)."""
 

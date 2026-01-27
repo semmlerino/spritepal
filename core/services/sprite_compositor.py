@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.palette_utils import (
@@ -44,6 +44,8 @@ class TransformParams:
     flip_h: bool = False
     flip_v: bool = False
     scale: float = 1.0
+    sharpen: float = 0.0  # Pre-sharpening amount (0.0-4.0)
+    resampling: str = "lanczos"  # "lanczos" or "nearest"
 
 
 @dataclass
@@ -328,10 +330,10 @@ class SpriteCompositor:
         ai_image: Image.Image,
         transform: TransformParams,
     ) -> Image.Image:
-        """Apply flip and scale transforms in SNES-correct order.
+        """Apply flip, sharpen, and scale transforms in SNES-correct order.
 
-        Transform order: flip -> scale
-        This matches SNES hardware behavior.
+        Transform order: flip -> sharpen -> scale
+        Sharpening happens before scale to preserve detail that would be lost.
         """
         result = ai_image.copy()
 
@@ -341,11 +343,23 @@ class SpriteCompositor:
         if transform.flip_v:
             result = result.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
-        # Apply scale SECOND
+        # Apply sharpening SECOND (before scaling to preserve detail)
+        if transform.sharpen > 0:
+            result = self._sharpen_preserving_alpha(result, transform.sharpen)
+
+        # Apply scale THIRD
         if abs(transform.scale - 1.0) > 0.01:
             new_w = max(1, int(result.width * transform.scale))
             new_h = max(1, int(result.height * transform.scale))
-            result = result.resize((new_w, new_h), Image.Resampling.NEAREST)
+
+            if transform.resampling == "lanczos":
+                # Premultiplied alpha resize prevents color bleeding at edges
+                result = self._resize_with_premultiplied_alpha(
+                    result, (new_w, new_h), Image.Resampling.LANCZOS
+                )
+            else:
+                # Nearest neighbor for blocky pixel art look
+                result = result.resize((new_w, new_h), Image.Resampling.NEAREST)
 
         return result
 
@@ -485,3 +499,96 @@ class SpriteCompositor:
         quantized_rgba.putalpha(Image.fromarray(binary_alpha, mode="L"))
 
         return quantized_rgba
+
+    def _sharpen_preserving_alpha(self, img: Image.Image, amount: float) -> Image.Image:
+        """Apply unsharp mask sharpening while preserving alpha channel.
+
+        Sharpening before downscaling helps preserve fine details like eyes
+        that would otherwise be lost during the resize.
+
+        Args:
+            img: RGBA image
+            amount: Sharpening strength (1.0 = standard, 2.0 = strong, max 4.0)
+
+        Returns:
+            Sharpened RGBA image with original alpha preserved.
+        """
+        if img.mode != "RGBA":
+            img = img.convert("RGBA")
+
+        # Clamp amount to valid range
+        amount = max(0.0, min(4.0, amount))
+        if amount < 0.01:
+            return img
+
+        # Split channels
+        r, g, b, a = img.split()
+
+        # Create RGB image for sharpening
+        rgb = Image.merge("RGB", (r, g, b))
+
+        # Apply unsharp mask (radius=2, percent=amount*100, threshold=3)
+        sharpened = rgb.filter(
+            ImageFilter.UnsharpMask(radius=2, percent=int(amount * 100), threshold=3)
+        )
+
+        # Recombine with original alpha
+        sr, sg, sb = sharpened.split()
+        return Image.merge("RGBA", (sr, sg, sb, a))
+
+    def _resize_with_premultiplied_alpha(
+        self, img: Image.Image, new_size: tuple[int, int], resample: Image.Resampling
+    ) -> Image.Image:
+        """Resize RGBA image correctly using premultiplied alpha.
+
+        Standard resize causes color bleeding at edges because it blends RGB values
+        without considering transparency. Premultiplied alpha fixes this by:
+        1. Multiplying RGB by alpha before resize (blending now works correctly)
+        2. Resizing with high-quality filter
+        3. Dividing RGB by alpha after resize (restore original color space)
+
+        This eliminates the bright halo artifacts around transparent edges.
+
+        Args:
+            img: RGBA image to resize.
+            new_size: Target (width, height).
+            resample: PIL resampling filter (LANCZOS, NEAREST, etc.).
+
+        Returns:
+            Resized RGBA image without edge artifacts.
+        """
+        if img.mode != "RGBA":
+            img = img.convert("RGBA")
+
+        # Convert to numpy for efficient operations
+        pixels = np.array(img, dtype=np.float32)
+        rgb = pixels[:, :, :3]
+        alpha = pixels[:, :, 3:4]
+
+        # Premultiply: RGB' = RGB * (A / 255)
+        alpha_normalized = alpha / 255.0
+        premultiplied_rgb = rgb * alpha_normalized
+
+        # Reassemble and convert back to PIL
+        premultiplied = np.concatenate([premultiplied_rgb, alpha], axis=-1).astype(
+            np.uint8
+        )
+        premult_img = Image.fromarray(premultiplied, mode="RGBA")
+
+        # Resize in premultiplied space
+        resized = premult_img.resize(new_size, resample)
+
+        # Unpremultiply: RGB = RGB' / (A / 255), avoiding division by zero
+        resized_pixels = np.array(resized, dtype=np.float32)
+        resized_rgb = resized_pixels[:, :, :3]
+        resized_alpha = resized_pixels[:, :, 3:4]
+
+        # Avoid division by zero - where alpha is 0, RGB doesn't matter
+        alpha_safe = np.maximum(resized_alpha / 255.0, 1e-6)
+        unpremultiplied_rgb = np.clip(resized_rgb / alpha_safe, 0, 255)
+
+        # Reassemble final image
+        final = np.concatenate([unpremultiplied_rgb, resized_alpha], axis=-1).astype(
+            np.uint8
+        )
+        return Image.fromarray(final, mode="RGBA")

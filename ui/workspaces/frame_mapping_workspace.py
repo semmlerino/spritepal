@@ -523,9 +523,11 @@ class FrameMappingWorkspace(QWidget):
         """Handle game frame dropped onto drawer row."""
         self._logic.handle_drop_game_frame(ai_frame_id, game_frame_id)
 
-    def _on_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
+    def _on_alignment_changed(
+        self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float, sharpen: float, resampling: str
+    ) -> None:
         """Handle alignment change from canvas (auto-save)."""
-        self._logic.handle_alignment_changed(x, y, flip_h, flip_v, scale)
+        self._logic.handle_alignment_changed(x, y, flip_h, flip_v, scale, sharpen, resampling)
 
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.

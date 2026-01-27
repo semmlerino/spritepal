@@ -106,7 +106,7 @@ class TestCanvasAlignmentSync:
 
         # Verify initial canvas state
         canvas = workspace._alignment_canvas
-        initial_offset_x, initial_offset_y, _, _, _ = canvas.get_alignment()
+        initial_offset_x, initial_offset_y, _, _, _, _, _ = canvas.get_alignment()
         assert initial_offset_x == 10, f"Initial X offset should be 10, got {initial_offset_x}"
         assert initial_offset_y == 20, f"Initial Y offset should be 20, got {initial_offset_y}"
 
@@ -123,7 +123,7 @@ class TestCanvasAlignmentSync:
 
         # BUG: Canvas still shows old position (10, 20)
         # FIX: Canvas should now show new position (999, 888)
-        new_offset_x, new_offset_y, _, _, _ = canvas.get_alignment()
+        new_offset_x, new_offset_y, _, _, _, _, _ = canvas.get_alignment()
         assert new_offset_x == 999, (
             f"Canvas X offset should be 999 after programmatic update, got {new_offset_x}. "
             "Canvas was not synced when alignment_updated signal was emitted."
@@ -211,7 +211,7 @@ class TestCanvasAlignmentSync:
         qtbot.wait(50)
 
         canvas = workspace._alignment_canvas
-        initial_x, initial_y, _, _, _ = canvas.get_alignment()
+        initial_x, initial_y, _, _, _, _, _ = canvas.get_alignment()
         assert initial_x == 10, f"Initial X should be 10, got {initial_x}"
 
         # Now update alignment for frame 1 (NOT the selected frame)
@@ -220,7 +220,7 @@ class TestCanvasAlignmentSync:
         qtbot.wait(50)
 
         # Canvas should still show frame 0's alignment (unchanged)
-        final_x, _, _, _, _ = canvas.get_alignment()
+        final_x, _, _, _, _, _, _ = canvas.get_alignment()
         assert final_x == 10, (
             f"Canvas X should still be 10 (frame 0's alignment), got {final_x}. "
             "Canvas should not update for non-selected frame alignment changes."
