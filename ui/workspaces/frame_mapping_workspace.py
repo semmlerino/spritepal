@@ -24,9 +24,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from PIL import Image
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -42,19 +41,15 @@ from PySide6.QtWidgets import (
 )
 
 from core.app_context import get_app_context
-from core.services.tile_sampling_service import calculate_auto_alignment
 from ui.frame_mapping.auto_save_manager import AutoSaveManager
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.dialog_coordinator import DialogCoordinator
-from ui.frame_mapping.dialogs.replace_link_dialog import (
-    confirm_replace_ai_frame_link,
-    confirm_replace_link,
-)
 from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 from ui.frame_mapping.windows import AIFramePaletteEditorWindow
+from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 from ui.frame_mapping.workspace_state_manager import WorkspaceStateManager
 from utils.logging_config import get_logger
 
@@ -110,7 +105,22 @@ class FrameMappingWorkspace(QWidget):
         )
         self._auto_save_timer.timeout.connect(self._auto_save_manager.perform_save)
 
+        # Logic helper handles operations spanning multiple panes
+        self._logic = WorkspaceLogicHelper()
+        self._logic.set_controller(self._controller)
+        self._logic.set_state(self._state)
+        self._logic.set_parent_widget(self)
+
         self._setup_ui()
+
+        # Inject panes into logic helper after UI setup
+        self._logic.set_panes(
+            self._ai_frames_pane,
+            self._captures_pane,
+            self._mapping_panel,
+            self._alignment_canvas,
+        )
+
         self._connect_signals()
         self._setup_shortcuts()
 
@@ -123,6 +133,7 @@ class FrameMappingWorkspace(QWidget):
         """Set the message service for status updates."""
         self._message_service = service
         self._auto_save_manager.set_message_service(service.show_message if service else None)
+        self._logic.set_message_service(service)
 
     def set_rom_path(self, rom_path: Path | None) -> None:
         """Set ROM path for injection.
@@ -377,26 +388,12 @@ class FrameMappingWorkspace(QWidget):
     # -------------------------------------------------------------------------
 
     def _get_selected_ai_frame_id(self) -> str | None:
-        """Get the currently selected AI frame ID.
-
-        Returns the state manager value directly. This ensures selection is
-        preserved even when filters hide the selected item in the pane.
-
-        Returns:
-            AI frame ID (filename) or None if no selection
-        """
-        return self._state.selected_ai_frame_id
+        """Get the currently selected AI frame ID."""
+        return self._logic.get_selected_ai_frame_id()
 
     def _get_selected_game_id(self) -> str | None:
-        """Get the currently selected game frame ID.
-
-        Returns the state manager value directly. This ensures selection is
-        preserved even when filters hide the selected item in the pane.
-
-        Returns:
-            Game frame ID or None if no selection
-        """
-        return self._state.selected_game_id
+        """Get the currently selected game frame ID."""
+        return self._logic.get_selected_game_id()
 
     def _on_undo(self) -> None:
         """Handle Ctrl+Z - undo last action."""
@@ -507,218 +504,28 @@ class FrameMappingWorkspace(QWidget):
             logger.warning("No message service set - status update not shown in UI")
 
     def _on_ai_frame_selected(self, frame_id: str) -> None:
-        """Handle AI frame selection in left pane.
-
-        Syncs with drawer and canvas. If mapped, shows alignment.
-
-        Args:
-            frame_id: The AI frame ID (filename), or empty string for cleared selection.
-        """
-        project = self._controller.project
-        if project is None:
-            return
-
-        # Guard against cleared selection
-        if not frame_id:
-            self._state.selected_ai_frame_id = None
-            self._update_map_button_state()
-            self._alignment_canvas.set_ai_frame(None)
-            self._alignment_canvas.clear_alignment()
-            self._mapping_panel.clear_selection()
-            self._captures_pane.clear_selection()
-            self._state.selected_game_id = None
-            self._state.current_canvas_game_id = None
-            return
-
-        self._state.selected_ai_frame_id = frame_id
-        self._update_map_button_state()
-
-        # Sync drawer selection by ID
-        self._mapping_panel.select_row_by_ai_id(frame_id)
-
-        # Load AI frame into canvas
-        frame = project.get_ai_frame_by_id(frame_id)
-        self._alignment_canvas.set_ai_frame(frame)
-
-        # Check for mapping using ID-based lookup (O(1))
-        mapping = project.get_mapping_for_ai_frame(frame_id) if frame else None
-        if mapping:
-            game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
-            preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
-            capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
-            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
-            self._alignment_canvas.set_alignment(
-                mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
-            )
-            # Sync captures selection and track canvas state
-            self._captures_pane.select_frame(mapping.game_frame_id)
-            self._state.selected_game_id = mapping.game_frame_id
-            self._state.current_canvas_game_id = mapping.game_frame_id
-            # Clear browsing mode - canvas now shows the mapped capture
-            self._alignment_canvas.set_browsing_mode(False)
-        else:
-            self._alignment_canvas.set_game_frame(None)
-            self._alignment_canvas.clear_alignment()
-            self._captures_pane.clear_selection()
-            self._state.selected_game_id = None
-            self._state.current_canvas_game_id = None
-            # Clear browsing mode - no mapping exists
-            self._alignment_canvas.set_browsing_mode(False)
-
-        self._update_map_button_state()
+        """Handle AI frame selection in left pane."""
+        self._logic.handle_ai_frame_selected(frame_id)
 
     def _on_game_frame_selected(self, frame_id: str) -> None:
-        """Handle game frame selection in captures library.
-
-        Updates preview in canvas if an AI frame is selected.
-        Note: No longer auto-links - linking requires explicit user action.
-        """
-        project = self._controller.project
-        if project is None:
-            return
-
-        # Guard against invalid selections
-        if not frame_id:
-            self._state.selected_game_id = None
-            self._state.current_canvas_game_id = None
-            # Phase 3a fix: Clear canvas state
-            self._alignment_canvas.set_game_frame(None)
-            self._alignment_canvas.clear_alignment()
-            self._update_map_button_state()
-            return
-
-        self._state.selected_game_id = frame_id
-        self._update_map_button_state()
-
-        # Show preview in canvas if AI frame is selected
-        if self._state.selected_ai_frame_id is not None:
-            game_frame = project.get_game_frame_by_id(frame_id)
-            preview = self._controller.get_game_frame_preview(frame_id)
-            capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
-            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
-            self._state.current_canvas_game_id = frame_id
-
-            # Check if we're browsing (viewing different capture than mapping)
-            mapping = project.get_mapping_for_ai_frame(self._state.selected_ai_frame_id)
-            is_browsing = mapping is not None and frame_id != mapping.game_frame_id
-            self._alignment_canvas.set_browsing_mode(is_browsing)
+        """Handle game frame selection in captures library."""
+        self._logic.handle_game_frame_selected(frame_id)
 
     def _on_mapping_selected(self, ai_frame_id: str) -> None:
-        """Handle mapping row selection in drawer.
-
-        Syncs with AI frames pane and canvas.
-
-        Args:
-            ai_frame_id: AI frame ID (filename)
-        """
-        project = self._controller.project
-        if project is None:
-            return
-
-        # Get AI frame by ID
-        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
-        if ai_frame is None:
-            return
-
-        # Sync AI frames pane (uses index for scroll/selection)
-        self._ai_frames_pane.select_frame(ai_frame.index)
-        self._state.selected_ai_frame_id = ai_frame_id
-
-        # Load into canvas
-        self._alignment_canvas.set_ai_frame(ai_frame)
-
-        # Load game frame if mapped (use ID-based lookup)
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping:
-            game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
-            preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
-            capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
-            self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
-            self._alignment_canvas.set_alignment(
-                mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
-            )
-            # Sync captures selection
-            self._captures_pane.select_frame(mapping.game_frame_id)
-            self._state.selected_game_id = mapping.game_frame_id
-            self._state.current_canvas_game_id = mapping.game_frame_id
-        else:
-            self._alignment_canvas.set_game_frame(None)
-            self._alignment_canvas.clear_alignment()
-            self._captures_pane.clear_selection()
-            self._state.selected_game_id = None
-            self._state.current_canvas_game_id = None
-
-        self._update_map_button_state()
+        """Handle mapping row selection in drawer."""
+        self._logic.handle_mapping_selected(ai_frame_id)
 
     def _on_map_selected(self) -> None:
         """Handle map button click in AI frames pane."""
-        # Query fresh selection state from panes (source of truth)
-        ai_frame_id = self._get_selected_ai_frame_id()
-        game_id = self._get_selected_game_id()
-
-        if ai_frame_id is None:
-            QMessageBox.information(self, "Map Frames", "Please select an AI frame first.")
-            return
-
-        if game_id is None:
-            QMessageBox.information(self, "Map Frames", "Please select a game frame first.")
-            return
-
-        self._attempt_link(ai_frame_id, game_id)
+        self._logic.handle_map_selected()
 
     def _on_drop_game_frame(self, ai_frame_id: str, game_frame_id: str) -> None:
-        """Handle game frame dropped onto drawer row.
-
-        Args:
-            ai_frame_id: AI frame ID (filename)
-            game_frame_id: Game frame ID
-        """
-        self._attempt_link(ai_frame_id, game_frame_id)
+        """Handle game frame dropped onto drawer row."""
+        self._logic.handle_drop_game_frame(ai_frame_id, game_frame_id)
 
     def _on_alignment_changed(self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
-        """Handle alignment change from canvas (auto-save).
-
-        Alignment changes are only applied when the canvas is displaying the same
-        game frame as the existing mapping. This prevents accidental edits when
-        the user is previewing a different capture.
-        """
-        # Query fresh selection state from pane (source of truth)
-        ai_frame_id = self._get_selected_ai_frame_id()
-        if ai_frame_id is None:
-            return
-
-        project = self._controller.project
-        if project is None:
-            return
-
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping is None:
-            return
-
-        # Block alignment edit if canvas is showing a different game frame than the mapping
-        # This prevents accidentally modifying the mapping when previewing other captures
-        if self._state.current_canvas_game_id != mapping.game_frame_id:
-            logger.debug(
-                f"Blocking alignment change: canvas shows {self._state.current_canvas_game_id}, "
-                f"mapping points to {mapping.game_frame_id}"
-            )
-            # Provide user feedback about why the edit was blocked
-            if self._message_service:
-                self._message_service.show_message(
-                    "Alignment not saved - canvas shows a different capture than the mapping"
-                )
-            return
-
-        # Get drag start alignment for single undo command (if from drag operation)
-        drag_start = self._alignment_canvas.get_drag_start_alignment()
-        self._alignment_canvas.clear_drag_start_alignment()  # Consume it
-
-        # Update alignment in controller (includes scale)
-        # This emits alignment_updated signal which triggers _on_alignment_updated()
-        # which handles updating the mapping panel row
-        self._controller.update_mapping_alignment(
-            ai_frame_id, x, y, flip_h, flip_v, scale, drag_start_alignment=drag_start
-        )
+        """Handle alignment change from canvas (auto-save)."""
+        self._logic.handle_alignment_changed(x, y, flip_h, flip_v, scale)
 
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.
@@ -1575,240 +1382,28 @@ class FrameMappingWorkspace(QWidget):
             self._alignment_canvas.highlight_pixels_by_index(index)
 
     # -------------------------------------------------------------------------
-    # Helper Methods
+    # Helper Methods (delegated to WorkspaceLogicHelper)
     # -------------------------------------------------------------------------
-
-    def _attempt_link(self, ai_frame_id: str, game_frame_id: str) -> None:
-        """Attempt to link an AI frame to a game frame.
-
-        Handles existing link confirmation (for both AI and game frames) and auto-advance.
-        Preserves alignment if mapping already exists for the same pair.
-
-        Args:
-            ai_frame_id: AI frame ID (filename)
-            game_frame_id: Game frame ID
-        """
-        project = self._controller.project
-        if project is None:
-            return
-
-        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
-        ai_name = ai_frame.path.name if ai_frame else ai_frame_id
-
-        # Check if AI frame is already linked to a different game frame
-        existing_game_link = self._controller.get_existing_link_for_ai_frame(ai_frame_id)
-        if existing_game_link is not None:
-            if existing_game_link == game_frame_id:
-                # Same pair - no-op, preserve existing alignment
-                if self._message_service:
-                    self._message_service.show_message(f"'{ai_name}' is already linked to '{game_frame_id}'", 2000)
-                return
-
-            # Different game frame - confirm replacement
-            if not confirm_replace_ai_frame_link(self, ai_name, existing_game_link, game_frame_id):
-                return
-
-        # Check if game frame is already linked to a different AI frame
-        existing_ai_link = self._controller.get_existing_link_for_game_frame(game_frame_id)
-        if existing_ai_link is not None and existing_ai_link != ai_frame_id:
-            existing_ai = project.get_ai_frame_by_id(existing_ai_link)
-            existing_name = existing_ai.path.name if existing_ai else existing_ai_link
-
-            if not confirm_replace_link(self, game_frame_id, existing_name, ai_name):
-                return
-
-        # Create the mapping
-        self._controller.create_mapping(ai_frame_id, game_frame_id)
-
-        # Auto-align using bounding box alignment (center AI content over game content)
-        if ai_frame and ai_frame.path.exists():
-            capture_result, _used_fallback = self._controller.get_capture_result_for_game_frame(game_frame_id)
-            if capture_result and capture_result.has_entries:
-                try:
-                    ai_pil = Image.open(ai_frame.path).convert("RGBA")
-                    bbox = capture_result.bounding_box
-                    # Use (0, 0) for game bbox position since that's where it's displayed on canvas
-                    # (not the screen-relative capture coordinates)
-                    offset_x, offset_y = calculate_auto_alignment(ai_pil, 0, 0, bbox.width, bbox.height)
-                    self._controller.update_mapping_alignment(
-                        ai_frame_id, offset_x, offset_y, False, False, set_edited=False
-                    )
-                except Exception as e:
-                    logger.warning("Auto-alignment failed, using center: %s", e)
-                    # Fallback to simple centering
-                    game_preview = self._controller.get_game_frame_preview(game_frame_id)
-                    if game_preview:
-                        ai_pixmap = QPixmap(str(ai_frame.path))
-                        if not ai_pixmap.isNull():
-                            center_x = (game_preview.width() - ai_pixmap.width()) // 2
-                            center_y = (game_preview.height() - ai_pixmap.height()) // 2
-                            self._controller.update_mapping_alignment(
-                                ai_frame_id, center_x, center_y, False, False, set_edited=False
-                            )
-            else:
-                # No capture result - fallback to simple centering
-                game_preview = self._controller.get_game_frame_preview(game_frame_id)
-                if game_preview:
-                    ai_pixmap = QPixmap(str(ai_frame.path))
-                    if not ai_pixmap.isNull():
-                        center_x = (game_preview.width() - ai_pixmap.width()) // 2
-                        center_y = (game_preview.height() - ai_pixmap.height()) // 2
-                        self._controller.update_mapping_alignment(
-                            ai_frame_id, center_x, center_y, False, False, set_edited=False
-                        )
-
-        self._refresh_mapping_status()
-        self._refresh_game_frame_link_status()
-        self._update_mapping_panel_previews()
-
-        # Update canvas with alignment using ID-based lookup (O(1))
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping:
-            self._alignment_canvas.set_alignment(
-                mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v, mapping.scale
-            )
-
-        if self._message_service:
-            self._message_service.show_message(f"Linked '{ai_name}' to '{game_frame_id}'", 3000)
-
-        # Auto-advance if enabled (P2: unified signal pattern)
-        if self._state.auto_advance_enabled and ai_frame:
-            next_unmapped_id = self._find_next_unmapped_ai_frame(ai_frame.index)
-            if next_unmapped_id is not None:
-                next_frame = project.get_ai_frame_by_id(next_unmapped_id)
-                if next_frame:
-                    self._ai_frames_pane.select_frame(next_frame.index, emit_signal=True)
-
-    def _find_next_unmapped_ai_frame(self, current_index: int) -> str | None:
-        """Find the next unmapped AI frame after the given index.
-
-        Args:
-            current_index: Current AI frame index
-
-        Returns:
-            AI frame ID of the next unmapped frame, or None if all are mapped
-        """
-        project = self._controller.project
-        if project is None:
-            return None
-
-        ai_frames = project.ai_frames
-        total = len(ai_frames)
-        if total == 0:
-            return None
-
-        for i in range(1, total):
-            check_index = (current_index + i) % total
-            # Find frame at this index
-            for frame in ai_frames:
-                if frame.index == check_index:
-                    if project.get_mapping_for_ai_frame(frame.id) is None:
-                        return frame.id
-                    break
-
-        return None
 
     def _update_map_button_state(self) -> None:
         """Update the Map Selected button enabled state."""
-        # Query fresh selection state from panes (source of truth)
-        ai_frame_id = self._get_selected_ai_frame_id()
-        game_id = self._get_selected_game_id()
-        both_selected = ai_frame_id is not None and game_id is not None
-        self._ai_frames_pane.set_map_button_enabled(both_selected)
+        self._logic.update_map_button_state()
 
     def _refresh_mapping_status(self) -> None:
-        """Refresh the AI frame mapping status indicators.
-
-        Note: This only updates status indicators. Callers that also need
-        to refresh the mapping panel table should call _update_mapping_panel_previews()
-        or _mapping_panel.refresh() separately.
-        """
-        project = self._controller.project
-        if project is None:
-            self._ai_frames_pane.set_mapping_status({})
-            return
-
-        # Use ID-keyed status map (stable across reloads/reordering)
-        status_map: dict[str, str] = {}
-        for ai_frame in project.ai_frames:
-            mapping = project.get_mapping_for_ai_frame(ai_frame.id)
-            if mapping:
-                status_map[ai_frame.id] = mapping.status
-            else:
-                status_map[ai_frame.id] = "unmapped"
-
-        self._ai_frames_pane.set_mapping_status(status_map)
+        """Refresh the AI frame mapping status indicators."""
+        self._logic.refresh_mapping_status()
 
     def _refresh_game_frame_link_status(self) -> None:
         """Refresh the game frame link status indicators."""
-        project = self._controller.project
-        if project is None:
-            self._captures_pane.set_link_status({})
-            return
-
-        link_status: dict[str, str | None] = {}
-        for game_frame in project.game_frames:
-            linked_ai_id = project.get_ai_frame_linked_to_game_frame(game_frame.id)
-            link_status[game_frame.id] = linked_ai_id
-
-        self._captures_pane.set_link_status(link_status)
+        self._logic.refresh_game_frame_link_status()
 
     def _update_mapping_panel_previews(self) -> None:
         """Update the mapping panel with game frame preview pixmaps."""
-        project = self._controller.project
-        if project is None:
-            return
-
-        previews: dict[str, QPixmap] = {}
-        for game_frame in project.game_frames:
-            preview = self._controller.get_game_frame_preview(game_frame.id)
-            if preview:
-                previews[game_frame.id] = preview
-
-        self._mapping_panel.set_game_frame_previews(previews)
-        self._mapping_panel.refresh()
-
-        # Also update captures pane with previews for thumbnails
-        self._captures_pane.set_game_frame_previews(previews)
+        self._logic.update_mapping_panel_previews()
 
     def _sync_canvas_alignment_from_model(self) -> None:
-        """Sync the canvas alignment display with the current model state.
-
-        Called after undo/redo to ensure the canvas reflects restored values.
-        Queries the current AI frame's mapping and updates the canvas if a mapping exists.
-        """
-        ai_frame_id = self._get_selected_ai_frame_id()
-        if ai_frame_id is None:
-            return
-
-        project = self._controller.project
-        if project is None:
-            return
-
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping is not None:
-            # Update canvas with restored alignment values
-            self._alignment_canvas.set_alignment(
-                mapping.offset_x,
-                mapping.offset_y,
-                mapping.flip_h,
-                mapping.flip_v,
-                mapping.scale,
-                has_mapping=True,
-            )
-            # Ensure canvas is showing the mapped game frame
-            if self._state.current_canvas_game_id != mapping.game_frame_id:
-                game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
-                if game_frame:
-                    preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
-                    capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(
-                        mapping.game_frame_id
-                    )
-                    self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
-                    self._state.current_canvas_game_id = mapping.game_frame_id
-        else:
-            # No mapping - clear alignment
-            self._alignment_canvas.clear_alignment()
+        """Sync the canvas alignment display with the current model state."""
+        self._logic.sync_canvas_alignment_from_model()
 
     def _on_preview_cache_invalidated(self, frame_id: str) -> None:
         """Handle preview cache invalidation for a specific game frame.

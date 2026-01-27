@@ -408,7 +408,7 @@ class TestSplitBrainFixes:
 
         # Create mock message service to track feedback
         mock_message_service = MagicMock()
-        workspace._message_service = mock_message_service
+        workspace.set_message_service(mock_message_service)
 
         # Create project with AI frame and two game frames
         project = create_test_project(tmp_path, num_frames=1)

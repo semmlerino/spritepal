@@ -226,21 +226,31 @@ class TestAutoAlignCoordinates:
             captured_args.append((game_bbox_x, game_bbox_y, game_bbox_width, game_bbox_height))
             return original_func(ai_image, game_bbox_x, game_bbox_y, game_bbox_width, game_bbox_height)
 
-        # Patch at the import location in frame_mapping_workspace
+        # Patch at the import location in workspace_logic_helper
         with patch(
-            "ui.workspaces.frame_mapping_workspace.calculate_auto_alignment",
+            "ui.frame_mapping.workspace_logic_helper.calculate_auto_alignment",
             side_effect=tracking_wrapper,
         ):
-            from ui.workspaces.frame_mapping_workspace import FrameMappingWorkspace
+            from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 
-            # Create minimal workspace with mocked controller
-            workspace = MagicMock(spec=FrameMappingWorkspace)
-            workspace._controller = MagicMock()
-            workspace._message_service = None
-            workspace._alignment_canvas = MagicMock()
-            # Mock the state manager
-            workspace._state = MagicMock()
-            workspace._state.auto_advance_enabled = False
+            # Create real WorkspaceLogicHelper with mocked dependencies
+            helper = WorkspaceLogicHelper()
+
+            # Mock controller
+            mock_controller = MagicMock()
+            helper.set_controller(mock_controller)
+
+            # Mock state manager
+            mock_state = MagicMock()
+            mock_state.auto_advance_enabled = False
+            helper.set_state(mock_state)
+
+            # Mock panes
+            mock_ai_pane = MagicMock()
+            mock_captures_pane = MagicMock()
+            mock_mapping_panel = MagicMock()
+            mock_canvas = MagicMock()
+            helper.set_panes(mock_ai_pane, mock_captures_pane, mock_mapping_panel, mock_canvas)
 
             # Setup project with AI frame
             mock_project = MagicMock()
@@ -250,9 +260,9 @@ class TestAutoAlignCoordinates:
             mock_ai_frame.index = 0
             mock_project.get_ai_frame_by_id.return_value = mock_ai_frame
             mock_project.get_mapping_for_ai_frame.return_value = None
-            workspace._controller.project = mock_project
-            workspace._controller.get_existing_link_for_ai_frame.return_value = None
-            workspace._controller.get_existing_link_for_game_frame.return_value = None
+            mock_controller.project = mock_project
+            mock_controller.get_existing_link_for_ai_frame.return_value = None
+            mock_controller.get_existing_link_for_game_frame.return_value = None
 
             # Setup capture result with NON-ZERO screen position (the bug trigger)
             mock_capture = MagicMock()
@@ -261,10 +271,10 @@ class TestAutoAlignCoordinates:
             mock_capture.bounding_box.y = 80
             mock_capture.bounding_box.width = 32
             mock_capture.bounding_box.height = 32
-            workspace._controller.get_capture_result_for_game_frame.return_value = (mock_capture, False)
+            mock_controller.get_capture_result_for_game_frame.return_value = (mock_capture, False)
 
-            # Call the real _attempt_link method
-            FrameMappingWorkspace._attempt_link(workspace, ai_frame_id="frame0.png", game_frame_id="frame1")
+            # Call the real attempt_link method (now in WorkspaceLogicHelper)
+            helper.attempt_link(ai_frame_id="frame0.png", game_frame_id="frame1")
 
         # ASSERTION: Should be called with (0, 0) for canvas-relative alignment
         # BUG: Currently called with (120, 80) from capture screen position

@@ -159,6 +159,7 @@ class TestStateManagerAsSourceOfTruth:
         mock_controller.get_game_frame_preview.return_value = None
         mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
         workspace._controller = mock_controller
+        workspace._logic.set_controller(mock_controller)  # Also update logic helper
 
         # Load project
         workspace._ai_frames_pane.set_ai_frames(project.ai_frames)
@@ -187,6 +188,7 @@ class TestStateManagerAsSourceOfTruth:
         mock_controller.get_game_frame_preview.return_value = None
         mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
         workspace._controller = mock_controller
+        workspace._logic.set_controller(mock_controller)  # Also update logic helper
 
         # Load project
         workspace._ai_frames_pane.set_ai_frames(project.ai_frames)

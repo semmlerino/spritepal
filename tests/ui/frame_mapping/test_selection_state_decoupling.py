@@ -123,6 +123,7 @@ class TestSelectionGetterBehavior:
 
         Even when pane returns None (item filtered), the state value is returned.
         """
+        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
         from ui.workspaces.frame_mapping_workspace import (
             FrameMappingWorkspace,
             WorkspaceStateManager,
@@ -132,10 +133,15 @@ class TestSelectionGetterBehavior:
         state = WorkspaceStateManager()
         state.selected_ai_frame_id = "test_frame.png"
 
-        # Create workspace and inject mocked state
+        # Create logic helper with state
+        logic = WorkspaceLogicHelper()
+        logic.set_state(state)
+
+        # Create workspace and inject mocked state and logic
         with patch.object(FrameMappingWorkspace, "__init__", lambda self: None):
             workspace = FrameMappingWorkspace.__new__(FrameMappingWorkspace)
             workspace._state = state
+            workspace._logic = logic
 
             # Mock pane to return None (simulating filtered state)
             workspace._ai_frames_pane = MagicMock()
@@ -150,6 +156,7 @@ class TestSelectionGetterBehavior:
 
         Even when pane returns None, the state value is returned.
         """
+        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
         from ui.workspaces.frame_mapping_workspace import (
             FrameMappingWorkspace,
             WorkspaceStateManager,
@@ -159,10 +166,15 @@ class TestSelectionGetterBehavior:
         state = WorkspaceStateManager()
         state.selected_game_id = "game_capture_001"
 
-        # Create workspace and inject mocked state
+        # Create logic helper with state
+        logic = WorkspaceLogicHelper()
+        logic.set_state(state)
+
+        # Create workspace and inject mocked state and logic
         with patch.object(FrameMappingWorkspace, "__init__", lambda self: None):
             workspace = FrameMappingWorkspace.__new__(FrameMappingWorkspace)
             workspace._state = state
+            workspace._logic = logic
 
             # Mock pane to return None (simulating filtered state)
             workspace._captures_pane = MagicMock()

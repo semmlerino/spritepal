@@ -106,15 +106,32 @@ class TestFrameMappingWorkspaceDI:
         assert workspace1.controller is workspace2.controller
 
     def test_controller_survives_workspace_deletion_when_injected(self, app_context, qtbot) -> None:
-        """Injected controller is not deleted when workspace is deleted."""
+        """Injected controller is not deleted when workspace is deleted.
+
+        Note: This test manually manages widget lifecycle rather than using
+        qtbot.addWidget to avoid pytest-qt tracking issues with deleted widgets.
+        """
+        from PySide6.QtWidgets import QApplication
+
         controller = FrameMappingController(parent=None)
 
+        # Create workspace but don't add to qtbot - we manage lifecycle manually
         workspace = FrameMappingWorkspace(controller=controller)
-        qtbot.addWidget(workspace)
+        workspace.show()  # Need to show to initialize properly
+        QApplication.processEvents()
 
-        # Delete workspace
+        # Block signals before deletion to prevent signals being delivered to deleted object
+        controller.blockSignals(True)
+
+        # Close and delete workspace
+        workspace.close()
         workspace.deleteLater()
-        qtbot.wait(50)
+        QApplication.processEvents()
+        qtbot.wait(100)
+        QApplication.processEvents()
+
+        # Unblock signals now that workspace is gone
+        controller.blockSignals(False)
 
         # Controller still exists (caller owns it)
         assert controller is not None
@@ -250,19 +267,20 @@ class TestAutoSaveDebouncing:
         project_path = tmp_path / "test.spritepal"
         workspace._state.project_path = project_path
 
-        # Track save calls
+        # Track save calls - must mock at the auto_save_manager level since it
+        # captures the save_project reference at init time
         save_count = [0]
-        original_save = workspace._controller.save_project
+        original_save = workspace._auto_save_manager._save_project
 
         def counting_save(path):
             save_count[0] += 1
             return original_save(path)
 
-        workspace._controller.save_project = counting_save
+        workspace._auto_save_manager._save_project = counting_save
 
         # Trigger multiple save requests (simulating rapid nudges)
         for _ in range(10):
-            workspace._auto_save_after_injection()
+            workspace._auto_save_manager.schedule_save()
 
         # Save should not happen immediately
         assert save_count[0] == 0
@@ -283,24 +301,26 @@ class TestAutoSaveDebouncing:
         project_path = tmp_path / "test.spritepal"
         workspace._state.project_path = project_path
 
+        # Track save calls - must mock at the auto_save_manager level since it
+        # captures the save_project reference at init time
         save_count = [0]
-        original_save = workspace._controller.save_project
+        original_save = workspace._auto_save_manager._save_project
 
         def counting_save(path):
             save_count[0] += 1
             return original_save(path)
 
-        workspace._controller.save_project = counting_save
+        workspace._auto_save_manager._save_project = counting_save
 
         # First request
-        workspace._auto_save_after_injection()
+        workspace._auto_save_manager.schedule_save()
 
         # Wait 300ms (less than debounce)
         qtbot.wait(300)
         assert save_count[0] == 0  # Not saved yet
 
         # Second request restarts timer
-        workspace._auto_save_after_injection()
+        workspace._auto_save_manager.schedule_save()
 
         # Wait another 300ms - total 600ms from first but only 300ms from second
         qtbot.wait(300)

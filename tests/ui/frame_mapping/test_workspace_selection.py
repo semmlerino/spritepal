@@ -102,6 +102,7 @@ class TestUnmappedRowClearsGameSelection:
         mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
 
         workspace._controller = mock_controller
+        workspace._logic.set_controller(mock_controller)  # Also update logic helper
 
         # Load the project into the workspace UI
         workspace._mapping_panel.set_project(project)
@@ -143,6 +144,7 @@ class TestUnmappedRowClearsGameSelection:
         mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
 
         workspace._controller = mock_controller
+        workspace._logic.set_controller(mock_controller)  # Also update logic helper
 
         workspace._mapping_panel.set_project(project)
         workspace._ai_frames_pane.set_ai_frames(project.ai_frames)
