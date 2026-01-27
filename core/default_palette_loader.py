@@ -16,7 +16,10 @@ logger = get_logger(__name__)
 
 
 class DefaultPaletteLoader:
-    """Loads and manages default sprite palettes"""
+    """Loads and manages default sprite palettes.
+
+    Palette file is loaded lazily on first access for faster startup.
+    """
 
     DEFAULT_PALETTE_PATH: str = str(Path(__file__).parent.parent / "config" / "default_palettes.json")
 
@@ -40,15 +43,41 @@ class DefaultPaletteLoader:
         """
         self.palette_path: str = palette_path or self.DEFAULT_PALETTE_PATH
         # JSON data structure defined in core.types.DefaultPalettesJson
-        self.palette_data: DefaultPalettesJson = {
+        # _palette_data is None until first access (lazy loading)
+        self._palette_data: DefaultPalettesJson | None = None
+
+    @property
+    def palette_data(self) -> DefaultPalettesJson:
+        """Lazily load and return palette data."""
+        if self._palette_data is None:
+            self._palette_data = {
+                "format_version": "1.0",
+                "description": "",
+                "palettes": {},
+            }
+            self._do_load_palettes()
+        return self._palette_data
+
+    @palette_data.setter
+    def palette_data(self, value: DefaultPalettesJson) -> None:
+        """Set palette data directly (for testing)."""
+        self._palette_data = value
+
+    def load_palettes(self) -> None:
+        """Force reload default palettes from JSON file.
+
+        Normally not needed - palettes are loaded lazily on first access.
+        Call this to reload after the palette file has changed.
+        """
+        self._palette_data = {
             "format_version": "1.0",
             "description": "",
             "palettes": {},
         }
-        self.load_palettes()
+        self._do_load_palettes()
 
-    def load_palettes(self) -> None:
-        """Load default palettes from JSON file"""
+    def _do_load_palettes(self) -> None:
+        """Internal: Load default palettes from JSON file."""
         palette_path_obj = Path(self.palette_path)
         if not palette_path_obj.exists():
             logger.warning(f"Default palettes not found: {self.palette_path}")
@@ -56,7 +85,7 @@ class DefaultPaletteLoader:
 
         try:
             with palette_path_obj.open() as f:
-                self.palette_data = json.load(f)
+                self._palette_data = json.load(f)
             logger.info(f"Loaded default palettes: {self.palette_path}")
         except (OSError, json.JSONDecodeError) as e:
             logger.warning(f"Failed to load default palettes: {e}")

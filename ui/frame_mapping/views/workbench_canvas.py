@@ -90,7 +90,9 @@ class WorkbenchGraphicsView(QGraphicsView):
         super().__init__(scene, parent)
         self.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        # Use MinimalViewportUpdate for better performance during drag operations.
+        # Only redraws dirty regions instead of entire viewport on each mouse event.
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setBackgroundBrush(QBrush(QColor(26, 26, 26)))

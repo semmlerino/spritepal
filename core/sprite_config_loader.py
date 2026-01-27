@@ -30,7 +30,10 @@ class SpriteConfig:
 
 
 class SpriteConfigLoader:
-    """Loads and manages sprite location configurations"""
+    """Loads and manages sprite location configurations.
+
+    Config file is loaded lazily on first access for faster startup.
+    """
 
     DEFAULT_CONFIG_PATH: str = str(Path(__file__).parent.parent / "config" / "sprite_locations.json")
 
@@ -43,11 +46,33 @@ class SpriteConfigLoader:
         """
         self.config_path: str = config_path or self.DEFAULT_CONFIG_PATH
         # JSON data is inherently untyped; structure validated at runtime
-        self.config_data: dict[str, Any] = {}  # pyright: ignore[reportExplicitAny] - JSON config
-        self.load_config()
+        # _config_data is None until first access (lazy loading)
+        self._config_data: dict[str, Any] | None = None  # pyright: ignore[reportExplicitAny] - JSON config
+
+    @property
+    def config_data(self) -> dict[str, Any]:  # pyright: ignore[reportExplicitAny]
+        """Lazily load and return config data."""
+        if self._config_data is None:
+            self._config_data = {}
+            self._do_load_config()
+        return self._config_data
+
+    @config_data.setter
+    def config_data(self, value: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny]
+        """Set config data directly (for testing)."""
+        self._config_data = value
 
     def load_config(self) -> None:
-        """Load sprite configuration from JSON file"""
+        """Force reload sprite configuration from JSON file.
+
+        Normally not needed - config is loaded lazily on first access.
+        Call this to reload after the config file has changed.
+        """
+        self._config_data = {}
+        self._do_load_config()
+
+    def _do_load_config(self) -> None:
+        """Internal: Load sprite configuration from JSON file."""
         config_path_obj = Path(self.config_path)
         if not config_path_obj.exists():
             logger.warning(f"Sprite config not found: {self.config_path}")
@@ -55,7 +80,7 @@ class SpriteConfigLoader:
 
         try:
             with config_path_obj.open() as f:
-                self.config_data = json.load(f)
+                self._config_data = json.load(f)
             logger.info(f"Loaded sprite config: {self.config_path}")
         except (OSError, json.JSONDecodeError):
             logger.exception("Failed to load sprite config")

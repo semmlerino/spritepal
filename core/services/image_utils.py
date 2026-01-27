@@ -157,7 +157,7 @@ def create_checkerboard_pattern(
     color2: tuple[int, int, int] = (255, 255, 255),
 ) -> Image.Image:
     """
-    Create a checkerboard pattern image.
+    Create a checkerboard pattern image using vectorized NumPy operations.
 
     Args:
         width: Image width in pixels
@@ -169,18 +169,23 @@ def create_checkerboard_pattern(
     Returns:
         PIL Image with checkerboard pattern
     """
-    img = Image.new("RGB", (width, height))
+    import numpy as np
 
-    # Create checkerboard using efficient array operations
-    for y in range(0, height, tile_size):
-        for x in range(0, width, tile_size):
-            # Determine color based on position
-            is_even = ((x // tile_size) + (y // tile_size)) % 2 == 0
-            color = color1 if is_even else color2
+    # Create coordinate grids
+    y_coords = np.arange(height)
+    x_coords = np.arange(width)
+    y_grid, x_grid = np.meshgrid(y_coords, x_coords, indexing="ij")
 
-            # Fill tile area
-            for dy in range(min(tile_size, height - y)):
-                for dx in range(min(tile_size, width - x)):
-                    img.putpixel((x + dx, y + dy), color)
+    # Calculate which tile each pixel belongs to
+    tile_x = x_grid // tile_size
+    tile_y = y_grid // tile_size
 
-    return img
+    # Create checkerboard mask (True for color1, False for color2)
+    is_even = ((tile_x + tile_y) % 2) == 0
+
+    # Create RGB image array
+    rgb = np.zeros((height, width, 3), dtype=np.uint8)
+    rgb[is_even] = color1
+    rgb[~is_even] = color2
+
+    return Image.fromarray(rgb, mode="RGB")

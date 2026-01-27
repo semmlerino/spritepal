@@ -72,12 +72,12 @@ def create_quantized_thumbnail(
     if pixmap is None or pixmap.isNull():
         return None
 
-    # Scale to thumbnail size
+    # Scale to thumbnail size using fast transformation (good enough for small thumbnails)
     return pixmap.scaled(
         size,
         size,
         Qt.AspectRatioMode.KeepAspectRatio,
-        Qt.TransformationMode.SmoothTransformation,
+        Qt.TransformationMode.FastTransformation,
     )
 
 
@@ -331,10 +331,10 @@ class _ThumbnailWorker(QObject):
         if qimage.isNull():
             return None
 
-        # Scale to thumbnail size
+        # Scale to thumbnail size using fast transformation (good enough for small thumbnails)
         return qimage.scaled(
             self._size,
             self._size,
             Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
+            Qt.TransformationMode.FastTransformation,
         )

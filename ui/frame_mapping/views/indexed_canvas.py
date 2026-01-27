@@ -82,7 +82,9 @@ class IndexedCanvasView(QGraphicsView):
         """Configure view settings."""
         self.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
-        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        # Use MinimalViewportUpdate for better performance during brush strokes.
+        # Only redraws dirty regions instead of entire viewport.
+        self.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.MinimalViewportUpdate)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setBackgroundBrush(QBrush(QColor(40, 40, 40)))

@@ -35,6 +35,44 @@ QUANTIZATION_TRANSPARENCY_THRESHOLD = 128
 # different palette entries due to floating-point decision boundary effects.
 JND_THRESHOLD_SQ = 5.29
 
+# Cache for palette LAB conversions. Key: tuple of RGB tuples, Value: LAB numpy array.
+# Palettes are typically reused many times during preview updates and interactive editing.
+# Cache size is naturally limited since only a few palettes are used per session.
+_palette_lab_cache: dict[tuple[tuple[int, int, int], ...], NDArray[np.float64]] = {}
+
+# Maximum cache entries (each ~384 bytes for 16-color palette LAB data)
+_PALETTE_CACHE_MAX_SIZE = 32
+
+
+def _get_cached_palette_lab(
+    palette_rgb: list[tuple[int, int, int]],
+) -> NDArray[np.float64]:
+    """Get LAB representation of palette, using cache when available.
+
+    Args:
+        palette_rgb: List of RGB tuples (typically 16 colors)
+
+    Returns:
+        LAB array of shape (N, 3) where N is number of palette colors
+    """
+    cache_key = tuple(palette_rgb)
+
+    if cache_key in _palette_lab_cache:
+        return _palette_lab_cache[cache_key]
+
+    # Compute LAB conversion
+    palette_arr = np.array(palette_rgb, dtype=np.int32)
+    palette_lab = _rgb_array_to_lab(palette_arr)
+
+    # Add to cache (with simple LRU-like eviction)
+    if len(_palette_lab_cache) >= _PALETTE_CACHE_MAX_SIZE:
+        # Remove oldest entry (first key in dict order, Python 3.7+)
+        oldest_key = next(iter(_palette_lab_cache))
+        del _palette_lab_cache[oldest_key]
+
+    _palette_lab_cache[cache_key] = palette_lab
+    return palette_lab
+
 
 def _rgb_array_to_lab(rgb: NDArray[np.int32]) -> NDArray[np.float64]:
     """Convert RGB array to CIELAB color space (vectorized).
@@ -214,9 +252,8 @@ def quantize_to_palette(
     pixel_rgb = np.stack([r, g, b], axis=-1)  # Shape: (H, W, 3)
     pixel_lab = _rgb_array_to_lab(pixel_rgb)  # Shape: (H, W, 3)
 
-    # Convert palette to LAB
-    palette_arr = np.array(palette_rgb, dtype=np.int32)  # Shape: (16, 3)
-    palette_lab = _rgb_array_to_lab(palette_arr)  # Shape: (16, 3)
+    # Convert palette to LAB (cached for performance - same palette reused across updates)
+    palette_lab = _get_cached_palette_lab(palette_rgb)  # Shape: (16, 3)
 
     # Calculate squared distances in LAB space (perceptual distance)
     # Reshape for broadcasting: pixels (H, W, 1, 3) vs palette (1, 1, 16, 3)
@@ -304,9 +341,8 @@ def quantize_with_mappings(
     pixel_rgb = np.stack([r, g, b], axis=-1)  # Shape: (H, W, 3)
     pixel_lab = _rgb_array_to_lab(pixel_rgb)  # Shape: (H, W, 3)
 
-    # Convert palette to LAB
-    palette_arr = np.array(palette_rgb, dtype=np.int32)  # Shape: (16, 3)
-    palette_lab = _rgb_array_to_lab(palette_arr)  # Shape: (16, 3)
+    # Convert palette to LAB (cached for performance - same palette reused across updates)
+    palette_lab = _get_cached_palette_lab(palette_rgb)  # Shape: (16, 3)
 
     # Calculate squared distances in LAB space for nearest-color fallback
     pixel_lab_broadcast = pixel_lab[:, :, np.newaxis, :]  # Shape: (H, W, 1, 3)

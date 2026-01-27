@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, override
 
-from PySide6.QtCore import Qt, Signal
+import numpy as np
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -27,7 +28,6 @@ from ui.components.base.dialog_base import DialogBase
 from ui.workers.quantization_worker import AsyncQuantizationService
 
 if TYPE_CHECKING:
-    import numpy as np
     from numpy.typing import NDArray
     from PIL import Image
 
@@ -46,6 +46,9 @@ class ImageImportDialog(DialogBase):
     """
 
     import_requested = Signal(object)  # QuantizationResult
+
+    # Debounce delay for option changes (ms) - prevents redundant re-quantization
+    OPTION_DEBOUNCE_MS = 300
 
     def __init__(
         self,
@@ -79,6 +82,11 @@ class ImageImportDialog(DialogBase):
         self._quantization_service.result_ready.connect(self._on_quantization_ready)
         self._quantization_service.quantization_failed.connect(self._on_quantization_failed)
         self._quantization_service.quantization_started.connect(self._on_quantization_started)
+
+        # Debounce timer for option changes
+        self._option_debounce_timer = QTimer(self)
+        self._option_debounce_timer.setSingleShot(True)
+        self._option_debounce_timer.timeout.connect(self._do_update_quantized_preview)
 
         # Customize button box
         if self.button_box:
@@ -338,7 +346,16 @@ class ImageImportDialog(DialogBase):
                 self._color_swatches[i].setToolTip(f"Index {i}: RGB({r}, {g}, {b})")
 
     def _on_option_changed(self) -> None:
-        """Handle option checkbox changes."""
+        """Handle option checkbox changes with debouncing.
+
+        Schedules a preview update after OPTION_DEBOUNCE_MS to avoid redundant
+        re-quantization when user rapidly changes options.
+        """
+        if self._source_image is not None:
+            self._option_debounce_timer.start(self.OPTION_DEBOUNCE_MS)
+
+    def _do_update_quantized_preview(self) -> None:
+        """Execute debounced quantized preview update."""
         if self._source_image is not None:
             self._update_quantized_preview()
 
