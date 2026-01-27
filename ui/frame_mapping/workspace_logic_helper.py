@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
     from ui.frame_mapping.views.mapping_panel import MappingPanel
     from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
+    from ui.frame_mapping.views.workbench_types import AlignmentState
     from ui.frame_mapping.workspace_state_manager import WorkspaceStateManager
     from ui.managers.status_bar_manager import StatusBarManager
 
@@ -569,14 +570,15 @@ class WorkspaceLogicHelper:
 
     # ===== Phase 2e: Alignment coordination =====
 
-    def handle_alignment_changed(
-        self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float, sharpen: float, resampling: str
-    ) -> bool:
+    def handle_alignment_changed(self, state: AlignmentState) -> bool:
         """Handle alignment change from canvas (auto-save).
 
         Alignment changes are only applied when the canvas is displaying the same
         game frame as the existing mapping. This prevents accidental edits when
         the user is previewing a different capture.
+
+        Args:
+            state: AlignmentState dataclass with all alignment parameters
 
         Returns:
             True if alignment was applied, False if blocked
@@ -620,7 +622,15 @@ class WorkspaceLogicHelper:
         # This emits alignment_updated signal which triggers _on_alignment_updated()
         # which handles updating the mapping panel row
         self._controller.update_mapping_alignment(
-            ai_frame_id, x, y, flip_h, flip_v, scale, sharpen, resampling, drag_start_alignment=drag_start
+            ai_frame_id,
+            state.offset_x,
+            state.offset_y,
+            state.flip_h,
+            state.flip_v,
+            state.scale,
+            state.sharpen,
+            state.resampling,
+            drag_start_alignment=drag_start,
         )
         return True
 

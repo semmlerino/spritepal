@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QMimeData, QPoint, QSize, Qt, Signal
@@ -247,15 +248,15 @@ class CapturesLibraryPane(QWidget):
         current_name = frame.name if frame else frame_id
 
         rename_action = menu.addAction("Rename...")
-        rename_action.triggered.connect(lambda: self._show_rename_dialog(frame_id, current_name))
+        rename_action.triggered.connect(partial(self._show_rename_dialog, frame_id, current_name))
 
         menu.addSeparator()
 
         edit_action = menu.addAction("Edit in Sprite Editor")
-        edit_action.triggered.connect(lambda: self.edit_in_sprite_editor_requested.emit(frame_id))
+        edit_action.triggered.connect(partial(self.edit_in_sprite_editor_requested.emit, frame_id))
 
         details_action = menu.addAction("Show Details")
-        details_action.triggered.connect(lambda: self.show_details_requested.emit(frame_id))
+        details_action.triggered.connect(partial(self.show_details_requested.emit, frame_id))
 
         menu.addSeparator()
 
@@ -264,7 +265,7 @@ class CapturesLibraryPane(QWidget):
         linked_ai = self._link_status.get(frame_id)
         if linked_ai is not None:
             delete_action.setText(f"Delete Capture (linked to AI #{linked_ai})")
-        delete_action.triggered.connect(lambda: self.delete_capture_requested.emit(frame_id))
+        delete_action.triggered.connect(partial(self.delete_capture_requested.emit, frame_id))
 
         menu.exec(self._list.mapToGlobal(pos))
 

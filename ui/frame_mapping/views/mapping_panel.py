@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QPoint, QSize, Qt, Signal
@@ -603,21 +604,21 @@ class MappingPanel(QWidget):
         menu = QMenu(self)
 
         edit_action = menu.addAction("Edit AI Frame")
-        edit_action.triggered.connect(lambda: self.edit_frame_requested.emit(ai_frame_id))
+        edit_action.triggered.connect(partial(self.edit_frame_requested.emit, ai_frame_id))
 
         if has_mapping:
             align_action = menu.addAction("Adjust Alignment")
-            align_action.triggered.connect(lambda: self.adjust_alignment_requested.emit(ai_frame_id))
+            align_action.triggered.connect(partial(self.adjust_alignment_requested.emit, ai_frame_id))
 
             menu.addSeparator()
 
             remove_action = menu.addAction("Remove Mapping")
-            remove_action.triggered.connect(lambda: self.remove_mapping_requested.emit(ai_frame_id))
+            remove_action.triggered.connect(partial(self.remove_mapping_requested.emit, ai_frame_id))
 
             menu.addSeparator()
 
             inject_action = menu.addAction("Inject to ROM")
-            inject_action.triggered.connect(lambda: self.inject_mapping_requested.emit(ai_frame_id))
+            inject_action.triggered.connect(partial(self.inject_mapping_requested.emit, ai_frame_id))
 
         menu.exec(self._table.viewport().mapToGlobal(pos))
 

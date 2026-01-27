@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from tests.fixtures.timeouts import signal_timeout
+from ui.frame_mapping.views.workbench_types import AlignmentState
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
@@ -41,10 +42,10 @@ class TestScalePersistence:
         assert default_scale == 100  # 1.0x
 
         # Record emitted values
-        emitted_values: list[tuple[int, int, bool, bool, float]] = []
+        emitted_values: list[AlignmentState] = []
 
-        def record_emission(x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
-            emitted_values.append((x, y, flip_h, flip_v, scale))
+        def record_emission(state: AlignmentState) -> None:
+            emitted_values.append(state)
 
         canvas.alignment_changed.connect(record_emission)
 
@@ -55,9 +56,8 @@ class TestScalePersistence:
         assert len(emitted_values) >= 1, "alignment_changed signal not emitted on scale change"
 
         # The last emission should contain scale=0.5
-        last_emission = emitted_values[-1]
-        _, _, _, _, emitted_scale = last_emission
-        assert abs(emitted_scale - 0.5) < 0.01, f"Expected scale=0.5, got {emitted_scale}"
+        last_state = emitted_values[-1]
+        assert abs(last_state.scale - 0.5) < 0.01, f"Expected scale=0.5, got {last_state.scale}"
 
     def test_scale_persistence_matches_flip_pattern(self, qtbot: QtBot) -> None:
         """Scale handler should follow the same emit pattern as flip handler.
@@ -73,14 +73,14 @@ class TestScalePersistence:
         # Enable controls with initial scale 1.0 (100%)
         canvas.set_alignment(0, 0, False, False, 1.0)
 
-        flip_emissions: list[tuple[int, int, bool, bool, float]] = []
-        scale_emissions: list[tuple[int, int, bool, bool, float]] = []
+        flip_emissions: list[AlignmentState] = []
+        scale_emissions: list[AlignmentState] = []
 
-        def record_flip(x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
-            flip_emissions.append((x, y, flip_h, flip_v, scale))
+        def record_flip(state: AlignmentState) -> None:
+            flip_emissions.append(state)
 
-        def record_scale(x: int, y: int, flip_h: bool, flip_v: bool, scale: float) -> None:
-            scale_emissions.append((x, y, flip_h, flip_v, scale))
+        def record_scale(state: AlignmentState) -> None:
+            scale_emissions.append(state)
 
         # Test flip emits signal
         canvas.alignment_changed.connect(record_flip)

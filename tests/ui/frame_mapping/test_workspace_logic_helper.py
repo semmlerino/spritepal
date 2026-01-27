@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
+from ui.frame_mapping.views.workbench_types import AlignmentState
 from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 
 
@@ -275,7 +276,10 @@ class TestAlignmentCoordination:
         helper._state.current_canvas_game_id = "capture_1"  # type: ignore[union-attr]
         helper._alignment_canvas.get_drag_start_alignment.return_value = None  # type: ignore[union-attr]
 
-        result = helper.handle_alignment_changed(10, 20, False, True, 1.0, 0.0, "lanczos")
+        state = AlignmentState(
+            offset_x=10, offset_y=20, flip_h=False, flip_v=True, scale=1.0, sharpen=0.0, resampling="lanczos"
+        )
+        result = helper.handle_alignment_changed(state)
 
         assert result is True
         helper._controller.update_mapping_alignment.assert_called_once()  # type: ignore[union-attr]
@@ -290,7 +294,10 @@ class TestAlignmentCoordination:
         helper._state.selected_ai_frame_id = "frame_001.png"  # type: ignore[union-attr]
         helper._state.current_canvas_game_id = "capture_2"  # Different!  # type: ignore[union-attr]
 
-        result = helper.handle_alignment_changed(10, 20, False, True, 1.0, 0.0, "lanczos")
+        state = AlignmentState(
+            offset_x=10, offset_y=20, flip_h=False, flip_v=True, scale=1.0, sharpen=0.0, resampling="lanczos"
+        )
+        result = helper.handle_alignment_changed(state)
 
         assert result is False
         helper._controller.update_mapping_alignment.assert_not_called()  # type: ignore[union-attr]

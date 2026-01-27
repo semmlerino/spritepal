@@ -213,14 +213,12 @@ class WorkbenchCanvas(QWidget):
 
     Signals:
         alignment_changed: Emitted when alignment values change.
-            Args: (offset_x: int, offset_y: int, flip_h: bool, flip_v: bool, scale: float,
-                   sharpen: float, resampling: str)
+            Args: (state: AlignmentState) - immutable dataclass with all alignment params
         compression_type_changed: Emitted when compression type selection changes.
             Args: (compression_type: str) - "raw" or "hal"
     """
 
-    # offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling
-    alignment_changed = Signal(int, int, bool, bool, float, float, str)
+    alignment_changed = Signal(AlignmentState)
     compression_type_changed = Signal(str)  # "raw" or "hal"
     apply_transforms_to_all_requested = Signal(int, int, float)  # offset_x, offset_y, scale
     # Pixel inspection signals
@@ -1908,16 +1906,7 @@ class WorkbenchCanvas(QWidget):
 
     def _emit_alignment_changed(self) -> None:
         """Emit alignment_changed signal with current values."""
-        alignment = self.get_alignment()
-        self.alignment_changed.emit(
-            alignment.offset_x,
-            alignment.offset_y,
-            alignment.flip_h,
-            alignment.flip_v,
-            alignment.scale,
-            alignment.sharpen,
-            alignment.resampling,
-        )
+        self.alignment_changed.emit(self.get_alignment())
 
     def _update_scene_for_alignment(self) -> None:
         """Update scene rect and fit view to show both frames after alignment.

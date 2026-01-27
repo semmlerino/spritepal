@@ -20,6 +20,7 @@ from core.frame_mapping_project import AIFrame, FrameMappingProject, GameFrame
 from tests.fixtures.frame_mapping_helpers import create_test_project
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.views.mapping_panel import MappingPanel
+from ui.frame_mapping.views.workbench_types import AlignmentState
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
@@ -445,7 +446,10 @@ class TestSplitBrainFixes:
         workspace._state.current_canvas_game_id = "capture_b"  # Canvas shows different frame
 
         # User tries to adjust alignment
-        workspace._on_alignment_changed(10, 20, False, False, 1.0, 0.0, "lanczos")
+        state = AlignmentState(
+            offset_x=10, offset_y=20, flip_h=False, flip_v=False, scale=1.0, sharpen=0.0, resampling="lanczos"
+        )
+        workspace._on_alignment_changed(state)
 
         # Alignment should be blocked (no change to mapping)
         mapping = project.get_mapping_for_ai_frame(ai_frame_id)

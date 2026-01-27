@@ -48,6 +48,7 @@ from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
+from ui.frame_mapping.views.workbench_types import AlignmentState
 from ui.frame_mapping.windows import AIFramePaletteEditorWindow
 from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 from ui.frame_mapping.workspace_state_manager import WorkspaceStateManager
@@ -548,11 +549,9 @@ class FrameMappingWorkspace(QWidget):
         """Handle game frame dropped onto drawer row."""
         self._logic.handle_drop_game_frame(ai_frame_id, game_frame_id)
 
-    def _on_alignment_changed(
-        self, x: int, y: int, flip_h: bool, flip_v: bool, scale: float, sharpen: float, resampling: str
-    ) -> None:
+    def _on_alignment_changed(self, state: AlignmentState) -> None:
         """Handle alignment change from canvas (auto-save)."""
-        self._logic.handle_alignment_changed(x, y, flip_h, flip_v, scale, sharpen, resampling)
+        self._logic.handle_alignment_changed(state)
 
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.

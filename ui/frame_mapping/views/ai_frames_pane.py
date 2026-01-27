@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
@@ -441,7 +442,7 @@ class AIFramesPane(QWidget):
 
         # Rename action
         rename_action = menu.addAction("Rename...")
-        rename_action.triggered.connect(lambda: self._show_rename_dialog(frame_id))
+        rename_action.triggered.connect(partial(self._show_rename_dialog, frame_id))
 
         # Tags submenu
         tags_menu = menu.addMenu("Tags")
@@ -449,28 +450,32 @@ class AIFramesPane(QWidget):
             action = tags_menu.addAction(tag.capitalize())
             action.setCheckable(True)
             action.setChecked(tag in current_tags)
-            # Capture tag in closure
-            action.triggered.connect(lambda checked, t=tag: self.frame_tag_toggled.emit(frame_id, t))
+            # Use partial with captured tag - triggered signal passes checked as first arg
+            action.triggered.connect(partial(self._emit_tag_toggled, frame_id, tag))
 
         menu.addSeparator()
 
         edit_action = menu.addAction("Edit in Sprite Editor")
-        edit_action.triggered.connect(lambda: self.edit_in_sprite_editor_requested.emit(frame_id))
+        edit_action.triggered.connect(partial(self.edit_in_sprite_editor_requested.emit, frame_id))
 
         edit_palette_action = menu.addAction("Edit Palette...")
-
-        def emit_edit_palette() -> None:
-            logger.info("Edit Palette clicked for frame: %s", frame_id)
-            self.edit_frame_palette_requested.emit(frame_id)
-
-        edit_palette_action.triggered.connect(emit_edit_palette)
+        edit_palette_action.triggered.connect(partial(self._emit_edit_palette, frame_id))
 
         menu.addSeparator()
 
         remove_action = menu.addAction("Remove from Project")
-        remove_action.triggered.connect(lambda: self.remove_from_project_requested.emit(frame_id))
+        remove_action.triggered.connect(partial(self.remove_from_project_requested.emit, frame_id))
 
         menu.exec(self._list.mapToGlobal(pos))
+
+    def _emit_tag_toggled(self, frame_id: str, tag: str, checked: bool) -> None:
+        """Emit tag toggled signal (helper for partial)."""
+        self.frame_tag_toggled.emit(frame_id, tag)
+
+    def _emit_edit_palette(self, frame_id: str) -> None:
+        """Emit edit palette signal (helper for partial with logging)."""
+        logger.info("Edit Palette clicked for frame: %s", frame_id)
+        self.edit_frame_palette_requested.emit(frame_id)
 
     def _refresh_list(self, is_frame_list_change: bool = False) -> None:
         """Refresh the list with current filter and search.
