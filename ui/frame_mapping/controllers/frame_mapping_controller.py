@@ -44,6 +44,7 @@ from ui.frame_mapping.undo import (
     UndoRedoStack,
     UpdateAlignmentCommand,
 )
+from ui.frame_mapping.views.workbench_types import AlignmentState
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -700,7 +701,7 @@ class FrameMappingController(QObject):
         sharpen: float = 0.0,
         resampling: str = "lanczos",
         set_edited: bool = True,
-        drag_start_alignment: tuple[int, int, bool, bool, float, float, str] | None = None,
+        drag_start_alignment: AlignmentState | None = None,
     ) -> bool:
         """Update alignment for a mapping.
 
@@ -717,7 +718,6 @@ class FrameMappingController(QObject):
                         Use False for auto-centering during initial link creation.
             drag_start_alignment: If provided, use this as old state for undo command.
                         This creates a single undo for an entire drag operation.
-                        Format: (offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling)
 
         Returns:
             True if alignment was updated
@@ -734,7 +734,13 @@ class FrameMappingController(QObject):
             # Use drag start alignment for undo if provided (creates single undo for entire drag)
             # Otherwise use current mapping state (for keyboard nudge, etc.)
             if drag_start_alignment is not None:
-                old_x, old_y, old_flip_h, old_flip_v, old_scale, old_sharpen, old_resampling = drag_start_alignment
+                old_x = drag_start_alignment.offset_x
+                old_y = drag_start_alignment.offset_y
+                old_flip_h = drag_start_alignment.flip_h
+                old_flip_v = drag_start_alignment.flip_v
+                old_scale = drag_start_alignment.scale
+                old_sharpen = drag_start_alignment.sharpen
+                old_resampling = drag_start_alignment.resampling
             else:
                 old_x = mapping.offset_x
                 old_y = mapping.offset_y

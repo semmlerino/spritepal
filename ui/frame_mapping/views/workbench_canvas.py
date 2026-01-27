@@ -61,6 +61,11 @@ from ui.frame_mapping.views.workbench_items import (
     TileMetadata,
     TileOverlayItem,
 )
+from ui.frame_mapping.views.workbench_types import (
+    AlignmentState,
+    PreviewSnapshot,
+    TileCalcSnapshot,
+)
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -253,16 +258,16 @@ class WorkbenchCanvas(QWidget):
         self._tile_calc_timer = QTimer(self)
         self._tile_calc_timer.setSingleShot(True)
         self._tile_calc_timer.timeout.connect(self._update_tile_touch_status)
-        # Snapshot: (offset_x, offset_y, scale) captured when scheduling
-        self._tile_calc_snapshot: tuple[int, int, float] | None = None
+        # Snapshot captured when scheduling to ensure calculation uses schedule-time values
+        self._tile_calc_snapshot: TileCalcSnapshot | None = None
 
         # Preview generation debounce timer with snapshot
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
         self._preview_timer.timeout.connect(self._generate_preview)
         self._preview_enabled = False
-        # Snapshot: (offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling) captured when scheduling
-        self._preview_snapshot: tuple[int, int, bool, bool, float, float, str] | None = None
+        # Snapshot captured when scheduling to ensure preview uses schedule-time values
+        self._preview_snapshot: PreviewSnapshot | None = None
 
         self._tile_sampling_service = TileSamplingService()
         self._multi_palette_warning_label: QLabel | None = None
@@ -292,7 +297,7 @@ class WorkbenchCanvas(QWidget):
 
         # Drag state tracking for undo optimization
         self._drag_in_progress = False
-        self._drag_start_alignment: tuple[int, int, bool, bool, float, float, str] | None = None
+        self._drag_start_alignment: AlignmentState | None = None
 
         # Tile selection state
         self._selected_tile_index: int | None = None
@@ -456,7 +461,7 @@ class WorkbenchCanvas(QWidget):
         controls1.addWidget(scale_label)
 
         self._scale_slider = QSlider(Qt.Orientation.Horizontal)
-        self._scale_slider.setRange(10, 100)  # 0.1 to 1.0
+        self._scale_slider.setRange(1, 100)  # 0.01 to 1.0
         self._scale_slider.setValue(100)
         self._scale_slider.setMaximumWidth(80)
         controls1.addWidget(self._scale_slider)
@@ -550,6 +555,7 @@ class WorkbenchCanvas(QWidget):
 
         # Match Scale checkbox (next to Auto-Align)
         self._match_scale_checkbox = QCheckBox("Match Scale")
+        self._match_scale_checkbox.setChecked(True)
         self._match_scale_checkbox.setStyleSheet("font-size: 11px;")
         self._match_scale_checkbox.setToolTip("Auto-Align also scales AI frame to fit game sprite bounds")
         controls2.addWidget(self._match_scale_checkbox)
@@ -1002,11 +1008,11 @@ class WorkbenchCanvas(QWidget):
         """
         return self._preview_timer.isActive()
 
-    def get_alignment(self) -> tuple[int, int, bool, bool, float, float, str]:
+    def get_alignment(self) -> AlignmentState:
         """Get current alignment values.
 
         Returns:
-            Tuple of (offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling).
+            AlignmentState with offset, flip, scale, sharpen, and resampling values.
         """
         pos = self._ai_frame_item.pos()
         # Convert from display scale to actual coordinates
@@ -1014,14 +1020,14 @@ class WorkbenchCanvas(QWidget):
         offset_y = int(pos.y() / self._display_scale)
         sharpen = self._sharpen_slider.value() / 10.0
         resampling = self._resampling_combo.currentData() or "lanczos"
-        return (
-            offset_x,
-            offset_y,
-            self._flip_h_checkbox.isChecked(),
-            self._flip_v_checkbox.isChecked(),
-            self._ai_frame_item.scale_factor(),
-            sharpen,
-            resampling,
+        return AlignmentState(
+            offset_x=offset_x,
+            offset_y=offset_y,
+            flip_h=self._flip_h_checkbox.isChecked(),
+            flip_v=self._flip_v_checkbox.isChecked(),
+            scale=self._ai_frame_item.scale_factor(),
+            sharpen=sharpen,
+            resampling=resampling,
         )
 
     def get_preserve_sprite(self) -> bool:
@@ -1165,7 +1171,11 @@ class WorkbenchCanvas(QWidget):
         offset_x = int(pos.x() / self._display_scale)
         offset_y = int(pos.y() / self._display_scale)
         scale = self._ai_frame_item.scale_factor()
-        self._tile_calc_snapshot = (offset_x, offset_y, scale)
+        self._tile_calc_snapshot = TileCalcSnapshot(
+            offset_x=offset_x,
+            offset_y=offset_y,
+            scale=scale,
+        )
         self._tile_calc_timer.start(self._config.tile_calc_debounce_ms)
 
     def _update_tile_touch_status(self) -> None:
@@ -1182,7 +1192,9 @@ class WorkbenchCanvas(QWidget):
 
         # Use snapshot if available, otherwise use current values
         if self._tile_calc_snapshot is not None:
-            offset_x, offset_y, scale = self._tile_calc_snapshot
+            offset_x = self._tile_calc_snapshot.offset_x
+            offset_y = self._tile_calc_snapshot.offset_y
+            scale = self._tile_calc_snapshot.scale
         else:
             # Fallback to current values (for direct calls in tests)
             pos = self._ai_frame_item.pos()
@@ -1418,8 +1430,8 @@ class WorkbenchCanvas(QWidget):
         """
         if not self._has_mapping:
             return
-        offset_x, offset_y, _flip_h, _flip_v, scale, _sharpen, _resampling = self.get_alignment()
-        self.apply_transforms_to_all_requested.emit(offset_x, offset_y, scale)
+        alignment = self.get_alignment()
+        self.apply_transforms_to_all_requested.emit(alignment.offset_x, alignment.offset_y, alignment.scale)
 
     def _schedule_preview_update(self) -> None:
         """Schedule a debounced preview generation.
@@ -1438,7 +1450,15 @@ class WorkbenchCanvas(QWidget):
         scale = self._ai_frame_item.scale_factor()
         sharpen = self._sharpen_slider.value() / 10.0
         resampling = self._resampling_combo.currentData() or "lanczos"
-        self._preview_snapshot = (offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling)
+        self._preview_snapshot = PreviewSnapshot(
+            offset_x=offset_x,
+            offset_y=offset_y,
+            flip_h=flip_h,
+            flip_v=flip_v,
+            scale=scale,
+            sharpen=sharpen,
+            resampling=resampling,
+        )
         self._preview_timer.start(self._config.preview_debounce_ms)
 
     def _generate_preview(self) -> None:
@@ -1462,7 +1482,13 @@ class WorkbenchCanvas(QWidget):
 
         # Use snapshot if available, otherwise use current values
         if self._preview_snapshot is not None:
-            offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling = self._preview_snapshot
+            offset_x = self._preview_snapshot.offset_x
+            offset_y = self._preview_snapshot.offset_y
+            flip_h = self._preview_snapshot.flip_h
+            flip_v = self._preview_snapshot.flip_v
+            scale = self._preview_snapshot.scale
+            sharpen = self._preview_snapshot.sharpen
+            resampling = self._preview_snapshot.resampling
         else:
             # Fallback to current values (for direct calls in tests)
             pos = self._ai_frame_item.pos()
@@ -1526,6 +1552,74 @@ class WorkbenchCanvas(QWidget):
         """
         logger.warning("Failed to generate preview: %s", error_message)
         self._preview_item.setVisible(False)
+
+    def _get_content_bbox(self, image: Image.Image) -> tuple[int, int, int, int]:
+        """Get bounding box of actual content in the image.
+
+        Handles both transparent backgrounds (via alpha channel) and solid backgrounds
+        (by detecting background color from corners).
+
+        Args:
+            image: PIL Image to analyze.
+
+        Returns:
+            Bounding box as (left, top, right, bottom).
+        """
+        import numpy as np
+
+        # First try alpha-based detection
+        alpha_bbox = image.getbbox()
+        full_bounds = (0, 0, image.width, image.height)
+
+        # If getbbox returned None or full image bounds, try color-based detection
+        if alpha_bbox is None or alpha_bbox == full_bounds:
+            # Convert to RGB for color analysis
+            rgb_image = image.convert("RGB")
+            pixels = np.array(rgb_image)
+
+            # Sample background color from corners (average of 4 corners)
+            corner_size = min(5, image.width // 10, image.height // 10)
+            corner_size = max(corner_size, 1)
+
+            corners = [
+                pixels[:corner_size, :corner_size],  # top-left
+                pixels[:corner_size, -corner_size:],  # top-right
+                pixels[-corner_size:, :corner_size],  # bottom-left
+                pixels[-corner_size:, -corner_size:],  # bottom-right
+            ]
+            bg_color = np.mean([c.mean(axis=(0, 1)) for c in corners], axis=0)
+
+            # Find pixels that differ significantly from background
+            tolerance = 30  # RGB distance threshold
+            diff = np.sqrt(np.sum((pixels.astype(float) - bg_color) ** 2, axis=2))
+            content_mask = diff > tolerance
+
+            # Find bounding box of content
+            rows_with_content = np.any(content_mask, axis=1)
+            cols_with_content = np.any(content_mask, axis=0)
+
+            if rows_with_content.any() and cols_with_content.any():
+                row_indices = np.where(rows_with_content)[0]
+                col_indices = np.where(cols_with_content)[0]
+                color_bbox = (
+                    int(col_indices[0]),
+                    int(row_indices[0]),
+                    int(col_indices[-1] + 1),
+                    int(row_indices[-1] + 1),
+                )
+                logger.debug(
+                    "Content bbox from color detection: %s (bg_color=%.0f,%.0f,%.0f)",
+                    color_bbox,
+                    bg_color[0],
+                    bg_color[1],
+                    bg_color[2],
+                )
+                return color_bbox
+
+        if alpha_bbox is not None:
+            return alpha_bbox
+
+        return full_bounds
 
     def _compute_tile_rects(self) -> list[tuple[int, int, int, int]]:
         """Compute 8x8 tile rectangles from OAM entries in scene coordinates.
@@ -1706,9 +1800,7 @@ class WorkbenchCanvas(QWidget):
             return
 
         # Get AI content bounding box (non-transparent pixels)
-        ai_bbox = self._ai_image.getbbox()
-        if ai_bbox is None:
-            ai_bbox = (0, 0, self._ai_image.width, self._ai_image.height)
+        ai_bbox = self._get_content_bbox(self._ai_image)
 
         ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
         ai_content_width = ai_x2 - ai_x
@@ -1773,7 +1865,7 @@ class WorkbenchCanvas(QWidget):
         self._emit_alignment_changed()
         logger.debug("Drag finished, emitting final alignment")
 
-    def get_drag_start_alignment(self) -> tuple[int, int, bool, bool, float, float, str] | None:
+    def get_drag_start_alignment(self) -> AlignmentState | None:
         """Return alignment at drag start, or None if not from drag.
 
         Used by workspace to pass to controller for single undo command.
@@ -1816,8 +1908,16 @@ class WorkbenchCanvas(QWidget):
 
     def _emit_alignment_changed(self) -> None:
         """Emit alignment_changed signal with current values."""
-        offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling = self.get_alignment()
-        self.alignment_changed.emit(offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling)
+        alignment = self.get_alignment()
+        self.alignment_changed.emit(
+            alignment.offset_x,
+            alignment.offset_y,
+            alignment.flip_h,
+            alignment.flip_v,
+            alignment.scale,
+            alignment.sharpen,
+            alignment.resampling,
+        )
 
     def _update_scene_for_alignment(self) -> None:
         """Update scene rect and fit view to show both frames after alignment.
