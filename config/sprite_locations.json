@@ -88,6 +88,14 @@
           "9": "Power-up variants",
           "10": "Additional states",
           "11": "Enemies (green/orange)"
+        },
+        "character_offsets": {
+          "king_dedede": {
+            "offset": "0x144037",
+            "palette_index": 7,
+            "description": "King Dedede's palette - use for Dedede sprite replacements",
+            "rom_offset_hints": ["0x7937C", "0x793BC", "0x793FC", "0x7943C", "0x7947C", "0x794BC", "0x794FC", "0x79674"]
+          }
         }
       }
     },
@@ -159,6 +167,17 @@
           "offset": "0x280000",
           "expected_size": 1185,
           "notes": "CONFIRMED: Valid sprite data - visually verified Dec 2025"
+        }
+      },
+      "palettes": {
+        "offset": "0x467D6",
+        "description": "Kirby sprite palette data - same as KIRBY SUPER STAR",
+        "character_offsets": {
+          "king_dedede": {
+            "offset": "0x144037",
+            "palette_index": 7,
+            "description": "King Dedede's palette - use for Dedede sprite replacements"
+          }
         }
       }
     },

@@ -1010,6 +1010,9 @@ class FrameMappingController(QObject):
     def _calculate_palette_rom_offset(self, rom_path: Path, game_frame_id: str) -> int | None:
         """Calculate palette ROM offset from game config and frame's palette index.
 
+        First checks for character-specific palette offsets (e.g., King Dedede),
+        then falls back to the generic palette calculation.
+
         Args:
             rom_path: Path to the ROM file.
             game_frame_id: ID of the game frame being injected.
@@ -1020,7 +1023,7 @@ class FrameMappingController(QObject):
         if self._project is None:
             return None
 
-        # Get the game frame to get its palette_index
+        # Get the game frame to get its palette_index and rom_offsets
         game_frame = self._project.get_game_frame_by_id(game_frame_id)
         if game_frame is None:
             logger.debug("Cannot calculate palette offset: game_frame %s not found", game_frame_id)
@@ -1044,6 +1047,53 @@ class FrameMappingController(QObject):
             if not isinstance(palettes, dict):
                 return None
 
+            # Check for character-specific palette offsets first
+            character_offsets = palettes.get("character_offsets", {})
+            if isinstance(character_offsets, dict):
+                # Try hint-based matching first
+                for char_name, char_config in character_offsets.items():
+                    if not isinstance(char_config, dict):
+                        continue
+                    rom_offset_hints = char_config.get("rom_offset_hints", [])
+                    if not isinstance(rom_offset_hints, list) or not rom_offset_hints:
+                        continue
+
+                    # Convert hints to integers for comparison
+                    hint_ints: set[int] = set()
+                    for hint in rom_offset_hints:
+                        if isinstance(hint, str):
+                            hint_ints.add(int(hint, 16) if hint.startswith("0x") else int(hint))
+                        elif isinstance(hint, int):
+                            hint_ints.add(hint)
+
+                    # Check if any of the game frame's ROM offsets match the hints
+                    if game_frame.rom_offsets and hint_ints.intersection(game_frame.rom_offsets):
+                        char_offset_str = char_config.get("offset")
+                        if char_offset_str and isinstance(char_offset_str, str):
+                            char_offset = int(char_offset_str, 16) if char_offset_str.startswith("0x") else int(char_offset_str)
+                            logger.info(
+                                "Using character-specific palette offset for %s (hint match): 0x%X",
+                                char_name,
+                                char_offset,
+                            )
+                            return char_offset
+
+                # No hint match - if there's only one character config, use it as default
+                # This handles the common case of single-character replacement projects
+                if len(character_offsets) == 1:
+                    char_name, char_config = next(iter(character_offsets.items()))
+                    if isinstance(char_config, dict):
+                        char_offset_str = char_config.get("offset")
+                        if char_offset_str and isinstance(char_offset_str, str):
+                            char_offset = int(char_offset_str, 16) if char_offset_str.startswith("0x") else int(char_offset_str)
+                            logger.info(
+                                "Using character-specific palette offset for %s (single character default): 0x%X",
+                                char_name,
+                                char_offset,
+                            )
+                            return char_offset
+
+            # Fall back to generic palette calculation
             base_offset_str = palettes.get("offset")
             if not base_offset_str or not isinstance(base_offset_str, str):
                 logger.debug("No palette offset in game config for %s", game_name)
