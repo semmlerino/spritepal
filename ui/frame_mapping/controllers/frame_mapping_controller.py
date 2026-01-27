@@ -1070,7 +1070,9 @@ class FrameMappingController(QObject):
                     if game_frame.rom_offsets and hint_ints.intersection(game_frame.rom_offsets):
                         char_offset_str = char_config.get("offset")
                         if char_offset_str and isinstance(char_offset_str, str):
-                            char_offset = int(char_offset_str, 16) if char_offset_str.startswith("0x") else int(char_offset_str)
+                            char_offset = (
+                                int(char_offset_str, 16) if char_offset_str.startswith("0x") else int(char_offset_str)
+                            )
                             logger.info(
                                 "Using character-specific palette offset for %s (hint match): 0x%X",
                                 char_name,
@@ -1085,7 +1087,9 @@ class FrameMappingController(QObject):
                     if isinstance(char_config, dict):
                         char_offset_str = char_config.get("offset")
                         if char_offset_str and isinstance(char_offset_str, str):
-                            char_offset = int(char_offset_str, 16) if char_offset_str.startswith("0x") else int(char_offset_str)
+                            char_offset = (
+                                int(char_offset_str, 16) if char_offset_str.startswith("0x") else int(char_offset_str)
+                            )
                             logger.info(
                                 "Using character-specific palette offset for %s (single character default): 0x%X",
                                 char_name,

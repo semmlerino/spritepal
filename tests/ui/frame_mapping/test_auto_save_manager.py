@@ -43,9 +43,7 @@ def auto_save_manager(mock_timer: QTimer, mock_project_path: Path) -> AutoSaveMa
 class TestAutoSaveManagerInit:
     """Test AutoSaveManager initialization."""
 
-    def test_init_stores_dependencies(
-        self, mock_timer: QTimer, mock_project_path: Path
-    ) -> None:
+    def test_init_stores_dependencies(self, mock_timer: QTimer, mock_project_path: Path) -> None:
         """AutoSaveManager stores provided dependencies."""
         save_fn = MagicMock()
         msg_fn = MagicMock()
@@ -65,17 +63,13 @@ class TestAutoSaveManagerInit:
 class TestScheduleSave:
     """Test schedule_save method."""
 
-    def test_schedule_save_starts_timer(
-        self, auto_save_manager: AutoSaveManager, mock_timer: QTimer
-    ) -> None:
+    def test_schedule_save_starts_timer(self, auto_save_manager: AutoSaveManager, mock_timer: QTimer) -> None:
         """schedule_save starts the debounce timer."""
         auto_save_manager.schedule_save()
 
         mock_timer.start.assert_called_once()
 
-    def test_schedule_save_no_path_logs_warning(
-        self, mock_timer: QTimer, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_schedule_save_no_path_logs_warning(self, mock_timer: QTimer, caplog: pytest.LogCaptureFixture) -> None:
         """schedule_save logs warning when no project path."""
         manager = AutoSaveManager(
             timer=mock_timer,
@@ -92,9 +86,7 @@ class TestScheduleSave:
 class TestPerformSave:
     """Test perform_save method."""
 
-    def test_perform_save_calls_save_project(
-        self, mock_project_path: Path, mock_timer: QTimer
-    ) -> None:
+    def test_perform_save_calls_save_project(self, mock_project_path: Path, mock_timer: QTimer) -> None:
         """perform_save calls the save_project callback with path."""
         save_fn = MagicMock()
         manager = AutoSaveManager(
@@ -107,9 +99,7 @@ class TestPerformSave:
 
         save_fn.assert_called_once_with(mock_project_path)
 
-    def test_perform_save_shows_message_on_success(
-        self, mock_project_path: Path, mock_timer: QTimer
-    ) -> None:
+    def test_perform_save_shows_message_on_success(self, mock_project_path: Path, mock_timer: QTimer) -> None:
         """perform_save shows status message on success."""
         msg_fn = MagicMock()
         manager = AutoSaveManager(
@@ -136,9 +126,7 @@ class TestPerformSave:
 
         save_fn.assert_not_called()
 
-    def test_perform_save_handles_exception(
-        self, mock_project_path: Path, mock_timer: QTimer
-    ) -> None:
+    def test_perform_save_handles_exception(self, mock_project_path: Path, mock_timer: QTimer) -> None:
         """perform_save handles save errors gracefully."""
         save_fn = MagicMock(side_effect=RuntimeError("Save failed"))
         manager = AutoSaveManager(
@@ -177,9 +165,7 @@ class TestPerformSave:
 class TestSetMessageService:
     """Test set_message_service method."""
 
-    def test_set_message_service_updates_callback(
-        self, auto_save_manager: AutoSaveManager
-    ) -> None:
+    def test_set_message_service_updates_callback(self, auto_save_manager: AutoSaveManager) -> None:
         """set_message_service updates the show_message callback."""
         new_msg_fn = MagicMock()
 
@@ -187,9 +173,7 @@ class TestSetMessageService:
 
         assert auto_save_manager._show_message is new_msg_fn
 
-    def test_set_message_service_to_none(
-        self, auto_save_manager: AutoSaveManager
-    ) -> None:
+    def test_set_message_service_to_none(self, auto_save_manager: AutoSaveManager) -> None:
         """set_message_service can set callback to None."""
         auto_save_manager.set_message_service(None)
 
@@ -199,9 +183,7 @@ class TestSetMessageService:
 class TestSetParentWidget:
     """Test set_parent_widget method."""
 
-    def test_set_parent_widget_updates_widget(
-        self, auto_save_manager: AutoSaveManager
-    ) -> None:
+    def test_set_parent_widget_updates_widget(self, auto_save_manager: AutoSaveManager) -> None:
         """set_parent_widget updates the parent widget."""
         mock_widget = MagicMock()
 

@@ -1,4 +1,5 @@
 # Repository Guidelines
+**IMPORTANT**: If proceeding with TDD, ensure FIRST that the test that should fail ACTUALLY FAILS, before attempting to fix.
 
 Always activate the Serena MCP at the start.
 
@@ -54,13 +55,7 @@ Run from `spritepal/`:
   `mesen2_exchange/mesen2_preflight_probe.txt` (or `mesen2_exchange/mesen2_preflight_probe_latest.txt`).
 - Movie playback: `.mmo` files only play once a ROM is already running (see `LoadRomHelper.LoadFile`).
   Use a second Mesen2 launch to pass the `.mmo` to the running instance (SingleInstance IPC).
-- Headless testrunner example (PowerShell):
-  ```
-  powershell.exe -NoProfile -Command "
-    & 'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\tools\mesen2\Mesen2.exe' --testrunner
-    'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\roms\Kirby Super Star (USA).sfc'
-    'C:\CustomScripts\KirbyMax\workshop\exhal-master\spritepal\mesen2_integration\lua_scripts\mesen2_preflight_probe.lua'
-  "
-  ```
+ 
+ 
 - Screenshots are available via `emu.takeScreenshot()` (works in headless testrunner); save PNGs to
   `mesen2_exchange/` for debugging.

@@ -642,3 +642,167 @@ class TestSheetPaletteQuantization:
             f"Expected green (0,255,0) from capture palette (SNES 5-bit fully scaled), "
             f"but got {pixel[:3]}. Should fall back to capture palette."
         )
+
+
+class TestTransparentPolicyNoOriginalSprite:
+    """Test that transparent policy completely removes original sprite content.
+
+    Bug: User reports that when "Preserve Sprite" is OFF, both the AI frame
+    AND the original Dedede sprite appear "on top of each other" after injection.
+
+    Expected behavior: When preserve_sprite=False (uncovered_policy="transparent"),
+    areas within tile bounds but NOT covered by AI should be transparent (index 0),
+    NOT show the original sprite pixels.
+    """
+
+    def test_uncovered_areas_are_transparent_not_original(self) -> None:
+        """Areas within tile bounds but not covered by AI should be transparent.
+
+        Creates a scenario where:
+        - Original sprite has blue content
+        - AI frame has red content but only covers part of the tile
+        - With "transparent" policy, uncovered areas should be transparent (alpha=0)
+        - Bug behavior: uncovered areas show original blue content
+
+        If this test fails, the original sprite content is leaking through.
+        """
+        from dataclasses import dataclass, field
+
+        import numpy as np
+
+        @dataclass
+        class MockTileData:
+            tile_index: int
+            vram_addr: int
+            pos_x: int
+            pos_y: int
+            data_hex: str
+            rom_offset: int | None = None
+
+            @property
+            def data_bytes(self) -> bytes:
+                return bytes.fromhex(self.data_hex)
+
+        @dataclass
+        class MockOAMEntry:
+            id: int
+            x: int
+            y: int
+            width: int
+            height: int
+            palette: int
+            flip_h: bool = False
+            flip_v: bool = False
+            priority: int = 0
+            tile: int = 0
+            name_table: int = 0
+            size_large: bool = False
+            rom_offset: int = 0x10000
+            tiles: list = field(default_factory=list)
+
+            @property
+            def tiles_wide(self) -> int:
+                return self.width // 8
+
+            @property
+            def tiles_high(self) -> int:
+                return self.height // 8
+
+        @dataclass
+        class MockCaptureBoundingBox:
+            x: int
+            y: int
+            width: int
+            height: int
+
+        @dataclass
+        class MockCaptureResultFull:
+            frame: int
+            visible_count: int
+            obsel: int
+            entries: list
+            palettes: dict
+            timestamp: str = ""
+
+            @property
+            def bounding_box(self) -> MockCaptureBoundingBox:
+                if not self.entries:
+                    return MockCaptureBoundingBox(0, 0, 0, 0)
+                min_x = min(e.x for e in self.entries)
+                min_y = min(e.y for e in self.entries)
+                max_x = max(e.x + e.width for e in self.entries)
+                max_y = max(e.y + e.height for e in self.entries)
+                return MockCaptureBoundingBox(min_x, min_y, max_x - min_x, max_y - min_y)
+
+        # Create a 16x16 sprite entry (2x2 tiles)
+        solid_tile_hex = "ff" * 32
+        entry = MockOAMEntry(
+            id=0,
+            x=0,
+            y=0,
+            width=16,
+            height=16,
+            palette=0,
+            tiles=[
+                MockTileData(tile_index=i, vram_addr=i, pos_x=(i % 2) * 8, pos_y=(i // 2) * 8, data_hex=solid_tile_hex)
+                for i in range(4)
+            ],
+        )
+
+        # Original sprite has BLUE pixels
+        # This simulates the Dedede sprite that should be replaced
+        # Palette 0: blue-ish colors
+        capture_palettes = {0: [(0, 0, 255, 255)] * 16}
+
+        capture = MockCaptureResultFull(
+            frame=0,
+            visible_count=1,
+            obsel=0,
+            entries=[entry],
+            palettes=capture_palettes,
+        )
+
+        # AI image: RED but only covers top-left quadrant (8x8 of the 16x16 sprite)
+        # Bottom-right quadrant (8x8) has NO AI content (transparent)
+        ai_image = Image.new("RGBA", (16, 16), (0, 0, 0, 0))  # Start transparent
+        # Fill only top-left 8x8 with red
+        for y in range(8):
+            for x in range(8):
+                ai_image.putpixel((x, y), (255, 0, 0, 255))
+
+        # Create compositor with TRANSPARENT policy (preserve_sprite=False)
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        transform = TransformParams(offset_x=0, offset_y=0)
+
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=False,  # Don't quantize to see raw RGBA result
+        )
+
+        composited = result.composited_image
+
+        # Check that top-left quadrant has RED content (from AI)
+        tl_pixel = composited.getpixel((4, 4))
+        assert tl_pixel[:3] == (255, 0, 0), f"Top-left should be red (AI content), got {tl_pixel[:3]}"
+        assert tl_pixel[3] == 255, f"Top-left should be opaque, got alpha={tl_pixel[3]}"
+
+        # Check that bottom-right quadrant is TRANSPARENT (NOT blue original)
+        # This is the critical check - if this fails, original sprite is leaking through
+        br_pixel = composited.getpixel((12, 12))
+        assert br_pixel[3] == 0, (
+            f"Bottom-right should be transparent (alpha=0) because AI doesn't cover it "
+            f"and preserve_sprite=False. Got alpha={br_pixel[3]}, color={br_pixel[:3]}. "
+            f"If color is blue, original sprite content is leaking through!"
+        )
+
+        # Verify NO blue pixels exist anywhere in the composited image
+        # The original sprite was all blue - none should appear
+        img_array = np.array(composited)
+        blue_pixels = np.any((img_array[:, :, 2] > 200) & (img_array[:, :, 3] > 0), axis=None)
+        assert not blue_pixels, (
+            "Found blue pixels in composited image! Original sprite content is leaking through "
+            "when preserve_sprite=False. The transparent policy should completely remove "
+            "the original sprite."
+        )

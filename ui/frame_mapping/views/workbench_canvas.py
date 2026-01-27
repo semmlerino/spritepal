@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, override
 
+import numpy as np
 from PIL import Image
 from PySide6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QMouseEvent, QPainter, QPixmap, QWheelEvent
@@ -46,6 +47,7 @@ from PySide6.QtWidgets import (
 from core.frame_mapping_project import AIFrame, GameFrame
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.services.content_bounds_analyzer import ContentBoundsAnalyzer
+from core.services.rgb_to_indexed import load_image_preserving_indices
 from core.services.sprite_compositor import SpriteCompositor, TransformParams
 from core.services.tile_sampling_service import TileSamplingService
 from ui.frame_mapping.services.canvas_config_service import CanvasConfig
@@ -238,6 +240,7 @@ class WorkbenchCanvas(QWidget):
         self._game_pixmap: QPixmap | None = None
         self._ai_pixmap: QPixmap | None = None
         self._ai_image: Image.Image | None = None  # PIL image for auto-alignment
+        self._ai_index_map: np.ndarray | None = None  # Original palette indices for indexed PNGs
         self._has_mapping = False
         self._updating_from_external = False
 
@@ -734,15 +737,22 @@ class WorkbenchCanvas(QWidget):
         if frame is None:
             self._ai_pixmap = None
             self._ai_image = None
+            self._ai_index_map = None
             self._ai_frame_item.set_pixmap(None)
             self._update_auto_align_button_state()
             return
 
         if frame.path.exists():
             self._ai_pixmap = QPixmap(str(frame.path))
-            # Also load as PIL image for auto-alignment
+            # Also load as PIL image for auto-alignment and index-preserving preview
             try:
-                self._ai_image = Image.open(frame.path).convert("RGBA")
+                self._ai_index_map, self._ai_image = load_image_preserving_indices(frame.path)
+                if self._ai_index_map is not None:
+                    logger.debug(
+                        "Loaded AI frame %s with preserved index map (shape: %s)",
+                        frame.path.name,
+                        self._ai_index_map.shape,
+                    )
             except Exception as e:
                 logger.warning(
                     "Failed to load PIL image for %s: %s - auto-align will be disabled",
@@ -750,9 +760,11 @@ class WorkbenchCanvas(QWidget):
                     e,
                 )
                 self._ai_image = None
+                self._ai_index_map = None
         else:
             self._ai_pixmap = None
             self._ai_image = None
+            self._ai_index_map = None
 
         if self._ai_pixmap is not None:
             # Scale for display
@@ -1397,6 +1409,7 @@ class WorkbenchCanvas(QWidget):
                 transform=transform,
                 quantize=True,
                 sheet_palette=self._sheet_palette,
+                ai_index_map=self._ai_index_map,
             )
 
             preview_img = result.composited_image
@@ -1851,6 +1864,13 @@ class WorkbenchCanvas(QWidget):
 
         # Get pixel color from AI image
         try:
+            # BUG-1 FIX: Use index map directly if available to ensure WYSIWYG
+            # reporting of indices, even when multiple indices have same color.
+            palette_index: int = -1
+            if self._ai_index_map is not None:
+                # index_map is already in original (non-flipped) image space
+                palette_index = int(self._ai_index_map[img_y, img_x])
+
             pixel_raw = self._ai_image.getpixel((img_x, img_y))
             # Cast to tuple for type safety (PIL returns various types)
             if isinstance(pixel_raw, int | float):
@@ -1869,8 +1889,10 @@ class WorkbenchCanvas(QWidget):
             else:
                 return None
 
-            # Lookup palette index
-            palette_index = self._lookup_palette_index(rgb)
+            # Lookup palette index only if not already found in index_map
+            if palette_index == -1:
+                palette_index = self._lookup_palette_index(rgb)
+
             return (img_x, img_y, rgb, palette_index)
 
         except Exception as e:

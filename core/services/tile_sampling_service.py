@@ -355,7 +355,9 @@ class TileSamplingService:
             return (False, [])
 
         # Merge adjacent overflow cells into rectangles (simple row-based merge)
-        overflow_rects = self._merge_overflow_cells(overflow_cells, cell_size, scene_left, scene_top, scene_right, scene_bottom)
+        overflow_rects = self._merge_overflow_cells(
+            overflow_cells, cell_size, scene_left, scene_top, scene_right, scene_bottom
+        )
 
         return (len(overflow_rects) > 0, overflow_rects)
 
@@ -409,8 +411,14 @@ class TileSamplingService:
                 else:
                     # Gap, emit current span and start new one
                     rect = self._cell_span_to_rect(
-                        span_start, span_end, cell_y, cell_size,
-                        content_left, content_top, content_right, content_bottom
+                        span_start,
+                        span_end,
+                        cell_y,
+                        cell_size,
+                        content_left,
+                        content_top,
+                        content_right,
+                        content_bottom,
                     )
                     if rect:
                         overflow_rects.append(rect)
@@ -419,8 +427,7 @@ class TileSamplingService:
 
             # Emit final span
             rect = self._cell_span_to_rect(
-                span_start, span_end, cell_y, cell_size,
-                content_left, content_top, content_right, content_bottom
+                span_start, span_end, cell_y, cell_size, content_left, content_top, content_right, content_bottom
             )
             if rect:
                 overflow_rects.append(rect)

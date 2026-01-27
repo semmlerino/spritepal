@@ -11,9 +11,7 @@ import pytest
 from core.services.tile_sampling_service import TileSamplingService
 
 
-def make_tile_grid(
-    x: int, y: int, width: int, height: int, tile_size: int = 8
-) -> list[tuple[int, int, int, int]]:
+def make_tile_grid(x: int, y: int, width: int, height: int, tile_size: int = 8) -> list[tuple[int, int, int, int]]:
     """Create a grid of tiles covering the specified area.
 
     Args:

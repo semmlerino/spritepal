@@ -23,6 +23,7 @@ from core.palette_utils import (
     QUANTIZATION_TRANSPARENCY_THRESHOLD,
     quantize_to_palette,
     quantize_with_mappings,
+    snap_to_snes_color,
     snes_palette_to_rgb,
 )
 from utils.logging_config import get_logger
@@ -55,6 +56,7 @@ class CompositeResult:
         canvas_width: Width of the compositing canvas.
         canvas_height: Height of the compositing canvas.
         uncovered_policy: Policy used for uncovered areas.
+        index_map: Transformed palette index map (matching composited_image).
     """
 
     composited_image: Image.Image
@@ -62,6 +64,7 @@ class CompositeResult:
     canvas_width: int
     canvas_height: int
     uncovered_policy: Literal["transparent", "original"]
+    index_map: np.ndarray | None = None
 
 
 class SpriteCompositor:
@@ -99,6 +102,7 @@ class SpriteCompositor:
         selected_entry_ids: list[int] | None = None,
         quantize: bool = True,
         sheet_palette: SheetPalette | None = None,
+        ai_index_map: np.ndarray | None = None,
     ) -> CompositeResult:
         """Composite an AI frame onto a game sprite.
 
@@ -110,6 +114,8 @@ class SpriteCompositor:
             quantize: Whether to quantize to the game palette.
             sheet_palette: If provided, use this palette for quantization instead
                 of the capture palette. This ensures preview matches injection.
+            ai_index_map: Optional pre-indexed map for the AI frame. If provided,
+                this is transformed and used to bypass quantization where possible.
 
         Returns:
             CompositeResult with the composited image and metadata.
@@ -158,9 +164,25 @@ class SpriteCompositor:
             # Original sprite preserved - AI composites on top
             composited = Image.alpha_composite(original_sprite.copy(), ai_canvas)
 
+        # Handle index map transformation if provided
+        transformed_index_map: np.ndarray | None = None
+        if ai_index_map is not None:
+            transformed_index_map = self._transform_index_map(ai_index_map, transform, (canvas_w, canvas_h))
+
         # Quantize to game palette if requested
         if quantize:
-            composited = self._quantize_to_palette(composited, filtered_capture, sheet_palette=sheet_palette)
+            # BUG-1 FIX: Use transformed_index_map if available to bypass quantization
+            # This ensures preview matches injection (index-preserving passthrough)
+            if transformed_index_map is not None and sheet_palette is not None:
+                # Check if index map has valid data for all opaque pixels
+                # (actually _quantize_with_index_map handles this)
+                composited = self._quantize_with_index_map(
+                    composited,
+                    transformed_index_map,
+                    sheet_palette,
+                )
+            else:
+                composited = self._quantize_to_palette(composited, filtered_capture, sheet_palette=sheet_palette)
 
         return CompositeResult(
             composited_image=composited,
@@ -168,7 +190,138 @@ class SpriteCompositor:
             canvas_width=canvas_w,
             canvas_height=canvas_h,
             uncovered_policy=self._uncovered_policy,
+            index_map=transformed_index_map,
         )
+
+    def _transform_index_map(
+        self,
+        index_map: np.ndarray,
+        transform: TransformParams,
+        canvas_size: tuple[int, int],
+    ) -> np.ndarray:
+        """Transform index map to match the composited canvas coordinates.
+
+        Applies the same transforms (flip, scale, offset) to the index map
+        that are applied to the RGBA image during compositing, using NEAREST
+        interpolation to preserve exact palette indices.
+
+        Args:
+            index_map: Original palette index array from AI frame
+            transform: Alignment parameters (offset, flip, scale)
+            canvas_size: Size of the composited canvas (width, height)
+
+        Returns:
+            Transformed index map at canvas coordinates, with 255 marking "no AI data"
+        """
+        canvas_w, canvas_h = canvas_size
+
+        # Start with "no data" marker (255 = outside AI frame area)
+        result = np.full((canvas_h, canvas_w), 255, dtype=np.uint8)
+
+        # Convert to PIL for easy transforming (preserves indices)
+        img = Image.fromarray(index_map, mode="P")
+
+        # Apply flips FIRST
+        if transform.flip_h:
+            img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+        if transform.flip_v:
+            img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+
+        # Apply scale SECOND
+        if abs(transform.scale - 1.0) > 0.01:
+            new_w = max(1, int(img.width * transform.scale))
+            new_h = max(1, int(img.height * transform.scale))
+            img = img.resize((new_w, new_h), Image.Resampling.NEAREST)
+
+        scaled = np.array(img, dtype=np.uint8)
+        scaled_h, scaled_w = scaled.shape
+
+        # Calculate placement in canvas
+        start_x = transform.offset_x
+        start_y = transform.offset_y
+
+        # Calculate overlap region
+        src_x_start = max(0, -start_x)
+        src_y_start = max(0, -start_y)
+        dst_x_start = max(0, start_x)
+        dst_y_start = max(0, start_y)
+
+        copy_w = min(scaled_w - src_x_start, canvas_w - dst_x_start)
+        copy_h = min(scaled_h - src_y_start, canvas_h - dst_y_start)
+
+        if copy_w > 0 and copy_h > 0:
+            result[
+                dst_y_start : dst_y_start + copy_h,
+                dst_x_start : dst_x_start + copy_w,
+            ] = scaled[
+                src_y_start : src_y_start + copy_h,
+                src_x_start : src_x_start + copy_w,
+            ]
+
+        return result
+
+    def _quantize_with_index_map(
+        self,
+        image: Image.Image,
+        index_map: np.ndarray,
+        sheet_palette: SheetPalette,
+    ) -> Image.Image:
+        """Quantize image using a pre-calculated index map where available.
+
+        For pixels where index_map != 255, uses the index directly from the map.
+        For other pixels (e.g. original sprite pixels in "original" policy),
+        falls back to standard quantization.
+
+        Args:
+            image: RGBA image to quantize
+            index_map: Transformed index map (255 = no index)
+            sheet_palette: Target palette
+
+        Returns:
+            Quantized RGBA image with binary alpha (WYSIWYG).
+        """
+        # 1. Start with standard quantization as baseline
+        # (This handles original sprite pixels if uncovered_policy="original")
+        # Snap palette colors to SNES precision for WYSIWYG fidelity
+        palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
+        if sheet_palette.color_mappings:
+            indexed = quantize_with_mappings(
+                image,
+                palette_rgb,
+                sheet_palette.color_mappings,
+                transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+            )
+        else:
+            indexed = quantize_to_palette(
+                image,
+                palette_rgb,
+                transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+            )
+
+        # 2. Overlay indices from the map where available
+        pixels = np.array(indexed)
+        mask = index_map != 255
+        pixels[mask] = index_map[mask]
+
+        # 3. Create final indexed image
+        final_indexed = Image.fromarray(pixels, mode="P")
+
+        # Build palette for PIL
+        flat_palette: list[int] = []
+        for rgb in palette_rgb:
+            flat_palette.extend([rgb[0], rgb[1], rgb[2]])
+        flat_palette.extend([0] * (768 - len(flat_palette)))
+        final_indexed.putpalette(flat_palette)
+
+        # Convert back to RGBA
+        result = final_indexed.convert("RGBA")
+
+        # BUG-FIX: Enforce binary alpha for WYSIWYG fidelity.
+        # Index 0 is always fully transparent, Indices 1-15 are fully opaque.
+        binary_alpha = np.where(pixels == 0, 0, 255).astype(np.uint8)
+        result.putalpha(Image.fromarray(binary_alpha, mode="L"))
+
+        return result
 
     def _apply_transforms(
         self,
@@ -281,15 +434,13 @@ class SpriteCompositor:
             sheet_palette: User-defined palette with color mappings (preferred).
 
         Returns:
-            Quantized RGBA image.
+            Quantized RGBA image with binary alpha (WYSIWYG).
         """
-        # Save original alpha before quantization
-        original_alpha = image.split()[3]
-
         # Priority: sheet_palette > capture palette (matches injection behavior)
         if sheet_palette is not None:
             # Use sheet palette (user-defined for consistent AI frame rendering)
-            palette_rgb = list(sheet_palette.colors)
+            # Snap palette colors to SNES precision for WYSIWYG fidelity
+            palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
             if sheet_palette.color_mappings:
                 # Use explicit color mappings
                 indexed = quantize_with_mappings(
@@ -326,7 +477,11 @@ class SpriteCompositor:
         # Convert back to RGBA for compositing
         quantized_rgba = indexed.convert("RGBA")
 
-        # Restore original alpha (quantization may have changed it)
-        quantized_rgba.putalpha(original_alpha)
+        # BUG-FIX: Enforce binary alpha for WYSIWYG fidelity.
+        # SNES hardware doesn't support semi-transparency in sprites.
+        # Index 0 is always fully transparent, Indices 1-15 are fully opaque.
+        idx_array = np.array(indexed)
+        binary_alpha = np.where(idx_array == 0, 0, 255).astype(np.uint8)
+        quantized_rgba.putalpha(Image.fromarray(binary_alpha, mode="L"))
 
         return quantized_rgba

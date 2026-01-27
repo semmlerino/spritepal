@@ -470,92 +470,28 @@ app.exec()
 
 ### Headless Rendering & Visual Comparisons
 
-For testing visual changes (quantization, alignment, compositing) without launching the full app:
+Test visual changes without launching the full app. Images saved to `/tmp/` can be viewed with the Read tool.
 
-**Render workbench alignment view:**
 ```bash
-# From project file
-uv run python scripts/render_workbench.py --project mapping.spritepal-mapping.json -m 0
+# Render workbench alignment (list mappings with --list-mappings)
+uv run python scripts/render_workbench.py -p mapping.spritepal-mapping.json -m 0 -o /tmp/workbench.png
 
-# List all mappings in project
-uv run python scripts/render_workbench.py --project mapping.spritepal-mapping.json --list-mappings
-
-# With options
-uv run python scripts/render_workbench.py --project mapping.spritepal-mapping.json -m 0 \
-    --use-saved --tile-overlay --show-overflow -o /tmp/workbench.png
-```
-
-**Render quantized preview (tests palette quantization):**
-```bash
-# From project file
-uv run python scripts/render_quantized_preview.py --project mapping.spritepal-mapping.json -m 0
-
-# Side-by-side original vs quantized
-uv run python scripts/render_quantized_preview.py --project mapping.spritepal-mapping.json -m 0 \
+# Render quantized preview (side-by-side original vs quantized)
+uv run python scripts/render_quantized_preview.py -p mapping.spritepal-mapping.json -m 0 \
     --side-by-side --display-scale 8 -o /tmp/quantized.png
 ```
 
-**Testing quantization changes (before/after comparison):**
+**Before/after comparison workflow:**
+1. Render with current code → `/tmp/after.png`
+2. Temporarily revert the change in source
+3. Render with old code → `/tmp/before.png`
+4. Restore the fix
+5. Create comparison: `uv run python -c "from PIL import Image; ..."`  (see `scripts/render_quantized_preview.py` for pattern)
+
+**Quick symmetry test** (verifies quantization preserves symmetric pixels):
 ```bash
-# 1. Generate "after" with current code
-uv run python scripts/render_quantized_preview.py --project mapping.spritepal-mapping.json -m 0 \
-    --display-scale 8 -o /tmp/after.png
-
-# 2. Temporarily revert the change in core/palette_utils.py
-
-# 3. Generate "before" with old code
-uv run python scripts/render_quantized_preview.py --project mapping.spritepal-mapping.json -m 0 \
-    --display-scale 8 -o /tmp/before.png
-
-# 4. Restore the fix
-
-# 5. Create side-by-side comparison
-uv run python -c "
-from PIL import Image, ImageDraw
-before = Image.open('/tmp/before.png')
-after = Image.open('/tmp/after.png')
-gap = 40
-canvas = Image.new('RGBA', (before.width + gap + after.width, max(before.height, after.height) + 30), (32, 32, 32, 255))
-canvas.paste(before, (0, 30))
-canvas.paste(after, (before.width + gap, 30))
-draw = ImageDraw.Draw(canvas)
-draw.text((before.width // 2 - 30, 5), 'BEFORE', fill=(255, 100, 100))
-draw.text((before.width + gap + after.width // 2 - 25, 5), 'AFTER', fill=(100, 255, 100))
-canvas.save('/tmp/comparison.png')
-"
+uv run pytest tests/unit/test_palette_utils.py::TestQuantizationSymmetry -v
 ```
-
-**Synthetic quantization symmetry test:**
-```bash
-# Quick test that quantization preserves symmetry
-uv run python -c "
-import numpy as np
-from PIL import Image
-import sys; sys.path.insert(0, '.')
-from core.palette_utils import quantize_to_palette
-
-# Palette with close colors that trigger boundary conditions
-palette = [(0,0,0), (50,50,50), (100,100,100), (150,150,150), (200,200,200), (255,255,255),
-           (100,50,50), (100,100,50), (50,100,50), (50,100,100), (50,50,100), (100,50,100),
-           (128,64,64), (64,128,64), (64,64,128), (128,128,64)]
-
-img = Image.new('RGBA', (10, 10), (150, 150, 150, 255))
-pixels = img.load()
-# Colors that differ by 1 RGB unit - known to trigger asymmetry without fix
-pixels[2, 4] = (80, 100, 80, 255)   # left
-pixels[7, 4] = (81, 100, 80, 255)   # right
-
-result = quantize_to_palette(img, palette)
-arr = np.array(result)
-print(f'Left={arr[4,2]}, Right={arr[4,7]}, Symmetric={arr[4,2]==arr[4,7]}')
-assert arr[4, 2] == arr[4, 7], 'Asymmetry detected!'
-print('✓ Symmetry preserved')
-"
-```
-
-**View rendered images (requires Read tool or file viewer):**
-- Images saved to `/tmp/` can be viewed with the Read tool in Claude Code
-- Or open directly: `xdg-open /tmp/comparison.png` (Linux with display)
 
 ### Qt Thread Cleanup (gc.collect() Hazard)
 

@@ -36,6 +36,9 @@ class ROMVerificationResult:
     matched_raw: int = 0
     not_found: int = 0
     total: int = 0
+    missing_total: int = 0
+    missing_filled: int = 0
+    missing_not_found: int = 0
 
     @property
     def all_found(self) -> bool:
@@ -69,6 +72,7 @@ class ROMVerificationService:
         self,
         capture_result: CaptureResult,
         selected_entry_ids: list[int] | None = None,
+        include_missing: bool = False,
     ) -> ROMVerificationResult:
         """Verify tile ROM offsets against the actual ROM.
 
@@ -77,6 +81,8 @@ class ROMVerificationService:
         Args:
             capture_result: Parsed capture with tile data.
             selected_entry_ids: If provided, only process these entries.
+            include_missing: If True, attempt to fill tiles with missing rom_offset
+                by searching ROM data (mutates tiles in-place).
 
         Returns:
             ROMVerificationResult with corrections and statistics.
@@ -87,6 +93,9 @@ class ROMVerificationService:
         matched_hal = 0
         matched_raw = 0
         not_found = 0
+        missing_total = 0
+        missing_filled = 0
+        missing_not_found = 0
 
         # Initialize matcher
         matcher = ROMTileMatcher(str(self._rom_path))
@@ -103,6 +112,23 @@ class ROMVerificationService:
 
             for tile in entry.tiles:
                 if tile.rom_offset is None:
+                    if not include_missing:
+                        continue
+                    missing_total += 1
+                    if len(tile.data_bytes) != 32:
+                        missing_not_found += 1
+                        continue
+                    matches = matcher.lookup_vram_tile(tile.data_bytes)
+                    if matches:
+                        tile.rom_offset = matches[0].rom_offset
+                        missing_filled += 1
+                    else:
+                        raw_offset = self._search_raw_tile(tile.data_bytes)
+                        if raw_offset is not None:
+                            tile.rom_offset = raw_offset
+                            missing_filled += 1
+                        else:
+                            missing_not_found += 1
                     continue
 
                 # Skip if already processed
@@ -152,6 +178,13 @@ class ROMVerificationService:
             matched_raw,
             not_found,
         )
+        if include_missing and missing_total > 0:
+            logger.info(
+                "ROM attribution: filled %d/%d missing tile offsets (%d not found)",
+                missing_filled,
+                missing_total,
+                missing_not_found,
+            )
 
         return ROMVerificationResult(
             corrections=corrections,
@@ -159,6 +192,9 @@ class ROMVerificationService:
             matched_raw=matched_raw,
             not_found=not_found,
             total=total,
+            missing_total=missing_total,
+            missing_filled=missing_filled,
+            missing_not_found=missing_not_found,
         )
 
     def apply_corrections(
