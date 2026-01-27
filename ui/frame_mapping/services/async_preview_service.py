@@ -249,7 +249,21 @@ class AsyncPreviewService(QObject):
         self._cleanup_thread()
 
     def _cleanup_thread(self) -> None:
-        """Clean up thread resources."""
+        """Clean up thread resources.
+
+        Signals are disconnected first to prevent stale results from propagating
+        to the UI. The request_id mechanism provides additional protection against
+        processing outdated results.
+        """
+        # Disconnect signals first to prevent stale results from reaching UI
+        if self._worker is not None:
+            try:
+                self._worker.preview_ready.disconnect()
+                self._worker.error.disconnect()
+                self._worker.finished.disconnect()
+            except (RuntimeError, TypeError):
+                pass  # Already disconnected or never connected
+
         if self._thread is not None:
             if self._thread.isRunning():
                 self._thread.quit()

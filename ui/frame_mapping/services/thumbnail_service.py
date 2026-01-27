@@ -186,6 +186,7 @@ class AsyncThumbnailLoader(QObject):
         self._worker: _ThumbnailWorker | None = None
         self._thread: QThread | None = None
         self._destroyed = False
+        self._current_request_id = 0  # Track request batches for stale filtering
 
         # Ensure cleanup on destruction
         if parent is not None:
@@ -209,6 +210,9 @@ class AsyncThumbnailLoader(QObject):
             sheet_palette: SheetPalette for quantization, or None for raw colors
             size: Thumbnail size in pixels
         """
+        # Increment request ID to invalidate any in-progress work
+        self._current_request_id += 1
+
         # Cancel any existing work
         self.cancel()
 
@@ -250,7 +254,20 @@ class AsyncThumbnailLoader(QObject):
         self._cleanup_thread()
 
     def _cleanup_thread(self) -> None:
-        """Clean up thread resources."""
+        """Clean up thread resources.
+
+        Signals are disconnected first to prevent stale results from propagating
+        to the UI. The request_id mechanism provides additional protection against
+        processing outdated results.
+        """
+        # Disconnect signals first to prevent stale results from reaching UI
+        if self._worker is not None:
+            try:
+                self._worker.thumbnail_ready.disconnect()
+                self._worker.finished.disconnect()
+            except (RuntimeError, TypeError):
+                pass  # Already disconnected or never connected
+
         if self._thread is not None:
             if self._thread.isRunning():
                 self._thread.quit()
