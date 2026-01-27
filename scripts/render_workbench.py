@@ -347,7 +347,7 @@ def compute_optimal_align(
     scale_x = tile_width / ai_content_width
     scale_y = tile_height / ai_content_height
     initial_scale = min(scale_x, scale_y)
-    initial_scale = max(0.1, min(1.0, initial_scale))
+    initial_scale = max(0.01, min(1.0, initial_scale))
 
     # Apply flips to find content bbox corners
     if flip_h:
@@ -381,9 +381,10 @@ def compute_optimal_align(
             return (True, center_offset_x, center_offset_y)
 
         # Try adjusting position - search in a grid around center
-        # The search range is how far we can shift in each direction
-        max_shift_x = int(tile_width - scaled_width) // 2 + 4
-        max_shift_y = int(tile_height - scaled_height) // 2 + 4
+        # Use abs() to ensure search range is positive even when content > tiles
+        margin = 4
+        max_shift_x = max(abs(int(tile_width - scaled_width)) // 2 + margin, margin)
+        max_shift_y = max(abs(int(tile_height - scaled_height)) // 2 + margin, margin)
 
         # Start from center, spiral outward
         for radius in range(1, max(max_shift_x, max_shift_y) + 1):
@@ -404,7 +405,7 @@ def compute_optimal_align(
         return (False, center_offset_x, center_offset_y)
 
     # Binary search for maximum scale that fits
-    low = 0.1
+    low = 0.01
     high = initial_scale * 1.1  # Allow slight overshoot for search
     high = min(high, 1.0)
     best_scale = low
