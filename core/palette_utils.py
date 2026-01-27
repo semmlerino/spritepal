@@ -28,6 +28,13 @@ SNES_PALETTE_SIZE = 16
 # this same value to ensure WYSIWYG behavior.
 QUANTIZATION_TRANSPARENCY_THRESHOLD = 128
 
+# Just Noticeable Difference (JND) threshold for stable tie-breaking in quantization.
+# LAB JND is ~2.3. When distances differ by less than JND² (~5.29), colors are
+# perceptually equivalent → pick lowest palette index for consistency.
+# This prevents symmetric pixels with near-identical RGB values from mapping to
+# different palette entries due to floating-point decision boundary effects.
+JND_THRESHOLD_SQ = 5.29
+
 
 def _rgb_array_to_lab(rgb: NDArray[np.int32]) -> NDArray[np.float64]:
     """Convert RGB array to CIELAB color space (vectorized).
@@ -82,6 +89,33 @@ def _rgb_array_to_lab(rgb: NDArray[np.int32]) -> NDArray[np.float64]:
     b_val = 200.0 * (f_y - f_z)
 
     return np.stack([L, a, b_val], axis=-1)
+
+
+def _stable_argmin(
+    distances: NDArray[np.float64],
+    jnd_sq: float = JND_THRESHOLD_SQ,
+) -> NDArray[np.uint8]:
+    """Select palette indices with stable tie-breaking for near-equal distances.
+
+    When multiple palette colors are within JND of the minimum distance,
+    consistently picks the lowest index. This ensures symmetric pixels with
+    nearly-identical colors map to the same palette entry, preventing
+    asymmetric visual artifacts during quantization.
+
+    Args:
+        distances: Array of shape (H, W, 16) with squared distances to each palette color
+        jnd_sq: Squared JND threshold for treating distances as equivalent
+
+    Returns:
+        Array of shape (H, W) with palette indices (uint8)
+    """
+    min_dist = np.min(distances, axis=-1, keepdims=True)
+    candidates = distances <= (min_dist + jnd_sq)
+    # Create index array that broadcasts to (H, W, 16)
+    index_array = np.arange(16, dtype=np.uint8).reshape(1, 1, 16)
+    # For non-candidates, use 255 (max uint8) so argmin picks from candidates
+    candidate_indices = np.where(candidates, index_array, np.uint8(255))
+    return np.argmin(candidate_indices, axis=-1).astype(np.uint8)
 
 
 def bgr555_to_rgb(bgr555: int) -> tuple[int, int, int]:
@@ -198,8 +232,9 @@ def quantize_to_palette(
     opaque_mask = ~transparent_mask
     distances[opaque_mask, 0] = np.inf
 
-    # Find nearest color for each pixel
-    indices = np.argmin(distances, axis=-1).astype(np.uint8)  # Shape: (H, W)
+    # Find nearest color for each pixel using stable tie-breaking
+    # This ensures symmetric pixels with near-identical colors map consistently
+    indices = _stable_argmin(distances)  # Shape: (H, W)
 
     # Override transparent pixels to index 0
     indices[transparent_mask] = 0
@@ -285,8 +320,9 @@ def quantize_with_mappings(
     opaque_mask = ~transparent_mask
     distances[opaque_mask, 0] = np.inf
 
-    # Find nearest color for each pixel (fallback)
-    indices = np.argmin(distances, axis=-1).astype(np.uint8)  # Shape: (H, W)
+    # Find nearest color for each pixel (fallback) using stable tie-breaking
+    # This ensures symmetric pixels with near-identical colors map consistently
+    indices = _stable_argmin(distances)  # Shape: (H, W)
 
     # Apply explicit color mappings (override nearest-color for mapped colors)
     mapped_count = 0

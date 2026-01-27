@@ -7,8 +7,10 @@ import pytest
 from PIL import Image
 
 from core.palette_utils import (
+    JND_THRESHOLD_SQ,
     QUANTIZATION_TRANSPARENCY_THRESHOLD,
     SNES_PALETTE_SIZE,
+    _stable_argmin,
     bgr555_to_rgb,
     extract_unique_colors,
     find_nearest_palette_index,
@@ -529,3 +531,172 @@ class TestQuantizeColorsToPalette:
         result = quantize_colors_to_palette({})
         assert len(result) == SNES_PALETTE_SIZE
         assert all(c == (0, 0, 0) for c in result)
+
+
+class TestStableArgmin:
+    """Tests for _stable_argmin helper - stable tie-breaking in quantization."""
+
+    def test_picks_lowest_index_among_ties(self) -> None:
+        """When distances are within JND threshold, picks lowest index."""
+        # Create distance array where indices 1 and 2 are nearly equal
+        # Shape: (1, 1, 16) - single pixel
+        distances = np.full((1, 1, 16), 1000.0, dtype=np.float64)
+        distances[0, 0, 0] = np.inf  # Index 0 excluded (transparency)
+        distances[0, 0, 1] = 10.0  # Minimum
+        distances[0, 0, 2] = 10.0 + JND_THRESHOLD_SQ - 0.1  # Within JND of minimum
+
+        result = _stable_argmin(distances)
+        assert result[0, 0] == 1, "Should pick lowest index (1) among near-ties"
+
+    def test_clear_winner_not_affected(self) -> None:
+        """Clear winner with large distance gap is unaffected by threshold."""
+        distances = np.full((1, 1, 16), 1000.0, dtype=np.float64)
+        distances[0, 0, 0] = np.inf
+        distances[0, 0, 3] = 5.0  # Clear winner
+        distances[0, 0, 1] = 50.0  # Far from minimum
+        distances[0, 0, 2] = 100.0
+
+        result = _stable_argmin(distances)
+        assert result[0, 0] == 3, "Clear winner should still be selected"
+
+    def test_two_pixels_with_reversed_tie_order_get_same_index(self) -> None:
+        """Two pixels with tie-scenario reversed should both pick same index."""
+        # Pixel A: index 1 slightly closer, index 2 slightly further
+        # Pixel B: index 2 slightly closer, index 1 slightly further
+        # Both should map to index 1 (lowest among ties)
+        distances = np.full((2, 1, 16), 1000.0, dtype=np.float64)
+        distances[:, :, 0] = np.inf
+
+        # Pixel A: dist[1]=10.0, dist[2]=10.1 (within JND)
+        distances[0, 0, 1] = 10.0
+        distances[0, 0, 2] = 10.1
+
+        # Pixel B: dist[1]=10.1, dist[2]=10.0 (reversed, still within JND)
+        distances[1, 0, 1] = 10.1
+        distances[1, 0, 2] = 10.0
+
+        result = _stable_argmin(distances)
+        assert result[0, 0] == result[1, 0], "Symmetric pixels should map to same index"
+        assert result[0, 0] == 1, "Both should pick lowest index among ties"
+
+    def test_custom_jnd_threshold(self) -> None:
+        """Custom jnd_sq parameter should override default threshold."""
+        distances = np.full((1, 1, 16), 1000.0, dtype=np.float64)
+        distances[0, 0, 0] = np.inf
+        distances[0, 0, 1] = 10.0
+        distances[0, 0, 2] = 12.0  # 2.0 apart
+
+        # With default JND (~5.29), these are ties -> pick 1
+        result_default = _stable_argmin(distances)
+        assert result_default[0, 0] == 1
+
+        # With tight threshold (1.0), these are NOT ties -> pick 1 (still minimum)
+        result_tight = _stable_argmin(distances, jnd_sq=1.0)
+        assert result_tight[0, 0] == 1
+
+
+class TestQuantizationSymmetry:
+    """Tests verifying symmetric images stay symmetric after quantization."""
+
+    def test_near_identical_colors_map_to_same_index(self) -> None:
+        """Pixels differing by 1-2 RGB should map to same palette index."""
+        # Create 2x1 image with nearly-identical colors (simulates AI generation noise)
+        img = Image.new("RGBA", (2, 1))
+        img.putpixel((0, 0), (100, 100, 100, 255))  # Base gray
+        img.putpixel((1, 0), (101, 100, 100, 255))  # Off by 1 in red
+
+        # Palette with two grays that could both match
+        palette = [
+            (0, 0, 0),  # 0: transparency
+            (98, 98, 98),  # 1: darker gray
+            (102, 102, 102),  # 2: lighter gray
+        ]
+        palette.extend([(128, 128, 128)] * 13)
+
+        result = quantize_to_palette(img, palette)
+        pixels = list(result.getdata())
+
+        # Both pixels should map to same index despite RGB difference
+        assert pixels[0] == pixels[1], f"Near-identical pixels mapped to different indices: {pixels[0]} vs {pixels[1]}"
+
+    def test_mirrored_image_stays_symmetric(self) -> None:
+        """Horizontal mirror of image should produce same quantized result."""
+        # Create asymmetric test image
+        img = Image.new("RGBA", (4, 2), (0, 0, 0, 0))
+        # Fill with gradient that varies slightly
+        for x in range(4):
+            for y in range(2):
+                # Small variations in color to trigger tie scenarios
+                r = 100 + x + y
+                g = 100 + x
+                b = 100
+                img.putpixel((x, y), (r, g, b, 255))
+
+        # Palette with colors that could cause ties
+        palette = [
+            (0, 0, 0),  # 0
+            (99, 99, 99),  # 1
+            (103, 103, 103),  # 2
+            (107, 107, 107),  # 3
+        ]
+        palette.extend([(128, 128, 128)] * 12)
+
+        # Quantize original and mirrored
+        result_orig = quantize_to_palette(img, palette)
+        result_mirror = quantize_to_palette(img.transpose(Image.FLIP_LEFT_RIGHT), palette)
+
+        # Mirror the result back
+        result_mirror_back = result_mirror.transpose(Image.FLIP_LEFT_RIGHT)
+
+        # Compare pixel data
+        pixels_orig = list(result_orig.getdata())
+        pixels_mirror = list(result_mirror_back.getdata())
+
+        assert pixels_orig == pixels_mirror, "Mirrored image should quantize symmetrically"
+
+    def test_symmetric_eyes_stay_symmetric(self) -> None:
+        """Simulated symmetric eye pattern should remain symmetric after quantization.
+
+        This is the core bug scenario: symmetric visual features (like eyes)
+        become asymmetric when near-identical pixels map to different colors.
+        """
+        # Create 8x4 image simulating two symmetric "eyes"
+        # Each eye is a 2x2 block with nearly-identical "pupil" color
+        img = Image.new("RGBA", (8, 4), (200, 200, 200, 255))  # Light gray background
+
+        # Left eye pupil (2x2 at position 1,1)
+        # Simulate AI-generation noise: slight RGB variations
+        img.putpixel((1, 1), (30, 30, 32, 255))
+        img.putpixel((2, 1), (31, 30, 30, 255))
+        img.putpixel((1, 2), (30, 31, 30, 255))
+        img.putpixel((2, 2), (30, 30, 31, 255))
+
+        # Right eye pupil (2x2 at position 5,1) - mirror of left
+        # Same colors but in mirror positions
+        img.putpixel((6, 1), (30, 30, 32, 255))
+        img.putpixel((5, 1), (31, 30, 30, 255))
+        img.putpixel((6, 2), (30, 31, 30, 255))
+        img.putpixel((5, 2), (30, 30, 31, 255))
+
+        # Palette with colors that could cause tie scenarios for dark grays
+        palette = [
+            (0, 0, 0),  # 0: transparency
+            (24, 24, 24),  # 1: very dark gray
+            (32, 32, 32),  # 2: dark gray
+            (200, 200, 200),  # 3: light gray (background)
+        ]
+        palette.extend([(128, 128, 128)] * 12)
+
+        result = quantize_to_palette(img, palette)
+        pixels = np.array(result)
+
+        # Extract eye regions
+        left_eye = pixels[1:3, 1:3]
+        right_eye = pixels[1:3, 5:7]
+
+        # Right eye should be horizontal mirror of left eye
+        right_eye_mirrored = np.fliplr(right_eye)
+
+        assert np.array_equal(left_eye, right_eye_mirrored), (
+            f"Eyes should be symmetric!\nLeft eye:\n{left_eye}\nRight eye (mirrored):\n{right_eye_mirrored}"
+        )
