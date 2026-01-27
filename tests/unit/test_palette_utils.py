@@ -411,25 +411,35 @@ class TestSnapToSnesColor:
     """Tests for snap_to_snes_color function."""
 
     def test_exact_snes_color_unchanged(self) -> None:
-        """Colors already SNES-valid should be unchanged."""
-        assert snap_to_snes_color((248, 128, 0)) == (248, 128, 0)
-        assert snap_to_snes_color((0, 0, 0)) == (0, 0, 0)
+        """Colors that are already SNES-valid should be unchanged."""
+        # Values produced by (c5 << 3) | (c5 >> 2) are the ONLY valid SNES values
+        assert snap_to_snes_color((255, 255, 255)) == (255, 255, 255)  # 31 -> 255
+        assert snap_to_snes_color((0, 0, 0)) == (0, 0, 0)  # 0 -> 0
+        assert snap_to_snes_color((8, 8, 8)) == (8, 8, 8)  # 1 -> 8
+        assert snap_to_snes_color((132, 132, 132)) == (132, 132, 132)  # 16 -> 132
+        # Note: 248 is NOT a valid SNES-expanded value (31 expands to 255, not 248)
 
-    def test_snaps_to_nearest_multiple_of_8(self) -> None:
-        """Colors should snap to nearest multiple of 8."""
-        # 255 snaps to 248 (nearest valid SNES value)
-        assert snap_to_snes_color((255, 255, 255)) == (248, 248, 248)
-        # 4 snaps to 0
+    def test_snaps_to_nearest_snes_value(self) -> None:
+        """Colors should snap to nearest SNES-valid value."""
+        # 248 is NOT a valid SNES-expanded value; round(248/8)=31 -> expands to 255
+        assert snap_to_snes_color((248, 248, 248)) == (255, 255, 255)
+        # 4 rounds to 5-bit 0 (banker's rounding: round(0.5)=0), expands to 0
         assert snap_to_snes_color((4, 4, 4)) == (0, 0, 0)
-        # 5 snaps to 8
+        # 5 rounds to 5-bit 1 (round(0.625)=1), expands to 8
         assert snap_to_snes_color((5, 5, 5)) == (8, 8, 8)
+        # 127 rounds to 5-bit 16 (round(15.875)=16), expands to 132
+        assert snap_to_snes_color((127, 127, 127)) == (132, 132, 132)
 
-    def test_clamps_to_valid_range(self) -> None:
-        """Values should be clamped to 0-248."""
-        # Already tested via 255 -> 248, but be explicit
-        result = snap_to_snes_color((255, 0, 127))
-        assert result[0] == 248
-        assert result[2] == 128
+    def test_round_trip_consistency(self) -> None:
+        """Snapped values should round-trip through BGR555 correctly."""
+        from core.rom_palette_injector import ROMPaletteInjector
+
+        for val in [0, 50, 100, 150, 200, 255]:
+            snapped = snap_to_snes_color((val, val, val))
+            # Convert to BGR555 and back
+            bgr = ROMPaletteInjector.rgb888_to_bgr555(snapped[0], snapped[1], snapped[2])
+            recovered = bgr555_to_rgb(bgr)
+            assert recovered == snapped, f"Round-trip failed for {val}: {snapped} -> {bgr} -> {recovered}"
 
 
 class TestFindNearestPaletteIndex:
@@ -503,14 +513,16 @@ class TestQuantizeColorsToPalette:
         assert result[0] == (0, 0, 0)
 
     def test_snaps_to_snes_by_default(self) -> None:
-        """Colors should be snapped to SNES-valid values."""
+        """Colors should be snapped to SNES-valid values that round-trip correctly."""
         colors = {(255, 127, 63): 100}
         result = quantize_colors_to_palette(colors, snap_to_snes=True)
-        # All colors should be multiples of 8
+        # All colors should round-trip correctly through 5-bit conversion
+        # Valid SNES values satisfy: c8 == (c5 << 3) | (c5 >> 2) where c5 = c8 >> 3
         for r, g, b in result:
-            assert r % 8 == 0, f"Red {r} not multiple of 8"
-            assert g % 8 == 0, f"Green {g} not multiple of 8"
-            assert b % 8 == 0, f"Blue {b} not multiple of 8"
+            for c, name in [(r, "Red"), (g, "Green"), (b, "Blue")]:
+                c5 = c >> 3
+                expected = (c5 << 3) | (c5 >> 2)
+                assert c == expected, f"{name} {c} is not a valid SNES-expanded value"
 
     def test_empty_colors_returns_black_palette(self) -> None:
         """Empty color dict should return all-black palette."""

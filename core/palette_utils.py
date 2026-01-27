@@ -330,20 +330,26 @@ def quantize_with_mappings(
 def snap_to_snes_color(color: tuple[int, int, int]) -> tuple[int, int, int]:
     """Snap an RGB color to the nearest SNES-valid color.
 
-    SNES uses BGR555 (5 bits per channel), so valid RGB888 values
-    must be multiples of 8: 0, 8, 16, ..., 240, 248.
+    SNES uses BGR555 (5 bits per channel). Valid RGB888 values are those
+    that round-trip correctly through 5-bit conversion using the formula:
+    (c5 << 3) | (c5 >> 2)
+
+    This produces values: 0, 8, 16, 24, 33, 41, ... 231, 239, 247, 255
+    (NOT simple multiples of 8).
 
     Args:
         color: RGB tuple with 8-bit values (0-255)
 
     Returns:
-        RGB tuple snapped to nearest SNES-valid values
+        RGB tuple snapped to nearest SNES-valid values that round-trip correctly
     """
 
     def snap_component(val: int) -> int:
-        # Round to nearest multiple of 8, clamped to 0-248
-        snapped = round(val / 8) * 8
-        return max(0, min(248, snapped))
+        # Round to nearest 5-bit value, clamped to valid range
+        c5 = round(val / 8)
+        c5 = max(0, min(31, c5))
+        # Expand back to 8-bit using the standard SNES formula
+        return (c5 << 3) | (c5 >> 2)
 
     return (snap_component(color[0]), snap_component(color[1]), snap_component(color[2]))
 
