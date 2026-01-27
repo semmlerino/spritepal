@@ -25,8 +25,8 @@ if TYPE_CHECKING:
 
 from typing import override
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QKeySequence
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QAction, QCloseEvent, QKeyEvent, QKeySequence, QShowEvent
 from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
@@ -167,15 +167,15 @@ class MainWindow(QMainWindow):
         # Injection state (Phase 4e)
         self._current_injection_dialog: InjectionDialog | None = None
 
+        # Deferred startup flag (load ROM/project in showEvent for faster first paint)
+        self._startup_deferred = False
+
         self._setup_ui()
         self._setup_managers()  # This creates all UI widgets via managers
         self._connect_signals()
 
-        # Load last ROM AFTER signals are connected, so Sprite Editor receives rom_loaded
-        self.rom_extraction_panel.load_last_rom_deferred()
-
-        # Load last .spritepal project if one was previously opened
-        self._sprite_editor_workspace.rom_workflow_controller.load_last_project()
+        # NOTE: ROM and project loading deferred to showEvent/_perform_deferred_startup
+        # This allows the window to render before potentially blocking I/O operations
 
         # Controller will be created on first access via property
         # This breaks the circular dependency: tests can create MainWindow without hanging
@@ -1726,6 +1726,30 @@ class MainWindow(QMainWindow):
     # Session restore/save now handled by UICoordinator
 
     # Session save now handled by UICoordinator
+
+    @override
+    def showEvent(self, event: QShowEvent) -> None:
+        """Handle window show event.
+
+        Defers ROM and project loading until after first paint for faster startup.
+        Uses QTimer.singleShot(0) to let event loop process pending events first.
+        """
+        super().showEvent(event)
+        if not self._startup_deferred:
+            self._startup_deferred = True
+            QTimer.singleShot(0, self._perform_deferred_startup)
+
+    def _perform_deferred_startup(self) -> None:
+        """Perform deferred startup operations.
+
+        Called after the first showEvent to load ROM and project after
+        the window has rendered. This improves time-to-first-paint.
+        """
+        # Load last ROM AFTER window is visible, so Sprite Editor receives rom_loaded
+        self.rom_extraction_panel.load_last_rom_deferred()
+
+        # Load last .spritepal project if one was previously opened
+        self._sprite_editor_workspace.rom_workflow_controller.load_last_project()
 
     @override
     def closeEvent(self, a0: QCloseEvent | None) -> None:

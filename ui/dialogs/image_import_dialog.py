@@ -16,13 +16,15 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
-from core.color_quantization import ColorQuantizer, QuantizationResult
+from core.color_quantization import QuantizationResult
 from ui.components.base.dialog_base import DialogBase
+from ui.workers.quantization_worker import AsyncQuantizationService
 
 if TYPE_CHECKING:
     import numpy as np
@@ -62,12 +64,21 @@ class ImageImportDialog(DialogBase):
         self._source_image: Image.Image | None = None
         self._result: QuantizationResult | None = None
 
+        # Async quantization service
+        self._quantization_service: AsyncQuantizationService | None = None
+
         super().__init__(
             parent,
             title="Import Image",
             min_size=(700, 550),
             with_button_box=True,
         )
+
+        # Set up async quantization service after UI is created
+        self._quantization_service = AsyncQuantizationService(self)
+        self._quantization_service.result_ready.connect(self._on_quantization_ready)
+        self._quantization_service.quantization_failed.connect(self._on_quantization_failed)
+        self._quantization_service.quantization_started.connect(self._on_quantization_started)
 
         # Customize button box
         if self.button_box:
@@ -106,6 +117,14 @@ class ImageImportDialog(DialogBase):
         self._quantized_preview.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Sunken)
         self._quantized_preview.setScaledContents(False)
         quantized_layout.addWidget(self._quantized_preview)
+
+        # Loading indicator (hidden by default)
+        self._loading_bar = QProgressBar()
+        self._loading_bar.setRange(0, 0)  # Indeterminate mode
+        self._loading_bar.setVisible(False)
+        self._loading_bar.setMaximumHeight(16)
+        quantized_layout.addWidget(self._loading_bar)
+
         self._quantized_info = QLabel("--")
         quantized_layout.addWidget(self._quantized_info)
         preview_layout.addWidget(quantized_group)
@@ -241,26 +260,39 @@ class ImageImportDialog(DialogBase):
         self._original_info.setText(f"{w} x {h} pixels, {mode}")
 
     def _update_quantized_preview(self) -> None:
-        """Generate and display quantized preview."""
-        if self._source_image is None:
+        """Request async quantization and preview generation."""
+        if self._source_image is None or self._quantization_service is None:
             return
 
-        # Create quantizer with current options
-        quantizer = ColorQuantizer(
+        # Disable import button while quantizing
+        self._set_import_enabled(False)
+
+        # Request async quantization
+        self._quantization_service.request_quantization(
+            source_image=self._source_image,
+            target_size=self._target_size,
             dither=self._dither_checkbox.isChecked(),
             transparency_threshold=127 if self._transparency_checkbox.isChecked() else 0,
         )
 
-        # Quantize the image
-        self._result = quantizer.quantize(
-            self._source_image,
-            target_size=self._target_size,
-        )
+    def _on_quantization_started(self) -> None:
+        """Handle quantization start - show loading indicator."""
+        self._loading_bar.setVisible(True)
+        self._quantized_info.setText("Quantizing...")
+
+    def _on_quantization_ready(self, result: QuantizationResult) -> None:
+        """Handle async quantization completion.
+
+        Args:
+            result: The quantization result from the worker.
+        """
+        self._loading_bar.setVisible(False)
+        self._result = result
 
         # Update preview image
         preview_image = self._indexed_to_pil(
-            self._result.indexed_data,
-            self._result.palette,
+            result.indexed_data,
+            result.palette,
         )
         pixmap = self._pil_to_qpixmap(preview_image)
         if pixmap:
@@ -274,7 +306,7 @@ class ImageImportDialog(DialogBase):
             self._quantized_preview.setPixmap(scaled)
 
         # Update info
-        h, w = self._result.indexed_data.shape
+        h, w = result.indexed_data.shape
         self._quantized_info.setText(f"{w} x {h} pixels, 16 colors")
 
         # Update palette display
@@ -282,6 +314,17 @@ class ImageImportDialog(DialogBase):
 
         # Enable import button
         self._set_import_enabled(True)
+
+    def _on_quantization_failed(self, error_message: str) -> None:
+        """Handle quantization failure.
+
+        Args:
+            error_message: Description of the failure.
+        """
+        self._loading_bar.setVisible(False)
+        self._quantized_info.setText(f"Error: {error_message}")
+        self._result = None
+        self._set_import_enabled(False)
 
     def _update_palette_display(self) -> None:
         """Update the palette color swatches."""
@@ -325,7 +368,7 @@ class ImageImportDialog(DialogBase):
         return QPixmap.fromImage(qimage.copy())
 
     def _create_checkerboard(self, w: int, h: int, cell_size: int = 8) -> NDArray[np.uint8]:
-        """Create checkerboard pattern for transparency display.
+        """Create checkerboard pattern for transparency display using vectorized ops.
 
         Args:
             w: Width in pixels
@@ -335,16 +378,25 @@ class ImageImportDialog(DialogBase):
         Returns:
             RGBA numpy array with checkerboard pattern
         """
-        import numpy as np
+        # Create coordinate grids
+        y_coords = np.arange(h)
+        x_coords = np.arange(w)
+        y_grid, x_grid = np.meshgrid(y_coords, x_coords, indexing="ij")
 
+        # Calculate which tile each pixel belongs to
+        tile_x = x_grid // cell_size
+        tile_y = y_grid // cell_size
+
+        # Create checkerboard mask (True for light, False for dark)
+        is_light = ((tile_x + tile_y) % 2) == 0
+
+        # Create RGBA array
         rgba = np.zeros((h, w, 4), dtype=np.uint8)
         light = (220, 220, 220, 255)  # Match PixelCanvas colors
         dark = (180, 180, 180, 255)
 
-        for y in range(h):
-            for x in range(w):
-                is_light = ((x // cell_size) + (y // cell_size)) % 2 == 0
-                rgba[y, x] = light if is_light else dark
+        rgba[is_light] = light
+        rgba[~is_light] = dark
 
         return rgba
 

@@ -14,6 +14,7 @@ from PIL import Image
 from PySide6.QtCore import QRectF
 from PySide6.QtGui import QPixmap
 
+from tests.fixtures.timeouts import worker_timeout
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 
 if TYPE_CHECKING:
@@ -125,7 +126,11 @@ class TestPreviewGeneration:
 
 
 class TestPreviewWithMockData:
-    """Tests for preview generation with mock data."""
+    """Tests for preview generation with mock data.
+
+    These tests verify async preview generation using the AsyncPreviewService.
+    They wait for the preview_ready signal to confirm preview completion.
+    """
 
     def test_preview_generates_with_valid_data(self, qtbot: QtBot) -> None:
         """Preview should be generated when all required data is present."""
@@ -147,6 +152,7 @@ class TestPreviewWithMockData:
         mock_capture.bounding_box.width = 32
         mock_capture.bounding_box.height = 32
         mock_capture.palettes = {}
+        mock_capture.entries = []  # Required for compositor
         canvas._capture_result = mock_capture
 
         canvas.set_preview_enabled(True)
@@ -157,7 +163,12 @@ class TestPreviewWithMockData:
             mock_renderer.render_selection.return_value = Image.new("RGBA", (32, 32), (0, 255, 0, 255))
             mock_renderer_cls.return_value = mock_renderer
 
-            canvas._generate_preview()
+            # Wait for async preview completion
+            with qtbot.waitSignal(
+                canvas._async_preview_service.preview_ready,
+                timeout=worker_timeout(),
+            ):
+                canvas._generate_preview()
 
         assert canvas.is_preview_visible()
 
@@ -182,6 +193,7 @@ class TestPreviewWithMockData:
         mock_capture.bounding_box.height = 32
         # Provide a 16-color palette
         mock_capture.palettes = {0: [(0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)] + [(128, 128, 128)] * 12}
+        mock_capture.entries = []  # Required for compositor
         canvas._capture_result = mock_capture
 
         canvas.set_preview_enabled(True)
@@ -191,7 +203,12 @@ class TestPreviewWithMockData:
             mock_renderer.render_selection.return_value = Image.new("RGBA", (32, 32), (0, 255, 0, 255))
             mock_renderer_cls.return_value = mock_renderer
 
-            canvas._generate_preview()
+            # Wait for async preview completion
+            with qtbot.waitSignal(
+                canvas._async_preview_service.preview_ready,
+                timeout=worker_timeout(),
+            ):
+                canvas._generate_preview()
 
         # Should still be visible even with palette quantization
         assert canvas.is_preview_visible()

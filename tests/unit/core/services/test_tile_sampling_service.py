@@ -2,11 +2,15 @@
 
 Focuses on the check_content_outside_tiles method which detects
 AI frame content that extends beyond game sprite tile boundaries.
+
+Also tests the vectorized get_touched_tiles method to ensure
+it produces the same results as the original loop implementation.
 """
 
 from __future__ import annotations
 
 import pytest
+from PySide6.QtCore import QRect
 
 from core.services.tile_sampling_service import TileSamplingService
 
@@ -360,3 +364,185 @@ class TestCheckContentOutsideTiles:
         total_overflow_area = sum(r[2] * r[3] for r in overflow_rects)
         # Gap is 16x16 = 256 pixels
         assert total_overflow_area == 16 * 16
+
+
+class TestGetTouchedTilesVectorized:
+    """Tests for get_touched_tiles vectorized implementation.
+
+    Verifies the NumPy-based vectorized implementation produces
+    the same results as the original loop-based implementation.
+    """
+
+    @pytest.fixture
+    def service(self) -> TileSamplingService:
+        """Create a TileSamplingService instance."""
+        return TileSamplingService()
+
+    def test_empty_tile_list(self, service: TileSamplingService) -> None:
+        """Empty tile list should return empty sets."""
+        tile_rects: list[QRect] = []
+        touched, untouched = service.get_touched_tiles(
+            tile_rects=tile_rects,
+            image_width=32,
+            image_height=32,
+        )
+        assert touched == set()
+        assert untouched == set()
+
+    def test_single_tile_fully_covered(self, service: TileSamplingService) -> None:
+        """Single tile fully covered by overlay should be touched."""
+        tile_rects = [QRect(0, 0, 8, 8)]
+        touched, untouched = service.get_touched_tiles(
+            tile_rects=tile_rects,
+            image_width=32,
+            image_height=32,
+            offset_x=0,
+            offset_y=0,
+            scale=1.0,
+        )
+        assert touched == {0}
+        assert untouched == set()
+
+    def test_single_tile_not_covered(self, service: TileSamplingService) -> None:
+        """Single tile outside overlay bounds should be untouched."""
+        tile_rects = [QRect(100, 100, 8, 8)]  # Outside 32x32 overlay
+        touched, untouched = service.get_touched_tiles(
+            tile_rects=tile_rects,
+            image_width=32,
+            image_height=32,
+            offset_x=0,
+            offset_y=0,
+            scale=1.0,
+        )
+        assert touched == set()
+        assert untouched == {0}
+
+    def test_multiple_tiles_mixed_coverage(self, service: TileSamplingService) -> None:
+        """Multiple tiles with mixed coverage."""
+        tile_rects = [
+            QRect(0, 0, 8, 8),  # Inside - touched
+            QRect(8, 0, 8, 8),  # Inside - touched
+            QRect(100, 0, 8, 8),  # Outside - untouched
+            QRect(16, 16, 8, 8),  # Inside - touched
+        ]
+        touched, untouched = service.get_touched_tiles(
+            tile_rects=tile_rects,
+            image_width=32,
+            image_height=32,
+            offset_x=0,
+            offset_y=0,
+            scale=1.0,
+        )
+        assert touched == {0, 1, 3}
+        assert untouched == {2}
+
+    def test_offset_affects_coverage(self, service: TileSamplingService) -> None:
+        """Offset should affect which tiles are touched."""
+        tile_rects = [
+            QRect(0, 0, 8, 8),  # With offset 10, this is outside
+            QRect(10, 10, 8, 8),  # With offset 10, this is inside
+        ]
+        touched, untouched = service.get_touched_tiles(
+            tile_rects=tile_rects,
+            image_width=32,
+            image_height=32,
+            offset_x=10,
+            offset_y=10,
+            scale=1.0,
+        )
+        assert touched == {1}
+        assert untouched == {0}
+
+    def test_scale_affects_coverage(self, service: TileSamplingService) -> None:
+        """Scale should affect which tiles are touched."""
+        tile_rects = [
+            QRect(0, 0, 8, 8),  # Covered at scale 2.0 (scaled size 64x64)
+            QRect(50, 50, 8, 8),  # Covered at scale 2.0
+            QRect(70, 70, 8, 8),  # Outside at scale 2.0 (only 64x64)
+        ]
+        touched, untouched = service.get_touched_tiles(
+            tile_rects=tile_rects,
+            image_width=32,
+            image_height=32,
+            offset_x=0,
+            offset_y=0,
+            scale=2.0,  # Scaled size becomes 64x64
+        )
+        assert touched == {0, 1}
+        assert untouched == {2}
+
+    def test_vectorized_matches_loop(self, service: TileSamplingService) -> None:
+        """Vectorized implementation should match loop implementation."""
+        # Create a more complex tile arrangement
+        tile_rects = [
+            QRect(0, 0, 8, 8),
+            QRect(8, 0, 8, 8),
+            QRect(16, 0, 8, 8),
+            QRect(0, 8, 8, 8),
+            QRect(8, 8, 8, 8),
+            QRect(16, 8, 8, 8),
+            QRect(24, 24, 8, 8),
+            QRect(100, 100, 8, 8),  # Outside
+        ]
+
+        # Test with various parameters
+        params_list = [
+            {"offset_x": 0, "offset_y": 0, "scale": 1.0},
+            {"offset_x": 5, "offset_y": 5, "scale": 1.0},
+            {"offset_x": 0, "offset_y": 0, "scale": 0.5},
+            {"offset_x": 0, "offset_y": 0, "scale": 2.0},
+        ]
+
+        for params in params_list:
+            # Get results from vectorized (public API)
+            touched_vec, untouched_vec = service.get_touched_tiles(
+                tile_rects=tile_rects,
+                image_width=32,
+                image_height=32,
+                **params,
+            )
+
+            # Get results from loop (internal)
+            touched_loop, untouched_loop = service._get_touched_tiles_loop(
+                tile_rects=tile_rects,
+                image_width=32,
+                image_height=32,
+                **params,
+            )
+
+            assert touched_vec == touched_loop, f"Touched mismatch with params {params}"
+            assert untouched_vec == untouched_loop, f"Untouched mismatch with params {params}"
+
+    def test_edge_case_tile_at_boundary(self, service: TileSamplingService) -> None:
+        """Tile at exact boundary should be untouched (not fully covered)."""
+        tile_rects = [
+            QRect(24, 0, 8, 8),  # Right edge at x=32, same as scaled image width
+        ]
+        # At scale 1.0, image is 32x32, tile needs x + width <= 32
+        # Tile at x=24 with width=8 means x + w = 32, which is exactly equal
+        touched, untouched = service.get_touched_tiles(
+            tile_rects=tile_rects,
+            image_width=32,
+            image_height=32,
+            offset_x=0,
+            offset_y=0,
+            scale=1.0,
+        )
+        assert touched == {0}
+        assert untouched == set()
+
+    def test_tile_exceeds_boundary(self, service: TileSamplingService) -> None:
+        """Tile exceeding boundary should be untouched."""
+        tile_rects = [
+            QRect(25, 0, 8, 8),  # Right edge at x=33, exceeds 32
+        ]
+        touched, untouched = service.get_touched_tiles(
+            tile_rects=tile_rects,
+            image_width=32,
+            image_height=32,
+            offset_x=0,
+            offset_y=0,
+            scale=1.0,
+        )
+        assert touched == set()
+        assert untouched == {0}

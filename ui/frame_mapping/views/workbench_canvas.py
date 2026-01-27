@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Literal, override
 import numpy as np
 from PIL import Image
 from PySide6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor, QMouseEvent, QPainter, QPixmap, QWheelEvent
+from PySide6.QtGui import QBrush, QColor, QImage, QMouseEvent, QPainter, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -48,8 +48,9 @@ from core.frame_mapping_project import AIFrame, GameFrame
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.services.content_bounds_analyzer import ContentBoundsAnalyzer
 from core.services.rgb_to_indexed import load_image_preserving_indices
-from core.services.sprite_compositor import SpriteCompositor, TransformParams
+from core.services.sprite_compositor import TransformParams
 from core.services.tile_sampling_service import TileSamplingService
+from ui.frame_mapping.services.async_preview_service import AsyncPreviewService
 from ui.frame_mapping.services.canvas_config_service import CanvasConfig
 from ui.frame_mapping.views.workbench_items import (
     AIFrameItem,
@@ -293,6 +294,11 @@ class WorkbenchCanvas(QWidget):
 
         # Tile selection state
         self._selected_tile_index: int | None = None
+
+        # Async preview service for offloading compositor to background thread
+        self._async_preview_service = AsyncPreviewService(self)
+        self._async_preview_service.preview_ready.connect(self._on_async_preview_ready)
+        self._async_preview_service.preview_failed.connect(self._on_async_preview_failed)
 
         self._setup_ui()
         self._connect_signals()
@@ -1434,10 +1440,10 @@ class WorkbenchCanvas(QWidget):
         self._preview_timer.start(self._config.preview_debounce_ms)
 
     def _generate_preview(self) -> None:
-        """Generate the in-game preview image.
+        """Generate the in-game preview image asynchronously.
 
-        Uses SpriteCompositor with "original" policy so uncovered areas
-        show original sprite pixels (WYSIWYG preview).
+        Uses AsyncPreviewService to offload SpriteCompositor work to a
+        background thread, preventing UI blocking (50-80ms per preview).
 
         Transform order: flip -> sharpen -> scale (matching injection)
 
@@ -1466,61 +1472,58 @@ class WorkbenchCanvas(QWidget):
             sharpen = self._sharpen_slider.value() / 10.0
             resampling = self._resampling_combo.currentData() or "lanczos"
 
-        try:
-            # Use SpriteCompositor with policy based on "Preserve sprite" checkbox
-            # - Checked: "original" - original sprite visible where AI doesn't cover
-            # - Unchecked: "transparent" - original sprite completely removed
-            uncovered_policy: Literal["transparent", "original"] = (
-                "original" if self._preserve_sprite_checkbox.isChecked() else "transparent"
-            )
-            compositor = SpriteCompositor(uncovered_policy=uncovered_policy)
-            transform = TransformParams(
-                offset_x=offset_x,
-                offset_y=offset_y,
-                flip_h=flip_h,
-                flip_v=flip_v,
-                scale=scale,
-                sharpen=sharpen,
-                resampling=resampling,
-            )
+        # Determine uncovered policy based on "Preserve sprite" checkbox
+        # - Checked: "original" - original sprite visible where AI doesn't cover
+        # - Unchecked: "transparent" - original sprite completely removed
+        uncovered_policy: Literal["transparent", "original"] = (
+            "original" if self._preserve_sprite_checkbox.isChecked() else "transparent"
+        )
 
-            result = compositor.composite_frame(
-                ai_image=self._ai_image,
-                capture_result=self._capture_result,
-                transform=transform,
-                quantize=True,
-                sheet_palette=self._sheet_palette,
-                ai_index_map=self._ai_index_map,
-            )
+        transform = TransformParams(
+            offset_x=offset_x,
+            offset_y=offset_y,
+            flip_h=flip_h,
+            flip_v=flip_v,
+            scale=scale,
+            sharpen=sharpen,
+            resampling=resampling,
+        )
 
-            preview_img = result.composited_image
+        # Request async preview generation
+        self._async_preview_service.request_preview(
+            ai_image=self._ai_image,
+            capture_result=self._capture_result,
+            transform=transform,
+            uncovered_policy=uncovered_policy,
+            sheet_palette=self._sheet_palette,
+            ai_index_map=self._ai_index_map,
+            display_scale=self._display_scale,
+        )
 
-            # Convert PIL image to QPixmap
-            from PySide6.QtGui import QImage
+    def _on_async_preview_ready(self, qimage: QImage, width: int, height: int) -> None:
+        """Handle async preview completion.
 
-            data = preview_img.tobytes("raw", "RGBA")
-            qimage = QImage(
-                data,
-                preview_img.width,
-                preview_img.height,
-                preview_img.width * 4,
-                QImage.Format.Format_RGBA8888,
-            )
+        Args:
+            qimage: The generated preview QImage (already scaled).
+            width: Original preview width.
+            height: Original preview height.
+        """
+        if not self._preview_enabled:
+            return
 
-            # Scale for display
-            scaled_pixmap = QPixmap.fromImage(qimage).scaled(
-                preview_img.width * self._display_scale,
-                preview_img.height * self._display_scale,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            )
+        # Convert QImage to QPixmap on main thread (Qt requirement)
+        scaled_pixmap = QPixmap.fromImage(qimage)
+        self._preview_item.setPixmap(scaled_pixmap)
+        self._preview_item.setVisible(True)
 
-            self._preview_item.setPixmap(scaled_pixmap)
-            self._preview_item.setVisible(True)
+    def _on_async_preview_failed(self, error_message: str) -> None:
+        """Handle async preview failure.
 
-        except Exception:
-            logger.exception("Failed to generate preview")
-            self._preview_item.setVisible(False)
+        Args:
+            error_message: Description of the failure.
+        """
+        logger.warning("Failed to generate preview: %s", error_message)
+        self._preview_item.setVisible(False)
 
     def _compute_tile_rects(self) -> list[tuple[int, int, int, int]]:
         """Compute 8x8 tile rectangles from OAM entries in scene coordinates.
