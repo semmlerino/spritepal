@@ -319,6 +319,53 @@ class FrameMappingController(QObject):
         logger.info("Loaded %d AI frames from %s", len(frames), directory)
         return len(frames)
 
+    def add_ai_frame_from_file(self, file_path: Path) -> bool:
+        """Add a single AI frame from a PNG file.
+
+        Args:
+            file_path: Path to the PNG file
+
+        Returns:
+            True if frame was added successfully
+        """
+        if self._project is None:
+            self.new_project()
+
+        if not file_path.is_file() or file_path.suffix.lower() != ".png":
+            self.error_occurred.emit(f"Not a PNG file: {file_path}")
+            return False
+
+        # Get image dimensions
+        img = QImage(str(file_path))
+        width = img.width() if not img.isNull() else 0
+        height = img.height() if not img.isNull() else 0
+
+        # Check if frame already exists (by path)
+        existing_frames = self._project.ai_frames if self._project else []
+        for frame in existing_frames:
+            if frame.path == file_path:
+                logger.info("AI frame already exists: %s", file_path)
+                # Just notify UI to refresh/select it
+                self.ai_frames_loaded.emit(len(existing_frames))
+                return True
+
+        # Create new frame with next available index
+        next_index = len(existing_frames)
+        frame = AIFrame(
+            path=file_path,
+            index=next_index,
+            width=width,
+            height=height,
+        )
+
+        # Add to project
+        self._project.add_ai_frame(frame)  # type: ignore[union-attr]
+
+        self.ai_frames_loaded.emit(len(self._project.ai_frames))  # type: ignore[union-attr]
+        self.project_changed.emit()
+        logger.info("Added AI frame: %s", file_path)
+        return True
+
     def import_mesen_capture(self, capture_path: Path) -> None:
         """Parse a Mesen 2 capture file and emit signal for sprite selection.
 

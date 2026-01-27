@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QIcon
+from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -25,7 +25,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.frame_mapping.services.thumbnail_service import create_quantized_thumbnail
+from ui.frame_mapping.services.thumbnail_service import (
+    DEFAULT_THUMBNAIL_SIZE,
+    AsyncThumbnailLoader,
+)
 from ui.frame_mapping.views.sheet_palette_widget import SheetPaletteWidget
 from ui.frame_mapping.views.status_colors import get_status_color
 from utils.logging_config import get_logger
@@ -38,7 +41,7 @@ from core.frame_mapping_project import FRAME_TAGS, SheetPalette
 logger = get_logger(__name__)
 
 # Thumbnail size for list items
-THUMBNAIL_SIZE = 64
+THUMBNAIL_SIZE = DEFAULT_THUMBNAIL_SIZE
 
 # Tag colors for frame organization
 TAG_COLORS = {
@@ -79,7 +82,8 @@ class AIFramesPane(QWidget):
     palette_color_changed = Signal(int, object)  # index, rgb tuple - user edited a color
     palette_swatch_hovered = Signal(object)  # int index or None - user hovered swatch
     # Drag-and-drop / tab signals
-    folder_dropped = Signal(object)  # Path - emitted when folder/PNG dropped
+    folder_dropped = Signal(object)  # Path - emitted when folder dropped
+    file_dropped = Signal(object)  # Path - emitted when single PNG file dropped
     tab_folder_changed = Signal(object)  # Path | None - active tab's folder changed
     # Frame organization signals (V4)
     frame_rename_requested = Signal(str, str)  # frame_id, new_display_name
@@ -97,6 +101,10 @@ class AIFramesPane(QWidget):
         # Tab management
         self._tab_folders: list[Path | None] = [None]  # One empty tab initially
         self._suppress_tab_signal: bool = False
+
+        # Async thumbnail loading (prevents UI freeze when loading many frames)
+        self._thumbnail_loader = AsyncThumbnailLoader(self)
+        self._thumbnail_loader.thumbnail_ready.connect(self._on_thumbnail_ready)
 
         self.setAcceptDrops(True)
         self._setup_ui()
@@ -476,6 +484,9 @@ class AIFramesPane(QWidget):
         selection_restored = False
         restored_id: str | None = None
 
+        # Collect thumbnail requests for async loading
+        thumbnail_requests: list[tuple[str, Path]] = []
+
         self._list.blockSignals(True)
         try:
             self._list.clear()
@@ -527,10 +538,8 @@ class AIFramesPane(QWidget):
                 color = get_status_color(status)
                 item.setForeground(QBrush(color))
 
-                # Load thumbnail (quantized if palette defined)
-                thumbnail = create_quantized_thumbnail(frame.path, self._sheet_palette, THUMBNAIL_SIZE)
-                if thumbnail is not None:
-                    item.setIcon(QIcon(thumbnail))
+                # Queue thumbnail for async loading (prevents UI freeze)
+                thumbnail_requests.append((frame.id, frame.path))
 
                 self._list.addItem(item)
 
@@ -557,6 +566,9 @@ class AIFramesPane(QWidget):
         finally:
             self._list.blockSignals(False)
 
+        # Start async thumbnail loading (UI remains responsive)
+        self._thumbnail_loader.load_thumbnails(thumbnail_requests, self._sheet_palette, THUMBNAIL_SIZE)
+
         # Phase 2 fix: Notify listeners if selection was silently restored during frame list change
         if is_frame_list_change and selection_restored and restored_id is not None:
             self.ai_frame_selected.emit(restored_id)
@@ -568,6 +580,20 @@ class AIFramesPane(QWidget):
         """Handle tag filter combo box change."""
         self._tag_filter = self._tag_filter_combo.currentData() or ""
         self._refresh_list()
+
+    def _on_thumbnail_ready(self, frame_id: str, pixmap: QPixmap) -> None:
+        """Update list item icon when async thumbnail is ready.
+
+        Args:
+            frame_id: The AI frame ID
+            pixmap: The loaded thumbnail pixmap
+        """
+        # Find the list item with this frame ID and update its icon
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item and item.data(Qt.ItemDataRole.UserRole) == frame_id:
+                item.setIcon(QIcon(pixmap))
+                break
 
     def _show_rename_dialog(self, frame_id: str) -> None:
         """Show rename dialog for a frame."""
@@ -631,7 +657,7 @@ class AIFramesPane(QWidget):
 
     @override
     def dropEvent(self, event: QDropEvent) -> None:
-        """Handle drop - emit folder_dropped signal."""
+        """Handle drop - emit folder_dropped or file_dropped signal."""
         self._list.setStyleSheet("")  # Reset visual feedback
 
         mime_data = event.mimeData()
@@ -642,9 +668,12 @@ class AIFramesPane(QWidget):
         for url in mime_data.urls():
             if url.isLocalFile():
                 path = Path(url.toLocalFile())
-                # If PNG dropped, use parent directory
+                # Emit appropriate signal based on what was dropped
                 if path.is_file() and path.suffix.lower() == ".png":
-                    path = path.parent
+                    logger.info("File dropped: %s", path)
+                    self.file_dropped.emit(path)
+                    event.acceptProposedAction()
+                    return
                 if path.is_dir():
                     logger.info("Folder dropped: %s", path)
                     self.folder_dropped.emit(path)

@@ -66,54 +66,63 @@ class TestSetSheetPaletteViewportUpdate:
         assert len(update_called) > 0, "viewport.update() should be called after set_sheet_palette()"
 
     def test_set_sheet_palette_refreshes_all_thumbnails(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """set_sheet_palette should refresh thumbnails for all frames."""
+        """set_sheet_palette should trigger async thumbnail refresh for all frames."""
         pane = AIFramesPane()
         qtbot.addWidget(pane)
 
         frames = create_ai_frames(tmp_path, num_frames=3)
         pane.set_ai_frames(frames)
 
-        # Track thumbnail creation calls by patching the module-level function
-        thumbnail_calls: list[Path] = []
+        # Track that async loader is called with all frame paths
+        load_calls: list[list[tuple[str, Path]]] = []
 
-        def track_thumbnail(frame_path: Path, palette: object, size: int) -> None:
-            thumbnail_calls.append(frame_path)
+        def track_load(requests: list[tuple[str, Path]], palette: object, size: int) -> None:
+            load_calls.append(list(requests))
+            # Don't call original to avoid thread issues in test
 
         palette = create_test_palette()
 
-        with patch("ui.frame_mapping.views.ai_frames_pane.create_quantized_thumbnail", side_effect=track_thumbnail):
+        with patch.object(pane._thumbnail_loader, "load_thumbnails", side_effect=track_load):
             pane.set_sheet_palette(palette)
 
-        # All 3 frames should have had thumbnails regenerated
-        assert len(thumbnail_calls) == 3, f"Expected 3 thumbnail calls, got {len(thumbnail_calls)}"
+        # Async loader should have been called with all 3 frame requests
+        assert len(load_calls) == 1, f"Expected 1 load_thumbnails call, got {len(load_calls)}"
+        assert len(load_calls[0]) == 3, f"Expected 3 thumbnail requests, got {len(load_calls[0])}"
 
     def test_set_sheet_palette_twice_regenerates_thumbnails(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """Calling set_sheet_palette twice should regenerate thumbnails each time."""
+        """Calling set_sheet_palette twice should trigger async refresh each time."""
         pane = AIFramesPane()
         qtbot.addWidget(pane)
 
         frames = create_ai_frames(tmp_path, num_frames=3)
         pane.set_ai_frames(frames)
 
+        # Track async loader calls
+        load_calls: list[list[tuple[str, Path]]] = []
+
+        def track_load(requests: list[tuple[str, Path]], palette: object, size: int) -> None:
+            load_calls.append(list(requests))
+            # Don't call original to avoid thread issues in test
+
         # First palette
         palette1 = create_test_palette()
-        pane.set_sheet_palette(palette1)
 
-        # Track thumbnail creation for second palette call
-        thumbnail_calls: list[Path] = []
+        with patch.object(pane._thumbnail_loader, "load_thumbnails", side_effect=track_load):
+            pane.set_sheet_palette(palette1)
 
-        def track_thumbnail(frame_path: Path, palette: object, size: int) -> None:
-            thumbnail_calls.append(frame_path)
+        # First palette change should trigger loader
+        assert len(load_calls) == 1, f"Expected 1 load call after first palette, got {len(load_calls)}"
 
         # Second palette (simulating palette edit)
         palette2 = create_test_palette()
         palette2.colors = [(255, 255, 255), (128, 128, 128), (64, 64, 64), (0, 0, 0)]
 
-        with patch("ui.frame_mapping.views.ai_frames_pane.create_quantized_thumbnail", side_effect=track_thumbnail):
+        with patch.object(pane._thumbnail_loader, "load_thumbnails", side_effect=track_load):
             pane.set_sheet_palette(palette2)
 
-        # All 3 frames should have had thumbnails regenerated again
-        assert len(thumbnail_calls) == 3, f"Expected 3 thumbnail calls on palette change, got {len(thumbnail_calls)}"
+        # Second palette change should also trigger loader
+        assert len(load_calls) == 2, f"Expected 2 load calls total, got {len(load_calls)}"
+        assert len(load_calls[1]) == 3, f"Expected 3 thumbnail requests on second call, got {len(load_calls[1])}"
 
 
 class TestPaletteChangeViewportRepaint:

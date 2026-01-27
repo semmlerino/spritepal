@@ -472,6 +472,19 @@ class FrameMappingProject:
             self.ai_frames_dir = ai_frames_dir
         self._invalidate_ai_frame_index()
 
+    def add_ai_frame(self, frame: AIFrame) -> AIFrame:
+        """Add a single AI frame to the project.
+
+        Args:
+            frame: AIFrame to add
+
+        Returns:
+            The added frame (for method chaining)
+        """
+        self.ai_frames.append(frame)
+        self._invalidate_ai_frame_index()
+        return frame
+
     def add_game_frame(self, frame: GameFrame) -> GameFrame:
         """Add a game frame to the project.
 

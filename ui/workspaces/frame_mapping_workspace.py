@@ -344,6 +344,7 @@ class FrameMappingWorkspace(QWidget):
         self._ai_frames_pane.palette_swatch_hovered.connect(self._on_palette_swatch_hovered)
         # Drag-drop and tab signals
         self._ai_frames_pane.folder_dropped.connect(self._on_ai_folder_dropped)
+        self._ai_frames_pane.file_dropped.connect(self._on_ai_file_dropped)
         self._ai_frames_pane.tab_folder_changed.connect(self._on_ai_tab_folder_changed)
         # Frame organization signals (V4)
         self._ai_frames_pane.frame_rename_requested.connect(self._on_frame_rename_requested)
@@ -1505,6 +1506,16 @@ class FrameMappingWorkspace(QWidget):
             return
 
         self._controller.load_ai_frames_from_directory(path)
+
+    def _on_ai_file_dropped(self, path: object) -> None:
+        """Add a single AI frame from dropped PNG file.
+
+        Args:
+            path: Path object (typed as object due to Signal limitation)
+        """
+        if not isinstance(path, Path) or not path.is_file():
+            return
+        self._controller.add_ai_frame_from_file(path)
 
     def _on_ai_tab_folder_changed(self, path: object) -> None:
         """Reload frames when tab changes.
