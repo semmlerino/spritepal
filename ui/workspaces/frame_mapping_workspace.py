@@ -311,6 +311,8 @@ class FrameMappingWorkspace(QWidget):
         self._controller.project_changed.connect(self._on_project_changed)
         self._controller.ai_frames_loaded.connect(self._on_ai_frames_loaded)
         self._controller.game_frame_added.connect(self._on_game_frame_added)
+        self._controller.mapping_created.connect(self._on_mapping_created)
+        self._controller.mapping_removed.connect(self._on_mapping_removed)
         self._controller.mapping_injected.connect(self._on_mapping_injected)
         self._controller.error_occurred.connect(self._on_error)
         self._controller.status_update.connect(self._on_status_update)
@@ -489,6 +491,28 @@ class FrameMappingWorkspace(QWidget):
         """Handle game frame added."""
         if self._message_service:
             self._message_service.show_message(f"Imported game frame: {frame_id}")
+
+    def _on_mapping_created(self, ai_frame_id: str, game_frame_id: str) -> None:
+        """Handle mapping created - targeted UI update.
+
+        Only updates the UI elements affected by mapping creation,
+        avoiding full project refresh for better performance.
+        """
+        self._update_map_button_state()
+        self._refresh_mapping_status()
+        self._refresh_game_frame_link_status()
+        self._update_mapping_panel_previews()
+
+    def _on_mapping_removed(self, ai_frame_id: str) -> None:
+        """Handle mapping removed - targeted UI update.
+
+        Only updates the UI elements affected by mapping removal,
+        avoiding full project refresh for better performance.
+        """
+        self._update_map_button_state()
+        self._refresh_mapping_status()
+        self._refresh_game_frame_link_status()
+        self._update_mapping_panel_previews()
 
     def _on_error(self, message: str) -> None:
         """Handle error from controller."""

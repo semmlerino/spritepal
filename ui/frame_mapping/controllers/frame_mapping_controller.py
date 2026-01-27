@@ -604,7 +604,6 @@ class FrameMappingController(QObject):
         self._undo_stack.push(command)
 
         self.mapping_created.emit(ai_frame_id, game_frame_id)
-        self.project_changed.emit()
         self.save_requested.emit()
         logger.info("Created mapping: AI frame %s -> Game frame %s", ai_frame_id, game_frame_id)
         return True
@@ -680,7 +679,6 @@ class FrameMappingController(QObject):
         self._undo_stack.push(command)
 
         self.mapping_removed.emit(ai_frame_id)
-        self.project_changed.emit()
         self.save_requested.emit()
         logger.info("Removed mapping for AI frame %s", ai_frame_id)
         return True
