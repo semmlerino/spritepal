@@ -37,6 +37,7 @@ class InjectionRequest:
     allow_fallback: bool = False
     preserve_sprite: bool = False
     emit_project_changed: bool = True
+    palette_rom_offset: int | None = None  # ROM offset for palette injection
 
 
 @dataclass(frozen=True)

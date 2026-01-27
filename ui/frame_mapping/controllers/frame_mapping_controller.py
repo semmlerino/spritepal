@@ -1007,6 +1007,65 @@ class FrameMappingController(QObject):
         staging_manager = ROMStagingManager()
         return staging_manager.create_injection_copy(rom_path, None)
 
+    def _calculate_palette_rom_offset(self, rom_path: Path, game_frame_id: str) -> int | None:
+        """Calculate palette ROM offset from game config and frame's palette index.
+
+        Args:
+            rom_path: Path to the ROM file.
+            game_frame_id: ID of the game frame being injected.
+
+        Returns:
+            ROM offset where the palette should be written, or None if not available.
+        """
+        if self._project is None:
+            return None
+
+        # Get the game frame to get its palette_index
+        game_frame = self._project.get_game_frame_by_id(game_frame_id)
+        if game_frame is None:
+            logger.debug("Cannot calculate palette offset: game_frame %s not found", game_frame_id)
+            return None
+
+        try:
+            # Read ROM header to get title/checksum
+            from core.app_context import get_app_context
+
+            rom_extractor = get_app_context().rom_extractor
+            header = rom_extractor.read_rom_header(str(rom_path))
+
+            # Find game config
+            config_loader = get_app_context().sprite_config_loader
+            game_name, game_config = config_loader.find_game_config(header.title, header.checksum)
+            if not game_config:
+                logger.debug("No game config found for %s (checksum 0x%04X)", header.title, header.checksum)
+                return None
+
+            palettes = game_config.get("palettes", {})
+            if not isinstance(palettes, dict):
+                return None
+
+            base_offset_str = palettes.get("offset")
+            if not base_offset_str or not isinstance(base_offset_str, str):
+                logger.debug("No palette offset in game config for %s", game_name)
+                return None
+
+            base_offset = int(base_offset_str, 16) if base_offset_str.startswith("0x") else int(base_offset_str)
+
+            # Calculate offset for this palette index
+            # Each palette is 32 bytes (16 colors x 2 bytes BGR555)
+            palette_offset = base_offset + (game_frame.palette_index * 32)
+            logger.info(
+                "Calculated palette ROM offset: 0x%X (base 0x%X + palette_index %d * 32)",
+                palette_offset,
+                base_offset,
+                game_frame.palette_index,
+            )
+            return palette_offset
+
+        except Exception as e:
+            logger.warning("Failed to calculate palette offset: %s", e)
+            return None
+
     def inject_mapping(
         self,
         ai_frame_id: str,
@@ -1053,6 +1112,12 @@ class FrameMappingController(QObject):
             self.error_occurred.emit("No project loaded")
             return False
 
+        # Calculate palette ROM offset for injection
+        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
+        palette_rom_offset: int | None = None
+        if mapping is not None:
+            palette_rom_offset = self._calculate_palette_rom_offset(rom_path, mapping.game_frame_id)
+
         # Build injection request
         request = InjectionRequest(
             ai_frame_id=ai_frame_id,
@@ -1063,6 +1128,7 @@ class FrameMappingController(QObject):
             allow_fallback=allow_fallback,
             preserve_sprite=preserve_sprite,
             emit_project_changed=emit_project_changed,
+            palette_rom_offset=palette_rom_offset,
         )
 
         # Progress callback wraps Qt signal

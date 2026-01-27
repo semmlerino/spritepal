@@ -549,3 +549,348 @@ class TestInjectionOrchestratorTilePadding:
                 f"Position 2 should be red (our tile), but got {pixel_pos2}. "
                 "Bug: tile_index_in_block not used for placement"
             )
+
+
+class TestInjectionOrchestratorColorFidelity:
+    """Tests for color fidelity between preview and injection."""
+
+    def test_injection_snaps_palette_to_snes_colors(self, tmp_path: Path) -> None:
+        """Injection uses same SNES-snapped palette as preview.
+
+        Regression test for preview-to-ROM color fidelity bug where injection
+        used unsnapped palette colors while preview snapped them to SNES-valid
+        values, causing color mismatches between preview and ROM.
+        """
+        from core.palette_utils import snap_to_snes_color
+
+        # Create orchestrator with mocked dependencies
+        staging = MagicMock()
+        rom_injector = MagicMock()
+
+        orchestrator = InjectionOrchestrator(
+            staging_manager=staging,
+            rom_injector=rom_injector,
+        )
+
+        # Capture the palette passed to quantize_to_palette
+        captured_palettes: list[list[tuple[int, int, int]]] = []
+
+        # Patch quantize_to_palette to capture palette argument
+        with patch("core.services.injection_orchestrator.quantize_to_palette") as mock_quantize:
+            # Return a valid indexed image
+            indexed_img = Image.new("P", (8, 8))
+            indexed_img.putpalette([0] * 768)
+            mock_quantize.return_value = indexed_img
+
+            def capture_quantize(
+                img: Image.Image,
+                palette_rgb: list[tuple[int, int, int]],
+                **kwargs: object,
+            ) -> Image.Image:
+                captured_palettes.append(list(palette_rgb))
+                return indexed_img
+
+            mock_quantize.side_effect = capture_quantize
+
+            # Mock rom_injector.find_compressed_sprite for HAL compression
+            rom_injector.find_compressed_sprite.return_value = (
+                b"\x00" * 100,
+                b"\x00" * 32,  # 1 tile
+                100,
+            )
+            rom_injector.inject_sprite_to_rom.return_value = (True, "Success")
+
+            # Non-SNES-valid colors (will be snapped to different values)
+            non_snes_colors: list[tuple[int, int, int]] = [
+                (0, 0, 0),  # Valid SNES color
+                (10, 10, 10),  # Not valid - snaps to (8, 8, 8)
+                (100, 100, 100),  # Not valid - snaps to (99, 99, 99)
+                (200, 200, 200),  # Not valid - snaps to (206, 206, 206)
+            ] + [(0, 0, 0)] * 12
+
+            # Create minimal VRAM tiles
+            vram_tiles: dict[int, tuple[int, int, int, int | None, bool, bool]] = {
+                0x1000: (0, 0, 0, 0, False, False),
+            }
+
+            # Create canvas with some content
+            masked_canvas = Image.new("RGBA", (8, 8), (255, 0, 0, 255))
+
+            bbox = SimpleNamespace(x=0, y=0, width=8, height=8)
+
+            filtered_capture = SimpleNamespace(
+                entries=[],
+                palettes={0: [(31, 0, 0)] * 16},
+            )
+
+            # Project with non-SNES-valid palette colors
+            project = MagicMock()
+            project.sheet_palette = SheetPalette(colors=non_snes_colors)
+
+            game_frame = MagicMock()
+            game_frame.compression_types = {0x50000: "hal"}
+
+            debug = InjectionDebugContext(enabled=False)
+
+            # Call the method
+            orchestrator._inject_tile_group(
+                rom_offset=0x50000,
+                vram_tiles=vram_tiles,
+                masked_canvas=masked_canvas,
+                filtered_capture=filtered_capture,
+                bbox=bbox,
+                project=project,
+                game_frame=game_frame,
+                rom_data=b"\x00" * 0x100000,
+                force_raw=False,
+                current_rom_path=str(tmp_path / "output.sfc"),
+                source_rom_path=str(tmp_path / "source.sfc"),
+                create_backup=False,
+                preserve_existing=False,
+                debug=debug,
+            )
+
+        # Verify quantize_to_palette was called
+        assert len(captured_palettes) == 1, "quantize_to_palette should be called once"
+
+        # Key assertion: the palette passed to quantization should be SNES-snapped
+        actual_palette = captured_palettes[0]
+        expected_palette = [snap_to_snes_color(c) for c in non_snes_colors]
+
+        for i, (actual, expected) in enumerate(zip(actual_palette, expected_palette, strict=True)):
+            assert actual == expected, (
+                f"Palette color {i} not snapped to SNES: "
+                f"expected {expected}, got {actual}. "
+                "Bug: injection not snapping palette colors like preview does."
+            )
+
+
+class TestInjectionOrchestratorPaletteInjection:
+    """Tests for palette injection functionality."""
+
+    def test_palette_injected_when_offset_provided(self, tmp_path: Path) -> None:
+        """Palette is injected to ROM when palette_rom_offset is provided."""
+        rom_path = tmp_path / "game.sfc"
+        rom_path.write_bytes(b"ROM DATA")
+
+        # Create mock dependencies
+        staging = MagicMock()
+        staging.create_injection_copy.return_value = tmp_path / "output.sfc"
+        session = MagicMock()
+        session.staging_path = tmp_path / "staging.sfc"
+        staging.create_staging.return_value = session
+        staging.commit.return_value = True
+
+        rom_injector = MagicMock()
+        rom_injector.inject_palette_to_rom.return_value = (True, "Palette injected")
+
+        orchestrator = InjectionOrchestrator(
+            staging_manager=staging,
+            rom_injector=rom_injector,
+        )
+
+        # Mock project with palette
+        project = MagicMock()
+        project.sheet_palette = SheetPalette(
+            colors=[(255, 0, 0)] * 16  # Red palette
+        )
+
+        # Mock _execute_injection to return success
+        with (
+            patch.object(
+                orchestrator,
+                "_execute_injection",
+                return_value=InjectionResult(
+                    success=True,
+                    tile_results=(),
+                    messages=("Tiles injected",),
+                ),
+            ),
+            patch.object(
+                orchestrator,
+                "_validate_mapping",
+                return_value=None,  # No validation error
+            ),
+            patch.object(
+                orchestrator,
+                "_prepare_images",
+                return_value=(
+                    Image.new("RGBA", (8, 8)),  # masked_canvas
+                    MagicMock(),  # filtered_capture
+                    [],  # relevant_entries
+                    None,  # transformed_index_map
+                ),
+            ),
+        ):
+            request = InjectionRequest(
+                ai_frame_id="frame_0.png",
+                rom_path=rom_path,
+                palette_rom_offset=0x467D6,  # Palette offset provided
+            )
+
+            # Mock required project methods
+            mapping = MagicMock()
+            mapping.game_frame_id = "test_frame"
+            project.get_mapping_for_ai_frame.return_value = mapping
+            ai_frame = MagicMock()
+            ai_frame.path = tmp_path / "frame.png"
+            ai_frame.index = 0
+            project.get_ai_frame_by_id.return_value = ai_frame
+            game_frame = MagicMock()
+            game_frame.id = "test_frame"
+            game_frame.rom_offsets = [0x10000]
+            project.get_game_frame_by_id.return_value = game_frame
+
+            result = orchestrator.execute(request, project)
+
+        # Verify palette injection was called
+        rom_injector.inject_palette_to_rom.assert_called_once()
+        call_kwargs = rom_injector.inject_palette_to_rom.call_args
+        assert call_kwargs[1]["palette_offset"] == 0x467D6
+        assert len(call_kwargs[1]["colors"]) == 16
+
+        # Verify success message includes palette injection
+        assert result.success is True
+        assert any("palette" in msg.lower() for msg in result.messages)
+
+    def test_palette_not_injected_when_no_offset(self, tmp_path: Path) -> None:
+        """Palette is not injected when palette_rom_offset is None."""
+        rom_path = tmp_path / "game.sfc"
+        rom_path.write_bytes(b"ROM DATA")
+
+        staging = MagicMock()
+        staging.create_injection_copy.return_value = tmp_path / "output.sfc"
+        session = MagicMock()
+        session.staging_path = tmp_path / "staging.sfc"
+        staging.create_staging.return_value = session
+        staging.commit.return_value = True
+
+        rom_injector = MagicMock()
+
+        orchestrator = InjectionOrchestrator(
+            staging_manager=staging,
+            rom_injector=rom_injector,
+        )
+
+        project = MagicMock()
+        project.sheet_palette = SheetPalette(colors=[(255, 0, 0)] * 16)
+
+        with (
+            patch.object(
+                orchestrator,
+                "_execute_injection",
+                return_value=InjectionResult(
+                    success=True,
+                    tile_results=(),
+                    messages=("Tiles injected",),
+                ),
+            ),
+            patch.object(
+                orchestrator,
+                "_validate_mapping",
+                return_value=None,
+            ),
+            patch.object(
+                orchestrator,
+                "_prepare_images",
+                return_value=(
+                    Image.new("RGBA", (8, 8)),
+                    MagicMock(),
+                    [],
+                    None,
+                ),
+            ),
+        ):
+            request = InjectionRequest(
+                ai_frame_id="frame_0.png",
+                rom_path=rom_path,
+                palette_rom_offset=None,  # No palette offset
+            )
+
+            mapping = MagicMock()
+            mapping.game_frame_id = "test_frame"
+            project.get_mapping_for_ai_frame.return_value = mapping
+            ai_frame = MagicMock()
+            ai_frame.path = tmp_path / "frame.png"
+            ai_frame.index = 0
+            project.get_ai_frame_by_id.return_value = ai_frame
+            game_frame = MagicMock()
+            game_frame.id = "test_frame"
+            game_frame.rom_offsets = [0x10000]
+            project.get_game_frame_by_id.return_value = game_frame
+
+            orchestrator.execute(request, project)
+
+        # Verify palette injection was NOT called
+        rom_injector.inject_palette_to_rom.assert_not_called()
+
+    def test_palette_not_injected_when_no_sheet_palette(self, tmp_path: Path) -> None:
+        """Palette is not injected when project has no sheet_palette."""
+        rom_path = tmp_path / "game.sfc"
+        rom_path.write_bytes(b"ROM DATA")
+
+        staging = MagicMock()
+        staging.create_injection_copy.return_value = tmp_path / "output.sfc"
+        session = MagicMock()
+        session.staging_path = tmp_path / "staging.sfc"
+        staging.create_staging.return_value = session
+        staging.commit.return_value = True
+
+        rom_injector = MagicMock()
+
+        orchestrator = InjectionOrchestrator(
+            staging_manager=staging,
+            rom_injector=rom_injector,
+        )
+
+        project = MagicMock()
+        project.sheet_palette = None  # No sheet palette
+
+        with (
+            patch.object(
+                orchestrator,
+                "_execute_injection",
+                return_value=InjectionResult(
+                    success=True,
+                    tile_results=(),
+                    messages=("Tiles injected",),
+                ),
+            ),
+            patch.object(
+                orchestrator,
+                "_validate_mapping",
+                return_value=None,
+            ),
+            patch.object(
+                orchestrator,
+                "_prepare_images",
+                return_value=(
+                    Image.new("RGBA", (8, 8)),
+                    MagicMock(),
+                    [],
+                    None,
+                ),
+            ),
+        ):
+            request = InjectionRequest(
+                ai_frame_id="frame_0.png",
+                rom_path=rom_path,
+                palette_rom_offset=0x467D6,  # Offset provided but no palette
+            )
+
+            mapping = MagicMock()
+            mapping.game_frame_id = "test_frame"
+            project.get_mapping_for_ai_frame.return_value = mapping
+            ai_frame = MagicMock()
+            ai_frame.path = tmp_path / "frame.png"
+            ai_frame.index = 0
+            project.get_ai_frame_by_id.return_value = ai_frame
+            game_frame = MagicMock()
+            game_frame.id = "test_frame"
+            game_frame.rom_offsets = [0x10000]
+            project.get_game_frame_by_id.return_value = game_frame
+
+            orchestrator.execute(request, project)
+
+        # Verify palette injection was NOT called (no palette to inject)
+        rom_injector.inject_palette_to_rom.assert_not_called()

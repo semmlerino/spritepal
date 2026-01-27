@@ -28,6 +28,7 @@ from core.palette_utils import (
     QUANTIZATION_TRANSPARENCY_THRESHOLD,
     quantize_to_palette,
     quantize_with_mappings,
+    snap_to_snes_color,
     snes_palette_to_rgb,
 )
 from core.rom_injector import ROMInjector
@@ -224,11 +225,30 @@ class InjectionOrchestrator:
                     self._staging_manager.rollback(session)
                     return InjectionResult.failure("Failed to commit staged injection to ROM")
 
+                # Inject palette if offset provided
+                messages = list(result.messages)
+                if request.palette_rom_offset is not None and project.sheet_palette is not None:
+                    palette_colors = [snap_to_snes_color(c) for c in project.sheet_palette.colors]
+                    success, msg = self._rom_injector.inject_palette_to_rom(
+                        rom_path=str(injection_rom_path),
+                        output_path=str(injection_rom_path),
+                        palette_offset=request.palette_rom_offset,
+                        colors=palette_colors,
+                        create_backup=False,  # Already have backup from tile injection
+                        ignore_checksum=True,  # Checksum updated by tile injection
+                    )
+                    if success:
+                        messages.append(f"Palette injected at 0x{request.palette_rom_offset:X}")
+                        logger.info("Palette injected at 0x%X", request.palette_rom_offset)
+                    else:
+                        logger.warning("Palette injection failed: %s", msg)
+                        messages.append(f"WARNING: Palette injection failed: {msg}")
+
                 return InjectionResult(
                     success=True,
                     tile_results=result.tile_results,
                     output_rom_path=injection_rom_path,
-                    messages=result.messages,
+                    messages=tuple(messages),
                     new_mapping_status="injected",
                 )
             else:
@@ -384,9 +404,11 @@ class InjectionOrchestrator:
             capture_result=filtered_capture,
             transform=transform,
             quantize=False,
+            ai_index_map=ai_index_map,
         )
 
         masked_canvas = composite_result.composited_image
+        transformed_index_map = composite_result.index_map
 
         # Debug: Save intermediate images
         if debug.enabled and debug.debug_dir:
@@ -395,85 +417,7 @@ class InjectionOrchestrator:
             debug.save_debug_image("original_sprite_mask", original_sprite_img)
             debug.save_debug_image("masked_canvas", masked_canvas)
 
-        # BUG-1 FIX: Transform the index map to match the composited canvas coordinates
-        # This enables index-preserving injection (skipping re-quantization)
-        transformed_index_map: np.ndarray | None = None
-        if ai_index_map is not None:
-            transformed_index_map = self._transform_index_map(
-                ai_index_map,
-                mapping,
-                masked_canvas.size,
-            )
-
         return masked_canvas, filtered_capture, relevant_entries, transformed_index_map
-
-    def _transform_index_map(
-        self,
-        index_map: np.ndarray,
-        mapping: FrameMapping,
-        canvas_size: tuple[int, int],
-    ) -> np.ndarray:
-        """Transform index map to match the composited canvas coordinates.
-
-        BUG-1 FIX: Applies the same transforms (flip, scale, offset) to the index map
-        that are applied to the RGBA image during compositing, using NEAREST interpolation
-        to preserve exact palette indices.
-
-        Args:
-            index_map: Original palette index array from AI frame
-            mapping: Frame mapping with transform parameters
-            canvas_size: Size of the composited canvas (width, height)
-
-        Returns:
-            Transformed index map at canvas coordinates, with 255 marking "no AI data"
-        """
-        from scipy.ndimage import zoom
-
-        canvas_w, canvas_h = canvas_size
-
-        # Start with "no data" marker (255 = outside AI frame area)
-        result = np.full((canvas_h, canvas_w), 255, dtype=np.uint8)
-
-        # Apply scale if needed (using NEAREST to preserve indices)
-        if mapping.scale != 1.0:
-            scaled: np.ndarray = np.asarray(zoom(index_map, mapping.scale, order=0), dtype=np.uint8)
-        else:
-            scaled = index_map
-
-        # Apply flips
-        if mapping.flip_h:
-            scaled = np.fliplr(scaled)
-        if mapping.flip_v:
-            scaled = np.flipud(scaled)
-
-        # Calculate placement in canvas (matching compositor logic)
-        scaled_h, scaled_w = int(scaled.shape[0]), int(scaled.shape[1])
-
-        # The AI frame is placed at offset relative to canvas center
-        # (matching SpriteCompositor's placement logic)
-        # Place at offset from canvas origin
-        start_x = mapping.offset_x
-        start_y = mapping.offset_y
-
-        # Calculate overlap region
-        src_x_start = max(0, -start_x)
-        src_y_start = max(0, -start_y)
-        dst_x_start = max(0, start_x)
-        dst_y_start = max(0, start_y)
-
-        copy_w = min(scaled_w - src_x_start, canvas_w - dst_x_start)
-        copy_h = min(scaled_h - src_y_start, canvas_h - dst_y_start)
-
-        if copy_w > 0 and copy_h > 0:
-            result[
-                dst_y_start : dst_y_start + copy_h,
-                dst_x_start : dst_x_start + copy_w,
-            ] = scaled[
-                src_y_start : src_y_start + copy_h,
-                src_x_start : src_x_start + copy_w,
-            ]
-
-        return result
 
     def _execute_injection(
         self,
@@ -862,7 +806,8 @@ class InjectionOrchestrator:
         # Quantize (fallback when no index map or index map has invalid data)
         elif project.sheet_palette:
             sheet_palette = project.sheet_palette
-            palette_rgb = list(sheet_palette.colors)
+            # FIX: Snap palette to SNES-valid colors (matches preview pipeline)
+            palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
             if sheet_palette.color_mappings:
                 chunk_img = quantize_with_mappings(
                     chunk_img,
