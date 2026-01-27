@@ -72,6 +72,15 @@ class PaletteService(QObject):
             logger.warning("set_sheet_palette: No project loaded")
             return
 
+        # Validate transparency index assumption
+        if palette is not None and palette.colors and palette.colors[0] != (0, 0, 0):
+            logger.warning(
+                "SheetPalette index 0 is %s, not (0,0,0). "
+                "SNES sprites assume index 0 is transparent. "
+                "This may cause incorrect transparency.",
+                palette.colors[0],
+            )
+
         project.sheet_palette = palette
         self.sheet_palette_changed.emit()
         if palette is not None:
@@ -213,6 +222,23 @@ class PaletteService(QObject):
             parser = MesenCaptureParser()
             capture_result = parser.parse_file(game_frame.capture_path)
             palette_index = game_frame.palette_index
+
+            # Validate palette_index exists in capture
+            if palette_index not in capture_result.palettes:
+                available_palettes = list(capture_result.palettes.keys())
+                logger.warning(
+                    "GameFrame %s has palette_index=%d which doesn't exist in capture. "
+                    "Available palettes: %s. Using first available.",
+                    game_frame_id,
+                    palette_index,
+                    available_palettes,
+                )
+                if available_palettes:
+                    palette_index = available_palettes[0]
+                else:
+                    logger.warning("No palettes found in capture for game frame %s", game_frame_id)
+                    return None
+
             snes_palette = capture_result.palettes.get(palette_index, [])
 
             if not snes_palette:
@@ -265,6 +291,21 @@ class PaletteService(QObject):
                 parser = MesenCaptureParser()
                 capture_result = parser.parse_file(game_frame.capture_path)
                 palette_index = game_frame.palette_index
+
+                # Validate palette_index exists in capture
+                if palette_index not in capture_result.palettes:
+                    available_palettes = list(capture_result.palettes.keys())
+                    logger.warning(
+                        "GameFrame %s has palette_index=%d which doesn't exist in capture. Available: %s",
+                        game_frame.id,
+                        palette_index,
+                        available_palettes,
+                    )
+                    if available_palettes:
+                        palette_index = available_palettes[0]
+                    else:
+                        continue
+
                 snes_palette = capture_result.palettes.get(palette_index, [])
 
                 if snes_palette:

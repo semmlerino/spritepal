@@ -55,6 +55,7 @@ class MockEntry:
         palette: int = 0,
         flip_h: bool = False,
         flip_v: bool = False,
+        priority: int = 0,
     ) -> None:
         self.id = id
         self.x = x
@@ -64,6 +65,7 @@ class MockEntry:
         self.palette = palette
         self.flip_h = flip_h
         self.flip_v = flip_v
+        self.priority = priority
         self.tiles: list = []
         self.rom_offset = 0x10000
 
@@ -880,9 +882,7 @@ class TestSharpenPreservingAlpha:
             for y in range(20):
                 orig_alpha = img.getpixel((x, y))[3]
                 new_alpha = result.getpixel((x, y))[3]
-                assert orig_alpha == new_alpha, (
-                    f"Alpha at ({x},{y}) changed: {orig_alpha} -> {new_alpha}"
-                )
+                assert orig_alpha == new_alpha, f"Alpha at ({x},{y}) changed: {orig_alpha} -> {new_alpha}"
 
     def test_sharpen_clamps_to_valid_range(self) -> None:
         """Sharpening amount should be clamped to 0.0-4.0."""
@@ -1002,3 +1002,58 @@ class TestSharpenAndScaleTogether:
         right_pixel = result.getpixel((8, 2))
         # Should be reddish (exact color may vary due to sharpening/scaling)
         assert right_pixel[0] > right_pixel[1], "Red channel should dominate on right after flip"
+
+
+class TestPaletteInvariantAssertions:
+    """Tests for BUG-4: Runtime invariant assertions in compositor."""
+
+    def test_composite_rejects_palette_with_wrong_size(self) -> None:
+        """composite_frame raises AssertionError if palette has wrong size."""
+        from core.frame_mapping_project import SheetPalette
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        ai_image = Image.new("RGBA", (16, 16), (100, 100, 100, 255))
+
+        # Create palette with wrong size (only 8 colors instead of 16)
+        wrong_size_palette = SheetPalette(colors=[(0, 0, 0)] * 8)
+
+        entry = MockEntry(id=0, x=0, y=0, width=16, height=16)
+        capture = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16})
+
+        transform = TransformParams()
+
+        with pytest.raises(AssertionError, match="16 colors"):
+            compositor.composite_frame(
+                ai_image,
+                capture,
+                transform,
+                quantize=True,
+                sheet_palette=wrong_size_palette,
+            )
+
+    def test_composite_accepts_palette_with_correct_size(self) -> None:
+        """composite_frame accepts palette with exactly 16 colors."""
+        from core.frame_mapping_project import SheetPalette
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        ai_image = Image.new("RGBA", (16, 16), (100, 100, 100, 255))
+
+        # Create valid palette with 16 colors
+        valid_palette = SheetPalette(colors=[(0, 0, 0)] + [(i, i, i) for i in range(1, 16)])
+
+        entry = MockEntry(id=0, x=0, y=0, width=16, height=16)
+        capture = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16})
+
+        transform = TransformParams()
+
+        # Should not raise
+        result = compositor.composite_frame(
+            ai_image,
+            capture,
+            transform,
+            quantize=True,
+            sheet_palette=valid_palette,
+        )
+
+        assert result is not None
+        assert result.composited_image is not None

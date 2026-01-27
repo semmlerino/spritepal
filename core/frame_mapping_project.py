@@ -75,6 +75,7 @@ class SheetPalette:
         - RGB values are clamped to 0-255 (backward compatible)
         - Mapping indices are clamped to 0-15 (SNES_PALETTE_SIZE - 1)
         - Warnings are logged for invalid values
+        - Warns if index 0 is not (0,0,0) (transparency assumption)
         """
         colors_raw = cast(list[list[int]], data.get("colors", []))
         colors: list[tuple[int, int, int]] = []
@@ -103,6 +104,15 @@ class SheetPalette:
         while len(colors) < SNES_PALETTE_SIZE:
             colors.append((0, 0, 0))
         colors = colors[:SNES_PALETTE_SIZE]
+
+        # Validate transparency index assumption: index 0 should be (0,0,0)
+        if colors and colors[0] != (0, 0, 0):
+            logger.warning(
+                "SheetPalette index 0 is %s, not (0,0,0). "
+                "SNES sprites assume index 0 is transparent (black). "
+                "This may cause incorrect transparency in previews and injection.",
+                colors[0],
+            )
 
         # Convert string keys back to tuples
         mappings_raw = cast(dict[str, int], data.get("color_mappings", {}))

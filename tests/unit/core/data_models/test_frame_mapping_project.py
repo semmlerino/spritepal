@@ -544,7 +544,10 @@ class TestFrameMappingQuantizationOptions:
         # Test negative clamps to 0
         project.update_mapping_alignment(
             ai_frame_id="frame_001.png",
-            offset_x=0, offset_y=0, flip_h=False, flip_v=False,
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
             sharpen=-1.0,
         )
         mapping = project.get_mapping_for_ai_frame("frame_001.png")
@@ -554,7 +557,10 @@ class TestFrameMappingQuantizationOptions:
         # Test > 4.0 clamps to 4.0
         project.update_mapping_alignment(
             ai_frame_id="frame_001.png",
-            offset_x=0, offset_y=0, flip_h=False, flip_v=False,
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
             sharpen=10.0,
         )
         mapping = project.get_mapping_for_ai_frame("frame_001.png")
@@ -568,7 +574,10 @@ class TestFrameMappingQuantizationOptions:
         # Invalid resampling should default to lanczos
         project.update_mapping_alignment(
             ai_frame_id="frame_001.png",
-            offset_x=0, offset_y=0, flip_h=False, flip_v=False,
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
             resampling="invalid_value",
         )
         mapping = project.get_mapping_for_ai_frame("frame_001.png")
@@ -985,3 +994,58 @@ class TestCreateMappingValidation:
 
         assert mapping.ai_frame_id == "sprite-001_v2.png"
         assert mapping.game_frame_id == "G_001-test"
+
+
+class TestSheetPaletteTransparencyValidation:
+    """Tests for BUG-1: Validate transparency at index 0."""
+
+    def test_sheet_palette_from_dict_warns_on_non_transparent_index_0(self, caplog: pytest.LogCaptureFixture) -> None:
+        """from_dict logs warning if index 0 is not (0,0,0)."""
+        import logging
+
+        data = {
+            "colors": [
+                [255, 0, 0],  # Index 0 should be transparent (black)
+                *[[i, i, i] for i in range(1, 16)],
+            ]
+        }
+
+        caplog.set_level(logging.WARNING)
+        palette = SheetPalette.from_dict(data)
+
+        # Should have logged a warning
+        assert any("index 0 is (255, 0, 0), not (0,0,0)" in record.message for record in caplog.records), (
+            "Expected warning about non-transparent index 0"
+        )
+
+        # Palette should still be created (we warn, not reject)
+        assert palette.colors[0] == (255, 0, 0)
+
+    def test_sheet_palette_from_dict_no_warning_for_transparent_index_0(self, caplog: pytest.LogCaptureFixture) -> None:
+        """from_dict does not warn if index 0 is (0,0,0)."""
+        import logging
+
+        data = {
+            "colors": [
+                [0, 0, 0],  # Correct transparent index
+                *[[i * 16, i * 16, i * 16] for i in range(1, 16)],
+            ]
+        }
+
+        caplog.set_level(logging.WARNING)
+        palette = SheetPalette.from_dict(data)
+
+        # Should not have logged warning about index 0
+        transparency_warnings = [r for r in caplog.records if "index 0" in r.message and "(0,0,0)" in r.message]
+        assert len(transparency_warnings) == 0, "Unexpected transparency warning"
+
+        assert palette.colors[0] == (0, 0, 0)
+
+    def test_sheet_palette_from_dict_empty_pads_with_black(self) -> None:
+        """from_dict pads empty palettes with black (0,0,0)."""
+        data: dict[str, object] = {"colors": []}
+
+        palette = SheetPalette.from_dict(data)
+
+        assert len(palette.colors) == 16
+        assert all(c == (0, 0, 0) for c in palette.colors)

@@ -122,6 +122,15 @@ class SpriteCompositor:
         Returns:
             CompositeResult with the composited image and metadata.
         """
+        # Validate palette invariants (SNES sprites: 16 colors, index 0 = transparent)
+        if sheet_palette is not None:
+            assert len(sheet_palette.colors) == 16, (
+                f"SheetPalette must have exactly 16 colors, got {len(sheet_palette.colors)}"
+            )
+            # Note: We warn but don't assert on index 0 != (0,0,0) because
+            # this is caught earlier in from_dict/set_sheet_palette with warnings.
+            # A hard assert here would break existing projects with non-standard palettes.
+
         # Ensure RGBA mode
         if ai_image.mode != "RGBA":
             ai_image = ai_image.convert("RGBA")
@@ -354,9 +363,7 @@ class SpriteCompositor:
 
             if transform.resampling == "lanczos":
                 # Premultiplied alpha resize prevents color bleeding at edges
-                result = self._resize_with_premultiplied_alpha(
-                    result, (new_w, new_h), Image.Resampling.LANCZOS
-                )
+                result = self._resize_with_premultiplied_alpha(result, (new_w, new_h), Image.Resampling.LANCZOS)
             else:
                 # Nearest neighbor for blocky pixel art look
                 result = result.resize((new_w, new_h), Image.Resampling.NEAREST)
@@ -528,9 +535,7 @@ class SpriteCompositor:
         rgb = Image.merge("RGB", (r, g, b))
 
         # Apply unsharp mask (radius=2, percent=amount*100, threshold=3)
-        sharpened = rgb.filter(
-            ImageFilter.UnsharpMask(radius=2, percent=int(amount * 100), threshold=3)
-        )
+        sharpened = rgb.filter(ImageFilter.UnsharpMask(radius=2, percent=int(amount * 100), threshold=3))
 
         # Recombine with original alpha
         sr, sg, sb = sharpened.split()
@@ -570,9 +575,7 @@ class SpriteCompositor:
         premultiplied_rgb = rgb * alpha_normalized
 
         # Reassemble and convert back to PIL
-        premultiplied = np.concatenate([premultiplied_rgb, alpha], axis=-1).astype(
-            np.uint8
-        )
+        premultiplied = np.concatenate([premultiplied_rgb, alpha], axis=-1).astype(np.uint8)
         premult_img = Image.fromarray(premultiplied, mode="RGBA")
 
         # Resize in premultiplied space
@@ -588,7 +591,5 @@ class SpriteCompositor:
         unpremultiplied_rgb = np.clip(resized_rgb / alpha_safe, 0, 255)
 
         # Reassemble final image
-        final = np.concatenate([unpremultiplied_rgb, resized_alpha], axis=-1).astype(
-            np.uint8
-        )
+        final = np.concatenate([unpremultiplied_rgb, resized_alpha], axis=-1).astype(np.uint8)
         return Image.fromarray(final, mode="RGBA")
