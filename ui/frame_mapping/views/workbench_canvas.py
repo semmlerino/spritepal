@@ -1831,6 +1831,31 @@ class WorkbenchCanvas(QWidget):
         self._emit_alignment_changed()
         self._update_scene_for_alignment()
 
+    def auto_align(self, with_scale: bool = True) -> bool:
+        """Programmatically trigger auto-alignment.
+
+        This is the public API for triggering auto-align, used when a mapping
+        is first created to automatically find the optimal alignment.
+
+        Args:
+            with_scale: If True, also optimizes scale to fit AI content
+                       within game sprite bounds. Default True.
+
+        Returns:
+            True if auto-align was performed, False if preconditions not met.
+        """
+        if self._ai_image is None or self._capture_result is None:
+            return False
+
+        # Temporarily set the Match Scale checkbox to the requested state
+        original_state = self._match_scale_checkbox.isChecked()
+        self._match_scale_checkbox.setChecked(with_scale)
+        try:
+            self._on_auto_align()
+        finally:
+            self._match_scale_checkbox.setChecked(original_state)
+        return True
+
     def _on_drag_started(self) -> None:
         """Handle drag start from AI frame item."""
         self._drag_in_progress = True

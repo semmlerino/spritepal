@@ -199,22 +199,30 @@ class TestLinkingLogic:
     """Test Phase 2d: Linking logic."""
 
     def test_attempt_link_creates_mapping(self, helper: WorkspaceLogicHelper) -> None:
-        """attempt_link creates a mapping via controller."""
+        """attempt_link creates a mapping and triggers auto-align with scale."""
         project = MagicMock()
         ai_frame = MagicMock()
         ai_frame.path.name = "frame_001.png"
         ai_frame.path.exists.return_value = False
+        ai_frame.index = 0
+        game_frame = MagicMock()
         project.get_ai_frame_by_id.return_value = ai_frame
+        project.get_game_frame_by_id.return_value = game_frame
         project.get_mapping_for_ai_frame.return_value = None
         helper._controller.project = project  # type: ignore[union-attr]
         helper._controller.get_existing_link_for_ai_frame.return_value = None  # type: ignore[union-attr]
         helper._controller.get_existing_link_for_game_frame.return_value = None  # type: ignore[union-attr]
+        helper._controller.get_game_frame_preview.return_value = None  # type: ignore[union-attr]
+        helper._controller.get_capture_result_for_game_frame.return_value = (None, False)  # type: ignore[union-attr]
 
         helper.attempt_link("frame_001.png", "capture_1")
 
         helper._controller.create_mapping.assert_called_once_with(  # type: ignore[union-attr]
             "frame_001.png", "capture_1"
         )
+        # Verify canvas was set up with game frame and auto-align triggered
+        helper._alignment_canvas.set_game_frame.assert_called_once()  # type: ignore[union-attr]
+        helper._alignment_canvas.auto_align.assert_called_once_with(with_scale=True)  # type: ignore[union-attr]
 
     def test_attempt_link_same_pair_shows_message(self, helper: WorkspaceLogicHelper) -> None:
         """attempt_link shows message when linking same pair."""

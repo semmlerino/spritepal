@@ -194,108 +194,61 @@ class TestAutoAlignVisibility:
         assert viewport_rect.contains(ai_center), f"AI frame center {ai_center} not in viewport {viewport_rect}"
 
 
-class TestAutoAlignCoordinates:
-    """Tests for Bug #4: Initial auto-align uses wrong bounding box coordinates.
+class TestAutoAlignOnMappingCreation:
+    """Tests for auto-align with scale when creating a new mapping.
 
-    Bug: _attempt_link() passes capture bounding box x,y (screen coordinates)
-    to calculate_auto_alignment(), but the canvas displays the game frame at (0,0).
-    This causes large incorrect offsets when the capture position != (0,0).
-
-    The fix: Always use (0, 0) for game_bbox_x/y since that's where the game frame
-    is displayed on the canvas.
+    When a mapping is created via attempt_link(), the canvas should be set up
+    with the game frame and auto_align(with_scale=True) should be called to
+    automatically optimize the alignment.
     """
 
-    def test_auto_alignment_uses_canvas_origin_not_capture_position(self, tmp_path: Path) -> None:
-        """Auto-alignment should calculate offset relative to canvas origin (0,0).
+    def test_attempt_link_triggers_canvas_auto_align(self) -> None:
+        """Creating a mapping should trigger canvas auto-align with scale optimization.
 
-        When a sprite is captured at screen position (120, 80), the bounding box
-        will have x=120, y=80. But on the canvas, the game frame is always displayed
-        at (0, 0). The alignment offset must be calculated relative to (0, 0).
-
-        This test FAILS until _attempt_link is fixed to use (0, 0) instead of bbox.x/y.
+        This ensures that when a user links an AI frame to a game frame,
+        the alignment is automatically optimized without manual intervention.
         """
-        from unittest.mock import MagicMock, patch
+        from unittest.mock import MagicMock
 
-        from core.services.tile_sampling_service import calculate_auto_alignment
+        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 
-        # Create AI image with content at (100, 100) to (150, 150)
-        ai_image_path = tmp_path / "ai_frame.png"
-        ai_img = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(ai_img)
-        draw.rectangle([100, 100, 150, 150], fill=(255, 0, 0, 255))
-        ai_img.save(ai_image_path)
+        # Create WorkspaceLogicHelper with mocked dependencies
+        helper = WorkspaceLogicHelper()
 
-        # Track what coordinates are passed to calculate_auto_alignment
-        captured_args: list[tuple[int, int, int, int]] = []
-        original_func = calculate_auto_alignment
+        # Mock controller
+        mock_controller = MagicMock()
+        helper.set_controller(mock_controller)
 
-        def tracking_wrapper(
-            ai_image: Image.Image,
-            game_bbox_x: int,
-            game_bbox_y: int,
-            game_bbox_width: int,
-            game_bbox_height: int,
-        ) -> tuple[int, int]:
-            captured_args.append((game_bbox_x, game_bbox_y, game_bbox_width, game_bbox_height))
-            return original_func(ai_image, game_bbox_x, game_bbox_y, game_bbox_width, game_bbox_height)
+        # Mock state manager
+        mock_state = MagicMock()
+        mock_state.auto_advance_enabled = False
+        helper.set_state(mock_state)
 
-        # Patch at the import location in workspace_logic_helper
-        with patch(
-            "ui.frame_mapping.workspace_logic_helper.calculate_auto_alignment",
-            side_effect=tracking_wrapper,
-        ):
-            from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
+        # Mock panes - canvas is the key one we want to verify
+        mock_canvas = MagicMock()
+        helper.set_panes(MagicMock(), MagicMock(), MagicMock(), mock_canvas)
 
-            # Create real WorkspaceLogicHelper with mocked dependencies
-            helper = WorkspaceLogicHelper()
+        # Setup project with AI frame
+        mock_project = MagicMock()
+        mock_ai_frame = MagicMock()
+        mock_ai_frame.path.name = "frame0.png"
+        mock_ai_frame.index = 0
+        mock_game_frame = MagicMock()
+        mock_project.get_ai_frame_by_id.return_value = mock_ai_frame
+        mock_project.get_game_frame_by_id.return_value = mock_game_frame
+        mock_project.get_mapping_for_ai_frame.return_value = None
+        mock_controller.project = mock_project
+        mock_controller.get_existing_link_for_ai_frame.return_value = None
+        mock_controller.get_existing_link_for_game_frame.return_value = None
+        mock_controller.get_game_frame_preview.return_value = None
+        mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
 
-            # Mock controller
-            mock_controller = MagicMock()
-            helper.set_controller(mock_controller)
+        # Call attempt_link to create a new mapping
+        helper.attempt_link(ai_frame_id="frame0.png", game_frame_id="frame1")
 
-            # Mock state manager
-            mock_state = MagicMock()
-            mock_state.auto_advance_enabled = False
-            helper.set_state(mock_state)
-
-            # Mock panes
-            mock_ai_pane = MagicMock()
-            mock_captures_pane = MagicMock()
-            mock_mapping_panel = MagicMock()
-            mock_canvas = MagicMock()
-            helper.set_panes(mock_ai_pane, mock_captures_pane, mock_mapping_panel, mock_canvas)
-
-            # Setup project with AI frame
-            mock_project = MagicMock()
-            mock_ai_frame = MagicMock()
-            mock_ai_frame.path = ai_image_path
-            mock_ai_frame.id = "frame0.png"
-            mock_ai_frame.index = 0
-            mock_project.get_ai_frame_by_id.return_value = mock_ai_frame
-            mock_project.get_mapping_for_ai_frame.return_value = None
-            mock_controller.project = mock_project
-            mock_controller.get_existing_link_for_ai_frame.return_value = None
-            mock_controller.get_existing_link_for_game_frame.return_value = None
-
-            # Setup capture result with NON-ZERO screen position (the bug trigger)
-            mock_capture = MagicMock()
-            mock_capture.has_entries = True
-            mock_capture.bounding_box.x = 120  # Screen position, NOT canvas position
-            mock_capture.bounding_box.y = 80
-            mock_capture.bounding_box.width = 32
-            mock_capture.bounding_box.height = 32
-            mock_controller.get_capture_result_for_game_frame.return_value = (mock_capture, False)
-
-            # Call the real attempt_link method (now in WorkspaceLogicHelper)
-            helper.attempt_link(ai_frame_id="frame0.png", game_frame_id="frame1")
-
-        # ASSERTION: Should be called with (0, 0) for canvas-relative alignment
-        # BUG: Currently called with (120, 80) from capture screen position
-        assert len(captured_args) == 1, f"Expected 1 call, got {len(captured_args)}"
-        bbox_x, bbox_y, bbox_w, bbox_h = captured_args[0]
-
-        assert bbox_x == 0, f"Expected bbox_x=0 (canvas origin), got {bbox_x} (screen position)"
-        assert bbox_y == 0, f"Expected bbox_y=0 (canvas origin), got {bbox_y} (screen position)"
+        # Verify: canvas should receive game frame and auto_align should be triggered
+        mock_canvas.set_game_frame.assert_called_once()
+        mock_canvas.auto_align.assert_called_once_with(with_scale=True)
 
 
 class TestLargeImageAutoAlign:
@@ -555,4 +508,154 @@ class TestAutoAlignWithTileGaps:
         assert not has_overflow, (
             "Auto-align should not cause overflow with non-contiguous tiles. "
             "Content was likely centered over bounding box instead of tile centroid."
+        )
+
+
+class TestAutoAlignScaleMaximization:
+    """Tests for auto-align finding maximum scale with Match Scale enabled.
+
+    Bug: Auto-align with Match Scale produces scales far too small. The algorithm
+    should find the maximum scale where content fits within tile coverage, but
+    position search range is too limited (only ~8px) and upper bound too restrictive
+    (only 10% above initial estimate).
+
+    When tile coverage has gaps, the content might need to shift further to find
+    a valid position. Limited search range causes find_valid_position() to fail,
+    and binary search unnecessarily reduces scale.
+    """
+
+    def test_auto_align_finds_maximum_scale_with_gaps(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Auto-align should find scale close to theoretical maximum.
+
+        Scenario: AI content that should fit at ~80-90% of tile coverage height/width.
+        Bug: Position search (only ~8px radius) fails to find valid positions for
+        larger scales when tile pattern has gaps, causing premature scale reduction.
+
+        Fix: Increase position search margin from tile_size//4 to tile_size//2.
+        """
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+
+        # Create AI image with 48x48 content that should fit in 40x40 tile coverage
+        # Theoretical max scale: 40/48 ≈ 0.833
+        ai_image_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(ai_img)
+        # Content at (26, 26) to (74, 74) - 48x48 centered
+        draw.rectangle([26, 26, 74, 74], fill=(255, 0, 0, 255))
+        ai_img.save(ai_image_path)
+
+        # Create game preview
+        game_preview_path = tmp_path / "game.png"
+        game_preview = Image.new("RGBA", (48, 48), (0, 255, 0, 255))
+        game_preview.save(game_preview_path)
+
+        # Create tile grid with gaps - 5x5 tiles (8px each = 40x40 total)
+        # but with one corner tile missing to create non-contiguous coverage
+        entries = []
+        for row in range(5):
+            for col in range(5):
+                # Skip corner at (0,0) to create gap
+                if row == 0 and col == 0:
+                    continue
+                x = col * 8
+                y = row * 8
+                entries.append(MockOAMEntry(x=x, y=y, width=8, height=8))
+
+        mock_capture = MockCaptureResult(
+            entries=entries,
+            _bounding_box=MockBoundingBox(x=0, y=0, width=40, height=40),
+        )
+
+        game_frame = GameFrame(id="test_frame", width=40, height=40)
+
+        # Setup canvas
+        canvas.set_game_frame(
+            frame=game_frame,
+            preview_pixmap=QPixmap(str(game_preview_path)),
+            capture_result=mock_capture,  # type: ignore[arg-type]
+        )
+        canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
+
+        # Enable Match Scale and trigger auto-align
+        canvas._match_scale_checkbox.setChecked(True)
+        canvas.set_alignment(0, 0, False, False, 1.0)
+        canvas._on_auto_align()
+
+        # Get resulting scale
+        actual_scale = canvas._scale_slider.value() / 1000.0
+
+        # Theoretical max scale: 40/48 ≈ 0.833
+        # Due to gap and position constraints, expect ~0.7-0.85
+        # Bug produces scales like 0.3-0.5 (far too small)
+        theoretical_max = 40 / 48  # ≈ 0.833
+
+        assert actual_scale >= theoretical_max * 0.75, (
+            f"Scale {actual_scale:.3f} too small. Expected at least {theoretical_max * 0.75:.3f} "
+            f"(75% of theoretical max {theoretical_max:.3f}). "
+            "Position search range may be too limited for non-contiguous tile patterns."
+        )
+
+    def test_auto_align_upper_bound_allows_exploration(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Binary search upper bound should allow exploration above initial estimate.
+
+        Bug: Upper bound = initial_scale * 1.1 limits exploration to only 10% above
+        initial estimate. Content that could fit at scale 1.0 when better positioned
+        gets limited to much smaller scales.
+
+        Fix: Increase upper bound multiplier from 1.1 to 1.5.
+        """
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+
+        # Create AI image with content exactly matching tile coverage size
+        # 32x32 content in 32x32 tiles - scale should be able to reach 1.0
+        ai_image_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(ai_img)
+        # Content at (16, 16) to (48, 48) - 32x32 centered
+        draw.rectangle([16, 16, 48, 48], fill=(255, 0, 0, 255))
+        ai_img.save(ai_image_path)
+
+        # Create game preview
+        game_preview_path = tmp_path / "game.png"
+        game_preview = Image.new("RGBA", (32, 32), (0, 255, 0, 255))
+        game_preview.save(game_preview_path)
+
+        # Create simple 4x4 tile grid (8px tiles = 32x32 total), no gaps
+        entries = []
+        for row in range(4):
+            for col in range(4):
+                x = col * 8
+                y = row * 8
+                entries.append(MockOAMEntry(x=x, y=y, width=8, height=8))
+
+        mock_capture = MockCaptureResult(
+            entries=entries,
+            _bounding_box=MockBoundingBox(x=0, y=0, width=32, height=32),
+        )
+
+        game_frame = GameFrame(id="test_frame", width=32, height=32)
+
+        # Setup canvas
+        canvas.set_game_frame(
+            frame=game_frame,
+            preview_pixmap=QPixmap(str(game_preview_path)),
+            capture_result=mock_capture,  # type: ignore[arg-type]
+        )
+        canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
+
+        # Enable Match Scale and trigger auto-align
+        canvas._match_scale_checkbox.setChecked(True)
+        canvas.set_alignment(0, 0, False, False, 1.0)
+        canvas._on_auto_align()
+
+        # Get resulting scale
+        actual_scale = canvas._scale_slider.value() / 1000.0
+
+        # Content exactly matches tile coverage, scale should be 1.0 or very close
+        # Bug: Limited upper bound (1.1x initial) prevents reaching optimal scale
+        assert actual_scale >= 0.95, (
+            f"Scale {actual_scale:.3f} too small. Expected >= 0.95 for exact-fit scenario. "
+            "Binary search upper bound may be limiting scale exploration."
         )

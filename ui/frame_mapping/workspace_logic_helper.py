@@ -7,11 +7,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PIL import Image
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QMessageBox
 
-from core.services.tile_sampling_service import calculate_auto_alignment
 from ui.frame_mapping.dialogs.replace_link_dialog import (
     confirm_replace_ai_frame_link,
     confirm_replace_link,
@@ -21,7 +19,6 @@ from utils.logging_config import get_logger
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
-    from core.frame_mapping_project import AIFrame
     from ui.frame_mapping.controllers.frame_mapping_controller import (
         FrameMappingController,
     )
@@ -417,6 +414,7 @@ class WorkspaceLogicHelper:
 
         Handles existing link confirmation (for both AI and game frames) and auto-advance.
         Preserves alignment if mapping already exists for the same pair.
+        After creating a new mapping, automatically aligns with scale optimization.
 
         Args:
             ai_frame_id: AI frame ID (filename)
@@ -469,25 +467,22 @@ class WorkspaceLogicHelper:
         # Create the mapping
         self._controller.create_mapping(ai_frame_id, game_frame_id)
 
-        # Auto-align using bounding box alignment (center AI content over game content)
-        self._auto_align_mapping(ai_frame, ai_frame_id, game_frame_id)
+        # Load the game frame into the canvas for auto-alignment
+        game_frame = project.get_game_frame_by_id(game_frame_id)
+        preview = self._controller.get_game_frame_preview(game_frame_id)
+        capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(game_frame_id)
+        self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
+
+        # Update state tracking so alignment changes are saved to the correct mapping
+        self._state.selected_game_id = game_frame_id
+        self._state.current_canvas_game_id = game_frame_id
+
+        # Auto-align with scale optimization (emits alignment_changed signal)
+        self._alignment_canvas.auto_align(with_scale=True)
 
         self.refresh_mapping_status()
         self.refresh_game_frame_link_status()
         self.update_mapping_panel_previews()
-
-        # Update canvas with alignment using ID-based lookup (O(1))
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping:
-            self._alignment_canvas.set_alignment(
-                mapping.offset_x,
-                mapping.offset_y,
-                mapping.flip_h,
-                mapping.flip_v,
-                mapping.scale,
-                mapping.sharpen,
-                mapping.resampling,
-            )
 
         if self._message_service:
             self._message_service.show_message(f"Linked '{ai_name}' to '{game_frame_id}'", 3000)
@@ -499,46 +494,6 @@ class WorkspaceLogicHelper:
                 next_frame = project.get_ai_frame_by_id(next_unmapped_id)
                 if next_frame:
                     self._ai_frames_pane.select_frame(next_frame.index, emit_signal=True)
-
-    def _auto_align_mapping(self, ai_frame: AIFrame | None, ai_frame_id: str, game_frame_id: str) -> None:
-        """Auto-align a newly created mapping using bounding box alignment."""
-        if self._controller is None:
-            return
-
-        if ai_frame and ai_frame.path.exists():
-            capture_result, _used_fallback = self._controller.get_capture_result_for_game_frame(game_frame_id)
-            if capture_result and capture_result.has_entries:
-                try:
-                    ai_pil = Image.open(ai_frame.path).convert("RGBA")
-                    bbox = capture_result.bounding_box
-                    # Use (0, 0) for game bbox position since that's where it's displayed on canvas
-                    # (not the screen-relative capture coordinates)
-                    offset_x, offset_y = calculate_auto_alignment(ai_pil, 0, 0, bbox.width, bbox.height)
-                    self._controller.update_mapping_alignment(
-                        ai_frame_id, offset_x, offset_y, False, False, set_edited=False
-                    )
-                except Exception as e:
-                    logger.warning("Auto-alignment failed, using center: %s", e)
-                    # Fallback to simple centering
-                    self._center_align_mapping(ai_frame, ai_frame_id, game_frame_id)
-            else:
-                # No capture result - fallback to simple centering
-                self._center_align_mapping(ai_frame, ai_frame_id, game_frame_id)
-
-    def _center_align_mapping(self, ai_frame: AIFrame, ai_frame_id: str, game_frame_id: str) -> None:
-        """Center-align a mapping as fallback when auto-alignment isn't possible."""
-        if self._controller is None:
-            return
-
-        game_preview = self._controller.get_game_frame_preview(game_frame_id)
-        if game_preview:
-            ai_pixmap = QPixmap(str(ai_frame.path))
-            if not ai_pixmap.isNull():
-                center_x = (game_preview.width() - ai_pixmap.width()) // 2
-                center_y = (game_preview.height() - ai_pixmap.height()) // 2
-                self._controller.update_mapping_alignment(
-                    ai_frame_id, center_x, center_y, False, False, set_edited=False
-                )
 
     def find_next_unmapped_ai_frame(self, current_index: int) -> str | None:
         """Find the next unmapped AI frame after the given index.
