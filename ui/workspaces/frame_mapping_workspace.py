@@ -1224,8 +1224,7 @@ class FrameMappingWorkspace(QWidget):
             self._message_service.show_message(f"Injection successful for frame {ai_frame_id}")
 
         self._refresh_mapping_status()
-        self._mapping_panel.refresh()  # Refresh table to show updated status
-        QMessageBox.information(self, "Injection Successful", message)
+        self._mapping_panel.refresh()  # Refresh table to show updated status (preserves selection)
 
     def _on_stale_entries_warning(self, frame_id: str) -> None:
         """Handle stale entry ID warning from controller.
