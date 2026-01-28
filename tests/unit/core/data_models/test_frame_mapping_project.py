@@ -315,6 +315,9 @@ class TestFrameMappingProjectAlignment:
     def test_update_mapping_alignment_success(self) -> None:
         """update_mapping_alignment updates existing mapping."""
         project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
         project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
 
         result = project.update_mapping_alignment(
@@ -350,6 +353,9 @@ class TestFrameMappingProjectAlignment:
     def test_update_mapping_alignment_preserves_other_fields(self) -> None:
         """update_mapping_alignment preserves other mapping fields."""
         project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
         mapping = project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
         mapping.status = "edited"
 
@@ -483,6 +489,9 @@ class TestFrameMappingQuantizationOptions:
     def test_update_mapping_alignment_with_sharpen_resampling(self) -> None:
         """update_mapping_alignment should update sharpen and resampling."""
         project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
         project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
 
         result = project.update_mapping_alignment(
@@ -539,6 +548,9 @@ class TestFrameMappingQuantizationOptions:
     def test_sharpen_clamped_to_valid_range(self) -> None:
         """update_mapping_alignment should clamp sharpen to 0.0-4.0."""
         project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
         project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
 
         # Test negative clamps to 0
@@ -569,6 +581,9 @@ class TestFrameMappingQuantizationOptions:
     def test_resampling_validated(self) -> None:
         """update_mapping_alignment should validate resampling value."""
         project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
         project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
 
         # Invalid resampling should default to lanczos
@@ -591,6 +606,9 @@ class TestFrameMappingProjectStableIDs:
     def test_mapping_uses_ai_frame_id(self) -> None:
         """Mappings use stable ai_frame_id, not position-dependent index."""
         project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("my_sprite.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
         project.create_mapping(ai_frame_id="my_sprite.png", game_frame_id="G001")
 
         mapping = project.get_mapping_for_ai_frame("my_sprite.png")
@@ -698,6 +716,12 @@ class TestFrameMappingProjectPerformance:
         """Mapping lookup uses O(1) index."""
         project = FrameMappingProject(name="test")
 
+        # Create many frames first
+        for i in range(100):
+            project.ai_frames.append(AIFrame(path=Path(f"frame_{i:04d}.png"), index=i))
+            project.game_frames.append(GameFrame(id=f"G{i:04d}"))
+        project._rebuild_indices()
+
         # Create many mappings
         for i in range(100):
             project.create_mapping(ai_frame_id=f"frame_{i:04d}.png", game_frame_id=f"G{i:04d}")
@@ -746,6 +770,7 @@ class TestRemoveGameFrame:
         game_frame = GameFrame(id="G001", rom_offsets=[0x1000])
         project.ai_frames.append(ai_frame)
         project.game_frames.append(game_frame)
+        project._rebuild_indices()
         project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
 
         assert project.get_mapping_for_game_frame("G001") is not None
@@ -875,6 +900,7 @@ class TestFacadeMethods:
 
         project.ai_frames = [ai1, ai2]
         project.game_frames = [g1, g2]
+        project._rebuild_indices()
         project.create_mapping("frame_001.png", "G001")
         project.create_mapping("frame_002.png", "G002")
 
@@ -896,6 +922,7 @@ class TestFacadeMethods:
         g1 = GameFrame(id="G001", rom_offsets=[0x1000])
         project.ai_frames = [ai1]
         project.game_frames = [g1]
+        project._rebuild_indices()
         project.create_mapping("frame_001.png", "G001")
 
         # No orphans when all IDs valid
@@ -914,6 +941,7 @@ class TestFacadeMethods:
         g1 = GameFrame(id="G001", rom_offsets=[0x1000])
         project.ai_frames = [ai1]
         project.game_frames = [g1]
+        project._rebuild_indices()
         project.create_mapping("frame_001.png", "G001")
 
         # Verify index is populated
@@ -958,8 +986,11 @@ class TestCreateMappingValidation:
             project.create_mapping("frame_001.png", "   ")
 
     def test_create_mapping_accepts_valid_ids(self) -> None:
-        """create_mapping accepts valid non-empty IDs."""
+        """create_mapping accepts valid non-empty IDs when frames exist."""
         project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
 
         mapping = project.create_mapping("frame_001.png", "G001")
 
@@ -967,13 +998,36 @@ class TestCreateMappingValidation:
         assert mapping.game_frame_id == "G001"
 
     def test_create_mapping_accepts_ids_with_special_chars(self) -> None:
-        """create_mapping accepts IDs with special characters."""
+        """create_mapping accepts IDs with special characters when frames exist."""
         project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("sprite-001_v2.png"), index=0)]
+        project.game_frames = [GameFrame(id="G_001-test")]
+        project._rebuild_indices()
 
         mapping = project.create_mapping("sprite-001_v2.png", "G_001-test")
 
         assert mapping.ai_frame_id == "sprite-001_v2.png"
         assert mapping.game_frame_id == "G_001-test"
+
+    def test_create_mapping_rejects_nonexistent_ai_frame(self) -> None:
+        """create_mapping raises ValueError for AI frame ID not in project."""
+        project = FrameMappingProject(name="test")
+        # Add game frame but no AI frame
+        project.game_frames.append(GameFrame(id="G001", rom_offsets=[0x1000]))
+        project._rebuild_indices()
+
+        with pytest.raises(ValueError, match="AI frame.*not found"):
+            project.create_mapping("ghost.png", "G001")
+
+    def test_create_mapping_rejects_nonexistent_game_frame(self) -> None:
+        """create_mapping raises ValueError for game frame ID not in project."""
+        project = FrameMappingProject(name="test")
+        # Add AI frame but no game frame
+        project.ai_frames.append(AIFrame(path=Path("frame_001.png"), index=0))
+        project._rebuild_indices()
+
+        with pytest.raises(ValueError, match="Game frame.*not found"):
+            project.create_mapping("frame_001.png", "ghost_game")
 
 
 class TestSheetPaletteTransparencyValidation:

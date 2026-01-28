@@ -39,6 +39,9 @@ class TestFrameMappingRepositorySaveLoad:
     def test_save_uses_current_format(self, tmp_path: Path) -> None:
         """Save uses current format version with ai_frame_id."""
         project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("sprite.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
         project.create_mapping(ai_frame_id="sprite.png", game_frame_id="G001")
 
         save_path = tmp_path / "test.spritepal-mapping.json"
@@ -62,6 +65,7 @@ class TestFrameMappingRepositorySaveLoad:
         project = FrameMappingProject(name="Test Project", ai_frames_dir=ai_dir)
         project.ai_frames.append(AIFrame(path=ai_path, index=0, width=16, height=16))
         project.game_frames.append(GameFrame(id="G001", rom_offsets=[0x1000]))
+        project._rebuild_indices()
         project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
 
         save_path = tmp_path / "project.spritepal-mapping.json"
@@ -363,6 +367,7 @@ class TestRepositoryErrorHandling:
                 display_name="Game Frame 1",
             )
         )
+        project._rebuild_indices()
         project.create_mapping(ai_frame_id="frame.png", game_frame_id="G001")
         project.update_mapping_alignment(
             ai_frame_id="frame.png", offset_x=5, offset_y=-3, flip_h=True, flip_v=False, scale=0.8

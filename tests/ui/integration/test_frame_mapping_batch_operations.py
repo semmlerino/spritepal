@@ -33,7 +33,7 @@ def mock_controller(tmp_path):
     controller = FrameMappingController()
     controller.new_project("Test Project")
 
-    # Create 5 dummy frames and mappings
+    # Create 5 dummy frames
     frames = []
     game_frames = []
 
@@ -49,10 +49,13 @@ def mock_controller(tmp_path):
         game_frame = GameFrame(id=gf_id, rom_offsets=[0x1000 + i], capture_path=cap_path)
         game_frames.append(game_frame)
 
-        controller.project.create_mapping(ai_frame.id, gf_id)
-
+    # Add frames to project first, then create mappings
     controller.project.ai_frames = frames
     controller.project.game_frames = game_frames
+    controller.project._rebuild_indices()
+
+    for i in range(5):
+        controller.project.create_mapping(frames[i].id, f"gf_{i}")
 
     return controller
 

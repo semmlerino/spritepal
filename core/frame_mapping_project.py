@@ -691,12 +691,19 @@ class FrameMappingProject:
 
         Raises:
             ValueError: If ai_frame_id or game_frame_id is empty
+            ValueError: If ai_frame_id or game_frame_id does not exist in project
         """
         # Validate inputs - empty IDs break downstream operations
         if not ai_frame_id or not ai_frame_id.strip():
             raise ValueError("ai_frame_id cannot be empty")
         if not game_frame_id or not game_frame_id.strip():
             raise ValueError("game_frame_id cannot be empty")
+
+        # Validate referential integrity - frames must exist
+        if self.get_ai_frame_by_id(ai_frame_id) is None:
+            raise ValueError(f"AI frame '{ai_frame_id}' not found in project")
+        if self.get_game_frame_by_id(game_frame_id) is None:
+            raise ValueError(f"Game frame '{game_frame_id}' not found in project")
 
         # Remove existing mapping for this AI frame if any
         self.mappings = [m for m in self.mappings if m.ai_frame_id != ai_frame_id]

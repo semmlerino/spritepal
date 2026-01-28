@@ -203,15 +203,17 @@ class TestInjectMappingEntryFiltering:
                     "height": 8,
                     "palette": 7,
                     "rom_offset": shared_offset,
-                    "tiles": [{
-                        "tile_index": 0,
-                        "vram_addr": 0x1000,
-                        "pos_x": 0,
-                        "pos_y": 0,
-                        "data_hex": solid_tile,
-                        "rom_offset": shared_offset,
-                        "tile_index_in_block": 0,
-                    }],
+                    "tiles": [
+                        {
+                            "tile_index": 0,
+                            "vram_addr": 0x1000,
+                            "pos_x": 0,
+                            "pos_y": 0,
+                            "data_hex": solid_tile,
+                            "rom_offset": shared_offset,
+                            "tile_index_in_block": 0,
+                        }
+                    ],
                 },
                 {
                     "id": 20,
@@ -222,15 +224,17 @@ class TestInjectMappingEntryFiltering:
                     "height": 8,
                     "palette": 7,
                     "rom_offset": shared_offset,  # Same ROM offset
-                    "tiles": [{
-                        "tile_index": 0,
-                        "vram_addr": 0x1020,
-                        "pos_x": 0,
-                        "pos_y": 0,
-                        "data_hex": solid_tile,
-                        "rom_offset": shared_offset,
-                        "tile_index_in_block": 0,
-                    }],
+                    "tiles": [
+                        {
+                            "tile_index": 0,
+                            "vram_addr": 0x1020,
+                            "pos_x": 0,
+                            "pos_y": 0,
+                            "data_hex": solid_tile,
+                            "rom_offset": shared_offset,
+                            "tile_index_in_block": 0,
+                        }
+                    ],
                 },
             ],
             "palettes": {7: [[0, 0, 0]] + [[255, 255, 255]] * 15},
@@ -2323,7 +2327,7 @@ class TestHeadlessControllerUsage:
         assert len(controller2.get_ai_frames()) == 1
 
     def test_create_mapping_without_parent(self, tmp_path: Path, qtbot) -> None:
-        """Can create mappings without parent."""
+        """Can create mappings without parent, emits signals and enables undo."""
         # Create minimal AI frame and game frame
         img = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
         ai_frame_path = tmp_path / "frame_001.png"
@@ -2351,12 +2355,22 @@ class TestHeadlessControllerUsage:
         project._rebuild_indices()
         controller._project = project
 
-        # Create mapping
-        success = controller.create_mapping("frame_001.png", "G001")
+        # Verify undo not available before operation
+        assert not controller.can_undo()
+
+        # Create mapping and verify signals emitted
+        with qtbot.waitSignals(
+            [controller.mapping_created, controller.save_requested],
+            timeout=1000,
+        ):
+            success = controller.create_mapping("frame_001.png", "G001")
 
         # Verify mapping created
         assert success
         assert len(controller.project.mappings) == 1
+
+        # Verify undo stack populated
+        assert controller.can_undo()
 
     def test_alignment_update_without_parent(self, tmp_path: Path, qtbot) -> None:
         """Can update alignment without parent."""
