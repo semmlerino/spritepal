@@ -372,3 +372,105 @@ class TestPreviewServiceEdgeCases:
         assert cached_pixmap == mock_pixmap
         assert cached_mtime == 123.45
         assert cached_entries == (1, 2, 3)
+
+
+class TestPreviewServiceIntegration:
+    """Integration tests with real rendering pipeline (no mocked CaptureRenderer)."""
+
+    @pytest.fixture
+    def minimal_capture_json(self, tmp_path: Path) -> Path:
+        """Create 8x8 sprite capture with all pixels = palette index 1 (red).
+
+        SNES 4bpp tile format: 8 rows × 4 bytes each = 32 bytes per tile.
+        Bitplanes: row N uses bytes at offsets 2N, 2N+1 (bp0, bp1) and 16+2N, 16+2N+1 (bp2, bp3).
+        For palette index 1 (0b0001), we need bp0=1, bp1=0, bp2=0, bp3=0.
+        So: bp0=0xFF (all pixels have bit0=1), bp1=0x00, bp2=0x00, bp3=0x00 for each row.
+        """
+        import json
+
+        # Build 4bpp tile data: 8 rows, each row sets all 8 pixels to palette index 1
+        # Format: rows 0-7 interleaved bp0/bp1, then rows 0-7 interleaved bp2/bp3
+        tile_bytes = []
+        for _row in range(8):
+            tile_bytes.append(0xFF)  # bp0 = 1 for all pixels
+            tile_bytes.append(0x00)  # bp1 = 0
+        for _row in range(8):
+            tile_bytes.append(0x00)  # bp2 = 0
+            tile_bytes.append(0x00)  # bp3 = 0
+        tile_hex = "".join(f"{b:02x}" for b in tile_bytes)
+
+        capture_data = {
+            "schema_version": "1.0",
+            "frame": 100,
+            "obsel": {"raw": 0},
+            "visible_count": 1,
+            "entries": [
+                {
+                    "id": 1,
+                    "x": 0,
+                    "y": 0,
+                    "tile": 0,
+                    "width": 8,
+                    "height": 8,
+                    "palette": 0,
+                    "priority": 0,
+                    "flip_h": False,
+                    "flip_v": False,
+                    "name_table": 0,
+                    "tile_page": 0,
+                    "tiles": [
+                        {
+                            "tile_index": 0,
+                            "vram_addr": 0,
+                            "pos_x": 0,
+                            "pos_y": 0,
+                            "data_hex": tile_hex,
+                        }
+                    ],
+                }
+            ],
+            # Palette 0: index 0 = black (transparent), index 1 = red
+            "palettes": {
+                "0": [[0, 0, 0], [255, 0, 0]] + [[0, 0, 0]] * 14,
+            },
+        }
+        path = tmp_path / "capture.json"
+        path.write_text(json.dumps(capture_data))
+        return path
+
+    def test_preview_renders_correct_pixel_colors(self, preview_service, minimal_capture_json: Path, tmp_path: Path):
+        """Verify actual pixel colors from real rendering pipeline (no CaptureRenderer mock)."""
+        # Create a real project with proper structure
+        project = FrameMappingProject(
+            name="test",
+            ai_frames_dir=tmp_path,
+            ai_frames=[],
+            game_frames=[],
+            mappings=[],
+        )
+
+        game_frame = GameFrame(
+            id="f1",
+            capture_path=minimal_capture_json,
+            selected_entry_ids=[1],
+            rom_offsets=[0x1000],
+            palette_index=0,
+            width=8,
+            height=8,
+            compression_types={},
+        )
+        project.add_game_frame(game_frame)
+
+        # Get preview using real rendering (no mocks!)
+        pixmap = preview_service.get_preview("f1", project)
+
+        assert pixmap is not None, "Preview should be generated"
+        assert pixmap.width() == 8, f"Expected width 8, got {pixmap.width()}"
+        assert pixmap.height() == 8, f"Expected height 8, got {pixmap.height()}"
+
+        # Check pixel color - center pixel should be red (palette index 1)
+        image = pixmap.toImage()
+        color = image.pixelColor(4, 4)
+        assert color.red() == 255, f"Expected red=255, got {color.red()}"
+        assert color.green() == 0, f"Expected green=0, got {color.green()}"
+        assert color.blue() == 0, f"Expected blue=0, got {color.blue()}"

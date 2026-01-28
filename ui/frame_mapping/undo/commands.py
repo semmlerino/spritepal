@@ -30,11 +30,11 @@ class CreateMappingCommand:
     controller: FrameMappingController
     ai_frame_id: str
     game_frame_id: str
-    # Previous state for undo
+    # Previous state for undo (all 7 alignment properties)
     prev_ai_mapping_game_id: str | None = None  # Game frame previously linked to this AI frame
     prev_game_mapping_ai_id: str | None = None  # AI frame previously linked to this game frame
-    prev_ai_mapping_alignment: tuple[int, int, bool, bool, float] | None = None  # (x, y, flip_h, flip_v, scale)
-    prev_game_mapping_alignment: tuple[int, int, bool, bool, float] | None = None
+    prev_ai_mapping_alignment: tuple[int, int, bool, bool, float, float, str] | None = None
+    prev_game_mapping_alignment: tuple[int, int, bool, bool, float, float, str] | None = None
 
     @property
     def description(self) -> str:
@@ -51,15 +51,17 @@ class CreateMappingCommand:
         if self.prev_ai_mapping_game_id is not None:
             self.controller._create_mapping_no_history(self.ai_frame_id, self.prev_ai_mapping_game_id)
             if self.prev_ai_mapping_alignment:
-                x, y, fh, fv, scale = self.prev_ai_mapping_alignment
-                self.controller._update_alignment_no_history(self.ai_frame_id, x, y, fh, fv, scale)
+                x, y, fh, fv, scale, sharpen, resampling = self.prev_ai_mapping_alignment
+                self.controller._update_alignment_no_history(self.ai_frame_id, x, y, fh, fv, scale, sharpen, resampling)
 
         # Restore previous game frame mapping if it existed
         if self.prev_game_mapping_ai_id is not None:
             self.controller._create_mapping_no_history(self.prev_game_mapping_ai_id, self.game_frame_id)
             if self.prev_game_mapping_alignment:
-                x, y, fh, fv, scale = self.prev_game_mapping_alignment
-                self.controller._update_alignment_no_history(self.prev_game_mapping_ai_id, x, y, fh, fv, scale)
+                x, y, fh, fv, scale, sharpen, resampling = self.prev_game_mapping_alignment
+                self.controller._update_alignment_no_history(
+                    self.prev_game_mapping_ai_id, x, y, fh, fv, scale, sharpen, resampling
+                )
 
 
 @dataclass
@@ -68,9 +70,9 @@ class RemoveMappingCommand:
 
     controller: FrameMappingController
     ai_frame_id: str
-    # Previous state for undo
+    # Previous state for undo (all 7 alignment properties)
     removed_game_frame_id: str | None = None
-    removed_alignment: tuple[int, int, bool, bool, float] | None = None  # (x, y, flip_h, flip_v, scale)
+    removed_alignment: tuple[int, int, bool, bool, float, float, str] | None = None
     removed_status: str = "mapped"
 
     @property
@@ -84,8 +86,8 @@ class RemoveMappingCommand:
         if self.removed_game_frame_id is not None:
             self.controller._create_mapping_no_history(self.ai_frame_id, self.removed_game_frame_id)
             if self.removed_alignment:
-                x, y, fh, fv, scale = self.removed_alignment
-                self.controller._update_alignment_no_history(self.ai_frame_id, x, y, fh, fv, scale)
+                x, y, fh, fv, scale, sharpen, resampling = self.removed_alignment
+                self.controller._update_alignment_no_history(self.ai_frame_id, x, y, fh, fv, scale, sharpen, resampling)
             # Restore status
             self.controller._set_mapping_status_no_history(self.ai_frame_id, self.removed_status)
 

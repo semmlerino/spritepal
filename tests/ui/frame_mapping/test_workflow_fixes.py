@@ -105,8 +105,9 @@ class TestBatchInjectionSignalCoalescing:
 
         This enables batch injection to emit once at the end instead of per-frame.
         """
+        from core.services.injection_results import InjectionResult
+
         controller = FrameMappingController()
-        # Note: FrameMappingController is QObject, not QWidget - no addWidget needed
 
         # Track project_changed emissions
         emissions: list[None] = []
@@ -114,13 +115,13 @@ class TestBatchInjectionSignalCoalescing:
 
         # Create project with AI frame and game frame
         project = create_test_project(tmp_path, num_frames=1)
-        ai_frame = project.ai_frames[0]
+        ai_frame_id = project.ai_frames[0].id  # Use actual ID from project
 
         # Create game frame with ROM offset
         game_frame = GameFrame(
             id="test_game",
             rom_offsets=[0x1000],
-            capture_path=None,  # Will cause injection to fail, but that's OK for this test
+            capture_path=tmp_path / "dummy.json",  # Non-None path
             palette_index=0,
             width=8,
             height=8,
@@ -128,22 +129,65 @@ class TestBatchInjectionSignalCoalescing:
             compression_types={0x1000: "raw"},
         )
         project.add_game_frame(game_frame)
-        project.create_mapping(ai_frame.id, game_frame.id)
+        project.create_mapping(ai_frame_id, game_frame.id)
         controller._project = project
         emissions.clear()  # Clear any emissions from setup
 
-        # inject_mapping with emit_project_changed=False should not emit
-        # (It will fail due to no capture file, but the signal behavior is what we're testing)
-        with patch.object(controller, "_project", project):
+        # Mock orchestrator to return success - we're testing the flag, not injection itself
+        mock_result = InjectionResult(success=True, new_mapping_status="injected", messages=())
+        with patch.object(controller._injection_orchestrator, "execute", return_value=mock_result):
             controller.inject_mapping(
-                ai_frame_id="frame_0.png",
-                rom_path=tmp_path / "nonexistent.sfc",
+                ai_frame_id=ai_frame_id,
+                rom_path=tmp_path / "dummy.sfc",
                 emit_project_changed=False,
             )
 
-        # We expect NO project_changed emission when emit_project_changed=False
-        # Note: The injection will fail, but what matters is no signal during batch
-        # (The actual test is: no emissions from inject_mapping's project_changed.emit line)
+        # With emit_project_changed=False, no project_changed emission should occur
+        assert len(emissions) == 0, f"Expected 0 emissions with emit_project_changed=False, got {len(emissions)}"
+
+    def test_inject_mapping_with_emit_true_does_emit_project_changed(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """inject_mapping(emit_project_changed=True) should emit signal.
+
+        This is the default behavior for single-frame injection.
+        """
+        from core.services.injection_results import InjectionResult
+
+        controller = FrameMappingController()
+
+        # Track project_changed emissions
+        emissions: list[None] = []
+        controller.project_changed.connect(lambda: emissions.append(None))
+
+        # Create project with AI frame and game frame
+        project = create_test_project(tmp_path, num_frames=1)
+        ai_frame_id = project.ai_frames[0].id
+
+        game_frame = GameFrame(
+            id="test_game",
+            rom_offsets=[0x1000],
+            capture_path=tmp_path / "dummy.json",
+            palette_index=0,
+            width=8,
+            height=8,
+            selected_entry_ids=[],
+            compression_types={0x1000: "raw"},
+        )
+        project.add_game_frame(game_frame)
+        project.create_mapping(ai_frame_id, game_frame.id)
+        controller._project = project
+        emissions.clear()
+
+        # Mock orchestrator to return success
+        mock_result = InjectionResult(success=True, new_mapping_status="injected", messages=())
+        with patch.object(controller._injection_orchestrator, "execute", return_value=mock_result):
+            controller.inject_mapping(
+                ai_frame_id=ai_frame_id,
+                rom_path=tmp_path / "dummy.sfc",
+                emit_project_changed=True,  # Explicitly True (also the default)
+            )
+
+        # With emit_project_changed=True, exactly 1 project_changed emission expected
+        assert len(emissions) == 1, f"Expected 1 emission with emit_project_changed=True, got {len(emissions)}"
 
 
 class TestAutoSaveAfterStructuralChanges:

@@ -45,17 +45,32 @@ def populated_controller(controller: FrameMappingController, tmp_path: Path) -> 
 class TestUndoRedoState:
     """Tests for undo/redo state management."""
 
-    def test_new_project_clears_undo_history(self, qtbot: object) -> None:
+    def test_new_project_clears_undo_history(self, qtbot: object, tmp_path: Path) -> None:
         """Creating a new project clears undo history."""
         controller = FrameMappingController()
         controller.new_project("First")
 
-        # Add something to undo stack by creating a mapping
-        # (we need frames first, which makes this complex - skip for basic test)
+        # Setup: create frames and perform an undoable action
+        project = controller.project
+        assert project is not None
 
+        # Create test PNG file and add AI frame
+        (tmp_path / "sprite.png").write_bytes(b"PNG")
+        ai_frame = AIFrame(path=tmp_path / "sprite.png", index=0)
+        project.replace_ai_frames([ai_frame], tmp_path)
+
+        # Add game frame
+        game_frame = GameFrame(id="capture_A", rom_offsets=[0x1000])
+        project.add_game_frame(game_frame)
+
+        # Create mapping - this populates the undo stack
+        controller.create_mapping("sprite.png", "capture_A")
+        assert controller.can_undo(), "Undo stack should be populated after create_mapping"
+
+        # Now create new project - should clear undo history
         controller.new_project("Second")
 
-        assert not controller.can_undo()
+        assert not controller.can_undo(), "Undo stack should be cleared after new_project"
         assert not controller.can_redo()
 
     def test_initial_state_cannot_undo(self, controller: FrameMappingController) -> None:
@@ -166,7 +181,7 @@ class TestRemoveMappingUndo:
         assert project.get_mapping_for_ai_frame("sprite_01.png") is not None
 
     def test_undo_remove_restores_alignment(self, populated_controller: FrameMappingController, qtbot: object) -> None:
-        """Undoing remove restores alignment values."""
+        """Undoing remove restores all alignment values including sharpen and resampling."""
         from pytestqt.qtbot import QtBot
 
         assert isinstance(qtbot, QtBot)
@@ -174,7 +189,10 @@ class TestRemoveMappingUndo:
         assert project is not None
 
         populated_controller.create_mapping("sprite_01.png", "capture_A")
-        populated_controller.update_mapping_alignment("sprite_01.png", 10, 20, True, False, 0.5)
+        # Set ALL 7 alignment properties
+        populated_controller.update_mapping_alignment(
+            "sprite_01.png", 10, 20, True, False, 0.5, sharpen=2.5, resampling="nearest"
+        )
         populated_controller.clear_undo_history()
 
         populated_controller.remove_mapping("sprite_01.png")
@@ -187,6 +205,8 @@ class TestRemoveMappingUndo:
         assert mapping.flip_h is True
         assert mapping.flip_v is False
         assert mapping.scale == 0.5
+        assert mapping.sharpen == 2.5
+        assert mapping.resampling == "nearest"
 
 
 class TestUpdateAlignmentUndo:

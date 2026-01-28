@@ -583,6 +583,8 @@ class FrameMappingController(QObject):
                 prev_ai_mapping.flip_h,
                 prev_ai_mapping.flip_v,
                 prev_ai_mapping.scale,
+                prev_ai_mapping.sharpen,
+                prev_ai_mapping.resampling,
             )
         if prev_game_mapping and prev_game_ai_id != ai_frame_id:
             prev_game_alignment = (
@@ -591,6 +593,8 @@ class FrameMappingController(QObject):
                 prev_game_mapping.flip_h,
                 prev_game_mapping.flip_v,
                 prev_game_mapping.scale,
+                prev_game_mapping.sharpen,
+                prev_game_mapping.resampling,
             )
 
         # Create and execute command via undo stack
@@ -667,6 +671,8 @@ class FrameMappingController(QObject):
             mapping.flip_h,
             mapping.flip_v,
             mapping.scale,
+            mapping.sharpen,
+            mapping.resampling,
         )
         removed_status = mapping.status
 

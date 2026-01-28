@@ -112,17 +112,19 @@ class TestCreateMappingCommand:
         project = populated_controller.project
         assert project is not None
 
-        # Create initial mapping
+        # Create initial mapping with all 7 alignment properties
         populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
-        populated_controller._update_alignment_no_history("sprite_01.png", 10, 20, True, False, 0.5)
+        populated_controller._update_alignment_no_history(
+            "sprite_01.png", 10, 20, True, False, 0.5, sharpen=1.5, resampling="nearest"
+        )
 
-        # Command to remap to different game frame
+        # Command to remap to different game frame (capture all 7 properties)
         cmd = CreateMappingCommand(
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
             game_frame_id="capture_B",
             prev_ai_mapping_game_id="capture_A",
-            prev_ai_mapping_alignment=(10, 20, True, False, 0.5),
+            prev_ai_mapping_alignment=(10, 20, True, False, 0.5, 1.5, "nearest"),
         )
 
         cmd.execute()
@@ -132,7 +134,7 @@ class TestCreateMappingCommand:
 
         cmd.undo()
 
-        # Original mapping restored with alignment
+        # Original mapping restored with all alignment properties
         mapping = project.get_mapping_for_ai_frame("sprite_01.png")
         assert mapping is not None
         assert mapping.game_frame_id == "capture_A"
@@ -141,6 +143,8 @@ class TestCreateMappingCommand:
         assert mapping.flip_h is True
         assert mapping.flip_v is False
         assert mapping.scale == 0.5
+        assert mapping.sharpen == 1.5
+        assert mapping.resampling == "nearest"
 
 
 class TestRemoveMappingCommand:
@@ -174,19 +178,21 @@ class TestRemoveMappingCommand:
         assert project.get_mapping_for_ai_frame("sprite_01.png") is None
 
     def test_undo_restores_mapping(self, populated_controller: FrameMappingController) -> None:
-        """Undo restores the removed mapping with alignment."""
+        """Undo restores the removed mapping with all alignment properties."""
         project = populated_controller.project
         assert project is not None
 
-        # Create and configure a mapping
+        # Create and configure a mapping with all 7 alignment properties
         populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
-        populated_controller._update_alignment_no_history("sprite_01.png", 5, 10, False, True, 0.75)
+        populated_controller._update_alignment_no_history(
+            "sprite_01.png", 5, 10, False, True, 0.75, sharpen=2.0, resampling="nearest"
+        )
 
         cmd = RemoveMappingCommand(
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
             removed_game_frame_id="capture_A",
-            removed_alignment=(5, 10, False, True, 0.75),
+            removed_alignment=(5, 10, False, True, 0.75, 2.0, "nearest"),
             removed_status="edited",
         )
 
@@ -195,7 +201,7 @@ class TestRemoveMappingCommand:
 
         cmd.undo()
 
-        # Mapping restored with alignment
+        # Mapping restored with all alignment properties
         mapping = project.get_mapping_for_ai_frame("sprite_01.png")
         assert mapping is not None
         assert mapping.game_frame_id == "capture_A"
@@ -204,6 +210,8 @@ class TestRemoveMappingCommand:
         assert mapping.flip_h is False
         assert mapping.flip_v is True
         assert mapping.scale == 0.75
+        assert mapping.sharpen == 2.0
+        assert mapping.resampling == "nearest"
 
 
 class TestUpdateAlignmentCommand:
