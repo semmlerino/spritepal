@@ -875,7 +875,7 @@ class WorkbenchCanvas(QWidget):
 
             self._flip_h_checkbox.setChecked(flip_h)
             self._flip_v_checkbox.setChecked(flip_v)
-            self._scale_slider.setValue(round(scale * 1000))
+            self._scale_slider.setValue(int(scale * 1000))
             self._scale_value.setText(f"{scale:.3f}x")
             self._offset_label.setText(f"Offset: ({offset_x}, {offset_y})")
 
@@ -1896,7 +1896,7 @@ class WorkbenchCanvas(QWidget):
         # Update UI (always update for visual feedback during drag)
         self._offset_label.setText(f"Offset: ({actual_x}, {actual_y})")
         self._scale_slider.blockSignals(True)
-        self._scale_slider.setValue(round(scale * 1000))
+        self._scale_slider.setValue(int(scale * 1000))
         self._scale_value.setText(f"{scale:.3f}x")
         self._scale_slider.blockSignals(False)
 
