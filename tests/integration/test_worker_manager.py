@@ -199,6 +199,7 @@ class TestWorkerManagerReal:
         # Cleanup
         worker.stop()
         qtbot.waitUntil(lambda: not worker.isRunning(), timeout=TEST_TIMEOUT_MEDIUM)
+        worker.wait(500)  # Ensure thread fully stopped before cleanup_all
 
     def test_start_with_cleanup_real(self, qtbot):
         """Test starting a worker with cleanup of existing real worker."""
@@ -218,9 +219,11 @@ class TestWorkerManagerReal:
         # New worker should be running
         assert new_worker.isRunning()
 
-        # Cleanup
+        # Cleanup new_worker (old_worker already cleaned by WorkerManager)
         new_worker.stop()
         qtbot.waitUntil(lambda: not new_worker.isRunning(), timeout=signal_timeout())
+        new_worker.wait(500)
+        # Note: new_worker registered via start_worker, cleanup_all handles deleteLater
 
     def test_worker_interruption_handling_real(self, qtbot):
         """Test that workers properly handle interruption requests."""
@@ -239,6 +242,10 @@ class TestWorkerManagerReal:
         # Verify worker detected interruption
         assert worker._interrupted
         assert not worker.work_done  # Should not complete work
+
+        # Cleanup: ensure thread is fully stopped before test ends
+        worker.wait(500)
+        worker.deleteLater()  # Should not complete work
 
     def test_worker_error_handling_real(self, qtbot):
         """Test real error signal emission."""
@@ -267,9 +274,10 @@ class TestWorkerManagerReal:
         assert "Test error" in error_msg
         assert isinstance(error_exc, ValueError)
 
-        # Cleanup
+        # Cleanup: ensure thread is fully stopped before test ends
         worker.quit()
         worker.wait(1000)
+        worker.deleteLater()
 
     def test_multiple_worker_management_real(self, qtbot):
         """Test managing multiple real workers."""
@@ -316,6 +324,10 @@ class TestWorkerManagerReal:
         assert finished_spy.count() == 1
         assert not worker.isRunning()
 
+        # Cleanup: ensure thread is fully stopped before test ends
+        worker.wait(500)
+        worker.deleteLater()
+
     def test_worker_priority_handling_real(self, qtbot):
         """Test worker thread priority management."""
         import sys
@@ -345,9 +357,10 @@ class TestWorkerManagerReal:
         else:
             assert worker.priority() == QThread.Priority.HighPriority
 
-        # Cleanup
+        # Cleanup: ensure thread is fully stopped before test ends
         worker.stop()
         worker.wait(1000)
+        worker.deleteLater()
 
     def test_worker_state_consistency_real(self, qtbot):
         """Test worker state remains consistent through lifecycle."""
@@ -373,6 +386,10 @@ class TestWorkerManagerReal:
         assert not worker.isRunning()
         assert worker._work_cycles >= 0  # Some work may have been done
         assert worker._interrupted or not worker.should_run
+
+        # Cleanup: ensure thread is fully stopped before test ends
+        worker.wait(500)
+        worker.deleteLater()
 
 
 @pytest.mark.usefixtures("isolated_managers")
@@ -428,4 +445,5 @@ class TestWorkerCancellationStability:
 
         # Verify safe handling - no terminate() should be called
         assert not hasattr(mock_worker, "terminate") or not mock_worker.terminate.called
-        mock_worker.deleteLater.assert_called_once()
+        # CRITICAL: deleteLater must NOT be called if thread is still running to prevent crash
+        mock_worker.deleteLater.assert_not_called()
