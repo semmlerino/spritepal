@@ -26,7 +26,12 @@ class TestDragEnterAcceptance:
     """Tests for drag enter event acceptance logic."""
 
     def test_accepts_folder_drag(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """Drag containing a folder should be accepted."""
+        """Drag containing a folder should be accepted based on content evaluation.
+
+        This test verifies that folder drags are accepted AND that the acceptance
+        is based on proper evaluation of mime data (not called unconditionally).
+        The companion test_rejects_non_png_file_drag ensures selective acceptance.
+        """
         pane = AIFramesPane()
         qtbot.addWidget(pane)
 
@@ -41,10 +46,17 @@ class TestDragEnterAcceptance:
 
         pane.dragEnterEvent(event)
 
+        # Verify acceptance
         event.acceptProposedAction.assert_called_once()
+        # Verify ignore was NOT called (ensures selective acceptance, not accept-then-ignore)
+        event.ignore.assert_not_called()
 
     def test_accepts_png_file_drag(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """Drag containing a PNG file should be accepted."""
+        """Drag containing a PNG file should be accepted based on extension check.
+
+        This test verifies PNG files are accepted AND that the acceptance
+        is based on proper file type evaluation (see test_rejects_non_png_file_drag).
+        """
         pane = AIFramesPane()
         qtbot.addWidget(pane)
 
@@ -59,7 +71,10 @@ class TestDragEnterAcceptance:
 
         pane.dragEnterEvent(event)
 
+        # Verify acceptance
         event.acceptProposedAction.assert_called_once()
+        # Verify ignore was NOT called (ensures selective acceptance)
+        event.ignore.assert_not_called()
 
     def test_rejects_non_png_file_drag(self, qtbot: QtBot, tmp_path: Path) -> None:
         """Drag containing non-PNG file should be rejected."""
@@ -217,8 +232,6 @@ class TestSetAIFramesResponsiveness:
     during _refresh_list().
     """
 
-    @pytest.mark.skip(reason="AsyncThumbnailLoader has Qt threading cleanup issues in tests - to be fixed separately")
-    @pytest.mark.allows_registry_state(reason="Skipped test triggers teardown check")
     def test_set_ai_frames_with_many_images_remains_responsive(self, qtbot: QtBot, tmp_path: Path) -> None:
         """Setting many AI frames should not block main thread excessively.
 

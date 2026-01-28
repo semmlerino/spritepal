@@ -89,16 +89,28 @@ class TestPreviewServiceCaching:
                 renderer_inst.render_selection.return_value = mock_pil_img
 
                 with patch("ui.frame_mapping.services.preview_service.pil_to_qpixmap") as mock_pil_to_qpixmap:
-                    mock_pixmap = QPixmap(100, 100)
+                    # Create pixmap with specific dimensions that we can verify
+                    expected_width, expected_height = 100, 100
+                    mock_pixmap = QPixmap(expected_width, expected_height)
                     mock_pil_to_qpixmap.return_value = mock_pixmap
 
                     # First call - cache miss
                     result = preview_service.get_preview("frame1", project)
 
+                    # Verify result type and content
                     assert result is not None
                     assert isinstance(result, QPixmap)
+                    assert result.width() == expected_width, "Returned pixmap should have expected width"
+                    assert result.height() == expected_height, "Returned pixmap should have expected height"
+
+                    # Verify rendering pipeline was invoked
                     parser_inst.parse_file.assert_called_once()
                     MockRenderer.assert_called_once()
+
+                    # Verify cache was populated (this is the key verification)
+                    assert "frame1" in preview_service._game_frame_previews, "Preview should be cached"
+                    cached_pixmap, cached_mtime, cached_entry_ids = preview_service._game_frame_previews["frame1"]
+                    assert cached_pixmap is result, "Cached pixmap should be the same as returned"
 
     def test_cache_hit_returns_cached_pixmap(self, preview_service, mock_project, mock_capture_result, qtbot):
         """Test that cache hit returns cached pixmap without regeneration."""

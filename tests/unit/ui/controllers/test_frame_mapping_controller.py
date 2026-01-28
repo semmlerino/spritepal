@@ -33,9 +33,10 @@ class TestGetCaptureResultFiltering:
     """Tests for get_capture_result_for_game_frame entry ID filtering."""
 
     def test_returns_all_entries_when_no_selected_ids(self, tmp_path: Path, qtbot) -> None:
-        """Without selected_entry_ids, returns all entries."""
+        """Without selected_entry_ids, returns all entries with correct IDs."""
         # Create capture file with 5 entries
-        capture_data = create_test_capture([0, 1, 2, 3, 4])
+        expected_ids = [0, 1, 2, 3, 4]
+        capture_data = create_test_capture(expected_ids)
         capture_path = tmp_path / "capture.json"
         capture_path.write_text(json.dumps(capture_data))
 
@@ -56,6 +57,12 @@ class TestGetCaptureResultFiltering:
 
         assert result is not None
         assert len(result.entries) == 5
+
+        # Verify the correct entries are returned (not just count)
+        returned_ids = {e.id for e in result.entries}
+        assert returned_ids == set(expected_ids), (
+            f"Expected entries with IDs {set(expected_ids)}, but got {returned_ids}"
+        )
 
     def test_filters_entries_by_selected_ids(self, tmp_path: Path, qtbot) -> None:
         """With selected_entry_ids, returns only matching entries."""

@@ -70,6 +70,11 @@ class TestBatchInjectionSignalStorm:
         """
         Reproduces the issue where inject_mapping emits project_changed for every single frame,
         causing massive UI thrashing during batch operations.
+
+        This test verifies:
+        1. Signal count matches injection count (documents current behavior)
+        2. Injections actually succeeded (not just signals emitted)
+        3. Mapping status is updated correctly after injection
         """
         # Create a successful injection result
         success_result = InjectionResult(
@@ -102,18 +107,39 @@ class TestBatchInjectionSignalStorm:
             rom_path = tmp_path / "dummy.sfc"
             rom_path.touch()
 
+            # Capture initial mapping statuses
+            initial_statuses = {}
+            for i in range(5):
+                ai_frame_id = f"frame_{i}.png"
+                mapping = mock_controller.project.get_mapping_for_ai_frame(ai_frame_id)
+                assert mapping is not None, f"Mapping for {ai_frame_id} should exist"
+                initial_statuses[ai_frame_id] = mapping.status
+
             # Simulate a batch injection loop (like in Workspace._on_inject_all)
             # In the current implementation, the workspace loops and calls inject_mapping
+            # Note: ai_frame_id must be the string ID (filename), not an index
             for i in range(5):
-                mock_controller.inject_mapping(i, rom_path, output_path=tmp_path / "out.sfc")
+                ai_frame_id = f"frame_{i}.png"
+                mock_controller.inject_mapping(ai_frame_id, rom_path, output_path=tmp_path / "out.sfc")
 
-            # Verification: Each inject_mapping call should emit project_changed.
+            # Verification 1: Each inject_mapping call should emit project_changed.
             # This test documents that the current implementation emits per-injection
             # (5 calls = 5 signals). If batch optimization is added later to reduce
             # signal storms, this assertion should be updated accordingly.
             assert signal_spy.call_count == 5, (
                 f"Expected 5 project_changed signals for 5 injections, got {signal_spy.call_count}"
             )
+
+            # Verification 2: All mappings should now have "injected" status
+            # This verifies that injections actually succeeded (not just signals emitted)
+            for i in range(5):
+                ai_frame_id = f"frame_{i}.png"
+                mapping = mock_controller.project.get_mapping_for_ai_frame(ai_frame_id)
+                assert mapping is not None, f"Mapping for {ai_frame_id} should still exist"
+                assert mapping.status == "injected", (
+                    f"Mapping for {ai_frame_id} should be marked 'injected' after "
+                    f"successful injection, but was '{mapping.status}'"
+                )
 
 
 if __name__ == "__main__":

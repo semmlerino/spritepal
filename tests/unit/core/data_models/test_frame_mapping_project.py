@@ -713,20 +713,23 @@ class TestFrameMappingProjectPerformance:
     """Tests for O(1) lookup optimization (Issue #5 fix)."""
 
     def test_mapping_lookup_is_fast(self) -> None:
-        """Mapping lookup uses O(1) index."""
+        """Mapping lookup uses O(1) index - verified with timing."""
+        import time
+
         project = FrameMappingProject(name="test")
 
         # Create many frames first
-        for i in range(100):
+        num_items = 100
+        for i in range(num_items):
             project.ai_frames.append(AIFrame(path=Path(f"frame_{i:04d}.png"), index=i))
             project.game_frames.append(GameFrame(id=f"G{i:04d}"))
         project._rebuild_indices()
 
         # Create many mappings
-        for i in range(100):
+        for i in range(num_items):
             project.create_mapping(ai_frame_id=f"frame_{i:04d}.png", game_frame_id=f"G{i:04d}")
 
-        # Lookups should use the index (O(1) not O(n))
+        # Basic correctness verification
         mapping = project.get_mapping_for_ai_frame("frame_0050.png")
         assert mapping is not None
         assert mapping.game_frame_id == "G0050"
@@ -734,6 +737,24 @@ class TestFrameMappingProjectPerformance:
         mapping = project.get_mapping_for_game_frame("G0099")
         assert mapping is not None
         assert mapping.ai_frame_id == "frame_0099.png"
+
+        # Performance verification: O(1) should handle many lookups quickly
+        # Time 1000 lookups - O(1) should be <10ms, O(n) with 100 items would be ~100ms+
+        num_lookups = 1000
+        start = time.perf_counter()
+        for _ in range(num_lookups):
+            project.get_mapping_for_ai_frame("frame_0050.png")
+            project.get_mapping_for_game_frame("G0099")
+        elapsed = time.perf_counter() - start
+
+        # With O(1) lookup and 100 items, 2000 lookups (1000 iterations * 2 lookups)
+        # should complete in <50ms even on slow machines.
+        # O(n) linear scan would take much longer (100 items * 2000 calls = 200K operations).
+        max_allowed_seconds = 0.05  # 50ms
+        assert elapsed < max_allowed_seconds, (
+            f"Lookup appears O(n): {elapsed*1000:.1f}ms for {num_lookups*2} lookups. "
+            f"Expected O(1) to complete in <{max_allowed_seconds*1000}ms"
+        )
 
 
 class TestRemoveGameFrame:
