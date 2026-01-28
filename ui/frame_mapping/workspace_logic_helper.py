@@ -60,6 +60,10 @@ class WorkspaceLogicHelper:
         self._alignment_canvas: WorkbenchCanvas | None = None
         self._message_service: StatusBarManager | None = None
         self._parent_widget: QWidget | None = None
+        # Flag to prevent feedback loop: canvas change → model update → canvas sync
+        # When True, sync_canvas_alignment_from_model() skips the sync since canvas
+        # already has the correct values (avoids int truncation drift during slider interaction)
+        self._canvas_change_in_progress: bool = False
 
     # ===== Setters for deferred injection =====
 
@@ -621,17 +625,23 @@ class WorkspaceLogicHelper:
         # Update alignment in controller (includes scale, sharpen, resampling)
         # This emits alignment_updated signal which triggers _on_alignment_updated()
         # which handles updating the mapping panel row
-        self._controller.update_mapping_alignment(
-            ai_frame_id,
-            state.offset_x,
-            state.offset_y,
-            state.flip_h,
-            state.flip_v,
-            state.scale,
-            state.sharpen,
-            state.resampling,
-            drag_start_alignment=drag_start,
-        )
+        # Set flag to prevent feedback loop (canvas already has correct float position,
+        # don't overwrite with truncated int from model)
+        self._canvas_change_in_progress = True
+        try:
+            self._controller.update_mapping_alignment(
+                ai_frame_id,
+                state.offset_x,
+                state.offset_y,
+                state.flip_h,
+                state.flip_v,
+                state.scale,
+                state.sharpen,
+                state.resampling,
+                drag_start_alignment=drag_start,
+            )
+        finally:
+            self._canvas_change_in_progress = False
         return True
 
     def sync_canvas_alignment_from_model(self) -> None:
@@ -639,7 +649,15 @@ class WorkspaceLogicHelper:
 
         Called after undo/redo to ensure the canvas reflects restored values.
         Queries the current AI frame's mapping and updates the canvas if a mapping exists.
+
+        Note: Skips sync when _canvas_change_in_progress is True to prevent
+        feedback loop during slider interaction (canvas has float precision,
+        model has int-truncated values).
         """
+        # Skip sync if change originated from canvas - canvas already has correct
+        # float-precision position, syncing would overwrite with truncated int
+        if self._canvas_change_in_progress:
+            return
         if self._controller is None or self._state is None:
             return
         if self._alignment_canvas is None:
