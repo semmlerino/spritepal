@@ -875,8 +875,8 @@ class WorkbenchCanvas(QWidget):
 
             self._flip_h_checkbox.setChecked(flip_h)
             self._flip_v_checkbox.setChecked(flip_v)
-            self._scale_slider.setValue(int(scale * 100))
-            self._scale_value.setText(f"{scale:.1f}x")
+            self._scale_slider.setValue(round(scale * 100))
+            self._scale_value.setText(f"{scale:.2f}x")
             self._offset_label.setText(f"Offset: ({offset_x}, {offset_y})")
 
             # Set sharpen slider (0-40 -> 0.0-4.0)
@@ -1312,7 +1312,7 @@ class WorkbenchCanvas(QWidget):
         center_before = self._ai_frame_item.sceneBoundingRect().center()
 
         # Apply scale
-        self._scale_value.setText(f"{new_scale:.1f}x")
+        self._scale_value.setText(f"{new_scale:.2f}x")
         self._ai_frame_item.set_scale_factor(new_scale)
 
         # Reposition to preserve center
@@ -1896,8 +1896,8 @@ class WorkbenchCanvas(QWidget):
         # Update UI (always update for visual feedback during drag)
         self._offset_label.setText(f"Offset: ({actual_x}, {actual_y})")
         self._scale_slider.blockSignals(True)
-        self._scale_slider.setValue(int(scale * 100))
-        self._scale_value.setText(f"{scale:.1f}x")
+        self._scale_slider.setValue(round(scale * 100))
+        self._scale_value.setText(f"{scale:.2f}x")
         self._scale_slider.blockSignals(False)
 
         # Schedule tile touch update (already debounced)
