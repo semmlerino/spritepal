@@ -676,6 +676,11 @@ class WorkspaceLogicHelper:
                     )
                     self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
                     self._state.current_canvas_game_id = mapping.game_frame_id
+
+            # Always sync selection state and UI when mapping exists (undo/redo)
+            self._state.selected_game_id = mapping.game_frame_id
+            if self._captures_pane:
+                self._captures_pane.select_frame(mapping.game_frame_id)
         else:
             # No mapping - clear alignment
             self._alignment_canvas.clear_alignment()
