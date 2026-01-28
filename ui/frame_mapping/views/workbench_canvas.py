@@ -1555,74 +1555,6 @@ class WorkbenchCanvas(QWidget):
         logger.warning("Failed to generate preview: %s", error_message)
         self._preview_item.setVisible(False)
 
-    def _get_content_bbox(self, image: Image.Image) -> tuple[int, int, int, int]:
-        """Get bounding box of actual content in the image.
-
-        Handles both transparent backgrounds (via alpha channel) and solid backgrounds
-        (by detecting background color from corners).
-
-        Args:
-            image: PIL Image to analyze.
-
-        Returns:
-            Bounding box as (left, top, right, bottom).
-        """
-        import numpy as np
-
-        # First try alpha-based detection
-        alpha_bbox = image.getbbox()
-        full_bounds = (0, 0, image.width, image.height)
-
-        # If getbbox returned None or full image bounds, try color-based detection
-        if alpha_bbox is None or alpha_bbox == full_bounds:
-            # Convert to RGB for color analysis
-            rgb_image = image.convert("RGB")
-            pixels = np.array(rgb_image)
-
-            # Sample background color from corners (average of 4 corners)
-            corner_size = min(5, image.width // 10, image.height // 10)
-            corner_size = max(corner_size, 1)
-
-            corners = [
-                pixels[:corner_size, :corner_size],  # top-left
-                pixels[:corner_size, -corner_size:],  # top-right
-                pixels[-corner_size:, :corner_size],  # bottom-left
-                pixels[-corner_size:, -corner_size:],  # bottom-right
-            ]
-            bg_color = np.mean([c.mean(axis=(0, 1)) for c in corners], axis=0)
-
-            # Find pixels that differ significantly from background
-            tolerance = 30  # RGB distance threshold
-            diff = np.sqrt(np.sum((pixels.astype(float) - bg_color) ** 2, axis=2))
-            content_mask = diff > tolerance
-
-            # Find bounding box of content
-            rows_with_content = np.any(content_mask, axis=1)
-            cols_with_content = np.any(content_mask, axis=0)
-
-            if rows_with_content.any() and cols_with_content.any():
-                row_indices = np.where(rows_with_content)[0]
-                col_indices = np.where(cols_with_content)[0]
-                color_bbox = (
-                    int(col_indices[0]),
-                    int(row_indices[0]),
-                    int(col_indices[-1] + 1),
-                    int(row_indices[-1] + 1),
-                )
-                logger.debug(
-                    "Content bbox from color detection: %s (bg_color=%.0f,%.0f,%.0f)",
-                    color_bbox,
-                    bg_color[0],
-                    bg_color[1],
-                    bg_color[2],
-                )
-                return color_bbox
-
-        if alpha_bbox is not None:
-            return alpha_bbox
-
-        return full_bounds
-
     def _compute_tile_rects(self) -> list[tuple[int, int, int, int]]:
         """Compute 8x8 tile rectangles from OAM entries in scene coordinates.
 
@@ -1809,8 +1741,8 @@ class WorkbenchCanvas(QWidget):
             self._status_label.setText("Auto-align requires game frame capture")
             return
 
-        # Get AI content bounding box (non-transparent pixels)
-        ai_bbox = self._get_content_bbox(self._ai_image)
+        # Get AI content bounding box (handles solid backgrounds too)
+        ai_bbox = get_content_bbox(self._ai_image)
 
         ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
         ai_content_width = ai_x2 - ai_x
