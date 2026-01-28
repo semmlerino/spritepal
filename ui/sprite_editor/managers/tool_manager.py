@@ -11,7 +11,7 @@ from typing import Any, override
 
 from PySide6.QtCore import QObject, Signal
 
-from ..models.image_model import ImageModel
+from ..models import ImageModel
 
 
 class ToolType(Enum):

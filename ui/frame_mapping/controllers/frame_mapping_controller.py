@@ -14,7 +14,7 @@ from PIL import Image
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 
-from ui.common.qt_image_utils import pil_to_qpixmap
+from core.services.image_utils import pil_to_qpixmap
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
@@ -463,9 +463,10 @@ class FrameMappingController(QObject):
 
             # Convert PIL Image to QPixmap and cache with mtime + entry IDs for invalidation
             pixmap = pil_to_qpixmap(preview_img)
-            mtime = capture_path.stat().st_mtime if capture_path.exists() else 0.0
-            entry_ids = tuple(entry.id for entry in selected_entries)
-            self._preview_service.set_preview_cache(frame_id, pixmap, mtime, entry_ids)
+            if pixmap is not None:
+                mtime = capture_path.stat().st_mtime if capture_path.exists() else 0.0
+                entry_ids = tuple(entry.id for entry in selected_entries)
+                self._preview_service.set_preview_cache(frame_id, pixmap, mtime, entry_ids)
 
             # Infer palette from selected entries (use first entry's palette if all same)
             palette_idx = 0

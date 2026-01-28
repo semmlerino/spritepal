@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, Mock
 import pytest
 
 from ui.sprite_editor.managers.tool_manager import EraserTool, ToolManager, ToolType
-from ui.sprite_editor.models.image_model import ImageModel
+from ui.sprite_editor.models import ImageModel
 
 
 def test_tool_manager_has_eraser():

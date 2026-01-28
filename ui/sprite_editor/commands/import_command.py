@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING, Any, override
 
 import numpy as np
 
-from ui.sprite_editor.commands.pixel_commands import UndoCommand
+from core.editing import UndoCommand
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from ui.sprite_editor.models.image_model import ImageModel
+    from core.editing import IndexedImageModel as ImageModel
 
 
 class ImportImageCommand(UndoCommand):

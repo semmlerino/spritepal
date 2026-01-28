@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ui.sprite_editor.models.image_model import ImageModel
+from ui.sprite_editor.models import ImageModel
 
 # Use session fixtures for tests that don't modify state
 pytestmark = [

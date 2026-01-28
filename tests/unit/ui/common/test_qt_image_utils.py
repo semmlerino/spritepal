@@ -1,4 +1,11 @@
-"""Tests for Qt image conversion utilities."""
+"""Tests for Qt image conversion utilities.
+
+NOTE: This test file exists for backward compatibility after consolidating
+ui.common.qt_image_utils into core.services.image_utils.
+
+The more comprehensive test suite is at tests/ui/components/test_image_utils.py
+which covers error handling, edge cases, and mocked paths.
+"""
 
 from __future__ import annotations
 
@@ -6,19 +13,19 @@ import pytest
 from PIL import Image
 from PySide6.QtGui import QPixmap
 
-from ui.common.qt_image_utils import pil_to_qpixmap
+from core.services.image_utils import pil_to_qpixmap
 
 
 class TestPilToQpixmap:
-    """Tests for pil_to_qpixmap function."""
+    """Tests for pil_to_qpixmap function (consolidated from ui.common)."""
 
     def test_converts_rgba_image(self, qapp: None) -> None:
         """Convert a simple RGBA PIL image to QPixmap."""
-        # Create a test image
         pil_img = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
 
         result = pil_to_qpixmap(pil_img)
 
+        assert result is not None
         assert isinstance(result, QPixmap)
         assert result.width() == 32
         assert result.height() == 32
@@ -30,6 +37,7 @@ class TestPilToQpixmap:
 
         result = pil_to_qpixmap(pil_img)
 
+        assert result is not None
         assert isinstance(result, QPixmap)
         assert result.width() == 16
         assert result.height() == 24
@@ -41,6 +49,7 @@ class TestPilToQpixmap:
 
         result = pil_to_qpixmap(pil_img)
 
+        assert result is not None
         # Convert back to QImage to verify alpha
         qimg = result.toImage()
         assert qimg.hasAlphaChannel()
@@ -53,15 +62,6 @@ class TestPilToQpixmap:
             pil_img = Image.new("RGBA", (width, height), (128, 128, 128, 255))
             result = pil_to_qpixmap(pil_img)
 
+            assert result is not None
             assert result.width() == width
             assert result.height() == height
-
-    def test_custom_format_parameter(self, qapp: None) -> None:
-        """Allow specifying different serialization formats."""
-        pil_img = Image.new("RGBA", (16, 16), (255, 255, 255, 255))
-
-        # BMP format should also work
-        result = pil_to_qpixmap(pil_img, format="BMP")
-
-        assert isinstance(result, QPixmap)
-        assert not result.isNull()

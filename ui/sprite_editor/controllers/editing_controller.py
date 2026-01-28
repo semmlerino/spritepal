@@ -16,7 +16,7 @@ from core.default_palette_loader import DefaultPaletteLoader
 from core.services.signal_payloads import PaletteSourcePayload
 from utils.logging_config import get_logger
 
-from ..commands.pixel_commands import BatchCommand, DrawPixelCommand, FloodFillCommand
+from ..commands import BatchCommand, DrawPixelCommand, FloodFillCommand
 from ..managers import ToolManager, ToolType, UndoManager
 from ..models import ImageModel, PaletteModel
 

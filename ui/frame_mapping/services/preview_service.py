@@ -14,7 +14,7 @@ from PySide6.QtGui import QPixmap
 from core.frame_mapping_exceptions import CaptureParseError
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
-from ui.common.qt_image_utils import pil_to_qpixmap
+from core.services.image_utils import pil_to_qpixmap
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -104,6 +104,10 @@ class PreviewService(QObject):
 
             # Convert PIL Image to QPixmap and cache with mtime + entry IDs
             pixmap = pil_to_qpixmap(preview_img)
+            if pixmap is None:
+                logger.warning("Failed to convert preview image to QPixmap for frame %s", frame_id)
+                return None
+
             current_mtime = 0.0
             current_entries: tuple[int, ...] = ()
             if project is not None:
