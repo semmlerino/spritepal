@@ -1598,6 +1598,84 @@ class WorkbenchCanvas(QWidget):
 
         return tile_rects
 
+
+    def _find_non_overflowing_position(
+        self,
+        ai_bbox: tuple[int, int, int, int],
+        tile_rects: list[tuple[int, int, int, int]],
+        initial_offset_x: int,
+        initial_offset_y: int,
+        scale: float,
+    ) -> tuple[int, int, bool]:
+        """Try to adjust position to eliminate overflow while keeping scale.
+
+        Searches in expanding rings around the initial position to find
+        a position where AI content doesn't overflow the tile coverage.
+
+        Args:
+            ai_bbox: AI content bounding box (left, top, right, bottom),
+                already transformed for flip if needed.
+            tile_rects: List of (x, y, w, h) tile rectangles.
+            initial_offset_x: Starting X offset.
+            initial_offset_y: Starting Y offset.
+            scale: Scale factor (kept constant).
+
+        Returns:
+            Tuple of (offset_x, offset_y, found_valid) where found_valid
+            indicates if a non-overflowing position was found.
+        """
+        service = TileSamplingService()
+
+        # Check if initial position works
+        has_overflow, _ = service.check_content_outside_tiles(
+            ai_bbox, tile_rects, initial_offset_x, initial_offset_y, scale
+        )
+        if not has_overflow:
+            return (initial_offset_x, initial_offset_y, True)
+
+        # No tiles means everything is overflow - can't find valid position
+        if not tile_rects:
+            return (initial_offset_x, initial_offset_y, False)
+
+        # Get tile coverage bounds for search limits
+        tile_min_x = min(x for x, _, _, _ in tile_rects)
+        tile_min_y = min(y for _, y, _, _ in tile_rects)
+        tile_max_x = max(x + w for x, _, w, _ in tile_rects)
+        tile_max_y = max(y + h for _, y, _, h in tile_rects)
+        tile_width = tile_max_x - tile_min_x
+        tile_height = tile_max_y - tile_min_y
+
+        # Get AI content size
+        ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
+        ai_content_width = ai_x2 - ai_x
+        ai_content_height = ai_y2 - ai_y
+        scaled_width = ai_content_width * scale
+        scaled_height = ai_content_height * scale
+
+        # Search in expanding rings around initial position
+        tile_size = max(tile_rects[0][2], tile_rects[0][3]) if tile_rects else 8
+        margin = max(8, tile_size // 4)
+        max_shift_x = max(abs(int(tile_width - scaled_width)) // 2 + margin, margin)
+        max_shift_y = max(abs(int(tile_height - scaled_height)) // 2 + margin, margin)
+
+        for radius in range(1, max(max_shift_x, max_shift_y) + 1):
+            for dx in range(-radius, radius + 1):
+                for dy in range(-radius, radius + 1):
+                    if abs(dx) != radius and abs(dy) != radius:
+                        continue
+
+                    test_x = initial_offset_x + dx
+                    test_y = initial_offset_y + dy
+
+                    has_overflow, _ = service.check_content_outside_tiles(
+                        ai_bbox, tile_rects, test_x, test_y, scale
+                    )
+                    if not has_overflow:
+                        return (test_x, test_y, True)
+
+        # No valid position found - return original
+        return (initial_offset_x, initial_offset_y, False)
+
     def _compute_optimal_alignment(
         self,
         ai_bbox: tuple[int, int, int, int],
@@ -1780,7 +1858,7 @@ class WorkbenchCanvas(QWidget):
         if self._match_scale_checkbox.isChecked() and ai_content_width > 0 and ai_content_height > 0:
             offset_x, offset_y, scale = self._compute_optimal_alignment(ai_bbox, flip_h, flip_v)
         else:
-            # Keep current scale, just center on game frame centroid
+            # Keep current scale, center on game frame centroid, then adjust for overflow
             scale = self._ai_frame_item.scale_factor()
 
             ai_center_x = ai_x + ai_content_width / 2
@@ -1798,8 +1876,37 @@ class WorkbenchCanvas(QWidget):
             game_image = renderer.render_selection()
             game_center_x, game_center_y = ContentBoundsAnalyzer.compute_centroid(game_image)
 
-            offset_x = int(game_center_x - scaled_ai_center_x)
-            offset_y = int(game_center_y - scaled_ai_center_y)
+            initial_offset_x = int(game_center_x - scaled_ai_center_x)
+            initial_offset_y = int(game_center_y - scaled_ai_center_y)
+
+            # Transform bbox for flip (needed for overflow check)
+            bbox_for_check = ai_bbox
+            if flip_h:
+                bbox_for_check = (
+                    self._ai_image.width - ai_x2,
+                    bbox_for_check[1],
+                    self._ai_image.width - ai_x,
+                    bbox_for_check[3],
+                )
+            if flip_v:
+                bbox_for_check = (
+                    bbox_for_check[0],
+                    self._ai_image.height - ai_y2,
+                    bbox_for_check[2],
+                    self._ai_image.height - ai_y,
+                )
+
+            # Try to find position without overflow
+            tile_rects = self._compute_tile_rects()
+            offset_x, offset_y, found_valid = self._find_non_overflowing_position(
+                bbox_for_check, tile_rects, initial_offset_x, initial_offset_y, scale
+            )
+
+            if not found_valid:
+                logger.debug(
+                    "Auto-align: no overflow-free position found at scale=%.4f, using centered position",
+                    scale,
+                )
 
         # Apply the alignment (preserving sharpen and resampling)
         self.set_alignment(
