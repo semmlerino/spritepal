@@ -83,21 +83,47 @@ def compute_tile_centroid(
     return (weighted_x / total_area, weighted_y / total_area)
 
 
-def get_content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
+def get_content_bbox(
+    image: Image.Image,
+    min_alpha: int = 5,
+) -> tuple[int, int, int, int]:
     """Get bounding box of actual content in the image.
 
     Handles both transparent backgrounds (via alpha channel) and solid backgrounds
-    (by detecting background color from corners).
+    (by detecting background color from corners). Uses a minimum alpha threshold
+    to ignore near-transparent pixels (anti-aliasing artifacts, etc.).
 
     Args:
         image: PIL Image to analyze.
+        min_alpha: Minimum alpha value to consider as content (default 5).
+            Pixels with alpha <= min_alpha are treated as transparent.
 
     Returns:
         Bounding box as (left, top, right, bottom).
     """
-    # First try alpha-based detection
-    alpha_bbox = image.getbbox()
     full_bounds = (0, 0, image.width, image.height)
+
+    # Alpha-based detection with threshold
+    rgba = image.convert("RGBA")
+    alpha = np.array(rgba)[:, :, 3]
+
+    # Apply minimum alpha threshold
+    content_mask = alpha > min_alpha
+
+    rows_with_content = np.any(content_mask, axis=1)
+    cols_with_content = np.any(content_mask, axis=0)
+
+    if rows_with_content.any() and cols_with_content.any():
+        row_indices = np.where(rows_with_content)[0]
+        col_indices = np.where(cols_with_content)[0]
+        alpha_bbox: tuple[int, int, int, int] | None = (
+            int(col_indices[0]),
+            int(row_indices[0]),
+            int(col_indices[-1] + 1),
+            int(row_indices[-1] + 1),
+        )
+    else:
+        alpha_bbox = None
 
     # If getbbox returned None or full image bounds, try color-based detection
     if alpha_bbox is None or alpha_bbox == full_bounds:
@@ -140,3 +166,47 @@ def get_content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
         return alpha_bbox
 
     return full_bounds
+
+
+def get_tight_content_bbox(
+    image: Image.Image,
+    percentile: float = 99.0,
+) -> tuple[int, int, int, int]:
+    """Get tight bounding box ignoring outlier pixels.
+
+    Uses percentile-based bounds to exclude stray pixels that would make
+    the standard bounding box much larger than the main content area.
+    This is useful for AI-generated images that may have artifacts near edges.
+
+    Args:
+        image: PIL Image to analyze.
+        percentile: Percentage of pixels to include (default 99% excludes 1% outliers).
+
+    Returns:
+        Bounding box as (left, top, right, bottom).
+    """
+    arr = np.array(image.convert("RGBA"))
+    alpha = arr[:, :, 3]
+
+    # Find all non-transparent pixel coordinates
+    y_coords, x_coords = np.where(alpha > 0)
+
+    if len(x_coords) == 0:
+        return (0, 0, image.width, image.height)
+
+    # Compute percentile bounds to exclude outliers
+    lower_pct = (100 - percentile) / 2
+    upper_pct = 100 - lower_pct
+
+    left = int(np.percentile(x_coords, lower_pct))
+    right = int(np.percentile(x_coords, upper_pct)) + 1
+    top = int(np.percentile(y_coords, lower_pct))
+    bottom = int(np.percentile(y_coords, upper_pct)) + 1
+
+    # Clamp to image bounds
+    left = max(0, left)
+    top = max(0, top)
+    right = min(image.width, right)
+    bottom = min(image.height, bottom)
+
+    return (left, top, right, bottom)
