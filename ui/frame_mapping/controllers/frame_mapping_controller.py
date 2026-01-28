@@ -840,7 +840,7 @@ class FrameMappingController(QObject):
         Args:
             offset_x: X offset to apply
             offset_y: Y offset to apply
-            scale: Scale factor to apply (0.1 - 1.0)
+            scale: Scale factor to apply (0.01 - 1.0)
             exclude_ai_frame_id: AI frame ID to exclude (typically the current frame)
 
         Returns:
@@ -858,7 +858,7 @@ class FrameMappingController(QObject):
             # Update position and scale, preserve flip values
             mapping.offset_x = offset_x
             mapping.offset_y = offset_y
-            mapping.scale = max(0.1, min(1.0, scale))
+            mapping.scale = max(0.01, min(1.0, scale))
             mapping.status = "edited"
             updated_count += 1
 

@@ -599,6 +599,65 @@ class TestFrameMappingQuantizationOptions:
         assert mapping is not None
         assert mapping.resampling == "lanczos"
 
+    def test_scale_below_10_percent_persists(self) -> None:
+        """Verify scale values below 10% are not clamped to 0.1.
+
+        Bug fix: UI allows 0.01x-1.0x but model was clamping to 0.1x-1.0x,
+        causing slider snap-back behavior when dragging below 10%.
+        """
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
+        project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
+
+        # Set scale to 5% (below the old 10% minimum)
+        project.update_mapping_alignment(
+            ai_frame_id="frame_001.png",
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
+            scale=0.05,
+        )
+        mapping = project.get_mapping_for_ai_frame("frame_001.png")
+        assert mapping is not None
+        assert mapping.scale == 0.05  # Should be 5%, not clamped to 10%
+
+    def test_scale_clamped_to_valid_range(self) -> None:
+        """update_mapping_alignment should clamp scale to 0.01-1.0."""
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
+        project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
+        project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
+
+        # Test below minimum clamps to 0.01
+        project.update_mapping_alignment(
+            ai_frame_id="frame_001.png",
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
+            scale=0.001,
+        )
+        mapping = project.get_mapping_for_ai_frame("frame_001.png")
+        assert mapping is not None
+        assert mapping.scale == 0.01
+
+        # Test above maximum clamps to 1.0
+        project.update_mapping_alignment(
+            ai_frame_id="frame_001.png",
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
+            scale=2.0,
+        )
+        mapping = project.get_mapping_for_ai_frame("frame_001.png")
+        assert mapping is not None
+        assert mapping.scale == 1.0
+
 
 class TestFrameMappingProjectStableIDs:
     """Tests for stable AI frame ID feature (Issue #1 fix)."""
@@ -752,8 +811,8 @@ class TestFrameMappingProjectPerformance:
         # O(n) linear scan would take much longer (100 items * 2000 calls = 200K operations).
         max_allowed_seconds = 0.05  # 50ms
         assert elapsed < max_allowed_seconds, (
-            f"Lookup appears O(n): {elapsed*1000:.1f}ms for {num_lookups*2} lookups. "
-            f"Expected O(1) to complete in <{max_allowed_seconds*1000}ms"
+            f"Lookup appears O(n): {elapsed * 1000:.1f}ms for {num_lookups * 2} lookups. "
+            f"Expected O(1) to complete in <{max_allowed_seconds * 1000}ms"
         )
 
 

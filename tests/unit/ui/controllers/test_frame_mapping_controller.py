@@ -3334,7 +3334,7 @@ class TestApplyTransformsToAllMappings:
         assert m2.offset_x == 10  # Updated
 
     def test_apply_transforms_clamps_scale(self, qtbot) -> None:
-        """apply_transforms_to_all_mappings clamps scale to 0.1-1.0."""
+        """apply_transforms_to_all_mappings clamps scale to 0.01-1.0."""
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
 
@@ -3346,11 +3346,11 @@ class TestApplyTransformsToAllMappings:
 
         controller._project = project
 
-        # Test scale below minimum (0.1)
-        controller.apply_transforms_to_all_mappings(offset_x=0, offset_y=0, scale=0.05)
+        # Test scale below minimum (0.01)
+        controller.apply_transforms_to_all_mappings(offset_x=0, offset_y=0, scale=0.005)
         mapping = project.get_mapping_for_ai_frame("frame_001.png")
         assert mapping is not None
-        assert mapping.scale == 0.1  # Clamped
+        assert mapping.scale == 0.01  # Clamped
 
         # Test scale above maximum (1.0)
         controller.apply_transforms_to_all_mappings(offset_x=0, offset_y=0, scale=1.5)

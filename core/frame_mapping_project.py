@@ -341,7 +341,7 @@ class FrameMapping:
     offset_y: int = 0
     flip_h: bool = False
     flip_v: bool = False
-    scale: float = 1.0  # Uniform scale factor (0.1 - 1.0)
+    scale: float = 1.0  # Uniform scale factor (0.01 - 1.0)
 
     # Quantization quality options
     sharpen: float = 0.0  # Pre-sharpening before scale (0.0-4.0)
@@ -740,7 +740,7 @@ class FrameMappingProject:
             offset_y: Y offset for alignment
             flip_h: Horizontal flip state
             flip_v: Vertical flip state
-            scale: Scale factor (0.1 - 1.0)
+            scale: Scale factor (0.01 - 1.0)
             sharpen: Pre-sharpening amount (0.0 - 4.0)
             resampling: Resampling method ("lanczos" or "nearest")
             set_edited: If True, set status to 'edited' (clears 'injected' status).
@@ -757,7 +757,7 @@ class FrameMappingProject:
         mapping.offset_y = offset_y
         mapping.flip_h = flip_h
         mapping.flip_v = flip_v
-        mapping.scale = max(0.1, min(1.0, scale))
+        mapping.scale = max(0.01, min(1.0, scale))
         mapping.sharpen = max(0.0, min(4.0, sharpen))
         mapping.resampling = resampling if resampling in ("lanczos", "nearest") else "lanczos"
 

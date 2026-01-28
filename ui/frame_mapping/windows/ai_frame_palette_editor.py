@@ -40,7 +40,6 @@ from ui.frame_mapping.views.indexed_canvas import IndexedCanvas
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import AIFrame, SheetPalette
-    from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 
 logger = logging.getLogger(__name__)
 
@@ -87,25 +86,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._ai_frame = ai_frame
         self._palette = palette
         self._controller = PaletteEditorController(self)
-        self._external_signal_connected = False
-        self._parent_controller: FrameMappingController | None = None
 
         self._setup_ui()
         self._setup_menu()
         self._setup_shortcuts()
         self._connect_signals()
         self._load_image()
-
-        # Connect to parent controller's palette changed signal for external updates
-        if parent is not None:
-            parent_ctrl = getattr(parent, "_controller", None)
-            if parent_ctrl is not None and hasattr(parent_ctrl, "sheet_palette_changed"):
-                try:
-                    parent_ctrl.sheet_palette_changed.connect(self._on_external_palette_changed)
-                    self._external_signal_connected = True
-                    self._parent_controller = parent_ctrl
-                except (RuntimeError, AttributeError):
-                    pass  # Controller not available or signal connection failed
 
         # Window settings
         self.setWindowTitle(f"Palette Editor - {ai_frame.display_name or Path(ai_frame.path).name}")
@@ -646,24 +632,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
         # Notify workspace to refresh other frames with updated palette
         self.palette_color_changed.emit(index, color)
 
-    def _on_external_palette_changed(self) -> None:
-        """Handle palette changes from external sources (mapping dialog, etc.).
-
-        Updates the editor's palette reference when the workspace controller
-        replaces the sheet palette object.
-        """
-        if self._parent_controller is None:
-            return
-
-        new_palette = self._parent_controller.get_sheet_palette()
-        if new_palette is not None and new_palette is not self._palette:
-            self._palette = new_palette
-            self._palette_panel.set_palette(self._palette)
-            # Refresh canvas with new palette
-            data = self._controller.get_indexed_data()
-            if data is not None:
-                self._canvas.set_image(data, self._palette)
-
     def _on_palette_merge_requested(self, primary_index: int, merge_index: int) -> None:
         """Handle palette merge request (Ctrl+click).
 
@@ -791,15 +759,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
             elif result == QMessageBox.StandardButton.Cancel:
                 event.ignore()
                 return
-
-        # Disconnect from parent controller's signal
-        if self._external_signal_connected and self._parent_controller is not None:
-            try:
-                self._parent_controller.sheet_palette_changed.disconnect(self._on_external_palette_changed)
-            except RuntimeError:
-                pass  # Already disconnected
-            self._external_signal_connected = False
-            self._parent_controller = None
 
         self.closed.emit()
         event.accept()
