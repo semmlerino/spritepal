@@ -1177,6 +1177,8 @@ class WorkbenchCanvas(QWidget):
             offset_x=offset_x,
             offset_y=offset_y,
             scale=scale,
+            flip_h=self._flip_h_checkbox.isChecked(),
+            flip_v=self._flip_v_checkbox.isChecked(),
         )
         self._tile_calc_timer.start(self._config.tile_calc_debounce_ms)
 
@@ -1197,12 +1199,16 @@ class WorkbenchCanvas(QWidget):
             offset_x = self._tile_calc_snapshot.offset_x
             offset_y = self._tile_calc_snapshot.offset_y
             scale = self._tile_calc_snapshot.scale
+            flip_h = self._tile_calc_snapshot.flip_h
+            flip_v = self._tile_calc_snapshot.flip_v
         else:
             # Fallback to current values (for direct calls in tests)
             pos = self._ai_frame_item.pos()
             offset_x = int(pos.x() / self._display_scale)
             offset_y = int(pos.y() / self._display_scale)
             scale = self._ai_frame_item.scale_factor()
+            flip_h = self._flip_h_checkbox.isChecked()
+            flip_v = self._flip_v_checkbox.isChecked()
 
         # Build tile rects in actual coordinates
         tile_rects: list[QRectF] = []
@@ -1240,7 +1246,22 @@ class WorkbenchCanvas(QWidget):
 
         # Check for content outside tile area using actual tile positions
         # (not just the union bounding box - handles non-rectangular sprites)
-        content_bbox = get_content_bbox(self._ai_image)  # Handles solid backgrounds too
+        content_bbox: tuple[int, int, int, int] | None = get_content_bbox(self._ai_image)
+
+        # Transform content_bbox for flip transforms
+        # The visual display applies flips, so we need to match that for overflow detection
+        if flip_h or flip_v:
+            left, top, right, bottom = content_bbox
+            img_width = self._ai_image.width
+            img_height = self._ai_image.height
+            if flip_h:
+                # Horizontal flip: x -> width - x
+                left, right = img_width - right, img_width - left
+            if flip_v:
+                # Vertical flip: y -> height - y
+                top, bottom = img_height - bottom, img_height - top
+            content_bbox = (left, top, right, bottom)
+
         tile_tuples = [(r.x(), r.y(), r.width(), r.height()) for r in qt_rects]
 
         has_overflow, overflow_rects = self._tile_sampling_service.check_content_outside_tiles(

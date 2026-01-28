@@ -336,3 +336,168 @@ class TestComputeTileUnionRect:
         ]
         result = canvas._compute_tile_union_rect(tiles)
         assert result == (0, 0, 108, 108)
+
+
+class TestClippingWithFlipTransforms:
+    """Tests for clipping detection accounting for flip transforms.
+
+    When flip_h or flip_v is enabled, the content bounding box must be
+    transformed to match the flipped visual display, otherwise overflow
+    is detected at the wrong location.
+    """
+
+    def test_overflow_detected_with_flip_h(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Overflow detection should account for flip_h transform.
+
+        Creates a 24x16 AI image with content only on the LEFT side (x=0-8).
+        Tiles are 16x16 at origin.
+
+        Without flip_h: content at x=0-8 is within tiles (0-16)
+        With flip_h: content visually moves to x=16-24 (right side)
+        Since 24 > 16, content is now outside the tile area = overflow
+        """
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+
+        # Create 24x16 AI image with content only on LEFT side (x=0-8)
+        ai_image_path = tmp_path / "asymmetric_left.png"
+        ai_img = Image.new("RGBA", (24, 16), (0, 0, 0, 0))  # Transparent
+        # Draw opaque content only on left 8 pixels
+        for y in range(16):
+            for x in range(8):
+                ai_img.putpixel((x, y), (255, 0, 0, 255))
+        ai_img.save(ai_image_path)
+
+        # Create game frame with 16x16 tiles at origin
+        capture = create_capture_with_entries(width=16, height=16)
+        game_pixmap = QPixmap(16, 16)
+        game_pixmap.fill()
+
+        ai_frame = AIFrame(path=ai_image_path, index=0)
+        game_frame = GameFrame(id="test_game")
+
+        canvas.set_game_frame(
+            frame=game_frame,
+            preview_pixmap=game_pixmap,
+            capture_result=capture,  # type: ignore[arg-type]
+        )
+        canvas.set_ai_frame(ai_frame)
+
+        # Without flip: content bbox is (0, 0, 8, 16), within 16x16 tiles = no overflow
+        canvas.set_alignment(0, 0, False, False, 1.0)
+        canvas._update_tile_touch_status()
+        assert canvas._out_of_bounds_warning_label.isHidden() is True, (
+            "Without flip, left-side content (x=0-8) should be inside 16x16 tiles"
+        )
+
+        # With flip_h: content visually at x=(24-8) to (24-0) = x=16-24
+        # 16-24 is outside the 0-16 tile area = overflow
+        canvas.set_alignment(0, 0, True, False, 1.0)  # flip_h=True
+        canvas._update_tile_touch_status()
+        assert canvas._out_of_bounds_warning_label.isHidden() is False, (
+            "With flip_h, content should appear at x=16-24 which is outside 16x16 tiles - overflow should be detected"
+        )
+
+    def test_overflow_detected_with_flip_v(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Overflow detection should account for flip_v transform.
+
+        Creates a 16x24 AI image with content only on the TOP side (y=0-8).
+        Tiles are 16x16 at origin.
+
+        Without flip_v: content at y=0-8 is within tiles (0-16)
+        With flip_v: content visually moves to y=16-24 (bottom side)
+        Since 24 > 16, content is now outside the tile area = overflow
+        """
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+
+        # Create 16x24 AI image with content only on TOP side (y=0-8)
+        ai_image_path = tmp_path / "asymmetric_top.png"
+        ai_img = Image.new("RGBA", (16, 24), (0, 0, 0, 0))  # Transparent
+        # Draw opaque content only on top 8 pixels
+        for y in range(8):
+            for x in range(16):
+                ai_img.putpixel((x, y), (255, 0, 0, 255))
+        ai_img.save(ai_image_path)
+
+        # Create game frame with 16x16 tiles at origin
+        capture = create_capture_with_entries(width=16, height=16)
+        game_pixmap = QPixmap(16, 16)
+        game_pixmap.fill()
+
+        ai_frame = AIFrame(path=ai_image_path, index=0)
+        game_frame = GameFrame(id="test_game")
+
+        canvas.set_game_frame(
+            frame=game_frame,
+            preview_pixmap=game_pixmap,
+            capture_result=capture,  # type: ignore[arg-type]
+        )
+        canvas.set_ai_frame(ai_frame)
+
+        # Without flip: content bbox is (0, 0, 16, 8), within 16x16 tiles = no overflow
+        canvas.set_alignment(0, 0, False, False, 1.0)
+        canvas._update_tile_touch_status()
+        assert canvas._out_of_bounds_warning_label.isHidden() is True, (
+            "Without flip, top-side content (y=0-8) should be inside 16x16 tiles"
+        )
+
+        # With flip_v: content visually at y=(24-8) to (24-0) = y=16-24
+        # 16-24 is outside the 0-16 tile area = overflow
+        canvas.set_alignment(0, 0, False, True, 1.0)  # flip_v=True
+        canvas._update_tile_touch_status()
+        assert canvas._out_of_bounds_warning_label.isHidden() is False, (
+            "With flip_v, content should appear at y=16-24 which is outside 16x16 tiles - overflow should be detected"
+        )
+
+    def test_overflow_detected_with_both_flips(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Overflow detection should account for both flip transforms.
+
+        Creates a 24x24 AI image with content only in top-left 8x8 corner.
+        Tiles are 16x16 at origin.
+
+        Without flips: content at (0-8, 0-8) is within tiles
+        With both flips: content appears at (16-24, 16-24) which is outside tiles
+        """
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+
+        # Create 24x24 AI image with content only in TOP-LEFT corner (8x8)
+        ai_image_path = tmp_path / "asymmetric_topleft.png"
+        ai_img = Image.new("RGBA", (24, 24), (0, 0, 0, 0))  # Transparent
+        # Draw opaque content only in top-left 8x8 corner
+        for y in range(8):
+            for x in range(8):
+                ai_img.putpixel((x, y), (255, 0, 0, 255))
+        ai_img.save(ai_image_path)
+
+        # Create game frame with 16x16 tiles at origin
+        capture = create_capture_with_entries(width=16, height=16)
+        game_pixmap = QPixmap(16, 16)
+        game_pixmap.fill()
+
+        ai_frame = AIFrame(path=ai_image_path, index=0)
+        game_frame = GameFrame(id="test_game")
+
+        canvas.set_game_frame(
+            frame=game_frame,
+            preview_pixmap=game_pixmap,
+            capture_result=capture,  # type: ignore[arg-type]
+        )
+        canvas.set_ai_frame(ai_frame)
+
+        # Without flips: content bbox is (0, 0, 8, 8), within 16x16 tiles = no overflow
+        canvas.set_alignment(0, 0, False, False, 1.0)
+        canvas._update_tile_touch_status()
+        assert canvas._out_of_bounds_warning_label.isHidden() is True, (
+            "Without flips, top-left content should be inside 16x16 tiles"
+        )
+
+        # With both flips: content visually at (24-8, 24-8) to (24-0, 24-0) = (16-24, 16-24)
+        # (16-24, 16-24) is outside the (0-16, 0-16) tile area = overflow
+        canvas.set_alignment(0, 0, True, True, 1.0)  # flip_h=True, flip_v=True
+        canvas._update_tile_touch_status()
+        assert canvas._out_of_bounds_warning_label.isHidden() is False, (
+            "With both flips, content should appear at (16-24, 16-24) "
+            "which is outside 16x16 tiles - overflow should be detected"
+        )

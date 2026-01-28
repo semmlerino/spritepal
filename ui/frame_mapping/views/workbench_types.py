@@ -21,6 +21,8 @@ class TileCalcSnapshot:
     offset_x: int
     offset_y: int
     scale: float
+    flip_h: bool = False
+    flip_v: bool = False
 
 
 @dataclass(frozen=True, slots=True)
