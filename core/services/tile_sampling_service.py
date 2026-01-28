@@ -58,7 +58,7 @@ class TileSamplingService:
     would break 8x8 tile boundaries.
     """
 
-    SCALE_MIN = 0.1
+    SCALE_MIN = 0.01
     SCALE_MAX = 10.0
 
     def __init__(

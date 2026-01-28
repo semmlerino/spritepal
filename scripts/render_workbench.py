@@ -668,7 +668,7 @@ def render_workbench(
         )
 
         # AI content center (after transforms) - yellow
-        ai_bbox = ai_image.getbbox()
+        ai_bbox = get_content_bbox(ai_image)
         if ai_bbox:
             ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
             ai_center_x = ai_x + (ai_x2 - ai_x) / 2
@@ -889,7 +889,7 @@ Examples:
 
     # Print debug info
     game_centroid = ContentBoundsAnalyzer.compute_centroid(game_image)
-    ai_bbox = ai_image.getbbox()
+    ai_bbox = get_content_bbox(ai_image)
     if ai_bbox:
         ai_center = (
             ai_bbox[0] + (ai_bbox[2] - ai_bbox[0]) / 2,
