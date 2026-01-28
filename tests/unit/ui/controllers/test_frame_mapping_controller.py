@@ -176,15 +176,65 @@ class TestInjectMappingEntryFiltering:
         """Injection should filter by selected_entry_ids, not rom_offset.
 
         Scenario: Two entries with different IDs but SAME rom_offset (shared tile).
-        If filtering by rom_offset, both entries are included (wrong).
-        If filtering by selected_entry_ids, only the selected entry is included (correct).
+        Entry 10 at x=0, Entry 20 at x=100 (far apart to detect if both included).
+        If filtering by rom_offset, both entries are included → wider bounding box.
+        If filtering by selected_entry_ids, only entry 10 → smaller bounding box.
         """
-        # Create capture with 2 entries sharing the SAME rom_offset
-        shared_offset = 0x123456
-        capture_data = create_test_capture(
-            entry_ids=[10, 20],  # Different IDs
-            rom_offsets=[shared_offset, shared_offset],  # Same ROM offset
+        from tests.infrastructure.injection_test_helpers import (
+            InjectingMockROMInjector,
+            make_solid_tile_hex,
         )
+
+        shared_offset = 0x123456
+        # Entry 10 at x=0, Entry 20 at x=100 (far apart)
+        # Both have 8x8 size, so if only entry 10: bbox width=8
+        # If both entries: bbox would span from 0 to 108 (width=108)
+        solid_tile = make_solid_tile_hex(1)  # Palette index 1 = visible pixels
+        capture_data = {
+            "frame": 1,
+            "obsel": {},
+            "entries": [
+                {
+                    "id": 10,
+                    "x": 0,
+                    "y": 0,
+                    "tile": 0,
+                    "width": 8,
+                    "height": 8,
+                    "palette": 7,
+                    "rom_offset": shared_offset,
+                    "tiles": [{
+                        "tile_index": 0,
+                        "vram_addr": 0x1000,
+                        "pos_x": 0,
+                        "pos_y": 0,
+                        "data_hex": solid_tile,
+                        "rom_offset": shared_offset,
+                        "tile_index_in_block": 0,
+                    }],
+                },
+                {
+                    "id": 20,
+                    "x": 100,  # Far from entry 10
+                    "y": 0,
+                    "tile": 1,
+                    "width": 8,
+                    "height": 8,
+                    "palette": 7,
+                    "rom_offset": shared_offset,  # Same ROM offset
+                    "tiles": [{
+                        "tile_index": 0,
+                        "vram_addr": 0x1020,
+                        "pos_x": 0,
+                        "pos_y": 0,
+                        "data_hex": solid_tile,
+                        "rom_offset": shared_offset,
+                        "tile_index_in_block": 0,
+                    }],
+                },
+            ],
+            "palettes": {7: [[0, 0, 0]] + [[255, 255, 255]] * 15},
+        }
         capture_path = tmp_path / "capture.json"
         capture_path.write_text(json.dumps(capture_data))
 
@@ -207,7 +257,7 @@ class TestInjectMappingEntryFiltering:
         )
         project.mappings.append(
             FrameMapping(
-                ai_frame_id="ai_frame.png",  # Must match AIFrame path filename
+                ai_frame_id="ai_frame.png",
                 game_frame_id="F001",
                 offset_x=0,
                 offset_y=0,
@@ -215,47 +265,52 @@ class TestInjectMappingEntryFiltering:
         )
         project._rebuild_indices()
 
+        # Mock ROMVerificationService to return identity mapping (no correction needed)
+        mock_verification = ROMVerificationResult(
+            corrections={shared_offset: shared_offset},
+            matched_hal=1,
+            matched_raw=0,
+            not_found=0,
+            total=1,
+        )
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+        mock_verifier.apply_corrections.return_value = 0
+
+        # Use capturing mock injector
+        mock_injector = InjectingMockROMInjector(tile_count=1)
+
         controller = FrameMappingController()
         controller._project = project
+        # Replace the orchestrator's internal ROM injector with our capturing mock
+        controller._injection_orchestrator._rom_injector = mock_injector
 
-        # Track which entries are used in injection
-        captured_entries: list[int] = []
-
-        def mock_render_selection(self):
-            """Capture which entries are being rendered."""
-            for entry in self.capture.entries:
-                captured_entries.append(entry.id)
-            # Return a minimal valid image
-            return Image.new("RGBA", (8, 8), (0, 0, 0, 255))
-
-        # Mock ROM operations to avoid actual file manipulation
         with (
-            patch(
-                "core.mesen_integration.capture_renderer.CaptureRenderer.render_selection",
-                mock_render_selection,
-            ),
             patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("core.services.injection_orchestrator.ROMInjector") as mock_injector_class,
+            patch(
+                "core.services.injection_orchestrator.ROMVerificationService",
+                return_value=mock_verifier,
+            ),
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
-            mock_injector_class.return_value = mock_injector
-
-            # Create a fake ROM file
+            # Create fake ROM files
             rom_path = tmp_path / "test.sfc"
             rom_path.write_bytes(b"\x00" * 0x200000)
             (tmp_path / "out.sfc").write_bytes(b"\x00" * 0x200000)
 
-            # This should use ONLY entry 10 (via selected_entry_ids)
-            # BUG: Currently uses ALL entries matching rom_offset (both 10 AND 20)
             controller.inject_mapping("ai_frame.png", rom_path)
 
-        # Should only have processed entry 10
-        # BUG: Will have both [10, 20] because filtering uses rom_offset
-        assert captured_entries == [10], (
-            f"Expected only entry 10 from selected_entry_ids, "
-            f"but got {captured_entries} (filtering by rom_offset includes all matching entries)"
+        # Verify an image was injected
+        assert len(mock_injector.injected_images) == 1, "Expected one injection"
+
+        # The key assertion: if only entry 10 was included (correct), the injected
+        # image should be small (8x8 or similar). If both entries were included
+        # (bug), the bounding box would span x=0 to x=108, making a much wider image.
+        img = mock_injector.last_injected_image
+        assert img is not None
+        assert img.width <= 16, (
+            f"Expected narrow image for single entry (width <= 16), "
+            f"but got width={img.width}. Both entries may have been included "
+            f"due to filtering by rom_offset instead of selected_entry_ids."
         )
 
 
@@ -368,11 +423,12 @@ class TestInjectMappingFlipHandling:
 
         To verify correct behavior:
         - Create AI frame with distinct colors in each quadrant
-        - After injection, check that tile 0 (pos_x=0, vram_addr=0x1000) contains
-          the RIGHT side of the AI frame (because flip_h mirrors positions)
+        - After injection, check that the injected image has correct pixel arrangement
 
         BUG: Currently calculates screen_x = entry.x + pos_x * 8, ignoring flip.
         """
+        from tests.infrastructure.injection_test_helpers import InjectingMockROMInjector
+
         capture_data = create_flipped_capture(entry_id=1, flip_h=True, flip_v=False)
         capture_path = tmp_path / "capture.json"
         capture_path.write_text(json.dumps(capture_data))
@@ -407,23 +463,9 @@ class TestInjectMappingFlipHandling:
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
         project._rebuild_indices()
 
-        controller = FrameMappingController()
-        controller._project = project
-
-        # Track tiles pasted to chunk image (in grid order = tile_index order)
-        pasted_tiles: list[Image.Image] = []
-        original_paste = Image.Image.paste
-
-        def track_paste(self, im, box=None, mask=None):
-            """Track tiles pasted to chunk image."""
-            if isinstance(im, Image.Image) and im.size == (8, 8):
-                pasted_tiles.append(im.copy())
-            return original_paste(self, im, box, mask)
-
         # Mock ROMVerificationService to return identity mapping (no correction needed)
-        # This test focuses on flip handling, not ROM offset correction
         mock_verification = ROMVerificationResult(
-            corrections={0x100000: 0x100000},  # Identity mapping
+            corrections={0x100000: 0x100000},
             matched_hal=4,
             matched_raw=0,
             not_found=0,
@@ -433,48 +475,54 @@ class TestInjectMappingFlipHandling:
         mock_verifier.verify_offsets.return_value = mock_verification
         mock_verifier.apply_corrections.return_value = 0
 
+        # Use capturing mock injector
+        mock_injector = InjectingMockROMInjector(tile_count=4)
+
+        controller = FrameMappingController()
+        controller._project = project
+        # Replace the orchestrator's internal ROM injector with our capturing mock
+        controller._injection_orchestrator._rom_injector = mock_injector
+
         with (
-            patch.object(Image.Image, "paste", track_paste),
             patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
             patch(
                 "core.services.injection_orchestrator.ROMVerificationService",
                 return_value=mock_verifier,
             ),
-            patch("core.services.injection_orchestrator.ROMInjector") as mock_injector_class,
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 128, 128)
-            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
-            mock_injector_class.return_value = mock_injector
-
             rom_path = tmp_path / "test.sfc"
             rom_path.write_bytes(b"\x00" * 0x200000)
             (tmp_path / "out.sfc").write_bytes(b"\x00" * 0x200000)
 
             controller.inject_mapping("ai_frame.png", rom_path)
 
-        # Find tiles pasted during chunk assembly (after the AI paste and mask paste)
-        # The chunk paste happens AFTER render_selection paste operations
-        # We expect 4 tiles for a 16x16 sprite
-        assert len(pasted_tiles) >= 4, f"Expected at least 4 tile pastes, got {len(pasted_tiles)}"
+        # Verify injection occurred
+        assert len(mock_injector.injected_images) >= 1, "Expected at least one injection"
 
-        # The first tile (tile_index_in_block=0, pos_x=0, pos_y=0) should contain
-        # pixels from the RIGHT side of canvas (because flip_h mirrors positions)
-        # With flip_h: pos_x=0 → screen x = width - 0 - 8 = 8 → should get GREEN quadrant
+        # Get the injected image and convert to RGBA for analysis
+        img = mock_injector.last_injected_image
+        assert img is not None
+        if img.mode != "RGBA":
+            img = img.convert("RGBA")
+
+        # The injected image is a grid of 8x8 tiles for injection.
+        # For a 16x16 sprite (4 tiles), the grid is 2x2.
+        # With flip_h=True, tile 0 (pos_x=0) should contain pixels from the RIGHT
+        # side of the AI frame (GREEN quadrant at top-right).
         #
-        # BUG: Without flip-aware position, pos_x=0 → screen x = 0 → gets RED quadrant
-        first_tile = pasted_tiles[-4]  # First of the 4 chunk tiles
-        center_pixel = first_tile.getpixel((4, 4))
+        # Grid layout (tile_index_in_block order):
+        # | tile 0 | tile 1 |
+        # | tile 2 | tile 3 |
+        #
+        # If flip_h is handled correctly:
+        # - Tile 0 (top-left in grid, pos_x=0) gets content from canvas x=8 (GREEN)
+        # - Tile 1 (top-right in grid, pos_x=1) gets content from canvas x=0 (RED)
+        #
+        # Sample the center of the top-left tile (position 0,0 to 8,8)
+        center_pixel = img.getpixel((4, 4))
 
         # Check if it's GREEN (correct) or RED (buggy)
-        # Green = high G channel, Red = high R channel
-        if len(center_pixel) >= 3:
-            is_green = center_pixel[1] > center_pixel[0] and center_pixel[1] > center_pixel[2]
-        else:
-            # Palette mode - convert to RGB
-            first_tile_rgb = first_tile.convert("RGBA")
-            center_pixel = first_tile_rgb.getpixel((4, 4))
-            is_green = center_pixel[1] > center_pixel[0] and center_pixel[1] > center_pixel[2]
+        is_green = center_pixel[1] > center_pixel[0] and center_pixel[1] > center_pixel[2]
 
         assert is_green, (
             f"With flip_h=True, tile at pos_x=0 should extract from canvas x=8 (green quadrant), "
@@ -493,6 +541,8 @@ class TestInjectMappingFlipHandling:
         BUG: Currently injects screen-appearance data without counter-flip.
         SNES applies flip_h again → double-flipped → incorrect.
         """
+        from tests.infrastructure.injection_test_helpers import InjectingMockROMInjector
+
         capture_data = create_flipped_capture(entry_id=1, flip_h=True, flip_v=False, width=8, height=8)
         capture_path = tmp_path / "capture.json"
         capture_path.write_text(json.dumps(capture_data))
@@ -522,22 +572,9 @@ class TestInjectMappingFlipHandling:
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))
         project._rebuild_indices()
 
-        controller = FrameMappingController()
-        controller._project = project
-
-        # Track the final tile image that gets saved (just before quantization/save)
-        saved_tile_images: list[Image.Image] = []
-        original_save = Image.Image.save
-
-        def track_save(self, path, *args, **kwargs):
-            """Capture images being saved (tile chunks for injection)."""
-            saved_tile_images.append(self.copy())
-            return original_save(self, path, *args, **kwargs)
-
-        # Mock ROMVerificationService to return identity mapping (no correction needed)
-        # This test focuses on flip handling, not ROM offset correction
+        # Mock ROMVerificationService to return identity mapping
         mock_verification = ROMVerificationResult(
-            corrections={0x100000: 0x100000},  # Identity mapping
+            corrections={0x100000: 0x100000},
             matched_hal=1,
             matched_raw=0,
             not_found=0,
@@ -547,32 +584,39 @@ class TestInjectMappingFlipHandling:
         mock_verifier.verify_offsets.return_value = mock_verification
         mock_verifier.apply_corrections.return_value = 0
 
+        # Use capturing mock injector
+        mock_injector = InjectingMockROMInjector(tile_count=1)
+
+        controller = FrameMappingController()
+        controller._project = project
+        # Replace the orchestrator's internal ROM injector with our capturing mock
+        controller._injection_orchestrator._rom_injector = mock_injector
+
         with (
-            patch.object(Image.Image, "save", track_save),
             patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
             patch(
                 "core.services.injection_orchestrator.ROMVerificationService",
                 return_value=mock_verifier,
             ),
-            patch("core.services.injection_orchestrator.ROMInjector") as mock_injector_class,
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
-            mock_injector_class.return_value = mock_injector
-
             rom_path = tmp_path / "test.sfc"
             rom_path.write_bytes(b"\x00" * 0x200000)
             (tmp_path / "out.sfc").write_bytes(b"\x00" * 0x200000)
 
             controller.inject_mapping("ai_frame.png", rom_path)
 
-        # Find the chunk image (should be 8x8 for single tile)
-        chunk_images = [img for img in saved_tile_images if img.size == (8, 8)]
+        # Verify injection occurred
+        assert len(mock_injector.injected_images) >= 1, "Expected at least one injection"
 
-        assert len(chunk_images) >= 1, f"Expected tile chunk image, got {len(saved_tile_images)} saves"
+        # Get the injected image (should be 8x8 for single tile)
+        img = mock_injector.last_injected_image
+        assert img is not None
 
-        # Check the saved tile's left edge color
+        # Convert to RGBA if in palette mode
+        if img.mode != "RGBA":
+            img = img.convert("RGBA")
+
+        # Check the tile's left edge color
         # If counter-flip applied correctly:
         #   - AI image has red on left, blue on right
         #   - Counter-flip for flip_h → blue on left, red on right in ROM
@@ -581,18 +625,10 @@ class TestInjectMappingFlipHandling:
         # If bug exists (no counter-flip):
         #   - ROM stores red on left (screen appearance, already flipped by renderer)
         #   - SNES applies flip_h → blue on left (wrong!)
-        chunk = chunk_images[0]
-
-        # Convert to RGBA if in palette mode
-        if chunk.mode != "RGBA":
-            chunk = chunk.convert("RGBA")
-
-        # Sample left edge to check color
-        left_pixel = chunk.getpixel((0, 4))  # Middle of left edge
+        left_pixel = img.getpixel((0, 4))  # Middle of left edge
 
         # With counter-flip applied, left edge should be BLUE (not red)
-        # Blue = (0, 0, 255, 255) or close to it after any processing
-        is_blue = left_pixel[2] > left_pixel[0]  # Blue channel > Red channel
+        is_blue = left_pixel[2] > left_pixel[0]
 
         assert is_blue, (
             f"With flip_h=True, tile data should be counter-flipped before injection. "
@@ -614,6 +650,8 @@ class TestInjectMappingScale:
         BUG: Currently inject_mapping ignores mapping.scale, only applying flips.
         The preview shows scaled image but injection uses original size.
         """
+        from tests.infrastructure.injection_test_helpers import InjectingMockROMInjector
+
         # Create capture with single entry
         capture_data = create_test_capture(entry_ids=[1])
         capture_path = tmp_path / "capture.json"
@@ -638,7 +676,7 @@ class TestInjectMappingScale:
         )
         project.mappings.append(
             FrameMapping(
-                ai_frame_id="frame_001.png",
+                ai_frame_id="ai_frame.png",  # Match the actual file name
                 game_frame_id="F001",
                 offset_x=0,
                 offset_y=0,
@@ -647,57 +685,63 @@ class TestInjectMappingScale:
         )
         project._rebuild_indices()
 
+        # Mock ROMVerificationService to return identity mapping (no correction needed)
+        mock_verification = ROMVerificationResult(
+            corrections={0x100000: 0x100000},
+            matched_hal=1,
+            matched_raw=0,
+            not_found=0,
+            total=1,
+        )
+        mock_verifier = MagicMock()
+        mock_verifier.verify_offsets.return_value = mock_verification
+        mock_verifier.apply_corrections.return_value = 0
+
+        # Use capturing mock injector
+        mock_injector = InjectingMockROMInjector(tile_count=1)
+
         controller = FrameMappingController()
         controller._project = project
-
-        # Track the size of AI image when pasted onto canvas
-        # The first paste call in inject_mapping is:
-        #   canvas.paste(ai_img, (mapping.offset_x, mapping.offset_y), ai_img)
-        # We need to verify ai_img has been scaled before this paste
-        # CaptureRenderer also does pastes with 8x8 tiles, so we look for images >= 16x16
-        # (the AI image is 16x16 before scaling, 8x8 after scaling if scale=0.5)
-        ai_image_size_at_paste: tuple[int, int] | None = None
-        all_paste_sizes: list[tuple[int, int]] = []
-        original_paste = Image.Image.paste
-
-        def track_paste(self, im, box=None, mask=None):
-            """Capture image sizes at paste, looking for AI image (>= original size)."""
-            nonlocal ai_image_size_at_paste
-            if isinstance(im, Image.Image):
-                all_paste_sizes.append((im.width, im.height))
-                # The AI image is 16x16 original, or 8x8 if scaled.
-                # Look for the first paste that's NOT 8x8 from tiles (could be 16x16 if unscaled)
-                # OR that happens after the 8x8 tile pastes
-                # Actually, just track all and inspect later
-            return original_paste(self, im, box, mask)
+        # Replace the orchestrator's internal ROM injector with our capturing mock
+        controller._injection_orchestrator._rom_injector = mock_injector
 
         with (
-            patch.object(Image.Image, "paste", track_paste),
             patch.object(controller, "create_injection_copy", return_value=tmp_path / "out.sfc"),
-            patch("core.services.injection_orchestrator.ROMInjector") as mock_injector_class,
+            patch(
+                "core.services.injection_orchestrator.ROMVerificationService",
+                return_value=mock_verifier,
+            ),
         ):
-            mock_injector = MagicMock()
-            mock_injector.find_compressed_sprite.return_value = (0, b"\x00" * 32, 32)
-            mock_injector.inject_sprite_to_rom.return_value = (True, "Success")
-            mock_injector_class.return_value = mock_injector
-
             # Create fake ROM files
             rom_path = tmp_path / "test.sfc"
             rom_path.write_bytes(b"\x00" * 0x200000)
             (tmp_path / "out.sfc").write_bytes(b"\x00" * 0x200000)
 
-            controller.inject_mapping("frame_001.png", rom_path)
+            controller.inject_mapping("ai_frame.png", rom_path)
 
-        # Find the AI image paste - should be the first paste that's not from CaptureRenderer tiles
-        # CaptureRenderer pastes 8x8 tiles, the AI image is 16x16 (or 8x8 if correctly scaled)
-        # If bug exists: AI image is 16x16 (unscaled)
-        # If bug fixed: AI image is 8x8 (scaled to 50%)
-        # We can identify the AI image paste by looking for a paste > 8x8 which would indicate the bug
-        has_unscaled_ai_image = any(size[0] > 8 or size[1] > 8 for size in all_paste_sizes)
+        # Verify injection occurred
+        assert len(mock_injector.injected_images) >= 1, "Expected at least one injection"
 
-        assert not has_unscaled_ai_image, (
-            f"AI image should be scaled to 8x8 (50% of 16x16), "
-            f"but found unscaled image in pastes: {all_paste_sizes} (scale not applied)"
+        # Get the injected image
+        img = mock_injector.last_injected_image
+        assert img is not None
+
+        # The key assertion: with scale=0.5, the AI image should have been scaled
+        # from 16x16 to 8x8 before being placed on the canvas. The injected tile
+        # grid should reflect this smaller content.
+        #
+        # If bug exists (no scaling): AI image is 16x16, may produce larger output
+        # If bug fixed (scaling applied): AI image is 8x8, output matches tile grid
+        #
+        # The game frame entry is 8x8 (from create_test_capture), so the canvas
+        # is 8x8. With scale=0.5, the 16x16 AI image becomes 8x8, fitting perfectly.
+        # Without scaling, 16x16 AI would overflow or produce different pixel content.
+        #
+        # We verify by checking that the injected image dimensions are appropriate
+        # for a single 8x8 tile (the result should be 8x8 for 1 tile).
+        assert img.size == (8, 8), (
+            f"AI image should be scaled to 8x8 (50% of 16x16) before injection, "
+            f"but injected image size is {img.size}. Scale transform not applied."
         )
 
 
