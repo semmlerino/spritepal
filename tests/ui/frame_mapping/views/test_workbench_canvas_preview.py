@@ -172,6 +172,21 @@ class TestPreviewWithMockData:
 
         assert canvas.is_preview_visible()
 
+        # Verify preview has expected dimensions (not just visibility)
+        preview_pixmap = canvas._preview_item.pixmap()
+        assert preview_pixmap is not None, "Preview should have pixmap"
+        assert not preview_pixmap.isNull(), "Preview pixmap should not be null"
+
+        # Preview should match game frame dimensions * display_scale
+        expected_width = 32 * canvas._display_scale
+        expected_height = 32 * canvas._display_scale
+        assert preview_pixmap.width() == expected_width, (
+            f"Preview width {preview_pixmap.width()} should be {expected_width}"
+        )
+        assert preview_pixmap.height() == expected_height, (
+            f"Preview height {preview_pixmap.height()} should be {expected_height}"
+        )
+
     def test_preview_with_palette_quantizes_colors(self, qtbot: QtBot) -> None:
         """Preview with palette should quantize to SNES colors."""
         canvas = WorkbenchCanvas()

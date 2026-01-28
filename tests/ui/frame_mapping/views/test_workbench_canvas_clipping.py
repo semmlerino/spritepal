@@ -187,7 +187,22 @@ class TestClippingOverlayItem:
         canvas._update_tile_touch_status()
 
         # Should have overflow rects (32x32 AI > 16x16 tiles)
-        assert len(canvas._clipping_overlay_item._clipped_rects) > 0
+        clipped_rects = canvas._clipping_overlay_item._clipped_rects
+        display_scale = canvas._display_scale
+
+        assert len(clipped_rects) >= 1, "Should have overflow rects"
+
+        # Verify all overflow rects are OUTSIDE tile coverage (0,0)-(16,16)
+        tile_coverage = QRectF(0, 0, 16 * display_scale, 16 * display_scale)
+        ai_bounds = QRectF(0, 0, 32 * display_scale, 32 * display_scale)
+
+        for rect in clipped_rects:
+            # Each rect should not be fully contained in tile area
+            assert not tile_coverage.contains(rect), (
+                f"Overflow rect {rect} should be outside tile coverage {tile_coverage}"
+            )
+            # Each rect should be within AI frame bounds
+            assert ai_bounds.intersects(rect), f"Overflow rect {rect} should be within AI frame bounds {ai_bounds}"
 
     def test_clipping_overlay_clears_when_no_overflow(self, qtbot: QtBot, tmp_path: Path) -> None:
         """Clipping overlay rects should be cleared when no overflow."""

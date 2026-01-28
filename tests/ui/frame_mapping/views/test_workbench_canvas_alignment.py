@@ -132,8 +132,14 @@ class TestAutoAlignVisibility:
         ai_rect = canvas._ai_frame_item.sceneBoundingRect()
         game_rect = canvas._game_frame_item.sceneBoundingRect()
 
-        assert scene_rect.intersects(ai_rect), "AI frame moved outside scene"
-        assert scene_rect.intersects(game_rect), "Game frame not in scene"
+        # Verify centers are within scene, not just any overlap (a 1-pixel overlap would pass
+        # the intersects check even if 99% of the frame was off-screen)
+        assert scene_rect.contains(ai_rect.center()), (
+            f"AI frame center {ai_rect.center()} should be within scene {scene_rect}"
+        )
+        assert scene_rect.contains(game_rect.center()), (
+            f"Game frame center {game_rect.center()} should be within scene {scene_rect}"
+        )
 
     def test_auto_align_frames_in_viewport(self, qtbot: QtBot, tmp_path: Path) -> None:
         """Auto-align should show both frames in the actual viewport (not just scene rect).
@@ -420,14 +426,28 @@ class TestLargeImageAutoAlign:
         # Trigger auto-align - should still attempt to find best position
         canvas._on_auto_align()
 
-        # The key assertion: offset should be non-zero (search found a position)
-        # If search loop was skipped, offset would be centered (0, 0)
+        # The key assertion: position should NOT be (0,0) since that's the initial value
+        # and the search loop should have found a better alignment.
+        # Bug being tested: When scaled_width > tile_width, max_shift becomes negative,
+        # making range(1, max_shift + 1) empty.
         ai_pos = canvas._ai_frame_item.pos()
+        display_scale = canvas._display_scale
 
         # Position should have been adjusted from pure center
-        # (The exact values depend on the algorithm, but it should have searched)
-        # Just verify that auto-align completed without error and set some position
-        assert ai_pos is not None, "Auto-align should set AI frame position"
+        assert ai_pos.x() != 0 or ai_pos.y() != 0, (
+            "Auto-align should move AI frame from origin when searching for optimal position"
+        )
+
+        # Additionally: verify the positioned content overlaps with tiles
+        # Test setup: 100x100 AI image, content at (25,25)-(75,75), tiles at (0,0)-(32,32), scale=0.8
+        # Content starts at offset + 25*scale*display_scale from AI item pos
+        content_scene_x = ai_pos.x() + 25 * 0.8 * display_scale
+        content_scene_y = ai_pos.y() + 25 * 0.8 * display_scale
+        tile_area_end = 32 * display_scale
+
+        # Content should overlap with tile area (not be completely outside)
+        assert content_scene_x < tile_area_end, "Aligned content should overlap tile area horizontally"
+        assert content_scene_y < tile_area_end, "Aligned content should overlap tile area vertically"
 
 
 class TestAutoAlignWithTileGaps:
@@ -507,12 +527,31 @@ class TestAutoAlignWithTileGaps:
         canvas.set_alignment(0, 0, False, False, 1.0)
         canvas._on_auto_align()
 
-        # Check that there's no overflow - content should fit within tiles
+        # After auto-align, verify position directly (not just warning visibility)
+        ai_pos = canvas._ai_frame_item.pos()
+        display_scale = canvas._display_scale
+        scale = canvas._ai_frame_item.scale_factor()
+
+        # Calculate where AI content center ended up
+        # AI content is at (16,12)-(48,52) in source, center at (32, 32)
+        ai_content_center_x = 32 * scale * display_scale + ai_pos.x()
+
+        # Tile grid: x=8-40, y=0-48 (gap at x=0-8)
+        # Tile centroid (mass center) x: (8+16+24+32)/4 + 4 = 24
+        # In display coords: 24 * display_scale
+        tile_centroid_x = 24 * display_scale
+
+        tolerance = 8.0 * display_scale  # Allow some variance
+
+        # Primary assertion: content should be centered over tiles, not bounding box
+        # (bounding box center would be at x=20, tile centroid is at x=24)
+        assert abs(ai_content_center_x - tile_centroid_x) < tolerance, (
+            f"AI content center X ({ai_content_center_x}) should be near tile centroid ({tile_centroid_x})"
+        )
+
+        # Keep original assertion as secondary check
         warning_label = canvas._out_of_bounds_warning_label
         has_overflow = warning_label.isVisible() if warning_label else False
-
-        # With the fix, content should be centered over actual tiles (x=8-40),
-        # not the bounding box (x=0-40), avoiding overflow into the gap
         assert not has_overflow, (
             "Auto-align should not cause overflow with non-contiguous tiles. "
             "Content was likely centered over bounding box instead of tile centroid."
