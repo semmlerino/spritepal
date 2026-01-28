@@ -293,6 +293,64 @@ class TestUpdateAlignmentCommand:
         assert mapping.flip_v is False
         assert mapping.scale == 1.0
 
+    def test_undo_restores_sharpen_and_resampling(self, populated_controller: FrameMappingController) -> None:
+        """Undo restores sharpen and resampling values.
+
+        Regression test: sharpen and resampling must be preserved across undo/redo
+        to avoid losing image quality settings when alignment is adjusted.
+        """
+        project = populated_controller.project
+        assert project is not None
+
+        # Create a mapping with specific sharpen/resampling values
+        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        populated_controller._update_alignment_no_history(
+            "sprite_01.png", 0, 0, False, False, 1.0, sharpen=2.5, resampling="nearest"
+        )
+
+        # Verify initial state
+        mapping = project.get_mapping_for_ai_frame("sprite_01.png")
+        assert mapping is not None
+        assert mapping.sharpen == 2.5
+        assert mapping.resampling == "nearest"
+
+        # Create command that changes sharpen and resampling
+        cmd = UpdateAlignmentCommand(
+            controller=populated_controller,
+            ai_frame_id="sprite_01.png",
+            new_offset_x=10,
+            new_offset_y=10,
+            new_flip_h=False,
+            new_flip_v=False,
+            new_scale=1.0,
+            new_sharpen=0.0,  # Changed
+            new_resampling="lanczos",  # Changed
+            old_offset_x=0,
+            old_offset_y=0,
+            old_flip_h=False,
+            old_flip_v=False,
+            old_scale=1.0,
+            old_sharpen=2.5,  # Original value
+            old_resampling="nearest",  # Original value
+            old_status="edited",
+        )
+
+        cmd.execute()
+
+        # Verify new values applied
+        mapping = project.get_mapping_for_ai_frame("sprite_01.png")
+        assert mapping is not None
+        assert mapping.sharpen == 0.0
+        assert mapping.resampling == "lanczos"
+
+        cmd.undo()
+
+        # Verify original sharpen/resampling restored
+        mapping = project.get_mapping_for_ai_frame("sprite_01.png")
+        assert mapping is not None
+        assert mapping.sharpen == 2.5, "Sharpen should be restored after undo"
+        assert mapping.resampling == "nearest", "Resampling should be restored after undo"
+
 
 class TestRenameAIFrameCommand:
     """Tests for RenameAIFrameCommand."""

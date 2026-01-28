@@ -574,12 +574,17 @@ class AIFramesPane(QWidget):
         # Start async thumbnail loading (UI remains responsive)
         self._thumbnail_loader.load_thumbnails(thumbnail_requests, self._sheet_palette, THUMBNAIL_SIZE)
 
-        # Phase 2 fix: Notify listeners if selection was silently restored during frame list change
-        if is_frame_list_change and selection_restored and restored_id is not None:
-            self.ai_frame_selected.emit(restored_id)
-        # NOTE: Removed "Bug #1 fix" that emitted empty string when selection was lost.
-        # The workspace state manager is now the source of truth for selection,
-        # and panes should not clear external state when filters hide items.
+        # Notify listeners about selection changes during frame list changes (add/remove frames)
+        if is_frame_list_change:
+            if selection_restored and restored_id is not None:
+                # Selection restored to same frame (still exists after change)
+                self.ai_frame_selected.emit(restored_id)
+            elif current_selection_id is not None:
+                # Previously selected frame no longer exists (was deleted) - notify to clear state
+                # This is different from filtering: filters hide items but they still exist,
+                # so state manager preserves selection. Deletion removes items completely,
+                # so state manager must be notified to clear the stale selection.
+                self.ai_frame_selected.emit("")
 
     def _on_tag_filter_changed(self, index: int) -> None:
         """Handle tag filter combo box change."""

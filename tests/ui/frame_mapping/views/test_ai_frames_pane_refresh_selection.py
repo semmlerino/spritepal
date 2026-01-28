@@ -214,12 +214,16 @@ class TestProjectReloadSignaling:
             f"got {signal_emissions}. Canvas would show stale data from old project."
         )
 
-    def test_project_reload_without_selection_does_not_emit_clear_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """Reloading project that loses selection should NOT emit empty string signal.
+    def test_project_reload_without_selection_emits_clear_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Reloading project that loses selection SHOULD emit empty string signal.
 
-        Selection state is managed by workspace state manager. The pane doesn't
-        emit empty strings to clear external state - the workspace is responsible
-        for detecting when a selected frame no longer exists.
+        When a frame list change removes the previously selected frame (e.g., frame
+        deleted or project reloaded with fewer frames), the pane must emit an empty
+        string signal to notify the workspace to clear its stale selection state.
+
+        This is different from filtering: filters hide items but they still exist,
+        so the workspace state manager preserves selection. Frame deletion/reload
+        actually removes items, so the workspace must be notified to clear state.
         """
         pane = AIFramesPane()
         qtbot.addWidget(pane)
@@ -240,8 +244,11 @@ class TestProjectReloadSignaling:
         # Selection should be cleared in pane (frame doesn't exist)
         assert pane.get_selected_index() is None
 
-        # NO empty string should be emitted - workspace handles missing frames
-        assert signal_emissions == [], f"Expected no emissions when reload loses selection, got {signal_emissions}"
+        # Empty string should be emitted to notify workspace to clear stale state
+        assert signal_emissions == [""], (
+            f"Expected [''] when reload loses selection, got {signal_emissions}. "
+            "Workspace state manager would retain stale frame ID without this signal."
+        )
 
 
 class TestIDBasedSelectionMethods:

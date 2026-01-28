@@ -515,6 +515,11 @@ class FrameMappingWorkspace(QWidget):
         self._refresh_game_frame_link_status()
         self._update_mapping_panel_previews()
 
+        # Clear browsing mode if the removed mapping was for the selected AI frame
+        # When a mapping is removed, there's nothing to "browse away from"
+        if ai_frame_id == self._state.selected_ai_frame_id:
+            self._alignment_canvas.set_browsing_mode(False)
+
     def _on_error(self, message: str) -> None:
         """Handle error from controller."""
         logger.error("Frame mapping error: %s", message)
@@ -824,8 +829,10 @@ class FrameMappingWorkspace(QWidget):
         if project is None:
             return
 
-        # Check if linked (use ID-based method)
+        # Check if linked (use ID-based method) - capture before deletion
         linked_ai_id = project.get_ai_frame_linked_to_game_frame(frame_id)
+        was_mapped_to_selected = linked_ai_id is not None and linked_ai_id == self._state.selected_ai_frame_id
+
         if linked_ai_id is not None:
             ai_frame = project.get_ai_frame_by_id(linked_ai_id)
             ai_name = ai_frame.name if ai_frame else linked_ai_id
@@ -852,6 +859,12 @@ class FrameMappingWorkspace(QWidget):
                 self._state.current_canvas_game_id = None
                 self._alignment_canvas.set_game_frame(None)
                 self._alignment_canvas.clear_alignment()
+
+            # Clear browsing mode if the deleted capture was mapped to the selected AI frame
+            # This handles the case where user is browsing a different capture and deletes
+            # the mapped capture - the mapping is now gone so there's nothing to browse from
+            if was_mapped_to_selected:
+                self._alignment_canvas.set_browsing_mode(False)
 
             if self._message_service:
                 self._message_service.show_message(f"Deleted capture: {frame_id}")
