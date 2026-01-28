@@ -459,12 +459,12 @@ class WorkbenchCanvas(QWidget):
         controls1.addWidget(scale_label)
 
         self._scale_slider = QSlider(Qt.Orientation.Horizontal)
-        self._scale_slider.setRange(1, 100)  # 0.01 to 1.0
-        self._scale_slider.setValue(100)
+        self._scale_slider.setRange(10, 1000)  # 0.01 to 1.0 with 0.001 precision
+        self._scale_slider.setValue(1000)
         self._scale_slider.setMaximumWidth(80)
         controls1.addWidget(self._scale_slider)
 
-        self._scale_value = QLabel("1.0x")
+        self._scale_value = QLabel("1.00x")
         self._scale_value.setStyleSheet("font-size: 11px;")
         self._scale_value.setMinimumWidth(35)
         controls1.addWidget(self._scale_value)
@@ -875,8 +875,8 @@ class WorkbenchCanvas(QWidget):
 
             self._flip_h_checkbox.setChecked(flip_h)
             self._flip_v_checkbox.setChecked(flip_v)
-            self._scale_slider.setValue(round(scale * 100))
-            self._scale_value.setText(f"{scale:.2f}x")
+            self._scale_slider.setValue(round(scale * 1000))
+            self._scale_value.setText(f"{scale:.3f}x")
             self._offset_label.setText(f"Offset: ({offset_x}, {offset_y})")
 
             # Set sharpen slider (0-40 -> 0.0-4.0)
@@ -1303,16 +1303,16 @@ class WorkbenchCanvas(QWidget):
         if self._updating_from_external:
             return
 
-        new_scale = value / 100.0
+        new_scale = value / 1000.0
         old_scale = self._ai_frame_item.scale_factor()
-        if abs(new_scale - old_scale) < 0.001:
+        if abs(new_scale - old_scale) < 0.0001:
             return
 
         # Capture center before scaling
         center_before = self._ai_frame_item.sceneBoundingRect().center()
 
         # Apply scale
-        self._scale_value.setText(f"{new_scale:.2f}x")
+        self._scale_value.setText(f"{new_scale:.3f}x")
         self._ai_frame_item.set_scale_factor(new_scale)
 
         # Reposition to preserve center
@@ -1896,8 +1896,8 @@ class WorkbenchCanvas(QWidget):
         # Update UI (always update for visual feedback during drag)
         self._offset_label.setText(f"Offset: ({actual_x}, {actual_y})")
         self._scale_slider.blockSignals(True)
-        self._scale_slider.setValue(round(scale * 100))
-        self._scale_value.setText(f"{scale:.2f}x")
+        self._scale_slider.setValue(round(scale * 1000))
+        self._scale_value.setText(f"{scale:.3f}x")
         self._scale_slider.blockSignals(False)
 
         # Schedule tile touch update (already debounced)

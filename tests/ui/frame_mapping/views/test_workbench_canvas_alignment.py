@@ -64,7 +64,7 @@ class TestAlignmentControlsState:
         # Values should be reset
         assert canvas._flip_h_checkbox.isChecked() is False
         assert canvas._flip_v_checkbox.isChecked() is False
-        assert canvas._scale_slider.value() == 100  # 1.0x
+        assert canvas._scale_slider.value() == 1000  # 1.0x
         # Controls should still be disabled
         assert canvas._has_mapping is False
 
@@ -359,7 +359,7 @@ class TestLargeImageAutoAlign:
         canvas._on_auto_align()
 
         # Get resulting scale
-        actual_scale = canvas._scale_slider.value() / 100.0
+        actual_scale = canvas._scale_slider.value() / 1000.0
 
         # Expected scale: tile_size / content_size = 16 / 56 ≈ 0.286
         expected_scale = 16 / 56  # ≈ 0.2857

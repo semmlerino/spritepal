@@ -39,7 +39,7 @@ class TestScalePersistence:
 
         # Start with default scale
         default_scale = canvas._scale_slider.value()
-        assert default_scale == 100  # 1.0x
+        assert default_scale == 1000  # 1.0x
 
         # Record emitted values
         emitted_values: list[AlignmentState] = []
@@ -49,8 +49,8 @@ class TestScalePersistence:
 
         canvas.alignment_changed.connect(record_emission)
 
-        # Change scale to 0.5x (50%)
-        canvas._scale_slider.setValue(50)
+        # Change scale to 0.5x (500/1000)
+        canvas._scale_slider.setValue(500)
 
         # ASSERTION: Signal should have been emitted with new scale value
         assert len(emitted_values) >= 1, "alignment_changed signal not emitted on scale change"
@@ -90,9 +90,9 @@ class TestScalePersistence:
         # Reset flip for clean state
         canvas._flip_h_checkbox.setChecked(False)
 
-        # Test scale emits signal (must use value in range 10-100, different from current)
+        # Test scale emits signal (must use value in range 10-1000, different from current)
         canvas.alignment_changed.connect(record_scale)
-        canvas._scale_slider.setValue(50)  # 0.5x - valid and different from initial 1.0
+        canvas._scale_slider.setValue(500)  # 0.5x - valid and different from initial 1.0
         canvas.alignment_changed.disconnect(record_scale)
 
         # Both should emit
@@ -116,7 +116,7 @@ class TestScalePersistence:
         initial_snapshot = canvas._preview_snapshot
 
         # Change scale
-        canvas._scale_slider.setValue(75)  # 0.75x
+        canvas._scale_slider.setValue(750)  # 0.75x
 
         # Preview snapshot should have been updated
         # _schedule_preview_update captures (offset_x, offset_y, flip_h, flip_v, scale)
