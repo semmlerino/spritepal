@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import override
 
 from PySide6.QtCore import QPoint, Qt, Signal
-from PySide6.QtGui import QKeyEvent, QMouseEvent, QPainter, QPixmap, QTransform
+from PySide6.QtGui import QKeyEvent, QMouseEvent, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QFormLayout,
@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.components.base.dialog_base import DialogBase
+from ui.frame_mapping.views.base_overlay_canvas import BaseOverlayCanvas
 
 # Preview canvas size
 CANVAS_SIZE = 400
@@ -28,8 +29,8 @@ CANVAS_SIZE = 400
 DISPLAY_SCALE = 4
 
 
-class OverlayCanvas(QWidget):
-    """Canvas widget that displays game frame with AI frame overlaid.
+class OverlayCanvas(BaseOverlayCanvas):
+    """Canvas widget for alignment dialog with drag-to-adjust.
 
     Supports drag-to-adjust: click and drag the AI frame overlay to adjust its position.
 
@@ -40,14 +41,7 @@ class OverlayCanvas(QWidget):
     offset_changed = Signal(int, int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._game_pixmap: QPixmap | None = None
-        self._ai_pixmap: QPixmap | None = None
-        self._offset_x = 0
-        self._offset_y = 0
-        self._flip_h = False
-        self._flip_v = False
-        self._opacity = 0.5
+        super().__init__(CANVAS_SIZE, DISPLAY_SCALE, parent)
 
         # Drag state
         self._dragging = False
@@ -55,37 +49,12 @@ class OverlayCanvas(QWidget):
         self._drag_start_offset_x = 0
         self._drag_start_offset_y = 0
 
-        self.setMinimumSize(CANVAS_SIZE, CANVAS_SIZE)
-        self.setStyleSheet("background-color: #1a1a1a;")
         self.setMouseTracking(True)
         self.setCursor(Qt.CursorShape.OpenHandCursor)
 
-    def set_game_frame(self, pixmap: QPixmap | None) -> None:
-        """Set the game frame (background)."""
-        self._game_pixmap = pixmap
-        self.update()
-
-    def set_ai_frame(self, pixmap: QPixmap | None) -> None:
-        """Set the AI frame (overlay)."""
-        self._ai_pixmap = pixmap
-        self.update()
-
-    def set_offset(self, x: int, y: int) -> None:
-        """Set the offset for the AI frame overlay."""
-        self._offset_x = x
-        self._offset_y = y
-        self.update()
-
-    def set_flip(self, flip_h: bool, flip_v: bool) -> None:
-        """Set the flip state for the AI frame overlay."""
-        self._flip_h = flip_h
-        self._flip_v = flip_v
-        self.update()
-
-    def set_opacity(self, opacity: float) -> None:
-        """Set the opacity for the AI frame overlay (0.0 to 1.0)."""
-        self._opacity = max(0.0, min(1.0, opacity))
-        self.update()
+    # -------------------------------------------------------------------------
+    # Test/Inspection Properties
+    # -------------------------------------------------------------------------
 
     @property
     def offset_x(self) -> int:
@@ -137,6 +106,10 @@ class OverlayCanvas(QWidget):
             return None
         return (self._ai_pixmap.width(), self._ai_pixmap.height())
 
+    # -------------------------------------------------------------------------
+    # Drag-to-Adjust Functionality
+    # -------------------------------------------------------------------------
+
     def start_drag(self, start_pos: QPoint, start_offset_x: int = 0, start_offset_y: int = 0) -> None:
         """Start a drag operation (public API for testing)."""
         self._dragging = True
@@ -181,95 +154,6 @@ class OverlayCanvas(QWidget):
             self._dragging = False
             self._drag_start = None
             self.setCursor(Qt.CursorShape.OpenHandCursor)
-
-    @override
-    def paintEvent(self, event: object) -> None:
-        """Paint the overlay composite."""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
-
-        # Calculate centering offset
-        canvas_center_x = self.width() // 2
-        canvas_center_y = self.height() // 2
-
-        # Draw checkerboard background
-        self._draw_checkerboard(painter)
-
-        if self._game_pixmap is None and self._ai_pixmap is None:
-            painter.setPen(Qt.GlobalColor.gray)
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No frames loaded")
-            return
-
-        # Determine the frame size (prefer game frame dimensions)
-        if self._game_pixmap is not None:
-            frame_width = self._game_pixmap.width()
-            frame_height = self._game_pixmap.height()
-        elif self._ai_pixmap is not None:
-            frame_width = self._ai_pixmap.width()
-            frame_height = self._ai_pixmap.height()
-        else:
-            return
-
-        # Scale up for visibility
-        scaled_width = frame_width * DISPLAY_SCALE
-        scaled_height = frame_height * DISPLAY_SCALE
-
-        # Calculate top-left position to center the frame
-        x_start = canvas_center_x - scaled_width // 2
-        y_start = canvas_center_y - scaled_height // 2
-
-        # Draw game frame (background)
-        if self._game_pixmap is not None:
-            scaled_game = self._game_pixmap.scaled(
-                scaled_width,
-                scaled_height,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            )
-            painter.drawPixmap(x_start, y_start, scaled_game)
-
-        # Draw AI frame (overlay with offset and flip)
-        # AI frame is rendered at its natural relative size to show size differences
-        if self._ai_pixmap is not None:
-            ai_pixmap = self._ai_pixmap
-
-            # Apply flips
-            if self._flip_h or self._flip_v:
-                transform = QTransform()
-                transform.scale(-1 if self._flip_h else 1, -1 if self._flip_v else 1)
-                ai_pixmap = ai_pixmap.transformed(transform)
-
-            # Scale AI frame at its natural size (not forced to match game frame)
-            ai_scaled_width = ai_pixmap.width() * DISPLAY_SCALE
-            ai_scaled_height = ai_pixmap.height() * DISPLAY_SCALE
-            scaled_ai = ai_pixmap.scaled(
-                ai_scaled_width,
-                ai_scaled_height,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            )
-
-            # Apply offset (scaled)
-            offset_x_scaled = self._offset_x * DISPLAY_SCALE
-            offset_y_scaled = self._offset_y * DISPLAY_SCALE
-
-            painter.setOpacity(self._opacity)
-            painter.drawPixmap(x_start + offset_x_scaled, y_start + offset_y_scaled, scaled_ai)
-            painter.setOpacity(1.0)
-
-        # Draw frame border
-        painter.setPen(Qt.GlobalColor.darkGray)
-        painter.drawRect(x_start - 1, y_start - 1, scaled_width + 1, scaled_height + 1)
-
-    def _draw_checkerboard(self, painter: QPainter) -> None:
-        """Draw a checkerboard background pattern."""
-        cell_size = 16
-        colors = [Qt.GlobalColor.darkGray, Qt.GlobalColor.gray]
-
-        for y in range(0, self.height(), cell_size):
-            for x in range(0, self.width(), cell_size):
-                color_index = ((x // cell_size) + (y // cell_size)) % 2
-                painter.fillRect(x, y, cell_size, cell_size, colors[color_index])
 
 
 class AlignmentDialog(DialogBase):

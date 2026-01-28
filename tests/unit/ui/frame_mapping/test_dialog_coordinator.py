@@ -84,7 +84,7 @@ def test_clear_queue(coordinator, mock_capture_result):
     assert coordinator.get_queue_size() == 0
 
 
-def test_show_sprite_selection_accepted(qtbot, coordinator, mock_capture_result):
+def test_show_sprite_selection_accepted(coordinator, mock_capture_result):
     """Test sprite selection dialog when user accepts."""
     capture_path = Path("/test/capture.json")
     mock_entry = mock_capture_result.entries[0]
@@ -96,15 +96,13 @@ def test_show_sprite_selection_accepted(qtbot, coordinator, mock_capture_result)
         mock_dialog.selected_entries = [mock_entry]
         mock_dialog_cls.return_value = mock_dialog
 
-        # Track signal emissions
-        with qtbot.waitSignal(coordinator.dialog_completed, timeout=1000):
-            result = coordinator.show_sprite_selection(coordinator, mock_capture_result, capture_path)
+        result = coordinator.show_sprite_selection(coordinator, mock_capture_result, capture_path)
 
         assert result == [mock_entry]
         mock_dialog.exec.assert_called_once()
 
 
-def test_show_sprite_selection_rejected(qtbot, coordinator, mock_capture_result):
+def test_show_sprite_selection_rejected(coordinator, mock_capture_result):
     """Test sprite selection dialog when user rejects."""
     capture_path = Path("/test/capture.json")
 
@@ -114,57 +112,51 @@ def test_show_sprite_selection_rejected(qtbot, coordinator, mock_capture_result)
         mock_dialog.exec.return_value = 0  # QDialog.DialogCode.Rejected
         mock_dialog_cls.return_value = mock_dialog
 
-        # Track signal emissions
-        with qtbot.waitSignal(coordinator.dialog_completed, timeout=1000):
-            result = coordinator.show_sprite_selection(coordinator, mock_capture_result, capture_path)
+        result = coordinator.show_sprite_selection(coordinator, mock_capture_result, capture_path)
 
         assert result is None
         mock_dialog.exec.assert_called_once()
 
 
-def test_confirm_injection_accepted(qtbot, coordinator):
+def test_confirm_injection_accepted(coordinator):
     """Test injection confirmation when user accepts."""
     with patch("ui.frame_mapping.dialog_coordinator.QMessageBox.question") as mock_question:
         mock_question.return_value = 0x00004000  # QMessageBox.StandardButton.Yes
 
-        with qtbot.waitSignal(coordinator.dialog_completed, timeout=1000):
-            result = coordinator.confirm_injection(coordinator, 5)
+        result = coordinator.confirm_injection(coordinator, 5)
 
         assert result is True
         mock_question.assert_called_once()
 
 
-def test_confirm_injection_rejected(qtbot, coordinator):
+def test_confirm_injection_rejected(coordinator):
     """Test injection confirmation when user rejects."""
     with patch("ui.frame_mapping.dialog_coordinator.QMessageBox.question") as mock_question:
         mock_question.return_value = 0x00010000  # QMessageBox.StandardButton.No
 
-        with qtbot.waitSignal(coordinator.dialog_completed, timeout=1000):
-            result = coordinator.confirm_injection(coordinator, 5)
+        result = coordinator.confirm_injection(coordinator, 5)
 
         assert result is False
         mock_question.assert_called_once()
 
 
-def test_confirm_replace_link(qtbot, coordinator):
+def test_confirm_replace_link(coordinator):
     """Test replace link confirmation dialog."""
     with patch("ui.frame_mapping.dialog_coordinator.confirm_replace_link") as mock_confirm:
         mock_confirm.return_value = True
 
-        with qtbot.waitSignal(coordinator.dialog_completed, timeout=1000):
-            result = coordinator.confirm_replace_link(coordinator, "game_01", "old_ai.png", "new_ai.png")
+        result = coordinator.confirm_replace_link(coordinator, "game_01", "old_ai.png", "new_ai.png")
 
         assert result is True
         mock_confirm.assert_called_once_with(coordinator, "game_01", "old_ai.png", "new_ai.png")
 
 
-def test_confirm_replace_ai_frame_link(qtbot, coordinator):
+def test_confirm_replace_ai_frame_link(coordinator):
     """Test replace AI frame link confirmation dialog."""
     with patch("ui.frame_mapping.dialog_coordinator.confirm_replace_ai_frame_link") as mock_confirm:
         mock_confirm.return_value = False
 
-        with qtbot.waitSignal(coordinator.dialog_completed, timeout=1000):
-            result = coordinator.confirm_replace_ai_frame_link(coordinator, "ai.png", "old_game", "new_game")
+        result = coordinator.confirm_replace_ai_frame_link(coordinator, "ai.png", "old_game", "new_game")
 
         assert result is False
         mock_confirm.assert_called_once_with(coordinator, "ai.png", "old_game", "new_game")
@@ -263,8 +255,8 @@ def test_process_queue_multiple_captures(qtbot, coordinator, mock_capture_result
         assert mock_controller.complete_capture_import.call_count == 2
 
 
-def test_capture_import_completed_signal(qtbot, coordinator, mock_capture_result, mock_controller):
-    """Test capture_import_completed signal is emitted on successful import."""
+def test_successful_import_increments_count(qtbot, coordinator, mock_capture_result, mock_controller):
+    """Test successful import increments the import count."""
     capture_path = Path("/test/capture.json")
     mock_entry = mock_capture_result.entries[0]
 
@@ -283,9 +275,9 @@ def test_capture_import_completed_signal(qtbot, coordinator, mock_capture_result
         mock_dialog.selected_entries = [mock_entry]
         mock_dialog_cls.return_value = mock_dialog
 
-        # Track both signals
-        with qtbot.waitSignal(coordinator.capture_import_completed, timeout=1000) as capture_blocker:
+        # Process queue and verify final count via queue_processing_finished signal
+        with qtbot.waitSignal(coordinator.queue_processing_finished, timeout=1000) as blocker:
             coordinator.process_capture_import_queue(coordinator, mock_controller)
 
-        # Should emit frame ID
-        assert capture_blocker.args[0] == "game_01"
+        # Should emit 1 for single successful import
+        assert blocker.args == [1]

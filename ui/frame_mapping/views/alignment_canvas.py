@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QKeyEvent, QPainter, QPixmap, QTransform
+from PySide6.QtGui import QKeyEvent, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QHBoxLayout,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.frame_mapping.services.canvas_config_service import CanvasConfig
+from ui.frame_mapping.views.base_overlay_canvas import BaseOverlayCanvas
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -25,8 +26,8 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-class OverlayCanvasWidget(QWidget):
-    """Canvas widget that displays game frame with AI frame overlay.
+class OverlayCanvasWidget(BaseOverlayCanvas):
+    """Canvas widget for alignment editing with keyboard support.
 
     Supports keyboard input for nudging alignment when focused.
     Arrow keys nudge by 1 pixel, Shift+Arrow nudges by 8 pixels.
@@ -38,51 +39,13 @@ class OverlayCanvasWidget(QWidget):
     offset_changed = Signal(int, int)  # new offset_x, offset_y
 
     def __init__(self, canvas_size: int, display_scale: int, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self._canvas_size = canvas_size
-        self._display_scale = display_scale
-        self._game_pixmap: QPixmap | None = None
-        self._ai_pixmap: QPixmap | None = None
-        self._offset_x = 0
-        self._offset_y = 0
-        self._flip_h = False
-        self._flip_v = False
-        self._opacity = 0.5
-
-        self.setMinimumSize(canvas_size, canvas_size)
-        self.setStyleSheet("background-color: #1a1a1a;")
+        super().__init__(canvas_size, display_scale, parent)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-    def set_game_frame(self, pixmap: QPixmap | None) -> None:
-        """Set the game frame (background)."""
-        self._game_pixmap = pixmap
-        self.update()
-
-    def set_ai_frame(self, pixmap: QPixmap | None) -> None:
-        """Set the AI frame (overlay)."""
-        self._ai_pixmap = pixmap
-        self.update()
-
-    def set_offset(self, x: int, y: int) -> None:
-        """Set the offset for the AI frame overlay."""
-        self._offset_x = x
-        self._offset_y = y
-        self.update()
-
-    def get_offset(self) -> tuple[int, int]:
-        """Get the current offset."""
-        return self._offset_x, self._offset_y
-
-    def set_flip(self, flip_h: bool, flip_v: bool) -> None:
-        """Set the flip state for the AI frame overlay."""
-        self._flip_h = flip_h
-        self._flip_v = flip_v
-        self.update()
-
-    def set_opacity(self, opacity: float) -> None:
-        """Set the opacity for the AI frame overlay (0.0 to 1.0)."""
-        self._opacity = max(0.0, min(1.0, opacity))
-        self.update()
+    @override
+    def _get_empty_message(self) -> str:
+        """Return custom empty message for alignment canvas."""
+        return "Select a mapped AI frame\nto preview alignment"
 
     @override
     def keyPressEvent(self, event: QKeyEvent) -> None:
@@ -111,91 +74,14 @@ class OverlayCanvasWidget(QWidget):
 
     @override
     def paintEvent(self, event: object) -> None:
-        """Paint the overlay composite."""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
-
-        canvas_center_x = self.width() // 2
-        canvas_center_y = self.height() // 2
-
-        self._draw_checkerboard(painter)
-
-        if self._game_pixmap is None and self._ai_pixmap is None:
-            painter.setPen(Qt.GlobalColor.gray)
-            painter.drawText(
-                self.rect(), Qt.AlignmentFlag.AlignCenter, "Select a mapped AI frame\nto preview alignment"
-            )
-            return
-
-        # Determine frame size (prefer game frame dimensions)
-        if self._game_pixmap is not None:
-            frame_width = self._game_pixmap.width()
-            frame_height = self._game_pixmap.height()
-        elif self._ai_pixmap is not None:
-            frame_width = self._ai_pixmap.width()
-            frame_height = self._ai_pixmap.height()
-        else:
-            return
-
-        scaled_width = frame_width * self._display_scale
-        scaled_height = frame_height * self._display_scale
-
-        x_start = canvas_center_x - scaled_width // 2
-        y_start = canvas_center_y - scaled_height // 2
-
-        # Draw game frame (background)
-        if self._game_pixmap is not None:
-            scaled_game = self._game_pixmap.scaled(
-                scaled_width,
-                scaled_height,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            )
-            painter.drawPixmap(x_start, y_start, scaled_game)
-
-        # Draw AI frame (overlay with offset and flip)
-        if self._ai_pixmap is not None:
-            ai_pixmap = self._ai_pixmap
-
-            if self._flip_h or self._flip_v:
-                transform = QTransform()
-                transform.scale(-1 if self._flip_h else 1, -1 if self._flip_v else 1)
-                ai_pixmap = ai_pixmap.transformed(transform)
-
-            ai_scaled_width = ai_pixmap.width() * self._display_scale
-            ai_scaled_height = ai_pixmap.height() * self._display_scale
-            scaled_ai = ai_pixmap.scaled(
-                ai_scaled_width,
-                ai_scaled_height,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            )
-
-            offset_x_scaled = self._offset_x * self._display_scale
-            offset_y_scaled = self._offset_y * self._display_scale
-
-            painter.setOpacity(self._opacity)
-            painter.drawPixmap(x_start + offset_x_scaled, y_start + offset_y_scaled, scaled_ai)
-            painter.setOpacity(1.0)
-
-        # Draw frame border
-        painter.setPen(Qt.GlobalColor.darkGray)
-        painter.drawRect(x_start - 1, y_start - 1, scaled_width + 1, scaled_height + 1)
+        """Paint the overlay composite with focus indicator."""
+        super().paintEvent(event)
 
         # Draw focus indicator
         if self.hasFocus():
+            painter = QPainter(self)
             painter.setPen(Qt.GlobalColor.cyan)
             painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
-
-    def _draw_checkerboard(self, painter: QPainter) -> None:
-        """Draw a checkerboard background pattern."""
-        cell_size = 16
-        colors = [Qt.GlobalColor.darkGray, Qt.GlobalColor.gray]
-
-        for y in range(0, self.height(), cell_size):
-            for x in range(0, self.width(), cell_size):
-                color_index = ((x // cell_size) + (y // cell_size)) % 2
-                painter.fillRect(x, y, cell_size, cell_size, colors[color_index])
 
 
 class AlignmentCanvas(QWidget):

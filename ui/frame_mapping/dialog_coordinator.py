@@ -35,13 +35,9 @@ class DialogCoordinator(QObject):
     - Sequential processing of batch capture imports
 
     Signals:
-        dialog_completed: Emitted when a dialog completes (dialog_type, result)
-        capture_import_completed: Emitted when capture import succeeds (game_frame_id, sprite_config)
         queue_processing_finished: Emitted when batch import queue completes (import_count)
     """
 
-    dialog_completed = Signal(str, object)  # dialog_type, result
-    capture_import_completed = Signal(str, object)  # game_frame_id, SpriteConfig
     queue_processing_finished = Signal(int)  # import_count
 
     def __init__(self, parent: QObject | None = None) -> None:
@@ -81,10 +77,8 @@ class DialogCoordinator(QObject):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             selected_entries = dialog.selected_entries
             if selected_entries:
-                self.dialog_completed.emit("sprite_selection", selected_entries)
                 return selected_entries
 
-        self.dialog_completed.emit("sprite_selection", None)
         return None
 
     def confirm_injection(self, parent: QWidget, frame_count: int) -> bool:
@@ -105,9 +99,7 @@ class DialogCoordinator(QObject):
             QMessageBox.StandardButton.No,
         )
 
-        confirmed = reply == QMessageBox.StandardButton.Yes
-        self.dialog_completed.emit("injection_confirm", confirmed)
-        return confirmed
+        return reply == QMessageBox.StandardButton.Yes
 
     def confirm_replace_link(
         self,
@@ -127,9 +119,7 @@ class DialogCoordinator(QObject):
         Returns:
             True if user confirmed replacement, False if cancelled
         """
-        confirmed = confirm_replace_link(parent, game_frame_id, old_ai_frame_name, new_ai_frame_name)
-        self.dialog_completed.emit("replace_link", confirmed)
-        return confirmed
+        return confirm_replace_link(parent, game_frame_id, old_ai_frame_name, new_ai_frame_name)
 
     def confirm_replace_ai_frame_link(
         self,
@@ -149,9 +139,7 @@ class DialogCoordinator(QObject):
         Returns:
             True if user confirmed replacement, False if cancelled
         """
-        confirmed = confirm_replace_ai_frame_link(parent, ai_frame_name, old_game_frame_id, new_game_frame_id)
-        self.dialog_completed.emit("replace_ai_frame_link", confirmed)
-        return confirmed
+        return confirm_replace_ai_frame_link(parent, ai_frame_name, old_game_frame_id, new_game_frame_id)
 
     # -------------------------------------------------------------------------
     # Queue Management
@@ -196,7 +184,6 @@ class DialogCoordinator(QObject):
             frame = controller.complete_capture_import(capture_path, capture_result, selected_entries)
             if frame is not None:
                 self._import_count += 1
-                self.capture_import_completed.emit(frame.id, None)  # Emit with frame ID
 
         # Remove processed capture and continue to next
         self._pending_captures.pop(0)
