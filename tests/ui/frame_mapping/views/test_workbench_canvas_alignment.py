@@ -95,6 +95,7 @@ class TestAutoAlignVisibility:
         Bug: Auto-align moves AI frame outside scene rect, making frames disappear.
         """
         canvas = WorkbenchCanvas()
+        canvas._match_scale_checkbox.setChecked(False)
         qtbot.addWidget(canvas)
 
         # Create AI image with content NOT at origin (typical case)
@@ -141,6 +142,7 @@ class TestAutoAlignVisibility:
         and the viewport is smaller than the scene. fitInView() is needed instead.
         """
         canvas = WorkbenchCanvas()
+        canvas._match_scale_checkbox.setChecked(False)
         qtbot.addWidget(canvas)
         # Give the canvas a realistic size (smaller than typical AI images)
         canvas.resize(400, 300)
@@ -426,3 +428,92 @@ class TestLargeImageAutoAlign:
         # (The exact values depend on the algorithm, but it should have searched)
         # Just verify that auto-align completed without error and set some position
         assert ai_pos is not None, "Auto-align should set AI frame position"
+
+
+class TestAutoAlignWithTileGaps:
+    """Tests for auto-align with non-contiguous tile coverage (gaps in grid).
+
+    Bug: When tile coverage has gaps (e.g., left column missing), the bounding box
+    center is in the middle of the gap+tiles area, causing content to be centered
+    partially over gaps where no tiles exist. This results in overflow.
+
+    Fix: Use tile centroid (area-weighted center of actual tiles) instead of
+    bounding box center. This centers content over actual tile coverage, not gaps.
+
+    Example problematic layout:
+        Tile grid (5x6 tiles):
+          y= 0: .████   <- Column x=0 is EMPTY (gap)
+          y= 8: .████
+          ...
+
+        Bounding box: (0, 0) to (40, 48) - center at (20, 24)
+        Tile centroid: center of the 4 columns at x=8-40 - approx (24, 24)
+
+        With 32px content, centering at (20, 24) places 4px over the gap.
+        Centering at tile centroid (24, 24) keeps content within tiles.
+    """
+
+    def test_auto_align_with_left_column_gap(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Auto-align should handle tile grid with gap in left column.
+
+        This test reproduces the bug seen in mapping index 1 where the tile grid
+        has an empty column on the left, causing bounding-box-centered alignment
+        to overflow into the gap.
+        """
+        canvas = WorkbenchCanvas()
+        qtbot.addWidget(canvas)
+
+        # Create AI image with centered content (32x40)
+        ai_image_path = tmp_path / "ai_frame.png"
+        ai_img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(ai_img)
+        # Content at (16, 12) to (48, 52) - 32x40 centered
+        draw.rectangle([16, 12, 48, 52], fill=(255, 0, 0, 255))
+        ai_img.save(ai_image_path)
+
+        # Create game preview
+        game_preview_path = tmp_path / "game.png"
+        game_preview = Image.new("RGBA", (40, 48), (0, 255, 0, 255))
+        game_preview.save(game_preview_path)
+
+        # Create tile grid with LEFT COLUMN GAP (x=0-8 is empty)
+        # This is a 5x6 grid where the first column doesn't have tiles
+        # Tiles exist at x positions: 8, 16, 24, 32 (4 columns)
+        # All 6 rows: y positions 0, 8, 16, 24, 32, 40
+        entries = []
+        for row in range(6):
+            for col in range(4):  # Only 4 columns, starting at x=8
+                x = 8 + col * 8  # Skip column 0 (the gap)
+                y = row * 8
+                entries.append(MockOAMEntry(x=x, y=y, width=8, height=8))
+
+        mock_capture = MockCaptureResult(
+            entries=entries,
+            _bounding_box=MockBoundingBox(x=0, y=0, width=40, height=48),
+        )
+
+        game_frame = GameFrame(id="test_frame", width=40, height=48)
+
+        # Setup canvas
+        canvas.set_game_frame(
+            frame=game_frame,
+            preview_pixmap=QPixmap(str(game_preview_path)),
+            capture_result=mock_capture,  # type: ignore[arg-type]
+        )
+        canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
+
+        # Enable Match Scale and trigger auto-align
+        canvas._match_scale_checkbox.setChecked(True)
+        canvas.set_alignment(0, 0, False, False, 1.0)
+        canvas._on_auto_align()
+
+        # Check that there's no overflow - content should fit within tiles
+        warning_label = canvas._out_of_bounds_warning_label
+        has_overflow = warning_label.isVisible() if warning_label else False
+
+        # With the fix, content should be centered over actual tiles (x=8-40),
+        # not the bounding box (x=0-40), avoiding overflow into the gap
+        assert not has_overflow, (
+            "Auto-align should not cause overflow with non-contiguous tiles. "
+            "Content was likely centered over bounding box instead of tile centroid."
+        )

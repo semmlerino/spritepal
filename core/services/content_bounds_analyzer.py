@@ -46,3 +46,38 @@ class ContentBoundsAnalyzer:
         centroid_y = float(np.sum(y_coords * alpha) / total)
 
         return centroid_x, centroid_y
+
+
+def compute_tile_centroid(
+    tile_rects: list[tuple[int, int, int, int]],
+) -> tuple[float, float]:
+    """Compute centroid of tile coverage (weighted by area, ignores gaps).
+
+    Unlike bounding box center, this accounts for non-contiguous tile layouts
+    where gaps exist in the coverage. Each tile contributes proportionally
+    to its area.
+
+    Args:
+        tile_rects: List of (x, y, width, height) tuples for each tile
+
+    Returns:
+        Tuple of (centroid_x, centroid_y) coordinates.
+        Returns (0.0, 0.0) if tile_rects is empty.
+    """
+    if not tile_rects:
+        return (0.0, 0.0)
+
+    total_area = 0.0
+    weighted_x = 0.0
+    weighted_y = 0.0
+
+    for x, y, w, h in tile_rects:
+        area = w * h
+        weighted_x += (x + w / 2) * area
+        weighted_y += (y + h / 2) * area
+        total_area += area
+
+    if total_area == 0:
+        return (0.0, 0.0)
+
+    return (weighted_x / total_area, weighted_y / total_area)

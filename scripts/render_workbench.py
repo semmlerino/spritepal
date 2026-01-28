@@ -30,8 +30,69 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
-from core.services.content_bounds_analyzer import ContentBoundsAnalyzer
+from core.services.content_bounds_analyzer import ContentBoundsAnalyzer, compute_tile_centroid
 from core.services.tile_sampling_service import TileSamplingService
+
+
+def get_content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
+    """Get bounding box of actual content in the image.
+
+    Handles both transparent backgrounds (via alpha channel) and solid backgrounds
+    (by detecting background color from corners).
+
+    Args:
+        image: PIL Image to analyze.
+
+    Returns:
+        Bounding box as (left, top, right, bottom).
+    """
+    import numpy as np
+
+    # First try alpha-based detection
+    alpha_bbox = image.getbbox()
+    full_bounds = (0, 0, image.width, image.height)
+
+    # If getbbox returned None or full image bounds, try color-based detection
+    if alpha_bbox is None or alpha_bbox == full_bounds:
+        # Convert to RGB for color analysis
+        rgb_image = image.convert("RGB")
+        pixels = np.array(rgb_image)
+
+        # Sample background color from corners (average of 4 corners)
+        corner_size = min(5, image.width // 10, image.height // 10)
+        corner_size = max(corner_size, 1)
+
+        corners = [
+            pixels[:corner_size, :corner_size],  # top-left
+            pixels[:corner_size, -corner_size:],  # top-right
+            pixels[-corner_size:, :corner_size],  # bottom-left
+            pixels[-corner_size:, -corner_size:],  # bottom-right
+        ]
+        bg_color = np.mean([c.mean(axis=(0, 1)) for c in corners], axis=0)
+
+        # Find pixels that differ significantly from background
+        tolerance = 30  # RGB distance threshold
+        diff = np.sqrt(np.sum((pixels.astype(float) - bg_color) ** 2, axis=2))
+        content_mask = diff > tolerance
+
+        # Find bounding box of content
+        rows_with_content = np.any(content_mask, axis=1)
+        cols_with_content = np.any(content_mask, axis=0)
+
+        if rows_with_content.any() and cols_with_content.any():
+            row_indices = np.where(rows_with_content)[0]
+            col_indices = np.where(cols_with_content)[0]
+            return (
+                int(col_indices[0]),
+                int(row_indices[0]),
+                int(col_indices[-1] + 1),
+                int(row_indices[-1] + 1),
+            )
+
+    if alpha_bbox is not None:
+        return alpha_bbox
+
+    return full_bounds
 
 
 def load_capture(capture_path: Path, selected_entry_ids: list[int] | None = None) -> CaptureResult:
@@ -169,7 +230,8 @@ def check_out_of_bounds(
         (x, y, w, h) in scene coordinates.
     """
     service = TileSamplingService()
-    content_bbox = ai_image.getbbox()  # Non-transparent content bounds
+    # Use get_content_bbox for consistent detection with compute_optimal_align
+    content_bbox = get_content_bbox(ai_image)
 
     return service.check_content_outside_tiles(
         content_bbox,
@@ -262,10 +324,8 @@ def compute_auto_align(
     Returns:
         Tuple of (offset_x, offset_y, scale)
     """
-    # Get AI content bounding box (non-transparent pixels)
-    ai_bbox = ai_image.getbbox()
-    if ai_bbox is None:
-        ai_bbox = (0, 0, ai_image.width, ai_image.height)
+    # Get AI content bounding box (handles both transparent and solid backgrounds)
+    ai_bbox = get_content_bbox(ai_image)
 
     ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
     ai_content_width = ai_x2 - ai_x
@@ -279,7 +339,7 @@ def compute_auto_align(
         scale_x = bbox.width / ai_content_width
         scale_y = bbox.height / ai_content_height
         scale = min(scale_x, scale_y)
-        scale = max(0.1, min(1.0, scale))
+        scale = max(0.01, min(1.0, scale))
     else:
         scale = 1.0
 
@@ -331,10 +391,11 @@ def compute_optimal_align(
     tile_width = tile_max_x - tile_min_x
     tile_height = tile_max_y - tile_min_y
 
-    # Get AI content bbox
-    ai_bbox = ai_image.getbbox()
-    if ai_bbox is None:
-        ai_bbox = (0, 0, ai_image.width, ai_image.height)
+    # Compute tile centroid (handles non-contiguous coverage with gaps)
+    tile_centroid_x, tile_centroid_y = compute_tile_centroid(tile_rects)
+
+    # Get AI content bbox (handles both transparent and solid backgrounds)
+    ai_bbox = get_content_bbox(ai_image)
 
     ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
     ai_content_width = ai_x2 - ai_x
@@ -369,9 +430,9 @@ def compute_optimal_align(
         scaled_width = ai_content_width * scale
         scaled_height = ai_content_height * scale
 
-        # Start with centered position
-        center_offset_x = int(tile_min_x + (tile_width - scaled_width) / 2 - ai_x * scale)
-        center_offset_y = int(tile_min_y + (tile_height - scaled_height) / 2 - ai_y * scale)
+        # Center over tile centroid (not bounding box center) to handle gaps
+        center_offset_x = int(tile_centroid_x - scaled_width / 2 - ai_x * scale)
+        center_offset_y = int(tile_centroid_y - scaled_height / 2 - ai_y * scale)
 
         # Check if centered position works
         has_overflow, _ = service.check_content_outside_tiles(
@@ -381,8 +442,9 @@ def compute_optimal_align(
             return (True, center_offset_x, center_offset_y)
 
         # Try adjusting position - search in a grid around center
-        # Use abs() to ensure search range is positive even when content > tiles
-        margin = 4
+        # Larger margin to escape gaps (e.g., 8px tile gaps require margin > 4)
+        tile_size = max(tile_rects[0][2], tile_rects[0][3]) if tile_rects else 8
+        margin = max(8, tile_size // 4)
         max_shift_x = max(abs(int(tile_width - scaled_width)) // 2 + margin, margin)
         max_shift_y = max(abs(int(tile_height - scaled_height)) // 2 + margin, margin)
 
@@ -415,7 +477,10 @@ def compute_optimal_align(
     # First check if initial scale already fits
     fits, offset_x, offset_y = find_valid_position(initial_scale)
     if fits:
-        # Try to find even larger scale
+        # Record as current best, then try to find even larger scale
+        best_scale = initial_scale
+        best_offset_x = offset_x
+        best_offset_y = offset_y
         low = initial_scale
     else:
         high = initial_scale
