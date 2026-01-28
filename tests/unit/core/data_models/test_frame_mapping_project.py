@@ -691,26 +691,6 @@ class TestFrameMappingProjectStableIDs:
         assert mapping.flip_h is True
 
 
-class TestFrameMappingProjectAtomicSave:
-    """Tests for atomic save functionality (Issue #3 fix).
-
-    Note: These tests moved to test_frame_mapping_repository.py.
-    Keeping this class for backward compatibility marker.
-    """
-
-    pass
-
-
-class TestFrameMappingProjectVersionValidation:
-    """Tests for version validation (Issue #4 fix).
-
-    Note: These tests moved to test_frame_mapping_repository.py.
-    Keeping this class for backward compatibility marker.
-    """
-
-    pass
-
-
 class TestFrameMappingProjectPerformance:
     """Tests for O(1) lookup optimization (Issue #5 fix)."""
 

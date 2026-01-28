@@ -104,10 +104,13 @@ class TestBatchInjectionSignalStorm:
             for i in range(5):
                 mock_controller.inject_mapping(i, rom_path, output_path=tmp_path / "out.sfc")
 
-            # Verification
-            # The key assertion would be about signal count, but the test was incomplete
-            # in the original file. Keeping behavior to ensure no crashes during batch ops.
-            assert True  # Test passes if no exception during batch injection
+            # Verification: Each inject_mapping call should emit project_changed.
+            # This test documents that the current implementation emits per-injection
+            # (5 calls = 5 signals). If batch optimization is added later to reduce
+            # signal storms, this assertion should be updated accordingly.
+            assert signal_spy.call_count == 5, (
+                f"Expected 5 project_changed signals for 5 injections, got {signal_spy.call_count}"
+            )
 
 
 if __name__ == "__main__":
