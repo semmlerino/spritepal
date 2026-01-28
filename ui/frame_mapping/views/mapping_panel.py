@@ -405,27 +405,6 @@ class MappingPanel(QWidget):
             return None
         return checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
 
-    def select_row_by_ai_index(self, ai_index: int) -> None:
-        """Select a row by AI frame index.
-
-        Blocks signals to prevent feedback loops.
-
-        Args:
-            ai_index: AI frame index to select
-        """
-        self._table.blockSignals(True)
-        try:
-            for row in range(self._table.rowCount()):
-                ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
-                if ai_item is not None and ai_item.data(Qt.ItemDataRole.UserRole) == ai_index:
-                    self._table.selectRow(row)
-                    self._table.scrollToItem(ai_item)
-                    break
-        finally:
-            self._table.blockSignals(False)
-        # Update button states since signals were blocked during selection
-        self._update_button_states()
-
     def select_row_by_ai_id(self, ai_frame_id: str) -> None:
         """Select a row by AI frame ID (filename).
 
@@ -780,14 +759,6 @@ class MappingPanel(QWidget):
                 if ai_frame_id is not None:
                     checked_ids.add(ai_frame_id)
         return checked_ids
-
-    def reset_checkbox_state(self) -> None:
-        """Reset checkbox state to default (checked = mapped).
-
-        Call this when loading a new project or when user wants to reset.
-        """
-        self._user_checked_ai_frame_ids = None
-        self.refresh()
 
     def _on_inject_selected_clicked(self) -> None:
         """Handle inject selected button click."""

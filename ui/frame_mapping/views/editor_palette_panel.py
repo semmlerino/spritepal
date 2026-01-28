@@ -496,10 +496,6 @@ class EditorPalettePanel(QWidget):
         self._swatches[index].set_free(True)
         self.clear_merge_target()
 
-    def is_slot_free(self, index: int) -> bool:
-        """Check if a slot is marked as free."""
-        return index in self._free_slots
-
     def _on_swatch_hovered(self, index: int) -> None:
         """Handle swatch hover."""
         # Show RGB info
@@ -518,10 +514,6 @@ class EditorPalettePanel(QWidget):
         # Propagate lock state to all swatches for tooltip updates
         for swatch in self._swatches:
             swatch.set_locked(locked)
-
-    def is_palette_locked(self) -> bool:
-        """Check if palette editing is locked."""
-        return self._palette_locked
 
     def set_palette_locked(self, locked: bool) -> None:
         """Set the palette lock state.

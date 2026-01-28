@@ -2091,10 +2091,6 @@ class WorkbenchCanvas(QWidget):
         else:
             self._view.unsetCursor()
 
-    def is_eyedropper_mode(self) -> bool:
-        """Check if eyedropper mode is active."""
-        return self._eyedropper_mode
-
     def _on_eyedropper_toggled(self, checked: bool) -> None:
         """Handle eyedropper button toggle."""
         self.set_eyedropper_mode(checked)

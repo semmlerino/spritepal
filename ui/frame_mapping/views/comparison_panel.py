@@ -432,21 +432,9 @@ class ComparisonPanel(QWidget):
         self._overlay_canvas.set_flip(flip_h, flip_v)
         self._update_alignment_label()
 
-    def switch_to_overlay_mode(self) -> None:
-        """Switch the comparison panel to overlay view mode programmatically."""
-        self._overlay_radio.setChecked(True)
-
     def clear_alignment(self) -> None:
         """Clear alignment values (reset to defaults)."""
         self.set_alignment(0, 0, False, False)
-
-    def clear_game_frame(self) -> None:
-        """Clear just the game frame preview (for unmapped AI frame selection)."""
-        self._game_preview.clear()
-        self._current_game_frame = None
-        self._game_pixmap = None
-        self.clear_alignment()
-        self._sync_overlay_canvas()
 
     def clear(self) -> None:
         """Clear both previews and alignment."""
