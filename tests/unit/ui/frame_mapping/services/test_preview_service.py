@@ -163,11 +163,8 @@ class TestPreviewServiceCaching:
                     mock_pixmap = QPixmap(100, 100)
                     mock_pil_to_qpixmap.return_value = mock_pixmap
 
-                    # First call - cache miss
-                    with qtbot.waitSignal(
-                        preview_service.preview_cache_invalidated, timeout=signal_timeout(), raising=False
-                    ):
-                        preview_service.get_preview("frame1", project)
+                    # First call - cache population (no signal emitted on initial cache fill)
+                    preview_service.get_preview("frame1", project)
 
                     # Modify file (change mtime)
                     capture_path.write_text('{"frame": 101}')

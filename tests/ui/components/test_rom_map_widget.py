@@ -53,21 +53,27 @@ class TestROMMapWidget:
         assert len(widget.found_sprites) == 1
         assert widget.found_sprites[0] == (offset, quality)
 
-    def test_sprite_count_limits(self, qtbot):
+    def test_sprite_count_limits(self, qtbot, monkeypatch):
         """Test sprite count limits prevent memory leaks"""
+        # Patch constants to smaller values for fast testing (12,100 → ~200 iterations)
+        test_threshold = 100
+        test_target = 50
+        monkeypatch.setattr("ui.components.visualization.rom_map_widget.SPRITE_CLEANUP_THRESHOLD", test_threshold)
+        monkeypatch.setattr("ui.components.visualization.rom_map_widget.SPRITE_CLEANUP_TARGET", test_target)
+
         parent_widget = QWidget()
         qtbot.addWidget(parent_widget)
 
         widget = ROMMapWidget(parent_widget)
         qtbot.addWidget(widget)
 
-        # Add many sprites to test limits
-        for i in range(SPRITE_CLEANUP_THRESHOLD + 100):
+        # Add enough sprites to trigger cleanup (threshold + buffer)
+        for i in range(test_threshold + 100):
             widget.add_found_sprite(0x1000 + i * 32, 1.0)
 
         # Should have cleaned up to around target count (allow small variation)
-        assert len(widget.found_sprites) <= SPRITE_CLEANUP_TARGET + 100
-        assert len(widget.found_sprites) < SPRITE_CLEANUP_THRESHOLD
+        assert len(widget.found_sprites) <= test_target + 100
+        assert len(widget.found_sprites) < test_threshold
 
     def test_cleanup_method(self, qtbot):
         """Test cleanup method clears resources"""
