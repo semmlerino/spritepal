@@ -46,7 +46,11 @@ from PySide6.QtWidgets import (
 
 from core.frame_mapping_project import AIFrame, GameFrame
 from core.mesen_integration.capture_renderer import CaptureRenderer
-from core.services.content_bounds_analyzer import ContentBoundsAnalyzer, compute_tile_centroid
+from core.services.content_bounds_analyzer import (
+    ContentBoundsAnalyzer,
+    compute_tile_centroid,
+    get_content_bbox,
+)
 from core.services.rgb_to_indexed import load_image_preserving_indices
 from core.services.sprite_compositor import TransformParams
 from core.services.tile_sampling_service import TileSamplingService
@@ -1236,7 +1240,7 @@ class WorkbenchCanvas(QWidget):
 
         # Check for content outside tile area using actual tile positions
         # (not just the union bounding box - handles non-rectangular sprites)
-        content_bbox = self._ai_image.getbbox()  # Non-transparent content bounds
+        content_bbox = get_content_bbox(self._ai_image)  # Handles solid backgrounds too
         tile_tuples = [(r.x(), r.y(), r.width(), r.height()) for r in qt_rects]
 
         has_overflow, overflow_rects = self._tile_sampling_service.check_content_outside_tiles(

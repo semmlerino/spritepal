@@ -30,69 +30,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
-from core.services.content_bounds_analyzer import ContentBoundsAnalyzer, compute_tile_centroid
+from core.services.content_bounds_analyzer import (
+    ContentBoundsAnalyzer,
+    compute_tile_centroid,
+    get_content_bbox,
+)
 from core.services.tile_sampling_service import TileSamplingService
-
-
-def get_content_bbox(image: Image.Image) -> tuple[int, int, int, int]:
-    """Get bounding box of actual content in the image.
-
-    Handles both transparent backgrounds (via alpha channel) and solid backgrounds
-    (by detecting background color from corners).
-
-    Args:
-        image: PIL Image to analyze.
-
-    Returns:
-        Bounding box as (left, top, right, bottom).
-    """
-    import numpy as np
-
-    # First try alpha-based detection
-    alpha_bbox = image.getbbox()
-    full_bounds = (0, 0, image.width, image.height)
-
-    # If getbbox returned None or full image bounds, try color-based detection
-    if alpha_bbox is None or alpha_bbox == full_bounds:
-        # Convert to RGB for color analysis
-        rgb_image = image.convert("RGB")
-        pixels = np.array(rgb_image)
-
-        # Sample background color from corners (average of 4 corners)
-        corner_size = min(5, image.width // 10, image.height // 10)
-        corner_size = max(corner_size, 1)
-
-        corners = [
-            pixels[:corner_size, :corner_size],  # top-left
-            pixels[:corner_size, -corner_size:],  # top-right
-            pixels[-corner_size:, :corner_size],  # bottom-left
-            pixels[-corner_size:, -corner_size:],  # bottom-right
-        ]
-        bg_color = np.mean([c.mean(axis=(0, 1)) for c in corners], axis=0)
-
-        # Find pixels that differ significantly from background
-        tolerance = 30  # RGB distance threshold
-        diff = np.sqrt(np.sum((pixels.astype(float) - bg_color) ** 2, axis=2))
-        content_mask = diff > tolerance
-
-        # Find bounding box of content
-        rows_with_content = np.any(content_mask, axis=1)
-        cols_with_content = np.any(content_mask, axis=0)
-
-        if rows_with_content.any() and cols_with_content.any():
-            row_indices = np.where(rows_with_content)[0]
-            col_indices = np.where(cols_with_content)[0]
-            return (
-                int(col_indices[0]),
-                int(row_indices[0]),
-                int(col_indices[-1] + 1),
-                int(row_indices[-1] + 1),
-            )
-
-    if alpha_bbox is not None:
-        return alpha_bbox
-
-    return full_bounds
 
 
 def load_capture(capture_path: Path, selected_entry_ids: list[int] | None = None) -> CaptureResult:

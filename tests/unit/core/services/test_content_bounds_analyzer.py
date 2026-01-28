@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 
-from core.services.content_bounds_analyzer import ContentBoundsAnalyzer
+from core.services.content_bounds_analyzer import ContentBoundsAnalyzer, get_content_bbox
 
 
 class TestComputeCentroid:
@@ -104,3 +104,55 @@ class TestComputeCentroid:
         # Should be treated as fully opaque, centroid at center
         assert abs(centroid_x - 4.5) < 0.01
         assert abs(centroid_y - 4.5) < 0.01
+
+
+class TestGetContentBbox:
+    """Tests for get_content_bbox() function."""
+
+    def test_transparent_background_uses_alpha(self) -> None:
+        """Image with transparent background should use alpha-based bbox."""
+        # 100x100 canvas, transparent background
+        image = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+        # Draw opaque content in center (30-70 x 30-70)
+        for x in range(30, 70):
+            for y in range(30, 70):
+                image.putpixel((x, y), (255, 255, 255, 255))
+
+        bbox = get_content_bbox(image)
+
+        assert bbox == (30, 30, 70, 70)
+
+    def test_solid_background_detects_content(self) -> None:
+        """Image with solid background should detect actual content via color."""
+        # 100x100 canvas with white background
+        image = Image.new("RGB", (100, 100), (255, 255, 255))
+        # Draw dark content in center (30-70 x 30-70)
+        for x in range(30, 70):
+            for y in range(30, 70):
+                image.putpixel((x, y), (50, 50, 50))
+
+        bbox = get_content_bbox(image)
+
+        # Should detect the dark content, not return full bounds
+        assert bbox[0] == 30  # left
+        assert bbox[1] == 30  # top
+        assert bbox[2] == 70  # right
+        assert bbox[3] == 70  # bottom
+
+    def test_empty_image_returns_full_bounds(self) -> None:
+        """Fully transparent image should return full bounds."""
+        image = Image.new("RGBA", (50, 60), (0, 0, 0, 0))
+
+        bbox = get_content_bbox(image)
+
+        # getbbox returns None for transparent, so we fall back to full bounds
+        assert bbox == (0, 0, 50, 60)
+
+    def test_uniform_color_returns_full_bounds(self) -> None:
+        """Uniform solid color image should return full bounds."""
+        image = Image.new("RGB", (50, 60), (128, 128, 128))
+
+        bbox = get_content_bbox(image)
+
+        # No distinguishable content, return full bounds
+        assert bbox == (0, 0, 50, 60)
