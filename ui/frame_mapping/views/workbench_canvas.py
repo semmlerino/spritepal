@@ -46,9 +46,9 @@ from PySide6.QtWidgets import (
 
 from core.frame_mapping_project import AIFrame, GameFrame
 from core.mesen_integration.capture_renderer import CaptureRenderer
+from core.services.alignment_optimizer import AlignmentOptimizer
 from core.services.content_bounds_analyzer import (
     ContentBoundsAnalyzer,
-    compute_tile_centroid,
     get_content_bbox,
 )
 from core.services.rgb_to_indexed import load_image_preserving_indices
@@ -1681,8 +1681,8 @@ class WorkbenchCanvas(QWidget):
     ) -> tuple[int, int, float]:
         """Compute optimal alignment that maximizes AI size without overflow.
 
-        Uses binary search to find the largest scale where AI content fits
-        entirely within tile coverage, with position adjustment.
+        Uses scipy differential evolution to find the largest scale where
+        AI content fits entirely within tile coverage, with optimal positioning.
 
         Args:
             ai_bbox: AI content bounding box (left, top, right, bottom)
@@ -1699,29 +1699,10 @@ class WorkbenchCanvas(QWidget):
         if not tile_rects:
             return (0, 0, 1.0)
 
-        # Get tile coverage bounds
-        tile_min_x = min(x for x, _, _, _ in tile_rects)
-        tile_min_y = min(y for _, y, _, _ in tile_rects)
-        tile_max_x = max(x + w for x, _, w, _ in tile_rects)
-        tile_max_y = max(y + h for _, y, _, h in tile_rects)
-        tile_width = tile_max_x - tile_min_x
-        tile_height = tile_max_y - tile_min_y
-
-        # Compute tile centroid (handles non-contiguous coverage with gaps)
-        tile_centroid_x, tile_centroid_y = compute_tile_centroid(tile_rects)
-
         ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
-        ai_content_width = ai_x2 - ai_x
-        ai_content_height = ai_y2 - ai_y
 
-        if ai_content_width <= 0 or ai_content_height <= 0:
+        if ai_x2 - ai_x <= 0 or ai_y2 - ai_y <= 0:
             return (0, 0, 1.0)
-
-        # Initial scale estimate based on tile coverage
-        scale_x = tile_width / ai_content_width
-        scale_y = tile_height / ai_content_height
-        initial_scale = min(scale_x, scale_y)
-        initial_scale = max(0.01, min(1.0, initial_scale))
 
         # Apply flips to bbox coordinates
         if flip_h:
@@ -1729,94 +1710,26 @@ class WorkbenchCanvas(QWidget):
         if flip_v:
             ai_y, ai_y2 = self._ai_image.height - ai_y2, self._ai_image.height - ai_y
 
-        service = TileSamplingService()
+        # Use scipy-based optimizer for global search
+        optimizer = AlignmentOptimizer(min_scale=0.01, max_scale=1.0)
+        result = optimizer.compute_optimal_alignment(
+            ai_bbox=(ai_x, ai_y, ai_x2, ai_y2),
+            tile_rects=tile_rects,
+        )
 
-        def find_valid_position(scale: float) -> tuple[bool, int, int]:
-            """Find a valid position for AI content at given scale."""
-            scaled_width = ai_content_width * scale
-            scaled_height = ai_content_height * scale
-
-            # Center over tile centroid (not bounding box center) to handle gaps
-            center_offset_x = int(tile_centroid_x - scaled_width / 2 - ai_x * scale)
-            center_offset_y = int(tile_centroid_y - scaled_height / 2 - ai_y * scale)
-
-            # Check if centered position works
-            has_overflow, _ = service.check_content_outside_tiles(
-                (ai_x, ai_y, ai_x2, ai_y2), tile_rects, center_offset_x, center_offset_y, scale
-            )
-            if not has_overflow:
-                return (True, center_offset_x, center_offset_y)
-
-            # Try adjusting position - search in a grid around center
-            # Larger margin to escape gaps (e.g., 8px tile gaps require margin > 4)
-            tile_size = max(tile_rects[0][2], tile_rects[0][3]) if tile_rects else 8
-            margin = max(8, tile_size // 4)
-            max_shift_x = max(abs(int(tile_width - scaled_width)) // 2 + margin, margin)
-            max_shift_y = max(abs(int(tile_height - scaled_height)) // 2 + margin, margin)
-
-            for radius in range(1, max(max_shift_x, max_shift_y) + 1):
-                for dx in range(-radius, radius + 1):
-                    for dy in range(-radius, radius + 1):
-                        if abs(dx) != radius and abs(dy) != radius:
-                            continue
-
-                        test_x = center_offset_x + dx
-                        test_y = center_offset_y + dy
-
-                        has_overflow, _ = service.check_content_outside_tiles(
-                            (ai_x, ai_y, ai_x2, ai_y2), tile_rects, test_x, test_y, scale
-                        )
-                        if not has_overflow:
-                            return (True, test_x, test_y)
-
-            return (False, center_offset_x, center_offset_y)
-
-        # Binary search for maximum scale that fits
-        low = 0.01
-        high = min(initial_scale * 1.1, 1.0)
-        best_scale = low
-        best_offset_x = 0
-        best_offset_y = 0
-
-        # First check if initial scale already fits
-        fits, offset_x, offset_y = find_valid_position(initial_scale)
-        if fits:
-            # Record as current best, then try to find even larger scale
-            best_scale = initial_scale
-            best_offset_x = offset_x
-            best_offset_y = offset_y
-            low = initial_scale
-        else:
-            high = initial_scale
-
-        # Binary search
-        for _ in range(25):
-            mid = (low + high) / 2
-            fits, offset_x, offset_y = find_valid_position(mid)
-
-            if fits:
-                best_scale = mid
-                best_offset_x = offset_x
-                best_offset_y = offset_y
-                low = mid
-            else:
-                high = mid
-
-            if high - low < 0.0005:
-                break
-
-        # Verify final result
-        fits, final_x, final_y = find_valid_position(best_scale)
-        if fits:
+        if result.success:
             logger.debug(
-                "Optimal alignment: scale=%.4f, offset=(%d, %d)",
-                best_scale,
-                final_x,
-                final_y,
+                "Scipy optimal alignment: scale=%.4f, offset=(%d, %d), iterations=%d",
+                result.scale,
+                result.offset_x,
+                result.offset_y,
+                result.iterations,
             )
-            return (final_x, final_y, best_scale)
+            return (result.offset_x, result.offset_y, result.scale)
 
-        return (best_offset_x, best_offset_y, best_scale)
+        # Fallback: return centered position at minimum scale
+        logger.warning("Scipy optimization failed, using fallback")
+        return (result.offset_x, result.offset_y, result.scale)
 
     def _on_auto_align(self) -> None:
         """Handle auto-align button click.
