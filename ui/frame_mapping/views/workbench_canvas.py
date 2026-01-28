@@ -465,7 +465,7 @@ class WorkbenchCanvas(QWidget):
         self._scale_slider = QSlider(Qt.Orientation.Horizontal)
         self._scale_slider.setRange(10, 1000)  # 0.01 to 1.0 with 0.001 precision
         self._scale_slider.setValue(1000)
-        self._scale_slider.setMaximumWidth(80)
+        self._scale_slider.setMaximumWidth(150)
         controls1.addWidget(self._scale_slider)
 
         self._scale_value = QLabel("1.00x")
@@ -1598,7 +1598,6 @@ class WorkbenchCanvas(QWidget):
 
         return tile_rects
 
-
     def _find_non_overflowing_position(
         self,
         ai_bbox: tuple[int, int, int, int],
@@ -1667,9 +1666,7 @@ class WorkbenchCanvas(QWidget):
                     test_x = initial_offset_x + dx
                     test_y = initial_offset_y + dy
 
-                    has_overflow, _ = service.check_content_outside_tiles(
-                        ai_bbox, tile_rects, test_x, test_y, scale
-                    )
+                    has_overflow, _ = service.check_content_outside_tiles(ai_bbox, tile_rects, test_x, test_y, scale)
                     if not has_overflow:
                         return (test_x, test_y, True)
 
