@@ -212,7 +212,7 @@ class AIFrameItem(QGraphicsObject):
 
     def set_scale_factor(self, scale: float) -> None:
         """Set the uniform scale factor."""
-        scale = max(0.1, min(1.0, scale))
+        scale = max(0.01, min(1.0, scale))
         if abs(scale - self._scale_factor) > 0.001:
             self.prepareGeometryChange()
             self._scale_factor = scale
@@ -422,7 +422,7 @@ class AIFrameItem(QGraphicsObject):
             delta: Scale change (e.g., 0.05 for +5%, -0.05 for -5%)
         """
         new_scale = self._scale_factor + delta
-        new_scale = max(0.1, min(1.0, new_scale))
+        new_scale = max(0.01, min(1.0, new_scale))
 
         if abs(new_scale - self._scale_factor) < 0.001:
             return
