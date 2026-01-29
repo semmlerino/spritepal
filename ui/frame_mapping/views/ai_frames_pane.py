@@ -935,3 +935,15 @@ class AIFramesPane(QWidget):
             self._suppress_tab_signal = False
         # Emit signal for the new empty tab
         self.tab_folder_changed.emit(None)
+
+    # -------------------------------------------------------------------------
+    # Cleanup
+    # -------------------------------------------------------------------------
+
+    def cleanup(self) -> None:
+        """Shut down async services and release resources.
+
+        Called during application close to properly stop background threads
+        before Qt objects are destroyed.
+        """
+        self._thumbnail_loader.cancel()

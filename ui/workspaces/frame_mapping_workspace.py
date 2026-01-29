@@ -1803,3 +1803,4 @@ class FrameMappingWorkspace(QWidget):
         """Cleanup resources."""
         logger.debug("FrameMappingWorkspace cleanup")
         self._alignment_canvas.cleanup()
+        self._ai_frames_pane.cleanup()
