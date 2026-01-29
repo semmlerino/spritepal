@@ -471,8 +471,8 @@ class WorkbenchCanvas(QWidget):
         self._scale_slider = QSlider(Qt.Orientation.Horizontal)
         self._scale_slider.setRange(10, 1000)  # 0.01 to 1.0 with 0.001 precision
         self._scale_slider.setValue(1000)
-        self._scale_slider.setMaximumWidth(150)
-        controls1.addWidget(self._scale_slider)
+        self._scale_slider.setMinimumWidth(150)
+        controls1.addWidget(self._scale_slider, 1)  # stretch factor 1 to fill space
 
         self._scale_value = QLabel("1.00x")
         self._scale_value.setStyleSheet("font-size: 11px;")
