@@ -956,18 +956,15 @@ class FrameMappingWorkspace(QWidget):
         Args:
             ai_frame_id: AI frame ID (filename)
         """
+        # remove_mapping() emits mapping_removed signal which triggers _on_mapping_removed()
+        # That handler already does: map button state, AI frame status, game frame link status,
+        # and mapping panel row clear. We only need the canvas/state cleanup here.
         self._controller.remove_mapping(ai_frame_id)
-        self._refresh_mapping_status()
-        self._refresh_game_frame_link_status()
-        self._mapping_panel.refresh()  # Refresh table after mapping removal
         self._alignment_canvas.clear_alignment()
-        # Phase 3c fix: Clear game frame from canvas and update map button
         self._alignment_canvas.set_game_frame(None)
         self._captures_pane.clear_selection()
-        # Phase 3c fix: Clear selected game ID and update Map button
         self._state.selected_game_id = None
         self._state.current_canvas_game_id = None
-        self._update_map_button_state()
 
     def _on_row_reorder_requested(self, ai_frame_id: str, target_index: int) -> None:
         """Handle row reorder request from mapping panel drag/drop.
@@ -1290,8 +1287,9 @@ class FrameMappingWorkspace(QWidget):
         if self._message_service:
             self._message_service.show_message(f"Injection successful for frame {ai_frame_id}")
 
-        self._refresh_mapping_status()
-        self._mapping_panel.refresh()  # Refresh table to show updated status (preserves selection)
+        # Use targeted updates instead of full refresh (avoids regenerating all thumbnails)
+        self._update_single_ai_frame_status(ai_frame_id)
+        self._mapping_panel.update_row_status(ai_frame_id, "injected")
 
     def _on_stale_entries_warning(self, frame_id: str) -> None:
         """Handle stale entry ID warning from controller.
