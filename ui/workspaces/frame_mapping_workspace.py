@@ -1802,3 +1802,4 @@ class FrameMappingWorkspace(QWidget):
     def cleanup(self) -> None:
         """Cleanup resources."""
         logger.debug("FrameMappingWorkspace cleanup")
+        self._alignment_canvas.cleanup()

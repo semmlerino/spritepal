@@ -2398,3 +2398,16 @@ class WorkbenchCanvas(QWidget):
             self._selected_tile_label.setText(f"0x{rom_offset:06X}")
         else:
             self._selected_tile_label.setText(f"#{self._selected_tile_index}")
+
+    # -------------------------------------------------------------------------
+    # Cleanup
+    # -------------------------------------------------------------------------
+
+    def cleanup(self) -> None:
+        """Shut down async services and release resources.
+
+        Called during application close to properly stop background threads
+        before Qt objects are destroyed.
+        """
+        self._async_preview_service.shutdown()
+        self._async_highlight_service.shutdown()
