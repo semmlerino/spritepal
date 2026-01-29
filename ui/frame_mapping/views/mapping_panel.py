@@ -564,6 +564,53 @@ class MappingPanel(QWidget):
                     status_item.setForeground(QBrush(color))
                 break
 
+    def clear_row_mapping(self, ai_frame_id: str) -> None:
+        """Clear mapping data from a row without full refresh.
+
+        Used when a mapping is removed - much faster than refresh() as it
+        doesn't regenerate any thumbnails.
+
+        Args:
+            ai_frame_id: AI frame ID (filename) to clear mapping for
+        """
+        # Find the row for this AI frame by ID
+        for row in range(self._table.rowCount()):
+            checkbox_item = self._table.item(row, 0)
+            if checkbox_item is not None and checkbox_item.data(Qt.ItemDataRole.UserRole + 1) == ai_frame_id:
+                # Clear Game Frame column (3) - text and icon
+                game_item = self._table.item(row, 3)
+                if game_item is not None:
+                    game_item.setText("—")
+                    game_item.setIcon(QIcon())
+
+                # Clear Offset column (4)
+                offset_item = self._table.item(row, 4)
+                if offset_item is not None:
+                    offset_item.setText("—")
+
+                # Clear Flip column (5)
+                flip_item = self._table.item(row, 5)
+                if flip_item is not None:
+                    flip_item.setText("—")
+
+                # Update Status column (6) to unmapped
+                status_item = self._table.item(row, 6)
+                if status_item is not None:
+                    status_item.setText("○ Unmapped")
+                    color = get_status_color("unmapped")
+                    status_item.setForeground(QBrush(color))
+
+                break
+
+        # Update status label count
+        if self._project is not None:
+            mapped = self._project.mapped_count
+            total = self._project.total_ai_frames
+            self._status_label.setText(f"{mapped}/{total} mapped")
+
+        # Update inject selected button state
+        self._update_inject_selected_state()
+
     def move_row(self, from_index: int, to_index: int) -> None:
         """Move a row from one position to another without full refresh.
 

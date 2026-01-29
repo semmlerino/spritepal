@@ -529,8 +529,8 @@ class FrameMappingWorkspace(QWidget):
         self._update_single_ai_frame_status(ai_frame_id)
         # Must use full refresh for captures - we don't know which game frame was unlinked
         self._refresh_game_frame_link_status()
-        # Mapping panel needs full refresh since row structure may change
-        self._mapping_panel.refresh()
+        # Use targeted clear instead of full refresh (avoids regenerating all thumbnails)
+        self._mapping_panel.clear_row_mapping(ai_frame_id)
 
         # Clear browsing mode if the removed mapping was for the selected AI frame
         # When a mapping is removed, there's nothing to "browse away from"
