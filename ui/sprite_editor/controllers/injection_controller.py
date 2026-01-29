@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QFileDialog
 
 from core.rom_injector import ROMInjector
+from core.services.worker_lifecycle import WorkerManager
 from ui.common.signal_utils import safe_disconnect
 
 from ..services import ImageConverter
@@ -76,13 +77,11 @@ class InjectionController(QObject):
         return self._rom_injector
 
     def _cleanup_worker(self) -> None:
-        """Clean up existing worker before creating new one."""
-        if self._worker is not None:
-            safe_disconnect(self._worker.progress)
-            safe_disconnect(self._worker.error)
-            safe_disconnect(self._worker.result)
-            safe_disconnect(self._worker.finished_signal)
-            self._worker = None
+        """Clean up existing worker before creating new one.
+
+        Uses WorkerManager to properly stop running threads and clean up resources.
+        """
+        WorkerManager.cleanup_worker_attr(self, "_worker")
 
     def cleanup(self) -> None:
         """Clean up resources before destruction."""

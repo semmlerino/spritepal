@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QFileDialog
 
+from core.services.worker_lifecycle import WorkerManager
 from ui.common.signal_utils import safe_disconnect
 
 from ..services import SpriteRenderer
@@ -72,20 +73,15 @@ class ExtractionController(QObject):
         return self._mode
 
     def _cleanup_worker(self) -> None:
-        """Clean up existing workers before creating new ones."""
-        if self._worker is not None:
-            safe_disconnect(self._worker.progress)
-            safe_disconnect(self._worker.error)
-            safe_disconnect(self._worker.result)
-            safe_disconnect(self._worker.finished_signal)
-            self._worker = None
+        """Clean up existing workers before creating new ones.
 
-        if self._multi_worker is not None:
-            safe_disconnect(self._multi_worker.progress)
-            safe_disconnect(self._multi_worker.error)
-            safe_disconnect(self._multi_worker.result)
-            safe_disconnect(self._multi_worker.finished_signal)
-            self._multi_worker = None
+        Uses WorkerManager to properly stop running threads and clean up resources.
+        """
+        # Stop and clean up extraction worker
+        WorkerManager.cleanup_worker_attr(self, "_worker")
+
+        # Stop and clean up multi-palette worker
+        WorkerManager.cleanup_worker_attr(self, "_multi_worker")
 
     def cleanup(self) -> None:
         """Clean up resources before destruction."""

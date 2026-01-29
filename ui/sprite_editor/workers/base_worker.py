@@ -14,7 +14,13 @@ logger = get_logger(__name__)
 
 
 class BaseWorker(QThread):
-    """Base class for worker threads with common signals and error handling."""
+    """Base class for worker threads with common signals and error handling.
+
+    This class provides:
+    - Standard signal interface (progress, error, finished_signal)
+    - Cancellation support (via cancel() method)
+    - Auto-registration with WorkerManager for cleanup on app shutdown
+    """
 
     progress = Signal(int, str)  # Progress percentage (0-100), message
     error = Signal(str)  # Error message
@@ -38,13 +44,25 @@ class BaseWorker(QThread):
         if file_path is not None:
             self._file_path = Path(file_path) if not isinstance(file_path, Path) else file_path
 
+        # Auto-register with WorkerManager for cleanup_all() on app shutdown
+        from core.services.worker_lifecycle import WorkerManager
+
+        WorkerManager._register_worker(self)
+
     def cancel(self) -> None:
-        """Request cancellation of the worker thread."""
+        """Request cancellation of the worker thread.
+
+        Uses both internal flag and Qt's requestInterruption() for robust cancellation.
+        """
         self._is_cancelled = True
+        self.requestInterruption()
 
     def is_cancelled(self) -> bool:
-        """Check if cancellation was requested."""
-        return self._is_cancelled
+        """Check if cancellation was requested via any mechanism.
+
+        Returns True if cancel() was called OR if Qt's requestInterruption() was called.
+        """
+        return self._is_cancelled or self.isInterruptionRequested()
 
     @property
     def file_path(self) -> Path | None:
