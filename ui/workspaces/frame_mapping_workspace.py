@@ -372,7 +372,8 @@ class FrameMappingWorkspace(QWidget):
         self._mapping_panel.inject_mapping_requested.connect(self._on_inject_single)
         self._mapping_panel.inject_selected_requested.connect(self._on_inject_selected)
         self._mapping_panel.row_reorder_requested.connect(self._on_row_reorder_requested)
-        self._controller.ai_frames_reordered.connect(self._on_ai_frames_reordered)
+        self._controller.ai_frame_moved.connect(self._on_ai_frame_moved)
+        self._controller.ai_frame_added.connect(self._on_ai_frame_added)
 
         # Alignment Canvas signals
         self._alignment_canvas.alignment_changed.connect(self._on_alignment_changed)
@@ -977,19 +978,46 @@ class FrameMappingWorkspace(QWidget):
         """
         self._controller.reorder_ai_frame(ai_frame_id, target_index)
 
-    def _on_ai_frames_reordered(self) -> None:
-        """Handle AI frames reordered signal from controller."""
+    def _on_ai_frame_moved(self, ai_frame_id: str, from_index: int, to_index: int) -> None:
+        """Handle AI frame moved signal from controller.
+
+        Uses targeted move_row/move_item instead of full refresh for performance.
+
+        Args:
+            ai_frame_id: ID of the moved frame
+            from_index: Original position
+            to_index: New position
+        """
+        # Use targeted move methods instead of full refresh
+        self._ai_frames_pane.move_item(from_index, to_index)
+        self._mapping_panel.move_row(from_index, to_index)
+
+        # Update state to track the moved frame
+        self._state.selected_ai_frame_id = ai_frame_id
+
+    def _on_ai_frame_added(self, ai_frame_id: str) -> None:
+        """Handle single AI frame added signal from controller.
+
+        Uses targeted add methods instead of full refresh for performance.
+
+        Args:
+            ai_frame_id: ID of the added frame
+        """
         project = self._controller.project
         if project is None:
             return
-        # Refresh AI frames pane with new order
-        self._ai_frames_pane.set_ai_frames(project.ai_frames)
-        # Refresh mapping panel (table)
-        self._mapping_panel.refresh()
-        # Re-select the row that was moved (if known from current selection)
-        selected_id = self._state.selected_ai_frame_id
-        if selected_id:
-            self._mapping_panel.select_row_by_ai_id(selected_id)
+
+        # Find the newly added frame
+        frame = project.get_ai_frame_by_id(ai_frame_id)
+        if frame is None:
+            return
+
+        # Use targeted add methods instead of full refresh
+        self._ai_frames_pane.add_single_item(frame)
+        self._mapping_panel.add_row(frame)
+
+        # Update mapping status (frame is unmapped by default)
+        self._refresh_mapping_status()
 
     def _on_inject_single(self, ai_frame_id: str) -> None:
         """Handle inject single mapping request.

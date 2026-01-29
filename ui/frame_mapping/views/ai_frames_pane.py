@@ -680,6 +680,109 @@ class AIFramesPane(QWidget):
         # A more optimized approach would update only the affected item
         self._refresh_list(is_frame_list_change=False)
 
+    def move_item(self, from_index: int, to_index: int) -> None:
+        """Move an item in the list without regenerating thumbnails.
+
+        This is much faster than set_ai_frames() + full refresh as it only
+        moves Qt list items rather than rebuilding everything.
+
+        Args:
+            from_index: Current item position (0-based)
+            to_index: Target item position (0-based)
+        """
+        if from_index == to_index:
+            return
+
+        item_count = self._list.count()
+        if from_index < 0 or from_index >= item_count:
+            return
+        if to_index < 0 or to_index >= item_count:
+            return
+
+        self._list.blockSignals(True)
+        try:
+            # Take the item from its current position
+            item = self._list.takeItem(from_index)
+            if item is None:  # type: ignore[reportUnnecessaryComparison]
+                return
+
+            # Insert at the new position
+            self._list.insertItem(to_index, item)
+
+            # Select the moved item
+            self._list.setCurrentRow(to_index)
+        finally:
+            self._list.blockSignals(False)
+
+    def add_single_item(self, frame: AIFrame) -> None:
+        """Add a single AI frame to the list without full refresh.
+
+        This is much faster than set_ai_frames() as it only adds one item
+        and requests one thumbnail, rather than rebuilding everything.
+
+        Args:
+            frame: The AIFrame to add
+        """
+        # Add to our internal list
+        self._ai_frames.append(frame)
+
+        # Check filters - skip if filtered out
+        status = self._mapping_status.get(frame.id, "unmapped")
+
+        if self._show_unmapped_only and status != "unmapped":
+            # Frame is filtered out, just update count
+            self._update_count_label()
+            return
+
+        if self._tag_filter and self._tag_filter not in frame.tags:
+            # Frame is filtered out, just update count
+            self._update_count_label()
+            return
+
+        if self._search_text:
+            search_target = frame.name.lower()
+            if self._search_text not in search_target and self._search_text not in frame.path.name.lower():
+                # Frame is filtered out, just update count
+                self._update_count_label()
+                return
+
+        # Create list item (same logic as _refresh_list)
+        item = QListWidgetItem()
+        status_indicator = "●" if status != "unmapped" else "○"
+        display_text = frame.name
+
+        if frame.tags:
+            tag_str = " ".join(f"[{t}]" for t in sorted(frame.tags))
+            display_text = f"{display_text}  {tag_str}"
+
+        item.setText(f"{status_indicator} {display_text}")
+
+        if frame.display_name:
+            item.setToolTip(f"File: {frame.path.name}")
+
+        item.setData(Qt.ItemDataRole.UserRole, frame.id)
+        item.setData(Qt.ItemDataRole.UserRole + 1, frame.index)
+
+        color = get_status_color(status)
+        item.setForeground(QBrush(color))
+
+        self._list.addItem(item)
+
+        # Request thumbnail for async loading
+        self._thumbnail_loader.load_thumbnails([(frame.id, frame.path)], self._sheet_palette, THUMBNAIL_SIZE)
+
+        # Update count label
+        self._update_count_label()
+
+    def _update_count_label(self) -> None:
+        """Update the count label based on current filter state."""
+        total_count = len(self._ai_frames)
+        if self._show_unmapped_only or self._search_text or self._tag_filter:
+            visible_count = self._list.count()
+            self._count_label.setText(f"{visible_count}/{total_count}")
+        else:
+            self._count_label.setText(f"{total_count} frame{'s' if total_count != 1 else ''}")
+
     # ─── Drag and Drop ────────────────────────────────────────────────────────
 
     @override

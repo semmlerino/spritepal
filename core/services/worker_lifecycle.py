@@ -162,18 +162,26 @@ class WorkerManager:
                 "to avoid Qt corruption. Consider reviewing worker cancellation logic."
             )
 
-        # Additional wait to ensure thread has fully exited
-        # This helps prevent thread leak detection from seeing the thread
-        if worker.isFinished():
-            # Thread has signaled finished, wait a bit more for complete cleanup
-            worker.wait(50)  # Extra 50ms to ensure thread exit is complete
-
         # Remove from registry
         WorkerManager._worker_registry.discard(worker)
 
-        # Schedule for deletion regardless of shutdown success
-        worker.deleteLater()
-        logger.debug(f"{worker_name}: Scheduled for deletion")
+        # CRITICAL: Only schedule for deletion if thread has actually stopped.
+        # Calling deleteLater on a still-running thread can cause crashes
+        # when the thread tries to access the deleted object.
+        # We trust stopped_cleanly (return value of wait()) as the authoritative
+        # signal that the thread has stopped. If wait() returned True, the thread
+        # is definitely stopped.
+        if stopped_cleanly:
+            # Additional wait to ensure thread has fully exited
+            if worker.isFinished():
+                worker.wait(50)  # Extra 50ms to ensure thread exit is complete
+            worker.deleteLater()
+            logger.debug(f"{worker_name}: Scheduled for deletion")
+        else:
+            logger.warning(
+                f"{worker_name}: NOT scheduling for deletion - thread did not stop cleanly. "
+                "This may leak memory but prevents potential crash."
+            )
 
         return stopped_cleanly
 

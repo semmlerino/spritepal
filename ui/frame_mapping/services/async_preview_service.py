@@ -280,3 +280,4 @@ class AsyncPreviewService(QObject):
     def shutdown(self) -> None:
         """Shutdown the service and clean up resources."""
         self._cancel_current()
+        self._destroyed = True

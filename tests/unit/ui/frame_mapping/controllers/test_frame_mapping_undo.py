@@ -472,10 +472,10 @@ class TestReorderAIFrameUndo:
         assert not populated_controller.can_undo()
 
     def test_reorder_emits_signal(self, populated_controller: FrameMappingController, qtbot: object) -> None:
-        """Reordering emits ai_frames_reordered signal."""
+        """Reordering emits ai_frame_moved signal."""
         from pytestqt.qtbot import QtBot
 
         assert isinstance(qtbot, QtBot)
 
-        with qtbot.waitSignal(populated_controller.ai_frames_reordered, timeout=1000):
+        with qtbot.waitSignal(populated_controller.ai_frame_moved, timeout=1000):
             populated_controller.reorder_ai_frame("sprite_01.png", 1)

@@ -34,12 +34,11 @@ class TestAsyncPreviewServiceBasics:
     """Basic functionality tests for AsyncPreviewService."""
 
     def test_service_creates_without_error(self, service: AsyncPreviewService) -> None:
-        """Service should create with proper initial state."""
+        """Service should create with proper initial state (lazy initialization)."""
         assert service is not None
-        # Verify worker and thread are properly initialized
-        assert service._worker is not None, "Worker should be created"
-        assert service._thread is not None, "Thread should be created"
-        assert service._thread.isRunning(), "Thread should be started during initialization"
+        # Service uses lazy initialization - worker/thread created on first request
+        assert service._worker is None, "Worker should be None before first request (lazy init)"
+        assert service._thread is None, "Thread should be None before first request (lazy init)"
         assert service._current_request_id == 0, "Request ID should start at 0"
         assert not service._destroyed, "Service should not be marked destroyed initially"
 
@@ -138,8 +137,7 @@ class TestAsyncPreviewWithMockData:
         # Verify cancellation behavior:
         # 1. Only one result should be emitted (last request)
         assert len(results) == 1, (
-            f"Expected exactly 1 result (only last request should complete), "
-            f"got {len(results)} results"
+            f"Expected exactly 1 result (only last request should complete), got {len(results)} results"
         )
 
         # 2. The result should be from the last request (display_scale=4)

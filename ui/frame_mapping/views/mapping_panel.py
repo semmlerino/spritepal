@@ -43,7 +43,7 @@ from ui.frame_mapping.views.status_colors import get_status_color
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.frame_mapping_project import FrameMappingProject, SheetPalette
+    from core.frame_mapping_project import AIFrame, FrameMappingProject, SheetPalette
 
 logger = get_logger(__name__)
 
@@ -564,6 +564,139 @@ class MappingPanel(QWidget):
                     status_item.setForeground(QBrush(color))
                 break
 
+    def move_row(self, from_index: int, to_index: int) -> None:
+        """Move a row from one position to another without full refresh.
+
+        This is much faster than calling refresh() as it only moves Qt items
+        rather than regenerating all thumbnails.
+
+        Args:
+            from_index: Current row position (0-based)
+            to_index: Target row position (0-based)
+        """
+        if from_index == to_index:
+            return
+
+        row_count = self._table.rowCount()
+        if from_index < 0 or from_index >= row_count:
+            return
+        if to_index < 0 or to_index >= row_count:
+            return
+
+        self._table.blockSignals(True)
+        try:
+            # Collect all items from the source row
+            col_count = self._table.columnCount()
+            items: list[QTableWidgetItem | None] = []
+            for col in range(col_count):
+                # takeItem removes and returns the item
+                items.append(self._table.takeItem(from_index, col))
+
+            # Remove the source row
+            self._table.removeRow(from_index)
+
+            # Insert a new row at target position
+            self._table.insertRow(to_index)
+
+            # Place items in the new row
+            for col, item in enumerate(items):
+                if item is not None:
+                    self._table.setItem(to_index, col, item)
+
+            # Update row number column for all affected rows
+            # The row number display (# column) should reflect the new order
+            start = min(from_index, to_index)
+            end = max(from_index, to_index)
+            for row in range(start, end + 1):
+                num_item = self._table.item(row, 1)  # # column is index 1
+                if num_item:
+                    num_item.setText(str(row + 1))
+                # Also update the index stored in UserRole for checkbox column
+                checkbox_item = self._table.item(row, 0)
+                if checkbox_item:
+                    checkbox_item.setData(Qt.ItemDataRole.UserRole, row)
+                # And the AI frame item
+                ai_item = self._table.item(row, 2)
+                if ai_item:
+                    ai_item.setData(Qt.ItemDataRole.UserRole, row)
+
+            # Select the moved row
+            self._table.selectRow(to_index)
+        finally:
+            self._table.blockSignals(False)
+
+    def add_row(self, ai_frame: AIFrame) -> None:
+        """Add a single row for a new AI frame without full refresh.
+
+        This is much faster than refresh() as it only creates one row
+        and generates one thumbnail, rather than rebuilding everything.
+
+        Args:
+            ai_frame: The AIFrame to add a row for
+        """
+        if self._project is None:
+            return
+
+        self._table.blockSignals(True)
+        try:
+            row = self._table.rowCount()
+            self._table.insertRow(row)
+
+            # Checkbox column (column 0)
+            checkbox_item = QTableWidgetItem()
+            checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+            # New frames default to unchecked
+            checkbox_item.setCheckState(Qt.CheckState.Unchecked)
+            checkbox_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
+            checkbox_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
+            self._table.setItem(row, 0, checkbox_item)
+
+            # # column (row number) - column 1
+            num_item = QTableWidgetItem(str(ai_frame.index + 1))
+            num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._table.setItem(row, 1, num_item)
+
+            # AI Frame column with thumbnail - column 2
+            ai_item = QTableWidgetItem(ai_frame.path.name)
+            ai_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
+            ai_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
+            # Load thumbnail
+            thumbnail = create_quantized_thumbnail(ai_frame.path, self._sheet_palette, THUMBNAIL_SIZE)
+            if thumbnail is not None:
+                ai_item.setIcon(QIcon(thumbnail))
+            self._table.setItem(row, 2, ai_item)
+
+            # Game Frame column - column 3 (unmapped)
+            game_item = QTableWidgetItem("—")
+            self._table.setItem(row, 3, game_item)
+
+            # Offset column - column 4 (unmapped)
+            offset_item = QTableWidgetItem("—")
+            offset_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._table.setItem(row, 4, offset_item)
+
+            # Flip column - column 5 (unmapped)
+            flip_item = QTableWidgetItem("—")
+            flip_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._table.setItem(row, 5, flip_item)
+
+            # Status column - column 6 (unmapped)
+            status_item = QTableWidgetItem("○ Unmapped")
+            color = get_status_color("unmapped")
+            status_item.setForeground(QBrush(color))
+            self._table.setItem(row, 6, status_item)
+
+            # Update status summary
+            mapped = self._project.mapped_count
+            total = self._project.total_ai_frames
+            self._status_label.setText(f"{mapped}/{total} mapped")
+
+        finally:
+            self._table.blockSignals(False)
+
+        # Update inject selected button state
+        self._update_inject_selected_state()
+
     def clear_selection(self) -> None:
         """Clear the current table selection.
 
@@ -667,7 +800,48 @@ class MappingPanel(QWidget):
             inject_action = menu.addAction("Inject to ROM")
             inject_action.triggered.connect(partial(self.inject_mapping_requested.emit, ai_frame_id))
 
+        # Row reordering options
+        menu.addSeparator()
+        row_count = self._table.rowCount()
+
+        move_up_action = menu.addAction("Move Up")
+        move_up_action.triggered.connect(partial(self._move_row_relative, ai_frame_id, -1))
+        move_up_action.setEnabled(row > 0)
+
+        move_down_action = menu.addAction("Move Down")
+        move_down_action.triggered.connect(partial(self._move_row_relative, ai_frame_id, 1))
+        move_down_action.setEnabled(row < row_count - 1)
+
+        move_to_top_action = menu.addAction("Send to Top")
+        move_to_top_action.triggered.connect(partial(self._move_row_to_index, ai_frame_id, 0))
+        move_to_top_action.setEnabled(row > 0)
+
         menu.exec(self._table.viewport().mapToGlobal(pos))
+
+    def _move_row_relative(self, ai_frame_id: str, direction: int) -> None:
+        """Move row up (-1) or down (+1) relative to current position.
+
+        Args:
+            ai_frame_id: ID of the AI frame to move
+            direction: -1 for up, +1 for down
+        """
+        # Find current row for this AI frame
+        for row in range(self._table.rowCount()):
+            checkbox_item = self._table.item(row, 0)
+            if checkbox_item and checkbox_item.data(Qt.ItemDataRole.UserRole + 1) == ai_frame_id:
+                new_row = row + direction
+                if 0 <= new_row < self._table.rowCount():
+                    self.row_reorder_requested.emit(ai_frame_id, new_row)
+                break
+
+    def _move_row_to_index(self, ai_frame_id: str, target_index: int) -> None:
+        """Move row to a specific index.
+
+        Args:
+            ai_frame_id: ID of the AI frame to move
+            target_index: Target index (0-based)
+        """
+        self.row_reorder_requested.emit(ai_frame_id, target_index)
 
     def _drag_enter_event(self, event: QDragEnterEvent) -> None:
         """Handle drag enter event."""

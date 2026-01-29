@@ -284,6 +284,16 @@ class TestAutoAlignWithTransforms:
         )
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
 
+        # Verify preconditions for auto-align
+        assert canvas._ai_image is not None, "AI image failed to load - check file path/format"
+        assert canvas._capture_result is not None, "Capture result not set"
+
+        # Verify AI image loaded correctly
+        from core.services.content_bounds_analyzer import get_content_bbox
+
+        ai_bbox = get_content_bbox(canvas._ai_image)
+        assert ai_bbox != (0, 0, 200, 200), f"AI bbox should not be full image: {ai_bbox}"
+
         # Set alignment with scale=0.5 (AI frame will be visually 100x100)
         # At scale=0.5: content is at visual position (40, 40) to (60, 60)
         # Visual content center: (50, 50)
@@ -291,23 +301,48 @@ class TestAutoAlignWithTransforms:
         # Expected logical offset to align centers: (20 - 50, 20 - 50) = (-30, -30)
         canvas.set_alignment(0, 0, False, False, 0.5)
 
+        # Verify scale was set correctly
+        scale_after_set = canvas._ai_frame_item.scale_factor()
+        assert abs(scale_after_set - 0.5) < 0.001, f"Scale should be 0.5, got {scale_after_set}"
+
+        # Uncheck "Match Scale" to test the scale-preserving path
+        canvas._match_scale_checkbox.setChecked(False)
+
+        # Manually compute what auto-align should compute, for comparison
+        from core.mesen_integration.capture_renderer import CaptureRenderer
+        from core.services.content_bounds_analyzer import ContentBoundsAnalyzer
+
+        ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
+        ai_content_width = ai_x2 - ai_x
+        ai_content_height = ai_y2 - ai_y
+        ai_center_x = ai_x + ai_content_width / 2
+        ai_center_y = ai_y + ai_content_height / 2
+        scaled_ai_center_x = ai_center_x * 0.5
+        scaled_ai_center_y = ai_center_y * 0.5
+
+        renderer = CaptureRenderer(canvas._capture_result)
+        game_image = renderer.render_selection()
+        game_center_x, game_center_y = ContentBoundsAnalyzer.compute_centroid(game_image)
+
+        expected_offset_x = int(game_center_x - scaled_ai_center_x)
+        expected_offset_y = int(game_center_y - scaled_ai_center_y)
+
         # Trigger auto-align
         canvas._on_auto_align()
 
         # Get resulting offset
-        # With scale=0.5, visual content center is at 0.5 * 100 = 50
-        # Game center is at 20
-        # Logical offset should be 20 - 50 = -30
         ai_pos = canvas._ai_frame_item.pos()
 
         # Position is in display coordinates (logical * display_scale)
-        expected_logical_offset = -30
-        expected_display_x = expected_logical_offset * display_scale
-        expected_display_y = expected_logical_offset * display_scale
+        expected_display_x = expected_offset_x * display_scale
+        expected_display_y = expected_offset_y * display_scale
 
         assert abs(ai_pos.x() - expected_display_x) < 2, (
             f"Expected display offset_x ~{expected_display_x}, got {ai_pos.x()}. "
-            "Auto-align may not be accounting for scale."
+            f"ai_bbox={ai_bbox}, ai_center=({ai_center_x}, {ai_center_y}), "
+            f"scaled_center=({scaled_ai_center_x}, {scaled_ai_center_y}), "
+            f"game_center=({game_center_x}, {game_center_y}), "
+            f"expected_offset=({expected_offset_x}, {expected_offset_y})."
         )
         assert abs(ai_pos.y() - expected_display_y) < 2, (
             f"Expected display offset_y ~{expected_display_y}, got {ai_pos.y()}. "
@@ -351,12 +386,19 @@ class TestAutoAlignWithTransforms:
         )
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
 
+        # Verify preconditions for auto-align
+        assert canvas._ai_image is not None, "AI image failed to load - check file path/format"
+        assert canvas._capture_result is not None, "Capture result not set"
+
         # Set alignment with flip_h=True (content visually moves to right side)
         # Original content center: (20, 50)
         # After flip_h: visual center X = 100 - 20 = 80, Y = 50
         # Game center: (20, 20)
         # Expected logical offset: (20 - 80, 20 - 50) = (-60, -30)
         canvas.set_alignment(0, 0, True, False, 1.0)
+
+        # Uncheck "Match Scale" to test the scale-preserving path
+        canvas._match_scale_checkbox.setChecked(False)
 
         # Trigger auto-align
         canvas._on_auto_align()

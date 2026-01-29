@@ -85,7 +85,8 @@ class FrameMappingController(QObject):
     # AI Frame Organization signals (V4)
     frame_renamed = Signal(str)  # ai_frame_id - display name changed
     frame_tags_changed = Signal(str)  # ai_frame_id - tags changed
-    ai_frames_reordered = Signal()  # Emitted when AI frames are reordered
+    ai_frame_moved = Signal(str, int, int)  # (ai_frame_id, from_index, to_index)
+    ai_frame_added = Signal(str)  # ai_frame_id - Emitted when a single AI frame is added
     # Capture Organization signals
     capture_renamed = Signal(str)  # game_frame_id - display name changed
     # Preview cache signal - emitted when a preview is regenerated (mtime/entries changed)
@@ -370,7 +371,8 @@ class FrameMappingController(QObject):
         self._project.add_ai_frame(frame)  # type: ignore[union-attr]
 
         self.ai_frames_loaded.emit(len(self._project.ai_frames))  # type: ignore[union-attr]
-        self.project_changed.emit()
+        # Emit targeted signal instead of project_changed to avoid full refresh
+        self.ai_frame_added.emit(frame.id)
         logger.info("Added AI frame: %s", file_path)
         return True
 
@@ -1078,9 +1080,25 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
+        # Find current index before reordering
+        old_index = -1
+        for i, frame in enumerate(self._project.ai_frames):
+            if frame.id == ai_frame_id:
+                old_index = i
+                break
+
+        if old_index == -1:
+            return False
+
         if self._project.reorder_ai_frame(ai_frame_id, new_index):
-            self.ai_frames_reordered.emit()
-            logger.info("Reordered AI frame %s to index %d", ai_frame_id, new_index)
+            # Emit with actual target index (may be clamped)
+            actual_new_index = -1
+            for i, frame in enumerate(self._project.ai_frames):
+                if frame.id == ai_frame_id:
+                    actual_new_index = i
+                    break
+            self.ai_frame_moved.emit(ai_frame_id, old_index, actual_new_index)
+            logger.info("Reordered AI frame %s from %d to %d", ai_frame_id, old_index, actual_new_index)
             return True
         return False
 
