@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 from PIL import Image
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QMutex, QMutexLocker, QObject, QThread, Signal, Slot
 from PySide6.QtGui import QImage
 
 from core.services.image_utils import pil_to_qimage
@@ -48,6 +48,7 @@ class PreviewRequest:
 class _PreviewWorker(QObject):
     """Worker that generates preview images in a background thread.
 
+    Uses persistent thread model with signal-triggered processing.
     Emits QImage (thread-safe) instead of QPixmap. The main thread
     must convert to QPixmap.
     """
@@ -55,35 +56,52 @@ class _PreviewWorker(QObject):
     # Signal: (request_id, qimage, preview_width, preview_height)
     preview_ready = Signal(int, QImage, int, int)
     error = Signal(int, str)  # (request_id, error_message)
-    finished = Signal()
 
     def __init__(self) -> None:
         super().__init__()
+        self._state_mutex = QMutex()
+        self._target_request_id = 0
         self._stop_requested = False
-        self._current_request: PreviewRequest | None = None
 
-    def request_stop(self) -> None:
-        """Request the worker to stop."""
-        self._stop_requested = True
+    def set_target_request_id(self, req_id: int) -> None:
+        """Update the target request ID and request stop of current work.
 
-    def set_request(self, request: PreviewRequest) -> None:
-        """Set the request to process. Called from main thread before run()."""
-        self._current_request = request
+        Thread-safe. Called from main thread.
+        """
+        with QMutexLocker(self._state_mutex):
+            self._target_request_id = req_id
+            self._stop_requested = True
 
-    def run(self) -> None:
-        """Generate preview for the current request."""
-        if self._current_request is None:
-            self.finished.emit()
-            return
+    def _should_cancel(self, request_id: int) -> bool:
+        """Check if this request should be cancelled.
 
-        request = self._current_request
+        Thread-safe. Called from worker thread.
+        Returns True if this request is stale (a newer request has arrived).
+        """
+        with QMutexLocker(self._state_mutex):
+            return request_id != self._target_request_id
+
+    def _clear_stop_flag(self) -> None:
+        """Clear stop flag at start of valid request processing.
+
+        Thread-safe. Called from worker thread.
+        """
+        with QMutexLocker(self._state_mutex):
+            self._stop_requested = False
+
+    @Slot(PreviewRequest)
+    def process_request(self, request: PreviewRequest) -> None:
+        """Process preview request. Called from worker thread via signal."""
         request_id = request.request_id
 
-        try:
-            if self._stop_requested:
-                self.finished.emit()
-                return
+        # Fast rejection if this request is already stale
+        if self._should_cancel(request_id):
+            return
 
+        # Clear stop flag for this new valid request
+        self._clear_stop_flag()
+
+        try:
             # Create compositor and generate preview
             compositor = SpriteCompositor(uncovered_policy=request.uncovered_policy)
             result = compositor.composite_frame(
@@ -96,8 +114,7 @@ class _PreviewWorker(QObject):
             )
 
             # Check cancellation after heavy work
-            if self._stop_requested:
-                self.finished.emit()
+            if self._should_cancel(request_id):
                 return
 
             preview_img = result.composited_image
@@ -106,31 +123,32 @@ class _PreviewWorker(QObject):
             qimage = pil_to_qimage(preview_img, thread_safe=True)
 
             if qimage.isNull():
-                self.error.emit(request_id, "Failed to convert preview to QImage")
+                if not self._should_cancel(request_id):
+                    self.error.emit(request_id, "Failed to convert preview to QImage")
             else:
                 # Scale for display
                 scaled_qimage = qimage.scaled(
                     preview_img.width * request.display_scale,
                     preview_img.height * request.display_scale,
                 )
-                self.preview_ready.emit(
-                    request_id,
-                    scaled_qimage,
-                    preview_img.width,
-                    preview_img.height,
-                )
+                if not self._should_cancel(request_id):
+                    self.preview_ready.emit(
+                        request_id,
+                        scaled_qimage,
+                        preview_img.width,
+                        preview_img.height,
+                    )
 
         except Exception as e:
             logger.exception("Preview worker error")
-            self.error.emit(request_id, str(e))
-        finally:
-            self.finished.emit()
+            if not self._should_cancel(request_id):
+                self.error.emit(request_id, str(e))
 
 
 class AsyncPreviewService(QObject):
     """Async preview service for workbench canvas.
 
-    Manages a background worker thread for generating preview images.
+    Manages a persistent background worker thread for generating preview images.
     Uses incrementing request IDs to cancel stale previews when new
     requests arrive.
 
@@ -144,15 +162,26 @@ class AsyncPreviewService(QObject):
     preview_ready = Signal(QImage, int, int)  # qimage, width, height
     preview_failed = Signal(str)  # error_message
 
+    # Internal signal to trigger worker
+    _start_worker = Signal(PreviewRequest)
+
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
-        self._worker: _PreviewWorker | None = None
-        self._thread: QThread | None = None
         self._destroyed = False
         self._current_request_id = 0
 
-        # Track pending request to avoid duplicate processing
-        self._pending_request: PreviewRequest | None = None
+        # Create persistent thread and worker
+        self._thread = QThread()
+        self._worker = _PreviewWorker()
+        self._worker.moveToThread(self._thread)
+
+        # Connect signals
+        self._start_worker.connect(self._worker.process_request)
+        self._worker.preview_ready.connect(self._on_preview_ready)
+        self._worker.error.connect(self._on_error)
+
+        # Start the thread immediately
+        self._thread.start()
 
         if parent is not None:
             parent.destroyed.connect(self._on_parent_destroyed)
@@ -193,9 +222,6 @@ class AsyncPreviewService(QObject):
         self._current_request_id += 1
         request_id = self._current_request_id
 
-        # Cancel existing work
-        self._cancel_current()
-
         # Create request
         request = PreviewRequest(
             request_id=request_id,
@@ -208,20 +234,18 @@ class AsyncPreviewService(QObject):
             display_scale=display_scale,
         )
 
-        # Start worker
-        self._worker = _PreviewWorker()
-        self._worker.set_request(request)
-        self._thread = QThread()
-        self._worker.moveToThread(self._thread)
+        # Update worker target ID to invalidate in-progress work
+        if self._worker is not None:
+            self._worker.set_target_request_id(request_id)
+            # Trigger processing in worker thread
+            self._start_worker.emit(request)
 
-        # Connect signals
-        self._thread.started.connect(self._worker.run)
-        self._worker.preview_ready.connect(self._on_preview_ready)
-        self._worker.error.connect(self._on_error)
-        self._worker.finished.connect(self._on_worker_finished)
-
-        # Start
-        self._thread.start()
+    def cancel(self) -> None:
+        """Cancel any in-progress preview generation."""
+        # Simply increment request ID to invalidate in-progress work
+        self._current_request_id += 1
+        if self._worker is not None:
+            self._worker.set_target_request_id(self._current_request_id)
 
     def _on_preview_ready(self, request_id: int, qimage: QImage, width: int, height: int) -> None:
         """Handle preview ready from worker."""
@@ -238,46 +262,30 @@ class AsyncPreviewService(QObject):
         if request_id == self._current_request_id:
             self.preview_failed.emit(error_message)
 
-    def _on_worker_finished(self) -> None:
-        """Clean up after worker finishes."""
-        self._cleanup_thread()
+    def shutdown(self) -> None:
+        """Shutdown the service and clean up resources."""
+        self._destroyed = True
 
-    def _cancel_current(self) -> None:
-        """Cancel any in-progress work."""
-        if self._worker:
-            self._worker.request_stop()
-        self._cleanup_thread()
-
-    def _cleanup_thread(self) -> None:
-        """Clean up thread resources.
-
-        Signals are disconnected first to prevent stale results from propagating
-        to the UI. The request_id mechanism provides additional protection against
-        processing outdated results.
-        """
-        # Disconnect signals first to prevent stale results from reaching UI
+        # Block signals first to prevent emission during cleanup
         if self._worker is not None:
+            self._worker.blockSignals(True)
             try:
                 self._worker.preview_ready.disconnect()
                 self._worker.error.disconnect()
-                self._worker.finished.disconnect()
             except (RuntimeError, TypeError):
                 pass  # Already disconnected or never connected
 
+        # Clean up thread
         if self._thread is not None:
             if self._thread.isRunning():
                 self._thread.quit()
-                if not self._thread.wait(1000):
-                    logger.warning("Preview worker thread did not stop within timeout")
-            if not self._destroyed:
+                if not self._thread.wait(3000):
+                    logger.warning("AsyncPreviewService thread did not stop in time")
+
+            if not self._thread.isRunning():
                 self._thread.deleteLater()
             self._thread = None
-        if self._worker is not None:
-            if not self._destroyed:
-                self._worker.deleteLater()
-            self._worker = None
 
-    def shutdown(self) -> None:
-        """Shutdown the service and clean up resources."""
-        self._cancel_current()
-        self._destroyed = True
+        if self._worker is not None:
+            self._worker.deleteLater()
+            self._worker = None

@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from PIL import Image
-from PySide6.QtCore import QObject, QThread, Signal, Slot
+from PySide6.QtCore import QMutex, QMutexLocker, QObject, QThread, Signal, Slot
 from PySide6.QtGui import QImage
 
 from core.services.image_utils import pil_to_qimage
@@ -56,15 +56,35 @@ class _HighlightWorker(QObject):
 
     def __init__(self) -> None:
         super().__init__()
+        self._state_mutex = QMutex()
         self._target_request_id = 0
         self._stop_requested = False
 
     def set_target_request_id(self, req_id: int) -> None:
         """Update the target request ID and request stop of current work.
-        Called from Main Thread.
+
+        Thread-safe. Called from main thread.
         """
-        self._target_request_id = req_id
-        self._stop_requested = True
+        with QMutexLocker(self._state_mutex):
+            self._target_request_id = req_id
+            self._stop_requested = True
+
+    def _should_cancel(self, request_id: int) -> bool:
+        """Check if this request should be cancelled.
+
+        Thread-safe. Called from worker thread.
+        Returns True if this request is stale (a newer request has arrived).
+        """
+        with QMutexLocker(self._state_mutex):
+            return request_id != self._target_request_id
+
+    def _clear_stop_flag(self) -> None:
+        """Clear stop flag at start of valid request processing.
+
+        Thread-safe. Called from worker thread.
+        """
+        with QMutexLocker(self._state_mutex):
+            self._stop_requested = False
 
     @Slot(HighlightRequest)
     def process_request(self, request: HighlightRequest) -> None:
@@ -72,11 +92,11 @@ class _HighlightWorker(QObject):
         request_id = request.request_id
 
         # Fast rejection if this request is already stale
-        if request_id != self._target_request_id:
+        if self._should_cancel(request_id):
             return
 
         # Clear stop flag for this new valid request
-        self._stop_requested = False
+        self._clear_stop_flag()
 
         try:
             ai_image = request.ai_image
@@ -101,7 +121,7 @@ class _HighlightWorker(QObject):
             # Iterate all pixels and find matches
             for y in range(height):
                 # Periodic cancellation check (every 64 rows)
-                if y % 64 == 0 and (self._stop_requested or request_id != self._target_request_id):
+                if y % 64 == 0 and self._should_cancel(request_id):
                     return
 
                 for x in range(width):
@@ -125,7 +145,7 @@ class _HighlightWorker(QObject):
                         mask_pixels[x, y] = (255, 255, 0, 128)
 
             # Check cancellation after heavy work
-            if self._stop_requested or request_id != self._target_request_id:
+            if self._should_cancel(request_id):
                 return
 
             # Apply flip transforms to match AI frame display
@@ -144,12 +164,12 @@ class _HighlightWorker(QObject):
             qimage = pil_to_qimage(scaled_mask, thread_safe=True)
 
             # Final check before emit
-            if request_id == self._target_request_id:
+            if not self._should_cancel(request_id):
                 self.highlight_ready.emit(request_id, qimage)
 
         except Exception as e:
             logger.exception("Highlight worker error")
-            if request_id == self._target_request_id:
+            if not self._should_cancel(request_id):
                 self.error.emit(request_id, str(e))
         finally:
             self.finished.emit()
@@ -292,6 +312,15 @@ class AsyncHighlightService(QObject):
     def shutdown(self) -> None:
         """Shutdown the service and clean up resources."""
         self._destroyed = True
+
+        # Block signals first to prevent emission during cleanup
+        if self._worker is not None:
+            self._worker.blockSignals(True)
+            try:
+                self._worker.highlight_ready.disconnect()
+                self._worker.error.disconnect()
+            except (RuntimeError, TypeError):
+                pass  # Already disconnected or never connected
 
         # Clean up thread
         if self._thread is not None:

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
-from PySide6.QtCore import QObject, Qt, QThread, Signal
+from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QThread, Signal
 from PySide6.QtGui import QImage, QPixmap
 
 from core.palette_utils import (
@@ -260,8 +260,9 @@ class AsyncThumbnailLoader(QObject):
         to the UI. The request_id mechanism provides additional protection against
         processing outdated results.
         """
-        # Disconnect signals first to prevent stale results from reaching UI
+        # Block signals first to prevent emission during cleanup
         if self._worker is not None:
+            self._worker.blockSignals(True)
             try:
                 self._worker.thumbnail_ready.disconnect()
                 self._worker.finished.disconnect()
@@ -300,17 +301,24 @@ class _ThumbnailWorker(QObject):
         self._requests = requests
         self._sheet_palette = sheet_palette
         self._size = size
+        self._state_mutex = QMutex()
         self._stop_requested = False
 
     def request_stop(self) -> None:
-        """Request the worker to stop."""
-        self._stop_requested = True
+        """Request the worker to stop. Thread-safe."""
+        with QMutexLocker(self._state_mutex):
+            self._stop_requested = True
+
+    def _is_stop_requested(self) -> bool:
+        """Check if stop has been requested. Thread-safe."""
+        with QMutexLocker(self._state_mutex):
+            return self._stop_requested
 
     def run(self) -> None:
         """Generate thumbnails for all requests."""
         try:
             for frame_id, frame_path in self._requests:
-                if self._stop_requested:
+                if self._is_stop_requested():
                     break
 
                 qimage = self._generate_thumbnail(frame_path)

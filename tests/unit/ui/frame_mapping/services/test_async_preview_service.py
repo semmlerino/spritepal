@@ -34,11 +34,12 @@ class TestAsyncPreviewServiceBasics:
     """Basic functionality tests for AsyncPreviewService."""
 
     def test_service_creates_without_error(self, service: AsyncPreviewService) -> None:
-        """Service should create with proper initial state (lazy initialization)."""
+        """Service should create with proper initial state (persistent thread model)."""
         assert service is not None
-        # Service uses lazy initialization - worker/thread created on first request
-        assert service._worker is None, "Worker should be None before first request (lazy init)"
-        assert service._thread is None, "Thread should be None before first request (lazy init)"
+        # Service uses persistent thread model - worker/thread created immediately
+        assert service._worker is not None, "Worker should be created immediately"
+        assert service._thread is not None, "Thread should be created immediately"
+        assert service._thread.isRunning(), "Thread should be running immediately"
         assert service._current_request_id == 0, "Request ID should start at 0"
         assert not service._destroyed, "Service should not be marked destroyed initially"
 
@@ -160,32 +161,7 @@ class TestAsyncPreviewWithMockData:
 
     def test_shutdown_cleans_up_resources(self, service: AsyncPreviewService, qtbot: QtBot) -> None:
         """Shutdown should clean up worker and thread completely."""
-        # Create mock AI image
-        ai_img = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
-
-        # Create mock capture result
-        mock_capture = MagicMock()
-        mock_capture.bounding_box = MagicMock()
-        mock_capture.bounding_box.x = 0
-        mock_capture.bounding_box.y = 0
-        mock_capture.bounding_box.width = 32
-        mock_capture.bounding_box.height = 32
-        mock_capture.palettes = {}
-        mock_capture.entries = []
-
-        transform = TransformParams(offset_x=0, offset_y=0)
-
-        service.request_preview(
-            ai_image=ai_img,
-            capture_result=mock_capture,
-            transform=transform,
-            uncovered_policy="original",
-            sheet_palette=None,
-            ai_index_map=None,
-            display_scale=2,
-        )
-
-        # Capture thread reference before shutdown
+        # Capture thread reference before shutdown (persistent thread is already running)
         thread_before = service._thread
         assert thread_before is not None
         assert thread_before.isRunning(), "Thread should be running before shutdown"
