@@ -41,6 +41,7 @@ from ui.frame_mapping.services.preview_service import PreviewService
 from ui.frame_mapping.undo import (
     CreateMappingCommand,
     RemoveMappingCommand,
+    ReorderAIFrameCommand,
     UndoRedoStack,
     UpdateAlignmentCommand,
 )
@@ -84,6 +85,7 @@ class FrameMappingController(QObject):
     # AI Frame Organization signals (V4)
     frame_renamed = Signal(str)  # ai_frame_id - display name changed
     frame_tags_changed = Signal(str)  # ai_frame_id - tags changed
+    ai_frames_reordered = Signal()  # Emitted when AI frames are reordered
     # Capture Organization signals
     capture_renamed = Signal(str)  # game_frame_id - display name changed
     # Preview cache signal - emitted when a preview is regenerated (mtime/entries changed)
@@ -1029,6 +1031,56 @@ class FrameMappingController(QObject):
         if self._project.remove_ai_frame(frame_id):
             self.project_changed.emit()
             logger.info("Removed AI frame %s", frame_id)
+            return True
+        return False
+
+    def reorder_ai_frame(self, ai_frame_id: str, new_index: int) -> bool:
+        """Reorder an AI frame to a new position (undoable).
+
+        Args:
+            ai_frame_id: ID of the AI frame to move.
+            new_index: Target position (0-based).
+
+        Returns:
+            True if the frame was moved.
+        """
+        if self._project is None:
+            return False
+
+        # Find current index
+        current_index = -1
+        for i, frame in enumerate(self._project.ai_frames):
+            if frame.id == ai_frame_id:
+                current_index = i
+                break
+
+        if current_index == -1:
+            return False
+
+        # Clamp and check for no-op
+        max_index = len(self._project.ai_frames) - 1
+        clamped_index = max(0, min(new_index, max_index))
+        if current_index == clamped_index:
+            return False
+
+        # Create and execute command
+        command = ReorderAIFrameCommand(
+            controller=self,
+            ai_frame_id=ai_frame_id,
+            old_index=current_index,
+            new_index=clamped_index,
+        )
+        self._undo_stack.push(command)
+        return True
+
+    def _reorder_ai_frame_no_history(self, ai_frame_id: str, new_index: int) -> bool:
+        """Internal: Reorder AI frame without undo history (for command execution)."""
+        if self._project is None:
+            return False
+
+        if self._project.reorder_ai_frame(ai_frame_id, new_index):
+            self.ai_frames_reordered.emit()
+            logger.info("Reordered AI frame %s to index %d", ai_frame_id, new_index)
             return True
         return False
 

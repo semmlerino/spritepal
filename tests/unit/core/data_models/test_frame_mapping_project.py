@@ -1163,3 +1163,103 @@ class TestSheetPaletteTransparencyValidation:
 
         assert len(palette.colors) == 16
         assert all(c == (0, 0, 0) for c in palette.colors)
+
+
+class TestReorderAIFrame:
+    """Tests for FrameMappingProject.reorder_ai_frame functionality."""
+
+    def test_reorder_to_later_position(self) -> None:
+        """Moving AI frame from index 0 to index 2."""
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("a.png"), index=0),
+            AIFrame(path=Path("b.png"), index=1),
+            AIFrame(path=Path("c.png"), index=2),
+        ]
+        project._rebuild_indices()
+
+        result = project.reorder_ai_frame("a.png", 2)
+
+        assert result is True
+        # New order should be b, c, a
+        assert [f.id for f in project.ai_frames] == ["b.png", "c.png", "a.png"]
+        # Indices should be renumbered
+        assert [f.index for f in project.ai_frames] == [0, 1, 2]
+
+    def test_reorder_to_earlier_position(self) -> None:
+        """Moving AI frame from index 2 to index 0."""
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("a.png"), index=0),
+            AIFrame(path=Path("b.png"), index=1),
+            AIFrame(path=Path("c.png"), index=2),
+        ]
+        project._rebuild_indices()
+
+        result = project.reorder_ai_frame("c.png", 0)
+
+        assert result is True
+        # New order should be c, a, b
+        assert [f.id for f in project.ai_frames] == ["c.png", "a.png", "b.png"]
+        # Indices should be renumbered
+        assert [f.index for f in project.ai_frames] == [0, 1, 2]
+
+    def test_reorder_same_position_is_noop(self) -> None:
+        """Moving AI frame to its current position returns False."""
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("a.png"), index=0),
+            AIFrame(path=Path("b.png"), index=1),
+        ]
+        project._rebuild_indices()
+
+        result = project.reorder_ai_frame("a.png", 0)
+
+        assert result is False
+        # Order unchanged
+        assert [f.id for f in project.ai_frames] == ["a.png", "b.png"]
+
+    def test_reorder_clamps_to_bounds(self) -> None:
+        """Moving to index beyond bounds clamps to last position."""
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("a.png"), index=0),
+            AIFrame(path=Path("b.png"), index=1),
+            AIFrame(path=Path("c.png"), index=2),
+        ]
+        project._rebuild_indices()
+
+        result = project.reorder_ai_frame("a.png", 999)
+
+        assert result is True
+        # a.png should be at the end (index 2)
+        assert [f.id for f in project.ai_frames] == ["b.png", "c.png", "a.png"]
+
+    def test_reorder_nonexistent_frame_returns_false(self) -> None:
+        """Reordering nonexistent frame returns False."""
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [AIFrame(path=Path("a.png"), index=0)]
+        project._rebuild_indices()
+
+        result = project.reorder_ai_frame("nonexistent.png", 0)
+
+        assert result is False
+
+    def test_reorder_updates_cache(self) -> None:
+        """Reordering updates the AI frame index cache."""
+        project = FrameMappingProject(name="test")
+        project.ai_frames = [
+            AIFrame(path=Path("a.png"), index=0),
+            AIFrame(path=Path("b.png"), index=1),
+        ]
+        project._rebuild_indices()
+
+        project.reorder_ai_frame("b.png", 0)
+
+        # Cache lookup should work correctly after reorder
+        frame_a = project.get_ai_frame_by_id("a.png")
+        frame_b = project.get_ai_frame_by_id("b.png")
+        assert frame_a is not None
+        assert frame_b is not None
+        assert frame_b.index == 0
+        assert frame_a.index == 1

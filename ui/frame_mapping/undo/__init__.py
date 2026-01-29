@@ -9,6 +9,7 @@ from ui.frame_mapping.undo.commands import (
     RemoveMappingCommand,
     RenameAIFrameCommand,
     RenameCaptureCommand,
+    ReorderAIFrameCommand,
     ToggleFrameTagCommand,
     UpdateAlignmentCommand,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "RemoveMappingCommand",
     "RenameAIFrameCommand",
     "RenameCaptureCommand",
+    "ReorderAIFrameCommand",
     "ToggleFrameTagCommand",
     "UndoRedoStack",
     "UpdateAlignmentCommand",

@@ -676,6 +676,45 @@ class FrameMappingProject:
 
         return True
 
+    def reorder_ai_frame(self, ai_frame_id: str, new_index: int) -> bool:
+        """Move an AI frame to a new position in the list.
+
+        Args:
+            ai_frame_id: ID of the AI frame to move.
+            new_index: Target position (0-based). Clamped to valid range.
+
+        Returns:
+            True if the frame was moved, False if not found or same position.
+        """
+        # Find current position
+        current_index = -1
+        for i, frame in enumerate(self.ai_frames):
+            if frame.id == ai_frame_id:
+                current_index = i
+                break
+
+        if current_index == -1:
+            return False
+
+        # Clamp target index to valid range
+        max_index = len(self.ai_frames) - 1
+        new_index = max(0, min(new_index, max_index))
+
+        # No-op if same position
+        if current_index == new_index:
+            return False
+
+        # Pop and reinsert
+        frame = self.ai_frames.pop(current_index)
+        self.ai_frames.insert(new_index, frame)
+
+        # Renumber all indices
+        for i, f in enumerate(self.ai_frames):
+            f.index = i
+
+        self._invalidate_ai_frame_index()
+        return True
+
     def create_mapping(self, ai_frame_id: str, game_frame_id: str) -> FrameMapping:
         """Create a new mapping between an AI frame and a game frame.
 

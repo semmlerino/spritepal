@@ -217,3 +217,23 @@ class ToggleFrameTagCommand:
     def undo(self) -> None:
         # Toggle again to reverse
         self.controller._toggle_frame_tag_no_history(self.frame_id, self.tag)
+
+
+@dataclass
+class ReorderAIFrameCommand:
+    """Command to reorder an AI frame to a new position."""
+
+    controller: FrameMappingController
+    ai_frame_id: str
+    old_index: int
+    new_index: int
+
+    @property
+    def description(self) -> str:
+        return f"Move frame from position {self.old_index + 1} to {self.new_index + 1}"
+
+    def execute(self) -> None:
+        self.controller._reorder_ai_frame_no_history(self.ai_frame_id, self.new_index)
+
+    def undo(self) -> None:
+        self.controller._reorder_ai_frame_no_history(self.ai_frame_id, self.old_index)

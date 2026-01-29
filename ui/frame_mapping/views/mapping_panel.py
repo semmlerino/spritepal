@@ -5,8 +5,21 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QPoint, QSize, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragMoveEvent, QDropEvent, QIcon, QPixmap
+from PySide6.QtCore import QEvent, QMimeData, QObject, QPoint, QSize, Qt, Signal
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QDrag,
+    QDragEnterEvent,
+    QDragLeaveEvent,
+    QDragMoveEvent,
+    QDropEvent,
+    QIcon,
+    QMouseEvent,
+    QPainter,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
@@ -21,7 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.common.mime_constants import MIME_GAME_FRAME
+from ui.common.mime_constants import MIME_AI_FRAME_REORDER, MIME_GAME_FRAME
 from ui.frame_mapping.services.thumbnail_service import (
     create_quantized_thumbnail,
     quantize_qpixmap,
@@ -63,6 +76,7 @@ class MappingPanel(QWidget):
     drop_game_frame_requested = Signal(str, str)  # AI frame ID, game frame ID
     inject_mapping_requested = Signal(str)  # AI frame ID
     inject_selected_requested = Signal()  # Request to inject selected frames
+    row_reorder_requested = Signal(str, int)  # AI frame ID, target index
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -74,6 +88,10 @@ class MappingPanel(QWidget):
         self._user_checked_ai_frame_ids: set[str] | None = None
         # Sheet palette for quantized AI frame thumbnails
         self._sheet_palette: SheetPalette | None = None
+        # Drag-drop reorder state
+        self._drag_source_row: int | None = None
+        self._drag_start_pos: QPoint | None = None
+        self._drop_insert_index: int | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -108,10 +126,13 @@ class MappingPanel(QWidget):
         self._table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._table.setIconSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
 
-        # Enable drag-drop
+        # Enable drag-drop (DragDrop for both receiving and initiating drags)
         self._table.setAcceptDrops(True)
-        self._table.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
+        self._table.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
+        self._table.setDragEnabled(True)
         self._table.viewport().setAcceptDrops(True)
+        # Install event filter for custom paint (insertion line)
+        self._table.viewport().installEventFilter(self)
 
         # Context menu
         self._table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -199,6 +220,9 @@ class MappingPanel(QWidget):
         self._table.dragMoveEvent = self._drag_move_event
         self._table.dragLeaveEvent = self._drag_leave_event
         self._table.dropEvent = self._drop_event
+        # Override mouse events for drag initiation
+        self._table.mousePressEvent = self._mouse_press_event
+        self._table.mouseMoveEvent = self._mouse_move_event
 
     def set_project(self, project: FrameMappingProject | None) -> None:
         """Set the project to display mappings from.
@@ -646,42 +670,215 @@ class MappingPanel(QWidget):
     def _drag_enter_event(self, event: QDragEnterEvent) -> None:
         """Handle drag enter event."""
         mime_data = event.mimeData()
-        if mime_data is not None and mime_data.hasFormat(MIME_GAME_FRAME):  # type: ignore[reportUnnecessaryComparison]
-            event.acceptProposedAction()
-        else:
-            event.ignore()
+        if mime_data is not None:  # type: ignore[reportUnnecessaryComparison]
+            if mime_data.hasFormat(MIME_GAME_FRAME) or mime_data.hasFormat(MIME_AI_FRAME_REORDER):
+                event.acceptProposedAction()
+                return
+        event.ignore()
 
     def _drag_move_event(self, event: QDragMoveEvent) -> None:
-        """Handle drag move event - highlight target row."""
+        """Handle drag move event - differentiate visual feedback by MIME type."""
         mime_data = event.mimeData()
-        if mime_data is None or not mime_data.hasFormat(MIME_GAME_FRAME):  # type: ignore[reportUnnecessaryComparison]
+        if mime_data is None:  # type: ignore[reportUnnecessaryComparison]
             event.ignore()
             return
 
         pos = event.position().toPoint()
-        item = self._table.itemAt(pos)
 
-        if item is not None:
-            new_target = item.row()
-            if new_target != self._drop_target_row:
-                # Clear previous highlight
+        # Game frame drop: highlight entire row
+        if mime_data.hasFormat(MIME_GAME_FRAME):
+            self._clear_insert_indicator()
+            item = self._table.itemAt(pos)
+            if item is not None:
+                new_target = item.row()
+                if new_target != self._drop_target_row:
+                    self._clear_drop_highlight()
+                    self._drop_target_row = new_target
+                    self._set_row_highlight(new_target, True)
+                event.acceptProposedAction()
+            else:
                 self._clear_drop_highlight()
-                # Set new highlight
-                self._drop_target_row = new_target
-                self._set_row_highlight(new_target, True)
-            event.acceptProposedAction()
-        else:
-            self._clear_drop_highlight()
-            event.ignore()
+                event.ignore()
+            return
 
-    def _drag_leave_event(self, event: object) -> None:
+        # Reorder drop: show insertion line between rows
+        if mime_data.hasFormat(MIME_AI_FRAME_REORDER):
+            self._clear_drop_highlight()
+            insert_index = self._get_insert_index_at_pos(pos)
+            if insert_index != self._drop_insert_index:
+                self._drop_insert_index = insert_index
+                self._table.viewport().update()  # Trigger repaint for insertion line
+            event.acceptProposedAction()
+            return
+
+        event.ignore()
+
+    def _drag_leave_event(self, event: QDragLeaveEvent) -> None:
         """Handle drag leave event."""
         self._clear_drop_highlight()
+        self._clear_insert_indicator()
 
     def _drop_event(self, event: QDropEvent) -> None:
-        """Handle drop event."""
+        """Handle drop event - route to appropriate handler by MIME type."""
         self._clear_drop_highlight()
+        self._clear_insert_indicator()
 
+        mime_data = event.mimeData()
+        if mime_data is None:  # type: ignore[reportUnnecessaryComparison]
+            event.ignore()
+            return
+
+        if mime_data.hasFormat(MIME_AI_FRAME_REORDER):
+            self._handle_reorder_drop(event)
+            return
+
+        if mime_data.hasFormat(MIME_GAME_FRAME):
+            self._handle_link_drop(event)
+            return
+
+        event.ignore()
+
+    def _set_row_highlight(self, row: int, highlighted: bool) -> None:
+        """Set or clear highlight for a row."""
+        for col in range(self._table.columnCount()):
+            item = self._table.item(row, col)
+            if item is not None:
+                if highlighted:
+                    item.setBackground(QBrush(QColor(60, 100, 140)))
+                else:
+                    item.setBackground(QBrush())
+
+    def _clear_drop_highlight(self) -> None:
+        """Clear any drop highlight."""
+        if self._drop_target_row is not None:
+            self._set_row_highlight(self._drop_target_row, False)
+            self._drop_target_row = None
+
+    def _clear_insert_indicator(self) -> None:
+        """Clear the insertion line indicator."""
+        if self._drop_insert_index is not None:
+            self._drop_insert_index = None
+            self._table.viewport().update()
+
+    def _get_insert_index_at_pos(self, pos: QPoint) -> int:
+        """Calculate the insertion index based on cursor position.
+
+        If cursor is in top half of a row, insert before that row.
+        If in bottom half, insert after. Returns valid index 0..rowCount.
+        """
+        row_count = self._table.rowCount()
+        if row_count == 0:
+            return 0
+
+        item = self._table.itemAt(pos)
+        if item is None:
+            # Below all rows - insert at end
+            return row_count
+
+        row = item.row()
+        # Get row geometry
+        row_rect = self._table.visualItemRect(item)
+        row_mid = row_rect.top() + row_rect.height() // 2
+
+        if pos.y() < row_mid:
+            return row
+        else:
+            return row + 1
+
+    def _mouse_press_event(self, event: QMouseEvent) -> None:
+        """Handle mouse press - record drag start position."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._drag_start_pos = event.position().toPoint()
+            item = self._table.itemAt(self._drag_start_pos)
+            if item is not None:
+                self._drag_source_row = item.row()
+        # Call default to maintain selection behavior
+        QTableWidget.mousePressEvent(self._table, event)
+
+    def _mouse_move_event(self, event: QMouseEvent) -> None:
+        """Handle mouse move - initiate drag if threshold exceeded."""
+        if not (event.buttons() & Qt.MouseButton.LeftButton):
+            return
+        if self._drag_start_pos is None or self._drag_source_row is None:
+            return
+
+        # Check drag threshold
+        distance = (event.position().toPoint() - self._drag_start_pos).manhattanLength()
+        if distance < 10:  # Standard drag threshold
+            return
+
+        # Get the AI frame ID from the source row
+        checkbox_item = self._table.item(self._drag_source_row, 0)
+        if checkbox_item is None:
+            return
+        ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
+        if ai_frame_id is None:
+            return
+
+        # Create MIME data for reorder
+        mime_data = QMimeData()
+        mime_data.setData(MIME_AI_FRAME_REORDER, ai_frame_id.encode("utf-8"))
+
+        # Create drag with visual feedback
+        drag = QDrag(self._table)
+        drag.setMimeData(mime_data)
+
+        # Create drag pixmap (small indicator showing row number)
+        pixmap = QPixmap(50, 20)
+        pixmap.fill(QColor(60, 100, 140, 200))
+        painter = QPainter(pixmap)
+        painter.setPen(QColor(255, 255, 255))
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, f"#{self._drag_source_row + 1}")
+        painter.end()
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(QPoint(25, 10))
+
+        # Execute drag
+        drag.exec(Qt.DropAction.MoveAction)
+
+        # Clear state
+        self._drag_start_pos = None
+        self._drag_source_row = None
+
+    def _handle_reorder_drop(self, event: QDropEvent) -> None:
+        """Handle drop for row reordering."""
+        mime_data = event.mimeData()
+        if mime_data is None:  # type: ignore[reportUnnecessaryComparison]
+            event.ignore()
+            return
+
+        # Get source AI frame ID
+        raw_data = mime_data.data(MIME_AI_FRAME_REORDER).data()
+        ai_frame_id = (
+            raw_data.tobytes().decode("utf-8") if isinstance(raw_data, memoryview) else raw_data.decode("utf-8")
+        )
+
+        # Calculate target index
+        pos = event.position().toPoint()
+        target_index = self._get_insert_index_at_pos(pos)
+
+        # Find source index to adjust for shifting
+        source_index = -1
+        for row in range(self._table.rowCount()):
+            checkbox_item = self._table.item(row, 0)
+            if checkbox_item and checkbox_item.data(Qt.ItemDataRole.UserRole + 1) == ai_frame_id:
+                source_index = row
+                break
+
+        if source_index == -1:
+            event.ignore()
+            return
+
+        # Adjust target if dropping after source (index will shift after removal)
+        if target_index > source_index:
+            target_index -= 1
+
+        # Emit signal (controller handles the actual reorder)
+        self.row_reorder_requested.emit(ai_frame_id, target_index)
+        event.acceptProposedAction()
+
+    def _handle_link_drop(self, event: QDropEvent) -> None:
+        """Handle drop for linking game frame to AI frame (original behavior)."""
         mime_data = event.mimeData()
         if mime_data is None or not mime_data.hasFormat(MIME_GAME_FRAME):  # type: ignore[reportUnnecessaryComparison]
             event.ignore()
@@ -694,7 +891,7 @@ class MappingPanel(QWidget):
             return
 
         row = item.row()
-        checkbox_item = self._table.item(row, 0)  # Checkbox column has ID
+        checkbox_item = self._table.item(row, 0)
         if checkbox_item is None:
             event.ignore()
             return
@@ -713,21 +910,52 @@ class MappingPanel(QWidget):
         self.drop_game_frame_requested.emit(ai_frame_id, game_frame_id)
         event.acceptProposedAction()
 
-    def _set_row_highlight(self, row: int, highlighted: bool) -> None:
-        """Set or clear highlight for a row."""
-        for col in range(self._table.columnCount()):
-            item = self._table.item(row, col)
-            if item is not None:
-                if highlighted:
-                    item.setBackground(QBrush(QColor(60, 100, 140)))
-                else:
-                    item.setBackground(QBrush())
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # type: ignore[override]
+        """Event filter to paint insertion indicator on viewport."""
+        from PySide6.QtGui import QPaintEvent
 
-    def _clear_drop_highlight(self) -> None:
-        """Clear any drop highlight."""
-        if self._drop_target_row is not None:
-            self._set_row_highlight(self._drop_target_row, False)
-            self._drop_target_row = None
+        if watched == self._table.viewport() and isinstance(event, QPaintEvent):
+            # Let normal painting happen first
+            result = super().eventFilter(watched, event)
+            # Then draw our indicator on top
+            self._draw_insert_indicator()
+            return result
+        return super().eventFilter(watched, event)
+
+    def _draw_insert_indicator(self) -> None:
+        """Draw horizontal line at insertion point during reorder drag."""
+        if self._drop_insert_index is None:
+            return
+
+        viewport = self._table.viewport()
+        painter = QPainter(viewport)
+        pen = QPen(QColor(100, 180, 255), 2)
+        painter.setPen(pen)
+
+        # Calculate Y position for the line
+        row_count = self._table.rowCount()
+        if row_count == 0:
+            y = 0
+        elif self._drop_insert_index >= row_count:
+            # After last row
+            last_item = self._table.item(row_count - 1, 0)
+            if last_item:
+                rect = self._table.visualItemRect(last_item)
+                y = rect.bottom()
+            else:
+                y = viewport.height()
+        else:
+            # Before a specific row
+            item = self._table.item(self._drop_insert_index, 0)
+            if item:
+                rect = self._table.visualItemRect(item)
+                y = rect.top()
+            else:
+                y = 0
+
+        # Draw horizontal line across viewport
+        painter.drawLine(0, y, viewport.width(), y)
+        painter.end()
 
     def _on_select_all(self) -> None:
         """Check all mapped frames for injection."""

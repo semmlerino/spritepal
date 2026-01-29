@@ -404,3 +404,78 @@ class TestSignalEmission:
             populated_controller.create_mapping("sprite_01.png", "capture_A")
 
         assert blocker.args == [True]
+
+
+class TestReorderAIFrameUndo:
+    """Tests for undoing AI frame reorder operations."""
+
+    def test_reorder_is_undoable(self, populated_controller: FrameMappingController, qtbot: object) -> None:
+        """Reordering an AI frame can be undone."""
+        from pytestqt.qtbot import QtBot
+
+        assert isinstance(qtbot, QtBot)
+        project = populated_controller.project
+        assert project is not None
+
+        # Initial order: sprite_01.png (index 0), sprite_02.png (index 1)
+        assert [f.id for f in project.ai_frames] == ["sprite_01.png", "sprite_02.png"]
+
+        # Move sprite_01.png to index 1
+        populated_controller.reorder_ai_frame("sprite_01.png", 1)
+
+        # Order should be sprite_02.png, sprite_01.png
+        assert [f.id for f in project.ai_frames] == ["sprite_02.png", "sprite_01.png"]
+        assert populated_controller.can_undo()
+
+        # Undo
+        desc = populated_controller.undo()
+
+        # Order should be restored
+        assert desc is not None
+        assert [f.id for f in project.ai_frames] == ["sprite_01.png", "sprite_02.png"]
+
+    def test_reorder_is_redoable(self, populated_controller: FrameMappingController, qtbot: object) -> None:
+        """Undone reorder can be redone."""
+        from pytestqt.qtbot import QtBot
+
+        assert isinstance(qtbot, QtBot)
+        project = populated_controller.project
+        assert project is not None
+
+        populated_controller.reorder_ai_frame("sprite_01.png", 1)
+        populated_controller.undo()
+
+        assert [f.id for f in project.ai_frames] == ["sprite_01.png", "sprite_02.png"]
+
+        # Redo
+        desc = populated_controller.redo()
+
+        assert desc is not None
+        assert [f.id for f in project.ai_frames] == ["sprite_02.png", "sprite_01.png"]
+
+    def test_reorder_same_position_not_undoable(
+        self, populated_controller: FrameMappingController, qtbot: object
+    ) -> None:
+        """Moving to same position doesn't add to undo history."""
+        from pytestqt.qtbot import QtBot
+
+        assert isinstance(qtbot, QtBot)
+        project = populated_controller.project
+        assert project is not None
+
+        populated_controller.clear_undo_history()
+
+        # Move to same position (no-op)
+        result = populated_controller.reorder_ai_frame("sprite_01.png", 0)
+
+        assert result is False
+        assert not populated_controller.can_undo()
+
+    def test_reorder_emits_signal(self, populated_controller: FrameMappingController, qtbot: object) -> None:
+        """Reordering emits ai_frames_reordered signal."""
+        from pytestqt.qtbot import QtBot
+
+        assert isinstance(qtbot, QtBot)
+
+        with qtbot.waitSignal(populated_controller.ai_frames_reordered, timeout=1000):
+            populated_controller.reorder_ai_frame("sprite_01.png", 1)

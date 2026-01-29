@@ -371,6 +371,8 @@ class FrameMappingWorkspace(QWidget):
         self._mapping_panel.drop_game_frame_requested.connect(self._on_drop_game_frame)
         self._mapping_panel.inject_mapping_requested.connect(self._on_inject_single)
         self._mapping_panel.inject_selected_requested.connect(self._on_inject_selected)
+        self._mapping_panel.row_reorder_requested.connect(self._on_row_reorder_requested)
+        self._controller.ai_frames_reordered.connect(self._on_ai_frames_reordered)
 
         # Alignment Canvas signals
         self._alignment_canvas.alignment_changed.connect(self._on_alignment_changed)
@@ -965,6 +967,29 @@ class FrameMappingWorkspace(QWidget):
         self._state.selected_game_id = None
         self._state.current_canvas_game_id = None
         self._update_map_button_state()
+
+    def _on_row_reorder_requested(self, ai_frame_id: str, target_index: int) -> None:
+        """Handle row reorder request from mapping panel drag/drop.
+
+        Args:
+            ai_frame_id: ID of the AI frame being moved.
+            target_index: Target position (0-based).
+        """
+        self._controller.reorder_ai_frame(ai_frame_id, target_index)
+
+    def _on_ai_frames_reordered(self) -> None:
+        """Handle AI frames reordered signal from controller."""
+        project = self._controller.project
+        if project is None:
+            return
+        # Refresh AI frames pane with new order
+        self._ai_frames_pane.set_ai_frames(project.ai_frames)
+        # Refresh mapping panel (table)
+        self._mapping_panel.refresh()
+        # Re-select the row that was moved (if known from current selection)
+        selected_id = self._state.selected_ai_frame_id
+        if selected_id:
+            self._mapping_panel.select_row_by_ai_id(selected_id)
 
     def _on_inject_single(self, ai_frame_id: str) -> None:
         """Handle inject single mapping request.
