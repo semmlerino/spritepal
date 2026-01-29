@@ -223,14 +223,56 @@ class MappingPanel(QWidget):
         self._game_frame_previews = previews
 
     def update_game_frame_preview(self, frame_id: str, preview: QPixmap) -> None:
-        """Update the preview for a single game frame.
+        """Update the preview for a single game frame without full refresh.
+
+        This is more efficient than refresh() when only updating a single
+        preview (e.g., after preview cache invalidation).
 
         Args:
             frame_id: The game frame ID
             preview: The new preview QPixmap
         """
         self._game_frame_previews[frame_id] = preview
-        self.refresh()
+        self._update_row_game_frame_icon(frame_id, preview)
+
+    def _update_row_game_frame_icon(self, game_frame_id: str, preview: QPixmap) -> None:
+        """Update game frame icon in rows using this game frame.
+
+        Finds all rows mapped to the given game frame and updates their
+        Game Frame column icon with the new preview (quantized and scaled).
+
+        Args:
+            game_frame_id: The game frame ID
+            preview: The preview QPixmap (will be quantized and scaled)
+        """
+        if self._project is None:
+            return
+
+        # Quantize to sheet palette if set (shows preview-accurate colors)
+        quantized = quantize_qpixmap(preview, self._sheet_palette)
+        scaled = quantized.scaled(
+            THUMBNAIL_SIZE,
+            THUMBNAIL_SIZE,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+
+        # Find all rows mapped to this game frame and update the icon
+        for row in range(self._table.rowCount()):
+            checkbox_item = self._table.item(row, 0)  # Checkbox column has AI frame ID
+            if checkbox_item is None:
+                continue
+
+            ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
+            if ai_frame_id is None:
+                continue
+
+            # Check if this AI frame is mapped to the target game frame
+            mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
+            if mapping is not None and mapping.game_frame_id == game_frame_id:
+                game_item = self._table.item(row, 3)  # Game Frame column
+                if game_item is not None:
+                    game_item.setIcon(QIcon(scaled))
 
     def set_sheet_palette(self, palette: SheetPalette | None) -> None:
         """Set the sheet palette for quantized AI frame thumbnails.

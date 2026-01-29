@@ -54,6 +54,7 @@ from core.services.content_bounds_analyzer import (
 from core.services.rgb_to_indexed import load_image_preserving_indices
 from core.services.sprite_compositor import TransformParams
 from core.services.tile_sampling_service import TileSamplingService
+from ui.frame_mapping.services.async_highlight_service import AsyncHighlightService
 from ui.frame_mapping.services.async_preview_service import AsyncPreviewService
 from ui.frame_mapping.services.canvas_config_service import CanvasConfig
 from ui.frame_mapping.views.workbench_items import (
@@ -308,6 +309,11 @@ class WorkbenchCanvas(QWidget):
         self._async_preview_service = AsyncPreviewService(self)
         self._async_preview_service.preview_ready.connect(self._on_async_preview_ready)
         self._async_preview_service.preview_failed.connect(self._on_async_preview_failed)
+
+        # Async highlight service for offloading pixel iteration to background thread
+        self._async_highlight_service = AsyncHighlightService(self)
+        self._async_highlight_service.highlight_ready.connect(self._on_async_highlight_ready)
+        self._async_highlight_service.highlight_failed.connect(self._on_async_highlight_failed)
 
         self._setup_ui()
         self._connect_signals()
@@ -2189,22 +2195,44 @@ class WorkbenchCanvas(QWidget):
         """Highlight all pixels that use the given palette index.
 
         This is called when the user hovers over a palette swatch to show
-        which pixels in the AI frame use that color.
+        which pixels in the AI frame use that color. Uses async service
+        to avoid blocking UI during pixel iteration.
 
         Args:
             index: Palette index to highlight, or None to hide highlight
         """
         if index is None:
-            # Hide highlight immediately
-            self._pixel_highlight_timer.stop()
+            # Hide highlight immediately and cancel any pending generation
+            self._async_highlight_service.cancel()
             self._pending_highlight_index = None
             if self._pixel_highlight_item is not None:
                 self._pixel_highlight_item.setVisible(False)
             return
 
-        # Debounce the mask generation
+        if self._ai_image is None:
+            return
+
+        if self._pixel_highlight_item is None:
+            return
+
+        # Store pending index for position update when ready
         self._pending_highlight_index = index
-        self._pixel_highlight_timer.start(self._config.pixel_highlight_debounce_ms)
+
+        # Get current transform parameters
+        user_scale = self._ai_frame_item.scale_factor()
+        flip_h = self._flip_h_checkbox.isChecked()
+        flip_v = self._flip_v_checkbox.isChecked()
+
+        # Request async highlight generation
+        self._async_highlight_service.request_highlight(
+            ai_image=self._ai_image,
+            palette_index=index,
+            sheet_palette=self._sheet_palette,
+            display_scale=self._display_scale,
+            user_scale=user_scale,
+            flip_h=flip_h,
+            flip_v=flip_v,
+        )
 
     def _generate_pixel_highlight_mask(self) -> None:
         """Generate and display the pixel highlight mask for the pending index."""
@@ -2289,6 +2317,37 @@ class WorkbenchCanvas(QWidget):
 
         except Exception as e:
             logger.warning("Failed to generate pixel highlight mask: %s", e)
+            self._pixel_highlight_item.setVisible(False)
+
+    def _on_async_highlight_ready(self, qimage: QImage) -> None:
+        """Handle async highlight mask ready from worker.
+
+        Args:
+            qimage: The highlight mask QImage from the worker thread
+        """
+        if self._pixel_highlight_item is None:
+            return
+
+        if qimage.isNull():
+            self._pixel_highlight_item.setVisible(False)
+            return
+
+        # Convert QImage to QPixmap (must be done on main thread)
+        pixmap = QPixmap.fromImage(qimage)
+
+        # Position the highlight overlay to match the AI frame
+        self._pixel_highlight_item.setPixmap(pixmap)
+        self._pixel_highlight_item.setPos(self._ai_frame_item.pos())
+        self._pixel_highlight_item.setVisible(True)
+
+    def _on_async_highlight_failed(self, error_message: str) -> None:
+        """Handle async highlight generation failure.
+
+        Args:
+            error_message: Description of the error
+        """
+        logger.warning("Async highlight generation failed: %s", error_message)
+        if self._pixel_highlight_item is not None:
             self._pixel_highlight_item.setVisible(False)
 
     def _on_scene_clicked(self, scene_x: float, scene_y: float) -> None:

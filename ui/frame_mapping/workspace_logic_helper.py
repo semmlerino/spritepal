@@ -198,6 +198,85 @@ class WorkspaceLogicHelper:
         # Also update captures pane with previews for thumbnails
         self._captures_pane.set_game_frame_previews(previews)
 
+    # ===== Targeted single-item update methods (performance optimization) =====
+
+    def update_single_ai_frame_status(self, ai_frame_id: str) -> None:
+        """Update status for one AI frame only (no full refresh).
+
+        This is more efficient than refresh_mapping_status() when only a single
+        frame's mapping has changed.
+
+        Args:
+            ai_frame_id: The AI frame ID to update
+        """
+        if self._controller is None or self._ai_frames_pane is None:
+            return
+
+        project = self._controller.project
+        if project is None:
+            return
+
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
+        status = mapping.status if mapping else "unmapped"
+        self._ai_frames_pane.update_single_item_status(ai_frame_id, status)
+
+    def update_single_game_frame_link_status(self, game_frame_id: str) -> None:
+        """Update link status for one game frame only (no full refresh).
+
+        This is more efficient than refresh_game_frame_link_status() when only
+        a single frame's link has changed.
+
+        Args:
+            game_frame_id: The game frame ID to update
+        """
+        if self._controller is None or self._captures_pane is None:
+            return
+
+        project = self._controller.project
+        if project is None:
+            return
+
+        linked_ai_id = project.get_ai_frame_linked_to_game_frame(game_frame_id)
+        self._captures_pane.update_single_item_link_status(game_frame_id, linked_ai_id)
+
+    def update_single_mapping_panel_row(self, ai_frame_id: str) -> None:
+        """Update one mapping panel row (alignment + status + preview).
+
+        This is more efficient than update_mapping_panel_previews() when only
+        a single mapping has changed.
+
+        Args:
+            ai_frame_id: The AI frame ID whose row to update
+        """
+        if self._controller is None or self._mapping_panel is None:
+            return
+
+        project = self._controller.project
+        if project is None:
+            return
+
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
+        if mapping is None:
+            return
+
+        # Update alignment and flip columns
+        self._mapping_panel.update_row_alignment(
+            ai_frame_id,
+            mapping.offset_x,
+            mapping.offset_y,
+            mapping.flip_h,
+            mapping.flip_v,
+        )
+
+        # Update status column
+        self._mapping_panel.update_row_status(ai_frame_id, mapping.status)
+
+        # Update game frame preview if applicable
+        if mapping.game_frame_id:
+            preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
+            if preview:
+                self._mapping_panel.update_game_frame_preview(mapping.game_frame_id, preview)
+
     # ===== Phase 2c: Selection handlers =====
 
     def handle_ai_frame_selected(self, frame_id: str) -> None:

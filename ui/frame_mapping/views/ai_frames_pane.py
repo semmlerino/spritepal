@@ -256,6 +256,44 @@ class AIFramesPane(QWidget):
         self._mapping_status = status_map
         self._refresh_list(is_frame_list_change=False)
 
+    def update_single_item_status(self, ai_frame_id: str, status: str) -> None:
+        """Update status indicator for one AI frame without full refresh.
+
+        This is more efficient than set_mapping_status() when only a single
+        frame's status has changed (e.g., after alignment edit or mapping creation).
+
+        Args:
+            ai_frame_id: The AI frame ID (filename) to update
+            status: New status string ("unmapped", "mapped", "edited", "injected")
+        """
+        # Update internal status map
+        self._mapping_status[ai_frame_id] = status
+
+        # Find and update the list item
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) == ai_frame_id:  # type: ignore[reportUnnecessaryComparison]
+                # Get the frame to reconstruct display text
+                frame = next((f for f in self._ai_frames if f.id == ai_frame_id), None)
+                if frame is None:
+                    break
+
+                # Update status indicator and text
+                status_indicator = "●" if status != "unmapped" else "○"
+                display_text = frame.name
+
+                # Add tag chips as suffix
+                if frame.tags:
+                    tag_str = " ".join(f"[{t}]" for t in sorted(frame.tags))
+                    display_text = f"{display_text}  {tag_str}"
+
+                item.setText(f"{status_indicator} {display_text}")
+
+                # Update color
+                color = get_status_color(status)
+                item.setForeground(QBrush(color))
+                break
+
     def get_selected_index(self) -> int | None:
         """Get the currently selected AI frame index.
 

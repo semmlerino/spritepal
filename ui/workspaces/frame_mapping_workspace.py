@@ -498,24 +498,36 @@ class FrameMappingWorkspace(QWidget):
     def _on_mapping_created(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Handle mapping created - targeted UI update.
 
-        Only updates the UI elements affected by mapping creation,
-        avoiding full project refresh for better performance.
+        Only updates the specific UI elements affected by the mapping creation,
+        avoiding full list rebuilds for better performance.
+
+        Args:
+            ai_frame_id: The AI frame ID that was mapped
+            game_frame_id: The game frame ID it was mapped to
         """
         self._update_map_button_state()
-        self._refresh_mapping_status()
-        self._refresh_game_frame_link_status()
-        self._update_mapping_panel_previews()
+        # Use targeted single-item updates instead of full refresh
+        self._update_single_ai_frame_status(ai_frame_id)
+        self._update_single_game_frame_link_status(game_frame_id)
+        self._update_single_mapping_panel_row(ai_frame_id)
 
     def _on_mapping_removed(self, ai_frame_id: str) -> None:
         """Handle mapping removed - targeted UI update.
 
         Only updates the UI elements affected by mapping removal,
         avoiding full project refresh for better performance.
+
+        Note: We use full refresh for game frame link status because
+        the mapping has already been removed and we don't have the
+        game_frame_id that was unlinked.
         """
         self._update_map_button_state()
-        self._refresh_mapping_status()
+        # Use targeted update for AI frame status (we know which one changed)
+        self._update_single_ai_frame_status(ai_frame_id)
+        # Must use full refresh for captures - we don't know which game frame was unlinked
         self._refresh_game_frame_link_status()
-        self._update_mapping_panel_previews()
+        # Mapping panel needs full refresh since row structure may change
+        self._mapping_panel.refresh()
 
         # Clear browsing mode if the removed mapping was for the selected AI frame
         # When a mapping is removed, there's nothing to "browse away from"
@@ -1291,8 +1303,9 @@ class FrameMappingWorkspace(QWidget):
         if self._state.selected_ai_frame_id == ai_frame_id:
             self._sync_canvas_alignment_from_model()
 
-        # Refresh status indicators (doesn't touch canvas)
-        self._refresh_mapping_status()
+        # Use targeted single-item update instead of full refresh
+        # Only the specific AI frame's status indicator needs updating
+        self._update_single_ai_frame_status(ai_frame_id)
 
     # -------------------------------------------------------------------------
     # Sheet Palette Handlers
@@ -1440,6 +1453,18 @@ class FrameMappingWorkspace(QWidget):
     def _update_mapping_panel_previews(self) -> None:
         """Update the mapping panel with game frame preview pixmaps."""
         self._logic.update_mapping_panel_previews()
+
+    def _update_single_ai_frame_status(self, ai_frame_id: str) -> None:
+        """Update status for one AI frame only (performance optimization)."""
+        self._logic.update_single_ai_frame_status(ai_frame_id)
+
+    def _update_single_game_frame_link_status(self, game_frame_id: str) -> None:
+        """Update link status for one game frame only (performance optimization)."""
+        self._logic.update_single_game_frame_link_status(game_frame_id)
+
+    def _update_single_mapping_panel_row(self, ai_frame_id: str) -> None:
+        """Update one mapping panel row (performance optimization)."""
+        self._logic.update_single_mapping_panel_row(ai_frame_id)
 
     def _sync_canvas_alignment_from_model(self) -> None:
         """Sync the canvas alignment display with the current model state."""

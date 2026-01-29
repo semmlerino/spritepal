@@ -145,6 +145,49 @@ class CapturesLibraryPane(QWidget):
         self._link_status = link_status
         self._refresh_list()
 
+    def update_single_item_link_status(self, game_frame_id: str, linked_ai_id: str | None) -> None:
+        """Update link status for one game frame without full refresh.
+
+        This is more efficient than set_link_status() when only a single
+        frame's link has changed (e.g., after mapping creation/removal).
+
+        Args:
+            game_frame_id: The game frame ID to update
+            linked_ai_id: The linked AI frame ID, or None if unlinked
+        """
+        # Update internal link status
+        self._link_status[game_frame_id] = linked_ai_id
+
+        # Find and update the list item
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) == game_frame_id:  # type: ignore[reportUnnecessaryComparison]
+                # Get the frame to reconstruct display
+                frame = next((f for f in self._game_frames if f.id == game_frame_id), None)
+                if frame is None:
+                    break
+
+                # Update display text and color based on link status
+                display_text = frame.name
+                if frame.display_name:
+                    tooltip = f"Original ID: {frame.id}"
+                else:
+                    tooltip = ""
+
+                if linked_ai_id is not None:
+                    color = STATUS_COLORS["linked"]
+                    item.setText(f"✓ {display_text}")
+                    tooltip_suffix = f"Linked to AI frame #{linked_ai_id}"
+                    item.setToolTip(f"{tooltip}\n{tooltip_suffix}" if tooltip else tooltip_suffix)
+                else:
+                    color = STATUS_COLORS["unlinked"]
+                    item.setText(display_text)
+                    tooltip_suffix = "Unlinked - drag to mapping drawer to link"
+                    item.setToolTip(f"{tooltip}\n{tooltip_suffix}" if tooltip else tooltip_suffix)
+
+                item.setForeground(QBrush(color))
+                break
+
     def set_game_frame_previews(self, previews: dict[str, QPixmap]) -> None:
         """Set the preview pixmaps for game frames.
 
