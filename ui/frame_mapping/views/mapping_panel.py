@@ -126,10 +126,12 @@ class MappingPanel(QWidget):
         self._table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._table.setIconSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
 
-        # Enable drag-drop (DragDrop for both receiving and initiating drags)
+        # Enable drag-drop: accept drops (for game frames and reorder)
+        # NOTE: We handle drag initiation manually via _mouse_move_event + QDrag,
+        # so setDragEnabled(False) - Qt's automatic drag causes multi-second hangs
         self._table.setAcceptDrops(True)
         self._table.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
-        self._table.setDragEnabled(True)
+        self._table.setDragEnabled(False)
         self._table.viewport().setAcceptDrops(True)
         # Install event filter for custom paint (insertion line)
         self._table.viewport().installEventFilter(self)
