@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import platform
 import weakref
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, override
 
 if TYPE_CHECKING:
     from core.rom_extractor import ROMExtractor
@@ -54,6 +54,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.types import SpriteInfo
 from ui.common.spacing_constants import FULLSCREEN_MARGINS
 from ui.styles.theme import COLORS
 from utils.logging_config import get_logger
@@ -78,7 +79,7 @@ class FullscreenSpriteViewer(QWidget):
         super().__init__(parent)
 
         # Data
-        self.sprites_data: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - sprite metadata
+        self.sprites_data: list[SpriteInfo] = []
         self.current_index: int = 0
         self.rom_path: str | None = None
         self.rom_extractor: ROMExtractor | None = None
@@ -217,7 +218,7 @@ class FullscreenSpriteViewer(QWidget):
 
     def set_sprite_data(
         self,
-        sprites_data: list[dict[str, Any]],  # pyright: ignore[reportExplicitAny] - sprite metadata dicts
+        sprites_data: list[SpriteInfo],
         current_offset: int,
         rom_path: str,
         rom_extractor: ROMExtractor | None,
@@ -226,7 +227,7 @@ class FullscreenSpriteViewer(QWidget):
         Set the sprite data for the viewer.
 
         Args:
-            sprites_data: List of sprite dictionaries
+            sprites_data: List of sprite info dictionaries
             current_offset: Offset of currently selected sprite
             rom_path: Path to ROM file
             rom_extractor: ROM extractor instance

@@ -5,7 +5,7 @@ Implements virtual scrolling through QAbstractListModel.
 
 from __future__ import annotations
 
-from typing import Any, override
+from typing import override
 
 from PySide6.QtCore import (
     QAbstractListModel,
@@ -17,6 +17,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QPixmap
 
+from core.types import SpriteInfo
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -43,8 +44,8 @@ class SpriteGalleryModel(QAbstractListModel):
         super().__init__(parent)  # type: ignore[arg-type]
 
         # Sprite data storage
-        self._sprites: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - sprite data
-        self._filtered_sprites: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - sprite data
+        self._sprites: list[SpriteInfo] = []
+        self._filtered_sprites: list[SpriteInfo] = []
         self._thumbnails: dict[int, QPixmap] = {}  # offset -> pixmap cache
         self._selected_offsets: set[int] = set()
 
@@ -167,12 +168,12 @@ class SpriteGalleryModel(QAbstractListModel):
 
         return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
 
-    def set_sprites(self, sprites: list[dict[str, Any]]):  # pyright: ignore[reportExplicitAny] - sprite data
+    def set_sprites(self, sprites: list[SpriteInfo]) -> None:
         """
         Set the sprite data for the model.
 
         Args:
-            sprites: List of sprite dictionaries
+            sprites: List of sprite info dictionaries
         """
         self.beginResetModel()
 
@@ -270,14 +271,14 @@ class SpriteGalleryModel(QAbstractListModel):
 
         self.endResetModel()
 
-    def get_sprite_at_row(self, row: int) -> dict[str, Any] | None:  # pyright: ignore[reportExplicitAny] - sprite data
+    def get_sprite_at_row(self, row: int) -> SpriteInfo | None:
         """Get sprite data at the given row."""
         sprites = self._filtered_sprites if self._use_filtering else self._sprites
         if 0 <= row < len(sprites):
             return sprites[row]
         return None
 
-    def get_selected_sprites(self) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - sprite data
+    def get_selected_sprites(self) -> list[SpriteInfo]:
         """Get all selected sprites."""
         selected = []
         for sprite in self._sprites:
@@ -379,7 +380,7 @@ class SpriteGalleryModel(QAbstractListModel):
             self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 0), [self.PixmapRole])
 
     @staticmethod
-    def _get_offset(sprite: dict[str, Any]) -> int:  # pyright: ignore[reportExplicitAny] - sprite data
+    def _get_offset(sprite: SpriteInfo) -> int:
         """Extract offset from sprite data."""
         offset = sprite.get("offset", 0)
         if isinstance(offset, str):

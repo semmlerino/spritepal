@@ -11,9 +11,12 @@ import hashlib
 import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import Qt, QThread, Signal
+
+if TYPE_CHECKING:
+    from ui.windows.detached_gallery_window import DetachedGalleryWindow
 from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
@@ -29,6 +32,7 @@ from PySide6.QtWidgets import (
 
 from core.rom_extractor import ROMExtractor
 from core.sprite_finder import SpriteFinder
+from core.types import SpriteInfo
 from ui.common.spacing_constants import SPACING_SMALL, SPACING_TINY
 from ui.widgets.sprite_gallery_widget import SpriteGalleryWidget
 from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
@@ -57,7 +61,7 @@ class SpriteGalleryTab(QWidget):
         self.rom_path: str | None = None
         self.rom_size: int = 0
         self.rom_extractor = None
-        self.sprites_data: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - Sprite metadata
+        self.sprites_data: list[SpriteInfo] = []
         self.scan_mode = "quick"
 
         # Workers
@@ -68,7 +72,7 @@ class SpriteGalleryTab(QWidget):
         self.gallery_widget: SpriteGalleryWidget  # Always initialized
         self.toolbar: QToolBar  # Always initialized
         self.progress_dialog: QProgressDialog | None = None
-        self.detached_window: Any | None = None  # pyright: ignore[reportExplicitAny] - DetachedGalleryWindow, avoid circular import
+        self.detached_window: DetachedGalleryWindow | None = None
 
         self._setup_ui()
 
@@ -504,15 +508,14 @@ class SpriteGalleryTab(QWidget):
         ):
             thumbnail = self.detached_window.gallery_widget.thumbnails[offset]
             # Find sprite info
-            sprite_info = None
+            sprite_info: SpriteInfo | None = None
             for info in self.sprites_data:
-                info_offset = info.get("offset", 0)
-                if isinstance(info_offset, str):
-                    info_offset = int(info_offset, 16) if info_offset.startswith("0x") else int(info_offset)
-                if info_offset == offset:
+                if info["offset"] == offset:  # offset is always int in SpriteInfo
                     sprite_info = info
                     break
-            thumbnail.set_sprite_data(pixmap, sprite_info)
+            # Only call set_sprite_data if thumbnail has that method
+            if hasattr(thumbnail, "set_sprite_data"):
+                thumbnail.set_sprite_data(pixmap, sprite_info)  # type: ignore[union-attr]
 
     def cleanup(self) -> None:
         """Clean up resources."""

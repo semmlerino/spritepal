@@ -319,7 +319,7 @@ class IconToolbar(QWidget):
             return
 
         # Block signals during programmatic update
-        blocker = QSignalBlocker(self.tool_group)  # noqa: F841  # pyright: ignore[reportUnusedVariable]
+        _ = QSignalBlocker(self.tool_group)  # RAII pattern - blocker active until scope exit
         self.tool_buttons[tool_name].setChecked(True)
         # Signal blocking ends automatically when blocker goes out of scope
 

@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 from shiboken6 import isValid
 
+from core.types import SpriteInfo
 from ui.common.spacing_constants import (
     MEDIUM_WIDTH,
     SPACING_LARGE,
@@ -342,12 +343,12 @@ class SpriteGalleryWidget(QWidget):
         controls.setLayout(layout)
         return controls
 
-    def set_sprites(self, sprites: list[dict[str, object]]) -> None:
+    def set_sprites(self, sprites: list[SpriteInfo]) -> None:
         """
         Set the sprites to display in the gallery.
 
         Args:
-            sprites: List of sprite dictionaries with offset, size, etc.
+            sprites: List of sprite info dictionaries with offset, size, etc.
         """
         if not self.model:
             logger.warning("Model not initialized")
@@ -546,7 +547,7 @@ class SpriteGalleryWidget(QWidget):
         # Trigger thumbnail loading when widget becomes visible
         self.viewport_timer.start()
 
-    def get_selected_sprites(self) -> list[dict[str, object]]:
+    def get_selected_sprites(self) -> list[SpriteInfo]:
         """Get information for all selected sprites."""
         if self.model:
             return self.model.get_selected_sprites()
@@ -557,11 +558,7 @@ class SpriteGalleryWidget(QWidget):
         if self.model:
             selected = self.model.get_selected_sprites()
             if selected:
-                offset = selected[0].get("offset", 0)
-                if isinstance(offset, str):
-                    return int(offset, 16) if offset.startswith("0x") else int(offset)
-                if isinstance(offset, int):
-                    return offset
+                return selected[0]["offset"]  # offset is always int in SpriteInfo
         return None
 
     def force_layout_update(self) -> None:
@@ -595,12 +592,9 @@ class SpriteGalleryWidget(QWidget):
             for i in range(self.model.rowCount()):
                 sprite = self.model.get_sprite_at_row(i)
                 if sprite:
-                    offset = sprite.get("offset", 0)
-                    if isinstance(offset, str):
-                        offset = int(offset, 16) if offset.startswith("0x") else int(offset)
+                    offset = sprite["offset"]  # offset is always int in SpriteInfo
                     # Create a minimal object that has the offset
-                    if isinstance(offset, int):
-                        result[offset] = type("ThumbnailCompat", (), {"offset": offset})
+                    result[offset] = type("ThumbnailCompat", (), {"offset": offset})
         return result
 
     def cleanup(self) -> None:

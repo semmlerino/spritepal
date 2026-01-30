@@ -174,7 +174,7 @@ class PalettePanel(QWidget):
         Uses QSignalBlocker to prevent re-emitting the signal that triggered this update.
         """
         # Block signals during programmatic update
-        blocker = QSignalBlocker(self.palette_widget)  # noqa: F841  # pyright: ignore[reportUnusedVariable]
+        _ = QSignalBlocker(self.palette_widget)  # RAII pattern - blocker active until scope exit
         self.palette_widget.selected_index = index
         self.palette_widget.update()
         # Signal blocking ends automatically when blocker goes out of scope

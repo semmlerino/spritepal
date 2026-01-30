@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast, override
+from typing import TYPE_CHECKING, cast, override
 
 if TYPE_CHECKING:
     from core.managers.application_state_manager import ApplicationStateManager
@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.services.rom_cache import ROMCache
+from core.types import SpriteInfo
 from ui.common import WorkerManager
 from ui.common.file_dialogs import browse_for_open_file, browse_for_save_file
 from ui.common.spacing_constants import (
@@ -84,7 +85,7 @@ class DetachedGalleryWindow(QMainWindow):
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.Window)
 
         # State
-        self.sprites_data: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - sprite metadata
+        self.sprites_data: list[SpriteInfo] = []
         self.rom_path: str | None = None
         self.rom_size: int = 0
         self.scan_worker: SpriteScanWorker | None = None
@@ -403,12 +404,12 @@ class DetachedGalleryWindow(QMainWindow):
         extract_action.triggered.connect(self._extract_selected_sprite)
         toolbar.addAction(extract_action)
 
-    def set_sprites(self, sprites: list[dict[str, object]]) -> None:
+    def set_sprites(self, sprites: list[SpriteInfo]) -> None:
         """
         Set the sprites to display.
 
         Args:
-            sprites: List of sprite dictionaries
+            sprites: List of sprite info dictionaries
         """
         self.sprites_data = sprites
         if self.gallery_widget:
@@ -679,11 +680,14 @@ class DetachedGalleryWindow(QMainWindow):
                 for name, pointer_obj in locations.items():
                     # Cast to SpritePointer for proper type checking
                     pointer = cast("SpritePointer", pointer_obj)
-                    sprite = {
+                    sprite: SpriteInfo = {
                         "offset": pointer.offset,
+                        "offset_hex": f"0x{pointer.offset:06X}",
+                        "compressed_size": 0,
                         "decompressed_size": 0,  # Will be determined during thumbnail generation
                         "tile_count": 0,
-                        "compressed": False,
+                        "alignment": "unknown",
+                        "quality": 1.0,
                         "name": name.replace("_", " ").title(),
                     }
                     self.sprites_data.append(sprite)
@@ -824,14 +828,20 @@ class DetachedGalleryWindow(QMainWindow):
 
     def _on_sprite_found(self, sprite_info: dict[str, object]) -> None:
         """Handle sprite found during scan."""
+        offset = int(sprite_info.get("offset", 0))  # type: ignore[arg-type]
+        quality_val = sprite_info.get("quality", 1.0)
+        quality = float(quality_val) if quality_val is not None else 1.0  # type: ignore[arg-type]
+
         # Convert to the format expected by gallery
-        sprite = {
-            "offset": sprite_info["offset"],
+        sprite: SpriteInfo = {
+            "offset": offset,
+            "offset_hex": f"0x{offset:06X}",
+            "compressed_size": 0,
             "decompressed_size": 0,  # Will be determined during thumbnail generation
             "tile_count": 0,
-            "compressed": False,  # Will be determined later
-            "name": f"Sprite_0x{sprite_info['offset']:06X}",
-            "quality": sprite_info.get("quality", 1.0),
+            "alignment": "unknown",
+            "quality": quality,
+            "name": f"Sprite_0x{offset:06X}",
         }
 
         # Add to sprites data
@@ -1270,7 +1280,7 @@ class DetachedGalleryWindow(QMainWindow):
         text = "Sprite Scan Results:\n\n"
         for i, sprite in enumerate(self.sprites_data, 1):
             text += f"{i}. Offset: 0x{sprite['offset']:06X}\n"
-            text += f"   Name: {sprite['name']}\n"
+            text += f"   Name: {sprite.get('name', 'Unknown')}\n"
             text += f"   Size: {sprite['decompressed_size']} bytes\n"
             text += f"   Tiles: {sprite['tile_count']}\n"
             if "quality" in sprite:

@@ -744,7 +744,9 @@ class ApplicationStateManager(BaseManager):
     def get_cache_max_size_mb(self) -> int:
         """Get maximum cache size in MB."""
         value = self.get("cache", "max_size_mb", 500)
-        return int(value) if value is not None else 500  # pyright: ignore[reportArgumentType] - runtime ensures int/str
+        if isinstance(value, (int, str)):
+            return int(value)
+        return 500
 
     def set_cache_max_size_mb(self, size_mb: int) -> None:
         """Set maximum cache size in MB."""
@@ -754,7 +756,9 @@ class ApplicationStateManager(BaseManager):
     def get_cache_expiration_days(self) -> int:
         """Get cache expiration in days."""
         value = self.get("cache", "expiration_days", 30)
-        return int(value) if value is not None else 30  # pyright: ignore[reportArgumentType] - runtime ensures int/str
+        if isinstance(value, (int, str)):
+            return int(value)
+        return 30
 
     def set_cache_expiration_days(self, days: int) -> None:
         """Set cache expiration in days."""

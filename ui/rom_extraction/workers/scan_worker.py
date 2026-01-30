@@ -17,6 +17,7 @@ from typing import Any, override
 from PySide6.QtCore import QMutex, QMutexLocker, Signal
 
 from core.parallel_sprite_finder import ParallelSpriteFinder
+from core.types import SpriteInfo
 from core.workers.base import BaseWorker, handle_worker_errors
 from utils.constants import ROM_SCAN_START_DEFAULT, ROM_SCAN_STEP_TILE, ROM_SIZE_4MB
 from utils.logging_config import get_logger
@@ -90,17 +91,16 @@ class SpriteScanWorker(BaseWorker):
         self.rom_cache = rom_cache
 
         # Thread-safe storage for found sprites
-        self._found_sprites: dict[int, dict[str, Any]] = {}  # pyright: ignore[reportExplicitAny] - Sprite result dicts
+        self._found_sprites: dict[int, SpriteInfo] = {}
         self._results_mutex = QMutex()
 
-    def _add_found_sprite(self, sprite_info: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Sprite result dict
+    def _add_found_sprite(self, sprite_info: SpriteInfo) -> None:
         """Thread-safe method to add a found sprite to the results."""
-        offset = sprite_info.get("offset")
-        if offset is not None:
-            with QMutexLocker(self._results_mutex):
-                self._found_sprites[offset] = sprite_info
+        offset = sprite_info["offset"]  # Required field in SpriteInfo
+        with QMutexLocker(self._results_mutex):
+            self._found_sprites[offset] = sprite_info
 
-    def _get_found_sprites_snapshot(self) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - Sprite result dicts
+    def _get_found_sprites_snapshot(self) -> list[SpriteInfo]:
         """Thread-safe method to get a snapshot of all found sprites."""
         with QMutexLocker(self._results_mutex):
             return list(self._found_sprites.values())
@@ -115,7 +115,7 @@ class SpriteScanWorker(BaseWorker):
         with QMutexLocker(self._results_mutex):
             self._found_sprites.clear()
 
-    def get_found_sprites(self) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - Sprite result dicts
+    def get_found_sprites(self) -> list[SpriteInfo]:
         """Public thread-safe getter for found sprites.
 
         Returns a copy of the found sprites list to prevent concurrent modification.
@@ -251,7 +251,7 @@ class SpriteScanWorker(BaseWorker):
 
         # Convert SearchResult objects to legacy sprite info format and emit
         for result in search_results:
-            sprite_info = {
+            sprite_info: SpriteInfo = {
                 "offset": result.offset,
                 "offset_hex": f"0x{result.offset:X}",
                 "compressed_size": result.compressed_size,
