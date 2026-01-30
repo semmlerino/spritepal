@@ -115,66 +115,26 @@ def asset_browser(qtbot: QtBot):
 class TestIconToolbarToolSignals:
     """Test IconToolbar emits correct toolChanged signals on UI interaction."""
 
-    def test_pencil_button_click_emits_toolChanged_with_pencil(self, qtbot: QtBot) -> None:
-        """Verify clicking pencil button emits toolChanged with 'pencil'."""
+    @pytest.mark.parametrize("tool_name", ["pencil", "fill", "picker", "eraser"])
+    def test_tool_button_click_emits_toolChanged(self, qtbot: QtBot, tool_name: str) -> None:
+        """Verify clicking a tool button emits toolChanged with the correct tool name."""
         from ui.sprite_editor.views.widgets.icon_toolbar import IconToolbar
 
         toolbar = IconToolbar()
         qtbot.addWidget(toolbar)
 
-        # First select a different tool so clicking pencil is a change
-        qtbot.mouseClick(toolbar.tool_buttons["fill"], Qt.MouseButton.LeftButton)
+        # Select a different tool first to ensure clicking causes a change
+        # For pencil, select fill first; for others, pencil is already selected so clicking triggers signal
+        if tool_name == "pencil":
+            qtbot.mouseClick(toolbar.tool_buttons["fill"], Qt.MouseButton.LeftButton)
 
         spy = QSignalSpy(toolbar.toolChanged)
+        qtbot.mouseClick(toolbar.tool_buttons[tool_name], Qt.MouseButton.LeftButton)
 
-        # Drive via real UI interaction
-        qtbot.mouseClick(toolbar.tool_buttons["pencil"], Qt.MouseButton.LeftButton)
-
-        # Assert ONLY on signal behavior
-        assert spy.count() == 1, "SIGNAL CONTRACT VIOLATION: toolChanged must be emitted when pencil button is clicked."
-        assert list(spy.at(0)) == ["pencil"]
-
-    def test_fill_button_click_emits_toolChanged_with_fill(self, qtbot: QtBot) -> None:
-        """Verify clicking fill button emits toolChanged with 'fill'."""
-        from ui.sprite_editor.views.widgets.icon_toolbar import IconToolbar
-
-        toolbar = IconToolbar()
-        qtbot.addWidget(toolbar)
-
-        spy = QSignalSpy(toolbar.toolChanged)
-
-        qtbot.mouseClick(toolbar.tool_buttons["fill"], Qt.MouseButton.LeftButton)
-
-        assert spy.count() == 1, "SIGNAL CONTRACT VIOLATION: toolChanged must be emitted when fill button is clicked."
-        assert list(spy.at(0)) == ["fill"]
-
-    def test_picker_button_click_emits_toolChanged_with_picker(self, qtbot: QtBot) -> None:
-        """Verify clicking picker button emits toolChanged with 'picker'."""
-        from ui.sprite_editor.views.widgets.icon_toolbar import IconToolbar
-
-        toolbar = IconToolbar()
-        qtbot.addWidget(toolbar)
-
-        spy = QSignalSpy(toolbar.toolChanged)
-
-        qtbot.mouseClick(toolbar.tool_buttons["picker"], Qt.MouseButton.LeftButton)
-
-        assert spy.count() == 1, "SIGNAL CONTRACT VIOLATION: toolChanged must be emitted when picker button is clicked."
-        assert list(spy.at(0)) == ["picker"]
-
-    def test_eraser_button_click_emits_toolChanged_with_eraser(self, qtbot: QtBot) -> None:
-        """Verify clicking eraser button emits toolChanged with 'eraser'."""
-        from ui.sprite_editor.views.widgets.icon_toolbar import IconToolbar
-
-        toolbar = IconToolbar()
-        qtbot.addWidget(toolbar)
-
-        spy = QSignalSpy(toolbar.toolChanged)
-
-        qtbot.mouseClick(toolbar.tool_buttons["eraser"], Qt.MouseButton.LeftButton)
-
-        assert spy.count() == 1, "SIGNAL CONTRACT VIOLATION: toolChanged must be emitted when eraser button is clicked."
-        assert list(spy.at(0)) == ["eraser"]
+        assert spy.count() == 1, (
+            f"SIGNAL CONTRACT VIOLATION: toolChanged must be emitted when {tool_name} button is clicked."
+        )
+        assert list(spy.at(0)) == [tool_name]
 
     def test_multiple_tool_clicks_emit_multiple_signals(self, qtbot: QtBot) -> None:
         """Verify each tool button click emits a separate toolChanged signal."""
@@ -301,8 +261,18 @@ class TestIconToolbarToggleSignals:
 class TestIconToolbarBackgroundSignals:
     """Test IconToolbar emits correct backgroundChanged signals."""
 
-    def test_background_menu_checkerboard_emits_backgroundChanged(self, qtbot: QtBot) -> None:
-        """Verify selecting checkerboard background emits backgroundChanged."""
+    @pytest.mark.parametrize(
+        "action_index,expected_bg",
+        [
+            (0, "checkerboard"),
+            (1, "black"),
+            (2, "white"),
+        ],
+    )
+    def test_background_menu_action_emits_backgroundChanged(
+        self, qtbot: QtBot, action_index: int, expected_bg: str
+    ) -> None:
+        """Verify selecting background option emits backgroundChanged with correct value."""
         from ui.sprite_editor.views.widgets.icon_toolbar import IconToolbar
 
         toolbar = IconToolbar()
@@ -314,85 +284,20 @@ class TestIconToolbarBackgroundSignals:
         menu = toolbar.background_btn.menu()
         assert menu is not None
 
-        # Find and trigger the checkerboard action
-        checkerboard_action = menu.actions()[0]  # First action is checkerboard
-        checkerboard_action.trigger()
+        # Trigger the action at the specified index
+        menu.actions()[action_index].trigger()
 
         assert spy.count() == 1, (
-            "SIGNAL CONTRACT VIOLATION: backgroundChanged must be emitted when checkerboard background is selected."
+            f"SIGNAL CONTRACT VIOLATION: backgroundChanged must be emitted when {expected_bg} background is selected."
         )
         args = list(spy.at(0))
-        assert args[0] == "checkerboard"
+        assert args[0] == expected_bg
         # Second arg is None for non-custom backgrounds
-        assert args[1] is None
-
-    def test_background_menu_black_emits_backgroundChanged(self, qtbot: QtBot) -> None:
-        """Verify selecting black background emits backgroundChanged."""
-        from ui.sprite_editor.views.widgets.icon_toolbar import IconToolbar
-
-        toolbar = IconToolbar()
-        qtbot.addWidget(toolbar)
-
-        spy = QSignalSpy(toolbar.backgroundChanged)
-
-        assert toolbar.background_btn is not None
-        menu = toolbar.background_btn.menu()
-        assert menu is not None
-
-        # Find and trigger the black action (second in menu)
-        black_action = menu.actions()[1]
-        black_action.trigger()
-
-        assert spy.count() == 1
-        args = list(spy.at(0))
-        assert args[0] == "black"
-        assert args[1] is None
-
-    def test_background_menu_white_emits_backgroundChanged(self, qtbot: QtBot) -> None:
-        """Verify selecting white background emits backgroundChanged."""
-        from ui.sprite_editor.views.widgets.icon_toolbar import IconToolbar
-
-        toolbar = IconToolbar()
-        qtbot.addWidget(toolbar)
-
-        spy = QSignalSpy(toolbar.backgroundChanged)
-
-        assert toolbar.background_btn is not None
-        menu = toolbar.background_btn.menu()
-        assert menu is not None
-
-        # Find and trigger the white action (third in menu)
-        white_action = menu.actions()[2]
-        white_action.trigger()
-
-        assert spy.count() == 1
-        args = list(spy.at(0))
-        assert args[0] == "white"
         assert args[1] is None
 
 
 class TestIconToolbarSignalContract:
     """Tests that document the expected public signal contract."""
-
-    @pytest.mark.parametrize(
-        "signal_name",
-        [
-            "toolChanged",
-            "zoomInClicked",
-            "zoomOutClicked",
-            "gridToggled",
-            "tileGridToggled",
-            "palettePreviewToggled",
-            "backgroundChanged",
-        ],
-    )
-    def test_signal_exists(self, qtbot: QtBot, signal_name: str) -> None:
-        """Verify all expected public signals exist on IconToolbar."""
-        from ui.sprite_editor.views.widgets.icon_toolbar import IconToolbar
-
-        toolbar = IconToolbar()
-        qtbot.addWidget(toolbar)
-        assert hasattr(toolbar, signal_name), f"SIGNAL CONTRACT: IconToolbar must expose '{signal_name}' signal"
 
     def test_programmatic_set_tool_does_not_emit_signal(self, qtbot: QtBot) -> None:
         """Verify set_tool() does not emit toolChanged (avoids feedback loops)."""
@@ -494,24 +399,6 @@ class TestInjectTabModeSignals:
         qtbot.mouseClick(inject_tab.save_rom_btn, Qt.MouseButton.LeftButton)
 
         assert spy.count() == 1
-
-
-class TestInjectTabSignalContract:
-    """Tests that document the expected public signal contract."""
-
-    @pytest.mark.parametrize(
-        "signal_name",
-        [
-            "inject_requested",
-            "save_rom_requested",
-            "browse_png_requested",
-            "browse_vram_requested",
-            "browse_rom_requested",
-        ],
-    )
-    def test_signal_exists(self, signal_name: str, inject_tab) -> None:
-        """Verify all expected public signals exist on InjectTab."""
-        assert hasattr(inject_tab, signal_name), f"SIGNAL CONTRACT: InjectTab must expose '{signal_name}' signal"
 
 
 # =============================================================================
@@ -649,20 +536,6 @@ class TestPalettePanelSourceSignals:
 
 class TestPalettePanelSignalContract:
     """Tests that document the expected public signal contract."""
-
-    @pytest.mark.parametrize(
-        "signal_name",
-        [
-            "colorSelected",
-            "sourceChanged",
-            "loadPaletteClicked",
-            "savePaletteClicked",
-            "editColorClicked",
-        ],
-    )
-    def test_signal_exists(self, signal_name: str, palette_panel) -> None:
-        """Verify all expected public signals exist on PalettePanel."""
-        assert hasattr(palette_panel, signal_name), f"SIGNAL CONTRACT: PalettePanel must expose '{signal_name}' signal"
 
     def test_programmatic_set_color_does_not_emit_signal(self, qtbot: QtBot, palette_panel) -> None:
         """Verify set_selected_color() does not emit colorSelected."""
@@ -869,25 +742,6 @@ class TestPixelCanvasZoomSignals:
         # New zoom should be lower than initial
         new_zoom = spy.at(0)[0]
         assert new_zoom < initial_zoom
-
-
-class TestPixelCanvasSignalContract:
-    """Tests that document the expected public signal contract."""
-
-    @pytest.mark.parametrize(
-        "signal_name",
-        [
-            "pixelPressed",
-            "pixelMoved",
-            "pixelReleased",
-            "zoomRequested",
-            "hoverPositionChanged",
-        ],
-    )
-    def test_signal_exists(self, signal_name: str, canvas_with_image: tuple) -> None:
-        """Verify all expected public signals exist on PixelCanvas."""
-        canvas, _ = canvas_with_image
-        assert hasattr(canvas, signal_name), f"SIGNAL CONTRACT: PixelCanvas must expose '{signal_name}' signal"
 
 
 class TestPixelCanvasRegression:
@@ -1113,22 +967,6 @@ class TestSpriteAssetBrowserContextMenuSignals:
 
 class TestSpriteAssetBrowserSignalContract:
     """Tests that document the expected public signal contract."""
-
-    @pytest.mark.parametrize(
-        "signal_name",
-        [
-            "sprite_selected",
-            "sprite_activated",
-            "rename_requested",
-            "delete_requested",
-            "save_to_library_requested",
-        ],
-    )
-    def test_signal_exists(self, signal_name: str, asset_browser) -> None:
-        """Verify all expected public signals exist on SpriteAssetBrowser."""
-        assert hasattr(asset_browser, signal_name), (
-            f"SIGNAL CONTRACT: SpriteAssetBrowser must expose '{signal_name}' signal"
-        )
 
     def test_category_selection_does_not_emit_sprite_selected(self, qtbot: QtBot, asset_browser) -> None:
         """Verify selecting a category (not a sprite) does not emit sprite_selected."""
