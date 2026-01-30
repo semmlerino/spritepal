@@ -374,9 +374,9 @@ class TestThumbnailRequeueOnAlignment:
     ):
         """Verify _on_item_offset_changed handler queues thumbnail for new offset."""
         controller, _ = controller_with_mock_coordinator
-        mock_thumb_ctrl = MagicMock()
-        controller._thumbnail_controller = mock_thumb_ctrl
+        # Mock the thumbnail service's request_thumbnail method
+        controller._thumbnail_service.request_thumbnail = MagicMock()
 
         controller._on_item_offset_changed(0x1000, 0x1004)
 
-        mock_thumb_ctrl.queue_thumbnail.assert_called_with(0x1004)
+        controller._thumbnail_service.request_thumbnail.assert_called_with(0x1004)

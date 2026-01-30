@@ -738,8 +738,8 @@ class TestAssetBrowserUI:
         )
 
         # Connect to catch thumbnails
-        if rom_workflow_controller._thumbnail_controller:
-            rom_workflow_controller._thumbnail_controller.thumbnail_ready.connect(capture_thumbnail)
+        if rom_workflow_controller._thumbnail_service._thumbnail_controller:
+            rom_workflow_controller._thumbnail_service._thumbnail_controller.thumbnail_ready.connect(capture_thumbnail)
 
         # Wait for at least one thumbnail
         qtbot.waitUntil(
@@ -816,8 +816,8 @@ class TestAssetBrowserUI:
         )
 
         # Connect to thumbnail signal
-        if rom_workflow_controller._thumbnail_controller:
-            rom_workflow_controller._thumbnail_controller.thumbnail_ready.connect(capture_thumbnail)
+        if rom_workflow_controller._thumbnail_service._thumbnail_controller:
+            rom_workflow_controller._thumbnail_service._thumbnail_controller.thumbnail_ready.connect(capture_thumbnail)
 
         # Wait for Kirby thumbnail specifically
         qtbot.waitUntil(
@@ -984,8 +984,8 @@ class TestAssetBrowserUI:
         )
 
         # Step 4: Connect thumbnail signal after worker is set up
-        if rom_workflow_controller._thumbnail_controller:
-            rom_workflow_controller._thumbnail_controller.thumbnail_ready.connect(on_thumbnail)
+        if rom_workflow_controller._thumbnail_service._thumbnail_controller:
+            rom_workflow_controller._thumbnail_service._thumbnail_controller.thumbnail_ready.connect(on_thumbnail)
 
         # Step 5: Wait for at least one thumbnail
         qtbot.waitUntil(
@@ -1040,8 +1040,8 @@ class TestAssetBrowserUI:
         )
 
         # Connect to thumbnail signal
-        if rom_workflow_controller._thumbnail_controller:
-            rom_workflow_controller._thumbnail_controller.thumbnail_ready.connect(capture_thumbnail)
+        if rom_workflow_controller._thumbnail_service._thumbnail_controller:
+            rom_workflow_controller._thumbnail_service._thumbnail_controller.thumbnail_ready.connect(capture_thumbnail)
 
         # Wait for Kirby thumbnail specifically
         qtbot.waitUntil(
@@ -1108,8 +1108,8 @@ class TestAssetBrowserUI:
         )
 
         # Connect to thumbnail signal
-        if rom_workflow_controller._thumbnail_controller:
-            rom_workflow_controller._thumbnail_controller.thumbnail_ready.connect(capture_thumbnail)
+        if rom_workflow_controller._thumbnail_service._thumbnail_controller:
+            rom_workflow_controller._thumbnail_service._thumbnail_controller.thumbnail_ready.connect(capture_thumbnail)
 
         # Wait for at least one thumbnail
         qtbot.waitUntil(

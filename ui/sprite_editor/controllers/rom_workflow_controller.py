@@ -19,7 +19,8 @@ from core.services.mesen_capture_sync import MesenCaptureSync, ViewAssetBrowserA
 from core.services.signal_payloads import PreviewData
 from core.types import CompressionType
 from ui.common.smart_preview_coordinator import SmartPreviewCoordinator
-from ui.workers.batch_thumbnail_worker import ThumbnailWorkerController
+from ui.sprite_editor.services.preview_result_processor import PreviewResultProcessor
+from ui.sprite_editor.services.sprite_thumbnail_service import SpriteThumbnailService
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from core.sprite_library import SpriteLibrary
     from ui.managers.status_bar_manager import StatusBarManager
     from ui.row_arrangement.grid_arrangement_manager import TilePosition
+    from ui.sprite_editor.services.preview_result_processor import PreviewActions
 
     from ..services.arrangement_bridge import ArrangementBridge
     from ..views.workspaces.rom_workflow_page import ROMWorkflowPage
@@ -134,8 +136,12 @@ class ROMWorkflowController(QObject):
         # Flag for preview loading state (used to disable action button)
         self._preview_pending: bool = False
 
-        # Thumbnail worker controller
-        self._thumbnail_controller: ThumbnailWorkerController | None = None
+        # Thumbnail service (extracted from this controller)
+        self._thumbnail_service = SpriteThumbnailService(
+            self,
+            data_provider=self,  # Controller implements ThumbnailDataProviderProtocol
+            sprite_library=sprite_library,
+        )
 
         # Mesen capture sync service (extracted from this controller)
         self._capture_sync = MesenCaptureSync(
@@ -163,8 +169,7 @@ class ROMWorkflowController(QObject):
 
     def _request_capture_thumbnail(self, offset: int) -> None:
         """Request thumbnail generation for a capture offset (callback for MesenCaptureSync)."""
-        if self._thumbnail_controller:
-            self._thumbnail_controller.queue_thumbnail(offset)
+        self._thumbnail_service.request_thumbnail(offset)
 
     def _show_message_if_available(self, message: str) -> None:
         """Show a message if message service is available (callback for services)."""
@@ -173,32 +178,7 @@ class ROMWorkflowController(QObject):
 
     def _setup_thumbnail_worker(self) -> None:
         """Create thumbnail worker after ROM is loaded."""
-        if self._thumbnail_controller:
-            self._thumbnail_controller.cleanup()
-
-        if not self.rom_extractor:
-            return
-
-        self._thumbnail_controller = ThumbnailWorkerController(self)
-        self._thumbnail_controller.start_worker(self.rom_path, self.rom_extractor)
-
-        # Connect ready signal to browser update
-        if self._thumbnail_controller.worker:
-            self._thumbnail_controller.worker.thumbnail_ready.connect(self._on_thumbnail_ready)
-            logger.debug("Thumbnail worker connected for asset browser")
-
-    def _on_thumbnail_ready(self, offset: int, thumbnail: QImage) -> None:
-        """Handle thumbnail ready from worker.
-
-        Worker-generated thumbnails apply only to "rom" and "mesen" items.
-        Library items use their saved thumbnails and should not be overwritten.
-        """
-        if self._view:
-            pixmap = QPixmap.fromImage(thumbnail)
-            # Apply to ROM and Mesen items only - library items have saved thumbnails
-            self._view.set_thumbnail(offset, pixmap, source_type="rom")
-            self._view.set_thumbnail(offset, pixmap, source_type="mesen")
-            logger.debug(f"Thumbnail set for offset 0x{offset:06X} (rom/mesen only)")
+        self._thumbnail_service.setup_worker(self.rom_path, self.rom_extractor)
 
     def set_message_service(self, service: "StatusBarManager | None") -> None:
         """Inject message service after construction (for deferred initialization)."""
@@ -229,6 +209,9 @@ class ROMWorkflowController(QObject):
         # Initialize ROM availability state (disabled until ROM is loaded)
         if not self.rom_path:
             self._view.set_rom_available(False)
+
+        # Set the view adapter on the thumbnail service
+        self._thumbnail_service.set_view_adapter(view)
 
         # Set the asset browser adapter on the capture sync service
         # This will also process any pending captures
@@ -519,101 +502,20 @@ class ROMWorkflowController(QObject):
         2. Attempt HAL decompression
         3. Fall back to raw ROM bytes
         """
-        if not self.rom_path:
-            return None
-
-        # Strategy 0: Use edited pixels if we're in edit mode for this offset
+        # Prepare edited pixels if in edit mode for this offset
+        edited_pixels: tuple[Image.Image, list[int]] | None = None
         if self.state == "edit" and self.current_tile_offset == offset:
             edited_data = self._editing_controller.get_image_data()
             if edited_data is not None:
-                try:
-                    flat_palette = self._editing_controller.get_flat_palette()
-                    img = Image.fromarray(edited_data, mode="P")
-                    img.putpalette(flat_palette)
-                    # Create thumbnail
-                    thumb_size = (64, 64)
-                    img.thumbnail(thumb_size, Image.Resampling.NEAREST)
-                    logger.debug("Using edited pixels for library thumbnail: 0x%06X", offset)
-                    return img
-                except Exception as e:
-                    logger.debug("Failed to use edited pixels for thumbnail: %s", e)
-                    # Fall through to other strategies
+                flat_palette = self._editing_controller.get_flat_palette()
+                img = Image.fromarray(edited_data, mode="P")
+                edited_pixels = (img, flat_palette)
 
-        data_to_render: bytes | None = None
-
-        # Strategy 1: Use current decompressed data if available
-        if self.current_tile_offset == offset and self.current_tile_data:
-            data_to_render = self.current_tile_data
-            logger.debug("Using current_tile_data for thumbnail: 0x%06X", offset)
-
-        # Strategy 2: Attempt HAL decompression
-        if not data_to_render and self.rom_extractor:
-            try:
-                with open(self.rom_path, "rb") as f:
-                    f.seek(offset)
-                    chunk = f.read(0x10000)  # Read up to 64KB for decompression
-
-                if chunk:
-                    _, decompressed_data, _ = self.rom_extractor.find_compressed_sprite(chunk, 0, expected_size=None)
-                    if decompressed_data:
-                        data_to_render = decompressed_data
-                        logger.debug(
-                            "HAL decompressed %d bytes for thumbnail: 0x%06X",
-                            len(decompressed_data),
-                            offset,
-                        )
-            except Exception as e:
-                logger.debug("HAL decompression failed for thumbnail at 0x%06X: %s", offset, e)
-
-        # Strategy 3: Fall back to raw ROM bytes (original behavior)
-        if not data_to_render:
-            try:
-                with open(self.rom_path, "rb") as f:
-                    f.seek(offset)
-                    data_to_render = f.read(32 * 64)  # Read up to 64 tiles worth
-                logger.debug("Using raw data for thumbnail: 0x%06X", offset)
-            except OSError as e:
-                logger.error("Failed to read ROM for thumbnail: %s", e)
-                return None
-
-        if not data_to_render:
-            return None
-
-        # Render tiles
-        try:
-            from core.tile_renderer import TileRenderer
-
-            tile_count = len(data_to_render) // 32
-            if tile_count == 0:
-                return None
-
-            # Calculate grid dimensions
-            width_tiles = min(8, tile_count)
-            height_tiles = (tile_count + width_tiles - 1) // width_tiles
-
-            # Render using TileRenderer (grayscale)
-            renderer = TileRenderer()
-            image = renderer.render_tiles(data_to_render, width_tiles, height_tiles, palette_index=None)
-            return image
-        except Exception as e:
-            logger.error("Failed to generate thumbnail: %s", e)
-            return None
+        return self._thumbnail_service.generate_library_thumbnail(offset, edited_pixels=edited_pixels)
 
     def _pil_to_qpixmap(self, pil_image: Image.Image) -> QPixmap:
         """Convert PIL Image to QPixmap."""
-        # Convert to RGBA if needed
-        if pil_image.mode != "RGBA":
-            pil_image = pil_image.convert("RGBA")
-
-        data = pil_image.tobytes("raw", "RGBA")
-        qimage = QImage(
-            data,
-            pil_image.width,
-            pil_image.height,
-            pil_image.width * 4,
-            QImage.Format.Format_RGBA8888,
-        )
-        return QPixmap.fromImage(qimage)
+        return SpriteThumbnailService.pil_to_qpixmap(pil_image)
 
     def _on_asset_renamed(self, offset: int, new_name: str) -> None:
         """Handle asset rename from context menu."""
@@ -644,12 +546,11 @@ class ROMWorkflowController(QObject):
         The old offset is invalidated first to prevent race conditions where a
         garbled thumbnail from the misaligned offset could be displayed.
         """
-        if self._thumbnail_controller:
-            # Clear stale thumbnail from old offset to prevent flicker
-            self._thumbnail_controller.invalidate_offset(old_offset)
-            # Queue generation at corrected offset
-            self._thumbnail_controller.queue_thumbnail(new_offset)
-            logger.debug("Re-queued thumbnail for aligned offset 0x%06X (was 0x%06X)", new_offset, old_offset)
+        # Clear stale thumbnail from old offset to prevent flicker
+        self._thumbnail_service.invalidate_offset(old_offset)
+        # Queue generation at corrected offset
+        self._thumbnail_service.request_thumbnail(new_offset)
+        logger.debug("Re-queued thumbnail for aligned offset 0x%06X (was 0x%06X)", new_offset, old_offset)
 
     def _on_asset_browser_refresh(self) -> None:
         """Handle refresh button click - clear caches and re-request thumbnails.
@@ -661,9 +562,7 @@ class ROMWorkflowController(QObject):
         4. Restores library thumbnails from saved files
         """
         # Clear in-memory cache
-        if self._thumbnail_controller and self._thumbnail_controller.worker:
-            self._thumbnail_controller.worker.clear_cache()
-            logger.debug("Cleared thumbnail worker in-memory cache")
+        self._thumbnail_service.clear_cache()
 
         # Clear disk cache for current ROM
         if self.rom_path and self.rom_cache:
@@ -678,13 +577,12 @@ class ROMWorkflowController(QObject):
 
     def _request_all_asset_thumbnails(self) -> None:
         """Request thumbnails for all sprites in the asset browser."""
-        if not self._view or not self._thumbnail_controller:
+        if not self._view:
             return
 
         offsets = self._view.asset_browser.get_all_offsets()
         if offsets:
-            self._thumbnail_controller.queue_batch(offsets)
-            logger.debug("Queued %d thumbnails for refresh", len(offsets))
+            self._thumbnail_service.request_batch(offsets)
 
     def _restore_library_thumbnails(self) -> None:
         """Restore library thumbnails from saved files after refresh.
@@ -692,20 +590,7 @@ class ROMWorkflowController(QObject):
         Library sprites use saved thumbnail files rather than the thumbnail worker,
         so they must be explicitly restored after refresh clears browser state.
         """
-        if not self._view or not self.rom_path or not self._sprite_library:
-            return
-
-        rom_hash = self._sprite_library.compute_rom_hash(self.rom_path)
-        restored = 0
-        for sprite in self._sprite_library.sprites:
-            if sprite.rom_hash == rom_hash:
-                thumbnail = self._load_library_thumbnail(sprite)
-                if thumbnail:
-                    self._view.asset_browser.set_thumbnail(sprite.rom_offset, thumbnail, source_type="library")
-                    restored += 1
-
-        if restored > 0:
-            logger.debug("Restored %d library thumbnails after refresh", restored)
+        self._thumbnail_service.restore_library_thumbnails(self.rom_path)
 
     def _load_library_sprites(self) -> None:
         """Load sprites from library that match current ROM."""
@@ -751,8 +636,7 @@ class ROMWorkflowController(QObject):
 
                 self._view.add_rom_sprite(name, pointer.offset)
                 # Queue thumbnail generation
-                if self._thumbnail_controller:
-                    self._thumbnail_controller.queue_thumbnail(pointer.offset)
+                self._thumbnail_service.request_thumbnail(pointer.offset)
                 count += 1
 
             if count > 0:
@@ -767,14 +651,10 @@ class ROMWorkflowController(QObject):
         """Load thumbnail from library."""
         from core.sprite_library import LibrarySprite
 
-        if not isinstance(sprite, LibrarySprite) or not self._sprite_library:
+        if not isinstance(sprite, LibrarySprite):
             return None
 
-        library = self._sprite_library
-        path = library.get_thumbnail_path(sprite)
-        if path and path.exists():
-            return QPixmap(str(path))
-        return None
+        return self._thumbnail_service.load_library_thumbnail(sprite)
 
     def browse_rom(self) -> None:
         """Open file dialog to select ROM file."""
@@ -2208,12 +2088,10 @@ class ROMWorkflowController(QObject):
                     self.preview_coordinator.invalidate_preview_cache(self.current_offset)
 
                 # Invalidate worker cache to prevent stale thumbnail after save
-                if self._thumbnail_controller:
-                    self._thumbnail_controller.invalidate_offset(self.current_offset)
+                self._thumbnail_service.invalidate_offset(self.current_offset)
 
                 # Re-queue thumbnail generation for the modified sprite
-                if self._thumbnail_controller:
-                    self._thumbnail_controller.queue_thumbnail(self.current_offset)
+                self._thumbnail_service.request_thumbnail(self.current_offset)
 
                 if self._message_service:
                     self._message_service.show_message(f"Successfully saved to: {output_path}")
@@ -2888,69 +2766,37 @@ class ROMWorkflowController(QObject):
         Args:
             payload: PreviewData with tile data and metadata
         """
-        # Unpack payload for local use
-        tile_data = payload.tile_data
-        width = payload.width
-        height = payload.height
-        sprite_name = payload.sprite_name
-        compressed_size = payload.compressed_size
-        slack_size = payload.slack_size
-        actual_offset = payload.actual_offset
-        hal_succeeded = payload.hal_succeeded
-        header_bytes = payload.header_bytes
+        # Process payload to compute actions (pure logic, no state mutation)
+        actions = PreviewResultProcessor.process(
+            payload,
+            current_offset=self.current_offset,
+            pending_open_in_editor=self._pending_open_in_editor,
+            pending_open_offset=self._pending_open_offset,
+        )
 
-        # Use current offset if actual_offset not provided
-        if actual_offset == -1:
-            actual_offset = self.current_offset
-
-        # Check if offset was adjusted during preview (e.g. alignment correction)
-        offset_adjusted = actual_offset != self.current_offset
-        if offset_adjusted:
-            old_offset = self.current_offset  # Capture before update
-            offset_delta = actual_offset - old_offset
-            logger.info(
-                f"[PREVIEW] Offset adjusted from 0x{old_offset:06X} to 0x{actual_offset:06X} (delta: {offset_delta:+d})"
-            )
-            # Track this adjustment to prevent duplicates during resync
-            self._capture_sync.record_offset_adjustment(old_offset, actual_offset)
-            # Keep pending auto-open aligned with the adjusted offset.
-            if self._pending_open_in_editor and self._pending_open_offset not in (-1, actual_offset):
-                self._pending_open_offset = actual_offset
-            # Update current offset to match reality
-            self.current_offset = actual_offset
-            # Update UI (preserve current source type during offset adjustment)
-            if self._view:
-                self._view.set_offset(actual_offset, self._current_source_type)
-                # Update asset browser item offset - this emits item_offset_changed signal
-                # which automatically re-queues thumbnail for the new offset
-                self._view.asset_browser.update_sprite_offset(old_offset, actual_offset)
-                if self._message_service:
-                    self._message_service.show_message(
-                        f"Aligned to valid sprite at 0x{actual_offset:06X} (adjusted by {offset_delta:+d} bytes)"
-                    )
-            # Notify ROM Extraction panel to update its Mesen captures list
-            self.capture_offset_adjusted.emit(old_offset, actual_offset)
+        # Handle offset adjustment if needed
+        if actions.offset_adjusted:
+            self._handle_offset_adjustment(actions)
 
         logger.debug(
-            f"[PREVIEW] _on_preview_ready called: {len(tile_data)} bytes, {width}x{height}, "
-            f"pending_open={self._pending_open_in_editor}, offset=0x{actual_offset:06X}, hal={hal_succeeded}, "
-            f"header_bytes={len(header_bytes)}"
+            f"[PREVIEW] _on_preview_ready called: {len(actions.tile_data)} bytes, "
+            f"{actions.width}x{actions.height}, pending_open={self._pending_open_in_editor}, "
+            f"offset=0x{actions.actual_offset:06X}, compression={actions.compression_type}, "
+            f"header_bytes={len(actions.header_bytes)}"
         )
-        self.current_tile_data = tile_data
-        self.current_tile_offset = actual_offset
-        self.current_width = width
-        self.current_height = height
-        self.current_sprite_name = sprite_name
-        self.original_compressed_size = compressed_size
-        self.available_slack = slack_size
-        # Track compression type for injection
-        self.current_compression_type = CompressionType.HAL if hal_succeeded else CompressionType.RAW
-        # Store header bytes for restoration during injection (prevents color shift bug)
-        self.current_header_bytes = header_bytes
 
-        # Sync dropdown to reflect actual compression type used
-        # (uses blockSignals internally to avoid triggering re-extraction)
-        # Clear loading state
+        # Apply state updates (controller owns its state)
+        self.current_tile_data = actions.tile_data
+        self.current_tile_offset = actions.actual_offset
+        self.current_width = actions.width
+        self.current_height = actions.height
+        self.current_sprite_name = actions.sprite_name
+        self.original_compressed_size = actions.compressed_size
+        self.available_slack = actions.slack_size
+        self.current_compression_type = actions.compression_type
+        self.current_header_bytes = actions.header_bytes
+
+        # Update view state
         self._preview_pending = False
         if (view := self._view) and isValid(view):
             view.set_compression_type(self.current_compression_type)
@@ -2961,59 +2807,95 @@ class ROMWorkflowController(QObject):
                 view.set_action_text("Open in Editor")
             view.source_bar.set_action_enabled(True)
 
-        if self._is_view_valid():
-            if hal_succeeded:
-                slack_info = f" (+{slack_size} slack)" if slack_size > 0 else ""
-                msg = f"Sprite found! Original size: {compressed_size} bytes{slack_info}"
-                if offset_adjusted:
-                    msg += f" (Aligned to 0x{actual_offset:06X})"
-            else:
-                # Raw sprite - can be edited and injected without compression
-                msg = f"Raw sprite data at 0x{actual_offset:06X} ({len(tile_data)} bytes, no HAL compression)"
+        # Show status message
+        if self._is_view_valid() and self._message_service:
+            self._message_service.show_message(actions.status_message)
 
+        # Handle auto-open in editor if triggered by double-click
+        self._handle_auto_open(actions)
+
+    def _handle_offset_adjustment(self, actions: "PreviewActions") -> None:
+        """Handle offset adjustment during preview (e.g., alignment correction).
+
+        Args:
+            actions: Computed preview actions with offset adjustment info.
+        """
+        logger.info(
+            f"[PREVIEW] Offset adjusted from 0x{actions.old_offset:06X} to "
+            f"0x{actions.actual_offset:06X} (delta: {actions.offset_delta:+d})"
+        )
+
+        # Track this adjustment to prevent duplicates during resync
+        self._capture_sync.record_offset_adjustment(actions.old_offset, actions.actual_offset)
+
+        # Keep pending auto-open aligned with the adjusted offset
+        if self._pending_open_in_editor and self._pending_open_offset not in (-1, actions.actual_offset):
+            self._pending_open_offset = actions.actual_offset
+
+        # Update current offset to match reality
+        self.current_offset = actions.actual_offset
+
+        # Update UI (preserve current source type during offset adjustment)
+        if self._view:
+            self._view.set_offset(actions.actual_offset, self._current_source_type)
+            # Update asset browser item offset - this emits item_offset_changed signal
+            # which automatically re-queues thumbnail for the new offset
+            self._view.asset_browser.update_sprite_offset(actions.old_offset, actions.actual_offset)
             if self._message_service:
-                self._message_service.show_message(msg)
+                self._message_service.show_message(
+                    f"Aligned to valid sprite at 0x{actions.actual_offset:06X} "
+                    f"(adjusted by {actions.offset_delta:+d} bytes)"
+                )
 
-        # Auto-open in editor if triggered by double-click
+        # Notify ROM Extraction panel to update its Mesen captures list
+        self.capture_offset_adjusted.emit(actions.old_offset, actions.actual_offset)
+
+    def _handle_auto_open(self, actions: "PreviewActions") -> None:
+        """Handle auto-open in editor if triggered by double-click.
+
+        Args:
+            actions: Computed preview actions with auto-open decision.
+        """
         logger.debug(f"[PREVIEW] Checking flag: _pending_open_in_editor={self._pending_open_in_editor}")
-        if self._pending_open_in_editor:
-            # Only auto-open if offset matches (prevents stale opens after errors/navigation)
-            if self._pending_open_offset in (-1, actual_offset):
-                self._pending_open_in_editor = False
-                self._pending_open_offset = -1
 
-                # Warn user about raw sprites (they can still edit/inject but without compression)
-                if not hal_succeeded:
-                    logger.debug(f"[PREVIEW] Raw sprite at 0x{actual_offset:06X}, allowing edit")
-                    if self._message_service:
-                        self._message_service.show_message(
-                            f"Opening raw sprite at 0x{actual_offset:06X} (will be injected without compression)"
-                        )
-
-                # Validation: Warn if size is not a multiple of 32 bytes (SNES tile size)
-                if len(tile_data) % 32 != 0 and self._is_view_valid():
-                    from PySide6.QtWidgets import QMessageBox
-
-                    reply = QMessageBox.warning(
-                        self._view,
-                        "Unusual Sprite Size",
-                        f"Decompressed data is {len(tile_data)} bytes, which is not a multiple of 32.\n"
-                        "This may not be valid 4bpp tile data.\n\n"
-                        "Open in editor anyway?",
-                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    )
-                    if reply == QMessageBox.StandardButton.No:
-                        return
-
-                logger.debug("[PREVIEW] Flag is True and offset matches, calling open_in_editor()")
-                self.open_in_editor()
-            else:
-                # Offset mismatch means a newer request is pending - don't clear flags,
-                # let the matching preview handle them when it arrives
+        if not actions.should_auto_open:
+            if self._pending_open_in_editor:
+                # Offset mismatch means a newer request is pending - don't clear flags
                 logger.debug(
                     f"[PREVIEW] Offset mismatch: pending=0x{self._pending_open_offset:X} "
-                    f"vs actual=0x{actual_offset:X}, keeping flags for pending request"
+                    f"vs actual=0x{actions.actual_offset:X}, keeping flags for pending request"
                 )
+            return
+
+        # Clear pending flags
+        self._pending_open_in_editor = False
+        self._pending_open_offset = -1
+
+        # Warn user about raw sprites (they can still edit/inject but without compression)
+        if actions.compression_type == CompressionType.RAW:
+            logger.debug(f"[PREVIEW] Raw sprite at 0x{actions.actual_offset:06X}, allowing edit")
+            if self._message_service:
+                self._message_service.show_message(
+                    f"Opening raw sprite at 0x{actions.actual_offset:06X} (will be injected without compression)"
+                )
+
+        # Warn if size is not a multiple of 32 bytes (SNES tile size)
+        if actions.should_warn_unusual_size and self._is_view_valid():
+            from PySide6.QtWidgets import QMessageBox
+
+            reply = QMessageBox.warning(
+                self._view,
+                "Unusual Sprite Size",
+                f"Decompressed data is {len(actions.tile_data)} bytes, which is not a multiple of 32.\n"
+                "This may not be valid 4bpp tile data.\n\n"
+                "Open in editor anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return
+
+        logger.debug("[PREVIEW] Flag is True and offset matches, calling open_in_editor()")
+        self.open_in_editor()
 
     def _is_view_valid(self) -> bool:
         """Check if the view exists and is still valid (not deleted by C++)."""
@@ -3235,6 +3117,4 @@ class ROMWorkflowController(QObject):
     def cleanup(self) -> None:
         """Clean up resources."""
         self.preview_coordinator.cleanup()
-        if self._thumbnail_controller:
-            self._thumbnail_controller.cleanup()
-            self._thumbnail_controller = None
+        self._thumbnail_service.cleanup()

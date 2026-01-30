@@ -293,10 +293,10 @@ class TestBug1LibraryThumbnailsWipedOnRefresh:
         # Mock _load_library_thumbnail to return a valid thumbnail
         mocker.patch.object(controller, "_load_library_thumbnail", return_value=test_thumbnail)
 
-        # Mock thumbnail controller
+        # Mock thumbnail service's internal controller
         mock_thumb_ctrl = MagicMock()
         mock_thumb_ctrl.worker = MagicMock()
-        controller._thumbnail_controller = mock_thumb_ctrl
+        controller._thumbnail_service._thumbnail_controller = mock_thumb_ctrl
 
         # Mock rom_cache
         controller.rom_cache = MagicMock()
