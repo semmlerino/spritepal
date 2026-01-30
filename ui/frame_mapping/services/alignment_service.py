@@ -41,35 +41,6 @@ class AlignmentService(QObject):
         """
         super().__init__(parent)
 
-    def get_mapping_alignment(
-        self,
-        project: FrameMappingProject | None,
-        ai_frame_id: str,
-    ) -> AlignmentState | None:
-        """Get the alignment state for a mapping.
-
-        Args:
-            project: The frame mapping project
-            ai_frame_id: ID of the AI frame
-
-        Returns:
-            AlignmentState if mapping exists, None otherwise
-        """
-        if project is None:
-            return None
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping is None:
-            return None
-        return AlignmentState(
-            offset_x=mapping.offset_x,
-            offset_y=mapping.offset_y,
-            flip_h=mapping.flip_h,
-            flip_v=mapping.flip_v,
-            scale=mapping.scale,
-            sharpen=mapping.sharpen,
-            resampling=mapping.resampling,
-        )
-
     def capture_alignment_undo_state(
         self,
         project: FrameMappingProject,

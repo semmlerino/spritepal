@@ -78,56 +78,6 @@ class MappingService(QObject):
         mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         return mapping.game_frame_id if mapping else None
 
-    def get_mapping_alignment(
-        self,
-        project: FrameMappingProject | None,
-        ai_frame_id: str,
-    ) -> AlignmentState | None:
-        """Get the alignment state for an AI frame's mapping.
-
-        Used to capture state for undo commands.
-
-        Args:
-            project: The frame mapping project
-            ai_frame_id: ID of the AI frame
-
-        Returns:
-            AlignmentState if mapping exists, None otherwise
-        """
-        if project is None:
-            return None
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping is None:
-            return None
-        return AlignmentState(
-            offset_x=mapping.offset_x,
-            offset_y=mapping.offset_y,
-            flip_h=mapping.flip_h,
-            flip_v=mapping.flip_v,
-            scale=mapping.scale,
-            sharpen=mapping.sharpen,
-            resampling=mapping.resampling,
-        )
-
-    def get_mapping_status(
-        self,
-        project: FrameMappingProject | None,
-        ai_frame_id: str,
-    ) -> str | None:
-        """Get the status of an AI frame's mapping.
-
-        Args:
-            project: The frame mapping project
-            ai_frame_id: ID of the AI frame
-
-        Returns:
-            Status string if mapping exists, None otherwise
-        """
-        if project is None:
-            return None
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        return mapping.status if mapping else None
-
     def validate_mapping_frames(
         self,
         project: FrameMappingProject,
