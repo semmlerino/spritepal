@@ -166,8 +166,15 @@ class TestPreviewServiceCaching:
                     # First call - cache population (no signal emitted on initial cache fill)
                     preview_service.get_preview("frame1", project)
 
-                    # Modify file (change mtime)
+                    # Ensure mtime actually changes (some filesystems have 1-second resolution)
+                    import os
+                    import time
+
+                    original_mtime = capture_path.stat().st_mtime
+                    # Explicitly set mtime to 1 second in the future to guarantee change
+                    new_mtime = original_mtime + 1.0
                     capture_path.write_text('{"frame": 101}')
+                    os.utime(capture_path, (new_mtime, new_mtime))
 
                     # Second call - cache invalidated due to mtime change
                     with qtbot.waitSignal(

@@ -88,6 +88,9 @@ class MappingPanel(QWidget):
         self._user_checked_ai_frame_ids: set[str] | None = None
         # Sheet palette for quantized AI frame thumbnails
         self._sheet_palette: SheetPalette | None = None
+        # Cache for quantized+scaled game frame icons
+        # Key: (game_frame_id, palette_hash), Value: scaled QPixmap
+        self._quantized_icon_cache: dict[tuple[str, int], QPixmap] = {}
         # Drag-drop reorder state
         self._drag_source_row: int | None = None
         self._drag_start_pos: QPoint | None = None
@@ -274,14 +277,8 @@ class MappingPanel(QWidget):
         if self._project is None:
             return
 
-        # Quantize to sheet palette if set (shows preview-accurate colors)
-        quantized = quantize_qpixmap(preview, self._sheet_palette)
-        scaled = quantized.scaled(
-            THUMBNAIL_SIZE,
-            THUMBNAIL_SIZE,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
+        # Get cached or generate quantized+scaled icon
+        scaled = self._get_quantized_scaled_icon(game_frame_id, preview)
 
         # Find all rows mapped to this game frame and update the icon
         for row in range(self._table.rowCount()):
@@ -300,6 +297,50 @@ class MappingPanel(QWidget):
                 if game_item is not None:
                     game_item.setIcon(QIcon(scaled))
 
+    def _get_quantized_scaled_icon(self, game_frame_id: str, preview: QPixmap) -> QPixmap:
+        """Get cached or generate quantized+scaled icon for a game frame.
+
+        Args:
+            game_frame_id: The game frame ID
+            preview: The raw preview QPixmap
+
+        Returns:
+            Quantized and scaled QPixmap ready for table icon
+        """
+        # Compute palette hash for cache key
+        palette_hash = self._compute_palette_hash()
+        cache_key = (game_frame_id, palette_hash)
+
+        if cache_key in self._quantized_icon_cache:
+            return self._quantized_icon_cache[cache_key]
+
+        # Generate quantized+scaled icon
+        quantized = quantize_qpixmap(preview, self._sheet_palette)
+        scaled = quantized.scaled(
+            THUMBNAIL_SIZE,
+            THUMBNAIL_SIZE,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+
+        # Cache the result
+        self._quantized_icon_cache[cache_key] = scaled
+        return scaled
+
+    def _compute_palette_hash(self) -> int:
+        """Compute hash of current sheet palette for cache keys.
+
+        Returns:
+            Integer hash, 0 if no palette set
+        """
+        if self._sheet_palette is None:
+            return 0
+        colors_hash = hash(self._sheet_palette.colors)
+        mappings_hash = (
+            hash(tuple(sorted(self._sheet_palette.color_mappings.items()))) if self._sheet_palette.color_mappings else 0
+        )
+        return hash((colors_hash, mappings_hash))
+
     def set_sheet_palette(self, palette: SheetPalette | None) -> None:
         """Set the sheet palette for quantized AI frame thumbnails.
 
@@ -310,6 +351,8 @@ class MappingPanel(QWidget):
             palette: SheetPalette to use, or None to show original colors
         """
         self._sheet_palette = palette
+        # Clear quantized icon cache since palette changed
+        self._quantized_icon_cache.clear()
         # Refresh to apply new palette to thumbnails
         self.refresh()
 
@@ -388,17 +431,10 @@ class MappingPanel(QWidget):
                     game_item = QTableWidgetItem(mapping.game_frame_id)
                     status = mapping.status
 
-                    # Load game frame thumbnail (P3 fix: apply palette quantization)
+                    # Load game frame thumbnail (use cached quantized+scaled icon)
                     if mapping.game_frame_id in self._game_frame_previews:
                         pixmap = self._game_frame_previews[mapping.game_frame_id]
-                        # Quantize to sheet palette if set (shows preview-accurate colors)
-                        pixmap = quantize_qpixmap(pixmap, self._sheet_palette)
-                        scaled = pixmap.scaled(
-                            THUMBNAIL_SIZE,
-                            THUMBNAIL_SIZE,
-                            Qt.AspectRatioMode.KeepAspectRatio,
-                            Qt.TransformationMode.SmoothTransformation,
-                        )
+                        scaled = self._get_quantized_scaled_icon(mapping.game_frame_id, pixmap)
                         game_item.setIcon(QIcon(scaled))
 
                     # Offset column - column 4

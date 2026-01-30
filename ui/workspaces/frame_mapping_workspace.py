@@ -44,6 +44,7 @@ from core.app_context import get_app_context
 from ui.frame_mapping.auto_save_manager import AutoSaveManager
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.dialog_coordinator import DialogCoordinator
+from ui.frame_mapping.services.thumbnail_service import clear_thumbnail_cache
 from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
@@ -1441,6 +1442,10 @@ class FrameMappingWorkspace(QWidget):
         which fails when the same palette object is modified in-place.
         """
         palette = self._controller.get_sheet_palette()
+
+        # Clear thumbnail cache to regenerate with new palette colors
+        clear_thumbnail_cache()
+
         self._ai_frames_pane.set_sheet_palette(palette)
         # Also update the workbench canvas for pixel inspection
         self._alignment_canvas.set_sheet_palette(palette)

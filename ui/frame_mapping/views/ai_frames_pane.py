@@ -671,14 +671,41 @@ class AIFramesPane(QWidget):
     def refresh_frame(self, frame_id: str) -> None:
         """Refresh display for a single frame after tag/name change.
 
-        Triggers a full list refresh to reflect the change.
+        Updates only the affected item instead of rebuilding the entire list.
 
         Args:
             frame_id: ID of the frame that changed
         """
-        # For simplicity, refresh the entire list
-        # A more optimized approach would update only the affected item
-        self._refresh_list(is_frame_list_change=False)
+        # Find the frame data
+        frame = next((f for f in self._ai_frames if f.id == frame_id), None)
+        if frame is None:
+            return
+
+        # Find the list item for this frame
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item is None:  # type: ignore[reportUnnecessaryComparison]
+                continue
+            if item.data(Qt.ItemDataRole.UserRole) == frame_id:
+                # Get current status for the indicator
+                status = self._mapping_status.get(frame_id, "unmapped")
+                status_indicator = "●" if status != "unmapped" else "○"
+
+                # Build display text
+                display_text = frame.name  # Uses display_name if set, else filename
+                if frame.tags:
+                    tag_str = " ".join(f"[{t}]" for t in sorted(frame.tags))
+                    display_text = f"{display_text}  {tag_str}"
+
+                item.setText(f"{status_indicator} {display_text}")
+
+                # Update tooltip
+                if frame.display_name:
+                    item.setToolTip(f"File: {frame.path.name}")
+                else:
+                    item.setToolTip("")
+
+                break
 
     def move_item(self, from_index: int, to_index: int) -> None:
         """Move an item in the list without regenerating thumbnails.

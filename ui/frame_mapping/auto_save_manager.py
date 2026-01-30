@@ -7,13 +7,39 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import override
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Signal
 from PySide6.QtWidgets import QMessageBox, QWidget
 
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+class _SaveWorkerSignals(QObject):
+    """Signals for the background save worker."""
+
+    finished = Signal(bool, str)  # success, error_message
+
+
+class _SaveWorker(QRunnable):
+    """Background worker for saving projects without blocking UI."""
+
+    def __init__(self, save_project: Callable[[Path], bool], project_path: Path) -> None:
+        super().__init__()
+        self.signals = _SaveWorkerSignals()
+        self._save_project = save_project
+        self._project_path = project_path
+
+    @override
+    def run(self) -> None:
+        """Run the save operation in background thread."""
+        try:
+            self._save_project(self._project_path)
+            self.signals.finished.emit(True, "")
+        except Exception as e:
+            self.signals.finished.emit(False, str(e))
 
 
 class AutoSaveManager:
@@ -53,6 +79,9 @@ class AutoSaveManager:
         self._save_project = save_project
         self._show_message = show_message
         self._parent_widget = parent_widget
+        self._save_in_progress = False
+        # Keep reference to current worker to prevent GC during signal emission
+        self._current_worker: _SaveWorker | None = None
 
     def set_message_service(self, show_message: Callable[[str, int], None] | None) -> None:
         """Set the message service for status updates.
@@ -88,23 +117,45 @@ class AutoSaveManager:
     def perform_save(self) -> None:
         """Actually perform the auto-save after debounce timer fires.
 
-        Saves the project to the correct project file path.
+        Saves the project in a background thread to avoid blocking UI.
         Shows a message on success or an error dialog on failure.
         """
         project_path = self._get_project_path()
         if not project_path:
             return
 
-        try:
-            self._save_project(project_path)
+        # Avoid concurrent saves
+        if self._save_in_progress:
+            logger.debug("Save already in progress, skipping")
+            return
+
+        self._save_in_progress = True
+
+        # Create and run worker in background thread
+        # Keep reference to prevent GC during signal emission
+        self._current_worker = _SaveWorker(self._save_project, project_path)
+        self._current_worker.signals.finished.connect(self._on_save_finished)
+        QThreadPool.globalInstance().start(self._current_worker)
+
+    def _on_save_finished(self, success: bool, error_message: str) -> None:
+        """Handle completion of background save operation.
+
+        Args:
+            success: Whether the save succeeded
+            error_message: Error message if save failed
+        """
+        self._save_in_progress = False
+        self._current_worker = None  # Release reference
+
+        if success:
             if self._show_message:
                 self._show_message("Project auto-saved", 2000)
-            logger.info("Auto-saved project to %s", project_path)
-        except Exception as e:
-            logger.exception("Failed to auto-save project after injection")
+            logger.info("Auto-saved project to %s", self._get_project_path())
+        else:
+            logger.exception("Failed to auto-save project: %s", error_message)
             if self._parent_widget:
                 QMessageBox.warning(
                     self._parent_widget,
                     "Auto-Save Failed",
-                    f"Failed to save project: {e}\n\nPlease save manually.",
+                    f"Failed to save project: {error_message}\n\nPlease save manually.",
                 )

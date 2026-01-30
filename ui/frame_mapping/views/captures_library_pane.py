@@ -200,12 +200,27 @@ class CapturesLibraryPane(QWidget):
     def update_frame_preview(self, frame_id: str, preview: QPixmap) -> None:
         """Update the preview for a single game frame and refresh display.
 
+        Updates only the affected item's icon instead of rebuilding the entire list.
+
         Args:
             frame_id: The game frame ID
             preview: The new preview QPixmap
         """
         self._game_frame_previews[frame_id] = preview
-        self._refresh_list()
+
+        # Find and update only the affected item
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) == frame_id:  # type: ignore[reportUnnecessaryComparison]
+                if not preview.isNull():
+                    scaled = preview.scaled(
+                        THUMBNAIL_SIZE,
+                        THUMBNAIL_SIZE,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                    item.setIcon(QIcon(scaled))
+                break
 
     def get_selected_id(self) -> str | None:
         """Get the currently selected game frame ID."""
@@ -459,7 +474,37 @@ class CapturesLibraryPane(QWidget):
     def refresh_frame(self, frame_id: str) -> None:
         """Refresh display for a specific frame (e.g., after rename).
 
+        Updates only the affected item instead of rebuilding the entire list.
+
         Args:
             frame_id: ID of the frame that changed
         """
-        self._refresh_list()
+        # Find the frame data
+        frame = next((f for f in self._game_frames if f.id == frame_id), None)
+        if frame is None:
+            return
+
+        # Find and update the list item
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) == frame_id:  # type: ignore[reportUnnecessaryComparison]
+                linked_ai = self._link_status.get(frame_id)
+
+                # Build display text
+                display_text = frame.name
+                if frame.display_name:
+                    tooltip = f"Original ID: {frame.id}"
+                else:
+                    tooltip = ""
+
+                # Update text based on link status
+                if linked_ai is not None:
+                    item.setText(f"✓ {display_text}")
+                    tooltip_suffix = f"Linked to AI frame #{linked_ai}"
+                    item.setToolTip(f"{tooltip}\n{tooltip_suffix}" if tooltip else tooltip_suffix)
+                else:
+                    item.setText(display_text)
+                    tooltip_suffix = "Unlinked - drag to mapping drawer to link"
+                    item.setToolTip(f"{tooltip}\n{tooltip_suffix}" if tooltip else tooltip_suffix)
+
+                break

@@ -6,6 +6,8 @@ ensuring WYSIWYG behavior by using the same quantization logic as injection.
 
 from __future__ import annotations
 
+import io
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,6 +31,135 @@ logger = get_logger(__name__)
 # Default thumbnail size for list items and table cells
 DEFAULT_THUMBNAIL_SIZE = 64
 
+# Maximum cached thumbnails (balances memory vs cache hits)
+_THUMBNAIL_CACHE_MAXSIZE = 500
+
+
+@lru_cache(maxsize=_THUMBNAIL_CACHE_MAXSIZE)
+def _cached_thumbnail_bytes(
+    path_str: str,
+    mtime: float,
+    palette_hash: int,
+    size: int,
+) -> bytes | None:
+    """Generate and cache thumbnail as PNG bytes.
+
+    This is the cached backend for create_quantized_thumbnail(). Uses PNG bytes
+    as the cache value since QPixmap isn't hashable and LRU cache needs
+    immutable return values.
+
+    Args:
+        path_str: String path to the image file
+        mtime: File modification time (for cache invalidation)
+        palette_hash: Hash of the palette (for cache invalidation)
+        size: Thumbnail size in pixels
+
+    Returns:
+        PNG bytes of the thumbnail, or None on failure
+    """
+    # Note: This function is called only on cache miss.
+    # The actual implementation loads the image, quantizes it, and returns PNG bytes.
+    # The caller will convert PNG bytes back to QPixmap.
+    frame_path = Path(path_str)
+    if not frame_path.exists():
+        return None
+
+    try:
+        pil_image = Image.open(frame_path)
+    except Exception:
+        logger.warning("Failed to load image: %s", frame_path)
+        return None
+
+    # Quantization is handled by the caller since we don't have the palette object here
+    # This function just stores raw image bytes; quantization happens after cache lookup
+
+    # Scale the image
+    pil_image.thumbnail((size, size), Image.Resampling.LANCZOS)
+
+    # Convert to PNG bytes
+    buffer = io.BytesIO()
+    pil_image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def clear_thumbnail_cache() -> None:
+    """Clear the thumbnail cache.
+
+    Call this when the palette changes to ensure thumbnails are regenerated
+    with the new palette colors.
+    """
+    _cached_thumbnail_bytes.cache_clear()
+    _cached_quantized_thumbnail_bytes.cache_clear()
+    logger.debug("Thumbnail cache cleared")
+
+
+@lru_cache(maxsize=_THUMBNAIL_CACHE_MAXSIZE)
+def _cached_quantized_thumbnail_bytes(
+    path_str: str,
+    mtime: float,
+    palette_colors: tuple[tuple[int, int, int], ...],
+    palette_mappings: tuple[tuple[tuple[int, int, int], int], ...] | None,
+    size: int,
+) -> bytes | None:
+    """Generate and cache a quantized thumbnail as PNG bytes.
+
+    Args:
+        path_str: String path to the image file
+        mtime: File modification time (for cache invalidation)
+        palette_colors: Tuple of (R, G, B) color tuples
+        palette_mappings: Tuple of ((R, G, B), index) mappings, or None
+        size: Thumbnail size in pixels
+
+    Returns:
+        PNG bytes of the quantized thumbnail, or None on failure
+    """
+    frame_path = Path(path_str)
+    if not frame_path.exists():
+        return None
+
+    try:
+        pil_image = Image.open(frame_path)
+    except Exception:
+        logger.warning("Failed to load image: %s", frame_path)
+        return None
+
+    # Ensure RGBA for quantization
+    if pil_image.mode != "RGBA":
+        pil_image = pil_image.convert("RGBA")
+
+    # Apply quantization
+    try:
+        # Convert tuple to list for quantization functions
+        palette_list = list(palette_colors)
+        if palette_mappings:
+            # Convert back to dict format for quantize_with_mappings
+            mappings_dict = dict(palette_mappings)
+            indexed = quantize_with_mappings(
+                pil_image,
+                palette_list,
+                mappings_dict,
+                transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+            )
+        else:
+            indexed = quantize_to_palette(
+                pil_image,
+                palette_list,
+                transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+            )
+        # Convert indexed back to RGBA for display
+        pil_image = indexed.convert("RGBA")
+    except Exception:
+        logger.debug("Failed to quantize image: %s", frame_path)
+        # Fall through to use original image
+
+    # Scale the image
+    pil_image.thumbnail((size, size), Image.Resampling.LANCZOS)
+
+    # Convert to PNG bytes
+    buffer = io.BytesIO()
+    pil_image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
 
 def create_quantized_thumbnail(
     frame_path: Path,
@@ -41,6 +172,9 @@ def create_quantized_thumbnail(
     WYSIWYG colors matching the injection result. Otherwise loads
     the raw PNG.
 
+    Results are cached using LRU cache keyed by (path, mtime, palette, size).
+    Call clear_thumbnail_cache() when palette changes to force regeneration.
+
     Args:
         frame_path: Path to the AI frame PNG file
         sheet_palette: SheetPalette for quantization, or None for raw colors
@@ -52,33 +186,36 @@ def create_quantized_thumbnail(
     if not frame_path.exists():
         return None
 
-    # Load original image with PIL
+    # Get file mtime for cache invalidation
     try:
-        pil_image = Image.open(frame_path)
-    except Exception:
-        logger.warning("Failed to load image: %s", frame_path)
+        mtime = frame_path.stat().st_mtime
+    except OSError:
         return None
 
-    # Apply palette quantization if palette is defined
+    path_str = str(frame_path)
+
+    # Use cached version based on whether we have a palette
     if sheet_palette is not None:
-        try:
-            pil_image = quantize_pil_image(pil_image, sheet_palette)
-        except Exception:
-            logger.warning("Failed to quantize image: %s", frame_path, exc_info=True)
-            # Fall through to use original image
+        # Convert palette to hashable format for cache key
+        palette_colors = tuple(sheet_palette.colors)
+        palette_mappings: tuple[tuple[tuple[int, int, int], int], ...] | None = None
+        if sheet_palette.color_mappings:
+            palette_mappings = tuple(sorted(sheet_palette.color_mappings.items()))
 
-    # Convert to QPixmap
-    pixmap = pil_to_qpixmap(pil_image)
-    if pixmap is None or pixmap.isNull():
+        png_bytes = _cached_quantized_thumbnail_bytes(path_str, mtime, palette_colors, palette_mappings, size)
+    else:
+        # No palette - use simpler cache
+        png_bytes = _cached_thumbnail_bytes(path_str, mtime, 0, size)
+
+    if png_bytes is None:
         return None
 
-    # Scale to thumbnail size using fast transformation (good enough for small thumbnails)
-    return pixmap.scaled(
-        size,
-        size,
-        Qt.AspectRatioMode.KeepAspectRatio,
-        Qt.TransformationMode.FastTransformation,
-    )
+    # Convert PNG bytes to QPixmap
+    pixmap = QPixmap()
+    if not pixmap.loadFromData(png_bytes):
+        return None
+
+    return pixmap
 
 
 def quantize_pil_image(

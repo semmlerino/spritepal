@@ -9,7 +9,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QThreadPool, QTimer
+from pytestqt.qtbot import QtBot
 
 from ui.frame_mapping.auto_save_manager import AutoSaveManager
 
@@ -38,6 +39,15 @@ def auto_save_manager(mock_timer: QTimer, mock_project_path: Path) -> AutoSaveMa
         show_message=MagicMock(),
         parent_widget=None,
     )
+
+
+def _wait_for_threadpool(qtbot: QtBot, timeout_ms: int = 5000) -> None:
+    """Wait for QThreadPool to complete all tasks."""
+
+    def check_done() -> bool:
+        return QThreadPool.globalInstance().activeThreadCount() == 0
+
+    qtbot.waitUntil(check_done, timeout=timeout_ms)
 
 
 class TestAutoSaveManagerInit:
@@ -86,8 +96,8 @@ class TestScheduleSave:
 class TestPerformSave:
     """Test perform_save method."""
 
-    def test_perform_save_calls_save_project(self, mock_project_path: Path, mock_timer: QTimer) -> None:
-        """perform_save calls the save_project callback with path."""
+    def test_perform_save_calls_save_project(self, mock_project_path: Path, mock_timer: QTimer, qtbot: QtBot) -> None:
+        """perform_save calls the save_project callback with path in background."""
         save_fn = MagicMock()
         manager = AutoSaveManager(
             timer=mock_timer,
@@ -96,10 +106,13 @@ class TestPerformSave:
         )
 
         manager.perform_save()
+        _wait_for_threadpool(qtbot)
 
         save_fn.assert_called_once_with(mock_project_path)
 
-    def test_perform_save_shows_message_on_success(self, mock_project_path: Path, mock_timer: QTimer) -> None:
+    def test_perform_save_shows_message_on_success(
+        self, mock_project_path: Path, mock_timer: QTimer, qtbot: QtBot
+    ) -> None:
         """perform_save shows status message on success."""
         msg_fn = MagicMock()
         manager = AutoSaveManager(
@@ -110,6 +123,7 @@ class TestPerformSave:
         )
 
         manager.perform_save()
+        _wait_for_threadpool(qtbot)
 
         msg_fn.assert_called_once_with("Project auto-saved", 2000)
 
@@ -126,7 +140,7 @@ class TestPerformSave:
 
         save_fn.assert_not_called()
 
-    def test_perform_save_handles_exception(self, mock_project_path: Path, mock_timer: QTimer) -> None:
+    def test_perform_save_handles_exception(self, mock_project_path: Path, mock_timer: QTimer, qtbot: QtBot) -> None:
         """perform_save handles save errors gracefully."""
         save_fn = MagicMock(side_effect=RuntimeError("Save failed"))
         manager = AutoSaveManager(
@@ -138,28 +152,76 @@ class TestPerformSave:
 
         # Should not raise
         manager.perform_save()
+        _wait_for_threadpool(qtbot)
 
     def test_perform_save_shows_error_dialog_on_failure(
-        self, mock_project_path: Path, mock_timer: QTimer, qapp: None
+        self, mock_project_path: Path, mock_timer: QTimer, qapp: None, qtbot: QtBot
     ) -> None:
         """perform_save shows error dialog when save fails and parent exists."""
         save_fn = MagicMock(side_effect=RuntimeError("Save failed"))
-        mock_widget = MagicMock()
+
+        # Need a real widget for QMessageBox
+        from PySide6.QtWidgets import QWidget
+
+        parent_widget = QWidget()
 
         manager = AutoSaveManager(
             timer=mock_timer,
             get_project_path=lambda: mock_project_path,
             save_project=save_fn,
-            parent_widget=mock_widget,
+            parent_widget=parent_widget,
         )
 
         with patch("ui.frame_mapping.auto_save_manager.QMessageBox") as mock_box:
             manager.perform_save()
+            _wait_for_threadpool(qtbot)
 
             mock_box.warning.assert_called_once()
             args = mock_box.warning.call_args
-            assert args[0][0] is mock_widget
+            assert args[0][0] is parent_widget
             assert "Auto-Save Failed" in args[0][1]
+
+        parent_widget.deleteLater()
+
+    def test_perform_save_skips_if_save_in_progress(
+        self, mock_project_path: Path, mock_timer: QTimer, qtbot: QtBot
+    ) -> None:
+        """perform_save skips if another save is already in progress."""
+        save_fn = MagicMock()
+        manager = AutoSaveManager(
+            timer=mock_timer,
+            get_project_path=lambda: mock_project_path,
+            save_project=save_fn,
+        )
+
+        # Manually set in-progress flag
+        manager._save_in_progress = True
+
+        manager.perform_save()
+
+        # Should not have called save_project since we're in progress
+        save_fn.assert_not_called()
+
+    def test_perform_save_clears_in_progress_flag_on_completion(
+        self, mock_project_path: Path, mock_timer: QTimer, qtbot: QtBot
+    ) -> None:
+        """perform_save clears the in-progress flag after completion."""
+        manager = AutoSaveManager(
+            timer=mock_timer,
+            get_project_path=lambda: mock_project_path,
+            save_project=MagicMock(),
+        )
+
+        manager.perform_save()
+        _wait_for_threadpool(qtbot)
+
+        # Wait for signal to be processed (queued connection from worker thread)
+        def check_flag_cleared() -> bool:
+            return not manager._save_in_progress
+
+        qtbot.waitUntil(check_flag_cleared, timeout=1000)
+
+        assert not manager._save_in_progress
 
 
 class TestSetMessageService:

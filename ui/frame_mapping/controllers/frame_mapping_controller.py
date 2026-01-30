@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from json import JSONDecodeError
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
@@ -18,6 +18,8 @@ from core.services.image_utils import pil_to_qpixmap
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
+
+from PySide6.QtCore import QThread
 
 from core.frame_mapping_project import (
     AIFrame,
@@ -49,6 +51,40 @@ from ui.frame_mapping.views.workbench_types import AlignmentState
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+class CaptureParseWorker(QThread):
+    """Background worker for parsing capture files without blocking UI.
+
+    Emits file_parsed for each successfully parsed file, then finished when done.
+    """
+
+    file_parsed = Signal(object, object)  # CaptureResult, Path
+    parse_error = Signal(object, str)  # Path, error_message
+    finished_all = Signal(int)  # total_count
+
+    def __init__(self, paths: list[Path], parent: QObject | None = None) -> None:
+        super().__init__(parent)
+        self._paths = paths
+        self._parser = MesenCaptureParser()
+
+    @override
+    def run(self) -> None:
+        """Parse all capture files in background thread."""
+        parsed_count = 0
+        for path in self._paths:
+            if self.isInterruptionRequested():
+                break
+            try:
+                capture_result = self._parser.parse_file(path)
+                if capture_result.has_entries:
+                    self.file_parsed.emit(capture_result, path)
+                    parsed_count += 1
+                else:
+                    self.parse_error.emit(path, "No sprite entries")
+            except (OSError, JSONDecodeError, KeyError, ValueError) as e:
+                self.parse_error.emit(path, str(e))
+        self.finished_all.emit(parsed_count)
 
 
 class FrameMappingController(QObject):
@@ -93,6 +129,9 @@ class FrameMappingController(QObject):
     preview_cache_invalidated = Signal(str)  # game_frame_id - preview was regenerated
     # Capture import signal - emitted when capture parsed, workspace shows dialog
     capture_import_requested = Signal(object, object)  # (CaptureResult, capture_path: Path)
+    # Directory import signals - for background parsing progress
+    directory_import_started = Signal(int)  # total_files - Emitted when directory import begins
+    directory_import_finished = Signal(int)  # parsed_count - Emitted when directory import completes
     # Undo/Redo signals
     can_undo_changed = Signal(bool)
     can_redo_changed = Signal(bool)
@@ -120,6 +159,8 @@ class FrameMappingController(QObject):
         self._undo_stack = UndoRedoStack(parent=self)
         self._undo_stack.can_undo_changed.connect(self.can_undo_changed)
         self._undo_stack.can_redo_changed.connect(self.can_redo_changed)
+        # Background capture parsing worker (kept alive during parsing)
+        self._capture_parse_worker: CaptureParseWorker | None = None
 
     @property
     def project(self) -> FrameMappingProject | None:
@@ -518,33 +559,82 @@ class FrameMappingController(QObject):
             self.error_occurred.emit(f"Failed to import capture: {e}")
             return None
 
-    def import_capture_directory(self, directory: Path) -> list[Path]:
-        """Parse all captures from a directory and emit signals for each.
+    def import_capture_directory(self, directory: Path) -> None:
+        """Parse all captures from a directory in background and emit signals.
 
+        Parses capture files in a background thread to avoid blocking UI.
         Emits capture_import_requested for each valid capture file.
         The workspace handles showing dialogs and calling complete_capture_import().
 
+        Emits:
+            directory_import_started: When parsing begins (total_files count)
+            capture_import_requested: For each successfully parsed capture
+            directory_import_finished: When all parsing completes (parsed_count)
+
         Args:
             directory: Directory containing capture JSON files
-
-        Returns:
-            List of capture file paths that were parsed (for workspace to track)
         """
         if not directory.is_dir():
             self.error_occurred.emit(f"Not a directory: {directory}")
-            return []
+            return
 
         json_files = sorted(directory.glob("sprite_capture_*.json"))
         if not json_files:
             json_files = sorted(directory.glob("*.json"))
 
-        parsed_paths: list[Path] = []
-        for json_path in json_files:
-            self.import_mesen_capture(json_path)
-            parsed_paths.append(json_path)
+        if not json_files:
+            self.error_occurred.emit(f"No capture files found in {directory}")
+            return
 
-        logger.info("Parsed %d captures from %s", len(parsed_paths), directory)
-        return parsed_paths
+        # Cancel any existing parsing operation
+        if self._capture_parse_worker is not None:
+            self._capture_parse_worker.requestInterruption()
+            self._capture_parse_worker.wait(1000)
+            self._capture_parse_worker = None
+
+        if self._project is None:
+            self.new_project()
+
+        # Create and start background worker
+        self._capture_parse_worker = CaptureParseWorker(json_files, parent=self)
+        self._capture_parse_worker.file_parsed.connect(self._on_capture_file_parsed)
+        self._capture_parse_worker.parse_error.connect(self._on_capture_parse_error)
+        self._capture_parse_worker.finished_all.connect(self._on_capture_directory_finished)
+
+        # Emit start signal with total count
+        self.directory_import_started.emit(len(json_files))
+        logger.info("Starting background parse of %d captures from %s", len(json_files), directory)
+        self._capture_parse_worker.start()
+
+    def _on_capture_file_parsed(self, capture_result: CaptureResult, capture_path: Path) -> None:
+        """Handle a capture file parsed by the background worker.
+
+        Emits capture_import_requested for workspace to show dialog.
+
+        Args:
+            capture_result: Parsed capture result
+            capture_path: Path to the capture file
+        """
+        self.capture_import_requested.emit(capture_result, capture_path)
+
+    def _on_capture_parse_error(self, capture_path: Path, error_message: str) -> None:
+        """Handle capture parsing error from background worker.
+
+        Args:
+            capture_path: Path to the file that failed to parse
+            error_message: Error description
+        """
+        logger.warning("Failed to parse capture %s: %s", capture_path, error_message)
+
+    def _on_capture_directory_finished(self, parsed_count: int) -> None:
+        """Handle completion of directory capture parsing.
+
+        Args:
+            parsed_count: Number of captures successfully parsed
+        """
+        logger.info("Directory import finished: %d captures parsed", parsed_count)
+        self.directory_import_finished.emit(parsed_count)
+        self._capture_parse_worker = None
 
     def create_mapping(self, ai_frame_id: str, game_frame_id: str) -> bool:
         """Create a mapping between an AI frame and a game frame.
@@ -942,14 +1032,18 @@ class FrameMappingController(QObject):
         self.project_changed.emit()
 
     def _invalidate_previews_on_palette_change(self) -> None:
-        """Invalidate all previews when sheet palette changes.
+        """Mark all previews as stale when sheet palette changes.
 
         BUG-2 FIX: Game frame previews may use the sheet palette for rendering.
         When the palette changes, cached previews become stale and must be
         regenerated to reflect the new colors.
+
+        Using mark_all_stale() instead of invalidate_all() allows the UI to
+        remain responsive - existing previews are displayed immediately while
+        regeneration happens lazily on next access.
         """
-        logger.debug("Invalidating preview cache due to palette change")
-        self._preview_service.invalidate_all()
+        logger.debug("Marking preview cache stale due to palette change")
+        self._preview_service.mark_all_stale()
 
     def extract_sheet_colors(self) -> dict[tuple[int, int, int], int]:
         """Extract unique colors from all AI frames in the project.

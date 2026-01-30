@@ -3179,35 +3179,39 @@ class TestInjectionRollback:
 
 
 class TestPreviewCacheInvalidationOnPaletteChange:
-    """Tests for BUG-2 fix: preview cache invalidation when palette changes."""
+    """Tests for BUG-2 fix: preview cache invalidation when palette changes.
 
-    def test_preview_cache_invalidated_on_palette_set(self, qtbot) -> None:
-        """Setting sheet palette invalidates preview cache."""
+    Note: As of Phase 4 performance optimization, palette changes call
+    mark_all_stale() instead of invalidate_all() for deferred regeneration.
+    """
+
+    def test_preview_cache_marked_stale_on_palette_set(self, qtbot) -> None:
+        """Setting sheet palette marks preview cache as stale."""
         from core.frame_mapping_project import SheetPalette
 
         controller = FrameMappingController()
         controller.new_project()
 
-        # Spy on the invalidate_all method
-        invalidate_calls: list[bool] = []
-        original_invalidate = controller._preview_service.invalidate_all
+        # Spy on the mark_all_stale method
+        stale_calls: list[bool] = []
+        original_mark_stale = controller._preview_service.mark_all_stale
 
-        def spy_invalidate() -> None:
-            invalidate_calls.append(True)
-            original_invalidate()
+        def spy_mark_stale() -> None:
+            stale_calls.append(True)
+            original_mark_stale()
 
-        controller._preview_service.invalidate_all = spy_invalidate
+        controller._preview_service.mark_all_stale = spy_mark_stale
 
         # Set a palette
         colors = [(0, 0, 0)] * 16
         palette = SheetPalette(colors=colors)
         controller.set_sheet_palette(palette)
 
-        # Preview cache should have been invalidated
-        assert len(invalidate_calls) == 1
+        # Preview cache should have been marked stale
+        assert len(stale_calls) == 1
 
-    def test_preview_cache_invalidated_on_palette_color_change(self, qtbot) -> None:
-        """Changing a single palette color invalidates preview cache."""
+    def test_preview_cache_marked_stale_on_palette_color_change(self, qtbot) -> None:
+        """Changing a single palette color marks preview cache as stale."""
         from core.frame_mapping_project import SheetPalette
 
         controller = FrameMappingController()
@@ -3218,24 +3222,24 @@ class TestPreviewCacheInvalidationOnPaletteChange:
         palette = SheetPalette(colors=colors)
         controller.set_sheet_palette(palette)
 
-        # Spy on invalidate_all after initial set
-        invalidate_calls: list[bool] = []
-        original_invalidate = controller._preview_service.invalidate_all
+        # Spy on mark_all_stale after initial set
+        stale_calls: list[bool] = []
+        original_mark_stale = controller._preview_service.mark_all_stale
 
-        def spy_invalidate() -> None:
-            invalidate_calls.append(True)
-            original_invalidate()
+        def spy_mark_stale() -> None:
+            stale_calls.append(True)
+            original_mark_stale()
 
-        controller._preview_service.invalidate_all = spy_invalidate
+        controller._preview_service.mark_all_stale = spy_mark_stale
 
         # Change a single color
         controller.set_sheet_palette_color(5, (255, 0, 0))
 
-        # Preview cache should have been invalidated
-        assert len(invalidate_calls) == 1
+        # Preview cache should have been marked stale
+        assert len(stale_calls) == 1
 
-    def test_preview_cache_invalidated_on_palette_clear(self, qtbot) -> None:
-        """Clearing the sheet palette invalidates preview cache."""
+    def test_preview_cache_marked_stale_on_palette_clear(self, qtbot) -> None:
+        """Clearing the sheet palette marks preview cache as stale."""
         from core.frame_mapping_project import SheetPalette
 
         controller = FrameMappingController()
@@ -3246,21 +3250,21 @@ class TestPreviewCacheInvalidationOnPaletteChange:
         palette = SheetPalette(colors=colors)
         controller.set_sheet_palette(palette)
 
-        # Spy on invalidate_all after initial set
-        invalidate_calls: list[bool] = []
-        original_invalidate = controller._preview_service.invalidate_all
+        # Spy on mark_all_stale after initial set
+        stale_calls: list[bool] = []
+        original_mark_stale = controller._preview_service.mark_all_stale
 
-        def spy_invalidate() -> None:
-            invalidate_calls.append(True)
-            original_invalidate()
+        def spy_mark_stale() -> None:
+            stale_calls.append(True)
+            original_mark_stale()
 
-        controller._preview_service.invalidate_all = spy_invalidate
+        controller._preview_service.mark_all_stale = spy_mark_stale
 
         # Clear palette
         controller.set_sheet_palette(None)
 
-        # Preview cache should have been invalidated
-        assert len(invalidate_calls) == 1
+        # Preview cache should have been marked stale
+        assert len(stale_calls) == 1
 
 
 class TestApplyTransformsToAllMappings:
