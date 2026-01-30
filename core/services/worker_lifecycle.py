@@ -111,9 +111,20 @@ class WorkerManager:
         if worker is None:
             return True
 
-        # Block signals FIRST to prevent race conditions with queued signals
-        # This ensures no callbacks fire on deleted objects during cleanup
-        worker.blockSignals(True)
+        # Check if Qt object is still valid before accessing it
+        # This prevents "Internal C++ object already deleted" errors
+        try:
+            from shiboken6 import isValid
+
+            if not isValid(worker):
+                return True
+            
+            # Block signals FIRST to prevent race conditions with queued signals
+            # This ensures no callbacks fire on deleted objects during cleanup
+            worker.blockSignals(True)
+        except (ImportError, RuntimeError, TypeError):
+            # shiboken6 not available or worker already invalid/deleted
+            return True
 
         worker_name = worker.__class__.__name__
 

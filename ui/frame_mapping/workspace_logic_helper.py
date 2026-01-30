@@ -177,12 +177,24 @@ class WorkspaceLogicHelper:
             )
 
     def update_map_button_state(self) -> None:
-        """Update the Map Selected button enabled state."""
+        """Update the Map Selected button enabled state.
+
+        Considers filter visibility: if the selected AI frame is hidden by
+        an active filter (unmapped-only, search, tag), the button is disabled
+        even though state manager still has the selection.
+        """
         if self._ai_frames_pane is None:
             return
         ai_frame_id = self.get_selected_ai_frame_id()
         game_id = self.get_selected_game_id()
-        both_selected = ai_frame_id is not None and game_id is not None
+
+        # Check if selected AI frame is visible (not filtered out)
+        # The list only contains items that pass all filters
+        is_visible = True
+        if ai_frame_id is not None:
+            is_visible = self._ai_frames_pane.has_visible_item(ai_frame_id)
+
+        both_selected = ai_frame_id is not None and game_id is not None and is_visible
         self._ai_frames_pane.set_map_button_enabled(both_selected)
 
     # ===== Phase 2b: Refresh helpers =====

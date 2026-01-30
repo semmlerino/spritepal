@@ -22,6 +22,7 @@ from PySide6.QtGui import QImage
 
 from core.services.image_utils import pil_to_qimage
 from core.services.sprite_compositor import SpriteCompositor, TransformParams
+from ui.common import WorkerManager, is_valid_qt
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -168,7 +169,14 @@ class AsyncPreviewService(QObject):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._destroyed = False
+        self._request_id_mutex = QMutex()  # Protects _current_request_id
         self._current_request_id = 0
+
+        # Image buffer cache to avoid repeated copies during rapid drags
+        # Only copy when the source image identity changes
+        self._cached_ai_image: Image.Image | None = None
+        self._cached_ai_index_map: np.ndarray | None = None
+        self._cached_image_id: int | None = None  # id() of source ai_image
 
         # Create persistent thread and worker
         self._thread = QThread()
@@ -180,8 +188,8 @@ class AsyncPreviewService(QObject):
         self._worker.preview_ready.connect(self._on_preview_ready)
         self._worker.error.connect(self._on_error)
 
-        # Start the thread immediately
-        self._thread.start()
+        # Start the thread via WorkerManager for proper lifecycle tracking
+        WorkerManager.start_worker(self._thread)
 
         if parent is not None:
             parent.destroyed.connect(self._on_parent_destroyed)
@@ -218,19 +226,27 @@ class AsyncPreviewService(QObject):
         if self._destroyed:
             return
 
-        # Increment request ID to invalidate any in-progress work
-        self._current_request_id += 1
-        request_id = self._current_request_id
+        # Increment request ID to invalidate any in-progress work (mutex-protected)
+        with QMutexLocker(self._request_id_mutex):
+            self._current_request_id += 1
+            request_id = self._current_request_id
 
-        # Create request
+        # Use cached copies if image identity unchanged (avoids repeated copies during drag)
+        image_id = id(ai_image)
+        if image_id != self._cached_image_id:
+            self._cached_ai_image = ai_image.copy()
+            self._cached_ai_index_map = ai_index_map.copy() if ai_index_map is not None else None
+            self._cached_image_id = image_id
+
+        # Create request with cached copies
         request = PreviewRequest(
             request_id=request_id,
-            ai_image=ai_image.copy(),  # Copy to avoid threading issues
+            ai_image=self._cached_ai_image,  # type: ignore[arg-type]  # cached copy
             capture_result=capture_result,
             transform=transform,
             uncovered_policy=uncovered_policy,
             sheet_palette=sheet_palette,
-            ai_index_map=ai_index_map.copy() if ai_index_map is not None else None,
+            ai_index_map=self._cached_ai_index_map,
             display_scale=display_scale,
         )
 
@@ -242,50 +258,66 @@ class AsyncPreviewService(QObject):
 
     def cancel(self) -> None:
         """Cancel any in-progress preview generation."""
-        # Simply increment request ID to invalidate in-progress work
-        self._current_request_id += 1
+        # Increment request ID to invalidate in-progress work (mutex-protected)
+        with QMutexLocker(self._request_id_mutex):
+            self._current_request_id += 1
+            current_id = self._current_request_id
         if self._worker is not None:
-            self._worker.set_target_request_id(self._current_request_id)
+            self._worker.set_target_request_id(current_id)
+
+    def clear_image_cache(self) -> None:
+        """Clear cached image buffers.
+
+        Call this when the AI frame changes (set_ai_frame) to ensure
+        the next request uses fresh copies.
+        """
+        self._cached_ai_image = None
+        self._cached_ai_index_map = None
+        self._cached_image_id = None
 
     def _on_preview_ready(self, request_id: int, qimage: QImage, width: int, height: int) -> None:
         """Handle preview ready from worker."""
         if self._destroyed:
             return
-        # Only emit if this is the current request (not stale)
-        if request_id == self._current_request_id:
+        # Only emit if this is the current request (not stale) - mutex-protected read
+        with QMutexLocker(self._request_id_mutex):
+            is_current = request_id == self._current_request_id
+        if is_current:
             self.preview_ready.emit(qimage, width, height)
 
     def _on_error(self, request_id: int, error_message: str) -> None:
         """Handle error from worker."""
         if self._destroyed:
             return
-        if request_id == self._current_request_id:
+        # Only emit if this is the current request (not stale) - mutex-protected read
+        with QMutexLocker(self._request_id_mutex):
+            is_current = request_id == self._current_request_id
+        if is_current:
             self.preview_failed.emit(error_message)
 
     def shutdown(self) -> None:
         """Shutdown the service and clean up resources."""
         self._destroyed = True
+        self.clear_image_cache()
 
-        # Block signals first to prevent emission during cleanup
-        if self._worker is not None:
-            self._worker.blockSignals(True)
-            try:
-                self._worker.preview_ready.disconnect()
-                self._worker.error.disconnect()
-            except (RuntimeError, TypeError):
-                pass  # Already disconnected or never connected
+        try:
+            # Block signals first to prevent emission during cleanup
+            if is_valid_qt(self._worker):
+                self._worker.blockSignals(True)
+                try:
+                    self._worker.preview_ready.disconnect()
+                    self._worker.error.disconnect()
+                except (RuntimeError, TypeError):
+                    pass  # Already disconnected or never connected
 
-        # Clean up thread
-        if self._thread is not None:
-            if self._thread.isRunning():
-                self._thread.quit()
-                if not self._thread.wait(3000):
-                    logger.warning("AsyncPreviewService thread did not stop in time")
+            # Clean up thread via WorkerManager
+            if is_valid_qt(self._thread):
+                WorkerManager.cleanup_worker(self._thread, timeout=3000)
+                self._thread = None
 
-            if not self._thread.isRunning():
-                self._thread.deleteLater()
-            self._thread = None
-
-        if self._worker is not None:
-            self._worker.deleteLater()
-            self._worker = None
+            if is_valid_qt(self._worker):
+                self._worker.deleteLater()
+                self._worker = None
+        except RuntimeError:
+            # Objects already deleted by Qt parent-child mechanism
+            pass
