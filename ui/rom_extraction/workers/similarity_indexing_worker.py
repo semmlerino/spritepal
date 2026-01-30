@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 from PIL import Image
 from PySide6.QtCore import QObject, Signal, Slot
 
+from core.types import SpriteInfo
 from core.visual_similarity_search import VisualSimilarityEngine
 from core.workers.base import BaseWorker, handle_worker_errors
 from utils.logging_config import get_logger
@@ -77,7 +78,7 @@ class SimilarityIndexingWorker(BaseWorker):
         # Indexing state
         self._indexed_count = 0
         self._total_to_index = 0
-        self._pending_sprites: dict[int, dict[str, Any]] = {}  # pyright: ignore[reportExplicitAny] - Dynamic sprite data
+        self._pending_sprites: dict[int, SpriteInfo] = {}
         self._index_lock = threading.Lock()
 
         # Load existing index if available
@@ -211,7 +212,7 @@ class SimilarityIndexingWorker(BaseWorker):
         temp_file.replace(self.index_file)
 
     @Slot(dict)
-    def on_sprite_found(self, sprite_info: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
+    def on_sprite_found(self, sprite_info: SpriteInfo) -> None:
         """
         Handle sprite_found signal by indexing the sprite.
 
@@ -219,10 +220,7 @@ class SimilarityIndexingWorker(BaseWorker):
             sprite_info: Dictionary containing sprite information including offset
         """
         try:
-            offset = sprite_info.get("offset")
-            if offset is None:
-                logger.warning("Sprite info missing offset, cannot index")
-                return
+            offset = sprite_info["offset"]
 
             # Check if already indexed
             if offset in self.similarity_engine.sprite_database:
@@ -283,8 +281,8 @@ class SimilarityIndexingWorker(BaseWorker):
                         logger.warning(f"Could not extract image for sprite at 0x{offset:X}")
                         continue
 
-                    # Index the sprite
-                    self.similarity_engine.index_sprite(offset=offset, image=sprite_image, metadata=sprite_info)
+                    # Index the sprite - cast SpriteInfo TypedDict to plain dict for API compatibility
+                    self.similarity_engine.index_sprite(offset=offset, image=sprite_image, metadata=dict(sprite_info))
 
                     indexed_count += 1
                     self.sprite_indexed.emit(offset)

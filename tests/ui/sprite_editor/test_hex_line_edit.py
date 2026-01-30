@@ -7,17 +7,18 @@ Tests validation, visual feedback, and signal emission.
 
 from __future__ import annotations
 
-from typing import Any
-
-QtBot = Any  # pyright: ignore[reportExplicitAny]
+from typing import TYPE_CHECKING
 
 from ui.sprite_editor.views.widgets.hex_line_edit import HexLineEdit
+
+if TYPE_CHECKING:
+    from pytestqt.qtbot import QtBot
 
 
 class TestHexLineEditValidation:
     """Tests for HexLineEdit input validation."""
 
-    def test_valid_hex_with_prefix(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_valid_hex_with_prefix(self, qtbot: QtBot) -> None:
         """Test valid hex value with 0x prefix."""
         widget = HexLineEdit("0x1234")
         qtbot.addWidget(widget)
@@ -25,7 +26,7 @@ class TestHexLineEditValidation:
         assert widget.isValid()
         assert widget.value() == 0x1234
 
-    def test_valid_hex_without_prefix(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_valid_hex_without_prefix(self, qtbot: QtBot) -> None:
         """Test valid hex value without 0x prefix."""
         widget = HexLineEdit("ABCD")
         qtbot.addWidget(widget)
@@ -33,7 +34,7 @@ class TestHexLineEditValidation:
         assert widget.isValid()
         assert widget.value() == 0xABCD
 
-    def test_valid_hex_lowercase(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_valid_hex_lowercase(self, qtbot: QtBot) -> None:
         """Test valid hex value with lowercase letters."""
         widget = HexLineEdit("0xabcd")
         qtbot.addWidget(widget)
@@ -41,7 +42,7 @@ class TestHexLineEditValidation:
         assert widget.isValid()
         assert widget.value() == 0xABCD
 
-    def test_empty_string_returns_zero(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_empty_string_returns_zero(self, qtbot: QtBot) -> None:
         """Test that empty string is valid and returns 0."""
         widget = HexLineEdit("")
         qtbot.addWidget(widget)
@@ -49,7 +50,7 @@ class TestHexLineEditValidation:
         # Empty is valid (returns 0)
         assert widget.value() == 0
 
-    def test_set_value_updates_text(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_set_value_updates_text(self, qtbot: QtBot) -> None:
         """Test setValue updates the displayed text."""
         widget = HexLineEdit("0x0000")
         qtbot.addWidget(widget)
@@ -63,7 +64,7 @@ class TestHexLineEditValidation:
 class TestHexLineEditSignals:
     """Tests for HexLineEdit signal emission."""
 
-    def test_value_changed_emits_on_valid_input(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_value_changed_emits_on_valid_input(self, qtbot: QtBot) -> None:
         """Test value_changed signal emits when valid text is entered."""
         widget = HexLineEdit("0x0000")
         qtbot.addWidget(widget)
@@ -79,7 +80,7 @@ class TestHexLineEditSignals:
         last_value = spy.at(spy.count() - 1)[0]
         assert last_value == 0x1000
 
-    def test_value_changed_not_emitted_on_invalid(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_value_changed_not_emitted_on_invalid(self, qtbot: QtBot) -> None:
         """Test value_changed signal uses last valid value for invalid input."""
         widget = HexLineEdit("0x1000")
         qtbot.addWidget(widget)
@@ -99,14 +100,14 @@ class TestHexLineEditSignals:
 class TestHexLineEditVisualFeedback:
     """Tests for HexLineEdit visual feedback."""
 
-    def test_valid_input_clears_style(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_valid_input_clears_style(self, qtbot: QtBot) -> None:
         """Test valid input clears error styling."""
         widget = HexLineEdit("0x1234")
         qtbot.addWidget(widget)
 
         assert widget.styleSheet() == HexLineEdit.STYLE_VALID
 
-    def test_last_valid_value_preserved(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_last_valid_value_preserved(self, qtbot: QtBot) -> None:
         """Test last valid value is preserved when input becomes partial."""
         widget = HexLineEdit("0x1234")
         qtbot.addWidget(widget)
@@ -126,7 +127,7 @@ class TestHexLineEditVisualFeedback:
 class TestHexLineEditEdgeCases:
     """Tests for HexLineEdit edge cases."""
 
-    def test_max_length_enforced(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_max_length_enforced(self, qtbot: QtBot) -> None:
         """Test that max length is enforced."""
         widget = HexLineEdit("0x0000")
         qtbot.addWidget(widget)
@@ -137,7 +138,7 @@ class TestHexLineEditEdgeCases:
         # Should be truncated
         assert len(widget.text()) <= 10
 
-    def test_zero_value(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_zero_value(self, qtbot: QtBot) -> None:
         """Test zero value handling."""
         widget = HexLineEdit("0x0000")
         qtbot.addWidget(widget)
@@ -145,7 +146,7 @@ class TestHexLineEditEdgeCases:
         assert widget.value() == 0
         assert widget.isValid()
 
-    def test_max_value(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_max_value(self, qtbot: QtBot) -> None:
         """Test maximum value (8 hex digits)."""
         widget = HexLineEdit("0xFFFFFFFF")
         qtbot.addWidget(widget)
@@ -153,7 +154,7 @@ class TestHexLineEditEdgeCases:
         assert widget.value() == 0xFFFFFFFF
         assert widget.isValid()
 
-    def test_case_insensitive_prefix(self, qtbot: QtBot) -> None:  # pyright: ignore[reportExplicitAny]
+    def test_case_insensitive_prefix(self, qtbot: QtBot) -> None:
         """Test both 0x and 0X prefixes work."""
         widget1 = HexLineEdit("0xABCD")
         widget2 = HexLineEdit("0XABCD")

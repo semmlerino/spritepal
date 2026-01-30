@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QObject, QThread, Signal
 
+from core.types import SpriteInfo
 from ui.common import WorkerManager
 from ui.rom_extraction.workers.scan_worker import SpriteScanWorker
 from ui.rom_extraction.workers.similarity_indexing_worker import SimilarityIndexingWorker
@@ -85,7 +86,7 @@ class ROMWorkerOrchestrator(QObject):
 
         # State tracking
         self._is_scanning = False
-        self._found_sprites: list[dict[str, Any]] = []  # pyright: ignore[reportExplicitAny] - Sprite result dicts
+        self._found_sprites: list[SpriteInfo] = []
 
         logger.debug("ROMWorkerOrchestrator initialized")
 
@@ -194,7 +195,7 @@ class ROMWorkerOrchestrator(QObject):
             self._scan_worker.cancel()
             logger.info("Scan cancellation requested")
 
-    def _on_sprite_found(self, sprite_data: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
+    def _on_sprite_found(self, sprite_data: SpriteInfo) -> None:
         """Handle sprite found during scan."""
         self._found_sprites.append(sprite_data)
 
@@ -276,7 +277,7 @@ class ROMWorkerOrchestrator(QObject):
         return self._is_scanning
 
     @property
-    def found_sprites(self) -> list[dict[str, Any]]:  # pyright: ignore[reportExplicitAny] - Sprite result dicts
+    def found_sprites(self) -> list[SpriteInfo]:
         """Get the list of sprites found during the current/last scan."""
         return self._found_sprites
 
