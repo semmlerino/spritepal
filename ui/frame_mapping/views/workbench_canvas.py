@@ -51,6 +51,7 @@ from core.services.content_bounds_analyzer import (
     ContentBoundsAnalyzer,
     get_content_bbox,
 )
+from core.services.image_utils import pil_to_qimage
 from core.services.rgb_to_indexed import load_image_preserving_indices
 from core.services.sprite_compositor import TransformParams
 from core.services.tile_sampling_service import TileSamplingService
@@ -304,6 +305,16 @@ class WorkbenchCanvas(QWidget):
 
         # Tile selection state
         self._selected_tile_index: int | None = None
+
+        # Tile geometry cache (invalidated on set_game_frame)
+        # Caches _compute_tile_rects() results since it's called multiple times per alignment
+        self._cached_tile_rects: list[tuple[int, int, int, int]] | None = None
+        # QRect cache - avoids creating new QRect list on every drag tick
+        self._cached_tile_qrects: list[QRect] | None = None
+
+        # Content bbox cache (invalidated on set_ai_frame)
+        # Caches get_content_bbox() since AI image is unchanged during alignment drag
+        self._cached_content_bbox: tuple[int, int, int, int] | None = None
 
         # Async preview service for offloading compositor to background thread
         self._async_preview_service = AsyncPreviewService(self)
@@ -696,6 +707,9 @@ class WorkbenchCanvas(QWidget):
         # Clear tile selection when game frame changes
         self._select_tile(None)
 
+        # Invalidate tile geometry cache (will be recomputed on next access)
+        self._invalidate_tile_cache()
+
         self._current_game_frame = frame
         self._capture_result = capture_result
 
@@ -794,17 +808,22 @@ class WorkbenchCanvas(QWidget):
         """
         self._current_ai_frame = frame
 
+        # Clear async service image caches since AI frame is changing
+        self._async_preview_service.clear_image_cache()
+        self._async_highlight_service.clear_image_cache()
+
         if frame is None:
             self._ai_pixmap = None
             self._ai_image = None
             self._ai_index_map = None
+            self._cached_content_bbox = None
             self._ai_frame_item.set_pixmap(None)
             self._update_auto_align_button_state()
             return
 
         if frame.path.exists():
-            self._ai_pixmap = QPixmap(str(frame.path))
-            # Also load as PIL image for auto-alignment and index-preserving preview
+            # Load once via PIL (preserving index map), then convert to QPixmap
+            # This avoids double-decoding (was: QPixmap load + PIL load separately)
             try:
                 self._ai_index_map, self._ai_image = load_image_preserving_indices(frame.path)
                 if self._ai_index_map is not None:
@@ -813,18 +832,26 @@ class WorkbenchCanvas(QWidget):
                         frame.path.name,
                         self._ai_index_map.shape,
                     )
+                # Cache content bbox for this AI image (used during alignment drag)
+                self._cached_content_bbox = get_content_bbox(self._ai_image)
+                # Convert PIL image to QPixmap (ai_image is always valid after load)
+                qimage = pil_to_qimage(self._ai_image, with_alpha=True)
+                self._ai_pixmap = QPixmap.fromImage(qimage)
             except Exception as e:
                 logger.warning(
-                    "Failed to load PIL image for %s: %s - auto-align will be disabled",
+                    "Failed to load image for %s: %s - auto-align will be disabled",
                     frame.path,
                     e,
                 )
                 self._ai_image = None
                 self._ai_index_map = None
+                self._ai_pixmap = None
+                self._cached_content_bbox = None
         else:
             self._ai_pixmap = None
             self._ai_image = None
             self._ai_index_map = None
+            self._cached_content_bbox = None
 
         if self._ai_pixmap is not None:
             # Scale for display
@@ -1216,27 +1243,9 @@ class WorkbenchCanvas(QWidget):
             flip_h = self._flip_h_checkbox.isChecked()
             flip_v = self._flip_v_checkbox.isChecked()
 
-        # Build tile rects in actual coordinates
-        tile_rects: list[QRectF] = []
-        bbox = self._capture_result.bounding_box
-
-        for entry in self._capture_result.entries:
-            rel_x = entry.x - bbox.x
-            rel_y = entry.y - bbox.y
-
-            for ty in range(0, entry.height, 8):
-                for tx in range(0, entry.width, 8):
-                    tile_rects.append(
-                        QRectF(
-                            rel_x + tx,
-                            rel_y + ty,
-                            8,
-                            8,
-                        )
-                    )
-
-        # Convert QRectF to QRect for the service
-        qt_rects = [QRect(int(r.x()), int(r.y()), int(r.width()), int(r.height())) for r in tile_rects]
+        # Use cached tile rects (tuples for check_content_outside_tiles, QRects for get_touched_tiles)
+        tile_tuples = self._get_cached_tile_rects()
+        qt_rects = self._get_cached_tile_qrects()
 
         # Calculate touched/untouched (untouched is not used but returned)
         touched, _untouched = self._tile_sampling_service.get_touched_tiles(
@@ -1250,9 +1259,11 @@ class WorkbenchCanvas(QWidget):
 
         self._tile_overlay_item.set_touched_indices(touched)
 
-        # Check for content outside tile area using actual tile positions
-        # (not just the union bounding box - handles non-rectangular sprites)
-        content_bbox: tuple[int, int, int, int] | None = get_content_bbox(self._ai_image)
+        # Use cached content bbox (computed once per AI frame, not per alignment update)
+        # Fallback to computing if cache is somehow missing
+        content_bbox = self._cached_content_bbox
+        if content_bbox is None:
+            content_bbox = get_content_bbox(self._ai_image)
 
         # Transform content_bbox for flip transforms
         # The visual display applies flips, so we need to match that for overflow detection
@@ -1267,8 +1278,6 @@ class WorkbenchCanvas(QWidget):
                 # Vertical flip: y -> height - y
                 top, bottom = img_height - bottom, img_height - top
             content_bbox = (left, top, right, bottom)
-
-        tile_tuples = [(r.x(), r.y(), r.width(), r.height()) for r in qt_rects]
 
         has_overflow, overflow_rects = self._tile_sampling_service.check_content_outside_tiles(
             content_bbox,
@@ -1604,6 +1613,42 @@ class WorkbenchCanvas(QWidget):
 
         return tile_rects
 
+    def _get_cached_tile_rects(self) -> list[tuple[int, int, int, int]]:
+        """Get tile rects, using cache if available.
+
+        This caches the result of _compute_tile_rects() to avoid repeated
+        computation during alignment operations. Cache is invalidated when
+        game frame changes.
+
+        Returns:
+            List of (x, y, width, height) tuples relative to game frame origin.
+        """
+        if self._cached_tile_rects is None:
+            self._cached_tile_rects = self._compute_tile_rects()
+        return self._cached_tile_rects
+
+    def _get_cached_tile_qrects(self) -> list[QRect]:
+        """Get tile rects as QRect list, using cache if available.
+
+        This caches the QRect conversion to avoid repeated allocation during
+        drag operations. The QRect list is derived from the tuple cache.
+
+        Returns:
+            List of QRect for tile geometry.
+        """
+        if self._cached_tile_qrects is None:
+            tuples = self._get_cached_tile_rects()
+            self._cached_tile_qrects = [QRect(x, y, w, h) for x, y, w, h in tuples]
+        return self._cached_tile_qrects
+
+    def _invalidate_tile_cache(self) -> None:
+        """Invalidate the tile geometry cache.
+
+        Called when game frame changes and tile rects need to be recomputed.
+        """
+        self._cached_tile_rects = None
+        self._cached_tile_qrects = None
+
     def _find_non_overflowing_position(
         self,
         ai_bbox: tuple[int, int, int, int],
@@ -1701,7 +1746,7 @@ class WorkbenchCanvas(QWidget):
         if self._ai_image is None or self._capture_result is None:
             return (0, 0, 1.0)
 
-        tile_rects = self._compute_tile_rects()
+        tile_rects = self._get_cached_tile_rects()
         if not tile_rects:
             return (0, 0, 1.0)
 
@@ -1813,7 +1858,7 @@ class WorkbenchCanvas(QWidget):
                 )
 
             # Try to find position without overflow
-            tile_rects = self._compute_tile_rects()
+            tile_rects = self._get_cached_tile_rects()
             offset_x, offset_y, found_valid = self._find_non_overflowing_position(
                 bbox_for_check, tile_rects, initial_offset_x, initial_offset_y, scale
             )
@@ -2224,6 +2269,7 @@ class WorkbenchCanvas(QWidget):
         flip_v = self._flip_v_checkbox.isChecked()
 
         # Request async highlight generation
+        # Pass ai_index_map for fast vectorized lookup (2-3x faster than RGB iteration)
         self._async_highlight_service.request_highlight(
             ai_image=self._ai_image,
             palette_index=index,
@@ -2232,6 +2278,7 @@ class WorkbenchCanvas(QWidget):
             user_scale=user_scale,
             flip_h=flip_h,
             flip_v=flip_v,
+            ai_index_map=self._ai_index_map,
         )
 
     def _generate_pixel_highlight_mask(self) -> None:

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
-from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QThread, Signal
+from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QImage, QPixmap
 
 from core.palette_utils import (
@@ -33,6 +33,12 @@ DEFAULT_THUMBNAIL_SIZE = 64
 
 # Maximum cached thumbnails (balances memory vs cache hits)
 _THUMBNAIL_CACHE_MAXSIZE = 500
+
+# QPixmap-level cache to avoid redundant PNG decoding
+# Key: (path_str, mtime, palette_hash, size) -> QPixmap
+# This cache is separate from the LRU cache which stores PNG bytes
+_pixmap_cache: dict[tuple[str, float, int, int], QPixmap] = {}
+_PIXMAP_CACHE_MAXSIZE = 200
 
 
 @lru_cache(maxsize=_THUMBNAIL_CACHE_MAXSIZE)
@@ -90,6 +96,7 @@ def clear_thumbnail_cache() -> None:
     """
     _cached_thumbnail_bytes.cache_clear()
     _cached_quantized_thumbnail_bytes.cache_clear()
+    _pixmap_cache.clear()
     logger.debug("Thumbnail cache cleared")
 
 
@@ -161,6 +168,17 @@ def _cached_quantized_thumbnail_bytes(
     return buffer.getvalue()
 
 
+def _compute_palette_hash(sheet_palette: SheetPalette | None) -> int:
+    """Compute a hash for the palette for cache key."""
+    if sheet_palette is None:
+        return 0
+    colors_hash = hash(tuple(sheet_palette.colors))
+    if sheet_palette.color_mappings:
+        mappings_hash = hash(tuple(sorted(sheet_palette.color_mappings.items())))
+        return hash((colors_hash, mappings_hash))
+    return colors_hash
+
+
 def create_quantized_thumbnail(
     frame_path: Path,
     sheet_palette: SheetPalette | None,
@@ -172,7 +190,10 @@ def create_quantized_thumbnail(
     WYSIWYG colors matching the injection result. Otherwise loads
     the raw PNG.
 
-    Results are cached using LRU cache keyed by (path, mtime, palette, size).
+    Results are cached at two levels:
+    1. LRU cache for PNG bytes (survives between calls)
+    2. QPixmap cache to avoid redundant PNG decoding
+
     Call clear_thumbnail_cache() when palette changes to force regeneration.
 
     Args:
@@ -193,6 +214,13 @@ def create_quantized_thumbnail(
         return None
 
     path_str = str(frame_path)
+    palette_hash = _compute_palette_hash(sheet_palette)
+
+    # Check QPixmap cache first (avoids PNG decode on repeated calls)
+    cache_key = (path_str, mtime, palette_hash, size)
+    cached_pixmap = _pixmap_cache.get(cache_key)
+    if cached_pixmap is not None:
+        return cached_pixmap
 
     # Use cached version based on whether we have a palette
     if sheet_palette is not None:
@@ -215,6 +243,14 @@ def create_quantized_thumbnail(
     if not pixmap.loadFromData(png_bytes):
         return None
 
+    # Store in QPixmap cache (with size limit)
+    if len(_pixmap_cache) >= _PIXMAP_CACHE_MAXSIZE:
+        # Simple eviction: remove oldest entries (first quarter)
+        keys_to_remove = list(_pixmap_cache.keys())[: _PIXMAP_CACHE_MAXSIZE // 4]
+        for key in keys_to_remove:
+            _pixmap_cache.pop(key, None)
+
+    _pixmap_cache[cache_key] = pixmap
     return pixmap
 
 
@@ -342,6 +378,9 @@ class AsyncThumbnailLoader(QObject):
     ) -> None:
         """Start loading thumbnails asynchronously.
 
+        Checks the QPixmap cache first and emits immediately for cache hits.
+        Only queues cache misses for background generation.
+
         Args:
             requests: List of (frame_id, frame_path) tuples
             sheet_palette: SheetPalette for quantization, or None for raw colors
@@ -357,8 +396,30 @@ class AsyncThumbnailLoader(QObject):
             self.finished.emit()
             return
 
-        # Create worker and thread
-        self._worker = _ThumbnailWorker(requests, sheet_palette, size)
+        # Check cache first - emit immediately for hits, collect misses
+        palette_hash = _compute_palette_hash(sheet_palette)
+        cache_misses: list[tuple[str, Path]] = []
+
+        for frame_id, frame_path in requests:
+            try:
+                mtime = frame_path.stat().st_mtime
+                cache_key = (str(frame_path), mtime, palette_hash, size)
+                cached_pixmap = _pixmap_cache.get(cache_key)
+                if cached_pixmap is not None:
+                    # Emit immediately for cache hit
+                    self.thumbnail_ready.emit(frame_id, cached_pixmap)
+                else:
+                    cache_misses.append((frame_id, frame_path))
+            except OSError:
+                cache_misses.append((frame_id, frame_path))
+
+        # If all hits, we're done
+        if not cache_misses:
+            self.finished.emit()
+            return
+
+        # Create worker and thread for cache misses
+        self._worker = _ThumbnailWorker(cache_misses, sheet_palette, size, self._current_request_id)
         self._thread = QThread()
         self._worker.moveToThread(self._thread)
 
@@ -370,9 +431,18 @@ class AsyncThumbnailLoader(QObject):
         # Start loading
         self._thread.start()
 
-    def _on_thumbnail_ready(self, frame_id: str, qimage: QImage) -> None:
-        """Convert QImage to QPixmap in main thread and emit signal."""
+    def _on_thumbnail_ready(self, frame_id: str, qimage: QImage, request_id: int) -> None:
+        """Convert QImage to QPixmap in main thread and emit signal.
+
+        Args:
+            frame_id: The frame identifier
+            qimage: The generated thumbnail image
+            request_id: The request batch ID (stale if != _current_request_id)
+        """
         if self._destroyed:
+            return
+        # Filter stale results from cancelled batches
+        if request_id != self._current_request_id:
             return
         if not qimage.isNull():
             pixmap = QPixmap.fromImage(qimage)
@@ -391,41 +461,64 @@ class AsyncThumbnailLoader(QObject):
         self._cleanup_thread()
 
     def _cleanup_thread(self) -> None:
-        """Clean up thread resources.
+        """Clean up thread resources without blocking UI.
 
         Signals are disconnected first to prevent stale results from propagating
         to the UI. The request_id mechanism provides additional protection against
         processing outdated results.
+
+        Uses a short initial wait (100ms) followed by deferred cleanup to avoid
+        blocking the UI thread for up to 5 seconds.
         """
+        worker = self._worker
+        thread = self._thread
+        destroyed = self._destroyed
+
         # Block signals first to prevent emission during cleanup
-        if self._worker is not None:
-            self._worker.blockSignals(True)
+        if worker is not None:
+            worker.blockSignals(True)
             try:
-                self._worker.thumbnail_ready.disconnect()
-                self._worker.finished.disconnect()
+                worker.thumbnail_ready.disconnect()
+                worker.finished.disconnect()
             except (RuntimeError, TypeError):
                 pass  # Already disconnected or never connected
 
-        if self._thread is not None:
-            if self._thread.isRunning():
-                self._thread.quit()
-                # Wait longer and log if it doesn't stop
-                if not self._thread.wait(5000):
-                    logger.warning("Thumbnail worker thread did not stop within timeout")
-            # Only deleteLater if not in destruction context
-            if not self._destroyed:
-                self._thread.deleteLater()
-            self._thread = None
-        if self._worker is not None:
-            if not self._destroyed:
-                self._worker.deleteLater()
-            self._worker = None
+        if thread is not None:
+            if thread.isRunning():
+                thread.quit()
+                if not thread.wait(100):  # Short initial wait
+                    # Schedule delayed cleanup instead of blocking UI
+                    QTimer.singleShot(500, lambda: self._finish_cleanup(thread, worker, destroyed))
+                    self._thread = None
+                    self._worker = None
+                    return
+
+        self._do_cleanup(thread, worker, destroyed)
+
+    def _finish_cleanup(self, thread: QThread, worker: QObject | None, destroyed: bool) -> None:
+        """Complete cleanup after delayed wait."""
+        if thread.isRunning():
+            thread.terminate()
+            thread.wait(100)
+        self._do_cleanup(thread, worker, destroyed)
+
+    def _do_cleanup(self, thread: QThread | None, worker: QObject | None, destroyed: bool) -> None:
+        """Perform actual cleanup of thread and worker objects."""
+        if thread is not None:
+            if not destroyed:
+                thread.deleteLater()
+        if worker is not None:
+            if not destroyed:
+                worker.deleteLater()
+        self._thread = None
+        self._worker = None
 
 
 class _ThumbnailWorker(QObject):
     """Worker that generates thumbnails in a background thread."""
 
-    thumbnail_ready = Signal(str, QImage)
+    # Signal includes request_id to filter stale results
+    thumbnail_ready = Signal(str, QImage, int)  # frame_id, qimage, request_id
     finished = Signal()
 
     def __init__(
@@ -433,11 +526,13 @@ class _ThumbnailWorker(QObject):
         requests: list[tuple[str, Path]],
         sheet_palette: SheetPalette | None,
         size: int,
+        request_id: int,
     ) -> None:
         super().__init__()
         self._requests = requests
         self._sheet_palette = sheet_palette
         self._size = size
+        self._request_id = request_id
         self._state_mutex = QMutex()
         self._stop_requested = False
 
@@ -460,7 +555,7 @@ class _ThumbnailWorker(QObject):
 
                 qimage = self._generate_thumbnail(frame_path)
                 if qimage is not None and not qimage.isNull():
-                    self.thumbnail_ready.emit(frame_id, qimage)
+                    self.thumbnail_ready.emit(frame_id, qimage, self._request_id)
         except Exception as e:
             logger.warning("Thumbnail worker error: %s", e, exc_info=True)
         finally:
@@ -489,14 +584,18 @@ class _ThumbnailWorker(QObject):
                 # Fall through to use original image
 
         # Convert to QImage (thread-safe)
-        qimage = pil_to_qimage(pil_image, thread_safe=True)
-        if qimage.isNull():
-            return None
+        try:
+            qimage = pil_to_qimage(pil_image, thread_safe=True)
+            if qimage.isNull():
+                return None
 
-        # Scale to thumbnail size using fast transformation (good enough for small thumbnails)
-        return qimage.scaled(
-            self._size,
-            self._size,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.FastTransformation,
-        )
+            # Scale to thumbnail size using fast transformation (good enough for small thumbnails)
+            return qimage.scaled(
+                self._size,
+                self._size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.FastTransformation,
+            )
+        except Exception:
+            logger.debug("Failed to convert/scale image: %s", frame_path)
+            return None

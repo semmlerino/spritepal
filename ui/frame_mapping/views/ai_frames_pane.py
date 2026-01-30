@@ -250,11 +250,25 @@ class AIFramesPane(QWidget):
     def set_mapping_status(self, status_map: dict[str, str]) -> None:
         """Update the mapping status for AI frames.
 
+        Uses incremental updates for changed items instead of full list rebuild,
+        avoiding redundant thumbnail loading.
+
         Args:
             status_map: Dictionary mapping AI frame ID (filename) to status string
         """
+        # Detect which frames have changed status
+        changed = [
+            (frame_id, status)
+            for frame_id, status in status_map.items()
+            if self._mapping_status.get(frame_id) != status
+        ]
+
+        # Update internal state
         self._mapping_status = status_map
-        self._refresh_list(is_frame_list_change=False)
+
+        # Only update changed items (avoids full rebuild and thumbnail reload)
+        for frame_id, status in changed:
+            self.update_single_item_status(frame_id, status)
 
     def update_single_item_status(self, ai_frame_id: str, status: str) -> None:
         """Update status indicator for one AI frame without full refresh.

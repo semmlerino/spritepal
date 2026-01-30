@@ -103,10 +103,13 @@ class PreviewService(QObject):
                     current_mtime = game_frame.capture_path.stat().st_mtime
                     if current_mtime != cached_mtime or current_entries != cached_entries:
                         cache_was_invalidated = True
-                    elif not is_stale:
+                    elif is_stale:
+                        # Stale entry - return cached immediately for responsive UI
+                        # Caller should schedule async regeneration separately
+                        return cached_pixmap
+                    else:
                         # Valid cache hit - return immediately
                         return cached_pixmap
-                    # If stale, fall through to regenerate
                 else:
                     # File missing: return cached preview
                     # This allows previews to persist if the source file is temporarily
@@ -283,10 +286,41 @@ class PreviewService(QObject):
 
         Call this instead of invalidate_all() when you want existing
         previews to remain visible during regeneration.
+
+        Note: Does NOT clear capture_result_cache since palette doesn't
+        affect the parsed JSON structure - only the rendered preview.
         """
         self._stale_previews.update(self._game_frame_previews.keys())
-        # Also clear capture result cache since palette affects rendering
-        self._capture_result_cache.clear()
+
+    def force_regenerate_preview(self, frame_id: str, project: FrameMappingProject | None) -> QPixmap | None:
+        """Force regeneration of a preview, bypassing stale-return optimization.
+
+        Used by async regeneration service after returning cached stale preview.
+
+        Args:
+            frame_id: Game frame ID
+            project: Current project
+
+        Returns:
+            Newly generated QPixmap or None if generation failed
+        """
+        # Clear from stale set to force regeneration path
+        was_stale = frame_id in self._stale_previews
+        self._stale_previews.discard(frame_id)
+
+        # Remove from preview cache to force regeneration
+        old_pixmap = self._game_frame_previews.pop(frame_id, None)
+
+        # Regenerate
+        new_pixmap = self.get_preview(frame_id, project)
+
+        # If regeneration failed, restore old cached pixmap
+        if new_pixmap is None and old_pixmap is not None:
+            self._game_frame_previews[frame_id] = old_pixmap
+            if was_stale:
+                self._stale_previews.add(frame_id)
+
+        return new_pixmap
 
     def regenerate_visible_previews(self, visible_frame_ids: list[str], project: FrameMappingProject | None) -> None:
         """Regenerate previews for visible frames first.
@@ -300,8 +334,8 @@ class PreviewService(QObject):
         """
         for frame_id in visible_frame_ids:
             if frame_id in self._stale_previews:
-                # Calling get_preview will regenerate the stale entry
-                self.get_preview(frame_id, project)
+                # Force regeneration (bypasses stale-return optimization)
+                self.force_regenerate_preview(frame_id, project)
 
     def get_stale_count(self) -> int:
         """Get the number of stale preview entries.

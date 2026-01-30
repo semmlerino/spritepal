@@ -209,6 +209,11 @@ class WorkspaceLogicHelper:
 
         This is the internal method that does the actual work. Called either
         immediately or after debounce timer fires.
+
+        Uses async preview generation to avoid blocking UI:
+        1. Immediately returns any cached previews
+        2. Requests async generation for remaining frames
+        3. Updates UI incrementally as previews complete
         """
         if self._controller is None or self._mapping_panel is None:
             return
@@ -219,17 +224,25 @@ class WorkspaceLogicHelper:
         if project is None:
             return
 
+        # First, collect any already-cached previews for immediate display
         previews: dict[str, QPixmap] = {}
+        missing_ids: list[str] = []
+
         for game_frame in project.game_frames:
             preview = self._controller.get_game_frame_preview(game_frame.id)
             if preview:
                 previews[game_frame.id] = preview
+            else:
+                missing_ids.append(game_frame.id)
 
+        # Update UI with cached previews immediately
         self._mapping_panel.set_game_frame_previews(previews)
         self._mapping_panel.refresh()
-
-        # Also update captures pane with previews for thumbnails
         self._captures_pane.set_game_frame_previews(previews)
+
+        # Request async generation for missing previews
+        if missing_ids:
+            self._controller.request_game_frame_previews_async(missing_ids)
 
     # ===== Targeted single-item update methods (performance optimization) =====
 

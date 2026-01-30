@@ -191,11 +191,26 @@ class CapturesLibraryPane(QWidget):
     def set_game_frame_previews(self, previews: dict[str, QPixmap]) -> None:
         """Set the preview pixmaps for game frames.
 
+        Uses incremental updates when only preview content changes.
+        Falls back to full refresh when structure changes (frames removed).
+
         Args:
             previews: Mapping of game_frame_id -> preview QPixmap
         """
-        self._game_frame_previews = previews
-        self._refresh_list()
+        # Check if frames were removed (structural change requires full rebuild)
+        removed = set(self._game_frame_previews.keys()) - set(previews.keys())
+
+        if removed:
+            # Structural change - need full refresh
+            self._game_frame_previews = previews
+            self._refresh_list()
+        else:
+            # Incremental update - only update changed/new previews
+            for frame_id, pixmap in previews.items():
+                old_pixmap = self._game_frame_previews.get(frame_id)
+                if old_pixmap is None or old_pixmap is not pixmap:
+                    self._game_frame_previews[frame_id] = pixmap
+                    self.update_frame_preview(frame_id, pixmap)
 
     def update_frame_preview(self, frame_id: str, preview: QPixmap) -> None:
         """Update the preview for a single game frame and refresh display.
@@ -264,6 +279,51 @@ class CapturesLibraryPane(QWidget):
         self._link_status = {}
         self._list.clear()
         self._count_label.setText("No captures")
+
+    def get_visible_frame_ids(self) -> list[str]:
+        """Get frame IDs of currently visible items in the list.
+
+        Used for prioritizing async preview generation for visible frames.
+
+        Returns:
+            List of game frame IDs that are currently visible in the viewport.
+        """
+        visible_ids: list[str] = []
+        viewport = self._list.viewport()
+        if viewport is None:  # type: ignore[reportUnnecessaryComparison]
+            return visible_ids
+
+        # Get visible rect
+        visible_rect = viewport.rect()
+
+        # Iterate through items and check visibility
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item is None:  # type: ignore[reportUnnecessaryComparison]
+                continue
+
+            item_rect = self._list.visualItemRect(item)
+            if visible_rect.intersects(item_rect):
+                frame_id = item.data(Qt.ItemDataRole.UserRole)
+                if frame_id is not None:
+                    visible_ids.append(frame_id)
+
+        return visible_ids
+
+    def get_all_frame_ids(self) -> list[str]:
+        """Get all frame IDs in the current filtered list.
+
+        Returns:
+            List of all game frame IDs in the list (respecting current filters).
+        """
+        ids: list[str] = []
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item is not None:  # type: ignore[reportUnnecessaryComparison]
+                frame_id = item.data(Qt.ItemDataRole.UserRole)
+                if frame_id is not None:
+                    ids.append(frame_id)
+        return ids
 
     def _on_search_changed(self, text: str) -> None:
         """Handle search text change."""

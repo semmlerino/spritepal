@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QObject, QThread, Signal, Slot
+from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
 
 from core.mesen_integration.click_extractor import MesenCaptureParser
 from core.repositories.capture_result_repository import CaptureResultRepository
@@ -222,7 +222,11 @@ class AsyncStaleEntryDetector(QObject):
         self._cleanup_thread()
 
     def _cleanup_thread(self) -> None:
-        """Clean up thread resources."""
+        """Clean up thread resources without blocking UI.
+
+        Uses a short initial wait (100ms) followed by a deferred cleanup
+        to avoid blocking the UI thread for up to 5 seconds.
+        """
         worker = getattr(self, "_worker", None)
         thread = getattr(self, "_thread", None)
         destroyed = getattr(self, "_destroyed", True)
@@ -238,12 +242,29 @@ class AsyncStaleEntryDetector(QObject):
         if thread is not None:
             if thread.isRunning():
                 thread.quit()
-                if not thread.wait(5000):
-                    logger.warning("Stale entry detection thread did not stop within timeout")
+                if not thread.wait(100):  # Short initial wait
+                    # Schedule delayed cleanup instead of blocking UI
+                    QTimer.singleShot(500, lambda: self._finish_cleanup(thread, worker, destroyed))
+                    self._thread = None
+                    self._worker = None
+                    return
+
+        self._do_cleanup(thread, worker, destroyed)
+
+    def _finish_cleanup(self, thread: QThread, worker: QObject | None, destroyed: bool) -> None:
+        """Complete cleanup after delayed wait."""
+        if thread.isRunning():
+            thread.terminate()
+            thread.wait(100)
+        self._do_cleanup(thread, worker, destroyed)
+
+    def _do_cleanup(self, thread: QThread | None, worker: QObject | None, destroyed: bool) -> None:
+        """Perform actual cleanup of thread and worker objects."""
+        if thread is not None:
             if not destroyed:
                 thread.deleteLater()
-            self._thread = None
         if worker is not None:
             if not destroyed:
                 worker.deleteLater()
-            self._worker = None
+        self._thread = None
+        self._worker = None

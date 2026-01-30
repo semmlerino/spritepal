@@ -33,13 +33,20 @@ from core.mesen_integration.click_extractor import (
     MesenCaptureParser,
     OAMEntry,
 )
+from core.repositories.capture_result_repository import CaptureResultRepository
 from core.repositories.frame_mapping_repository import FrameMappingRepository
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
+from ui.common import WorkerManager
+from ui.frame_mapping.services.async_game_frame_preview_service import (
+    AsyncGameFramePreviewService,
+)
+from ui.frame_mapping.services.async_injection_service import AsyncInjectionService
 from ui.frame_mapping.services.organization_service import OrganizationService
 from ui.frame_mapping.services.palette_service import PaletteService
 from ui.frame_mapping.services.preview_service import PreviewService
+from ui.frame_mapping.services.stale_entry_detector import AsyncStaleEntryDetector
 from ui.frame_mapping.undo import (
     CreateMappingCommand,
     RemoveMappingCommand,
@@ -135,14 +142,30 @@ class FrameMappingController(QObject):
     # Undo/Redo signals
     can_undo_changed = Signal(bool)
     can_redo_changed = Signal(bool)
+    # Async game frame preview signals (for batch preview generation)
+    game_frame_preview_ready = Signal(str, QPixmap)  # frame_id, pixmap
+    game_frame_previews_finished = Signal()
+    # Async injection signals
+    async_injection_started = Signal(str)  # ai_frame_id
+    async_injection_progress = Signal(str, str)  # ai_frame_id, message
+    async_injection_finished = Signal(str, bool, str)  # ai_frame_id, success, message
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._project: FrameMappingProject | None = None
-        # Preview service for game frame preview cache
-        self._preview_service = PreviewService(parent=self)
+        # Shared capture repository for parsed capture file caching (thread-safe)
+        # Both PreviewService and AsyncStaleEntryDetector use this to avoid duplicate parsing
+        self._capture_repository = CaptureResultRepository()
+        # Preview service for game frame preview cache (uses shared repository)
+        self._preview_service = PreviewService(parent=self, capture_repository=self._capture_repository)
         self._preview_service.preview_cache_invalidated.connect(self.preview_cache_invalidated)
         self._preview_service.stale_entries_warning.connect(self.stale_entries_warning)
+        # Async game frame preview service (for batch async preview generation)
+        self._async_preview_service = AsyncGameFramePreviewService(
+            parent=self, capture_repository=self._capture_repository
+        )
+        self._async_preview_service.preview_ready.connect(self._on_async_preview_ready)
+        self._async_preview_service.batch_finished.connect(self._on_async_previews_finished)
         # Palette service for palette management
         self._palette_service = PaletteService(parent=self)
         self._palette_service.sheet_palette_changed.connect(self.sheet_palette_changed)
@@ -153,8 +176,16 @@ class FrameMappingController(QObject):
         self._organization_service.frame_renamed.connect(self.frame_renamed)
         self._organization_service.frame_tags_changed.connect(self.frame_tags_changed)
         self._organization_service.capture_renamed.connect(self.capture_renamed)
-        # Injection orchestrator for frame injection pipeline
+        # Injection orchestrator for frame injection pipeline (sync)
         self._injection_orchestrator = InjectionOrchestrator()
+        # Async injection service (for non-blocking injections)
+        self._async_injection_service = AsyncInjectionService(parent=self)
+        self._async_injection_service.injection_started.connect(self.async_injection_started)
+        self._async_injection_service.injection_progress.connect(self.async_injection_progress)
+        self._async_injection_service.injection_finished.connect(self._on_async_injection_finished)
+        # Async stale entry detector (avoids UI freeze during project load, uses shared repository)
+        self._stale_entry_detector = AsyncStaleEntryDetector(parent=self, capture_repository=self._capture_repository)
+        self._stale_entry_detector.stale_entries_detected.connect(self.stale_entries_on_load)
         # Undo/Redo stack
         self._undo_stack = UndoRedoStack(parent=self)
         self._undo_stack.can_undo_changed.connect(self.can_undo_changed)
@@ -261,11 +292,9 @@ class FrameMappingController(QObject):
         try:
             self._project = FrameMappingRepository.load(path)
 
-            # Check for stale entries proactively
-            stale_frames = self._project.detect_stale_entries()
-            stale_ids = [fid for fid, is_stale in stale_frames.items() if is_stale]
-            if stale_ids:
-                self.stale_entries_on_load.emit(stale_ids)  # UI can show dialog/banner
+            # Start async stale entry detection (UI won't freeze for large projects)
+            # Signal will emit stale_entries_on_load when detection completes
+            self._stale_entry_detector.detect_stale_entries(self._project.game_frames)
 
             self._preview_service.invalidate_all()
             self._undo_stack.clear()  # Clear history on project load
@@ -603,11 +632,8 @@ class FrameMappingController(QObject):
             except RuntimeError:
                 pass  # Signals may not be connected
 
-            self._capture_parse_worker.requestInterruption()
-            if not self._capture_parse_worker.wait(1000):
-                logger.warning("Capture parse worker did not stop in time")
-
-            self._capture_parse_worker.deleteLater()
+            # Use WorkerManager for proper cleanup (handles wait, deleteLater, registry)
+            WorkerManager.cleanup_worker(self._capture_parse_worker, timeout=1000)
             self._capture_parse_worker = None
 
         if self._project is None:
@@ -622,7 +648,8 @@ class FrameMappingController(QObject):
         # Emit start signal with total count
         self.directory_import_started.emit(len(json_files))
         logger.info("Starting background parse of %d captures from %s", len(json_files), directory)
-        self._capture_parse_worker.start()
+        # Use WorkerManager for proper lifecycle tracking
+        WorkerManager.start_worker(self._capture_parse_worker)
 
     def _on_capture_file_parsed(self, capture_result: CaptureResult, capture_path: Path) -> None:
         """Handle a capture file parsed by the background worker.
@@ -1007,6 +1034,42 @@ class FrameMappingController(QObject):
             rom_offset filtering was used instead.
         """
         return self._preview_service.get_capture_result_for_game_frame(frame_id, self._project)
+
+    def request_game_frame_previews_async(self, frame_ids: list[str]) -> None:
+        """Request async preview generation for specified game frames.
+
+        Generates previews in a background thread, emitting game_frame_preview_ready
+        for each completed preview.
+
+        Args:
+            frame_ids: List of game frame IDs to generate previews for
+        """
+        if self._project is None:
+            self.game_frame_previews_finished.emit()
+            return
+
+        self._async_preview_service.request_previews(frame_ids, self._project)
+
+    def _on_async_preview_ready(self, frame_id: str, pixmap: QPixmap) -> None:
+        """Handle async preview completion.
+
+        Updates the synchronous preview cache and emits signal to UI.
+        """
+        # Update synchronous preview cache so get_game_frame_preview() returns this
+        if self._project is not None:
+            game_frame = self._project.get_game_frame_by_id(frame_id)
+            if game_frame is not None:
+                mtime = 0.0
+                if game_frame.capture_path and game_frame.capture_path.exists():
+                    mtime = game_frame.capture_path.stat().st_mtime
+                entry_ids = tuple(game_frame.selected_entry_ids)
+                self._preview_service.set_preview_cache(frame_id, pixmap, mtime, entry_ids)
+
+        self.game_frame_preview_ready.emit(frame_id, pixmap)
+
+    def _on_async_previews_finished(self) -> None:
+        """Handle async preview batch completion."""
+        self.game_frame_previews_finished.emit()
 
     def get_ai_frames(self) -> list[AIFrame]:
         """Get all AI frames from the current project."""
@@ -1497,6 +1560,103 @@ class FrameMappingController(QObject):
             if result.error:
                 self.error_occurred.emit(result.error)
             return False
+
+    def inject_mapping_async(
+        self,
+        ai_frame_id: str,
+        rom_path: Path,
+        output_path: Path | None = None,
+        create_backup: bool = True,
+        debug: bool = False,
+        force_raw: bool = False,
+        allow_fallback: bool = False,
+        preserve_sprite: bool = False,
+    ) -> None:
+        """Queue async injection of a mapped frame into the ROM.
+
+        Non-blocking version of inject_mapping(). Uses background thread to avoid
+        UI freeze during ROM I/O and image processing.
+
+        Args:
+            ai_frame_id: ID of the AI frame to inject (filename)
+            rom_path: Path to the input ROM
+            output_path: Path for the output ROM (default: same as input)
+            create_backup: Whether to create a backup before injection
+            debug: Enable debug mode (saves intermediate images to /tmp/inject_debug/)
+            force_raw: Force RAW (uncompressed) injection for all tiles
+            allow_fallback: Allow fallback to rom_offset filtering when entry IDs stale
+            preserve_sprite: If True, original sprite remains visible where AI doesn't cover
+        """
+        if self._project is None:
+            self.error_occurred.emit("No project loaded")
+            return
+
+        # Calculate palette ROM offset for injection
+        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
+        palette_rom_offset: int | None = None
+        if mapping is not None:
+            palette_rom_offset = self._calculate_palette_rom_offset(rom_path, mapping.game_frame_id)
+
+        # Build injection request
+        request = InjectionRequest(
+            ai_frame_id=ai_frame_id,
+            rom_path=rom_path,
+            output_path=output_path,
+            create_backup=create_backup,
+            force_raw=force_raw,
+            allow_fallback=allow_fallback,
+            preserve_sprite=preserve_sprite,
+            emit_project_changed=True,
+            palette_rom_offset=palette_rom_offset,
+        )
+
+        # Queue for async processing
+        self._async_injection_service.queue_injection(
+            ai_frame_id=ai_frame_id,
+            injection_request=request,
+            project=self._project,
+            debug=debug,
+        )
+
+    def _on_async_injection_finished(self, ai_frame_id: str, success: bool, message: str, result: object) -> None:
+        """Handle async injection completion.
+
+        Updates mapping status and emits signals like the sync version.
+        """
+        from core.services.injection_results import InjectionResult
+
+        if self._project is None:
+            return
+
+        if isinstance(result, InjectionResult):
+            # Handle stale entries warning
+            if result.needs_fallback_confirmation and result.stale_frame_id:
+                self.stale_entries_warning.emit(result.stale_frame_id)
+
+            if success:
+                # Update mapping status
+                mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
+                if mapping is not None and result.new_mapping_status:
+                    mapping.status = result.new_mapping_status
+
+                self.mapping_injected.emit(ai_frame_id, "\n".join(result.messages))
+                self.project_changed.emit()
+                self.save_requested.emit()
+            elif result.error:
+                self.error_occurred.emit(result.error)
+
+        # Emit the async_injection_finished signal
+        self.async_injection_finished.emit(ai_frame_id, success, message)
+
+    @property
+    def async_injection_busy(self) -> bool:
+        """Check if an async injection is currently in progress."""
+        return self._async_injection_service.is_busy
+
+    @property
+    def async_injection_pending_count(self) -> int:
+        """Get the number of pending async injections."""
+        return self._async_injection_service.pending_count
 
     # ─── AI Frame Organization (V4) ───────────────────────────────────────────
 

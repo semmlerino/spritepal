@@ -325,6 +325,9 @@ class FrameMappingWorkspace(QWidget):
         self._controller.alignment_updated.connect(self._on_alignment_updated)
         self._controller.preview_cache_invalidated.connect(self._on_preview_cache_invalidated)
         self._controller.capture_import_requested.connect(self._on_capture_import_requested)
+        # Async game frame preview signals (Phase 6 perf improvement)
+        self._controller.game_frame_preview_ready.connect(self._on_game_frame_preview_ready)
+        self._controller.game_frame_previews_finished.connect(self._on_game_frame_previews_finished)
 
         # Dialog coordinator signals
         self._dialog_coordinator.queue_processing_finished.connect(self._on_capture_queue_finished)
@@ -1567,6 +1570,35 @@ class FrameMappingWorkspace(QWidget):
                         self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
 
             logger.debug("Updated thumbnails for invalidated preview: %s", frame_id)
+
+    @signal_error_boundary()
+    def _on_game_frame_preview_ready(self, frame_id: str, pixmap: object) -> None:
+        """Handle async game frame preview completion.
+
+        Updates the mapping panel and captures pane with the newly generated preview.
+
+        Args:
+            frame_id: The game frame ID
+            pixmap: The generated preview pixmap (typed as object due to Signal limitation)
+        """
+        from PySide6.QtGui import QPixmap
+
+        if not isinstance(pixmap, QPixmap):
+            return
+
+        # Update mapping panel with the fresh preview
+        self._mapping_panel.update_game_frame_preview(frame_id, pixmap)
+        # Update captures pane thumbnail
+        self._captures_pane.update_frame_preview(frame_id, pixmap)
+
+    @signal_error_boundary()
+    def _on_game_frame_previews_finished(self) -> None:
+        """Handle async game frame preview batch completion.
+
+        Currently just logs completion - UI updates happen incrementally
+        via _on_game_frame_preview_ready.
+        """
+        logger.debug("Async game frame preview batch completed")
 
     # -------------------------------------------------------------------------
     # Capture Import Handler
