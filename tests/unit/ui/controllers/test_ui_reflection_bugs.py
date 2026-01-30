@@ -284,14 +284,20 @@ class TestBug1LibraryThumbnailsWipedOnRefresh:
 
         mock_view = MagicMock()
         mock_view.asset_browser = browser
+        # Configure set_thumbnail to delegate to real browser so we can verify tree items
+        mock_view.set_thumbnail.side_effect = browser.set_thumbnail
+
         controller._view = mock_view
+        # Must set view adapter on service manually since we skipped set_view()
+        controller._thumbnail_service.set_view_adapter(mock_view)
 
         # Create a mock thumbnail that library sprites use
         test_thumbnail = QPixmap(32, 32)
         test_thumbnail.fill()  # Fill with default color
 
-        # Mock _load_library_thumbnail to return a valid thumbnail
-        mocker.patch.object(controller, "_load_library_thumbnail", return_value=test_thumbnail)
+        # Mock thumbnail service's load_library_thumbnail to return a valid thumbnail
+        # (restore_library_thumbnails calls this method on the service, not the controller)
+        mocker.patch.object(controller._thumbnail_service, "load_library_thumbnail", return_value=test_thumbnail)
 
         # Mock thumbnail service's internal controller
         mock_thumb_ctrl = MagicMock()

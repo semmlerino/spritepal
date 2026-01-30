@@ -1580,10 +1580,40 @@ class PagedTileViewWidget(QWidget):
 
     def cleanup(self) -> None:
         """Clean up resources."""
-        # Cancel any running worker
-        if self._worker is not None and self._worker.isRunning():
-            self._worker.cancel()
-            self._worker.wait(2000)
+        # Cancel any running worker (raw mode)
+        if self._worker is not None:
+            try:
+                self._worker.page_ready.disconnect()
+                self._worker.error.disconnect()
+            except RuntimeError:
+                pass
+            if self._worker.isRunning():
+                self._worker.cancel()
+                self._worker.wait(5000)
 
-        # Clear cache
+        # Cancel decompressed worker
+        if self._decomp_worker is not None:
+            try:
+                self._decomp_worker.page_ready.disconnect()
+                self._decomp_worker.error.disconnect()
+            except RuntimeError:
+                pass
+            if self._decomp_worker.isRunning():
+                self._decomp_worker.cancel()
+                self._decomp_worker.wait(5000)
+
+        # Cancel prefetch workers
+        for worker in self._prefetch_workers:
+            try:
+                worker.page_ready.disconnect()
+                worker.operation_finished.disconnect()
+            except RuntimeError:
+                pass
+            if worker.isRunning():
+                worker.cancel()
+                worker.wait(500)
+        self._prefetch_workers.clear()
+
+        # Clear caches
         self._cache.clear()
+        self._decomp_cache.clear()

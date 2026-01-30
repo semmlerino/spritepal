@@ -6,15 +6,46 @@ Tests the dialog wrapper for the paged tile view widget.
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QObject, Qt, Signal
 
 from tests.fixtures.timeouts import signal_timeout
 from ui.dialogs.paged_tile_view_dialog import PagedTileViewDialog
 
 
+class MockWorker(QObject):
+    """Mock worker to avoid threading issues in tests."""
+    page_ready = Signal(int, object, int, int)
+    error = Signal(str, object)
+    operation_finished = Signal(bool, str)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+    
+    def start(self):
+        pass
+    
+    def cancel(self):
+        pass
+        
+    def wait(self, timeout=None):
+        return True
+    
+    def isRunning(self):
+        return False
+
+
 class TestPagedTileViewDialog:
     """Test the PagedTileViewDialog implementation."""
+
+    @pytest.fixture(autouse=True)
+    def mock_workers(self):
+        """Mock the worker classes to prevent threading crashes."""
+        with patch("ui.widgets.paged_tile_view.PagedTileViewWorker", MockWorker), \
+             patch("ui.widgets.paged_tile_view.DecompressedPageWorker", MockWorker):
+            yield
 
     @pytest.fixture
     def sample_rom_data(self) -> bytes:
