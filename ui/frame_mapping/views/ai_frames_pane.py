@@ -384,6 +384,18 @@ class AIFramesPane(QWidget):
         if emit_signal and selected_id is not None:
             self.ai_frame_selected.emit(selected_id)
 
+    def clear_selection(self) -> None:
+        """Clear the current AI frame selection.
+
+        Blocks signals during clearing to prevent feedback loops.
+        """
+        self._list.blockSignals(True)
+        try:
+            self._list.setCurrentRow(-1)
+            self._list.clearSelection()
+        finally:
+            self._list.blockSignals(False)
+
     def clear(self) -> None:
         """Clear all AI frames and reset tabs."""
         self._ai_frames = []

@@ -17,7 +17,22 @@ that query panes first, falling back to cached state when pane unavailable.
 
 from __future__ import annotations
 
+import logging
+import os
 from pathlib import Path
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+
+    class SelectionPane(Protocol):
+        """Protocol for panes that track selection."""
+
+        def get_selected_id(self) -> str | None:
+            """Get the currently selected frame ID from the pane."""
+            ...
+
+
+logger = logging.getLogger(__name__)
 
 
 class WorkspaceStateManager:
@@ -300,3 +315,46 @@ class WorkspaceStateManager:
             self._batch_injection_success.add(ai_frame_id)
         elif stale_entries:
             self._batch_injection_failed_stale.add(ai_frame_id)
+
+    def validate_selection_sync(
+        self,
+        ai_pane: SelectionPane | None,
+        captures_pane: SelectionPane | None,
+    ) -> None:
+        """Debug-only: Log warnings when cached state diverges from panes.
+
+        This method is only active when SPRITEPAL_DEBUG_STATE=1 environment
+        variable is set. It helps catch bugs where the cached selection state
+        gets out of sync with the actual pane selections.
+
+        The panes are the source of truth - this method validates that our
+        cached state matches them.
+
+        Args:
+            ai_pane: The AI frames pane (source of truth for AI selection)
+            captures_pane: The captures pane (source of truth for game selection)
+        """
+        if os.environ.get("SPRITEPAL_DEBUG_STATE") != "1":
+            return
+
+        # Validate AI frame selection
+        if ai_pane is not None:
+            pane_ai_selection = ai_pane.get_selected_id()
+            if pane_ai_selection != self._selected_ai_frame_id:
+                logger.warning(
+                    "STATE SYNC: AI frame selection mismatch - "
+                    "pane=%r, cached=%r",
+                    pane_ai_selection,
+                    self._selected_ai_frame_id,
+                )
+
+        # Validate game frame selection
+        if captures_pane is not None:
+            pane_game_selection = captures_pane.get_selected_id()
+            if pane_game_selection != self._selected_game_id:
+                logger.warning(
+                    "STATE SYNC: Game frame selection mismatch - "
+                    "pane=%r, cached=%r",
+                    pane_game_selection,
+                    self._selected_game_id,
+                )
