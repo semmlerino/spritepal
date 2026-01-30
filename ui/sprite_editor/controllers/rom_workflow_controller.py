@@ -2335,14 +2335,24 @@ class ROMWorkflowController(QObject):
                 if self._message_service:
                     self._message_service.show_message(f"Saved {injection_result.tiles_written} tiles")
 
-                QMessageBox.information(
-                    self._view,
-                    "Save Successful",
-                    f"Raw tiles injected successfully!\n\n"
-                    f"Tiles written: {injection_result.tiles_written}\n"
-                    f"Output: {Path(output_path).name}\n\n"
-                    f"{injection_result.message}",
-                )
+                # Show warning if some tiles were skipped, otherwise show success
+                if injection_result.skipped_offsets:
+                    QMessageBox.warning(
+                        self._view,
+                        "Injection Partial",
+                        f"Some tiles were skipped due to invalid offsets.\n\n"
+                        f"Tiles written: {injection_result.tiles_written}\n"
+                        f"Tiles skipped: {len(injection_result.skipped_offsets)}\n"
+                        f"Output: {Path(output_path).name}",
+                    )
+                else:
+                    QMessageBox.information(
+                        self._view,
+                        "Save Successful",
+                        f"Raw tiles injected successfully!\n\n"
+                        f"Tiles written: {injection_result.tiles_written}\n"
+                        f"Output: {Path(output_path).name}",
+                    )
 
                 # Offer to inject palette as well
                 self._offer_palette_injection(str(output_path))

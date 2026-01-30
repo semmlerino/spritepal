@@ -8,9 +8,11 @@ handles injection of such scattered tiles.
 from __future__ import annotations
 
 import logging
+import os
 import shutil
+import tempfile
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from PIL import Image
@@ -35,6 +37,7 @@ class RawTileInjectionResult:
     output_path: str
     tiles_written: int
     message: str
+    skipped_offsets: list[int] = field(default_factory=list)
 
 
 def image_to_4bpp_tile(tile_img: Image.Image) -> bytes:
@@ -126,14 +129,18 @@ class RawTileInjector:
     ) -> RawTileInjectionResult:
         """Inject multiple tiles to their mapped ROM addresses.
 
+        Uses atomic writes via temp file to ensure crash safety: the output
+        file is either the complete new version or unchanged, never partial.
+
         Args:
             rom_path: Path to source ROM file
-            output_path: Path for modified ROM output
+            output_path: Path for modified ROM output (can be same as rom_path)
             tile_mappings: List of TileInjectionMapping with rom_offset and tile_data
             create_backup: Whether to create backup of original
 
         Returns:
-            RawTileInjectionResult with success status and details
+            RawTileInjectionResult with success status, tiles_written count,
+            and skipped_offsets list for any tiles that couldn't be written
         """
         rom_path = Path(rom_path)
         output_path = Path(output_path)
@@ -156,20 +163,33 @@ class RawTileInjector:
                 message=f"{len(missing_data)} tiles missing data",
             )
 
-        # Create backup if requested
-        if create_backup:
-            backup_path = rom_path.with_suffix(rom_path.suffix + ".bak")
+        # Create backup if requested and output exists
+        if create_backup and output_path.exists():
+            backup_path = output_path.with_suffix(output_path.suffix + ".bak")
             if not backup_path.exists():
-                shutil.copy2(rom_path, backup_path)
+                shutil.copy2(output_path, backup_path)
                 logger.info(f"Created backup: {backup_path}")
 
-        # Copy ROM to output path
-        shutil.copy2(rom_path, output_path)
+        # ATOMIC WRITE: Use temp file in same directory for os.replace() compatibility
+        temp_fd, temp_path_str = tempfile.mkstemp(
+            dir=output_path.parent,
+            prefix=".spritepal_inject_",
+            suffix=".tmp",
+        )
+        temp_path = Path(temp_path_str)
 
-        # Inject tiles
         tiles_written = 0
+        skipped_offsets: list[int] = []
+
         try:
-            with open(output_path, "r+b") as f:
+            # Close the file descriptor, we'll use shutil.copy2 which opens the file
+            os.close(temp_fd)
+
+            # Copy ROM content to temp file
+            shutil.copy2(rom_path, temp_path)
+
+            # Write tiles to temp file
+            with open(temp_path, "r+b") as f:
                 rom_size = f.seek(0, 2)  # Get file size
 
                 for mapping in tile_mappings:
@@ -181,6 +201,7 @@ class RawTileInjector:
                         logger.warning(
                             f"Skipping tile at invalid offset 0x{mapping.rom_offset:06X} (ROM size: 0x{rom_size:06X})"
                         )
+                        skipped_offsets.append(mapping.rom_offset)
                         continue
 
                     # Write tile
@@ -189,20 +210,38 @@ class RawTileInjector:
                     tiles_written += 1
                     logger.debug(f"Wrote tile to ROM offset 0x{mapping.rom_offset:06X}")
 
+            # Atomic commit: replace output with temp
+            temp_path.replace(output_path)
+
+            # Build result message
+            if skipped_offsets:
+                msg = f"Wrote {tiles_written} tiles, skipped {len(skipped_offsets)} invalid offsets"
+            else:
+                msg = f"Successfully wrote {tiles_written} tiles to {output_path.name}"
+
+            return RawTileInjectionResult(
+                success=True,
+                output_path=str(output_path),
+                tiles_written=tiles_written,
+                message=msg,
+                skipped_offsets=skipped_offsets,
+            )
+
         except OSError as e:
             return RawTileInjectionResult(
                 success=False,
                 output_path=str(output_path),
                 tiles_written=tiles_written,
                 message=f"Write error: {e}",
+                skipped_offsets=skipped_offsets,
             )
-
-        return RawTileInjectionResult(
-            success=True,
-            output_path=str(output_path),
-            tiles_written=tiles_written,
-            message=f"Successfully wrote {tiles_written} tiles to {output_path.name}",
-        )
+        finally:
+            # Clean up temp file if it still exists (failed before replace)
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except OSError:
+                    pass  # Best effort cleanup
 
     def inject_from_rom_map(
         self,
