@@ -14,7 +14,8 @@ from PySide6.QtGui import QPixmap
 from core.frame_mapping_exceptions import CaptureParseError
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
-from core.services.image_utils import pil_to_qpixmap
+from core.repositories.capture_result_repository import CaptureResultRepository
+from core.services.image_utils import pil_to_qimage
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -37,20 +38,31 @@ class PreviewService(QObject):
     preview_cache_invalidated = Signal(str)  # game_frame_id
     stale_entries_warning = Signal(str)  # game_frame_id
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        *,
+        capture_repository: CaptureResultRepository | None = None,
+    ) -> None:
         """Initialize preview service.
 
         Args:
             parent: Optional Qt parent object
+            capture_repository: Shared repository for caching parsed capture files.
+                If None, creates a local parser (no caching shared with other services).
         """
         super().__init__(parent)
         # Cache stores (pixmap, mtime, selected_entry_ids) for invalidation on change
         self._game_frame_previews: dict[str, tuple[QPixmap, float, tuple[int, ...]]] = {}
-        # Cache for CaptureResult to avoid redundant JSON parsing
+        # Cache for filtered CaptureResult to avoid redundant filtering
         # Key: frame_id, Value: (CaptureResult, file_mtime, entry_ids_tuple)
         self._capture_result_cache: dict[str, tuple[CaptureResult, float, tuple[int, ...]]] = {}
         # Track stale entries (need regeneration but keep cached for display)
         self._stale_previews: set[str] = set()
+        # Shared repository for raw capture parsing (optional)
+        self._capture_repository = capture_repository
+        # Fallback parser when no repository provided
+        self._parser = MesenCaptureParser() if capture_repository is None else None
 
     def get_preview(self, frame_id: str, project: FrameMappingProject | None) -> QPixmap | None:
         """Get the rendered preview pixmap for a game frame.
@@ -115,11 +127,12 @@ class PreviewService(QObject):
             renderer = CaptureRenderer(capture_result)
             preview_img = renderer.render_selection()
 
-            # Convert PIL Image to QPixmap and cache with mtime + entry IDs
-            pixmap = pil_to_qpixmap(preview_img)
-            if pixmap is None:
-                logger.warning("Failed to convert preview image to QPixmap for frame %s", frame_id)
+            # Convert PIL Image to QPixmap via QImage (faster than PNG encode/decode)
+            qimage = pil_to_qimage(preview_img, with_alpha=True)
+            if qimage.isNull():
+                logger.warning("Failed to convert preview image to QImage for frame %s", frame_id)
                 return None
+            pixmap = QPixmap.fromImage(qimage)
 
             current_mtime = 0.0
             current_entries: tuple[int, ...] = ()
@@ -198,57 +211,41 @@ class PreviewService(QObject):
             # Cache miss due to mtime or entry change - will re-parse below
 
         try:
-            parser = MesenCaptureParser()
-            capture_result = parser.parse_file(capture_path)
-            used_fallback = False
+            # Use shared repository if available, otherwise parse directly
+            if self._capture_repository is not None:
+                capture_result = self._capture_repository.get_or_parse(capture_path)
+            else:
+                assert self._parser is not None
+                capture_result = self._parser.parse_file(capture_path)
 
             if not capture_result.has_entries:
                 return (None, False)
 
-            # Apply selection filter if stored (preserves import-time selection)
-            if game_frame.selected_entry_ids:
-                selected_ids = set(game_frame.selected_entry_ids)
-                filtered_entries = [entry for entry in capture_result.entries if entry.id in selected_ids]
+            # Use shared filtering utility
+            from core.mesen_integration.entry_filtering import (
+                create_filtered_capture,
+                filter_capture_entries,
+            )
 
-                if not filtered_entries:
-                    # Stale entry IDs - fall back to rom_offset filtering (mirrors injection)
-                    logger.warning(
-                        "Stored entry IDs %s not found in capture %s. Using rom_offset fallback.",
-                        game_frame.selected_entry_ids,
-                        capture_path,
-                    )
-                    self.stale_entries_warning.emit(frame_id)
-                    used_fallback = True
-                    # Fallback to rom_offset filtering (mirrors inject_mapping behavior)
-                    filtered_entries = [
-                        entry for entry in capture_result.entries if entry.rom_offset in game_frame.rom_offsets
-                    ]
-                    if filtered_entries:
-                        capture_result = CaptureResult(
-                            frame=capture_result.frame,
-                            visible_count=len(filtered_entries),
-                            obsel=capture_result.obsel,
-                            entries=filtered_entries,
-                            palettes=capture_result.palettes,
-                            timestamp=capture_result.timestamp,
-                        )
-                    # If still no entries, return unfiltered as last resort
-                else:
-                    # Create filtered CaptureResult with only selected entries
-                    capture_result = CaptureResult(
-                        frame=capture_result.frame,
-                        visible_count=len(filtered_entries),
-                        obsel=capture_result.obsel,
-                        entries=filtered_entries,
-                        palettes=capture_result.palettes,
-                        timestamp=capture_result.timestamp,
-                    )
+            filtering = filter_capture_entries(
+                capture_result,
+                selected_entry_ids=list(game_frame.selected_entry_ids),
+                rom_offsets=game_frame.rom_offsets,
+                allow_all_entries_fallback=False,
+                context_label=frame_id,
+            )
+
+            if filtering.is_stale:
+                self.stale_entries_warning.emit(frame_id)
+
+            if filtering.has_entries:
+                capture_result = create_filtered_capture(capture_result, filtering.entries)
 
             # Cache the result (only cache if not using fallback to avoid caching stale state)
-            if not used_fallback:
+            if not filtering.used_fallback:
                 self._capture_result_cache[frame_id] = (capture_result, current_mtime, current_entry_ids)
 
-            return (capture_result, used_fallback)
+            return (capture_result, filtering.used_fallback)
 
         except (OSError, JSONDecodeError, KeyError, ValueError, CaptureParseError, Exception) as e:
             logger.warning("Failed to get capture result for game frame %s: %s", frame_id, e)

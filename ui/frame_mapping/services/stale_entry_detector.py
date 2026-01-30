@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 from core.mesen_integration.click_extractor import MesenCaptureParser
+from core.repositories.capture_result_repository import CaptureResultRepository
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -27,10 +28,12 @@ class StaleDetectionRequest:
     Attributes:
         game_frames: List of game frames to check.
         request_id: Unique ID for this request batch.
+        capture_repository: Shared repository for caching parsed capture files.
     """
 
     game_frames: list[GameFrame]
     request_id: int
+    capture_repository: CaptureResultRepository | None
 
 
 class _StaleEntryWorker(QObject):
@@ -46,6 +49,8 @@ class _StaleEntryWorker(QObject):
         super().__init__()
         self._request = request
         self._stop_requested = False
+        # Fallback parser when no repository provided
+        self._parser = MesenCaptureParser() if request.capture_repository is None else None
 
     def request_stop(self) -> None:
         """Request the worker to stop processing."""
@@ -79,8 +84,12 @@ class _StaleEntryWorker(QObject):
 
             # Load the capture file and check if entry IDs are still valid
             try:
-                parser = MesenCaptureParser()
-                capture_result = parser.parse_file(game_frame.capture_path)
+                # Use shared repository if available, otherwise parse directly
+                if self._request.capture_repository is not None:
+                    capture_result = self._request.capture_repository.get_or_parse(game_frame.capture_path)
+                else:
+                    assert self._parser is not None
+                    capture_result = self._parser.parse_file(game_frame.capture_path)
 
                 # Get the IDs of all entries in the current capture
                 current_entry_ids = {entry.id for entry in capture_result.entries}
@@ -126,12 +135,18 @@ class AsyncStaleEntryDetector(QObject):
     # Signal: emitted when detection completes
     detection_finished = Signal()
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        *,
+        capture_repository: CaptureResultRepository | None = None,
+    ) -> None:
         super().__init__(parent)
         self._worker: _StaleEntryWorker | None = None
         self._thread: QThread | None = None
         self._destroyed = False
         self._current_request_id = 0
+        self._capture_repository = capture_repository
 
         if parent is not None:
             parent.destroyed.connect(self._on_parent_destroyed)
@@ -155,11 +170,7 @@ class AsyncStaleEntryDetector(QObject):
         self.cancel()
 
         # Filter to only frames that need checking (have selected_entry_ids and capture_path)
-        frames_to_check = [
-            gf
-            for gf in game_frames
-            if gf.selected_entry_ids and gf.capture_path is not None
-        ]
+        frames_to_check = [gf for gf in game_frames if gf.selected_entry_ids and gf.capture_path is not None]
 
         if not frames_to_check:
             self.stale_entries_detected.emit([])
@@ -170,6 +181,7 @@ class AsyncStaleEntryDetector(QObject):
         request = StaleDetectionRequest(
             game_frames=frames_to_check,
             request_id=self._current_request_id,
+            capture_repository=self._capture_repository,
         )
         self._worker = _StaleEntryWorker(request)
         self._thread = QThread()

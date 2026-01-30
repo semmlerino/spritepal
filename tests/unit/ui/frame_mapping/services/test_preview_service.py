@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QImage, QPixmap
 
 from core.frame_mapping_project import FrameMappingProject, GameFrame
 from core.mesen_integration.capture_renderer import CaptureRenderer
@@ -78,67 +78,67 @@ class TestPreviewServiceCaching:
         """Test that cache miss generates preview from capture file."""
         project, game_frame = mock_project
 
-        with patch("ui.frame_mapping.services.preview_service.MesenCaptureParser") as MockParser:
-            with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
-                # Setup mocks
-                parser_inst = MockParser.return_value
-                parser_inst.parse_file.return_value = mock_capture_result
+        # Patch the parser instance on the service (created in __init__)
+        mock_parser = Mock()
+        mock_parser.parse_file.return_value = mock_capture_result
+        preview_service._parser = mock_parser
 
-                renderer_inst = MockRenderer.return_value
-                mock_pil_img = Mock()
-                renderer_inst.render_selection.return_value = mock_pil_img
+        with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
+            renderer_inst = MockRenderer.return_value
+            mock_pil_img = Mock()
+            renderer_inst.render_selection.return_value = mock_pil_img
 
-                with patch("ui.frame_mapping.services.preview_service.pil_to_qpixmap") as mock_pil_to_qpixmap:
-                    # Create pixmap with specific dimensions that we can verify
-                    expected_width, expected_height = 100, 100
-                    mock_pixmap = QPixmap(expected_width, expected_height)
-                    mock_pil_to_qpixmap.return_value = mock_pixmap
+            with patch("ui.frame_mapping.services.preview_service.pil_to_qimage") as mock_pil_to_qimage:
+                # Create QImage with specific dimensions (pil_to_qimage returns QImage, not QPixmap)
+                expected_width, expected_height = 100, 100
+                mock_qimage = QImage(expected_width, expected_height, QImage.Format.Format_RGBA8888)
+                mock_pil_to_qimage.return_value = mock_qimage
 
-                    # First call - cache miss
-                    result = preview_service.get_preview("frame1", project)
+                # First call - cache miss
+                result = preview_service.get_preview("frame1", project)
 
-                    # Verify result type and content
-                    assert result is not None
-                    assert isinstance(result, QPixmap)
-                    assert result.width() == expected_width, "Returned pixmap should have expected width"
-                    assert result.height() == expected_height, "Returned pixmap should have expected height"
+                # Verify result type and content
+                assert result is not None
+                assert isinstance(result, QPixmap)
+                assert result.width() == expected_width, "Returned pixmap should have expected width"
+                assert result.height() == expected_height, "Returned pixmap should have expected height"
 
-                    # Verify rendering pipeline was invoked
-                    parser_inst.parse_file.assert_called_once()
-                    MockRenderer.assert_called_once()
+                # Verify rendering pipeline was invoked
+                mock_parser.parse_file.assert_called_once()
+                MockRenderer.assert_called_once()
 
-                    # Verify cache was populated (this is the key verification)
-                    assert "frame1" in preview_service._game_frame_previews, "Preview should be cached"
-                    cached_pixmap, cached_mtime, cached_entry_ids = preview_service._game_frame_previews["frame1"]
-                    assert cached_pixmap is result, "Cached pixmap should be the same as returned"
+                # Verify cache was populated (this is the key verification)
+                assert "frame1" in preview_service._game_frame_previews, "Preview should be cached"
+                cached_pixmap, cached_mtime, cached_entry_ids = preview_service._game_frame_previews["frame1"]
+                assert cached_pixmap is result, "Cached pixmap should be the same as returned"
 
     def test_cache_hit_returns_cached_pixmap(self, preview_service, mock_project, mock_capture_result, qtbot):
         """Test that cache hit returns cached pixmap without regeneration."""
         project, game_frame = mock_project
 
-        with patch("ui.frame_mapping.services.preview_service.MesenCaptureParser") as MockParser:
-            with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
-                # Setup mocks
-                parser_inst = MockParser.return_value
-                parser_inst.parse_file.return_value = mock_capture_result
+        # Patch the parser instance on the service
+        mock_parser = Mock()
+        mock_parser.parse_file.return_value = mock_capture_result
+        preview_service._parser = mock_parser
 
-                renderer_inst = MockRenderer.return_value
-                mock_pil_img = Mock()
-                renderer_inst.render_selection.return_value = mock_pil_img
+        with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
+            renderer_inst = MockRenderer.return_value
+            mock_pil_img = Mock()
+            renderer_inst.render_selection.return_value = mock_pil_img
 
-                with patch("ui.frame_mapping.services.preview_service.pil_to_qpixmap") as mock_pil_to_qpixmap:
-                    mock_pixmap = QPixmap(100, 100)
-                    mock_pil_to_qpixmap.return_value = mock_pixmap
+            with patch("ui.frame_mapping.services.preview_service.pil_to_qimage") as mock_pil_to_qimage:
+                mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
+                mock_pil_to_qimage.return_value = mock_qimage
 
-                    # First call - cache miss
-                    result1 = preview_service.get_preview("frame1", project)
+                # First call - cache miss
+                result1 = preview_service.get_preview("frame1", project)
 
-                    # Second call - cache hit
-                    result2 = preview_service.get_preview("frame1", project)
+                # Second call - cache hit
+                result2 = preview_service.get_preview("frame1", project)
 
-                    assert result1 == result2
-                    # Parser should only be called once (first time)
-                    assert parser_inst.parse_file.call_count == 1
+                assert result1 == result2
+                # Parser should only be called once (first time)
+                assert mock_parser.parse_file.call_count == 1
 
     def test_mtime_change_invalidates_cache(self, preview_service, mock_project, mock_capture_result, qtbot, tmp_path):
         """Test that file mtime change invalidates cache."""
@@ -149,77 +149,77 @@ class TestPreviewServiceCaching:
         capture_path.write_text('{"frame": 100}')
         game_frame.capture_path = capture_path
 
-        with patch("ui.frame_mapping.services.preview_service.MesenCaptureParser") as MockParser:
-            with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
-                # Setup mocks
-                parser_inst = MockParser.return_value
-                parser_inst.parse_file.return_value = mock_capture_result
+        # Patch the parser instance on the service
+        mock_parser = Mock()
+        mock_parser.parse_file.return_value = mock_capture_result
+        preview_service._parser = mock_parser
 
-                renderer_inst = MockRenderer.return_value
-                mock_pil_img = Mock()
-                renderer_inst.render_selection.return_value = mock_pil_img
+        with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
+            renderer_inst = MockRenderer.return_value
+            mock_pil_img = Mock()
+            renderer_inst.render_selection.return_value = mock_pil_img
 
-                with patch("ui.frame_mapping.services.preview_service.pil_to_qpixmap") as mock_pil_to_qpixmap:
-                    mock_pixmap = QPixmap(100, 100)
-                    mock_pil_to_qpixmap.return_value = mock_pixmap
+            with patch("ui.frame_mapping.services.preview_service.pil_to_qimage") as mock_pil_to_qimage:
+                mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
+                mock_pil_to_qimage.return_value = mock_qimage
 
-                    # First call - cache population (no signal emitted on initial cache fill)
+                # First call - cache population (no signal emitted on initial cache fill)
+                preview_service.get_preview("frame1", project)
+
+                # Ensure mtime actually changes (some filesystems have 1-second resolution)
+                import os
+                import time
+
+                original_mtime = capture_path.stat().st_mtime
+                # Explicitly set mtime to 1 second in the future to guarantee change
+                new_mtime = original_mtime + 1.0
+                capture_path.write_text('{"frame": 101}')
+                os.utime(capture_path, (new_mtime, new_mtime))
+
+                # Second call - cache invalidated due to mtime change
+                with qtbot.waitSignal(
+                    preview_service.preview_cache_invalidated, timeout=signal_timeout()
+                ) as blocker:
                     preview_service.get_preview("frame1", project)
 
-                    # Ensure mtime actually changes (some filesystems have 1-second resolution)
-                    import os
-                    import time
-
-                    original_mtime = capture_path.stat().st_mtime
-                    # Explicitly set mtime to 1 second in the future to guarantee change
-                    new_mtime = original_mtime + 1.0
-                    capture_path.write_text('{"frame": 101}')
-                    os.utime(capture_path, (new_mtime, new_mtime))
-
-                    # Second call - cache invalidated due to mtime change
-                    with qtbot.waitSignal(
-                        preview_service.preview_cache_invalidated, timeout=signal_timeout()
-                    ) as blocker:
-                        preview_service.get_preview("frame1", project)
-
-                    assert blocker.signal_triggered
-                    assert blocker.args == ["frame1"]
-                    # Parser called twice (cache invalidated)
-                    assert parser_inst.parse_file.call_count == 2
+                assert blocker.signal_triggered
+                assert blocker.args == ["frame1"]
+                # Parser called twice (cache invalidated)
+                assert mock_parser.parse_file.call_count == 2
 
     def test_entry_ids_change_invalidates_cache(self, preview_service, mock_project, mock_capture_result, qtbot):
         """Test that entry IDs change invalidates cache."""
         project, game_frame = mock_project
 
-        with patch("ui.frame_mapping.services.preview_service.MesenCaptureParser") as MockParser:
-            with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
-                # Setup mocks
-                parser_inst = MockParser.return_value
-                parser_inst.parse_file.return_value = mock_capture_result
+        # Patch the parser instance on the service
+        mock_parser = Mock()
+        mock_parser.parse_file.return_value = mock_capture_result
+        preview_service._parser = mock_parser
 
-                renderer_inst = MockRenderer.return_value
-                mock_pil_img = Mock()
-                renderer_inst.render_selection.return_value = mock_pil_img
+        with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
+            renderer_inst = MockRenderer.return_value
+            mock_pil_img = Mock()
+            renderer_inst.render_selection.return_value = mock_pil_img
 
-                with patch("ui.frame_mapping.services.preview_service.pil_to_qpixmap") as mock_pil_to_qpixmap:
-                    mock_pixmap = QPixmap(100, 100)
-                    mock_pil_to_qpixmap.return_value = mock_pixmap
+            with patch("ui.frame_mapping.services.preview_service.pil_to_qimage") as mock_pil_to_qimage:
+                mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
+                mock_pil_to_qimage.return_value = mock_qimage
 
-                    # First call - cache miss
+                # First call - cache miss
+                preview_service.get_preview("frame1", project)
+
+                # Change selected entry IDs
+                game_frame.selected_entry_ids = [1, 2]  # Changed from [1, 2, 3]
+
+                # Second call - cache invalidated due to entry ID change
+                with qtbot.waitSignal(
+                    preview_service.preview_cache_invalidated, timeout=signal_timeout()
+                ) as blocker:
                     preview_service.get_preview("frame1", project)
 
-                    # Change selected entry IDs
-                    game_frame.selected_entry_ids = [1, 2]  # Changed from [1, 2, 3]
-
-                    # Second call - cache invalidated due to entry ID change
-                    with qtbot.waitSignal(
-                        preview_service.preview_cache_invalidated, timeout=signal_timeout()
-                    ) as blocker:
-                        preview_service.get_preview("frame1", project)
-
-                    assert blocker.signal_triggered
-                    # Parser called twice (cache invalidated)
-                    assert parser_inst.parse_file.call_count == 2
+                assert blocker.signal_triggered
+                # Parser called twice (cache invalidated)
+                assert mock_parser.parse_file.call_count == 2
 
 
 class TestPreviewServiceInvalidation:
@@ -288,36 +288,38 @@ class TestPreviewServiceStaleEntries:
         capture.palettes = []
         capture.timestamp = "2026-01-24"
 
-        with patch("ui.frame_mapping.services.preview_service.MesenCaptureParser") as MockParser:
-            parser_inst = MockParser.return_value
-            parser_inst.parse_file.return_value = capture
+        # Patch the parser instance on the service
+        mock_parser = Mock()
+        mock_parser.parse_file.return_value = capture
+        preview_service._parser = mock_parser
 
-            # Should emit stale_entries_warning and use rom_offset fallback
-            with qtbot.waitSignal(preview_service.stale_entries_warning, timeout=signal_timeout()) as blocker:
-                result, used_fallback = preview_service.get_capture_result_for_game_frame("frame1", project)
+        # Should emit stale_entries_warning and use rom_offset fallback
+        with qtbot.waitSignal(preview_service.stale_entries_warning, timeout=signal_timeout()) as blocker:
+            result, used_fallback = preview_service.get_capture_result_for_game_frame("frame1", project)
 
-            assert blocker.signal_triggered
-            assert blocker.args == ["frame1"]
-            assert used_fallback is True
-            assert result is not None
-            # Only entry1 should be in filtered result (rom_offset matches)
-            assert len(result.entries) == 1
-            assert result.entries[0].id == 1
+        assert blocker.signal_triggered
+        assert blocker.args == ["frame1"]
+        assert used_fallback is True
+        assert result is not None
+        # Only entry1 should be in filtered result (rom_offset matches)
+        assert len(result.entries) == 1
+        assert result.entries[0].id == 1
 
     def test_valid_entries_no_fallback(self, preview_service, mock_project, mock_capture_result):
         """Test that valid entry IDs don't trigger fallback."""
         project, game_frame = mock_project
         game_frame.selected_entry_ids = [1, 2, 3]  # Valid IDs in capture
 
-        with patch("ui.frame_mapping.services.preview_service.MesenCaptureParser") as MockParser:
-            parser_inst = MockParser.return_value
-            parser_inst.parse_file.return_value = mock_capture_result
+        # Patch the parser instance on the service
+        mock_parser = Mock()
+        mock_parser.parse_file.return_value = mock_capture_result
+        preview_service._parser = mock_parser
 
-            result, used_fallback = preview_service.get_capture_result_for_game_frame("frame1", project)
+        result, used_fallback = preview_service.get_capture_result_for_game_frame("frame1", project)
 
-            assert used_fallback is False
-            assert result is not None
-            assert len(result.entries) == 3
+        assert used_fallback is False
+        assert result is not None
+        assert len(result.entries) == 3
 
 
 class TestPreviewServiceEdgeCases:
@@ -348,27 +350,29 @@ class TestPreviewServiceEdgeCases:
         """Test that parse error returns None."""
         project, game_frame = mock_project
 
-        with patch("ui.frame_mapping.services.preview_service.MesenCaptureParser") as MockParser:
-            parser_inst = MockParser.return_value
-            parser_inst.parse_file.side_effect = Exception("Parse error")
+        # Patch the parser instance on the service
+        mock_parser = Mock()
+        mock_parser.parse_file.side_effect = Exception("Parse error")
+        preview_service._parser = mock_parser
 
-            result = preview_service.get_preview("frame1", project)
-            assert result is None
+        result = preview_service.get_preview("frame1", project)
+        assert result is None
 
     def test_render_error_returns_none(self, preview_service, mock_project, mock_capture_result, qtbot):
         """Test that render error returns None."""
         project, game_frame = mock_project
 
-        with patch("ui.frame_mapping.services.preview_service.MesenCaptureParser") as MockParser:
-            with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
-                parser_inst = MockParser.return_value
-                parser_inst.parse_file.return_value = mock_capture_result
+        # Patch the parser instance on the service
+        mock_parser = Mock()
+        mock_parser.parse_file.return_value = mock_capture_result
+        preview_service._parser = mock_parser
 
-                renderer_inst = MockRenderer.return_value
-                renderer_inst.render_selection.side_effect = Exception("Render error")
+        with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
+            renderer_inst = MockRenderer.return_value
+            renderer_inst.render_selection.side_effect = Exception("Render error")
 
-                result = preview_service.get_preview("frame1", project)
-                assert result is None
+            result = preview_service.get_preview("frame1", project)
+            assert result is None
 
     def test_set_preview_cache_manual(self, preview_service):
         """Test manual cache setting."""

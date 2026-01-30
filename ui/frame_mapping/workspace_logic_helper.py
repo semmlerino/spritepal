@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QMessageBox
 
@@ -31,6 +32,9 @@ if TYPE_CHECKING:
     from ui.managers.status_bar_manager import StatusBarManager
 
 logger = get_logger(__name__)
+
+# Debounce interval for preview updates (milliseconds)
+_PREVIEW_DEBOUNCE_MS = 100
 
 
 class WorkspaceLogicHelper:
@@ -61,6 +65,8 @@ class WorkspaceLogicHelper:
         # When True, sync_canvas_alignment_from_model() skips the sync since canvas
         # already has the correct values (avoids int truncation drift during slider interaction)
         self._canvas_change_in_progress: bool = False
+        # Debounce timer for preview updates - coalesces rapid calls
+        self._preview_debounce_timer: QTimer | None = None
 
     # ===== Setters for deferred injection =====
 
@@ -175,8 +181,35 @@ class WorkspaceLogicHelper:
 
         self._captures_pane.set_link_status(link_status)
 
-    def update_mapping_panel_previews(self) -> None:
-        """Update the mapping panel with game frame preview pixmaps."""
+    def update_mapping_panel_previews(self, immediate: bool = False) -> None:
+        """Update the mapping panel with game frame preview pixmaps.
+
+        Uses debouncing to coalesce rapid calls (e.g., from undo/redo sequences).
+        Multiple calls within 100ms will result in a single actual update.
+
+        Args:
+            immediate: If True, skip debouncing and update immediately.
+                Use for single-shot updates that shouldn't be coalesced.
+        """
+        if immediate:
+            self._do_update_mapping_panel_previews()
+            return
+
+        # Create timer on first use (lazy initialization)
+        if self._preview_debounce_timer is None:
+            self._preview_debounce_timer = QTimer()
+            self._preview_debounce_timer.setSingleShot(True)
+            self._preview_debounce_timer.timeout.connect(self._do_update_mapping_panel_previews)
+
+        # Restart timer - this coalesces rapid calls
+        self._preview_debounce_timer.start(_PREVIEW_DEBOUNCE_MS)
+
+    def _do_update_mapping_panel_previews(self) -> None:
+        """Actually update the mapping panel with game frame preview pixmaps.
+
+        This is the internal method that does the actual work. Called either
+        immediately or after debounce timer fires.
+        """
         if self._controller is None or self._mapping_panel is None:
             return
         if self._captures_pane is None:
@@ -559,9 +592,19 @@ class WorkspaceLogicHelper:
         # Auto-align with scale optimization (emits alignment_changed signal)
         self._alignment_canvas.auto_align(with_scale=True)
 
-        self.refresh_mapping_status()
-        self.refresh_game_frame_link_status()
-        self.update_mapping_panel_previews()
+        # Use targeted single-item updates instead of full list rebuilds
+        self.update_single_ai_frame_status(ai_frame_id)
+        self.update_single_game_frame_link_status(game_frame_id)
+        self.update_single_mapping_panel_row(ai_frame_id)
+
+        # Update displaced frames if their links changed
+        if existing_game_link is not None and existing_game_link != game_frame_id:
+            # Old game frame is now unlinked
+            self.update_single_game_frame_link_status(existing_game_link)
+        if existing_ai_link is not None and existing_ai_link != ai_frame_id:
+            # Old AI frame is now unlinked
+            self.update_single_ai_frame_status(existing_ai_link)
+            self.update_single_mapping_panel_row(existing_ai_link)
 
         if self._message_service:
             self._message_service.show_message(f"Linked '{ai_name}' to '{game_frame_id}'", 3000)

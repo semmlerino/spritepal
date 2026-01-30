@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 from PIL import Image
 
 from core.mesen_integration.click_extractor import CaptureResult, OAMEntry, TileData
@@ -83,6 +84,50 @@ def decode_4bpp_tile(tile_data: bytes) -> list[list[int]]:
     return pixels
 
 
+def decode_4bpp_tile_vectorized(tile_data: bytes) -> np.ndarray:
+    """
+    Decode a 4bpp SNES tile to pixel indices using vectorized operations.
+
+    SNES 4bpp format: 32 bytes per 8x8 tile
+    - Bytes 0-15: Bitplanes 0-1
+    - Bytes 16-31: Bitplanes 2-3
+
+    Args:
+        tile_data: 32 bytes of tile data
+
+    Returns:
+        8x8 numpy array of pixel indices (0-15), dtype uint8
+    """
+    if len(tile_data) != 32:
+        logger.warning(f"Invalid tile data size: {len(tile_data)} (expected 32)")
+        return np.zeros((8, 8), dtype=np.uint8)
+
+    # Convert bytes to numpy array for vectorized bit manipulation
+    data = np.frombuffer(tile_data, dtype=np.uint8)
+
+    # Extract bitplanes - data is interleaved: bp0, bp1 for rows 0-7, then bp2, bp3
+    bp0 = data[0:16:2]  # bytes 0, 2, 4, ..., 14 (8 values, one per row)
+    bp1 = data[1:16:2]  # bytes 1, 3, 5, ..., 15
+    bp2 = data[16:32:2]  # bytes 16, 18, 20, ..., 30
+    bp3 = data[17:32:2]  # bytes 17, 19, 21, ..., 31
+
+    # Create bit masks for columns 0-7 (bit 7 = col 0, bit 0 = col 7)
+    bit_masks = np.array([128, 64, 32, 16, 8, 4, 2, 1], dtype=np.uint8)
+
+    # Expand bitplanes to 8x8 by broadcasting: (8,) x (8,) -> (8, 8)
+    # bp0[:, np.newaxis] is shape (8, 1), bit_masks is shape (8,)
+    # Result is (8, 8) where each row is the bitplane value masked for each column
+    plane0 = ((bp0[:, np.newaxis] & bit_masks) != 0).astype(np.uint8)
+    plane1 = ((bp1[:, np.newaxis] & bit_masks) != 0).astype(np.uint8)
+    plane2 = ((bp2[:, np.newaxis] & bit_masks) != 0).astype(np.uint8)
+    plane3 = ((bp3[:, np.newaxis] & bit_masks) != 0).astype(np.uint8)
+
+    # Combine bitplanes: pixel = bp0 | (bp1 << 1) | (bp2 << 2) | (bp3 << 3)
+    pixels = plane0 | (plane1 << 1) | (plane2 << 2) | (plane3 << 3)
+
+    return pixels
+
+
 class CaptureRenderer:
     """Renderer for Mesen 2 sprite captures."""
 
@@ -119,7 +164,7 @@ class CaptureRenderer:
         transparent_bg: bool = True,
     ) -> Image.Image:
         """
-        Render a single OAM entry to an image.
+        Render a single OAM entry to an image using vectorized operations.
 
         Args:
             entry: OAM entry to render
@@ -131,23 +176,32 @@ class CaptureRenderer:
         width = entry.width
         height = entry.height
 
-        if transparent_bg:
-            img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-        else:
-            img = Image.new("RGB", (width, height), (0, 0, 0))
-
         # Get palette for this sprite
         palette = self._rgb_palettes.get(entry.palette)
         if palette is None:
             logger.warning(f"Palette {entry.palette} not found, using grayscale")
             palette = [(i * 17, i * 17, i * 17) for i in range(16)]
 
-        # Render each tile
+        # Convert palette to numpy array for vectorized lookup
+        if transparent_bg:
+            # RGBA palette: index 0 is transparent
+            palette_array = np.zeros((16, 4), dtype=np.uint8)
+            for i, (r, g, b) in enumerate(palette):
+                if i == 0:
+                    palette_array[i] = [0, 0, 0, 0]  # Transparent
+                else:
+                    palette_array[i] = [r, g, b, 255]
+            canvas = np.zeros((height, width, 4), dtype=np.uint8)
+        else:
+            palette_array = np.array(palette, dtype=np.uint8)
+            canvas = np.zeros((height, width, 3), dtype=np.uint8)
+
+        # Render each tile using vectorized operations
         for tile in entry.tiles:
-            self._render_tile(
-                img,
+            self._render_tile_vectorized(
+                canvas,
                 tile,
-                palette,
+                palette_array,
                 entry.flip_h,
                 entry.flip_v,
                 entry.width,
@@ -155,14 +209,16 @@ class CaptureRenderer:
                 transparent_bg,
             )
 
-        return img
+        # Convert numpy array to PIL Image
+        mode = "RGBA" if transparent_bg else "RGB"
+        return Image.fromarray(canvas, mode=mode)
 
     def render_entry_indexed(
         self,
         entry: OAMEntry,
     ) -> Image.Image:
         """
-        Render a single OAM entry as indexed grayscale.
+        Render a single OAM entry as indexed grayscale using vectorized operations.
 
         This produces a grayscale image where pixel values represent
         palette indices (scaled to 0-255). This allows the arrangement
@@ -181,33 +237,59 @@ class CaptureRenderer:
         """
         width = entry.width
         height = entry.height
-        img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
 
-        # Render each tile with indexed values
+        # Create indexed palette: (gray, gray, gray, alpha)
+        # Index 0 is transparent, others are opaque
+        indexed_palette = np.zeros((16, 4), dtype=np.uint8)
+        for i in range(16):
+            gray = i * 17
+            if i == 0:
+                indexed_palette[i] = [0, 0, 0, 0]  # Transparent
+            else:
+                indexed_palette[i] = [gray, gray, gray, 255]
+
+        canvas = np.zeros((height, width, 4), dtype=np.uint8)
+
+        # Render each tile with indexed values using vectorized operations
         for tile in entry.tiles:
-            self._render_tile_indexed(
-                img,
+            self._render_tile_vectorized(
+                canvas,
                 tile,
+                indexed_palette,
                 entry.flip_h,
                 entry.flip_v,
                 entry.width,
                 entry.height,
+                transparent_bg=True,
             )
 
-        return img
+        return Image.fromarray(canvas, mode="RGBA")
 
-    def _render_tile_indexed(
+    def _render_tile_vectorized(
         self,
-        img: Image.Image,
+        canvas: np.ndarray,
         tile: TileData,
+        palette_array: np.ndarray,
         flip_h: bool,
         flip_v: bool,
         sprite_width: int,
         sprite_height: int,
+        transparent_bg: bool,
     ) -> None:
-        """Render a single tile onto the image as indexed grayscale."""
-        # Decode tile data
-        pixels = decode_4bpp_tile(tile.data_bytes)
+        """Render a single tile onto the canvas using vectorized operations.
+
+        Args:
+            canvas: Numpy array (H, W, 3 or 4) to render onto
+            tile: Tile data to render
+            palette_array: Numpy array (16, 3 or 4) of RGB/RGBA colors
+            flip_h: Horizontal flip flag
+            flip_v: Vertical flip flag
+            sprite_width: Total sprite width
+            sprite_height: Total sprite height
+            transparent_bg: Whether index 0 is transparent
+        """
+        # Decode tile data to 8x8 numpy array of indices
+        pixels = decode_4bpp_tile_vectorized(tile.data_bytes)
 
         # Calculate tile position in sprite
         tile_x = tile.pos_x * 8
@@ -219,25 +301,48 @@ class CaptureRenderer:
         if flip_v:
             tile_y = sprite_height - tile_y - 8
 
-        # Draw pixels
-        for py in range(8):
-            for px in range(8):
-                # Handle pixel-level flipping
-                src_x = (7 - px) if flip_h else px
-                src_y = (7 - py) if flip_v else py
+        # Apply pixel-level flipping using numpy slicing
+        if flip_h:
+            pixels = pixels[:, ::-1]
+        if flip_v:
+            pixels = pixels[::-1, :]
 
-                pixel_idx = pixels[src_y][src_x]
-                dest_x = tile_x + px
-                dest_y = tile_y + py
+        # Calculate destination bounds with clipping
+        dest_x_start = max(0, tile_x)
+        dest_y_start = max(0, tile_y)
+        dest_x_end = min(sprite_width, tile_x + 8)
+        dest_y_end = min(sprite_height, tile_y + 8)
 
-                if 0 <= dest_x < sprite_width and 0 <= dest_y < sprite_height:
-                    if pixel_idx == 0:
-                        # Index 0 is transparent
-                        img.putpixel((dest_x, dest_y), (0, 0, 0, 0))
-                    else:
-                        # Scale index to grayscale (0-15 -> 0-255)
-                        gray = pixel_idx * 17
-                        img.putpixel((dest_x, dest_y), (gray, gray, gray, 255))
+        # Calculate source bounds (handle negative tile positions)
+        src_x_start = dest_x_start - tile_x
+        src_y_start = dest_y_start - tile_y
+        src_x_end = src_x_start + (dest_x_end - dest_x_start)
+        src_y_end = src_y_start + (dest_y_end - dest_y_start)
+
+        # Skip if no pixels to render
+        if dest_x_start >= dest_x_end or dest_y_start >= dest_y_end:
+            return
+
+        # Get the pixel indices for this region
+        pixel_region = pixels[src_y_start:src_y_end, src_x_start:src_x_end]
+
+        # Apply palette lookup to get colors for all pixels at once
+        colors = palette_array[pixel_region]
+
+        if transparent_bg:
+            # Only update non-transparent pixels (index != 0)
+            # Create a mask for non-zero indices
+            mask = pixel_region != 0
+            # Expand mask to match color channels
+            mask_3d = mask[:, :, np.newaxis]
+            # Apply colors only where mask is True
+            canvas_region = canvas[dest_y_start:dest_y_end, dest_x_start:dest_x_end]
+            canvas[dest_y_start:dest_y_end, dest_x_start:dest_x_end] = np.where(
+                mask_3d, colors, canvas_region
+            )
+        else:
+            # Update all pixels
+            canvas[dest_y_start:dest_y_end, dest_x_start:dest_x_end] = colors
 
     def _render_tile(
         self,
@@ -250,7 +355,7 @@ class CaptureRenderer:
         sprite_height: int,
         transparent_bg: bool,
     ) -> None:
-        """Render a single tile onto the image."""
+        """Render a single tile onto the image (legacy per-pixel version)."""
         # Decode tile data
         pixels = decode_4bpp_tile(tile.data_bytes)
 
