@@ -44,6 +44,8 @@ class ExtractTab(QWidget):
     extract_requested = Signal()
     load_rom_requested = Signal()
     extractionRequested = Signal(str, dict)  # oam_path, settings
+    vram_file_changed = Signal(str)  # Emitted when VRAM file is set via drag-drop
+    cgram_file_changed = Signal(str)  # Emitted when CGRAM file is set via drag-drop
 
     def __init__(
         self,
@@ -63,7 +65,7 @@ class ExtractTab(QWidget):
 
         # File selection (Drop Zones for consistency)
         self.vram_drop = DropZone("VRAM", settings_manager=self.settings_manager, required=True)
-        self.vram_drop.file_dropped.connect(lambda p: self.set_vram_file(p))
+        self.vram_drop.file_dropped.connect(self._on_vram_dropped)
         layout.addWidget(self.vram_drop)
 
         # ROM Selection (Hidden by default)
@@ -123,7 +125,7 @@ class ExtractTab(QWidget):
         self.use_palette_check.toggled.connect(self._on_palette_toggle)
 
         self.cgram_drop = DropZone("CGRAM", settings_manager=self.settings_manager, required=False)
-        self.cgram_drop.file_dropped.connect(lambda p: self.set_cgram_file(p))
+        self.cgram_drop.file_dropped.connect(self._on_cgram_dropped)
 
         self.palette_combo = QComboBox()
         for i in range(16):
@@ -263,6 +265,16 @@ class ExtractTab(QWidget):
     def set_extract_enabled(self, enabled: bool) -> None:
         """Enable/disable the extract button."""
         self.extract_btn.setEnabled(enabled)
+
+    def _on_vram_dropped(self, file_path: str) -> None:
+        """Handle VRAM file dropped on drop zone."""
+        self.set_vram_file(file_path)
+        self.vram_file_changed.emit(file_path)
+
+    def _on_cgram_dropped(self, file_path: str) -> None:
+        """Handle CGRAM file dropped on drop zone."""
+        self.set_cgram_file(file_path)
+        self.cgram_file_changed.emit(file_path)
 
     def _on_palette_toggle(self, checked: bool) -> None:
         """Enable/disable CGRAM widgets based on checkbox state.

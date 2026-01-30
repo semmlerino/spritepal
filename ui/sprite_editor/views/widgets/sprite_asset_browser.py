@@ -267,12 +267,14 @@ class SpriteAssetBrowser(QWidget):
             item.setFlags(Qt.ItemFlag.NoItemFlags)
             item.setData(0, Qt.ItemDataRole.UserRole, {"is_placeholder": True})
 
-    def remove_sprite_by_offset(self, offset: int) -> bool:
+    def remove_sprite_by_offset(self, offset: int, source_type: str | None = None) -> bool:
         """
         Remove sprite by ROM offset.
 
         Args:
             offset: ROM offset to remove
+            source_type: Optional filter - only remove items matching this source type
+                        ("rom", "mesen", "library"). If None, removes first match.
 
         Returns:
             True if sprite was found and removed
@@ -282,6 +284,10 @@ class SpriteAssetBrowser(QWidget):
             item = iterator.value()
             data = item.data(0, Qt.ItemDataRole.UserRole)
             if isinstance(data, dict) and data.get("offset") == offset:
+                # If source_type specified, require exact match
+                if source_type is not None and data.get("source_type") != source_type:
+                    iterator += 1
+                    continue
                 parent = item.parent()
                 if parent:
                     parent.removeChild(item)

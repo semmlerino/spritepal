@@ -280,3 +280,41 @@ class LibraryService:
             return True
 
         return False
+
+    def update_sprite_offset(
+        self,
+        old_offset: int,
+        new_offset: int,
+        rom_path: str | Path,
+    ) -> bool:
+        """Update the ROM offset for a library sprite.
+
+        Used when sprite offset alignment is corrected in the browser.
+        Persists the change to the library file.
+
+        Args:
+            old_offset: The current ROM offset of the sprite.
+            new_offset: The corrected/aligned ROM offset.
+            rom_path: Path to the ROM file for hash matching.
+
+        Returns:
+            True if update succeeded, False otherwise.
+        """
+        if not self._sprite_library:
+            return False
+
+        library = self._sprite_library
+        rom_hash = library.compute_rom_hash(Path(rom_path))
+
+        for sprite in library.sprites:
+            if sprite.rom_hash == rom_hash and sprite.rom_offset == old_offset:
+                sprite.rom_offset = new_offset
+                library.save()
+                logger.info(
+                    "Updated library sprite offset: 0x%06X → 0x%06X",
+                    old_offset,
+                    new_offset,
+                )
+                return True
+
+        return False

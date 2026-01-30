@@ -133,6 +133,21 @@ class ExtractionController(QObject):
         self._view.browse_vram_requested.connect(self.browse_vram_file)
         self._view.browse_cgram_requested.connect(self.browse_cgram_file)
         self._view.browse_rom_requested.connect(self.browse_rom_file)
+        # Connect drag-drop file change signals to sync controller state
+        self._view.vram_file_changed.connect(self._on_vram_file_changed)
+        self._view.cgram_file_changed.connect(self._on_cgram_file_changed)
+
+    def _on_vram_file_changed(self, file_path: str) -> None:
+        """Handle VRAM file change from drag-drop in view."""
+        self.vram_file = file_path
+        if self._multi_palette_view:
+            self._multi_palette_view._validate_prerequisites()
+
+    def _on_cgram_file_changed(self, file_path: str) -> None:
+        """Handle CGRAM file change from drag-drop in view."""
+        self.cgram_file = file_path
+        if self._multi_palette_view:
+            self._multi_palette_view._validate_prerequisites()
 
     def set_mode(self, mode: str) -> None:
         """Set the extraction mode ('vram' or 'rom')."""

@@ -631,9 +631,9 @@ class ROMWorkflowController(QObject):
         if source_type == "library" and self.rom_path:
             self._library_service.delete_sprite(offset, self.rom_path)
 
-        # Remove item from browser tree
+        # Remove item from browser tree (pass source_type to avoid collision with same offset)
         if self._view:
-            self._view.asset_browser.remove_sprite_by_offset(offset)
+            self._view.asset_browser.remove_sprite_by_offset(offset, source_type)
 
     def _on_item_offset_changed(self, old_offset: int, new_offset: int) -> None:
         """Re-queue thumbnail when item's offset changes due to alignment.
@@ -658,6 +658,7 @@ class ROMWorkflowController(QObject):
         1. Clears in-memory thumbnail cache in worker
         2. Clears disk preview cache for current ROM
         3. Re-queues thumbnails for all items in browser
+        4. Restores library thumbnails from saved files
         """
         # Clear in-memory cache
         if self._thumbnail_controller and self._thumbnail_controller.worker:
@@ -672,6 +673,9 @@ class ROMWorkflowController(QObject):
         # Re-queue thumbnails for all offsets in browser
         self._request_all_asset_thumbnails()
 
+        # Restore library thumbnails from saved files (they don't come from thumbnail worker)
+        self._restore_library_thumbnails()
+
     def _request_all_asset_thumbnails(self) -> None:
         """Request thumbnails for all sprites in the asset browser."""
         if not self._view or not self._thumbnail_controller:
@@ -681,6 +685,27 @@ class ROMWorkflowController(QObject):
         if offsets:
             self._thumbnail_controller.queue_batch(offsets)
             logger.debug("Queued %d thumbnails for refresh", len(offsets))
+
+    def _restore_library_thumbnails(self) -> None:
+        """Restore library thumbnails from saved files after refresh.
+
+        Library sprites use saved thumbnail files rather than the thumbnail worker,
+        so they must be explicitly restored after refresh clears browser state.
+        """
+        if not self._view or not self.rom_path or not self._sprite_library:
+            return
+
+        rom_hash = self._sprite_library.compute_rom_hash(self.rom_path)
+        restored = 0
+        for sprite in self._sprite_library.sprites:
+            if sprite.rom_hash == rom_hash:
+                thumbnail = self._load_library_thumbnail(sprite)
+                if thumbnail:
+                    self._view.asset_browser.set_thumbnail(sprite.rom_offset, thumbnail, source_type="library")
+                    restored += 1
+
+        if restored > 0:
+            logger.debug("Restored %d library thumbnails after refresh", restored)
 
     def _load_library_sprites(self) -> None:
         """Load sprites from library that match current ROM."""
@@ -1236,6 +1261,9 @@ class ROMWorkflowController(QObject):
         elif self._view:
             self._view.hide_palette_warning()
 
+        # Change state BEFORE load_image so undoStateChanged handler sees correct state
+        self.state = "edit"
+
         logger.debug(f"[OPEN] Loading image into editor: {image_array.shape}")
         self._editing_controller.load_image(image_array, palette)
 
@@ -1266,8 +1294,6 @@ class ROMWorkflowController(QObject):
                     f"Using ROM Palette {detected_palette_index} ({palette_count} palettes available in dropdown)"
                 )
 
-        # Change state
-        self.state = "edit"
         if self._view:
             # Use different button text for raw tile mode (ROM map import)
             if self._current_rom_map_data:
