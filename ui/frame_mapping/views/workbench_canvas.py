@@ -69,7 +69,6 @@ from ui.frame_mapping.views.workbench_items import (
 )
 from ui.frame_mapping.views.workbench_types import (
     AlignmentState,
-    PreviewSnapshot,
     TileCalcSnapshot,
 )
 from utils.logging_config import get_logger
@@ -271,7 +270,7 @@ class WorkbenchCanvas(QWidget):
         self._preview_timer.timeout.connect(self._generate_preview)
         self._preview_enabled = False
         # Snapshot captured when scheduling to ensure preview uses schedule-time values
-        self._preview_snapshot: PreviewSnapshot | None = None
+        self._preview_snapshot: AlignmentState | None = None
 
         self._tile_sampling_service = TileSamplingService()
         self._multi_palette_warning_label: QLabel | None = None
@@ -1488,7 +1487,7 @@ class WorkbenchCanvas(QWidget):
         scale = self._ai_frame_item.scale_factor()
         sharpen = self._sharpen_slider.value() / 10.0
         resampling = self._resampling_combo.currentData() or "lanczos"
-        self._preview_snapshot = PreviewSnapshot(
+        self._preview_snapshot = AlignmentState(
             offset_x=offset_x,
             offset_y=offset_y,
             flip_h=flip_h,

@@ -32,7 +32,7 @@ class AlignmentState:
     Used for:
     - Tracking drag-start state (for undo coalescing)
     - Alignment change signals
-    - Debounced preview generation snapshots (replaces PreviewSnapshot)
+    - Debounced preview generation snapshots
 
     Contains all parameters that affect how the AI frame is positioned
     and transformed relative to the game frame.
@@ -45,8 +45,3 @@ class AlignmentState:
     scale: float
     sharpen: float
     resampling: str
-
-
-# Backward compatibility: PreviewSnapshot was merged into AlignmentState
-# since they have identical fields. Use AlignmentState for new code.
-PreviewSnapshot = AlignmentState
