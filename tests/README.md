@@ -63,7 +63,7 @@ tests/
 ```
 
 **Sprite Editor Tests:**
-- `tests/ui/sprite_editor/` - Subsystem-specific tests for the sprite editor (125+ tests)
+- `tests/ui/sprite_editor/` - Subsystem-specific tests for the sprite editor (185+ tests)
   - Consolidated from former `ui/sprite_editor/tests/` location (January 2026)
   - Run with: `uv run pytest tests/ui/sprite_editor/`
 
@@ -126,12 +126,12 @@ Reference for fixture scopes, state management, and cleanup. Critical for onboar
 
 | Fixture | Location | State | Cleanup | Risk |
 |---------|----------|-------|---------|------|
-| `qt_app` | `qt_fixtures.py:96` | Single `QApplication` instance | Session end | Qt app singleton; reused across all tests |
-| `session_app_context` | `app_context_fixtures.py:29` | Shared `AppContext` + managers | Session end via `reset_app_context()` | State leaks between tests without `@pytest.mark.shared_state_safe` |
-| `session_data_repository` | `core_fixtures.py:148` | Shared test data files | Session end (files in system temp) | Real ROM data may not be found in CI |
-| `capture_thread_baseline` | `qt_fixtures.py:96` | Thread count snapshot | Session end | Detects worker cleanup failures |
-| `worker_temp_root` | `xdist_fixtures.py:46` | Temp directory per xdist worker | Session end | Parallel safety: each worker gets isolated temp |
-| `configure_worker_environment` | `xdist_fixtures.py:46` | Environment variables (PYTEST_TIMEOUT_MULTIPLIER, etc.) | Session end (cleared) | Affects all tests in worker |
+| `qt_app` | `qt_fixtures.py` | Single `QApplication` instance | Session end | Qt app singleton; reused across all tests |
+| `session_app_context` | `app_context_fixtures.py` | Shared `AppContext` + managers | Session end via `reset_app_context()` | State leaks between tests without `@pytest.mark.shared_state_safe` |
+| `session_data_repository` | `core_fixtures.py` | Shared test data files | Session end (files in system temp) | Real ROM data may not be found in CI |
+| `capture_thread_baseline` | `qt_fixtures.py` | Thread count snapshot | Session end | Detects worker cleanup failures |
+| `worker_temp_root` | `xdist_fixtures.py` | Temp directory per xdist worker | Session end | Parallel safety: each worker gets isolated temp |
+| `configure_worker_environment` | `xdist_fixtures.py` | Environment variables (PYTEST_TIMEOUT_MULTIPLIER, etc.) | Session end (cleared) | Affects all tests in worker |
 
 **When to use session fixtures:**
 - Test is read-only (no state mutations)
@@ -142,41 +142,41 @@ Reference for fixture scopes, state management, and cleanup. Critical for onboar
 
 | Fixture | Location | State | Cleanup | Notes |
 |---------|----------|-------|---------|-------|
-| `app_context` | `app_context_fixtures.py:29` | Fresh `AppContext` + managers | Auto-reset + event processing | **Preferred**. Creates new context if none exists; suspends session context if present |
-| `clean_registry_state` | `core_fixtures.py:148` | Manager singletons (HAL, config, palette) | Suspend/reset + processes events (if not headless) | Ensures managers start clean |
-| `isolated_data_repository` | `core_fixtures.py:148` | Test files in `tmp_path` | Auto-cleanup via `tmp_path` | Parallel-safe; files deleted after test |
-| `main_window` | `qt_fixtures.py:96` | `QMainWindow` instance | Destroyed at test end | Requires `qtbot` fixture |
-| `cleanup_workers` | `qt_fixtures.py:96` | `WorkerManager` shutdown | Checks for leaks + stops active workers | Autouse; detects threading bugs |
-| `cleanup_singleton` | `qt_fixtures.py:96` | Qt singleton state | Clears singleton on teardown | Prevents cross-test contamination |
-| `real_extraction_manager` | `core_fixtures.py:148` | Real `ExtractionManager` instance | Auto-cleanup | Accessor; uses `app_context` internally |
-| `real_injection_manager` | `core_fixtures.py:148` | Real `InjectionManager` instance | Auto-cleanup | Accessor; uses `app_context` internally |
-| `real_session_manager` | `core_fixtures.py:148` | Real `SessionManager` instance | Auto-cleanup | Accessor; uses `app_context` internally |
-| `hal_pool` | `hal_fixtures.py:63` | HAL compression pool (mock or real) | Shutdown pool on teardown | Real mode with `@pytest.mark.real_hal` |
-| `hal_compressor` | `hal_fixtures.py:63` | `HALCompressor` singleton | Reset + shutdown on teardown | Real/mock per config |
-| `test_rom_file` | `test_data_fixtures.py:87` | ROM file in `tmp_path` | Auto-cleanup | Factory; pass `size="default"` etc. |
-| `test_vram_file` | `test_data_fixtures.py:87` | VRAM file in `tmp_path` | Auto-cleanup | Factory; pass `size=...` in bytes |
-| `rom_cache` | `core_fixtures.py:148` | ROM cache in `tmp_path` | Auto-cleanup | Isolated per-test cache |
-| `multi_signal_recorder` | `ui/integration/conftest.py:19` | Signal recorder factory | Clears recorders on teardown | Returns callable to create `MultiSignalRecorder` instances |
+| `app_context` | `app_context_fixtures.py` | Fresh `AppContext` + managers | Auto-reset + event processing | **Preferred**. Creates new context if none exists; suspends session context if present |
+| `clean_registry_state` | `core_fixtures.py` | Manager singletons (HAL, config, palette) | Suspend/reset + processes events (if not headless) | Ensures managers start clean |
+| `isolated_data_repository` | `core_fixtures.py` | Test files in `tmp_path` | Auto-cleanup via `tmp_path` | Parallel-safe; files deleted after test |
+| `main_window` | `qt_fixtures.py` | `QMainWindow` instance | Destroyed at test end | Requires `qtbot` fixture |
+| `cleanup_workers` | `qt_fixtures.py` | `WorkerManager` shutdown | Checks for leaks + stops active workers | Autouse; detects threading bugs |
+| `cleanup_singleton` | `qt_fixtures.py` | Qt singleton state | Clears singleton on teardown | Prevents cross-test contamination |
+| `real_extraction_manager` | `core_fixtures.py` | Real `ExtractionManager` instance | Auto-cleanup | Accessor; uses `app_context` internally |
+| `real_injection_manager` | `core_fixtures.py` | Real `InjectionManager` instance | Auto-cleanup | Accessor; uses `app_context` internally |
+| `real_session_manager` | `core_fixtures.py` | Real `SessionManager` instance | Auto-cleanup | Accessor; uses `app_context` internally |
+| `hal_pool` | `hal_fixtures.py` | HAL compression pool (mock or real) | Shutdown pool on teardown | Real mode with `@pytest.mark.real_hal` |
+| `hal_compressor` | `hal_fixtures.py` | `HALCompressor` singleton | Reset + shutdown on teardown | Real/mock per config |
+| `test_rom_file` | `test_data_fixtures.py` | ROM file in `tmp_path` | Auto-cleanup | Factory; pass `size="default"` etc. |
+| `test_vram_file` | `test_data_fixtures.py` | VRAM file in `tmp_path` | Auto-cleanup | Factory; pass `size=...` in bytes |
+| `rom_cache` | `core_fixtures.py` | ROM cache in `tmp_path` | Auto-cleanup | Isolated per-test cache |
+| `multi_signal_recorder` | `ui/integration/conftest.py` | Signal recorder factory | Clears recorders on teardown | Returns callable to create `MultiSignalRecorder` instances |
 
 ### Autouse Fixtures (Always Active)
 
 | Fixture | Location | Purpose | Applies To | Notes |
 |---------|----------|---------|------------|-------|
-| `skip_requires_display` | `conftest.py:451` | Skip tests marked `@pytest.mark.requires_display` in headless mode | All tests | Checks `QT_QPA_PLATFORM=offscreen` |
-| `verify_cleanup` | `conftest.py:451` | Assert no active operations at test end | All tests | Catches resource leaks |
-| `enforce_shared_state_safe` | `conftest.py:451` | Enforce `@pytest.mark.shared_state_safe` with `session_app_context` | All tests using `session_app_context` | Prevents accidental state sharing |
-| `reset_hal_singletons` | `hal_fixtures.py:63` | Clear HAL singleton state between tests | All tests (if HAL fixture used) | Prevents cross-test contamination |
-| `capture_thread_baseline` | `qt_fixtures.py:96` | Detect worker/thread leaks | All Qt tests | Session autouse; checks final thread count |
+| `skip_requires_display` | `conftest.py` | Skip tests marked `@pytest.mark.requires_display` in headless mode | All tests | Checks `QT_QPA_PLATFORM=offscreen` |
+| `verify_cleanup` | `conftest.py` | Assert no active operations at test end | All tests | Catches resource leaks |
+| `enforce_shared_state_safe` | `conftest.py` | Enforce `@pytest.mark.shared_state_safe` with `session_app_context` | All tests using `session_app_context` | Prevents accidental state sharing |
+| `reset_hal_singletons` | `hal_fixtures.py` | Clear HAL singleton state between tests | All tests (if HAL fixture used) | Prevents cross-test contamination |
+| `capture_thread_baseline` | `qt_fixtures.py` | Detect worker/thread leaks | All Qt tests | Session autouse; checks final thread count |
 
 ### Utility Functions (No Scope)
 
 | Function | Location | Returns | Cleanup |
 |----------|----------|---------|---------|
-| `test_data_factory` | `conftest.py:451` | Bytearray factory | No persistent state |
-| `temp_files` | `conftest.py:451` | `NamedTemporaryFile` wrapper | Deletes on teardown |
-| `standard_test_params` | `conftest.py:451` | Test parameters (uses `temp_files` + `tmp_path`) | Via `temp_files` |
-| `mock_manager_registry` | `conftest.py:451` | Mock registry | No cleanup needed (Mock) |
-| `wait_for`, `process_events`, etc. | `qt_waits.py:52` | Signal wait utilities | Semantic timeout helpers |
+| `test_data_factory` | `conftest.py` | Bytearray factory | No persistent state |
+| `temp_files` | `conftest.py` | `NamedTemporaryFile` wrapper | Deletes on teardown |
+| `standard_test_params` | `conftest.py` | Test parameters (uses `temp_files` + `tmp_path`) | Via `temp_files` |
+| `mock_manager_registry` | `conftest.py` | Mock registry | No cleanup needed (Mock) |
+| `wait_for`, `process_events`, etc. | `qt_waits.py` | Signal wait utilities | Semantic timeout helpers |
 
 ### Dependency Graph
 
@@ -420,7 +420,7 @@ uv run pytest -m real_hal --require-real-hal -v
 
 ## UI Integration Tests
 
-UI integration tests validate signal-driven workflows and observable behavior through public APIs rather than mocking internal state. Located in `tests/ui/integration/` with 140+ tests covering:
+UI integration tests validate signal-driven workflows and observable behavior through public APIs rather than mocking internal state. Located in `tests/ui/integration/` with 390+ tests covering:
 
 ### Coverage Areas
 
@@ -531,4 +531,4 @@ def test_with_workers(app_context, isolated_data_repository):
 
 ---
 
-*Last updated: January 24, 2026 (Updated test directory structure - consolidated ui/sprite_editor/tests/ to tests/ui/sprite_editor/)*
+*Last updated: January 30, 2026*

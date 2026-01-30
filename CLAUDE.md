@@ -1,6 +1,6 @@
 # SpritePal Development Guidelines
 
-**Last updated: January 27, 2026** | See [Table of Contents](#table-of-contents) below
+**Last updated: January 30, 2026** | See [Table of Contents](#table-of-contents) below
 
 **What is SpritePal?** A PySide6 desktop app for editing SNES sprite graphics. Key workflows: Extract sprites from ROM → Edit in pixel editor → Inject back. Also supports frame mapping of AI-generated frames for sprite animation replacement.
 
@@ -77,7 +77,7 @@ uv run python launch_spritepal.py
 
 3. **Test logic more than widgets** - Put business logic in plain Python classes so tests stay fast and stable. Keep widget tests focused on wiring, signals, and basic interactions.
 
-4. **Tests: serial for TDD, parallel for full suite** - Default (`pytest`) runs serial for fast iteration. Full suite (`pytest -n auto --dist=loadscope`) runs parallel. With 2400+ tests, parallel cuts 15+ minutes to ~3 minutes.
+4. **Tests: serial for TDD, parallel for full suite** - Default (`pytest`) runs serial for fast iteration. Full suite (`pytest -n auto --dist=loadscope`) runs parallel. With 3700+ tests, parallel cuts 15+ minutes to ~3 minutes.
 
 5. **Prefer boring determinism** - The fastest dev loop is: small change → run checks → commit.
 
@@ -235,7 +235,7 @@ pytest tests/test_hal_golden.py --regenerate-golden -v  # Update golden checksum
 
 ### UI Integration Tests
 
-Signal-driven workflow tests in `tests/ui/integration/` verify observable Qt behavior through public APIs (100+ tests):
+Signal-driven workflow tests in `tests/ui/integration/` verify observable Qt behavior through public APIs (390+ tests):
 - Mouse/canvas interactions (PixelCanvas, hover, zoom)
 - Tool selection and icon toolbar signals
 - Color/palette selection
@@ -373,7 +373,7 @@ Per-category logging control accessible via **Settings → Logging tab**. Suppor
 | **Safe signals** | `ui/common/signal_utils.py` — `safe_disconnect()`, etc. |
 | **ThreadSafeTestImage** | `tests/infrastructure/thread_safe_test_image.py` — for worker thread testing |
 | **RealComponentFactory** | `tests/infrastructure/real_component_factory.py` — for testing with real components |
-| **UI Integration Tests** | `tests/ui/integration/` — 100+ signal-driven workflow tests; see `helpers/signal_spy_utils.py` for MultiSignalRecorder |
+| **UI Integration Tests** | `tests/ui/integration/` — 390+ signal-driven workflow tests; see `helpers/signal_spy_utils.py` for MultiSignalRecorder |
 
 ### Project Structure
 
@@ -400,7 +400,7 @@ spritepal/
 │   ├── integration/       # Multi-component tests
 │   ├── ui/                # UI-specific tests
 │   │   ├── integration/   # UI integration tests
-│   │   └── sprite_editor/ # Sprite editor subsystem tests (125+)
+│   │   └── sprite_editor/ # Sprite editor subsystem tests (185+)
 │   ├── fixtures/          # Test fixtures (app_context, qtbot, etc.)
 │   └── infrastructure/    # Mocks, factories, test utilities
 ├── utils/                 # Stdlib-only utilities

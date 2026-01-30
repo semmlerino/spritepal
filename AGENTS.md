@@ -15,7 +15,7 @@ Always activate the Serena MCP at the start.
 Run from `spritepal/`:
 - `uv sync --extra dev` installs dev dependencies.
 - `uv run python launch_spritepal.py` starts the app.
-- `uv run pytest` runs the suite (parallel by default).
+- `uv run pytest` runs the suite (serial by default for fast TDD; use `-n auto` for parallel).
 - `uv run pytest -n 0 tests/path/test_file.py::test_name` runs a single test serially.
 - `uv run ruff check .` lints; add `--fix` for auto-fixes.
 - `uv run basedpyright core ui utils` runs strict type checks.
@@ -28,8 +28,8 @@ Run from `spritepal/`:
 
 ## Testing Guidelines
 - **Bug-First TDD (Mandatory)**: Always write a failing reproduction test before fixing a bug.
-- Frameworks: `pytest`, `pytest-qt`, `pytest-xdist` (default `-n auto`).
-- Use `isolated_managers` unless `session_managers` is required with `@pytest.mark.shared_state_safe`.
+- Frameworks: `pytest`, `pytest-qt`, `pytest-xdist`.
+- Use `app_context` fixture unless `session_app_context` is required with `@pytest.mark.shared_state_safe`.
 - Avoid `time.sleep()`; use `qtbot.wait()`/`waitSignal()` context managers.
 - Never create `QPixmap` in worker threads; use `ThreadSafeTestImage` instead.
 

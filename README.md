@@ -19,7 +19,7 @@ A PySide6-based sprite extraction and editing tool for SNES ROM hacking.
 - **Toggleable backgrounds** in sprite editor for better visibility during editing
 - **Revert to Original** button to restore a sprite from ROM if edits go wrong
 - **Per-category logging** control via Settings → Logging tab for detailed debugging
-- **140+ UI integration tests** for signal-driven workflow validation
+- **390+ UI integration tests** for signal-driven workflow validation
 
 ## Keyboard Shortcuts
 
@@ -184,4 +184,4 @@ MIT
 
 ---
 
-*Last updated: January 21, 2026 (Added Frame Mapping Workspace, Workbench Canvas with zoom/pan, in-game preview toggle)*
+*Last updated: January 30, 2026*

@@ -96,4 +96,4 @@ uv run pytest tests/path/test_file.py::test_name -vv --tb=long -s -n 0
 
 ---
 
-*Last updated: January 24, 2026 (Test directory structure consolidated)*
+*Last updated: January 30, 2026*
