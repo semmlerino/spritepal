@@ -1205,6 +1205,50 @@ QT_QPA_PLATFORM=offscreen pytest tests/
 - Cache consistency
 
 ---
-*Last Updated: January 24, 2026 | SpritePal Testing Reference - DO NOT DELETE*
+
+## Debugging Recipes
+
+### Taking UI Screenshots
+
+```bash
+# Capture app window (requires X11/xcb display)
+QT_QPA_PLATFORM=xcb uv run python -c "
+from PySide6.QtCore import QTimer; from launch_spritepal import SpritePalApp; import sys
+app = SpritePalApp(sys.argv); w = app.main_window; w.show(); w.resize(1000, 900)
+QTimer.singleShot(500, lambda: (w.grab().save('/tmp/spritepal_screenshot.png'), app.quit()))
+app.exec()
+"
+```
+
+**Debug widget boundaries:** `widget.setStyleSheet('QWidget { border: 1px solid red; }')`
+
+### Headless Rendering & Visual Comparisons
+
+Test visual changes without launching the full app:
+
+```bash
+# Render workbench alignment (list mappings with --list-mappings)
+uv run python scripts/render_workbench.py -p mapping.spritepal-mapping.json -m 0 -o /tmp/workbench.png
+
+# Render quantized preview (side-by-side original vs quantized)
+uv run python scripts/render_quantized_preview.py -p mapping.spritepal-mapping.json -m 0 \
+    --side-by-side --display-scale 8 -o /tmp/quantized.png
+```
+
+**Before/after comparison workflow:**
+1. Render with current code → `/tmp/after.png`
+2. Temporarily revert the change in source
+3. Render with old code → `/tmp/before.png`
+4. Restore the fix
+5. Create comparison (see `scripts/render_quantized_preview.py` for pattern)
+
+**Quick symmetry test** (verifies quantization preserves symmetric pixels):
+```bash
+uv run pytest tests/unit/test_palette_utils.py::TestQuantizationSymmetry -v
+```
+
+---
+
+*Last Updated: January 30, 2026 | SpritePal Testing Reference - DO NOT DELETE*
 
 **Critical**: ThreadSafeTestImage implementation required to prevent Qt threading violations that cause "Fatal Python error: Aborted" crashes in worker tests.
