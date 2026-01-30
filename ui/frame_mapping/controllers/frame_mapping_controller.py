@@ -272,7 +272,7 @@ class FrameMappingController(QObject):
             logger.warning("Project file not found: %s", path)
             self.error_occurred.emit(f"Project file not found: {path}")
             return False
-        except (JSONDecodeError, KeyError, ValueError) as e:
+        except (JSONDecodeError, KeyError, ValueError, AttributeError, TypeError) as e:
             logger.exception("Invalid project file format: %s", path)
             self.error_occurred.emit(f"Invalid project file format: {e}")
             return False

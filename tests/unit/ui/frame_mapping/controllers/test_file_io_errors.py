@@ -94,7 +94,7 @@ class TestLoadProjectErrors:
             "version": 1,
             "name": "Corrupted",
             "ai_frames": [
-                {"path": None, "index": "not_an_int"}  # Invalid index type
+                {"path": None, "index": "not_an_int"}  # Invalid types
             ],
             "game_frames": [],
             "mappings": [],
@@ -105,19 +105,12 @@ class TestLoadProjectErrors:
         errors: list[str] = []
         controller.error_occurred.connect(errors.append)
 
-        # The load should fail - either by returning False or raising an exception
-        # Currently some structural corruptions raise AttributeError which
-        # isn't caught by the controller. This tests the current behavior.
-        try:
-            result = controller.load_project(corrupted_file)
-            # If we get here, load handled the corruption
-            if result is False:
-                assert len(errors) >= 1
-            # If it loads successfully, we've verified it doesn't crash
-        except (AttributeError, TypeError):
-            # Current behavior: some corruptions propagate as exceptions
-            # This is acceptable - the test documents the behavior
-            pass
+        # Controller should catch AttributeError/TypeError and emit error
+        result = controller.load_project(corrupted_file)
+
+        assert result is False
+        assert len(errors) == 1
+        assert "Invalid project file format" in errors[0]
 
     def test_successful_load_clears_undo_stack(self, controller: FrameMappingController, tmp_path: Path) -> None:
         """load_project clears undo stack after successful load."""
