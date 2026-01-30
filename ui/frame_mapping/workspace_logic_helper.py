@@ -246,7 +246,7 @@ class WorkspaceLogicHelper:
 
         # Create timer on first use (lazy initialization)
         if self._preview_debounce_timer is None:
-            self._preview_debounce_timer = QTimer()
+            self._preview_debounce_timer = QTimer(self._parent_widget)
             self._preview_debounce_timer.setSingleShot(True)
             self._preview_debounce_timer.timeout.connect(self._do_update_mapping_panel_previews)
 

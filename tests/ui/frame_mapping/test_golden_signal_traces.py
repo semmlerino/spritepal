@@ -30,6 +30,7 @@ from ui.frame_mapping.undo.commands import (
     RemoveMappingCommand,
     UpdateAlignmentCommand,
 )
+from ui.frame_mapping.views.workbench_types import AlignmentState
 
 
 @pytest.fixture
@@ -139,9 +140,16 @@ class TestRemoveMappingUndoSignals:
         """
         # Create mapping with alignment
         populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
-        populated_controller._update_alignment_no_history(
-            "sprite_01.png", 5, 10, False, True, 0.75, sharpen=2.0, resampling="nearest"
+        alignment = AlignmentState(
+            offset_x=5,
+            offset_y=10,
+            flip_h=False,
+            flip_v=True,
+            scale=0.75,
+            sharpen=2.0,
+            resampling="nearest",
         )
+        populated_controller._update_alignment_no_history("sprite_01.png", alignment)
 
         collector = SignalCollector()
         collector.connect_signals(populated_controller, ["mapping_created", "mapping_removed", "alignment_updated"])
@@ -150,7 +158,7 @@ class TestRemoveMappingUndoSignals:
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
             removed_game_frame_id="capture_A",
-            removed_alignment=(5, 10, False, True, 0.75, 2.0, "nearest"),
+            removed_alignment=alignment,
             removed_status="edited",
         )
 
@@ -200,19 +208,30 @@ class TestUpdateAlignmentUndoSignals:
         collector = SignalCollector()
         collector.connect_signals(populated_controller, ["alignment_updated"])
 
+        old_alignment = AlignmentState(
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
+            scale=1.0,
+            sharpen=0.0,
+            resampling="lanczos",
+        )
+        new_alignment = AlignmentState(
+            offset_x=10,
+            offset_y=20,
+            flip_h=True,
+            flip_v=False,
+            scale=0.5,
+            sharpen=0.0,
+            resampling="lanczos",
+        )
+
         cmd = UpdateAlignmentCommand(
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
-            new_offset_x=10,
-            new_offset_y=20,
-            new_flip_h=True,
-            new_flip_v=False,
-            new_scale=0.5,
-            old_offset_x=0,
-            old_offset_y=0,
-            old_flip_h=False,
-            old_flip_v=False,
-            old_scale=1.0,
+            new_alignment=new_alignment,
+            old_alignment=old_alignment,
         )
 
         cmd.execute()
@@ -235,14 +254,30 @@ class TestUpdateAlignmentUndoSignals:
         collector = SignalCollector()
         collector.connect_signals(populated_controller, ["alignment_updated"])
 
+        old_alignment = AlignmentState(
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
+            scale=1.0,
+            sharpen=0.0,
+            resampling="lanczos",
+        )
+        new_alignment = AlignmentState(
+            offset_x=10,
+            offset_y=20,
+            flip_h=True,
+            flip_v=False,
+            scale=0.5,
+            sharpen=0.0,
+            resampling="lanczos",
+        )
+
         cmd = UpdateAlignmentCommand(
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
-            new_offset_x=10,
-            new_offset_y=20,
-            new_flip_h=True,
-            new_flip_v=False,
-            new_scale=0.5,
+            new_alignment=new_alignment,
+            old_alignment=old_alignment,
         )
 
         cmd.execute()

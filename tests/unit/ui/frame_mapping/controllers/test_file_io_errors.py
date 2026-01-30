@@ -137,6 +137,7 @@ class TestLoadProjectErrors:
         assert controller.can_undo() is False  # Still false (cleared)
 
 
+@pytest.mark.allows_registry_state(reason="FrameMappingController initializes services")
 class TestSaveProjectErrors:
     """Tests for save_project error handling."""
 

@@ -415,8 +415,12 @@ class TestRepositoryErrorHandling:
         loaded = FrameMappingRepository.load(save_path)
         assert loaded.name == "test"
 
-    def test_load_project_logs_stale_entries(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-        """Loading a project with stale entries should log a warning."""
+    def test_load_project_does_not_block_on_stale_entries(self, tmp_path: Path) -> None:
+        """Loading a project should not block on stale entry detection.
+
+        Stale entry detection is now deferred to the controller for async execution
+        to avoid UI freezes on large projects. The repository just loads the data.
+        """
         # Create a capture file with entry IDs 3, 4
         capture_path = tmp_path / "capture.json"
         capture_data = {
@@ -463,19 +467,9 @@ class TestRepositoryErrorHandling:
         save_path = tmp_path / "test.spritepal-mapping.json"
         FrameMappingRepository.save(project, save_path)
 
-        # Modify the capture file to have different entry IDs (already done above)
-        # This simulates re-recording the capture after the project was created
+        # Load the project - should succeed without blocking on stale detection
+        loaded = FrameMappingRepository.load(save_path)
 
-        # Load the project and check for warning
-        import logging
-
-        with caplog.at_level(logging.WARNING):
-            loaded = FrameMappingRepository.load(save_path)
-
-        # Should log a warning about stale entries
-        assert any("stale game frames" in record.message.lower() for record in caplog.records)
-        assert any("F1234" in record.message for record in caplog.records)
-
-        # Project should still load successfully
+        # Project should load successfully
         assert loaded.name == "test"
         assert len(loaded.game_frames) == 1
