@@ -7,12 +7,14 @@ preventing UI freezes when loading projects with many game frames.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
 
-from core.mesen_integration.click_extractor import MesenCaptureParser
+from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
 from core.repositories.capture_result_repository import CaptureResultRepository
+from core.services.stale_entry_logic import detect_stale_frame_ids
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -58,62 +60,19 @@ class _StaleEntryWorker(QObject):
 
     def run(self) -> None:
         """Run stale detection for all game frames."""
-        stale_ids: list[str] = []
 
-        for game_frame in self._request.game_frames:
-            if self._stop_requested:
-                break
+        def get_capture(path: Path) -> CaptureResult:
+            """Get capture result from repository or parse directly."""
+            if self._request.capture_repository is not None:
+                return self._request.capture_repository.get_or_parse(path)
+            assert self._parser is not None
+            return self._parser.parse_file(path)
 
-            # Skip frames without selected_entry_ids (ROM-only workflow)
-            if not game_frame.selected_entry_ids:
-                continue
-
-            # Skip frames without capture path
-            if not game_frame.capture_path:
-                continue
-
-            # Check if capture file exists
-            if not game_frame.capture_path.exists():
-                logger.warning(
-                    "Capture file not found for frame '%s': %s",
-                    game_frame.id,
-                    game_frame.capture_path,
-                )
-                stale_ids.append(game_frame.id)
-                continue
-
-            # Load the capture file and check if entry IDs are still valid
-            try:
-                # Use shared repository if available, otherwise parse directly
-                if self._request.capture_repository is not None:
-                    capture_result = self._request.capture_repository.get_or_parse(game_frame.capture_path)
-                else:
-                    assert self._parser is not None
-                    capture_result = self._parser.parse_file(game_frame.capture_path)
-
-                # Get the IDs of all entries in the current capture
-                current_entry_ids = {entry.id for entry in capture_result.entries}
-
-                # Check if all selected_entry_ids are present
-                selected_ids_set = set(game_frame.selected_entry_ids)
-                is_stale = not selected_ids_set.issubset(current_entry_ids)
-
-                if is_stale:
-                    stale_ids.append(game_frame.id)
-                    logger.debug(
-                        "Game frame '%s' has stale entries: %s not in current capture IDs %s",
-                        game_frame.id,
-                        selected_ids_set - current_entry_ids,
-                        current_entry_ids,
-                    )
-
-            except Exception as e:
-                logger.warning(
-                    "Failed to parse capture file for frame '%s': %s",
-                    game_frame.id,
-                    e,
-                )
-                stale_ids.append(game_frame.id)
+        stale_ids = detect_stale_frame_ids(
+            self._request.game_frames,
+            get_capture,
+            stop_check=lambda: self._stop_requested,
+        )
 
         if not self._stop_requested:
             self.detection_complete.emit(stale_ids, self._request.request_id)

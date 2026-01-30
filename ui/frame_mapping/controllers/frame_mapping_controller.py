@@ -32,6 +32,7 @@ from core.repositories.frame_mapping_repository import FrameMappingRepository
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
+from core.services.palette_offset_calculator import PaletteOffsetCalculator
 from ui.frame_mapping.services.async_game_frame_preview_service import (
     AsyncGameFramePreviewService,
 )
@@ -110,12 +111,22 @@ class FrameMappingController(QObject):
     async_injection_progress = Signal(str, str)  # ai_frame_id, message
     async_injection_finished = Signal(str, bool, str)  # ai_frame_id, success, message
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        *,
+        capture_repository: CaptureResultRepository | None = None,
+        injection_orchestrator: InjectionOrchestrator | None = None,
+        palette_offset_calculator: PaletteOffsetCalculator | None = None,
+    ) -> None:
         super().__init__(parent)
         self._project: FrameMappingProject | None = None
         # Shared capture repository for parsed capture file caching (thread-safe)
         # Both PreviewService and AsyncStaleEntryDetector use this to avoid duplicate parsing
-        self._capture_repository = CaptureResultRepository()
+        self._capture_repository = capture_repository or CaptureResultRepository()
+        # Store injected dependencies or create defaults lazily
+        self._injected_orchestrator = injection_orchestrator
+        self._injected_palette_calculator = palette_offset_calculator
         # Preview service for game frame preview cache (uses shared repository)
         self._preview_service = PreviewService(parent=self, capture_repository=self._capture_repository)
         self._preview_service.preview_cache_invalidated.connect(self.preview_cache_invalidated)
@@ -137,7 +148,7 @@ class FrameMappingController(QObject):
         self._organization_service.frame_tags_changed.connect(self.frame_tags_changed)
         self._organization_service.capture_renamed.connect(self.capture_renamed)
         # Injection orchestrator for frame injection pipeline (sync)
-        self._injection_orchestrator = InjectionOrchestrator()
+        self._injection_orchestrator = self._injected_orchestrator or InjectionOrchestrator()
         # Async injection service (for non-blocking injections)
         self._async_injection_service = AsyncInjectionService(parent=self)
         self._async_injection_service.injection_started.connect(self.async_injection_started)
@@ -169,6 +180,34 @@ class FrameMappingController(QObject):
     def has_project(self) -> bool:
         """Check if a project is loaded."""
         return self._project is not None
+
+    @property
+    def capture_repository(self) -> CaptureResultRepository:
+        """Get the capture result repository (for test inspection)."""
+        return self._capture_repository
+
+    @property
+    def injection_orchestrator(self) -> InjectionOrchestrator:
+        """Get the injection orchestrator (for test inspection)."""
+        return self._injection_orchestrator
+
+    @property
+    def palette_offset_calculator(self) -> PaletteOffsetCalculator | None:
+        """Get the palette offset calculator (lazy-initialized from AppContext).
+
+        Returns None if AppContext is not available (e.g., in tests without full setup).
+        """
+        if self._injected_palette_calculator is not None:
+            return self._injected_palette_calculator
+        # Lazy initialization from AppContext
+        try:
+            from core.app_context import get_app_context
+
+            ctx = get_app_context()
+            return PaletteOffsetCalculator(ctx.rom_extractor, ctx.sprite_config_loader)
+        except RuntimeError:
+            # AppContext not initialized (common in tests)
+            return None
 
     # ─── Undo/Redo Public API ──────────────────────────────────────────────────
 
@@ -1190,102 +1229,17 @@ class FrameMappingController(QObject):
         if self._project is None:
             return None
 
-        # Get the game frame to get its palette_index and rom_offsets
         game_frame = self._project.get_game_frame_by_id(game_frame_id)
         if game_frame is None:
             logger.debug("Cannot calculate palette offset: game_frame %s not found", game_frame_id)
             return None
 
-        try:
-            # Read ROM header to get title/checksum
-            from core.app_context import get_app_context
-
-            rom_extractor = get_app_context().rom_extractor
-            header = rom_extractor.read_rom_header(str(rom_path))
-
-            # Find game config
-            config_loader = get_app_context().sprite_config_loader
-            game_name, game_config = config_loader.find_game_config(header.title, header.checksum)
-            if not game_config:
-                logger.debug("No game config found for %s (checksum 0x%04X)", header.title, header.checksum)
-                return None
-
-            palettes = game_config.get("palettes", {})
-            if not isinstance(palettes, dict):
-                return None
-
-            # Check for character-specific palette offsets first
-            character_offsets = palettes.get("character_offsets", {})
-            if isinstance(character_offsets, dict):
-                # Try hint-based matching first
-                for char_name, char_config in character_offsets.items():
-                    if not isinstance(char_config, dict):
-                        continue
-                    rom_offset_hints = char_config.get("rom_offset_hints", [])
-                    if not isinstance(rom_offset_hints, list) or not rom_offset_hints:
-                        continue
-
-                    # Convert hints to integers for comparison
-                    hint_ints: set[int] = set()
-                    for hint in rom_offset_hints:
-                        if isinstance(hint, str):
-                            hint_ints.add(int(hint, 16) if hint.startswith("0x") else int(hint))
-                        elif isinstance(hint, int):
-                            hint_ints.add(hint)
-
-                    # Check if any of the game frame's ROM offsets match the hints
-                    if game_frame.rom_offsets and hint_ints.intersection(game_frame.rom_offsets):
-                        char_offset_str = char_config.get("offset")
-                        if char_offset_str and isinstance(char_offset_str, str):
-                            char_offset = (
-                                int(char_offset_str, 16) if char_offset_str.startswith("0x") else int(char_offset_str)
-                            )
-                            logger.info(
-                                "Using character-specific palette offset for %s (hint match): 0x%X",
-                                char_name,
-                                char_offset,
-                            )
-                            return char_offset
-
-                # No hint match - if there's only one character config, use it as default
-                # This handles the common case of single-character replacement projects
-                if len(character_offsets) == 1:
-                    char_name, char_config = next(iter(character_offsets.items()))
-                    if isinstance(char_config, dict):
-                        char_offset_str = char_config.get("offset")
-                        if char_offset_str and isinstance(char_offset_str, str):
-                            char_offset = (
-                                int(char_offset_str, 16) if char_offset_str.startswith("0x") else int(char_offset_str)
-                            )
-                            logger.info(
-                                "Using character-specific palette offset for %s (single character default): 0x%X",
-                                char_name,
-                                char_offset,
-                            )
-                            return char_offset
-
-            # Fall back to generic palette calculation
-            base_offset_str = palettes.get("offset")
-            if not base_offset_str or not isinstance(base_offset_str, str):
-                logger.debug("No palette offset in game config for %s", game_name)
-                return None
-
-            base_offset = int(base_offset_str, 16) if base_offset_str.startswith("0x") else int(base_offset_str)
-
-            # Calculate offset for this palette index
-            # Each palette is 32 bytes (16 colors x 2 bytes BGR555)
-            palette_offset = base_offset + (game_frame.palette_index * 32)
-            logger.info(
-                "Calculated palette ROM offset: 0x%X (base 0x%X + palette_index %d * 32)",
-                palette_offset,
-                base_offset,
-                game_frame.palette_index,
-            )
-            return palette_offset
-
-        except Exception as e:
-            logger.warning("Failed to calculate palette offset: %s", e)
+        calculator = self.palette_offset_calculator
+        if calculator is None:
+            logger.debug("Cannot calculate palette offset: calculator not available (AppContext not initialized)")
             return None
+
+        return calculator.calculate(rom_path, game_frame)
 
     def inject_mapping(
         self,
