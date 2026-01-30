@@ -179,8 +179,8 @@ class AsyncPreviewService(QObject):
         self._cached_image_id: int | None = None  # id() of source ai_image
 
         # Create persistent thread and worker
-        self._thread = QThread()
-        self._worker = _PreviewWorker()
+        self._thread: QThread | None = QThread()
+        self._worker: _PreviewWorker | None = _PreviewWorker()
         self._worker.moveToThread(self._thread)
 
         # Connect signals
@@ -302,7 +302,7 @@ class AsyncPreviewService(QObject):
 
         try:
             # Block signals first to prevent emission during cleanup
-            if is_valid_qt(self._worker):
+            if self._worker is not None and is_valid_qt(self._worker):
                 self._worker.blockSignals(True)
                 try:
                     self._worker.preview_ready.disconnect()
@@ -310,14 +310,22 @@ class AsyncPreviewService(QObject):
                 except (RuntimeError, TypeError):
                     pass  # Already disconnected or never connected
 
-            # Clean up thread via WorkerManager
-            if is_valid_qt(self._thread):
+            # Schedule worker deletion for when thread actually stops
+            # This must happen BEFORE cleanup_worker to connect to finished signal
+            if self._worker is not None and is_valid_qt(self._worker):
+                if self._thread is not None and is_valid_qt(self._thread):
+                    self._thread.finished.connect(self._worker.deleteLater)
+                else:
+                    # Fallback if no thread - delete directly
+                    self._worker.deleteLater()
+
+            # Now clean up thread via WorkerManager
+            if self._thread is not None and is_valid_qt(self._thread):
                 WorkerManager.cleanup_worker(self._thread, timeout=3000)
                 self._thread = None
 
-            if is_valid_qt(self._worker):
-                self._worker.deleteLater()
-                self._worker = None
+            # Clear reference - actual deletion happens via finished signal
+            self._worker = None
         except RuntimeError:
             # Objects already deleted by Qt parent-child mechanism
             pass

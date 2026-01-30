@@ -72,15 +72,26 @@ class WorkerManager:
         """
         Register a worker in the global registry for cleanup_all().
 
-        Workers remain in the registry until explicitly cleaned up via
-        cleanup_all() or cleanup_worker(). This ensures they're properly
-        stopped and waited for before removal.
+        Workers are automatically removed from the registry when they finish
+        naturally (via the finished signal) or when explicitly cleaned up via
+        cleanup_all() or cleanup_worker().
 
         Args:
             worker: Worker to register
         """
         # Add worker to registry
         WorkerManager._worker_registry.add(worker)
+
+        # Auto-unregister when worker finishes naturally
+        def on_finished() -> None:
+            WorkerManager._worker_registry.discard(worker)
+            logger.debug(
+                f"Auto-unregistered finished worker {worker.__class__.__name__} "
+                f"(registry size: {len(WorkerManager._worker_registry)})"
+            )
+
+        worker.finished.connect(on_finished)
+
         logger.debug(
             f"Registered worker {worker.__class__.__name__} (registry size: {len(WorkerManager._worker_registry)})"
         )

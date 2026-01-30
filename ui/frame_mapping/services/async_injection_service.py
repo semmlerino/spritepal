@@ -310,8 +310,14 @@ class AsyncInjectionService(QObject):
     def _finish_cleanup(self, thread: QThread, worker: QObject | None) -> None:
         """Complete cleanup after delayed wait."""
         if thread.isRunning():
-            thread.terminate()
-            thread.wait(100)
+            logger.warning(f"Thread {thread.__class__.__name__} still running after initial wait")
+            thread.quit()
+            if not thread.wait(3000):
+                logger.critical(
+                    f"Thread {thread.__class__.__name__} won't stop - orphaning to avoid Qt corruption"
+                )
+                # Don't terminate or delete - let it orphan safely
+                return
         self._do_cleanup(thread, worker)
 
     def _do_cleanup(self, thread: QThread | None, worker: QObject | None) -> None:

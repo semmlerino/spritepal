@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QObject, Signal
 
 from core.types import SpriteInfo
 from ui.common import WorkerManager
@@ -71,18 +71,11 @@ class ROMWorkerOrchestrator(QObject):
         self._rom_cache = rom_cache
         self._settings_manager = settings_manager
 
-        # Worker tracking
+        # Worker tracking (workers inherit from BaseWorker which IS a QThread)
         self._header_worker: ROMHeaderLoaderWorker | None = None
-        self._header_thread: QThread | None = None
-
         self._info_worker: ROMInfoLoaderWorker | None = None
-        self._info_thread: QThread | None = None
-
         self._scan_worker: SpriteScanWorker | None = None
-        self._scan_thread: QThread | None = None
-
         self._similarity_worker: SimilarityIndexingWorker | None = None
-        self._similarity_thread: QThread | None = None
 
         # State tracking
         self._is_scanning = False
@@ -96,16 +89,14 @@ class ROMWorkerOrchestrator(QObject):
         """Load ROM header information asynchronously."""
         self._cleanup_header_worker()
 
+        # BaseWorker IS a QThread - no separate thread needed
         self._header_worker = ROMHeaderLoaderWorker(rom_path, extractor.rom_injector)
-        self._header_thread = QThread()
-        self._header_worker.moveToThread(self._header_thread)
 
         # Connect signals
         self._header_worker.header_loaded.connect(self._on_header_loaded)
         self._header_worker.error.connect(self._on_header_error)
-        self._header_thread.started.connect(self._header_worker.run)
 
-        WorkerManager.start_worker(self._header_worker, self._header_thread)
+        WorkerManager.start_worker(self._header_worker)
         logger.debug(f"Started header loading for: {rom_path}")
 
     def _on_header_loaded(self, header_data: dict[str, Any]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
@@ -120,7 +111,7 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_header_worker(self) -> None:
         """Clean up header worker resources."""
-        WorkerManager.cleanup_worker_attr(self, "_header_worker", "_header_thread", timeout=2000)
+        WorkerManager.cleanup_worker_attr(self, "_header_worker", timeout=2000)
 
     # ========== Sprite Location Loading ==========
 
@@ -133,21 +124,19 @@ class ROMWorkerOrchestrator(QObject):
         """
         self._cleanup_info_worker()
 
+        # BaseWorker IS a QThread - no separate thread needed
         self._info_worker = ROMInfoLoaderWorker(
             rom_path,
             extraction_manager=extraction_manager,
             load_header=False,
             load_sprite_locations=True,
         )
-        self._info_thread = QThread()
-        self._info_worker.moveToThread(self._info_thread)
 
         # Connect signals (ROMInfoLoaderWorker uses sprite_locations_loaded signal)
         self._info_worker.sprite_locations_loaded.connect(self._on_locations_loaded)
         self._info_worker.error.connect(self._on_locations_error)
-        self._info_thread.started.connect(self._info_worker.run)
 
-        WorkerManager.start_worker(self._info_worker, self._info_thread)
+        WorkerManager.start_worker(self._info_worker)
         logger.debug(f"Started sprite location loading for: {rom_path}")
 
     def _on_locations_loaded(self, locations: list[dict[str, Any]]) -> None:  # pyright: ignore[reportExplicitAny] - Signal payload
@@ -162,7 +151,7 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_info_worker(self) -> None:
         """Clean up info worker resources."""
-        WorkerManager.cleanup_worker_attr(self, "_info_worker", "_info_thread", timeout=2000)
+        WorkerManager.cleanup_worker_attr(self, "_info_worker", timeout=2000)
 
     # ========== Sprite Scanning ==========
 
@@ -176,17 +165,15 @@ class ROMWorkerOrchestrator(QObject):
         self._found_sprites = []
         self._is_scanning = True
 
+        # BaseWorker IS a QThread - no separate thread needed
         self._scan_worker = SpriteScanWorker(rom_path, step=step, rom_cache=self._rom_cache)
-        self._scan_thread = QThread()
-        self._scan_worker.moveToThread(self._scan_thread)
 
         # Connect signals
         self._scan_worker.sprite_found.connect(self._on_sprite_found)
         self._scan_worker.finished.connect(self._on_scan_finished)
         self._scan_worker.error.connect(self._on_scan_error)
-        self._scan_thread.started.connect(self._scan_worker.run)
 
-        WorkerManager.start_worker(self._scan_worker, self._scan_thread)
+        WorkerManager.start_worker(self._scan_worker)
         logger.info(f"Started sprite scan for: {rom_path}")
 
     def cancel_scan(self) -> None:
@@ -213,7 +200,7 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_scan_worker(self) -> None:
         """Clean up scan worker resources."""
-        WorkerManager.cleanup_worker_attr(self, "_scan_worker", "_scan_thread", timeout=5000)
+        WorkerManager.cleanup_worker_attr(self, "_scan_worker", timeout=5000)
 
     # ========== Similarity Indexing ==========
 
@@ -239,9 +226,7 @@ class ROMWorkerOrchestrator(QObject):
         for sprite_info in sprites:
             self._similarity_worker.on_sprite_found(sprite_info)
 
-        self._similarity_thread = QThread()
-        self._similarity_worker.moveToThread(self._similarity_thread)
-
+        # BaseWorker IS a QThread - no separate thread needed
         # Connect signals
         self._similarity_worker.progress.connect(lambda p, m: self.similarity_progress.emit(m))
         self._similarity_worker.sprite_indexed.connect(self.sprite_indexed.emit)
@@ -249,9 +234,8 @@ class ROMWorkerOrchestrator(QObject):
         self._similarity_worker.index_loaded.connect(self.index_loaded.emit)
         self._similarity_worker.operation_finished.connect(self._on_similarity_finished)
         self._similarity_worker.error.connect(self._on_similarity_error)
-        self._similarity_thread.started.connect(self._similarity_worker.run)
 
-        WorkerManager.start_worker(self._similarity_worker, self._similarity_thread)
+        WorkerManager.start_worker(self._similarity_worker)
         logger.debug(f"Started similarity indexing for: {rom_path}")
 
     def _on_similarity_finished(self, success: bool, message: str) -> None:
@@ -267,7 +251,7 @@ class ROMWorkerOrchestrator(QObject):
 
     def _cleanup_similarity_worker(self) -> None:
         """Clean up similarity worker resources."""
-        WorkerManager.cleanup_worker_attr(self, "_similarity_worker", "_similarity_thread", timeout=5000)
+        WorkerManager.cleanup_worker_attr(self, "_similarity_worker", timeout=5000)
 
     # ========== General Methods ==========
 
