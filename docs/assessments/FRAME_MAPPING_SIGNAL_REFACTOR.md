@@ -6,6 +6,16 @@
 
 **Current State:** 50+ signals across 3 layers (Service → Controller → Workspace) with mature patterns (debouncing, targeted updates, early disconnect). Recent commits (73efa162, 5509dadf) established good foundations.
 
+**Status Summary:**
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Lambda Memory Leak Elimination | **DONE** |
+| 2 | Signal Handler Error Boundaries | TODO |
+| 3 | Bundle Parameter-Heavy Signals | **DONE** |
+| 4 | Centralize Selection State | TODO |
+| 5 | Undo/Redo Signal-Driven Sync | TODO |
+| 6 | Golden Trace Infrastructure | TODO |
+
 **Architectural Principles (from review.md):**
 - Views emit intents (`*_requested`), Controller emits deltas (`*_changed`)
 - Bundle parameter-heavy signals into dataclasses
@@ -13,26 +23,26 @@
 - Avoid View → View connections
 - Prefer direct calls over signal chains once past UI boundary
 
-**Key Issues Identified:**
+**Remaining Issues:**
 | Priority | Issue | Impact |
 |----------|-------|--------|
-| HIGH | Lambda memory leaks in context menus | 12 lambda closures capturing `self` + locals |
-| HIGH | 7-parameter `alignment_changed` signal | Fragile, hard to version |
 | MEDIUM | Missing error handling in signal handlers | UI corruption on exceptions |
 | MEDIUM | Selection state scattered across workspace | "Edits applied to stale selection" bugs |
 | MEDIUM | Manual undo/redo UI sync | Error-prone as system grows |
 
 ---
 
-## Phase 1: Lambda Memory Leak Elimination (HIGH)
+## Phase 1: Lambda Memory Leak Elimination - DONE
 
-### Problem
-Context menu lambdas capture `self` + local variables, creating potential circular references.
+> **Status:** Completed. All context menu lambdas replaced with `functools.partial`.
 
-**Affected locations (verified):**
-- `ui/frame_mapping/views/ai_frames_pane.py:444, 453, 458, 471`
-- `ui/frame_mapping/views/captures_library_pane.py:250, 255, 258, 267`
-- `ui/frame_mapping/views/mapping_panel.py:606, 610, 615, 620`
+### Problem (Resolved)
+Context menu lambdas captured `self` + local variables, creating potential circular references.
+
+**Fixed locations:**
+- `ui/frame_mapping/views/ai_frames_pane.py` - uses `functools.partial`
+- `ui/frame_mapping/views/captures_library_pane.py` - uses `functools.partial`
+- `ui/frame_mapping/views/mapping_panel.py` - uses `functools.partial`
 
 ### Step 1.1: AIFramesPane Context Menu
 
@@ -146,58 +156,17 @@ pytest tests/ui/frame_mapping/ -v -k "alignment"
 
 ---
 
-## Phase 3: Bundle Parameter-Heavy Signals (HIGH - per review.md)
+## Phase 3: Bundle Parameter-Heavy Signals - DONE
 
-### Problem
-`alignment_changed(x, y, flip_h, flip_v, scale, sharpen, resampling)` has 7 parameters. This is fragile:
-- Adding parameters breaks all connections
-- Hard to trace/log
-- No versioning
+> **Status:** Completed. `AlignmentState` dataclass implemented.
 
-### Step 3.1: Create AlignmentState Dataclass
+### Problem (Resolved)
+`alignment_changed` had 7 positional parameters, making it fragile and hard to trace.
 
-**New file:** `core/data_models/alignment_state.py`
-
-```python
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class AlignmentState:
-    """Immutable alignment state for signal payloads."""
-    offset_x: int = 0
-    offset_y: int = 0
-    flip_h: bool = False
-    flip_v: bool = False
-    scale: float = 1.0
-    sharpen: float = 0.0
-    resampling: str = "nearest"
-```
-
-### Step 3.2: Refactor WorkbenchCanvas Signal
-
-**Files:** `ui/frame_mapping/views/workbench_canvas.py`
-
-**Change:**
-```python
-# BEFORE (line 223):
-alignment_changed = Signal(int, int, bool, bool, float, float, str)
-
-# AFTER:
-alignment_changed = Signal(AlignmentState)
-```
-
-Update all emission sites to create `AlignmentState` instances.
-
-### Step 3.3: Update Workspace Handler
-
-**Files:** `ui/workspaces/frame_mapping_workspace.py`
-
-**Change:** Handler unpacks dataclass instead of positional args.
-
-**Verify:**
-```bash
-pytest tests/ui/frame_mapping/ -v -k "alignment"
-```
+### Implementation
+- **AlignmentState dataclass:** `ui/frame_mapping/views/workbench_types.py:46`
+- **WorkbenchCanvas signal:** `alignment_changed = Signal(AlignmentState)` at line 226
+- All emission sites and handlers updated to use the dataclass
 
 ---
 
@@ -343,48 +312,49 @@ pytest tests/ui/frame_mapping/ -v  # Verify baseline restored
 
 ## Execution Order
 
-**Immediate (stability fixes):**
-1. **Phase 1** (Lambda leaks) - Steps 1.1-1.4, commit after each step
-2. **Phase 2** (Error boundaries) - Steps 2.1-2.2, single commit
+**Completed:**
+1. ~~**Phase 1** (Lambda leaks)~~ - DONE
+2. ~~**Phase 3** (AlignmentState dataclass)~~ - DONE
+
+**Next (stability fixes):**
+3. **Phase 2** (Error boundaries) - Steps 2.1-2.2, single commit
 
 **Architectural (per review.md):**
-3. **Phase 3** (AlignmentState dataclass) - Steps 3.1-3.3, single commit
 4. **Phase 4** (SelectionModel) - Steps 4.1-4.2, single commit
 
 **Follow-up:**
 5. **Phase 5** (Undo signals) - Step 5.1, verify with golden traces
 6. **Phase 6** (Golden traces) - Verification infrastructure
 
-**Estimated scope:** 8 files modified, 5 new files, ~300 lines changed
+**Remaining scope:** ~4 files modified, 3 new files, ~200 lines changed
 
 ---
 
 ## Files to Modify
 
-| File | Phase | Changes |
-|------|-------|---------|
-| `ui/frame_mapping/views/ai_frames_pane.py` | 1.1 | Replace 4 lambdas with `partial` |
-| `ui/frame_mapping/views/captures_library_pane.py` | 1.2 | Replace 4 lambdas with `partial` |
-| `ui/frame_mapping/views/mapping_panel.py` | 1.3 | Replace 4 lambdas with `partial` |
-| `ui/frame_mapping/signal_error_handling.py` | 2.1 | NEW: Error boundary decorator |
-| `ui/workspaces/frame_mapping_workspace.py` | 2.2, 4.2 | Apply decorator; wire SelectionModel |
-| `core/data_models/alignment_state.py` | 3.1 | NEW: AlignmentState dataclass |
-| `ui/frame_mapping/views/workbench_canvas.py` | 3.2 | Change signal signature to use dataclass |
-| `ui/frame_mapping/selection_model.py` | 4.1 | NEW: Centralized selection state |
-| `ui/frame_mapping/undo/*.py` | 5.1 | Add signal emission to undo() |
-| `tests/infrastructure/signal_trace_recorder.py` | 6.1 | NEW: Golden trace utility |
-| `tests/ui/frame_mapping/views/test_context_menu_cleanup.py` | 1.4 | NEW: Memory leak test |
+| File | Phase | Status |
+|------|-------|--------|
+| `ui/frame_mapping/views/ai_frames_pane.py` | 1.1 | **DONE** |
+| `ui/frame_mapping/views/captures_library_pane.py` | 1.2 | **DONE** |
+| `ui/frame_mapping/views/mapping_panel.py` | 1.3 | **DONE** |
+| `ui/frame_mapping/views/workbench_types.py` | 3.1 | **DONE** (AlignmentState) |
+| `ui/frame_mapping/views/workbench_canvas.py` | 3.2 | **DONE** |
+| `ui/frame_mapping/signal_error_handling.py` | 2.1 | TODO: Error boundary decorator |
+| `ui/workspaces/frame_mapping_workspace.py` | 2.2, 4.2 | TODO: Apply decorator; wire SelectionModel |
+| `ui/frame_mapping/selection_model.py` | 4.1 | TODO: Centralized selection state |
+| `ui/frame_mapping/undo/*.py` | 5.1 | TODO: Add signal emission to undo() |
+| `tests/infrastructure/signal_trace_recorder.py` | 6.1 | TODO: Golden trace utility |
 
 ---
 
 ## Alignment with review.md
 
-| Recommendation | Addressed | Phase |
-|----------------|-----------|-------|
-| Bundle parameter-heavy signals into dataclasses | YES | 3 (AlignmentState) |
-| Centralize selection state | YES | 4 (SelectionModel) |
-| Replace many tiny signals with delta signals | PARTIAL | Future (kept alignment_updated for now) |
-| Add trace ID for cascades | PARTIAL | 6 (golden traces; runtime trace ID deferred) |
+| Recommendation | Status | Phase |
+|----------------|--------|-------|
+| Bundle parameter-heavy signals into dataclasses | **DONE** | 3 (AlignmentState) |
+| Centralize selection state | TODO | 4 (SelectionModel) |
+| Replace many tiny signals with delta signals | Deferred | Future work |
+| Add trace ID for cascades | TODO | 6 (golden traces) |
 | Signal taxonomy (*_requested vs *_changed) | N/A | Already followed |
 | Avoid View → View connections | N/A | No such connections found |
 
@@ -398,9 +368,7 @@ pytest tests/ui/frame_mapping/ -v  # Verify baseline restored
 
 | Risk | Mitigation |
 |------|------------|
-| `partial` changes signal timing | Qt signals are queued; timing unchanged |
 | Error boundary hides bugs | Log at ERROR level with full traceback |
-| AlignmentState breaks existing connections | Update all emitters and handlers in same commit |
 | SelectionModel adds complexity | Start with workspace-only; migrate panes incrementally |
 | Undo signal changes cause loops | Commands emit same signals as forward ops; no new handlers |
 | Golden traces become stale | Only regenerate intentionally; treat as documentation |
