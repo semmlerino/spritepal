@@ -20,6 +20,7 @@ from ui.frame_mapping.undo.commands import (
     ToggleFrameTagCommand,
     UpdateAlignmentCommand,
 )
+from ui.frame_mapping.views.workbench_types import AlignmentState
 
 
 @pytest.fixture
@@ -112,19 +113,20 @@ class TestCreateMappingCommand:
         project = populated_controller.project
         assert project is not None
 
-        # Create initial mapping with all 7 alignment properties
+        # Create initial mapping with all alignment properties
         populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
-        populated_controller._update_alignment_no_history(
-            "sprite_01.png", 10, 20, True, False, 0.5, sharpen=1.5, resampling="nearest"
+        prev_alignment = AlignmentState(
+            offset_x=10, offset_y=20, flip_h=True, flip_v=False, scale=0.5, sharpen=1.5, resampling="nearest"
         )
+        populated_controller._update_alignment_no_history("sprite_01.png", prev_alignment)
 
-        # Command to remap to different game frame (capture all 7 properties)
+        # Command to remap to different game frame (capture all properties)
         cmd = CreateMappingCommand(
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
             game_frame_id="capture_B",
             prev_ai_mapping_game_id="capture_A",
-            prev_ai_mapping_alignment=(10, 20, True, False, 0.5, 1.5, "nearest"),
+            prev_ai_mapping_alignment=prev_alignment,
         )
 
         cmd.execute()
@@ -182,17 +184,18 @@ class TestRemoveMappingCommand:
         project = populated_controller.project
         assert project is not None
 
-        # Create and configure a mapping with all 7 alignment properties
+        # Create and configure a mapping with all alignment properties
         populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
-        populated_controller._update_alignment_no_history(
-            "sprite_01.png", 5, 10, False, True, 0.75, sharpen=2.0, resampling="nearest"
+        removed_alignment = AlignmentState(
+            offset_x=5, offset_y=10, flip_h=False, flip_v=True, scale=0.75, sharpen=2.0, resampling="nearest"
         )
+        populated_controller._update_alignment_no_history("sprite_01.png", removed_alignment)
 
         cmd = RemoveMappingCommand(
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
             removed_game_frame_id="capture_A",
-            removed_alignment=(5, 10, False, True, 0.75, 2.0, "nearest"),
+            removed_alignment=removed_alignment,
             removed_status="edited",
         )
 
@@ -222,11 +225,12 @@ class TestUpdateAlignmentCommand:
         cmd = UpdateAlignmentCommand(
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
-            new_offset_x=10,
-            new_offset_y=20,
-            new_flip_h=True,
-            new_flip_v=False,
-            new_scale=0.5,
+            new_alignment=AlignmentState(
+                offset_x=10, offset_y=20, flip_h=True, flip_v=False, scale=0.5, sharpen=0.0, resampling="lanczos"
+            ),
+            old_alignment=AlignmentState(
+                offset_x=0, offset_y=0, flip_h=False, flip_v=False, scale=1.0, sharpen=0.0, resampling="lanczos"
+            ),
         )
         assert "sprite_01.png" in cmd.description
 
@@ -241,11 +245,12 @@ class TestUpdateAlignmentCommand:
         cmd = UpdateAlignmentCommand(
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
-            new_offset_x=10,
-            new_offset_y=20,
-            new_flip_h=True,
-            new_flip_v=False,
-            new_scale=0.5,
+            new_alignment=AlignmentState(
+                offset_x=10, offset_y=20, flip_h=True, flip_v=False, scale=0.5, sharpen=0.0, resampling="lanczos"
+            ),
+            old_alignment=AlignmentState(
+                offset_x=0, offset_y=0, flip_h=False, flip_v=False, scale=1.0, sharpen=0.0, resampling="lanczos"
+            ),
         )
 
         cmd.execute()
@@ -269,16 +274,12 @@ class TestUpdateAlignmentCommand:
         cmd = UpdateAlignmentCommand(
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
-            new_offset_x=10,
-            new_offset_y=20,
-            new_flip_h=True,
-            new_flip_v=False,
-            new_scale=0.5,
-            old_offset_x=0,
-            old_offset_y=0,
-            old_flip_h=False,
-            old_flip_v=False,
-            old_scale=1.0,
+            new_alignment=AlignmentState(
+                offset_x=10, offset_y=20, flip_h=True, flip_v=False, scale=0.5, sharpen=0.0, resampling="lanczos"
+            ),
+            old_alignment=AlignmentState(
+                offset_x=0, offset_y=0, flip_h=False, flip_v=False, scale=1.0, sharpen=0.0, resampling="lanczos"
+            ),
             old_status="mapped",
         )
 
@@ -304,9 +305,10 @@ class TestUpdateAlignmentCommand:
 
         # Create a mapping with specific sharpen/resampling values
         populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
-        populated_controller._update_alignment_no_history(
-            "sprite_01.png", 0, 0, False, False, 1.0, sharpen=2.5, resampling="nearest"
+        initial_alignment = AlignmentState(
+            offset_x=0, offset_y=0, flip_h=False, flip_v=False, scale=1.0, sharpen=2.5, resampling="nearest"
         )
+        populated_controller._update_alignment_no_history("sprite_01.png", initial_alignment)
 
         # Verify initial state
         mapping = project.get_mapping_for_ai_frame("sprite_01.png")
@@ -318,20 +320,10 @@ class TestUpdateAlignmentCommand:
         cmd = UpdateAlignmentCommand(
             controller=populated_controller,
             ai_frame_id="sprite_01.png",
-            new_offset_x=10,
-            new_offset_y=10,
-            new_flip_h=False,
-            new_flip_v=False,
-            new_scale=1.0,
-            new_sharpen=0.0,  # Changed
-            new_resampling="lanczos",  # Changed
-            old_offset_x=0,
-            old_offset_y=0,
-            old_flip_h=False,
-            old_flip_v=False,
-            old_scale=1.0,
-            old_sharpen=2.5,  # Original value
-            old_resampling="nearest",  # Original value
+            new_alignment=AlignmentState(
+                offset_x=10, offset_y=10, flip_h=False, flip_v=False, scale=1.0, sharpen=0.0, resampling="lanczos"
+            ),
+            old_alignment=initial_alignment,
             old_status="edited",
         )
 

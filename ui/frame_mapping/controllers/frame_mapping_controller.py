@@ -712,28 +712,28 @@ class FrameMappingController(QObject):
 
         prev_ai_game_id = prev_ai_mapping.game_frame_id if prev_ai_mapping else None
         prev_game_ai_id = prev_game_mapping.ai_frame_id if prev_game_mapping else None
-        prev_ai_alignment = None
-        prev_game_alignment = None
+        prev_ai_alignment: AlignmentState | None = None
+        prev_game_alignment: AlignmentState | None = None
 
         if prev_ai_mapping:
-            prev_ai_alignment = (
-                prev_ai_mapping.offset_x,
-                prev_ai_mapping.offset_y,
-                prev_ai_mapping.flip_h,
-                prev_ai_mapping.flip_v,
-                prev_ai_mapping.scale,
-                prev_ai_mapping.sharpen,
-                prev_ai_mapping.resampling,
+            prev_ai_alignment = AlignmentState(
+                offset_x=prev_ai_mapping.offset_x,
+                offset_y=prev_ai_mapping.offset_y,
+                flip_h=prev_ai_mapping.flip_h,
+                flip_v=prev_ai_mapping.flip_v,
+                scale=prev_ai_mapping.scale,
+                sharpen=prev_ai_mapping.sharpen,
+                resampling=prev_ai_mapping.resampling,
             )
         if prev_game_mapping and prev_game_ai_id != ai_frame_id:
-            prev_game_alignment = (
-                prev_game_mapping.offset_x,
-                prev_game_mapping.offset_y,
-                prev_game_mapping.flip_h,
-                prev_game_mapping.flip_v,
-                prev_game_mapping.scale,
-                prev_game_mapping.sharpen,
-                prev_game_mapping.resampling,
+            prev_game_alignment = AlignmentState(
+                offset_x=prev_game_mapping.offset_x,
+                offset_y=prev_game_mapping.offset_y,
+                flip_h=prev_game_mapping.flip_h,
+                flip_v=prev_game_mapping.flip_v,
+                scale=prev_game_mapping.scale,
+                sharpen=prev_game_mapping.sharpen,
+                resampling=prev_game_mapping.resampling,
             )
 
         # Create and execute command via undo stack
@@ -804,14 +804,14 @@ class FrameMappingController(QObject):
             return False
 
         removed_game_id = mapping.game_frame_id
-        removed_alignment = (
-            mapping.offset_x,
-            mapping.offset_y,
-            mapping.flip_h,
-            mapping.flip_v,
-            mapping.scale,
-            mapping.sharpen,
-            mapping.resampling,
+        removed_alignment = AlignmentState(
+            offset_x=mapping.offset_x,
+            offset_y=mapping.offset_y,
+            flip_h=mapping.flip_h,
+            flip_v=mapping.flip_v,
+            scale=mapping.scale,
+            sharpen=mapping.sharpen,
+            resampling=mapping.resampling,
         )
         removed_status = mapping.status
 
@@ -875,45 +875,39 @@ class FrameMappingController(QObject):
         if mapping is None:
             return False
 
+        new_alignment = AlignmentState(
+            offset_x=offset_x,
+            offset_y=offset_y,
+            flip_h=flip_h,
+            flip_v=flip_v,
+            scale=scale,
+            sharpen=sharpen,
+            resampling=resampling,
+        )
+
         # Only record undo for explicit user edits, not auto-centering
         if set_edited:
             # Use drag start alignment for undo if provided (creates single undo for entire drag)
             # Otherwise use current mapping state (for keyboard nudge, etc.)
             if drag_start_alignment is not None:
-                old_x = drag_start_alignment.offset_x
-                old_y = drag_start_alignment.offset_y
-                old_flip_h = drag_start_alignment.flip_h
-                old_flip_v = drag_start_alignment.flip_v
-                old_scale = drag_start_alignment.scale
-                old_sharpen = drag_start_alignment.sharpen
-                old_resampling = drag_start_alignment.resampling
+                old_alignment = drag_start_alignment
             else:
-                old_x = mapping.offset_x
-                old_y = mapping.offset_y
-                old_flip_h = mapping.flip_h
-                old_flip_v = mapping.flip_v
-                old_scale = mapping.scale
-                old_sharpen = mapping.sharpen
-                old_resampling = mapping.resampling
+                old_alignment = AlignmentState(
+                    offset_x=mapping.offset_x,
+                    offset_y=mapping.offset_y,
+                    flip_h=mapping.flip_h,
+                    flip_v=mapping.flip_v,
+                    scale=mapping.scale,
+                    sharpen=mapping.sharpen,
+                    resampling=mapping.resampling,
+                )
 
             # Capture previous state for undo
             command = UpdateAlignmentCommand(
                 controller=self,
                 ai_frame_id=ai_frame_id,
-                new_offset_x=offset_x,
-                new_offset_y=offset_y,
-                new_flip_h=flip_h,
-                new_flip_v=flip_v,
-                new_scale=scale,
-                new_sharpen=sharpen,
-                new_resampling=resampling,
-                old_offset_x=old_x,
-                old_offset_y=old_y,
-                old_flip_h=old_flip_h,
-                old_flip_v=old_flip_v,
-                old_scale=old_scale,
-                old_sharpen=old_sharpen,
-                old_resampling=old_resampling,
+                new_alignment=new_alignment,
+                old_alignment=old_alignment,
                 old_status=mapping.status,
             )
             self._undo_stack.push(command)
@@ -939,22 +933,20 @@ class FrameMappingController(QObject):
         )
         return True
 
-    def _update_alignment_no_history(
-        self,
-        ai_frame_id: str,
-        offset_x: int,
-        offset_y: int,
-        flip_h: bool,
-        flip_v: bool,
-        scale: float,
-        sharpen: float = 0.0,
-        resampling: str = "lanczos",
-    ) -> bool:
+    def _update_alignment_no_history(self, ai_frame_id: str, alignment: AlignmentState) -> bool:
         """Internal: Update alignment without undo history (for command execution)."""
         if self._project is None:
             return False
         return self._project.update_mapping_alignment(
-            ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling, set_edited=True
+            ai_frame_id,
+            alignment.offset_x,
+            alignment.offset_y,
+            alignment.flip_h,
+            alignment.flip_v,
+            alignment.scale,
+            alignment.sharpen,
+            alignment.resampling,
+            set_edited=True,
         )
 
     def _set_mapping_status_no_history(self, ai_frame_id: str, status: str) -> bool:
