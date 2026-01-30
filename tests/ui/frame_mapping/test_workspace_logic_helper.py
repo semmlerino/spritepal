@@ -78,9 +78,10 @@ class TestSelectionHelpers:
         assert result == "capture_123"
 
     def test_update_map_button_state_enables_when_both_selected(self, helper: WorkspaceLogicHelper) -> None:
-        """update_map_button_state enables button when both frames selected."""
+        """update_map_button_state enables button when both frames selected and visible."""
         helper._state.selected_ai_frame_id = "frame.png"  # type: ignore[union-attr]
         helper._state.selected_game_id = "capture_1"  # type: ignore[union-attr]
+        helper._ai_frames_pane.has_visible_item.return_value = True  # type: ignore[union-attr]
 
         helper.update_map_button_state()
 
@@ -94,6 +95,28 @@ class TestSelectionHelpers:
         helper.update_map_button_state()
 
         helper._ai_frames_pane.set_map_button_enabled.assert_called_once_with(False)  # type: ignore[union-attr]
+
+    def test_update_map_button_state_disables_when_ai_frame_filtered(self, helper: WorkspaceLogicHelper) -> None:
+        """update_map_button_state disables button when selected AI frame is hidden by filter."""
+        helper._state.selected_ai_frame_id = "frame.png"  # type: ignore[union-attr]
+        helper._state.selected_game_id = "capture_1"  # type: ignore[union-attr]
+        # Frame exists in state but is not visible (filtered out)
+        helper._ai_frames_pane.has_visible_item.return_value = False  # type: ignore[union-attr]
+
+        helper.update_map_button_state()
+
+        helper._ai_frames_pane.set_map_button_enabled.assert_called_once_with(False)  # type: ignore[union-attr]
+
+    def test_update_map_button_state_enables_when_ai_frame_visible(self, helper: WorkspaceLogicHelper) -> None:
+        """update_map_button_state enables button when selected AI frame is visible."""
+        helper._state.selected_ai_frame_id = "frame.png"  # type: ignore[union-attr]
+        helper._state.selected_game_id = "capture_1"  # type: ignore[union-attr]
+        # Frame is visible (passes filters)
+        helper._ai_frames_pane.has_visible_item.return_value = True  # type: ignore[union-attr]
+
+        helper.update_map_button_state()
+
+        helper._ai_frames_pane.set_map_button_enabled.assert_called_once_with(True)  # type: ignore[union-attr]
 
 
 class TestRefreshHelpers:

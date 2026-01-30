@@ -396,6 +396,24 @@ class AIFramesPane(QWidget):
         finally:
             self._list.blockSignals(False)
 
+    def has_visible_item(self, frame_id: str) -> bool:
+        """Check if a frame is visible in the filtered list.
+
+        Used to verify that a selected frame is actually visible and not
+        hidden by active filters (unmapped-only, search, tag).
+
+        Args:
+            frame_id: The AI frame ID to check
+
+        Returns:
+            True if the frame has a visible list item, False if filtered out
+        """
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item is not None and item.data(Qt.ItemDataRole.UserRole) == frame_id:  # type: ignore[reportUnnecessaryComparison]
+                return True
+        return False
+
     def clear(self) -> None:
         """Clear all AI frames and reset tabs."""
         self._ai_frames = []

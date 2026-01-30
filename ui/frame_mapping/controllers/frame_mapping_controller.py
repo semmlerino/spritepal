@@ -10,7 +10,6 @@ from json import JSONDecodeError
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PIL import Image
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 
@@ -33,11 +32,14 @@ from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
 from core.services.palette_offset_calculator import PaletteOffsetCalculator
+from ui.frame_mapping.services.ai_frame_service import AIFrameService
+from ui.frame_mapping.services.alignment_service import AlignmentService
 from ui.frame_mapping.services.async_game_frame_preview_service import (
     AsyncGameFramePreviewService,
 )
 from ui.frame_mapping.services.async_injection_service import AsyncInjectionService
 from ui.frame_mapping.services.capture_import_service import CaptureImportService
+from ui.frame_mapping.services.mapping_service import MappingService
 from ui.frame_mapping.services.organization_service import OrganizationService
 from ui.frame_mapping.services.palette_service import PaletteService
 from ui.frame_mapping.services.preview_service import PreviewService
@@ -137,6 +139,12 @@ class FrameMappingController(QObject):
         )
         self._async_preview_service.preview_ready.connect(self._on_async_preview_ready)
         self._async_preview_service.batch_finished.connect(self._on_async_previews_finished)
+        # AI frame service for frame loading/management
+        self._ai_frame_service = AIFrameService(parent=self)
+        # Mapping service for mapping operations
+        self._mapping_service = MappingService(parent=self)
+        # Alignment service for alignment operations
+        self._alignment_service = AlignmentService(parent=self)
         # Palette service for palette management
         self._palette_service = PaletteService(parent=self)
         self._palette_service.sheet_palette_changed.connect(self.sheet_palette_changed)
@@ -362,28 +370,13 @@ class FrameMappingController(QObject):
             self.error_occurred.emit(f"Not a directory: {directory}")
             return 0
 
-        # Find all PNG files, sorted by name
-        png_files = sorted(directory.glob("*.png"))
-        if not png_files:
+        # Delegate to service for frame creation
+        frames, _orphan_count = self._ai_frame_service.load_frames_from_directory(
+            self._project, directory  # type: ignore[arg-type]
+        )
+        if not frames:
             self.error_occurred.emit(f"No PNG files found in {directory}")
             return 0
-
-        frames: list[AIFrame] = []
-        for idx, png_path in enumerate(png_files):
-            # Get image dimensions from header only (fast - reads ~100 bytes vs full decode)
-            try:
-                with Image.open(png_path) as img:
-                    width, height = img.size
-            except Exception:
-                width, height = 0, 0
-
-            frame = AIFrame(
-                path=png_path,
-                index=idx,
-                width=width,
-                height=height,
-            )
-            frames.append(frame)
 
         # Replace AI frames using facade (handles index invalidation)
         self._project.replace_ai_frames(frames, directory)  # type: ignore[union-attr]
@@ -391,7 +384,7 @@ class FrameMappingController(QObject):
         # Clear undo history: old commands reference deleted frame IDs
         self.clear_undo_history()
 
-        # Bug #3 fix: Prune orphaned mappings that reference non-existent AI frame IDs
+        # Prune orphaned mappings that reference non-existent AI frame IDs
         valid_ids = {f.id for f in frames}
         removed = self._project.filter_mappings_by_valid_ai_ids(valid_ids)  # type: ignore[union-attr]
         if removed > 0:
@@ -421,30 +414,16 @@ class FrameMappingController(QObject):
             self.error_occurred.emit(f"Not a PNG file: {file_path}")
             return False
 
-        # Get image dimensions from header only (fast - reads ~100 bytes vs full decode)
-        try:
-            with Image.open(file_path) as img:
-                width, height = img.size
-        except Exception:
-            width, height = 0, 0
-
-        # Check if frame already exists (by path)
-        existing_frames = self._project.ai_frames if self._project else []
-        for frame in existing_frames:
-            if frame.path == file_path:
-                logger.info("AI frame already exists: %s", file_path)
-                # Just notify UI to refresh/select it
-                self.ai_frames_loaded.emit(len(existing_frames))
-                return True
-
-        # Create new frame with next available index
-        next_index = len(existing_frames)
-        frame = AIFrame(
-            path=file_path,
-            index=next_index,
-            width=width,
-            height=height,
+        # Delegate to service for frame creation
+        frame = self._ai_frame_service.create_frame_from_file(
+            self._project, file_path  # type: ignore[arg-type]
         )
+
+        if frame is None:
+            # Frame already exists - just refresh UI
+            existing_count = len(self._project.ai_frames) if self._project else 0
+            self.ai_frames_loaded.emit(existing_count)
+            return True
 
         # Add to project (may raise ValueError for duplicate ID)
         try:
@@ -579,46 +558,23 @@ class FrameMappingController(QObject):
             self.error_occurred.emit("No project loaded")
             return False
 
-        # Verify both frames exist
-        ai_frame = self._project.get_ai_frame_by_id(ai_frame_id)
-        if ai_frame is None:
-            self.error_occurred.emit(f"AI frame {ai_frame_id} not found")
-            return False
-
-        game_frame = self._project.get_game_frame_by_id(game_frame_id)
-        if game_frame is None:
-            self.error_occurred.emit(f"Game frame {game_frame_id} not found")
+        # Validate both frames exist
+        is_valid, error_msg = self._mapping_service.validate_mapping_frames(
+            self._project, ai_frame_id, game_frame_id
+        )
+        if not is_valid:
+            self.error_occurred.emit(error_msg)
             return False
 
         # Capture previous state for undo
-        prev_ai_mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
-        prev_game_mapping = self._project.get_mapping_for_game_frame(game_frame_id)
-
-        prev_ai_game_id = prev_ai_mapping.game_frame_id if prev_ai_mapping else None
-        prev_game_ai_id = prev_game_mapping.ai_frame_id if prev_game_mapping else None
-        prev_ai_alignment: AlignmentState | None = None
-        prev_game_alignment: AlignmentState | None = None
-
-        if prev_ai_mapping:
-            prev_ai_alignment = AlignmentState(
-                offset_x=prev_ai_mapping.offset_x,
-                offset_y=prev_ai_mapping.offset_y,
-                flip_h=prev_ai_mapping.flip_h,
-                flip_v=prev_ai_mapping.flip_v,
-                scale=prev_ai_mapping.scale,
-                sharpen=prev_ai_mapping.sharpen,
-                resampling=prev_ai_mapping.resampling,
-            )
-        if prev_game_mapping and prev_game_ai_id != ai_frame_id:
-            prev_game_alignment = AlignmentState(
-                offset_x=prev_game_mapping.offset_x,
-                offset_y=prev_game_mapping.offset_y,
-                flip_h=prev_game_mapping.flip_h,
-                flip_v=prev_game_mapping.flip_v,
-                scale=prev_game_mapping.scale,
-                sharpen=prev_game_mapping.sharpen,
-                resampling=prev_game_mapping.resampling,
-            )
+        (
+            prev_ai_game_id,
+            prev_game_ai_id,
+            prev_ai_alignment,
+            prev_game_alignment,
+        ) = self._mapping_service.capture_create_mapping_undo_state(
+            self._project, ai_frame_id, game_frame_id
+        )
 
         # Create and execute command via undo stack
         command = CreateMappingCommand(
@@ -652,9 +608,7 @@ class FrameMappingController(QObject):
         Returns:
             AI frame ID if game frame is linked, None otherwise
         """
-        if self._project is None:
-            return None
-        return self._project.get_ai_frame_linked_to_game_frame(game_frame_id)
+        return self._mapping_service.get_link_for_game_frame(self._project, game_frame_id)
 
     def get_existing_link_for_ai_frame(self, ai_frame_id: str) -> str | None:
         """Get the game frame ID currently linked to an AI frame.
@@ -665,10 +619,7 @@ class FrameMappingController(QObject):
         Returns:
             Game frame ID if AI frame is linked, None otherwise
         """
-        if self._project is None:
-            return None
-        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
-        return mapping.game_frame_id if mapping else None
+        return self._mapping_service.get_link_for_ai_frame(self._project, ai_frame_id)
 
     def remove_mapping(self, ai_frame_id: str) -> bool:
         """Remove a mapping for an AI frame.
@@ -683,21 +634,13 @@ class FrameMappingController(QObject):
             return False
 
         # Capture state for undo
-        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping is None:
+        undo_state = self._mapping_service.capture_remove_mapping_undo_state(
+            self._project, ai_frame_id
+        )
+        if undo_state is None:
             return False
 
-        removed_game_id = mapping.game_frame_id
-        removed_alignment = AlignmentState(
-            offset_x=mapping.offset_x,
-            offset_y=mapping.offset_y,
-            flip_h=mapping.flip_h,
-            flip_v=mapping.flip_v,
-            scale=mapping.scale,
-            sharpen=mapping.sharpen,
-            resampling=mapping.resampling,
-        )
-        removed_status = mapping.status
+        removed_game_id, removed_alignment, removed_status = undo_state
 
         # Create and execute command via undo stack
         command = RemoveMappingCommand(
@@ -755,10 +698,6 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping is None:
-            return False
-
         new_alignment = AlignmentState(
             offset_x=offset_x,
             offset_y=offset_y,
@@ -771,34 +710,28 @@ class FrameMappingController(QObject):
 
         # Only record undo for explicit user edits, not auto-centering
         if set_edited:
-            # Use drag start alignment for undo if provided (creates single undo for entire drag)
-            # Otherwise use current mapping state (for keyboard nudge, etc.)
-            if drag_start_alignment is not None:
-                old_alignment = drag_start_alignment
-            else:
-                old_alignment = AlignmentState(
-                    offset_x=mapping.offset_x,
-                    offset_y=mapping.offset_y,
-                    flip_h=mapping.flip_h,
-                    flip_v=mapping.flip_v,
-                    scale=mapping.scale,
-                    sharpen=mapping.sharpen,
-                    resampling=mapping.resampling,
-                )
+            # Capture state for undo
+            undo_state = self._alignment_service.capture_alignment_undo_state(
+                self._project, ai_frame_id, drag_start_alignment
+            )
+            if undo_state is None:
+                return False
 
-            # Capture previous state for undo
+            old_alignment, old_status = undo_state
+
+            # Create and execute command via undo stack
             command = UpdateAlignmentCommand(
                 controller=self,
                 ai_frame_id=ai_frame_id,
                 new_alignment=new_alignment,
                 old_alignment=old_alignment,
-                old_status=mapping.status,
+                old_status=old_status,
             )
             self._undo_stack.push(command)
         else:
             # Auto-centering - update directly without history
-            self._project.update_mapping_alignment(
-                ai_frame_id, offset_x, offset_y, flip_h, flip_v, scale, sharpen, resampling, set_edited
+            self._alignment_service.apply_alignment_to_project(
+                self._project, ai_frame_id, new_alignment, set_edited=False
             )
 
         # Use targeted signal to avoid full UI refresh (which blanks canvas)
@@ -821,16 +754,8 @@ class FrameMappingController(QObject):
         """Internal: Update alignment without undo history (for command execution)."""
         if self._project is None:
             return False
-        return self._project.update_mapping_alignment(
-            ai_frame_id,
-            alignment.offset_x,
-            alignment.offset_y,
-            alignment.flip_h,
-            alignment.flip_v,
-            alignment.scale,
-            alignment.sharpen,
-            alignment.resampling,
-            set_edited=True,
+        return self._alignment_service.apply_alignment_to_project(
+            self._project, ai_frame_id, alignment, set_edited=True
         )
 
     def _set_mapping_status_no_history(self, ai_frame_id: str, status: str) -> bool:
@@ -864,18 +789,9 @@ class FrameMappingController(QObject):
         if self._project is None:
             return 0
 
-        updated_count = 0
-        for mapping in self._project.mappings:
-            # Skip excluded frame
-            if mapping.ai_frame_id == exclude_ai_frame_id:
-                continue
-
-            # Update position and scale, preserve flip values
-            mapping.offset_x = offset_x
-            mapping.offset_y = offset_y
-            mapping.scale = max(0.01, min(1.0, scale))
-            mapping.status = "edited"
-            updated_count += 1
+        updated_count = self._alignment_service.apply_transforms_to_all(
+            self._project, offset_x, offset_y, scale, exclude_ai_frame_id
+        )
 
         if updated_count > 0:
             self.project_changed.emit()
@@ -949,9 +865,7 @@ class FrameMappingController(QObject):
 
     def get_ai_frames(self) -> list[AIFrame]:
         """Get all AI frames from the current project."""
-        if self._project is None:
-            return []
-        return self._project.ai_frames
+        return self._ai_frame_service.get_frames(self._project)
 
     def get_game_frames(self) -> list[GameFrame]:
         """Get all game frames from the current project."""
@@ -1106,21 +1020,14 @@ class FrameMappingController(QObject):
         if self._project is None:
             return False
 
-        # Find current index
-        current_index = -1
-        for i, frame in enumerate(self._project.ai_frames):
-            if frame.id == ai_frame_id:
-                current_index = i
-                break
+        # Delegate to service for validation
+        result = self._ai_frame_service.validate_reorder(
+            self._project, ai_frame_id, new_index
+        )
+        if result is None:
+            return False  # Invalid or no-op
 
-        if current_index == -1:
-            return False
-
-        # Clamp and check for no-op
-        max_index = len(self._project.ai_frames) - 1
-        clamped_index = max(0, min(new_index, max_index))
-        if current_index == clamped_index:
-            return False
+        current_index, clamped_index = result
 
         # Create and execute command
         command = ReorderAIFrameCommand(
@@ -1138,22 +1045,15 @@ class FrameMappingController(QObject):
             return False
 
         # Find current index before reordering
-        old_index = -1
-        for i, frame in enumerate(self._project.ai_frames):
-            if frame.id == ai_frame_id:
-                old_index = i
-                break
-
+        old_index = self._ai_frame_service.find_frame_index(self._project, ai_frame_id)
         if old_index == -1:
             return False
 
         if self._project.reorder_ai_frame(ai_frame_id, new_index):
             # Emit with actual target index (may be clamped)
-            actual_new_index = -1
-            for i, frame in enumerate(self._project.ai_frames):
-                if frame.id == ai_frame_id:
-                    actual_new_index = i
-                    break
+            actual_new_index = self._ai_frame_service.find_frame_index(
+                self._project, ai_frame_id
+            )
             self.ai_frame_moved.emit(ai_frame_id, old_index, actual_new_index)
             logger.info("Reordered AI frame %s from %d to %d", ai_frame_id, old_index, actual_new_index)
             return True
