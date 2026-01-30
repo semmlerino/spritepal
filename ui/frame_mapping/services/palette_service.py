@@ -19,6 +19,7 @@ from core.palette_utils import (
     quantize_colors_to_palette,
     snes_palette_to_rgb,
 )
+from core.repositories.capture_result_repository import CaptureResultRepository
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -36,13 +37,23 @@ class PaletteService(QObject):
 
     sheet_palette_changed = Signal()
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        *,
+        capture_repository: CaptureResultRepository | None = None,
+    ) -> None:
         """Initialize the palette service.
 
         Args:
             parent: Optional Qt parent object
+            capture_repository: Shared repository for caching parsed capture files.
+                If None, creates a local parser (no caching).
         """
         super().__init__(parent)
+        self._capture_repository = capture_repository
+        # Fallback parser when no repository provided
+        self._parser = MesenCaptureParser() if capture_repository is None else None
 
     def get_sheet_palette(self, project: FrameMappingProject | None) -> SheetPalette | None:
         """Get the current sheet palette.
@@ -217,10 +228,13 @@ class PaletteService(QObject):
         if game_frame is None or game_frame.capture_path is None:
             return None
 
-        # Parse capture to get palette
+        # Parse capture to get palette (use repository if available for caching)
         try:
-            parser = MesenCaptureParser()
-            capture_result = parser.parse_file(game_frame.capture_path)
+            if self._capture_repository is not None:
+                capture_result = self._capture_repository.get_or_parse(game_frame.capture_path)
+            else:
+                assert self._parser is not None
+                capture_result = self._parser.parse_file(game_frame.capture_path)
             palette_index = game_frame.palette_index
 
             # Validate palette_index exists in capture
@@ -288,8 +302,12 @@ class PaletteService(QObject):
                 continue
 
             try:
-                parser = MesenCaptureParser()
-                capture_result = parser.parse_file(game_frame.capture_path)
+                # Use repository if available for caching (important in loops)
+                if self._capture_repository is not None:
+                    capture_result = self._capture_repository.get_or_parse(game_frame.capture_path)
+                else:
+                    assert self._parser is not None
+                    capture_result = self._parser.parse_file(game_frame.capture_path)
                 palette_index = game_frame.palette_index
 
                 # Validate palette_index exists in capture

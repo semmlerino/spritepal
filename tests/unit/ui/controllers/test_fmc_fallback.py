@@ -84,7 +84,7 @@ class TestStaleEntryIdsFallback:
 
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -114,7 +114,7 @@ class TestStaleEntryIdsFallback:
         capture_path.write_text(json.dumps(capture_data))
 
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -147,7 +147,7 @@ class TestStaleEntryIdsFallback:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -214,7 +214,7 @@ class TestEntryFallbackFlag:
         capture_path.write_text(json.dumps(capture_data))
 
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -240,7 +240,7 @@ class TestEntryFallbackFlag:
         capture_path.write_text(json.dumps(capture_data))
 
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -266,7 +266,7 @@ class TestEntryFallbackFlag:
         capture_path.write_text(json.dumps(capture_data))
 
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F002",
                 capture_path=capture_path,
@@ -287,17 +287,23 @@ class TestEntryFallbackFlag:
         assert signal_received[0] == "F002"
 
     def test_returns_false_when_no_selected_entry_ids(self, tmp_path: Path, qtbot) -> None:
-        """Returns used_fallback=False when game frame has no stored selection."""
-        capture_data = create_test_capture(entry_ids=[1, 2, 3])
+        """Returns used_fallback=False when game frame has no stored selection.
+
+        When no selected_entry_ids are stored, filtering falls back to rom_offsets.
+        This is consistent with how InjectionOrchestrator has always worked.
+        """
+        # Create capture with 3 entries, all with the same rom_offset
+        rom_offsets = [0x100000, 0x100000, 0x100000]  # All same offset
+        capture_data = create_test_capture(entry_ids=[1, 2, 3], rom_offsets=rom_offsets)
         capture_path = tmp_path / "capture.json"
         capture_path.write_text(json.dumps(capture_data))
 
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
-                rom_offsets=[0x100000],
+                rom_offsets=[0x100000],  # Matches all entries' rom_offset
                 selected_entry_ids=[],  # No selection stored
             )
         )
@@ -363,7 +369,7 @@ class TestRomOffsetCorrection:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -425,7 +431,7 @@ class TestRomOffsetCorrection:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -481,7 +487,7 @@ class TestRomOffsetCorrection:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -583,7 +589,7 @@ class TestRomOffsetCorrection:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -641,7 +647,7 @@ class TestAllowFallbackParameter:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -688,7 +694,7 @@ class TestAllowFallbackParameter:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -754,7 +760,7 @@ class TestInjectionRollback:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -835,7 +841,7 @@ class TestInjectionRollback:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -898,7 +904,7 @@ class TestInjectionRollback:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,

@@ -30,7 +30,7 @@ class TestGetCaptureResultFiltering:
         # Create controller with project
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -61,7 +61,7 @@ class TestGetCaptureResultFiltering:
         # Create controller with project - only select entries 1 and 3
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -87,7 +87,7 @@ class TestGetCaptureResultFiltering:
         # Create controller with project - select in different order than stored
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -114,7 +114,7 @@ class TestGetCaptureResultFiltering:
         # Create controller with non-matching IDs
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -142,7 +142,7 @@ class TestGetCaptureResultFiltering:
         # Create controller with single selection
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -251,7 +251,7 @@ class TestInjectMappingEntryFiltering:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,

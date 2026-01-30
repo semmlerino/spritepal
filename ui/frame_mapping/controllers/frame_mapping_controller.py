@@ -145,8 +145,8 @@ class FrameMappingController(QObject):
         self._mapping_service = MappingService(parent=self)
         # Alignment service for alignment operations
         self._alignment_service = AlignmentService(parent=self)
-        # Palette service for palette management
-        self._palette_service = PaletteService(parent=self)
+        # Palette service for palette management (shares capture repository for caching)
+        self._palette_service = PaletteService(parent=self, capture_repository=self._capture_repository)
         self._palette_service.sheet_palette_changed.connect(self.sheet_palette_changed)
         # BUG-2 FIX: Invalidate preview cache when palette changes (previews are palette-dependent)
         self._palette_service.sheet_palette_changed.connect(self._invalidate_previews_on_palette_change)
@@ -268,31 +268,6 @@ class FrameMappingController(QObject):
         self._undo_stack.clear()  # Clear history on new project
         self.project_changed.emit()
         logger.info("Created new frame mapping project: %s", name)
-
-    def _generate_unique_frame_id(self, base_id: str) -> str:
-        """Generate a unique frame ID, adding suffix if collision exists.
-
-        Args:
-            base_id: The initial frame ID (e.g., from filename)
-
-        Returns:
-            A unique frame ID, potentially with _N suffix
-        """
-        if self._project is None:
-            return base_id
-
-        existing_ids = {gf.id for gf in self._project.game_frames}
-        if base_id not in existing_ids:
-            return base_id
-
-        # Find next available suffix
-        counter = 1
-        while f"{base_id}_{counter}" in existing_ids:
-            counter += 1
-
-        unique_id = f"{base_id}_{counter}"
-        logger.info("Renamed duplicate capture ID %s -> %s", base_id, unique_id)
-        return unique_id
 
     def load_project(self, path: Path) -> bool:
         """Load a project from file.
@@ -811,6 +786,21 @@ class FrameMappingController(QObject):
             QPixmap preview or None if not available
         """
         return self._preview_service.get_preview(frame_id, self._project)
+
+    def get_cached_game_frame_preview(self, frame_id: str) -> QPixmap | None:
+        """Get cached preview without triggering regeneration.
+
+        Returns the cached preview only if it's available and valid.
+        Does not block to regenerate - use this for non-blocking UI updates.
+        Call request_game_frame_previews_async() for any cache misses.
+
+        Args:
+            frame_id: Game frame ID
+
+        Returns:
+            Cached QPixmap or None if not available/stale
+        """
+        return self._preview_service.get_cached_preview(frame_id, self._project)
 
     def get_capture_result_for_game_frame(self, frame_id: str) -> tuple[CaptureResult | None, bool]:
         """Get the CaptureResult for a game frame.

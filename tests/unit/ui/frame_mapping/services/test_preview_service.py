@@ -83,12 +83,12 @@ class TestPreviewServiceCaching:
         mock_parser.parse_file.return_value = mock_capture_result
         preview_service._parser = mock_parser
 
-        with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
+        with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
             renderer_inst = MockRenderer.return_value
             mock_pil_img = Mock()
             renderer_inst.render_selection.return_value = mock_pil_img
 
-            with patch("ui.frame_mapping.services.preview_service.pil_to_qimage") as mock_pil_to_qimage:
+            with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
                 # Create QImage with specific dimensions (pil_to_qimage returns QImage, not QPixmap)
                 expected_width, expected_height = 100, 100
                 mock_qimage = QImage(expected_width, expected_height, QImage.Format.Format_RGBA8888)
@@ -121,12 +121,12 @@ class TestPreviewServiceCaching:
         mock_parser.parse_file.return_value = mock_capture_result
         preview_service._parser = mock_parser
 
-        with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
+        with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
             renderer_inst = MockRenderer.return_value
             mock_pil_img = Mock()
             renderer_inst.render_selection.return_value = mock_pil_img
 
-            with patch("ui.frame_mapping.services.preview_service.pil_to_qimage") as mock_pil_to_qimage:
+            with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
                 mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
                 mock_pil_to_qimage.return_value = mock_qimage
 
@@ -154,12 +154,12 @@ class TestPreviewServiceCaching:
         mock_parser.parse_file.return_value = mock_capture_result
         preview_service._parser = mock_parser
 
-        with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
+        with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
             renderer_inst = MockRenderer.return_value
             mock_pil_img = Mock()
             renderer_inst.render_selection.return_value = mock_pil_img
 
-            with patch("ui.frame_mapping.services.preview_service.pil_to_qimage") as mock_pil_to_qimage:
+            with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
                 mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
                 mock_pil_to_qimage.return_value = mock_qimage
 
@@ -196,12 +196,12 @@ class TestPreviewServiceCaching:
         mock_parser.parse_file.return_value = mock_capture_result
         preview_service._parser = mock_parser
 
-        with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
+        with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
             renderer_inst = MockRenderer.return_value
             mock_pil_img = Mock()
             renderer_inst.render_selection.return_value = mock_pil_img
 
-            with patch("ui.frame_mapping.services.preview_service.pil_to_qimage") as mock_pil_to_qimage:
+            with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
                 mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
                 mock_pil_to_qimage.return_value = mock_qimage
 
@@ -367,7 +367,7 @@ class TestPreviewServiceEdgeCases:
         mock_parser.parse_file.return_value = mock_capture_result
         preview_service._parser = mock_parser
 
-        with patch("ui.frame_mapping.services.preview_service.CaptureRenderer") as MockRenderer:
+        with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
             renderer_inst = MockRenderer.return_value
             renderer_inst.render_selection.side_effect = Exception("Render error")
 

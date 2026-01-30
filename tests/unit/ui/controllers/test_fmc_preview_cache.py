@@ -45,7 +45,7 @@ class TestGetGameFramePreviewFiltering:
         # Create controller with project - select only entry 0 (top-left)
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -101,7 +101,7 @@ class TestGetGameFramePreviewFiltering:
 
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -135,7 +135,7 @@ class TestGetGameFramePreviewFiltering:
 
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -171,7 +171,7 @@ class TestPreviewCacheInvalidation:
 
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -206,7 +206,7 @@ class TestPreviewCacheInvalidation:
 
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -228,7 +228,7 @@ class TestPreviewCacheInvalidation:
 
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=None,  # No file
@@ -254,7 +254,7 @@ class TestPreviewCacheInvalidation:
 
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,

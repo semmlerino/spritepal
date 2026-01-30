@@ -12,10 +12,8 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 
 from core.frame_mapping_exceptions import CaptureParseError
-from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
 from core.repositories.capture_result_repository import CaptureResultRepository
-from core.services.image_utils import pil_to_qimage
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -86,6 +84,8 @@ class PreviewService(QObject):
         Returns:
             QPixmap preview or None if not available
         """
+        from ui.frame_mapping.services.preview_renderer import PreviewRenderer
+
         cache_was_invalidated = False
         is_stale = frame_id in self._stale_previews
 
@@ -127,13 +127,10 @@ class PreviewService(QObject):
             return None
 
         try:
-            renderer = CaptureRenderer(capture_result)
-            preview_img = renderer.render_selection()
-
-            # Convert PIL Image to QPixmap via QImage (faster than PNG encode/decode)
-            qimage = pil_to_qimage(preview_img, with_alpha=True)
-            if qimage.isNull():
-                logger.warning("Failed to convert preview image to QImage for frame %s", frame_id)
+            # Use shared renderer for consistent behavior
+            qimage = PreviewRenderer.render_preview_qimage(capture_result)
+            if qimage is None:
+                logger.warning("Failed to render preview for frame %s", frame_id)
                 return None
             pixmap = QPixmap.fromImage(qimage)
 
@@ -159,6 +156,55 @@ class PreviewService(QObject):
         except (OSError, ValueError, CaptureParseError, Exception) as e:
             logger.warning("Failed to regenerate preview for game frame %s: %s", frame_id, e)
             return None
+
+
+    def get_cached_preview(
+        self, frame_id: str, project: FrameMappingProject | None
+    ) -> QPixmap | None:
+        """Get cached preview if available and valid, without generating on miss.
+
+        This method is intended for UI refreshes where blocking to regenerate
+        a preview would cause jank. If the preview is not cached or is invalid,
+        returns None immediately. The caller should trigger async generation
+        separately for any cache misses.
+
+        Args:
+            frame_id: Game frame ID
+            project: Current project (needed for cache validation)
+
+        Returns:
+            Cached QPixmap if available and valid, None otherwise
+        """
+        if frame_id not in self._game_frame_previews:
+            return None
+
+        cached_pixmap, cached_mtime, cached_entries = self._game_frame_previews[frame_id]
+
+        # Validate cache against current game frame state
+        game_frame = project.get_game_frame_by_id(frame_id) if project else None
+        if game_frame is None:
+            # Frame was removed - invalidate cache entry
+            del self._game_frame_previews[frame_id]
+            self._stale_previews.discard(frame_id)
+            return None
+
+        current_entries = tuple(game_frame.selected_entry_ids)
+
+        # If capture file exists, validate mtime and entries
+        if game_frame.capture_path and game_frame.capture_path.exists():
+            try:
+                current_mtime = game_frame.capture_path.stat().st_mtime
+            except OSError:
+                # Can't stat file - treat as miss
+                return None
+
+            if current_mtime != cached_mtime or current_entries != cached_entries:
+                # Cache is stale - return None to trigger regeneration
+                return None
+
+        # Stale previews are still returned (they're visually close enough)
+        # The caller should handle async regeneration for stale entries separately
+        return cached_pixmap
 
     def get_capture_result_for_game_frame(
         self, frame_id: str, project: FrameMappingProject | None

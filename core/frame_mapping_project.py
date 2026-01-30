@@ -454,6 +454,7 @@ class FrameMappingProject:
     _mapping_index_by_ai: dict[str, FrameMapping] = field(default_factory=dict, init=False, repr=False, compare=False)
     _mapping_index_by_game: dict[str, FrameMapping] = field(default_factory=dict, init=False, repr=False, compare=False)
     _ai_frame_index_by_id: dict[str, AIFrame] = field(default_factory=dict, init=False, repr=False, compare=False)
+    _game_frame_index_by_id: dict[str, GameFrame] = field(default_factory=dict, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         """Initialize caches after dataclass init."""
@@ -464,6 +465,7 @@ class FrameMappingProject:
         self._mapping_index_by_ai = {m.ai_frame_id: m for m in self.mappings}
         self._mapping_index_by_game = {m.game_frame_id: m for m in self.mappings}
         self._ai_frame_index_by_id = {f.id: f for f in self.ai_frames}
+        self._game_frame_index_by_id = {f.id: f for f in self.game_frames}
 
     def _invalidate_mapping_index(self) -> None:
         """Invalidate mapping indices (call after modifying mappings)."""
@@ -473,6 +475,10 @@ class FrameMappingProject:
     def _invalidate_ai_frame_index(self) -> None:
         """Invalidate AI frame index (call after modifying ai_frames)."""
         self._ai_frame_index_by_id = {f.id: f for f in self.ai_frames}
+
+    def _invalidate_game_frame_index(self) -> None:
+        """Invalidate game frame index (call after modifying game_frames)."""
+        self._game_frame_index_by_id = {f.id: f for f in self.game_frames}
 
     def replace_ai_frames(self, frames: list[AIFrame], ai_frames_dir: Path | None = None) -> None:
         """Replace all AI frames and update internal indices.
@@ -551,6 +557,8 @@ class FrameMappingProject:
         if self.get_game_frame_by_id(frame.id) is not None:
             raise ValueError(f"Game frame with ID '{frame.id}' already exists")
         self.game_frames.append(frame)
+        # O(1) incremental update instead of O(N) rebuild
+        self._game_frame_index_by_id[frame.id] = frame
         return frame
 
     def filter_mappings_by_valid_ai_ids(self, valid_ai_ids: set[str]) -> int:
@@ -673,11 +681,11 @@ class FrameMappingProject:
         return new_id
 
     def get_game_frame_by_id(self, frame_id: str) -> GameFrame | None:
-        """Get game frame by ID."""
-        for frame in self.game_frames:
-            if frame.id == frame_id:
-                return frame
-        return None
+        """Get game frame by ID.
+
+        O(1) lookup using internal index.
+        """
+        return self._game_frame_index_by_id.get(frame_id)
 
     def remove_game_frame(self, frame_id: str) -> bool:
         """Remove a game frame and its associated mapping.
@@ -698,6 +706,8 @@ class FrameMappingProject:
 
         # Remove the game frame
         self.game_frames.remove(frame)
+        # O(1) incremental update instead of O(N) rebuild
+        self._game_frame_index_by_id.pop(frame_id, None)
 
         return True
 

@@ -1,7 +1,6 @@
 """Tests for miscellaneous FrameMappingController functionality.
 
 Covers:
-- Duplicate GameFrame ID handling
 - AI frames loading and mapping pruning
 - Batch transform operations
 - Frame tag management
@@ -18,65 +17,6 @@ import pytest
 
 from core.frame_mapping_project import AIFrame, FrameMapping, FrameMappingProject, GameFrame
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
-
-
-class TestDuplicateGameFrameIDs:
-    """Tests for Bug #4: duplicate GameFrame IDs on import.
-
-    When importing captures with the same filename from different directories,
-    the generated frame_id would collide, causing cache overwrites and lookup failures.
-    """
-
-    def test_generate_unique_frame_id_no_collision(self, tmp_path: Path, qtbot) -> None:
-        """Frame ID is unchanged when no collision exists."""
-        controller = FrameMappingController()
-        project = FrameMappingProject(name="test")
-        controller._project = project
-
-        # No existing frames, ID should be unchanged
-        unique_id = controller._generate_unique_frame_id("capture_001")
-        assert unique_id == "capture_001"
-
-    def test_generate_unique_frame_id_with_collision(self, tmp_path: Path, qtbot) -> None:
-        """Frame ID is suffixed when collision exists."""
-        controller = FrameMappingController()
-        project = FrameMappingProject(name="test")
-        project.game_frames.append(GameFrame(id="capture_001", rom_offsets=[0x1000]))
-        controller._project = project
-
-        # Collision exists, should get suffix
-        unique_id = controller._generate_unique_frame_id("capture_001")
-        assert unique_id == "capture_001_1"
-
-    def test_generate_unique_frame_id_multiple_collisions(self, tmp_path: Path, qtbot) -> None:
-        """Frame ID handles multiple collisions (increments suffix)."""
-        controller = FrameMappingController()
-        project = FrameMappingProject(name="test")
-        project.game_frames.append(GameFrame(id="capture_001", rom_offsets=[0x1000]))
-        project.game_frames.append(GameFrame(id="capture_001_1", rom_offsets=[0x2000]))
-        project.game_frames.append(GameFrame(id="capture_001_2", rom_offsets=[0x3000]))
-        controller._project = project
-
-        # Multiple collisions exist, should get next available suffix
-        unique_id = controller._generate_unique_frame_id("capture_001")
-        assert unique_id == "capture_001_3"
-
-    def test_game_frames_always_have_unique_ids(self, tmp_path: Path, qtbot) -> None:
-        """After adding multiple frames with same base ID, all IDs are unique."""
-        controller = FrameMappingController()
-        project = FrameMappingProject(name="test")
-        controller._project = project
-
-        # Simulate adding three frames that would have the same ID
-        ids = []
-        for i in range(3):
-            unique_id = controller._generate_unique_frame_id("capture_001")
-            project.game_frames.append(GameFrame(id=unique_id, rom_offsets=[0x1000 * (i + 1)]))
-            ids.append(unique_id)
-
-        # All IDs should be unique
-        assert len(ids) == len(set(ids))
-        assert ids == ["capture_001", "capture_001_1", "capture_001_2"]
 
 
 class TestAIFramesLoadingPrunesMappings:
@@ -403,6 +343,7 @@ class TestUpdateGameFrameCompression:
                 compression_types={0x1000: "raw", 0x2000: "raw", 0x3000: "raw"},
             )
         ]
+        project._rebuild_indices()
         controller._project = project
 
         result = controller.update_game_frame_compression("G001", "hal")
@@ -431,6 +372,7 @@ class TestCaptureOrganization:
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
         project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
         controller._project = project
 
         result = controller.rename_capture("G001", "My Capture")
@@ -445,6 +387,7 @@ class TestCaptureOrganization:
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
         project.game_frames = [GameFrame(id="G001", display_name="Old Name")]
+        project._rebuild_indices()
         controller._project = project
 
         result = controller.rename_capture("G001", None)
@@ -459,6 +402,7 @@ class TestCaptureOrganization:
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
         project.game_frames = [GameFrame(id="G001", display_name="My Capture")]
+        project._rebuild_indices()
         controller._project = project
 
         name = controller.get_capture_display_name("G001")
@@ -470,6 +414,7 @@ class TestCaptureOrganization:
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
         project.game_frames = [GameFrame(id="G001")]
+        project._rebuild_indices()
         controller._project = project
 
         name = controller.get_capture_display_name("G001")

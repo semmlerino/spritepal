@@ -256,6 +256,7 @@ class TestFrameMappingProjectCaptureOrganization:
         """set_capture_display_name updates game frame."""
         project = FrameMappingProject(name="test")
         project.game_frames = [GameFrame(id="F001")]
+        project._rebuild_indices()
 
         result = project.set_capture_display_name("F001", "My Capture")
         assert result is True
@@ -268,6 +269,7 @@ class TestFrameMappingProjectCaptureOrganization:
         """set_capture_display_name can clear display name."""
         project = FrameMappingProject(name="test")
         project.game_frames = [GameFrame(id="F001", display_name="Old Name")]
+        project._rebuild_indices()
 
         result = project.set_capture_display_name("F001", None)
         assert result is True
@@ -824,6 +826,7 @@ class TestRemoveGameFrame:
         project = FrameMappingProject(name="test")
         game_frame = GameFrame(id="G001", rom_offsets=[0x1000])
         project.game_frames.append(game_frame)
+        project._rebuild_indices()
 
         assert len(project.game_frames) == 1
         assert project.get_game_frame_by_id("G001") is not None
@@ -898,8 +901,8 @@ class TestRemoveAIFrame:
         ai_frame = AIFrame(path=Path("frame_001.png"), index=0)
         game_frame = GameFrame(id="G001", rom_offsets=[0x1000])
         project.ai_frames.append(ai_frame)
-        project._invalidate_ai_frame_index()  # Rebuild index after direct append
         project.game_frames.append(game_frame)
+        project._rebuild_indices()
         project.create_mapping(ai_frame_id="frame_001.png", game_frame_id="G001")
 
         assert project.get_mapping_for_game_frame("G001") is not None

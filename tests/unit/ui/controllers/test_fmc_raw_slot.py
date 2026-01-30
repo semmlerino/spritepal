@@ -136,7 +136,7 @@ class TestRawInjectionSlotRespect:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,
@@ -230,7 +230,7 @@ class TestRawInjectionSlotRespect:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="F001",
                 capture_path=capture_path,

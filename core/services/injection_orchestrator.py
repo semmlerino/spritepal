@@ -48,6 +48,7 @@ from utils.logging_config import get_logger
 if TYPE_CHECKING:
     from core.frame_mapping_project import AIFrame, FrameMapping, FrameMappingProject, GameFrame
     from core.mesen_integration.click_extractor import OAMEntry
+    from core.services.injection_snapshot import InjectionSnapshot
 
 logger = get_logger(__name__)
 
@@ -260,6 +261,236 @@ class InjectionOrchestrator:
             self._staging_manager.cleanup_on_failure(session, injection_rom_path, using_existing_output)
             return InjectionResult.failure(f"Injection process failed: {e}")
 
+    def execute_from_snapshot(
+        self,
+        request: InjectionRequest,
+        snapshot: InjectionSnapshot,
+        debug_context: InjectionDebugContext | None = None,
+        on_progress: Callable[[str], None] | None = None,
+    ) -> InjectionResult:
+        """Execute injection using immutable snapshot data.
+
+        This method is used by the async injection path to avoid reading
+        mutable project state from the worker thread. The snapshot captures
+        all necessary data at queue time.
+
+        Args:
+            request: Immutable injection parameters.
+            snapshot: Immutable snapshot of project data captured at queue time.
+            debug_context: Optional debug mode context.
+            on_progress: Optional callback for progress updates.
+
+        Returns:
+            InjectionResult with success/failure and details.
+        """
+        from core.frame_mapping_project import AIFrame, FrameMapping, GameFrame
+        from core.services.injection_snapshot import PaletteSnapshot
+
+        debug = debug_context or InjectionDebugContext(enabled=False)
+
+        def progress(msg: str) -> None:
+            if on_progress:
+                on_progress(msg)
+
+        logger.info(
+            "InjectionOrchestrator.execute_from_snapshot: ai_frame_id=%s, rom_path=%s",
+            request.ai_frame_id,
+            request.rom_path,
+        )
+
+        # Reconstruct objects from snapshot
+        mapping = FrameMapping(
+            ai_frame_id=snapshot.ai_frame.id,
+            game_frame_id=snapshot.game_frame.id,
+            offset_x=snapshot.mapping.offset_x,
+            offset_y=snapshot.mapping.offset_y,
+            flip_h=snapshot.mapping.flip_h,
+            flip_v=snapshot.mapping.flip_v,
+            scale=snapshot.mapping.scale,
+            sharpen=snapshot.mapping.sharpen,
+            resampling=snapshot.mapping.resampling,
+        )
+
+        ai_frame = AIFrame(
+            path=snapshot.ai_frame.path,
+            index=snapshot.ai_frame.index,
+        )
+
+        game_frame = GameFrame(
+            id=snapshot.game_frame.id,
+            rom_offsets=list(snapshot.game_frame.rom_offsets),
+            capture_path=snapshot.game_frame.capture_path,
+            palette_index=snapshot.game_frame.palette_index,
+            selected_entry_ids=list(snapshot.game_frame.selected_entry_ids),
+            compression_types=dict(snapshot.game_frame.compression_types),
+            width=snapshot.game_frame.width,
+            height=snapshot.game_frame.height,
+        )
+
+        # Create palette wrapper for internal methods
+        class _Palette:
+            """Minimal palette holder with typed colors attribute."""
+
+            def __init__(self, colors: list[tuple[int, int, int]]) -> None:
+                self.colors = colors
+
+        class _PaletteHolder:
+            """Wrapper mimicking project's sheet_palette attribute."""
+
+            def __init__(self, palette_snapshot: PaletteSnapshot | None) -> None:
+                if palette_snapshot is not None:
+                    self.sheet_palette: _Palette | None = _Palette(list(palette_snapshot.colors))
+                else:
+                    self.sheet_palette = None
+
+        palette_holder = _PaletteHolder(snapshot.palette)
+
+        # Validation (snapshot guarantees most data is present, but check files)
+        if not ai_frame.path.exists():
+            logger.warning("AI frame file not found: %s", ai_frame.path)
+            return InjectionResult.failure(f"AI frame file not found: {ai_frame.path}")
+
+        if not request.rom_path.exists():
+            logger.warning("ROM file not found: %s", request.rom_path)
+            return InjectionResult.failure(f"ROM file not found: {request.rom_path}")
+
+        if not game_frame.capture_path or not game_frame.capture_path.exists():
+            logger.warning("Capture file missing: %s", game_frame.capture_path)
+            return InjectionResult.failure(
+                f"Capture file missing (required for masking): {game_frame.capture_path}"
+            )
+
+        if not game_frame.rom_offsets:
+            logger.warning("Game frame %s has no ROM offsets", game_frame.id)
+            return InjectionResult.failure(
+                f"Game frame {game_frame.id} has no ROM offsets associated"
+            )
+
+        logger.info(
+            "Injection from snapshot: AI frame '%s' -> Game frame '%s' (offsets: %s)",
+            ai_frame.path.name,
+            game_frame.id,
+            [f"0x{o:X}" for o in game_frame.rom_offsets],
+        )
+
+        # Apply debug force_raw
+        force_raw = request.force_raw or debug.force_raw
+
+        debug.log_canvas_info(
+            ai_frame_name=ai_frame.path.name,
+            ai_frame_index=ai_frame.index,
+            game_frame_id=game_frame.id,
+            rom_offsets=list(game_frame.rom_offsets),
+            canvas_width=0,
+            canvas_height=0,
+            offset_x=mapping.offset_x,
+            offset_y=mapping.offset_y,
+            flip_h=mapping.flip_h,
+            flip_v=mapping.flip_v,
+            scale=mapping.scale,
+        )
+
+        # Prepare images (pass palette_holder as "project" for compatibility)
+        try:
+            composite_data = self._prepare_images(
+                ai_frame, game_frame, mapping, palette_holder, request, debug  # type: ignore[arg-type]
+            )
+            if isinstance(composite_data, InjectionResult):
+                return composite_data
+
+            masked_canvas, filtered_capture, relevant_entries, transformed_index_map = composite_data
+
+        except Exception as e:
+            logger.exception("Failed to prepare masked image")
+            return InjectionResult.failure(f"Image preparation failed: {e}")
+
+        # Set up ROM staging
+        using_existing_output = request.output_path is not None and request.output_path.exists()
+
+        if using_existing_output and request.output_path is not None:
+            injection_rom_path = request.output_path
+            logger.info("Using existing output ROM: %s", injection_rom_path)
+        else:
+            injection_rom_path = self._staging_manager.create_injection_copy(
+                request.rom_path, request.output_path
+            )
+            if injection_rom_path is None:
+                return InjectionResult.failure("Failed to create ROM copy for injection")
+            logger.info("Created injection ROM copy: %s", injection_rom_path)
+
+        session = self._staging_manager.create_staging(injection_rom_path)
+        if session is None:
+            if not using_existing_output:
+                injection_rom_path.unlink(missing_ok=True)
+            return InjectionResult.failure("Failed to create staging file for injection")
+
+        # Execute injection with staging
+        try:
+            result = self._execute_injection(
+                request=request,
+                project=palette_holder,  # type: ignore[arg-type]
+                ai_frame=ai_frame,
+                game_frame=game_frame,
+                mapping=mapping,
+                masked_canvas=masked_canvas,
+                filtered_capture=filtered_capture,
+                relevant_entries=relevant_entries,
+                injection_rom_path=injection_rom_path,
+                staging_path=session.staging_path,
+                using_existing_output=using_existing_output,
+                force_raw=force_raw,
+                debug=debug,
+                on_progress=progress,
+                transformed_index_map=transformed_index_map,
+            )
+
+            if result.success:
+                # Commit staging
+                if not self._staging_manager.commit(session):
+                    self._staging_manager.rollback(session)
+                    return InjectionResult.failure("Failed to commit staged injection to ROM")
+
+                # Inject palette if offset provided
+                messages = list(result.messages)
+                if request.palette_rom_offset is not None and palette_holder.sheet_palette is not None:
+                    palette_colors = [
+                        snap_to_snes_color(c) for c in palette_holder.sheet_palette.colors
+                    ]
+                    success, msg = self._rom_injector.inject_palette_to_rom(
+                        rom_path=str(injection_rom_path),
+                        output_path=str(injection_rom_path),
+                        palette_offset=request.palette_rom_offset,
+                        colors=palette_colors,
+                        create_backup=False,
+                        ignore_checksum=True,
+                    )
+                    if success:
+                        messages.append(f"Palette injected at 0x{request.palette_rom_offset:X}")
+                        logger.info("Palette injected at 0x%X", request.palette_rom_offset)
+                    else:
+                        logger.warning("Palette injection failed: %s", msg)
+                        messages.append(f"WARNING: Palette injection failed: {msg}")
+
+                return InjectionResult(
+                    success=True,
+                    tile_results=result.tile_results,
+                    output_rom_path=injection_rom_path,
+                    messages=tuple(messages),
+                    new_mapping_status="injected",
+                )
+            else:
+                self._staging_manager.cleanup_on_failure(
+                    session, injection_rom_path, using_existing_output
+                )
+                return result
+
+        except Exception as e:
+            logger.exception("Injection process failed")
+            self._staging_manager.cleanup_on_failure(
+                session, injection_rom_path, using_existing_output
+            )
+            return InjectionResult.failure(f"Injection process failed: {e}")
+
     def _validate_mapping(
         self,
         request: InjectionRequest,
@@ -331,36 +562,32 @@ class InjectionOrchestrator:
         parser = MesenCaptureParser()
         capture_result = parser.parse_file(game_frame.capture_path)
 
-        # Filter to relevant entries
-        if game_frame.selected_entry_ids:
-            selected_ids = set(game_frame.selected_entry_ids)
-            relevant_entries = [e for e in capture_result.entries if e.id in selected_ids]
+        # Use shared filtering utility
+        from core.mesen_integration.entry_filtering import (
+            create_filtered_capture,
+            filter_capture_entries,
+        )
 
-            if not relevant_entries:
-                logger.warning(
-                    "Stored entry IDs %s not found in capture %s",
-                    game_frame.selected_entry_ids,
-                    game_frame.capture_path,
-                )
+        filtering = filter_capture_entries(
+            capture_result,
+            selected_entry_ids=list(game_frame.selected_entry_ids),
+            rom_offsets=game_frame.rom_offsets,
+            allow_rom_offset_fallback=request.allow_fallback,
+            allow_all_entries_fallback=request.allow_fallback,
+            context_label=game_frame.id,
+        )
 
-                if not request.allow_fallback:
-                    return InjectionResult.stale_entries(
-                        frame_id=game_frame.id,
-                        error=(
-                            f"Entry selection for '{game_frame.id}' is outdated. "
-                            "Reimport the capture or enable fallback mode."
-                        ),
-                    )
+        # Handle stale entries error (when allow_fallback=False)
+        if filtering.is_stale and not filtering.has_entries and not request.allow_fallback:
+            return InjectionResult.stale_entries(
+                frame_id=game_frame.id,
+                error=(
+                    f"Entry selection for '{game_frame.id}' is outdated. Reimport the capture or enable fallback mode."
+                ),
+            )
 
-                # Fallback to rom_offset filtering
-                logger.info("Using rom_offset fallback (allow_fallback=True)")
-                relevant_entries = [e for e in capture_result.entries if e.rom_offset in game_frame.rom_offsets]
-        else:
-            relevant_entries = [e for e in capture_result.entries if e.rom_offset in game_frame.rom_offsets]
-
-        if not relevant_entries:
-            logger.warning("No entries match for frame %s", game_frame.id)
-
+        # Handle no entries found error
+        if not filtering.has_entries:
             if not request.allow_fallback:
                 return InjectionResult.stale_entries(
                     frame_id=game_frame.id,
@@ -369,19 +596,20 @@ class InjectionOrchestrator:
                         "The capture file may have changed. Reimport the capture."
                     ),
                 )
+            # This shouldn't happen since allow_all_entries_fallback=True would use all entries
+            logger.warning("No entries match for frame %s (unexpected)", game_frame.id)
+            relevant_entries = list(capture_result.entries)
+        else:
+            relevant_entries = filtering.entries
 
-            logger.info("Using all entries fallback (allow_fallback=True)")
-            relevant_entries = capture_result.entries
+        if filtering.used_fallback:
+            if filtering.used_all_entries:
+                logger.info("Using all entries fallback (allow_fallback=True)")
+            else:
+                logger.info("Using rom_offset fallback (allow_fallback=True)")
 
         # Create filtered capture for compositing
-        filtered_capture = CaptureResult(
-            frame=capture_result.frame,
-            visible_count=len(relevant_entries),
-            obsel=capture_result.obsel,
-            entries=relevant_entries,
-            palettes=capture_result.palettes,
-            timestamp=capture_result.timestamp,
-        )
+        filtered_capture = create_filtered_capture(capture_result, relevant_entries)
 
         # Composite using SpriteCompositor
         uncovered_policy: Literal["transparent", "original"] = "original" if request.preserve_sprite else "transparent"

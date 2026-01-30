@@ -41,6 +41,9 @@ class CaptureResultRepository:
         Thread-safe. If the file's mtime has changed since caching,
         the cache entry is invalidated and the file is re-parsed.
 
+        Uses double-checked locking to avoid holding the mutex during
+        JSON parsing, which improves concurrency for cache misses.
+
         Args:
             path: Path to capture JSON file
 
@@ -54,19 +57,30 @@ class CaptureResultRepository:
         # Get current mtime outside lock (filesystem operation)
         current_mtime = path.stat().st_mtime
 
+        # Fast path: check cache under lock
         with QMutexLocker(self._mutex):
-            # Check cache
             if path in self._cache:
                 cached_result, cached_mtime = self._cache[path]
                 if cached_mtime == current_mtime:
                     logger.debug("Cache hit for %s", path.name)
                     return cached_result
-                # Mtime changed - invalidate
+                # Mtime changed - will re-parse
                 logger.debug("Cache invalidated for %s (mtime changed)", path.name)
 
-            # Parse outside lock would be better for concurrency,
-            # but parsing is fast and we need to ensure cache consistency
-            result = self._parser.parse_file(path)
+        # Slow path: parse OUTSIDE lock to avoid blocking other threads
+        result = self._parser.parse_file(path)
+
+        # Store under lock (re-check for race condition)
+        with QMutexLocker(self._mutex):
+            # Another thread may have parsed and stored while we were parsing
+            if path in self._cache:
+                cached_result, cached_mtime = self._cache[path]
+                if cached_mtime == current_mtime:
+                    # Another thread beat us - use their result
+                    logger.debug("Cache hit after parse race for %s", path.name)
+                    return cached_result
+
+            # Our parse is authoritative - store it
             self._cache[path] = (result, current_mtime)
             logger.debug("Cached parse result for %s", path.name)
             return result

@@ -20,6 +20,7 @@ from PySide6.QtCore import QMutex, QMutexLocker, QObject, QThread, QTimer, Signa
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest, InjectionResult
+from core.services.injection_snapshot import InjectionSnapshot
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -30,12 +31,17 @@ logger = get_logger(__name__)
 
 @dataclass
 class AsyncInjectionRequest:
-    """Request for async injection."""
+    """Request for async injection.
+
+    Contains immutable snapshot of project data captured at queue time.
+    The worker uses the snapshot instead of the mutable project to avoid
+    race conditions when the user modifies settings during injection.
+    """
 
     request_id: int
     ai_frame_id: str
     injection_request: InjectionRequest
-    project: FrameMappingProject
+    snapshot: InjectionSnapshot
     debug: bool = False
 
 
@@ -85,24 +91,24 @@ class _InjectionWorker(QObject):
                 self.progress.emit(request_id, ai_frame_id, msg)
 
         try:
-            # Execute injection
+            # Execute injection using snapshot (thread-safe, no mutable project access)
             with InjectionDebugContext.from_env() as debug_ctx:
                 if request.debug and not debug_ctx.enabled:
                     debug_ctx = InjectionDebugContext(enabled=True)
                     debug_ctx.__enter__()
                     try:
-                        result = self._orchestrator.execute(
+                        result = self._orchestrator.execute_from_snapshot(
                             request=request.injection_request,
-                            project=request.project,
+                            snapshot=request.snapshot,
                             debug_context=debug_ctx,
                             on_progress=emit_progress,
                         )
                     finally:
                         debug_ctx.__exit__(None, None, None)
                 else:
-                    result = self._orchestrator.execute(
+                    result = self._orchestrator.execute_from_snapshot(
                         request=request.injection_request,
-                        project=request.project,
+                        snapshot=request.snapshot,
                         debug_context=debug_ctx,
                         on_progress=emit_progress,
                     )
@@ -168,20 +174,41 @@ class AsyncInjectionService(QObject):
         """Queue an injection for background processing.
 
         Injections are processed serially (one at a time) for ROM safety.
+        Project state is snapshotted at queue time to avoid race conditions
+        when the user modifies settings during injection.
 
         Args:
             ai_frame_id: ID of the AI frame to inject
             injection_request: The injection request parameters
-            project: Current project
+            project: Current project (used to create immutable snapshot)
             debug: Enable debug mode
         """
+        # Create immutable snapshot of project state NOW (on UI thread)
+        # This prevents race conditions if user modifies alignment/palette during injection
+        snapshot = InjectionSnapshot.from_project(project, ai_frame_id)
+        if snapshot is None:
+            logger.warning(
+                "Cannot create injection snapshot for %s - missing mapping/frame",
+                ai_frame_id,
+            )
+            # Emit failure immediately (signal expects: ai_frame_id, success, message, result)
+            result = InjectionResult(
+                success=False,
+                messages=(),
+                error=f"Missing mapping or frame data for {ai_frame_id}",
+            )
+            self.injection_finished.emit(
+                ai_frame_id, False, result.error or "Snapshot creation failed", result
+            )
+            return
+
         self._current_request_id += 1
 
         request = AsyncInjectionRequest(
             request_id=self._current_request_id,
             ai_frame_id=ai_frame_id,
             injection_request=injection_request,
-            project=project,
+            snapshot=snapshot,
             debug=debug,
         )
 

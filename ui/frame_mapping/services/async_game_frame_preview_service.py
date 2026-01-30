@@ -20,10 +20,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QThread, Signal, Slot
 from PySide6.QtGui import QImage, QPixmap
 
-from core.mesen_integration.capture_renderer import CaptureRenderer
-from core.mesen_integration.click_extractor import MesenCaptureParser
 from core.repositories.capture_result_repository import CaptureResultRepository
-from core.services.image_utils import pil_to_qimage
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -64,7 +61,6 @@ class _GameFramePreviewWorker(QObject):
         self._state_mutex = QMutex()
         self._target_request_id = 0
         self._stop_requested = False
-        self._parser = MesenCaptureParser()
 
     def set_target_request_id(self, req_id: int) -> None:
         """Update target request ID and request stop of current work."""
@@ -114,47 +110,27 @@ class _GameFramePreviewWorker(QObject):
         req: GameFramePreviewRequest,
         capture_repository: CaptureResultRepository | None,
     ) -> QImage | None:
-        """Generate preview for a single game frame."""
-        if not req.capture_path.exists():
+        """Generate preview for a single game frame.
+
+        Uses shared PreviewRenderer to ensure consistent rendering with
+        the synchronous PreviewService path.
+        """
+        from ui.frame_mapping.services.preview_renderer import PreviewRenderer
+
+        # Parse and filter capture using shared utility
+        capture_result, _ = PreviewRenderer.parse_and_filter_capture(
+            capture_path=req.capture_path,
+            selected_entry_ids=req.selected_entry_ids,
+            rom_offsets=req.rom_offsets,
+            frame_id=req.frame_id,
+            capture_repository=capture_repository,
+        )
+
+        if capture_result is None:
             return None
 
-        try:
-            # Parse capture file (use shared repository if available)
-            if capture_repository is not None:
-                capture_result = capture_repository.get_or_parse(req.capture_path)
-            else:
-                capture_result = self._parser.parse_file(req.capture_path)
-
-            if not capture_result.has_entries:
-                return None
-
-            # Apply entry filtering
-            from core.mesen_integration.entry_filtering import (
-                create_filtered_capture,
-                filter_capture_entries,
-            )
-
-            filtering = filter_capture_entries(
-                capture_result,
-                selected_entry_ids=req.selected_entry_ids,
-                rom_offsets=req.rom_offsets,
-                allow_all_entries_fallback=False,
-                context_label=req.frame_id,
-            )
-
-            if filtering.has_entries:
-                capture_result = create_filtered_capture(capture_result, filtering.entries)
-
-            # Render preview
-            renderer = CaptureRenderer(capture_result)
-            preview_img = renderer.render_selection()
-
-            # Convert to QImage (thread-safe)
-            return pil_to_qimage(preview_img, with_alpha=True)
-
-        except Exception as e:
-            logger.warning("Error generating preview for %s: %s", req.frame_id, e)
-            return None
+        # Render preview using shared renderer
+        return PreviewRenderer.render_preview_qimage(capture_result)
 
 
 class AsyncGameFramePreviewService(QObject):

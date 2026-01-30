@@ -102,7 +102,7 @@ class TestHeadlessControllerUsage:
 
         project = FrameMappingProject(name="test")
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="G001",
                 rom_offsets=[0x1000],
@@ -138,7 +138,7 @@ class TestHeadlessControllerUsage:
         controller = FrameMappingController(parent=None)
         project = FrameMappingProject(name="test")
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="G001",
                 rom_offsets=[0x1000],
@@ -181,7 +181,7 @@ class TestHeadlessControllerUsage:
         controller = FrameMappingController(parent=None)
         project = FrameMappingProject(name="test")
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(
+        project.add_game_frame(
             GameFrame(
                 id="G001",
                 rom_offsets=[0x1000],
@@ -224,7 +224,7 @@ class TestUpdateMappingAlignmentEmitsSaveRequested:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(GameFrame(id="G001", rom_offsets=[0x1000], selected_entry_ids=[]))
+        project.add_game_frame(GameFrame(id="G001", rom_offsets=[0x1000], selected_entry_ids=[]))
         project.mappings.append(FrameMapping(ai_frame_id="frame_001.png", game_frame_id="G001"))
         project._rebuild_indices()
 
@@ -255,7 +255,7 @@ class TestUpdateMappingAlignmentEmitsSaveRequested:
         project = FrameMappingProject(name="test")
         project.ai_frames_dir = tmp_path
         project.ai_frames.append(AIFrame(path=ai_frame_path, index=0))
-        project.game_frames.append(GameFrame(id="G002", rom_offsets=[0x2000], selected_entry_ids=[]))
+        project.add_game_frame(GameFrame(id="G002", rom_offsets=[0x2000], selected_entry_ids=[]))
         project.mappings.append(FrameMapping(ai_frame_id="frame_002.png", game_frame_id="G002"))
         project._rebuild_indices()
 
