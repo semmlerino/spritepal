@@ -8,18 +8,14 @@ from __future__ import annotations
 
 from json import JSONDecodeError
 from pathlib import Path
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 
-from core.services.image_utils import pil_to_qpixmap
-
 if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
-
-from PySide6.QtCore import QThread
 
 from core.frame_mapping_project import (
     AIFrame,
@@ -27,10 +23,8 @@ from core.frame_mapping_project import (
     GameFrame,
     SheetPalette,
 )
-from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import (
     CaptureResult,
-    MesenCaptureParser,
     OAMEntry,
 )
 from core.repositories.capture_result_repository import CaptureResultRepository
@@ -38,11 +32,11 @@ from core.repositories.frame_mapping_repository import FrameMappingRepository
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
-from ui.common import WorkerManager
 from ui.frame_mapping.services.async_game_frame_preview_service import (
     AsyncGameFramePreviewService,
 )
 from ui.frame_mapping.services.async_injection_service import AsyncInjectionService
+from ui.frame_mapping.services.capture_import_service import CaptureImportService
 from ui.frame_mapping.services.organization_service import OrganizationService
 from ui.frame_mapping.services.palette_service import PaletteService
 from ui.frame_mapping.services.preview_service import PreviewService
@@ -58,40 +52,6 @@ from ui.frame_mapping.views.workbench_types import AlignmentState
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
-
-
-class CaptureParseWorker(QThread):
-    """Background worker for parsing capture files without blocking UI.
-
-    Emits file_parsed for each successfully parsed file, then finished when done.
-    """
-
-    file_parsed = Signal(object, object)  # CaptureResult, Path
-    parse_error = Signal(object, str)  # Path, error_message
-    finished_all = Signal(int)  # total_count
-
-    def __init__(self, paths: list[Path], parent: QObject | None = None) -> None:
-        super().__init__(parent)
-        self._paths = paths
-        self._parser = MesenCaptureParser()
-
-    @override
-    def run(self) -> None:
-        """Parse all capture files in background thread."""
-        parsed_count = 0
-        for path in self._paths:
-            if self.isInterruptionRequested():
-                break
-            try:
-                capture_result = self._parser.parse_file(path)
-                if capture_result.has_entries:
-                    self.file_parsed.emit(capture_result, path)
-                    parsed_count += 1
-                else:
-                    self.parse_error.emit(path, "No sprite entries")
-            except (OSError, JSONDecodeError, KeyError, ValueError) as e:
-                self.parse_error.emit(path, str(e))
-        self.finished_all.emit(parsed_count)
 
 
 class FrameMappingController(QObject):
@@ -186,12 +146,19 @@ class FrameMappingController(QObject):
         # Async stale entry detector (avoids UI freeze during project load, uses shared repository)
         self._stale_entry_detector = AsyncStaleEntryDetector(parent=self, capture_repository=self._capture_repository)
         self._stale_entry_detector.stale_entries_detected.connect(self.stale_entries_on_load)
+        # Capture import service (handles parsing and importing Mesen captures)
+        self._capture_import_service = CaptureImportService(
+            preview_service=self._preview_service, parent=self
+        )
+        self._capture_import_service.import_requested.connect(self._on_capture_import_requested)
+        self._capture_import_service.import_completed.connect(self._on_capture_import_completed)
+        self._capture_import_service.import_failed.connect(self.error_occurred)
+        self._capture_import_service.directory_import_started.connect(self.directory_import_started)
+        self._capture_import_service.directory_import_finished.connect(self.directory_import_finished)
         # Undo/Redo stack
         self._undo_stack = UndoRedoStack(parent=self)
         self._undo_stack.can_undo_changed.connect(self.can_undo_changed)
         self._undo_stack.can_redo_changed.connect(self.can_redo_changed)
-        # Background capture parsing worker (kept alive during parsing)
-        self._capture_parse_worker: CaptureParseWorker | None = None
 
     @property
     def project(self) -> FrameMappingProject | None:
@@ -465,30 +432,13 @@ class FrameMappingController(QObject):
         if self._project is None:
             self.new_project()
 
-        try:
-            # Parse the capture file
-            parser = MesenCaptureParser()
-            capture_result = parser.parse_file(capture_path)
+        # Update service with current frame IDs for uniqueness checking
+        self._capture_import_service.update_existing_frame_ids(
+            {gf.id for gf in self._project.game_frames} if self._project else set()
+        )
 
-            if not capture_result.has_entries:
-                self.error_occurred.emit(f"No sprite entries in capture: {capture_path}")
-                return
-
-            # Emit signal for workspace to show sprite selection dialog
-            self.capture_import_requested.emit(capture_result, capture_path)
-
-        except FileNotFoundError:
-            logger.warning("Capture file not found: %s", capture_path)
-            self.error_occurred.emit(f"Capture file not found: {capture_path}")
-        except JSONDecodeError as e:
-            logger.exception("Invalid JSON in capture file: %s", capture_path)
-            self.error_occurred.emit(f"Invalid capture file format: {e}")
-        except (KeyError, ValueError) as e:
-            logger.exception("Malformed capture data in %s", capture_path)
-            self.error_occurred.emit(f"Malformed capture data: {e}")
-        except OSError as e:
-            logger.exception("Failed to read capture file: %s", capture_path)
-            self.error_occurred.emit(f"Failed to read capture: {e}")
+        # Delegate to capture import service
+        self._capture_import_service.import_mesen_capture(capture_path)
 
     def complete_capture_import(
         self,
@@ -512,88 +462,24 @@ class FrameMappingController(QObject):
             self.error_occurred.emit("No project loaded")
             return None
 
-        if not selected_entries:
-            self.error_occurred.emit("No sprites selected")
-            return None
+        # Update service with current frame IDs for uniqueness checking
+        self._capture_import_service.update_existing_frame_ids(
+            {gf.id for gf in self._project.game_frames}
+        )
 
-        try:
-            # Create filtered CaptureResult with only selected entries
-            filtered_capture = CaptureResult(
-                frame=capture_result.frame,
-                visible_count=len(selected_entries),
-                obsel=capture_result.obsel,
-                entries=selected_entries,
-                palettes=capture_result.palettes,
-                timestamp=capture_result.timestamp,
-            )
+        # Delegate to capture import service
+        frame = self._capture_import_service.complete_import(
+            capture_path, capture_result, selected_entries
+        )
 
-            # Generate frame ID from filename or ROM offsets
-            frame_id = capture_path.stem
-            if frame_id.startswith("sprite_capture_"):
-                frame_id = frame_id.replace("sprite_capture_", "")
-
-            # Bug #4 fix: Ensure unique ID when importing captures with same filename
-            frame_id = self._generate_unique_frame_id(frame_id)
-
-            # Get unique ROM offsets from selected entries only
-            rom_offsets = filtered_capture.unique_rom_offsets
-
-            # Render preview using filtered capture (cropped to bounding box)
-            renderer = CaptureRenderer(filtered_capture)
-            preview_img = renderer.render_selection()
-
-            # Convert PIL Image to QPixmap and cache with mtime + entry IDs for invalidation
-            pixmap = pil_to_qpixmap(preview_img)
-            if pixmap is not None:
-                mtime = capture_path.stat().st_mtime if capture_path.exists() else 0.0
-                entry_ids = tuple(entry.id for entry in selected_entries)
-                self._preview_service.set_preview_cache(frame_id, pixmap, mtime, entry_ids)
-
-            # Infer palette from selected entries (use first entry's palette if all same)
-            palette_idx = 0
-            if selected_entries:
-                first_palette = selected_entries[0].palette
-                if all(e.palette == first_palette for e in selected_entries):
-                    palette_idx = first_palette
-
-            # Create game frame with selected entry IDs for filtering on retrieval
-            bbox = filtered_capture.bounding_box
-            # Default all ROM offsets to RAW compression (user can change in workbench)
-            default_compression_types = dict.fromkeys(rom_offsets, "raw")
-            frame = GameFrame(
-                id=frame_id,
-                rom_offsets=rom_offsets,
-                capture_path=capture_path,
-                palette_index=palette_idx,  # Inferred from selected entries
-                width=bbox.width,
-                height=bbox.height,
-                selected_entry_ids=[entry.id for entry in selected_entries],
-                compression_types=default_compression_types,
-            )
-
+        # If successful, add to project and emit signals
+        if frame is not None:
             self._project.add_game_frame(frame)
-            self.game_frame_added.emit(frame_id)
+            self.game_frame_added.emit(frame.id)
             self.project_changed.emit()
             self.save_requested.emit()
-            logger.info(
-                "Imported game frame %s from %s (%d of %d entries selected, palette=%d)",
-                frame_id,
-                capture_path,
-                len(selected_entries),
-                len(capture_result.entries),
-                palette_idx,
-            )
-            return frame
 
-        except ValueError as e:
-            # Duplicate frame ID, invalid data
-            logger.exception("Invalid capture data from %s: %s", capture_path, e)
-            self.error_occurred.emit(f"Invalid capture data: {e}")
-            return None
-        except OSError as e:
-            logger.exception("Failed to import capture from %s", capture_path)
-            self.error_occurred.emit(f"Failed to import capture: {e}")
-            return None
+        return frame
 
     def import_capture_directory(self, directory: Path) -> None:
         """Parse all captures from a directory in background and emit signals.
@@ -610,51 +496,21 @@ class FrameMappingController(QObject):
         Args:
             directory: Directory containing capture JSON files
         """
-        if not directory.is_dir():
-            self.error_occurred.emit(f"Not a directory: {directory}")
-            return
-
-        json_files = sorted(directory.glob("sprite_capture_*.json"))
-        if not json_files:
-            json_files = sorted(directory.glob("*.json"))
-
-        if not json_files:
-            self.error_occurred.emit(f"No capture files found in {directory}")
-            return
-
-        # Cancel any existing parsing operation
-        if self._capture_parse_worker is not None:
-            # Disconnect signals FIRST to prevent stale emissions from old worker
-            try:
-                self._capture_parse_worker.file_parsed.disconnect(self._on_capture_file_parsed)
-                self._capture_parse_worker.parse_error.disconnect(self._on_capture_parse_error)
-                self._capture_parse_worker.finished_all.disconnect(self._on_capture_directory_finished)
-            except RuntimeError:
-                pass  # Signals may not be connected
-
-            # Use WorkerManager for proper cleanup (handles wait, deleteLater, registry)
-            WorkerManager.cleanup_worker(self._capture_parse_worker, timeout=1000)
-            self._capture_parse_worker = None
-
         if self._project is None:
             self.new_project()
 
-        # Create and start background worker
-        self._capture_parse_worker = CaptureParseWorker(json_files, parent=self)
-        self._capture_parse_worker.file_parsed.connect(self._on_capture_file_parsed)
-        self._capture_parse_worker.parse_error.connect(self._on_capture_parse_error)
-        self._capture_parse_worker.finished_all.connect(self._on_capture_directory_finished)
+        # Update service with current frame IDs for uniqueness checking
+        self._capture_import_service.update_existing_frame_ids(
+            {gf.id for gf in self._project.game_frames} if self._project else set()
+        )
 
-        # Emit start signal with total count
-        self.directory_import_started.emit(len(json_files))
-        logger.info("Starting background parse of %d captures from %s", len(json_files), directory)
-        # Use WorkerManager for proper lifecycle tracking
-        WorkerManager.start_worker(self._capture_parse_worker)
+        # Delegate to capture import service
+        self._capture_import_service.import_directory(directory)
 
-    def _on_capture_file_parsed(self, capture_result: CaptureResult, capture_path: Path) -> None:
-        """Handle a capture file parsed by the background worker.
+    def _on_capture_import_requested(self, capture_result: CaptureResult, capture_path: Path) -> None:
+        """Handle capture import request from service.
 
-        Emits capture_import_requested for workspace to show dialog.
+        Relays to capture_import_requested signal for workspace.
 
         Args:
             capture_result: Parsed capture result
@@ -662,24 +518,13 @@ class FrameMappingController(QObject):
         """
         self.capture_import_requested.emit(capture_result, capture_path)
 
-    def _on_capture_parse_error(self, capture_path: Path, error_message: str) -> None:
-        """Handle capture parsing error from background worker.
+    def _on_capture_import_completed(self, frame_id: str) -> None:
+        """Handle successful capture import from service.
 
         Args:
-            capture_path: Path to the file that failed to parse
-            error_message: Error description
+            frame_id: ID of the imported game frame
         """
-        logger.warning("Failed to parse capture %s: %s", capture_path, error_message)
-
-    def _on_capture_directory_finished(self, parsed_count: int) -> None:
-        """Handle completion of directory capture parsing.
-
-        Args:
-            parsed_count: Number of captures successfully parsed
-        """
-        logger.info("Directory import finished: %d captures parsed", parsed_count)
-        self.directory_import_finished.emit(parsed_count)
-        self._capture_parse_worker = None
+        logger.debug("Capture import completed: %s", frame_id)
 
     def create_mapping(self, ai_frame_id: str, game_frame_id: str) -> bool:
         """Create a mapping between an AI frame and a game frame.
