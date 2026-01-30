@@ -124,8 +124,11 @@ class TestApplicationStateManagerInit:
 
     def test_init_thread_locks_created(self, manager):
         """Manager should create thread locks on init."""
-        assert hasattr(manager, "_state_lock")
-        assert hasattr(manager, "_workflow_manager")  # Workflow lock is in WorkflowStateManager
+        # Uses _lock from BaseManager for thread safety (not a separate _state_lock)
+        assert hasattr(manager, "_lock")
+        assert hasattr(
+            manager, "_workflow_manager"
+        )  # Workflow lock is in WorkflowStateManager  # Workflow lock is in WorkflowStateManager
 
 
 class TestSettingsPersistence:

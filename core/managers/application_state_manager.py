@@ -8,7 +8,6 @@ into a single cohesive unit while maintaining backward compatibility.
 from __future__ import annotations
 
 import json
-import threading
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar, cast, override
@@ -114,9 +113,8 @@ class ApplicationStateManager(BaseManager):
         # Workflow state manager (composition - owns its own state and lock)
         self._workflow_manager = WorkflowStateManager(parent=None)
 
-        # Thread safety - state lock protects general state (_settings, etc.)
-        # Note: Workflow locking is handled by WorkflowStateManager internally
-        self._state_lock = threading.RLock()
+        # Note: Thread safety uses self._lock from BaseManager
+        # Workflow locking is handled by WorkflowStateManager internally
 
         super().__init__("ApplicationStateManager", parent)
 
@@ -165,7 +163,7 @@ class ApplicationStateManager(BaseManager):
                        session dirty flag. Does NOT reset initialization state
                        since this manager requires settings to function.
         """
-        with self._state_lock:
+        with self._lock:
             self._session_dirty = False
 
             if full_reset:
