@@ -335,11 +335,8 @@ class MappingPanel(QWidget):
         """
         if self._sheet_palette is None:
             return 0
-        colors_hash = hash(self._sheet_palette.colors)
-        mappings_hash = (
-            hash(tuple(sorted(self._sheet_palette.color_mappings.items()))) if self._sheet_palette.color_mappings else 0
-        )
-        return hash((colors_hash, mappings_hash))
+        # Use SheetPalette's built-in version_hash property
+        return self._sheet_palette.version_hash
 
     def set_sheet_palette(self, palette: SheetPalette | None) -> None:
         """Set the sheet palette for quantized AI frame thumbnails.
