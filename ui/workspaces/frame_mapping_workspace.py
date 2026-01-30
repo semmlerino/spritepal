@@ -45,6 +45,7 @@ from ui.frame_mapping.auto_save_manager import AutoSaveManager
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.dialog_coordinator import DialogCoordinator
 from ui.frame_mapping.services.thumbnail_service import clear_thumbnail_cache
+from ui.frame_mapping.signal_error_handling import signal_error_boundary
 from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
@@ -572,6 +573,7 @@ class FrameMappingWorkspace(QWidget):
         """Handle game frame dropped onto drawer row."""
         self._logic.handle_drop_game_frame(ai_frame_id, game_frame_id)
 
+    @signal_error_boundary()
     def _on_alignment_changed(self, state: AlignmentState) -> None:
         """Handle alignment change from canvas (auto-save)."""
         self._logic.handle_alignment_changed(state)
@@ -713,6 +715,7 @@ class FrameMappingWorkspace(QWidget):
         if self._message_service:
             self._message_service.show_message("No AI frame linked to this capture", 3000)
 
+    @signal_error_boundary()
     def _on_edit_frame_palette(self, ai_frame_id: str) -> None:
         """Handle edit frame palette request - open palette index editor.
 
@@ -769,6 +772,7 @@ class FrameMappingWorkspace(QWidget):
 
         logger.info("Opened palette editor for: %s", ai_frame_id)
 
+    @signal_error_boundary()
     def _on_palette_editor_save(self, ai_frame_id: str, indexed_data: object, output_path: str) -> None:
         """Handle save from palette editor.
 
@@ -842,6 +846,7 @@ class FrameMappingWorkspace(QWidget):
         """
         self._controller.set_sheet_palette_color(index, color)
 
+    @signal_error_boundary()
     def _on_delete_capture(self, frame_id: str) -> None:
         """Handle delete capture request."""
         project = self._controller.project
@@ -910,6 +915,7 @@ class FrameMappingWorkspace(QWidget):
 
         QMessageBox.information(self, "Capture Details", "\n".join(details))
 
+    @signal_error_boundary()
     def _on_remove_ai_frame(self, ai_frame_id: str) -> None:
         """Handle remove AI frame from project request."""
         project = self._controller.project
@@ -1018,6 +1024,7 @@ class FrameMappingWorkspace(QWidget):
         # Update mapping status (frame is unmapped by default)
         self._refresh_mapping_status()
 
+    @signal_error_boundary()
     def _on_inject_single(self, ai_frame_id: str) -> None:
         """Handle inject single mapping request.
 
@@ -1111,6 +1118,7 @@ class FrameMappingWorkspace(QWidget):
         if success:
             self._state.last_injected_rom = target_rom
 
+    @signal_error_boundary()
     def _on_inject_selected(self) -> None:
         """Handle inject selected frames request from mapping panel."""
         selected_ids = self._mapping_panel.get_selected_for_injection()
@@ -1197,6 +1205,7 @@ class FrameMappingWorkspace(QWidget):
         if self._message_service:
             self._message_service.show_message(msg)
 
+    @signal_error_boundary()
     def _on_inject_all(self) -> None:
         """Handle inject all mapped frames request."""
         project = self._controller.project
@@ -1332,6 +1341,7 @@ class FrameMappingWorkspace(QWidget):
             ", ".join(stale_frame_ids[:5]) + ("..." if count > 5 else ""),
         )
 
+    @signal_error_boundary()
     def _on_alignment_updated(self, ai_frame_id: str) -> None:
         """Handle alignment-only update from controller.
 
@@ -1364,6 +1374,7 @@ class FrameMappingWorkspace(QWidget):
     # Sheet Palette Handlers
     # -------------------------------------------------------------------------
 
+    @signal_error_boundary()
     def _on_palette_edit_requested(self) -> None:
         """Handle request to edit the sheet palette."""
         from ui.frame_mapping.dialogs.sheet_palette_mapping_dialog import SheetPaletteMappingDialog
@@ -1399,6 +1410,7 @@ class FrameMappingWorkspace(QWidget):
                     f"Sheet palette applied ({len(new_palette.color_mappings)} color mappings)"
                 )
 
+    @signal_error_boundary()
     def _on_palette_extract_requested(self) -> None:
         """Handle request to extract palette from AI sheet."""
         sheet_colors = self._controller.extract_sheet_colors()
@@ -1435,6 +1447,7 @@ class FrameMappingWorkspace(QWidget):
             if self._message_service:
                 self._message_service.show_message("Sheet palette cleared")
 
+    @signal_error_boundary()
     def _on_sheet_palette_changed(self) -> None:
         """Handle sheet palette change from controller.
 
@@ -1527,6 +1540,7 @@ class FrameMappingWorkspace(QWidget):
         """Sync the canvas alignment display with the current model state."""
         self._logic.sync_canvas_alignment_from_model()
 
+    @signal_error_boundary()
     def _on_preview_cache_invalidated(self, frame_id: str) -> None:
         """Handle preview cache invalidation for a specific game frame.
 
@@ -1591,6 +1605,7 @@ class FrameMappingWorkspace(QWidget):
     # File Operations
     # -------------------------------------------------------------------------
 
+    @signal_error_boundary()
     def _on_load_ai_frames(self) -> None:
         """Handle load AI frames button click."""
         start_dir = str(self._state.last_ai_dir) if self._state.last_ai_dir else ""
@@ -1697,6 +1712,7 @@ class FrameMappingWorkspace(QWidget):
         """
         self._captures_pane.refresh_frame(frame_id)
 
+    @signal_error_boundary()
     def _on_import_capture(self) -> None:
         """Handle import capture button click."""
         start_dir = str(self._state.last_capture_dir) if self._state.last_capture_dir else ""
@@ -1712,6 +1728,7 @@ class FrameMappingWorkspace(QWidget):
             # Controller will emit capture_import_requested, handled by _on_capture_import_requested
             self._controller.import_mesen_capture(path)
 
+    @signal_error_boundary()
     def _on_import_capture_dir(self) -> None:
         """Handle import capture directory button click."""
         start_dir = str(self._state.last_capture_dir) if self._state.last_capture_dir else ""
@@ -1729,6 +1746,7 @@ class FrameMappingWorkspace(QWidget):
             # _on_capture_import_requested queues them via dialog coordinator
             self._controller.import_capture_directory(path)
 
+    @signal_error_boundary()
     def _on_load_project(self) -> None:
         """Handle load project button click."""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -1743,6 +1761,7 @@ class FrameMappingWorkspace(QWidget):
                 self._state.project_path = path
                 self._set_last_project_path(path)
 
+    @signal_error_boundary()
     def _on_save_project(self) -> None:
         """Handle save project button click."""
         if not self._controller.has_project:

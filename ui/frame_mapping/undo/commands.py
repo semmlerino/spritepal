@@ -53,6 +53,8 @@ class CreateMappingCommand:
             if self.prev_ai_mapping_alignment:
                 x, y, fh, fv, scale, sharpen, resampling = self.prev_ai_mapping_alignment
                 self.controller._update_alignment_no_history(self.ai_frame_id, x, y, fh, fv, scale, sharpen, resampling)
+            # Emit signal for restored AI frame mapping
+            self.controller.mapping_created.emit(self.ai_frame_id, self.prev_ai_mapping_game_id)
 
         # Restore previous game frame mapping if it existed
         if self.prev_game_mapping_ai_id is not None:
@@ -62,6 +64,12 @@ class CreateMappingCommand:
                 self.controller._update_alignment_no_history(
                     self.prev_game_mapping_ai_id, x, y, fh, fv, scale, sharpen, resampling
                 )
+            # Emit signal for restored game frame mapping
+            self.controller.mapping_created.emit(self.prev_game_mapping_ai_id, self.game_frame_id)
+
+        # If no mapping was restored, emit removal signal
+        if self.prev_ai_mapping_game_id is None:
+            self.controller.mapping_removed.emit(self.ai_frame_id)
 
 
 @dataclass
@@ -90,6 +98,9 @@ class RemoveMappingCommand:
                 self.controller._update_alignment_no_history(self.ai_frame_id, x, y, fh, fv, scale, sharpen, resampling)
             # Restore status
             self.controller._set_mapping_status_no_history(self.ai_frame_id, self.removed_status)
+            # Emit signals so UI updates
+            self.controller.mapping_created.emit(self.ai_frame_id, self.removed_game_frame_id)
+            self.controller.alignment_updated.emit(self.ai_frame_id)
 
 
 @dataclass
@@ -145,6 +156,8 @@ class UpdateAlignmentCommand:
         )
         # Restore original status
         self.controller._set_mapping_status_no_history(self.ai_frame_id, self.old_status)
+        # Emit signal so UI updates
+        self.controller.alignment_updated.emit(self.ai_frame_id)
 
 
 # =============================================================================
@@ -172,6 +185,8 @@ class RenameAIFrameCommand:
 
     def undo(self) -> None:
         self.controller._rename_frame_no_history(self.frame_id, self.old_name)
+        # Emit signal so UI updates
+        self.controller.frame_renamed.emit(self.frame_id)
 
 
 @dataclass
@@ -194,6 +209,8 @@ class RenameCaptureCommand:
 
     def undo(self) -> None:
         self.controller._rename_capture_no_history(self.game_frame_id, self.old_name)
+        # Emit signal so UI updates
+        self.controller.capture_renamed.emit(self.game_frame_id)
 
 
 @dataclass
@@ -217,6 +234,8 @@ class ToggleFrameTagCommand:
     def undo(self) -> None:
         # Toggle again to reverse
         self.controller._toggle_frame_tag_no_history(self.frame_id, self.tag)
+        # Emit signal so UI updates
+        self.controller.frame_tags_changed.emit(self.frame_id)
 
 
 @dataclass
@@ -237,3 +256,5 @@ class ReorderAIFrameCommand:
 
     def undo(self) -> None:
         self.controller._reorder_ai_frame_no_history(self.ai_frame_id, self.old_index)
+        # Emit signal so UI updates (new_index, old_index params are from undo perspective)
+        self.controller.ai_frame_moved.emit(self.ai_frame_id, self.new_index, self.old_index)
