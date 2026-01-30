@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PIL import Image
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
@@ -24,10 +23,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.services.image_utils import pil_to_qpixmap_fast
 from ui.dialogs.color_mapping_dialog import (
     ColorMappingRow,
-    ColorSwatchWidget,
+    SimpleColorSwatch,
     _find_nearest_palette_index,
+    extract_colors_from_sampled_overlay,
 )
 
 if TYPE_CHECKING:
@@ -138,30 +139,6 @@ def render_quantized_preview(
     return Image.fromarray(output, "RGBA")
 
 
-def pil_to_qpixmap(image: Image.Image, scale: int = 1) -> QPixmap:
-    """Convert PIL Image to QPixmap with optional scaling.
-
-    Args:
-        image: PIL Image to convert
-        scale: Integer scale factor for display
-
-    Returns:
-        QPixmap for display
-    """
-    if image.mode != "RGBA":
-        image = image.convert("RGBA")
-
-    if scale > 1:
-        image = image.resize(
-            (image.width * scale, image.height * scale),
-            Image.Resampling.NEAREST,
-        )
-
-    data = image.tobytes("raw", "RGBA")
-    qimage = QImage(data, image.width, image.height, QImage.Format.Format_RGBA8888)
-    return QPixmap.fromImage(qimage)
-
-
 class PreviewImageWidget(QLabel):
     """Widget displaying a preview image with checkerboard background for transparency."""
 
@@ -179,7 +156,7 @@ class PreviewImageWidget(QLabel):
             self.setText("No preview")
             return
 
-        pixmap = pil_to_qpixmap(image, self._scale)
+        pixmap = pil_to_qpixmap_fast(image, self._scale)
         self.setPixmap(pixmap)
 
     def set_scale(self, scale: int) -> None:
@@ -233,36 +210,12 @@ class PaletteMappingPreviewPanel(QWidget):
 
     def _extract_colors(self) -> None:
         """Extract unique colors from sampled overlay regions."""
-        from ui.row_arrangement.grid_arrangement_manager import ArrangementType as ArrType
-
-        all_pixels: list[tuple[int, int, int]] = []
-
-        for (r, c), (arr_type, _key) in self._grid_mapping.items():
-            if arr_type != ArrType.TILE:
-                continue
-
-            tile_x = c * self._tile_width
-            tile_y = r * self._tile_height
-
-            region = self._overlay_layer.sample_region(tile_x, tile_y, self._tile_width, self._tile_height)
-            if region is None:
-                continue
-
-            if region.mode != "RGBA":
-                region = region.convert("RGBA")
-
-            pixels = np.array(region)
-            flat = pixels.reshape(-1, 4)
-            opaque_mask = flat[:, 3] >= 128
-            opaque_pixels = flat[opaque_mask]
-
-            for pixel in opaque_pixels:
-                all_pixels.append((int(pixel[0]), int(pixel[1]), int(pixel[2])))
-
-        # Count colors
-        self._overlay_colors: dict[tuple[int, int, int], int] = {}
-        for rgb in all_pixels:
-            self._overlay_colors[rgb] = self._overlay_colors.get(rgb, 0) + 1
+        self._overlay_colors = extract_colors_from_sampled_overlay(
+            self._overlay_layer,
+            self._grid_mapping,
+            self._tile_width,
+            self._tile_height,
+        )
 
     def _setup_ui(self) -> None:
         """Set up the panel UI."""
@@ -294,7 +247,7 @@ class PaletteMappingPreviewPanel(QWidget):
         palette_row = QHBoxLayout()
         palette_row.addWidget(QLabel("Palette:"))
         for idx, color in enumerate(self._palette):
-            swatch = ColorSwatchWidget(color, size=20)
+            swatch = SimpleColorSwatch(color, size=20)
             swatch.setToolTip(f"[{idx}] RGB({color[0]}, {color[1]}, {color[2]})")
             palette_row.addWidget(swatch)
         palette_row.addStretch()

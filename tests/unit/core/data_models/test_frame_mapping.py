@@ -1,8 +1,6 @@
 """Unit tests for FrameMapping dataclass."""
 
-from pathlib import Path
-
-from core.frame_mapping_project import AIFrame, FrameMapping
+from core.frame_mapping_project import FrameMapping
 
 
 class TestFrameMappingAlignment:
@@ -48,21 +46,19 @@ class TestFrameMappingAlignment:
         assert restored.flip_h is True
         assert restored.flip_v is False
 
-    def test_frame_mapping_v1_migration(self) -> None:
-        """V1 project files with ai_frame_index load via migration."""
-        # Create AI frames for migration lookup
-        ai_frames = [
-            AIFrame(path=Path("/tmp/frame_001.png"), index=0),
-            AIFrame(path=Path("/tmp/frame_002.png"), index=1),
-        ]
+    def test_frame_mapping_from_dict_v2_format(self) -> None:
+        """from_dict() accepts v2+ format with ai_frame_id.
 
-        old_data: dict[str, object] = {
-            "ai_frame_index": 0,  # V1 format
+        Note: V1 migration (ai_frame_index -> ai_frame_id) is now handled by
+        FrameMappingRepository._migrate_v1_to_v2() before from_dict() is called.
+        """
+        v2_data: dict[str, object] = {
+            "ai_frame_id": "frame_001.png",  # V2 format
             "game_frame_id": "F001",
             "status": "mapped",
         }
-        mapping = FrameMapping.from_dict(old_data, ai_frames=ai_frames)
-        assert mapping.ai_frame_id == "frame_001.png"  # Migrated from index
+        mapping = FrameMapping.from_dict(v2_data)
+        assert mapping.ai_frame_id == "frame_001.png"
         assert mapping.offset_x == 0
         assert mapping.offset_y == 0
         assert mapping.flip_h is False

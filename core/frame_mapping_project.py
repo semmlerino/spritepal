@@ -370,37 +370,18 @@ class FrameMapping:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, object], ai_frames: list[AIFrame] | None = None) -> FrameMapping:
+    def from_dict(cls, data: dict[str, object]) -> FrameMapping:
         """Deserialize from dictionary.
 
         Args:
-            data: Dictionary data.
-            ai_frames: Optional list of AI frames for v1 migration (index -> id).
-        """
-        # V2 format: use ai_frame_id directly
-        if "ai_frame_id" in data:
-            ai_frame_id = cast(str, data["ai_frame_id"])
-        # V1 migration: convert ai_frame_index to ai_frame_id
-        elif "ai_frame_index" in data and ai_frames:
-            ai_frame_index = cast(int, data["ai_frame_index"])
-            # Find AI frame by index and get its id
-            ai_frame_id = ""
-            for frame in ai_frames:
-                if frame.index == ai_frame_index:
-                    ai_frame_id = frame.id
-                    break
-            if not ai_frame_id:
-                logger.warning(
-                    "V1 migration: ai_frame_index %d not found in ai_frames, skipping",
-                    ai_frame_index,
-                )
-                ai_frame_id = f"__orphaned_index_{ai_frame_index}"
-        else:
-            # Fallback for malformed data
-            ai_frame_id = cast(str, data.get("ai_frame_id", ""))
+            data: Dictionary data (must be v2+ format with ai_frame_id).
 
+        Note:
+            V1 format (ai_frame_index) is converted to V2 (ai_frame_id)
+            by FrameMappingRepository._migrate_v1_to_v2 before this is called.
+        """
         return cls(
-            ai_frame_id=ai_frame_id,
+            ai_frame_id=cast(str, data.get("ai_frame_id", "")),
             game_frame_id=cast(str, data["game_frame_id"]),
             status=cast(str, data.get("status", "mapped")),
             offset_x=cast(int, data.get("offset_x", 0)),

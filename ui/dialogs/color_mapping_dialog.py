@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 _find_nearest_palette_index = find_nearest_palette_index
 
 
-class ColorSwatchWidget(QWidget):
+class SimpleColorSwatch(QWidget):
     """Small widget displaying a colored square."""
 
     def __init__(self, color: tuple[int, int, int], size: int = 24, parent: QWidget | None = None) -> None:
@@ -75,7 +75,7 @@ class ColorMappingRow(QWidget):
         layout.setContentsMargins(4, 2, 4, 2)
 
         # Overlay color swatch
-        self._overlay_swatch = ColorSwatchWidget(overlay_color, size=28)
+        self._overlay_swatch = SimpleColorSwatch(overlay_color, size=28)
         layout.addWidget(self._overlay_swatch)
 
         # Overlay color info
@@ -96,7 +96,7 @@ class ColorMappingRow(QWidget):
         layout.addWidget(self._palette_combo)
 
         # Palette color swatch (shows current selection)
-        self._palette_swatch = ColorSwatchWidget(palette[initial_index], size=28)
+        self._palette_swatch = SimpleColorSwatch(palette[initial_index], size=28)
         layout.addWidget(self._palette_swatch)
 
         layout.addStretch()
@@ -198,7 +198,7 @@ class ColorMappingDialog(DialogBase):
         palette_layout.addWidget(palette_label)
 
         for idx, color in enumerate(self._palette):
-            swatch = ColorSwatchWidget(color, size=20)
+            swatch = SimpleColorSwatch(color, size=20)
             swatch.setToolTip(f"[{idx}] RGB({color[0]}, {color[1]}, {color[2]})")
             palette_layout.addWidget(swatch)
 

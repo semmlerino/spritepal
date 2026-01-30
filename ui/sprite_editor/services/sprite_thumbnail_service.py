@@ -13,6 +13,7 @@ from PIL import Image
 from PySide6.QtCore import QObject
 from PySide6.QtGui import QImage, QPixmap
 
+from core.services.image_utils import pil_to_qpixmap_fast
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -364,16 +365,4 @@ class SpriteThumbnailService(QObject):
         Returns:
             QPixmap representation of the image.
         """
-        # Convert to RGBA if needed
-        if pil_image.mode != "RGBA":
-            pil_image = pil_image.convert("RGBA")
-
-        data = pil_image.tobytes("raw", "RGBA")
-        qimage = QImage(
-            data,
-            pil_image.width,
-            pil_image.height,
-            pil_image.width * 4,
-            QImage.Format.Format_RGBA8888,
-        )
-        return QPixmap.fromImage(qimage)
+        return pil_to_qpixmap_fast(pil_image)

@@ -74,6 +74,33 @@ def pil_to_qpixmap(pil_image: Image.Image | None) -> QPixmap | None:
         return None
 
 
+def pil_to_qpixmap_fast(image: Image.Image, scale: int = 1) -> QPixmap:
+    """Convert PIL Image to QPixmap using direct memory transfer (fast path).
+
+    This uses direct memory transfer instead of PNG encoding, making it faster
+    for UI display purposes where robustness is less critical.
+
+    Args:
+        image: PIL Image to convert
+        scale: Integer scale factor for nearest-neighbor upscaling (default 1)
+
+    Returns:
+        QPixmap for display (never None, but may be null on failure)
+    """
+    if image.mode != "RGBA":
+        image = image.convert("RGBA")
+
+    if scale > 1:
+        image = image.resize(
+            (image.width * scale, image.height * scale),
+            Image.Resampling.NEAREST,
+        )
+
+    data = image.tobytes("raw", "RGBA")
+    qimage = QImage(data, image.width, image.height, image.width * 4, QImage.Format.Format_RGBA8888)
+    return QPixmap.fromImage(qimage)
+
+
 def pil_to_qimage(
     image: Image.Image,
     *,

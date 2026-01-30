@@ -100,6 +100,9 @@ class FrameMappingRepository:
         Supports v1-v4 formats with automatic migration. Unknown fields
         are preserved for forward compatibility.
 
+        Note: Stale entry detection is performed asynchronously by the
+        controller after loading to avoid UI freezes on large projects.
+
         Args:
             path: Source file path
 
@@ -138,7 +141,7 @@ class FrameMappingRepository:
         if ai_frames_dir and not ai_frames_dir.is_absolute():
             ai_frames_dir = base_path / ai_frames_dir
 
-        # Load AI frames first (needed for v1 migration)
+        # Load AI frames
         ai_frames = [AIFrame.from_dict(f, base_path) for f in cast(list[dict[str, object]], data.get("ai_frames", []))]
 
         # Load game frames
@@ -146,13 +149,8 @@ class FrameMappingRepository:
             GameFrame.from_dict(f, base_path) for f in cast(list[dict[str, object]], data.get("game_frames", []))
         ]
 
-        # Load mappings (v1 needs ai_frames for migration)
-        if version == 1:
-            mappings = [
-                FrameMapping.from_dict(m, ai_frames) for m in cast(list[dict[str, object]], data.get("mappings", []))
-            ]
-        else:
-            mappings = [FrameMapping.from_dict(m) for m in cast(list[dict[str, object]], data.get("mappings", []))]
+        # Load mappings (v1->v2 migration already converted ai_frame_index -> ai_frame_id)
+        mappings = [FrameMapping.from_dict(m) for m in cast(list[dict[str, object]], data.get("mappings", []))]
 
         # Load sheet_palette (v3+, None for older versions)
         sheet_palette: SheetPalette | None = None
@@ -172,16 +170,8 @@ class FrameMappingRepository:
         # Prune orphaned mappings (referencing non-existent frames)
         project._prune_orphaned_mappings()
 
-        # Check for stale entries and log warnings
-        stale_frames = project.detect_stale_entries()
-        if stale_frames:
-            stale_ids = [fid for fid, is_stale in stale_frames.items() if is_stale]
-            logger.warning(
-                "Project loaded with %d stale game frames: %s. "
-                "Capture files may have been re-recorded. Preview/injection will fall back to ROM offsets.",
-                len(stale_ids),
-                stale_ids,
-            )
+        # Note: Stale entry detection is deferred to controller for async execution
+        # to avoid UI freezes on large projects
 
         logger.info("Loaded frame mapping project from %s (v%d)", path, version)
         return project
@@ -233,16 +223,40 @@ class FrameMappingRepository:
         """Migrate v1 to v2: ai_frame_index -> ai_frame_id.
 
         V1 used position-dependent indices. V2 uses stable filenames.
-        Migration is handled by FrameMapping.from_dict() when ai_frames are provided.
 
         Args:
             data: V1 project data
 
         Returns:
-            V2 project data (version field updated)
+            V2 project data with mappings converted to use ai_frame_id
         """
-        # Migration logic is in FrameMapping.from_dict()
-        # Just update version number here
+        # Build index-to-id mapping from ai_frames
+        # In v1, id is derived from path filename (not stored explicitly)
+        ai_frames = cast(list[dict[str, object]], data.get("ai_frames", []))
+        index_to_id: dict[int, str] = {}
+        for frame_data in ai_frames:
+            idx = cast(int, frame_data.get("index", -1))
+            path_str = cast(str, frame_data.get("path", ""))
+            # Derive id from filename (same as AIFrame.id property)
+            frame_id = Path(path_str.replace("\\", "/")).name if path_str else ""
+            if idx >= 0 and frame_id:
+                index_to_id[idx] = frame_id
+
+        # Convert mappings from ai_frame_index to ai_frame_id
+        mappings = cast(list[dict[str, object]], data.get("mappings", []))
+        for mapping in mappings:
+            if "ai_frame_index" in mapping and "ai_frame_id" not in mapping:
+                ai_frame_index = cast(int, mapping["ai_frame_index"])
+                if ai_frame_index in index_to_id:
+                    mapping["ai_frame_id"] = index_to_id[ai_frame_index]
+                else:
+                    logger.warning(
+                        "V1 migration: ai_frame_index %d not found in ai_frames, using orphan marker",
+                        ai_frame_index,
+                    )
+                    mapping["ai_frame_id"] = f"__orphaned_index_{ai_frame_index}"
+                del mapping["ai_frame_index"]
+
         data["version"] = 2
         return data
 
