@@ -10,11 +10,11 @@
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 1 | Lambda Memory Leak Elimination | **DONE** |
-| 2 | Signal Handler Error Boundaries | TODO |
+| 2 | Signal Handler Error Boundaries | **DONE** |
 | 3 | Bundle Parameter-Heavy Signals | **DONE** |
-| 4 | Centralize Selection State | TODO |
-| 5 | Undo/Redo Signal-Driven Sync | TODO |
-| 6 | Golden Trace Infrastructure | TODO |
+| 4 | Centralize Selection State | DEFERRED (low priority) |
+| 5 | Undo/Redo Signal-Driven Sync | **DONE** |
+| 6 | Golden Trace Infrastructure | **DONE** |
 
 **Architectural Principles (from review.md):**
 - Views emit intents (`*_requested`), Controller emits deltas (`*_changed`)
@@ -247,24 +247,30 @@ pytest tests/unit/ui/frame_mapping/controllers/test_frame_mapping_undo.py -v
 
 ---
 
-## Phase 6: Golden Trace Infrastructure (VERIFICATION)
+## Phase 6: Golden Trace Infrastructure - DONE
 
-### Step 6.1: Signal Trace Recorder
+> **Status:** Completed. Signal trace recorder and golden trace tests implemented.
+
+### Implementation
 
 **New file:** `tests/infrastructure/signal_trace_recorder.py`
+- `SignalEvent` and `SignalTrace` dataclasses for recording emissions
+- `SignalCollector` class for connecting to real Qt signals or mocks
+- Assertion helpers: `assert_trace_contains`, `assert_signal_emitted`, `assert_signal_args`
 
-Utility to record signal emissions during operations for before/after comparison.
+**New file:** `tests/ui/frame_mapping/test_golden_signal_traces.py`
+- `TestCreateMappingUndoSignals`: Verifies undo emits `mapping_removed` or `mapping_created`
+- `TestRemoveMappingUndoSignals`: Verifies undo emits both `mapping_created` and `alignment_updated`
+- `TestUpdateAlignmentUndoSignals`: Verifies undo emits `alignment_updated`
+- `TestSignalCollectorIntegration`: Unit tests for the trace recorder itself
 
-### Step 6.2: Golden Traces for Key Workflows
+**Regression targets covered:**
+- 246b9b35: Missing signal emissions in 7 undo commands
+- cb38ae69: Selection sync broken after undo/redo
 
-Generate baseline traces for:
-1. `alignment_change.json` - Alignment update flow
-2. `create_mapping.json` - Mapping creation flow
-3. `undo_alignment.json` - Undo flow
-
-**Usage:**
+**Verify:**
 ```bash
-pytest tests/ui/frame_mapping/test_golden_signal_traces.py --regenerate-golden -v
+pytest tests/ui/frame_mapping/test_golden_signal_traces.py -v
 ```
 
 ---
@@ -342,8 +348,9 @@ pytest tests/ui/frame_mapping/ -v  # Verify baseline restored
 | `ui/frame_mapping/signal_error_handling.py` | 2.1 | TODO: Error boundary decorator |
 | `ui/workspaces/frame_mapping_workspace.py` | 2.2, 4.2 | TODO: Apply decorator; wire SelectionModel |
 | `ui/frame_mapping/selection_model.py` | 4.1 | TODO: Centralized selection state |
-| `ui/frame_mapping/undo/*.py` | 5.1 | TODO: Add signal emission to undo() |
-| `tests/infrastructure/signal_trace_recorder.py` | 6.1 | TODO: Golden trace utility |
+| `ui/frame_mapping/undo/*.py` | 5.1 | **DONE**: Undo commands emit signals |
+| `tests/infrastructure/signal_trace_recorder.py` | 6.1 | **DONE**: Golden trace utility |
+| `tests/ui/frame_mapping/test_golden_signal_traces.py` | 6.2 | **DONE**: Golden trace tests |
 
 ---
 
