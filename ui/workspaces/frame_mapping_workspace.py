@@ -328,6 +328,10 @@ class FrameMappingWorkspace(QWidget):
         # Async game frame preview signals (Phase 6 perf improvement)
         self._controller.game_frame_preview_ready.connect(self._on_game_frame_preview_ready)
         self._controller.game_frame_previews_finished.connect(self._on_game_frame_previews_finished)
+        # Async injection signals (Issue 8 perf improvement)
+        self._controller.async_injection_started.connect(self._on_async_injection_started)
+        self._controller.async_injection_progress.connect(self._on_async_injection_progress)
+        self._controller.async_injection_finished.connect(self._on_async_injection_finished)
 
         # Dialog coordinator signals
         self._dialog_coordinator.queue_processing_finished.connect(self._on_capture_queue_finished)
@@ -1029,7 +1033,9 @@ class FrameMappingWorkspace(QWidget):
 
     @signal_error_boundary()
     def _on_inject_single(self, ai_frame_id: str) -> None:
-        """Handle inject single mapping request.
+        """Handle inject single mapping request (async).
+
+        Uses background thread to avoid UI freeze during ROM I/O.
 
         Args:
             ai_frame_id: AI frame ID (filename)
@@ -1078,7 +1084,7 @@ class FrameMappingWorkspace(QWidget):
         # Clear stale entry tracking before injection
         self._state.stale_entry_frame_id = None
 
-        # Either reuse existing ROM or let inject_mapping create a new copy
+        # Either reuse existing ROM or create a new copy
         if can_reuse:
             target_rom = cast(Path, self._state.last_injected_rom)
         else:
@@ -1088,42 +1094,24 @@ class FrameMappingWorkspace(QWidget):
                 QMessageBox.critical(self, "Inject Frame", "Failed to create ROM copy for injection.")
                 return
 
-        # Try injection with strict entry validation (no fallback)
+        # Track this as a single-frame batch for consistent completion handling
+        self._state.start_batch_injection([ai_frame_id], target_rom)
+
+        # Queue async injection (non-blocking)
         preserve_sprite = self._alignment_canvas.get_preserve_sprite()
-        success = self._controller.inject_mapping(
-            ai_frame_id, rom_path, output_path=target_rom, preserve_sprite=preserve_sprite
+        self._controller.inject_mapping_async(
+            ai_frame_id,
+            rom_path,
+            output_path=target_rom,
+            preserve_sprite=preserve_sprite,
         )
-
-        # If injection failed due to stale entries, offer to retry with fallback
-        if not success and self._state.stale_entry_frame_id is not None:
-            retry_reply = QMessageBox.question(
-                self,
-                "Entry Selection Outdated",
-                f"The stored entry selection for '{self._state.stale_entry_frame_id}' no longer "
-                f"matches the capture file.\n\n"
-                f"Would you like to inject using ROM offset filtering instead?\n\n"
-                f"Note: This may include unintended sprite entries. "
-                f"To avoid this, reimport the capture with updated entry selection.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if retry_reply == QMessageBox.StandardButton.Yes:
-                # Retry with allow_fallback=True
-                success = self._controller.inject_mapping(
-                    ai_frame_id,
-                    rom_path,
-                    output_path=target_rom,
-                    allow_fallback=True,
-                    preserve_sprite=preserve_sprite,
-                )
-
-        # Track the successfully used ROM for future reuse
-        if success:
-            self._state.last_injected_rom = target_rom
 
     @signal_error_boundary()
     def _on_inject_selected(self) -> None:
-        """Handle inject selected frames request from mapping panel."""
+        """Handle inject selected frames request (async).
+
+        Uses background thread to avoid UI freeze during batch ROM I/O.
+        """
         selected_ids = self._mapping_panel.get_selected_for_injection()
 
         if not selected_ids:
@@ -1174,43 +1162,29 @@ class FrameMappingWorkspace(QWidget):
                 QMessageBox.critical(self, "Inject Selected", "Failed to create ROM copy for injection.")
                 return
 
-        # Clear stale entry tracking before batch injection
-        self._state.stale_entry_frame_id = None
+        # Track batch injection for completion handling
+        self._state.start_batch_injection(selected_ids, target_rom)
 
-        # Inject selected frames into the same copy
-        # Use emit_project_changed=False to avoid N emissions, emit once after batch
-        success_count = 0
-        failed_due_to_stale = 0
+        # Show status message while batch processes
+        if self._message_service:
+            self._message_service.show_message(f"Injecting {frame_count} frames...")
+
+        # Queue all injections asynchronously (processed sequentially by worker)
         preserve_sprite = self._alignment_canvas.get_preserve_sprite()
-
         for ai_frame_id in selected_ids:
-            self._state.stale_entry_frame_id = None  # Reset for each frame
-            if self._controller.inject_mapping(
+            self._controller.inject_mapping_async(
                 ai_frame_id,
                 rom_path,
                 output_path=target_rom,
-                emit_project_changed=False,
                 preserve_sprite=preserve_sprite,
-            ):
-                success_count += 1
-            elif self._state.stale_entry_frame_id is not None:
-                failed_due_to_stale += 1
-
-        # Emit project_changed once for the entire batch if any succeeded
-        if success_count > 0:
-            self._controller.project_changed.emit()
-            self._state.last_injected_rom = target_rom
-
-        # Report results
-        msg = f"Injected {success_count}/{frame_count} selected frames into {target_rom.name}"
-        if failed_due_to_stale > 0:
-            msg += f"\n{failed_due_to_stale} frame(s) skipped due to outdated entry selection."
-        if self._message_service:
-            self._message_service.show_message(msg)
+            )
 
     @signal_error_boundary()
     def _on_inject_all(self) -> None:
-        """Handle inject all mapped frames request."""
+        """Handle inject all mapped frames request (async).
+
+        Uses background thread to avoid UI freeze during batch ROM I/O.
+        """
         project = self._controller.project
         if project is None or project.mapped_count == 0:
             QMessageBox.information(self, "Inject All", "No mapped frames to inject.")
@@ -1259,42 +1233,27 @@ class FrameMappingWorkspace(QWidget):
                 QMessageBox.critical(self, "Inject All", "Failed to create ROM copy for injection.")
                 return
 
-        # Clear stale entry tracking before batch injection
-        self._state.stale_entry_frame_id = None
+        # Collect all mapped frame IDs
+        mapped_ids = [
+            ai_frame.id for ai_frame in project.ai_frames if project.get_mapping_for_ai_frame(ai_frame.id) is not None
+        ]
 
-        # Inject all mapped frames into the same copy
-        # Use emit_project_changed=False to avoid N emissions, emit once after batch
-        success_count = 0
-        failed_due_to_stale = 0
-        preserve_sprite = self._alignment_canvas.get_preserve_sprite()
+        # Track batch injection for completion handling
+        self._state.start_batch_injection(mapped_ids, target_rom)
 
-        for ai_frame in project.ai_frames:
-            mapping = project.get_mapping_for_ai_frame(ai_frame.id)
-            if mapping:
-                self._state.stale_entry_frame_id = None  # Reset for each frame
-                # Pass the created copy as output_path to avoid creating new copies
-                if self._controller.inject_mapping(
-                    ai_frame.id,
-                    rom_path,
-                    output_path=target_rom,
-                    emit_project_changed=False,
-                    preserve_sprite=preserve_sprite,
-                ):
-                    success_count += 1
-                elif self._state.stale_entry_frame_id is not None:
-                    failed_due_to_stale += 1
-
-        # Emit project_changed once for the entire batch if any succeeded
-        if success_count > 0:
-            self._controller.project_changed.emit()
-            self._state.last_injected_rom = target_rom
-
-        # Report results
-        msg = f"Injected {success_count}/{project.mapped_count} frames into {target_rom.name}"
-        if failed_due_to_stale > 0:
-            msg += f"\n{failed_due_to_stale} frame(s) skipped due to outdated entry selection."
+        # Show status message while batch processes
         if self._message_service:
-            self._message_service.show_message(msg)
+            self._message_service.show_message(f"Injecting {len(mapped_ids)} frames...")
+
+        # Queue all injections asynchronously (processed sequentially by worker)
+        preserve_sprite = self._alignment_canvas.get_preserve_sprite()
+        for ai_frame_id in mapped_ids:
+            self._controller.inject_mapping_async(
+                ai_frame_id,
+                rom_path,
+                output_path=target_rom,
+                preserve_sprite=preserve_sprite,
+            )
 
     def _on_mapping_injected(self, ai_frame_id: str, message: str) -> None:
         """Handle successful injection signal."""
@@ -1343,6 +1302,87 @@ class FrameMappingWorkspace(QWidget):
             "Preview and injection will fall back to ROM offset filtering.",
             ", ".join(stale_frame_ids[:5]) + ("..." if count > 5 else ""),
         )
+
+    # -------------------------------------------------------------------------
+    # Async Injection Handlers (Issue 8 Performance Fix)
+    # -------------------------------------------------------------------------
+
+    def _on_async_injection_started(self, ai_frame_id: str) -> None:
+        """Handle async injection started signal.
+
+        Args:
+            ai_frame_id: The AI frame ID being injected
+        """
+        logger.debug("Async injection started for frame '%s'", ai_frame_id)
+        # Update status message to show progress
+        pending = len(self._state.batch_injection_pending)
+        if pending > 1 and self._message_service:
+            self._message_service.show_message(f"Injecting frame {ai_frame_id}... ({pending} remaining)")
+
+    def _on_async_injection_progress(self, ai_frame_id: str, message: str) -> None:
+        """Handle async injection progress signal.
+
+        Args:
+            ai_frame_id: The AI frame ID being injected
+            message: Progress message
+        """
+        logger.debug("Async injection progress for '%s': %s", ai_frame_id, message)
+
+    def _on_async_injection_finished(self, ai_frame_id: str, success: bool, message: str) -> None:
+        """Handle async injection completion signal.
+
+        Updates batch tracking state and shows completion message when all done.
+
+        Args:
+            ai_frame_id: The AI frame ID that was injected
+            success: Whether the injection succeeded
+            message: Result message
+        """
+        # Track stale entry failures for batch reporting
+        stale_entries = self._state.stale_entry_frame_id == ai_frame_id
+        self._state.record_batch_injection_result(ai_frame_id, success, stale_entries)
+
+        # Check if batch is complete
+        if not self._state.is_batch_injection_active():
+            self._on_batch_injection_complete()
+
+    def _on_batch_injection_complete(self) -> None:
+        """Handle completion of batch injection.
+
+        Shows summary message and updates ROM tracking state.
+        """
+        success_count = len(self._state.batch_injection_success)
+        failed_stale_count = len(self._state.batch_injection_failed_stale)
+        total_count = success_count + failed_stale_count
+        target_rom = self._state.batch_injection_target_rom
+
+        # Update last injected ROM if any succeeded
+        if success_count > 0 and target_rom is not None:
+            self._state.last_injected_rom = target_rom
+
+        # Build result message
+        if target_rom is not None:
+            if total_count == 1:
+                # Single frame injection
+                if success_count == 1:
+                    msg = f"Injection successful: {target_rom.name}"
+                else:
+                    msg = "Injection failed due to stale entry selection"
+            else:
+                # Batch injection
+                msg = f"Injected {success_count}/{total_count} frames into {target_rom.name}"
+                if failed_stale_count > 0:
+                    msg += f"\n{failed_stale_count} frame(s) skipped due to outdated entry selection."
+        else:
+            msg = f"Injection complete: {success_count}/{total_count} frames"
+
+        if self._message_service:
+            self._message_service.show_message(msg)
+
+        logger.info("Batch injection complete: %d/%d succeeded", success_count, total_count)
+
+        # Clear batch tracking state
+        self._state.clear_batch_injection()
 
     @signal_error_boundary()
     def _on_alignment_updated(self, ai_frame_id: str) -> None:

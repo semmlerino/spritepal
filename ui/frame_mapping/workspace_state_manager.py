@@ -54,6 +54,12 @@ class WorkspaceStateManager:
         # Track project identity for canvas state preservation
         self._previous_project_id: int | None = None
 
+        # Batch async injection tracking
+        self._batch_injection_target_rom: Path | None = None
+        self._batch_injection_pending: set[str] = set()
+        self._batch_injection_success: set[str] = set()
+        self._batch_injection_failed_stale: set[str] = set()
+
     # -------------------------------------------------------------------------
     # Directory History Properties
     # -------------------------------------------------------------------------
@@ -228,3 +234,69 @@ class WorkspaceStateManager:
     def previous_project_id(self, project_id: int | None) -> None:
         """Set the previous project identity (id())."""
         self._previous_project_id = project_id
+
+    # -------------------------------------------------------------------------
+    # Batch Async Injection Tracking
+    # -------------------------------------------------------------------------
+
+    @property
+    def batch_injection_target_rom(self) -> Path | None:
+        """Get the target ROM for batch injection."""
+        return self._batch_injection_target_rom
+
+    @batch_injection_target_rom.setter
+    def batch_injection_target_rom(self, path: Path | None) -> None:
+        """Set the target ROM for batch injection."""
+        self._batch_injection_target_rom = path
+
+    @property
+    def batch_injection_pending(self) -> set[str]:
+        """Get the set of frame IDs pending injection."""
+        return self._batch_injection_pending
+
+    @property
+    def batch_injection_success(self) -> set[str]:
+        """Get the set of frame IDs that were successfully injected."""
+        return self._batch_injection_success
+
+    @property
+    def batch_injection_failed_stale(self) -> set[str]:
+        """Get the set of frame IDs that failed due to stale entries."""
+        return self._batch_injection_failed_stale
+
+    def start_batch_injection(self, frame_ids: list[str], target_rom: Path) -> None:
+        """Start tracking a batch injection.
+
+        Args:
+            frame_ids: List of AI frame IDs to inject
+            target_rom: Target ROM path for injection
+        """
+        self._batch_injection_target_rom = target_rom
+        self._batch_injection_pending = set(frame_ids)
+        self._batch_injection_success = set()
+        self._batch_injection_failed_stale = set()
+
+    def clear_batch_injection(self) -> None:
+        """Clear batch injection tracking state."""
+        self._batch_injection_target_rom = None
+        self._batch_injection_pending = set()
+        self._batch_injection_success = set()
+        self._batch_injection_failed_stale = set()
+
+    def is_batch_injection_active(self) -> bool:
+        """Check if a batch injection is in progress."""
+        return len(self._batch_injection_pending) > 0
+
+    def record_batch_injection_result(self, ai_frame_id: str, success: bool, stale_entries: bool = False) -> None:
+        """Record the result of a single injection in the batch.
+
+        Args:
+            ai_frame_id: The frame ID that was injected
+            success: Whether the injection succeeded
+            stale_entries: Whether failure was due to stale entries
+        """
+        self._batch_injection_pending.discard(ai_frame_id)
+        if success:
+            self._batch_injection_success.add(ai_frame_id)
+        elif stale_entries:
+            self._batch_injection_failed_stale.add(ai_frame_id)
