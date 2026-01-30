@@ -353,6 +353,9 @@ class FrameMappingController(QObject):
         # Replace AI frames using facade (handles index invalidation)
         self._project.replace_ai_frames(frames, directory)  # type: ignore[union-attr]
 
+        # Clear undo history: old commands reference deleted frame IDs
+        self.clear_undo_history()
+
         # Bug #3 fix: Prune orphaned mappings that reference non-existent AI frame IDs
         valid_ids = {f.id for f in frames}
         removed = self._project.filter_mappings_by_valid_ai_ids(valid_ids)  # type: ignore[union-attr]
@@ -408,8 +411,12 @@ class FrameMappingController(QObject):
             height=height,
         )
 
-        # Add to project
-        self._project.add_ai_frame(frame)  # type: ignore[union-attr]
+        # Add to project (may raise ValueError for duplicate ID)
+        try:
+            self._project.add_ai_frame(frame)  # type: ignore[union-attr]
+        except ValueError as e:
+            self.error_occurred.emit(f"Cannot add frame: {e}")
+            return False
 
         self.ai_frames_loaded.emit(len(self._project.ai_frames))  # type: ignore[union-attr]
         # Emit targeted signal instead of project_changed to avoid full refresh
@@ -588,8 +595,19 @@ class FrameMappingController(QObject):
 
         # Cancel any existing parsing operation
         if self._capture_parse_worker is not None:
+            # Disconnect signals FIRST to prevent stale emissions from old worker
+            try:
+                self._capture_parse_worker.file_parsed.disconnect(self._on_capture_file_parsed)
+                self._capture_parse_worker.parse_error.disconnect(self._on_capture_parse_error)
+                self._capture_parse_worker.finished_all.disconnect(self._on_capture_directory_finished)
+            except RuntimeError:
+                pass  # Signals may not be connected
+
             self._capture_parse_worker.requestInterruption()
-            self._capture_parse_worker.wait(1000)
+            if not self._capture_parse_worker.wait(1000):
+                logger.warning("Capture parse worker did not stop in time")
+
+            self._capture_parse_worker.deleteLater()
             self._capture_parse_worker = None
 
         if self._project is None:

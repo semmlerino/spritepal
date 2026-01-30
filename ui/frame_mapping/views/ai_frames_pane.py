@@ -736,6 +736,15 @@ class AIFramesPane(QWidget):
             # Insert at the new position
             self._list.insertItem(to_index, item)
 
+            # Update index metadata for all affected items
+            # After move, positions between min/max indices have shifted
+            start = min(from_index, to_index)
+            end = max(from_index, to_index)
+            for row in range(start, end + 1):
+                affected_item = self._list.item(row)
+                if affected_item is not None:  # type: ignore[reportUnnecessaryComparison]
+                    affected_item.setData(Qt.ItemDataRole.UserRole + 1, row)
+
             # Select the moved item
             self._list.setCurrentRow(to_index)
         finally:

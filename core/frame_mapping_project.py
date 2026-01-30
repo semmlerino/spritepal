@@ -490,7 +490,12 @@ class FrameMappingProject:
 
         Returns:
             The added frame (for method chaining)
+
+        Raises:
+            ValueError: If an AI frame with the same ID already exists
         """
+        if self.get_ai_frame_by_id(frame.id) is not None:
+            raise ValueError(f"AI frame with ID '{frame.id}' already exists")
         self.ai_frames.append(frame)
         self._invalidate_ai_frame_index()
         return frame
@@ -604,14 +609,21 @@ class FrameMappingProject:
 
         Returns:
             New AI frame ID if successful, None if frame not found
+
+        Raises:
+            ValueError: If new path would create a duplicate ID
         """
         ai_frame = self._ai_frame_index_by_id.get(old_id)
         if ai_frame is None:
             return None
 
+        # Check for collision before updating path
+        new_id = new_path.name
+        if new_id != old_id and self.get_ai_frame_by_id(new_id) is not None:
+            raise ValueError(f"Cannot rename: AI frame '{new_id}' already exists")
+
         # Update the AI frame's path
         ai_frame.path = new_path
-        new_id = ai_frame.id  # Computed from new path.name
 
         # Update any mapping that references this AI frame
         mapping = self._mapping_index_by_ai.get(old_id)

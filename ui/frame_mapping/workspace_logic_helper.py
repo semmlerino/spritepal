@@ -418,8 +418,8 @@ class WorkspaceLogicHelper:
         if ai_frame is None:
             return
 
-        # Sync AI frames pane (uses index for scroll/selection)
-        self._ai_frames_pane.select_frame(ai_frame.index)
+        # Sync AI frames pane (uses ID-based selection, stable across reordering)
+        self._ai_frames_pane.select_frame_by_id(ai_frame_id)
         self._state.selected_ai_frame_id = ai_frame_id
 
         # Load into canvas
@@ -570,9 +570,8 @@ class WorkspaceLogicHelper:
         if self._state.auto_advance_enabled and ai_frame:
             next_unmapped_id = self.find_next_unmapped_ai_frame(ai_frame.index)
             if next_unmapped_id is not None:
-                next_frame = project.get_ai_frame_by_id(next_unmapped_id)
-                if next_frame:
-                    self._ai_frames_pane.select_frame(next_frame.index, emit_signal=True)
+                # Use ID-based selection (stable across reordering)
+                self._ai_frames_pane.select_frame_by_id(next_unmapped_id, emit_signal=True)
 
     def find_next_unmapped_ai_frame(self, current_index: int) -> str | None:
         """Find the next unmapped AI frame after the given index.

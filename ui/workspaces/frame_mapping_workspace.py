@@ -659,7 +659,8 @@ class FrameMappingWorkspace(QWidget):
             return
 
         # Select the frame and trigger handler via signal (P2: unified signal pattern)
-        self._ai_frames_pane.select_frame(ai_frame.index, emit_signal=True)
+        # Use ID-based selection (stable across reordering)
+        self._ai_frames_pane.select_frame_by_id(ai_frame_id, emit_signal=True)
 
         # Focus the canvas for keyboard input
         self._alignment_canvas.focus_canvas()
@@ -1648,6 +1649,7 @@ class FrameMappingWorkspace(QWidget):
             # Empty tab - clear frames and orphaned mappings
             self._controller.project.replace_ai_frames([], None)
             self._controller.project.filter_mappings_by_valid_ai_ids(set())
+            self._controller.clear_undo_history()  # Clear undo: old commands reference deleted frames
             self._controller.project_changed.emit()
 
     def _on_frame_rename_requested(self, frame_id: str, display_name: str) -> None:
