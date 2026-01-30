@@ -129,7 +129,12 @@ class FrameMappingRepository:
 
         # Resolve ai_frames_dir to absolute path
         ai_frames_dir_raw = data.get("ai_frames_dir")
-        ai_frames_dir = Path(cast(str, ai_frames_dir_raw)) if ai_frames_dir_raw else None
+        ai_frames_dir = None
+        if ai_frames_dir_raw:
+            # Normalize separators for cross-platform compatibility
+            ai_frames_dir_str = cast(str, ai_frames_dir_raw).replace("\\", "/")
+            ai_frames_dir = Path(ai_frames_dir_str)
+
         if ai_frames_dir and not ai_frames_dir.is_absolute():
             ai_frames_dir = base_path / ai_frames_dir
 

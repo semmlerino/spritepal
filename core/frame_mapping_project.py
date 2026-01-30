@@ -218,7 +218,10 @@ class AIFrame:
             Handles backward compatibility - display_name and tags default to
             None/empty if not present (V3 files).
         """
-        path = Path(cast(str, data["path"]))
+        path_str = cast(str, data["path"])
+        # Normalize separators to forward slashes for cross-platform compatibility
+        # This handles Windows paths (using backslashes) loaded on Linux
+        path = Path(path_str.replace("\\", "/"))
         if base_path and not path.is_absolute():
             path = base_path / path
 
@@ -302,7 +305,11 @@ class GameFrame:
             base_path: Optional base directory to resolve relative paths against.
         """
         capture_path_raw = data.get("capture_path")
-        capture_path = Path(cast(str, capture_path_raw)) if capture_path_raw else None
+        capture_path = None
+        if capture_path_raw:
+            # Normalize separators to forward slashes for cross-platform compatibility
+            capture_path_str = cast(str, capture_path_raw).replace("\\", "/")
+            capture_path = Path(capture_path_str)
 
         if base_path and capture_path and not capture_path.is_absolute():
             capture_path = base_path / capture_path
