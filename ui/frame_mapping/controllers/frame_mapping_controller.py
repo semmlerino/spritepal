@@ -36,6 +36,7 @@ from ui.frame_mapping.facades.ai_frames_facade import AIFramesFacade
 from ui.frame_mapping.facades.controller_context import ControllerContext
 from ui.frame_mapping.facades.game_frames_facade import GameFramesFacade
 from ui.frame_mapping.facades.mappings_facade import MappingsFacade
+from ui.frame_mapping.facades.palette_facade import PaletteFacade
 from ui.frame_mapping.services.ai_frame_service import AIFrameService
 from ui.frame_mapping.services.alignment_service import AlignmentService
 from ui.frame_mapping.services.async_game_frame_preview_service import (
@@ -208,6 +209,11 @@ class FrameMappingController(QObject):
             organization_service=self._organization_service,
             undo_stack=self._undo_stack,
             get_command_context=self._get_command_context,
+        )
+        self._palette = PaletteFacade(
+            context=self._controller_context,
+            signals=self,  # Controller implements PaletteSignals protocol
+            palette_service=self._palette_service,
         )
 
     @property
@@ -816,28 +822,26 @@ class FrameMappingController(QObject):
         """Get the current sheet palette.
 
         Returns:
-            SheetPalette if defined, None otherwise
+            SheetPalette if defined, None otherwise.
         """
-        return self._palette_service.get_sheet_palette(self._project)
+        return self._palette.get_sheet_palette()
 
     def set_sheet_palette(self, palette: SheetPalette | None) -> None:
         """Set the sheet palette for the project.
 
         Args:
-            palette: SheetPalette to set, or None to clear
+            palette: SheetPalette to set, or None to clear.
         """
-        self._palette_service.set_sheet_palette(self._project, palette)
-        self.project_changed.emit()
+        self._palette.set_sheet_palette(palette)
 
     def set_sheet_palette_color(self, index: int, rgb: tuple[int, int, int]) -> None:
         """Update a single color in the sheet palette.
 
         Args:
-            index: Palette index (0-15)
-            rgb: New RGB color tuple
+            index: Palette index (0-15).
+            rgb: New RGB color tuple.
         """
-        self._palette_service.set_sheet_palette_color(self._project, index, rgb)
-        self.project_changed.emit()
+        self._palette.set_sheet_palette_color(index, rgb)
 
     def _invalidate_previews_on_palette_change(self) -> None:
         """Mark all previews as stale and trigger async regeneration.
@@ -863,9 +867,9 @@ class FrameMappingController(QObject):
         """Extract unique colors from all AI frames in the project.
 
         Returns:
-            Dict mapping RGB tuples to pixel counts
+            Dict mapping RGB tuples to pixel counts.
         """
-        return self._palette_service.extract_sheet_colors(self._project)
+        return self._palette.extract_sheet_colors()
 
     def generate_sheet_palette_from_colors(
         self,
@@ -874,31 +878,31 @@ class FrameMappingController(QObject):
         """Generate a 16-color palette from AI sheet colors.
 
         Args:
-            colors: Color counts to use, or None to extract from AI frames
+            colors: Color counts to use, or None to extract from AI frames.
 
         Returns:
-            Generated SheetPalette with auto-mapped colors
+            Generated SheetPalette with auto-mapped colors.
         """
-        return self._palette_service.generate_sheet_palette_from_colors(self._project, colors)
+        return self._palette.generate_sheet_palette_from_colors(colors)
 
     def copy_game_palette_to_sheet(self, game_frame_id: str) -> SheetPalette | None:
         """Create a SheetPalette from a game frame's palette.
 
         Args:
-            game_frame_id: ID of game frame to copy palette from
+            game_frame_id: ID of game frame to copy palette from.
 
         Returns:
-            SheetPalette with the game frame's colors, or None if not found
+            SheetPalette with the game frame's colors, or None if not found.
         """
-        return self._palette_service.copy_game_palette_to_sheet(self._project, game_frame_id)
+        return self._palette.copy_game_palette_to_sheet(game_frame_id)
 
     def get_game_palettes(self) -> dict[str, list[tuple[int, int, int]]]:
         """Get palettes from all game frames.
 
         Returns:
-            Dict mapping game frame IDs to their RGB palettes
+            Dict mapping game frame IDs to their RGB palettes.
         """
-        return self._palette_service.get_game_palettes(self._project)
+        return self._palette.get_game_palettes()
 
     def remove_game_frame(self, frame_id: str) -> bool:
         """Remove a game frame from the project.
