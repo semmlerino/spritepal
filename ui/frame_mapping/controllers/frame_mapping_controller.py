@@ -28,13 +28,12 @@ from core.mesen_integration.click_extractor import (
 )
 from core.repositories.capture_result_repository import CaptureResultRepository
 from core.repositories.frame_mapping_repository import FrameMappingRepository
-from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
-from core.services.injection_results import InjectionRequest
 from core.services.palette_offset_calculator import PaletteOffsetCalculator
 from ui.frame_mapping.facades.ai_frames_facade import AIFramesFacade
 from ui.frame_mapping.facades.controller_context import ControllerContext
 from ui.frame_mapping.facades.game_frames_facade import GameFramesFacade
+from ui.frame_mapping.facades.injection_facade import InjectionFacade
 from ui.frame_mapping.facades.mappings_facade import MappingsFacade
 from ui.frame_mapping.facades.palette_facade import PaletteFacade
 from ui.frame_mapping.facades.preview_facade import PreviewFacade
@@ -222,6 +221,13 @@ class FrameMappingController(QObject):
             preview_service=self._preview_service,
             async_preview_service=self._async_preview_service,
         )
+        self._injection = InjectionFacade(
+            context=self._controller_context,
+            signals=self,  # Controller implements InjectionSignals protocol
+            injection_orchestrator=self._injection_orchestrator,
+            async_injection_service=self._async_injection_service,
+            palette_offset_calculator_getter=lambda: self.palette_offset_calculator,
+        )
 
     @property
     def _project(self) -> FrameMappingProject | None:
@@ -354,6 +360,18 @@ class FrameMappingController(QObject):
     def emit_project_changed(self) -> None:
         """Emit project_changed signal."""
         self.project_changed.emit()
+
+    def emit_status_update(self, message: str) -> None:
+        """Emit status_update signal."""
+        self.status_update.emit(message)
+
+    def emit_stale_entries_warning(self, frame_id: str) -> None:
+        """Emit stale_entries_warning signal."""
+        self.stale_entries_warning.emit(frame_id)
+
+    def emit_mapping_injected(self, ai_frame_id: str, message: str) -> None:
+        """Emit mapping_injected signal."""
+        self.mapping_injected.emit(ai_frame_id, message)
 
     # ─── Undo/Redo Public API ──────────────────────────────────────────────────
 
@@ -974,15 +992,12 @@ class FrameMappingController(QObject):
         Use this to pre-create a copy for batch injection operations.
 
         Args:
-            rom_path: Path to the source ROM
+            rom_path: Path to the source ROM.
 
         Returns:
-            Path to the created copy, or None if creation failed
+            Path to the created copy, or None if creation failed.
         """
-        from core.services.rom_staging_manager import ROMStagingManager
-
-        staging_manager = ROMStagingManager()
-        return staging_manager.create_injection_copy(rom_path, None)
+        return self._injection.create_injection_copy(rom_path)
 
     def _calculate_palette_rom_offset(self, rom_path: Path, game_frame_id: str) -> int | None:
         """Calculate palette ROM offset from game config and frame's palette index.
@@ -1029,105 +1044,30 @@ class FrameMappingController(QObject):
         Delegates to InjectionOrchestrator for the actual injection pipeline.
 
         Args:
-            ai_frame_id: ID of the AI frame to inject (filename)
-            rom_path: Path to the input ROM
-            output_path: Path for the output ROM (default: same as input)
-            create_backup: Whether to create a backup before injection
-            debug: Enable debug mode (saves intermediate images to /tmp/inject_debug/)
-            force_raw: Force RAW (uncompressed) injection for all tiles, skip HAL compression
-            allow_fallback: If True, allow fallback to rom_offset filtering or all entries
-                           when stored entry IDs are stale. If False (default), abort injection
-                           and emit stale_entries_warning for user to decide.
-            emit_project_changed: If True (default), emit project_changed after success.
-                                 Set False for batch operations to emit once at the end.
-            preserve_sprite: If True, original sprite remains visible where AI doesn't
-                            cover it. If False (default), original sprite is completely
-                            removed - only AI content remains.
+            ai_frame_id: ID of the AI frame to inject (filename).
+            rom_path: Path to the input ROM.
+            output_path: Path for the output ROM (default: same as input).
+            create_backup: Whether to create a backup before injection.
+            debug: Enable debug mode.
+            force_raw: Force RAW (uncompressed) injection for all tiles.
+            allow_fallback: Allow fallback to rom_offset filtering.
+            emit_project_changed: If True, emit project_changed after success.
+            preserve_sprite: If True, original sprite remains visible.
 
         Returns:
-            True if injection was successful
+            True if injection was successful.
         """
-        logger.info(
-            "inject_mapping() called: ai_frame_id=%s, rom_path=%s",
-            ai_frame_id,
-            rom_path,
-        )
-
-        if self._project is None:
-            logger.warning("inject_mapping: No project loaded")
-            self.error_occurred.emit("No project loaded")
-            return False
-
-        # Calculate palette ROM offset for injection
-        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
-        palette_rom_offset: int | None = None
-        if mapping is not None:
-            palette_rom_offset = self._calculate_palette_rom_offset(rom_path, mapping.game_frame_id)
-
-        # Build injection request
-        request = InjectionRequest(
+        return self._injection.inject_mapping(
             ai_frame_id=ai_frame_id,
             rom_path=rom_path,
             output_path=output_path,
             create_backup=create_backup,
+            debug=debug,
             force_raw=force_raw,
             allow_fallback=allow_fallback,
-            preserve_sprite=preserve_sprite,
             emit_project_changed=emit_project_changed,
-            palette_rom_offset=palette_rom_offset,
+            preserve_sprite=preserve_sprite,
         )
-
-        # Progress callback wraps Qt signal
-        def emit_progress(msg: str) -> None:
-            self.status_update.emit(msg)
-
-        # Execute via orchestrator with debug context
-        with InjectionDebugContext.from_env() as debug_ctx:
-            # Override with explicit debug flag if passed
-            if debug and not debug_ctx.enabled:
-                debug_ctx = InjectionDebugContext(enabled=True)
-                debug_ctx.__enter__()
-                try:
-                    result = self._injection_orchestrator.execute(
-                        request=request,
-                        project=self._project,
-                        debug_context=debug_ctx,
-                        on_progress=emit_progress,
-                    )
-                finally:
-                    debug_ctx.__exit__(None, None, None)
-            else:
-                result = self._injection_orchestrator.execute(
-                    request=request,
-                    project=self._project,
-                    debug_context=debug_ctx,
-                    on_progress=emit_progress,
-                )
-
-        # Handle stale entries warning
-        if result.needs_fallback_confirmation and result.stale_frame_id:
-            self.stale_entries_warning.emit(result.stale_frame_id)
-
-        # Handle result
-        if result.success:
-            # Update mapping status
-            mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
-            if mapping is not None and result.new_mapping_status:
-                mapping.status = result.new_mapping_status
-
-            self.mapping_injected.emit(ai_frame_id, "\n".join(result.messages))
-
-            # Emit project changed and save requested
-            if emit_project_changed:
-                self.project_changed.emit()
-            self.save_requested.emit()
-
-            return True
-        else:
-            # Emit error
-            if result.error:
-                self.error_occurred.emit(result.error)
-            return False
 
     def inject_mapping_async(
         self,
@@ -1146,44 +1086,24 @@ class FrameMappingController(QObject):
         UI freeze during ROM I/O and image processing.
 
         Args:
-            ai_frame_id: ID of the AI frame to inject (filename)
-            rom_path: Path to the input ROM
-            output_path: Path for the output ROM (default: same as input)
-            create_backup: Whether to create a backup before injection
-            debug: Enable debug mode (saves intermediate images to /tmp/inject_debug/)
-            force_raw: Force RAW (uncompressed) injection for all tiles
-            allow_fallback: Allow fallback to rom_offset filtering when entry IDs stale
-            preserve_sprite: If True, original sprite remains visible where AI doesn't cover
+            ai_frame_id: ID of the AI frame to inject (filename).
+            rom_path: Path to the input ROM.
+            output_path: Path for the output ROM (default: same as input).
+            create_backup: Whether to create a backup before injection.
+            debug: Enable debug mode.
+            force_raw: Force RAW (uncompressed) injection for all tiles.
+            allow_fallback: Allow fallback to rom_offset filtering.
+            preserve_sprite: If True, original sprite remains visible.
         """
-        if self._project is None:
-            self.error_occurred.emit("No project loaded")
-            return
-
-        # Calculate palette ROM offset for injection
-        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
-        palette_rom_offset: int | None = None
-        if mapping is not None:
-            palette_rom_offset = self._calculate_palette_rom_offset(rom_path, mapping.game_frame_id)
-
-        # Build injection request
-        request = InjectionRequest(
+        self._injection.inject_mapping_async(
             ai_frame_id=ai_frame_id,
             rom_path=rom_path,
             output_path=output_path,
             create_backup=create_backup,
+            debug=debug,
             force_raw=force_raw,
             allow_fallback=allow_fallback,
             preserve_sprite=preserve_sprite,
-            emit_project_changed=True,
-            palette_rom_offset=palette_rom_offset,
-        )
-
-        # Queue for async processing
-        self._async_injection_service.queue_injection(
-            ai_frame_id=ai_frame_id,
-            injection_request=request,
-            project=self._project,
-            debug=debug,
         )
 
     def _on_async_injection_finished(self, ai_frame_id: str, success: bool, message: str, result: object) -> None:
@@ -1219,12 +1139,12 @@ class FrameMappingController(QObject):
     @property
     def async_injection_busy(self) -> bool:
         """Check if an async injection is currently in progress."""
-        return self._async_injection_service.is_busy
+        return self._injection.async_injection_busy()
 
     @property
     def async_injection_pending_count(self) -> int:
         """Get the number of pending async injections."""
-        return self._async_injection_service.pending_count
+        return self._injection.async_injection_pending_count()
 
     # ─── AI Frame Organization (V4) ───────────────────────────────────────────
 
