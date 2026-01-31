@@ -36,10 +36,10 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.mime_constants import MIME_AI_FRAME_REORDER, MIME_GAME_FRAME
+from ui.frame_mapping.services.async_icon_quantizer import AsyncIconQuantizer
 from ui.frame_mapping.services.thumbnail_service import (
     AsyncThumbnailLoader,
     create_quantized_thumbnail,
-    quantize_qpixmap,
 )
 from ui.frame_mapping.views.status_colors import get_status_color
 from utils.logging_config import get_logger
@@ -100,6 +100,9 @@ class MappingPanel(QWidget):
         # Async thumbnail loader for AI frames (avoids UI blocking during refresh)
         self._thumbnail_loader = AsyncThumbnailLoader(self)
         self._thumbnail_loader.thumbnail_ready.connect(self._on_thumbnail_ready)
+        # Async icon quantizer for game frame icons (avoids UI blocking during palette changes)
+        self._icon_quantizer = AsyncIconQuantizer(self)
+        self._icon_quantizer.icon_ready.connect(self._on_quantized_icon_ready)
         # Visibility-based thumbnail loading state
         self._last_visible_range: tuple[int, int] = (-1, -1)
         self._visible_thumbnail_timer = QTimer(self)
@@ -333,7 +336,42 @@ class MappingPanel(QWidget):
                 found = True
                 # Don't break - continue to find all duplicates
         if not found:
-            logger.debug("MappingPanel: no row found for frame_id=%s (table has %d rows)", frame_id, self._table.rowCount())
+            logger.debug(
+                "MappingPanel: no row found for frame_id=%s (table has %d rows)", frame_id, self._table.rowCount()
+            )
+
+    def _on_quantized_icon_ready(self, game_frame_id: str, pixmap: QPixmap, palette_hash: int) -> None:
+        """Handle async quantized icon ready signal.
+
+        Updates the icon cache and all table rows using this game frame.
+
+        Args:
+            game_frame_id: The game frame ID
+            pixmap: The quantized and scaled QPixmap
+            palette_hash: Hash of the palette used for quantization
+        """
+        # Cache the result
+        cache_key = (game_frame_id, palette_hash)
+        self._quantized_icon_cache[cache_key] = pixmap
+
+        # Update all rows using this game frame
+        if self._project is None:
+            return
+
+        for row in range(self._table.rowCount()):
+            checkbox_item = self._table.item(row, 0)
+            if checkbox_item is None:
+                continue
+
+            ai_frame_id = checkbox_item.data(Qt.ItemDataRole.UserRole + 1)
+            if ai_frame_id is None:
+                continue
+
+            mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
+            if mapping is not None and mapping.game_frame_id == game_frame_id:
+                game_item = self._table.item(row, 3)  # Game Frame column
+                if game_item is not None:
+                    game_item.setIcon(QIcon(pixmap))
 
     def _on_scroll(self) -> None:
         """Handle scroll events - debounce thumbnail loading."""
@@ -400,12 +438,15 @@ class MappingPanel(QWidget):
     def _get_quantized_scaled_icon(self, game_frame_id: str, preview: QPixmap) -> QPixmap:
         """Get cached or generate quantized+scaled icon for a game frame.
 
+        If cached, returns immediately. Otherwise, queues async quantization
+        and returns a scaled-but-unquantized placeholder for immediate display.
+
         Args:
             game_frame_id: The game frame ID
             preview: The raw preview QPixmap
 
         Returns:
-            Quantized and scaled QPixmap ready for table icon
+            Quantized and scaled QPixmap if cached, otherwise scaled placeholder
         """
         # Compute palette hash for cache key
         palette_hash = self._compute_palette_hash()
@@ -414,18 +455,33 @@ class MappingPanel(QWidget):
         if cache_key in self._quantized_icon_cache:
             return self._quantized_icon_cache[cache_key]
 
-        # Generate quantized+scaled icon
-        quantized = quantize_qpixmap(preview, self._sheet_palette)
-        scaled = quantized.scaled(
+        # No palette set - just scale and cache
+        if self._sheet_palette is None:
+            scaled = preview.scaled(
+                THUMBNAIL_SIZE,
+                THUMBNAIL_SIZE,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self._quantized_icon_cache[cache_key] = scaled
+            return scaled
+
+        # Queue async quantization
+        self._icon_quantizer.quantize_icon(
+            game_frame_id=game_frame_id,
+            raw_pixmap=preview,
+            sheet_palette=self._sheet_palette,
+            palette_hash=palette_hash,
+            target_size=THUMBNAIL_SIZE,
+        )
+
+        # Return unquantized placeholder for immediate display
+        return preview.scaled(
             THUMBNAIL_SIZE,
             THUMBNAIL_SIZE,
             Qt.AspectRatioMode.KeepAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
-
-        # Cache the result
-        self._quantized_icon_cache[cache_key] = scaled
-        return scaled
 
     def _compute_palette_hash(self) -> int:
         """Compute hash of current sheet palette for cache keys.
