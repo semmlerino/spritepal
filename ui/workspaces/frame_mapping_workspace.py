@@ -1621,11 +1621,10 @@ class FrameMappingWorkspace(QWidget):
         from PySide6.QtGui import QPixmap
 
         if not isinstance(pixmap, QPixmap):
-            print(f"[DEBUG] _on_game_frame_preview_ready: pixmap is not QPixmap for {frame_id}")
+            logger.debug("_on_game_frame_preview_ready: pixmap is not QPixmap for %s", frame_id)
             return
 
-        print(f"[DEBUG] _on_game_frame_preview_ready: {frame_id}, pixmap null={pixmap.isNull()}")
-
+        logger.debug("_on_game_frame_preview_ready: %s, pixmap null=%s", frame_id, pixmap.isNull())
         # Update mapping panel with the fresh preview
         self._mapping_panel.update_game_frame_preview(frame_id, pixmap)
         # Update captures pane thumbnail

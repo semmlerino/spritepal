@@ -112,6 +112,8 @@ class CapturesLibraryPane(QWidget):
         self._list = QListWidget()
         self._list.setIconSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
         self._list.setViewMode(QListWidget.ViewMode.IconMode)  # Grid view
+        # Set grid size to prevent overlapping: icon + padding for text label
+        self._list.setGridSize(QSize(THUMBNAIL_SIZE + 24, THUMBNAIL_SIZE + 44))
         self._list.setResizeMode(QListWidget.ResizeMode.Adjust)
         self._list.setSpacing(4)
         self._list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
@@ -223,10 +225,14 @@ class CapturesLibraryPane(QWidget):
         """
         self._game_frame_previews[frame_id] = preview
 
+        logger.debug(f"CapturesLibraryPane.update_frame_preview: {frame_id}, list count={self._list.count()}")
+
         # Find and update only the affected item
+        found = False
         for row in range(self._list.count()):
             item = self._list.item(row)
             if item is not None and item.data(Qt.ItemDataRole.UserRole) == frame_id:  # type: ignore[reportUnnecessaryComparison]
+                found = True
                 if not preview.isNull():
                     scaled = preview.scaled(
                         THUMBNAIL_SIZE,
@@ -235,7 +241,11 @@ class CapturesLibraryPane(QWidget):
                         Qt.TransformationMode.SmoothTransformation,
                     )
                     item.setIcon(QIcon(scaled))
+                    logger.debug(f"Set icon for {frame_id}, scaled size={scaled.size()}")
                 break
+
+        if not found:
+            logger.warning(f"update_frame_preview: Item not found for {frame_id}")
 
     def get_selected_id(self) -> str | None:
         """Get the currently selected game frame ID."""

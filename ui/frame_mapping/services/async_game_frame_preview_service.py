@@ -68,6 +68,11 @@ class _GameFramePreviewWorker(QObject):
             self._target_request_id = req_id
             self._stop_requested = True
 
+    def init_target_request_id(self, req_id: int) -> None:
+        """Initialize target request ID for new work (does not set stop flag)."""
+        with QMutexLocker(self._state_mutex):
+            self._target_request_id = req_id
+
     def _should_cancel(self, request_id: int) -> bool:
         """Check if this request should be cancelled."""
         with QMutexLocker(self._state_mutex):
@@ -217,9 +222,10 @@ class AsyncGameFramePreviewService(QObject):
         if not requests:
             self.batch_finished.emit()
             return
-
         # Create worker and thread
         self._worker = _GameFramePreviewWorker()
+        # Initialize target request ID BEFORE moving to thread (fixes race condition)
+        self._worker.init_target_request_id(request_id)
         self._thread = QThread()
         self._thread.setObjectName(f"AsyncGameFramePreviewService-{request_id}")
         self._worker.moveToThread(self._thread)
