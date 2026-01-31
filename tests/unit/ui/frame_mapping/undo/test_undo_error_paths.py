@@ -191,25 +191,20 @@ class TestRedoAfterProjectReload:
         assert not populated_controller.can_redo()
 
 
-class TestUpdateAlignmentNoHistoryErrors:
-    """Tests for _update_alignment_no_history error cases."""
-
-    def test_returns_false_without_project(self, controller: FrameMappingController) -> None:
-        """_update_alignment_no_history returns False without project."""
-        controller._project = None
-
-        alignment = AlignmentState(
-            offset_x=0, offset_y=0, flip_h=False, flip_v=False, scale=1.0, sharpen=0.0, resampling="lanczos"
-        )
-        result = controller._update_alignment_no_history("any_frame", alignment)
-        assert result is False
+class TestAlignmentServiceErrors:
+    """Tests for alignment service error cases."""
 
     def test_returns_false_for_nonexistent_frame(self, populated_controller: FrameMappingController) -> None:
-        """_update_alignment_no_history returns False for nonexistent frame."""
+        """apply_alignment_to_project returns False for nonexistent frame."""
+        project = populated_controller.project
+        assert project is not None
+
         alignment = AlignmentState(
             offset_x=0, offset_y=0, flip_h=False, flip_v=False, scale=1.0, sharpen=0.0, resampling="lanczos"
         )
-        result = populated_controller._update_alignment_no_history("nonexistent.png", alignment)
+        result = populated_controller._alignment_service.apply_alignment_to_project(
+            project, "nonexistent.png", alignment, set_edited=True
+        )
         assert result is False
 
 
@@ -240,7 +235,9 @@ class TestCommandExecutionErrors:
     def test_undo_remove_mapping_restores_correctly(self, populated_controller: FrameMappingController) -> None:
         """RemoveMappingCommand.undo restores the mapping."""
         # Create a mapping first
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project = populated_controller.project
+        assert project is not None
+        project.create_mapping("sprite_01.png", "capture_A")
 
         ctx = get_ctx(populated_controller)
         cmd = RemoveMappingCommand(
@@ -261,7 +258,9 @@ class TestCommandExecutionErrors:
     def test_undo_update_alignment_restores_correctly(self, populated_controller: FrameMappingController) -> None:
         """UpdateAlignmentCommand.undo restores original alignment."""
         # Create a mapping first
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project = populated_controller.project
+        assert project is not None
+        project.create_mapping("sprite_01.png", "capture_A")
 
         ctx = get_ctx(populated_controller)
         cmd = UpdateAlignmentCommand(

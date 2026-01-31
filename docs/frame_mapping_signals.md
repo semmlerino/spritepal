@@ -497,7 +497,7 @@ User Action: Press Ctrl+Z (Undo)
             └─→ [Controller] undo()
                     ├─→ [UndoStack] undo()
                     │       ├─→ Pop command from undo stack
-                    │       ├─→ [Command] undo() (calls controller _*_no_history methods)
+                    │       ├─→ [Command] undo() (calls service _no_history methods via CommandContext)
                     │       └─→ Return command description
                     │
                     ├─→ [Controller] project_changed.emit()

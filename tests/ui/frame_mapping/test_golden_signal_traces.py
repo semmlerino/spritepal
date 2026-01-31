@@ -110,7 +110,9 @@ class TestCreateMappingUndoSignals:
         undo must emit mapping_created(ai_frame, capture_A) to restore the UI.
         """
         # Create initial mapping
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project = populated_controller.project
+        assert project is not None
+        project.create_mapping("sprite_01.png", "capture_A")
 
         collector = SignalCollector()
         collector.connect_signals(populated_controller, ["mapping_created", "mapping_removed"])
@@ -145,7 +147,9 @@ class TestRemoveMappingUndoSignals:
         doesn't update to show the restored alignment offsets.
         """
         # Create mapping with alignment
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project = populated_controller.project
+        assert project is not None
+        project.create_mapping("sprite_01.png", "capture_A")
         alignment = AlignmentState(
             offset_x=5,
             offset_y=10,
@@ -155,7 +159,9 @@ class TestRemoveMappingUndoSignals:
             sharpen=2.0,
             resampling="nearest",
         )
-        populated_controller._update_alignment_no_history("sprite_01.png", alignment)
+        populated_controller._alignment_service.apply_alignment_to_project(
+            project, "sprite_01.png", alignment, set_edited=True
+        )
 
         collector = SignalCollector()
         collector.connect_signals(populated_controller, ["mapping_created", "mapping_removed", "alignment_updated"])
@@ -209,7 +215,9 @@ class TestUpdateAlignmentUndoSignals:
         shows stale alignment after undo.
         """
         # Create mapping
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project = populated_controller.project
+        assert project is not None
+        project.create_mapping("sprite_01.png", "capture_A")
 
         collector = SignalCollector()
         collector.connect_signals(populated_controller, ["alignment_updated"])
@@ -255,7 +263,9 @@ class TestUpdateAlignmentUndoSignals:
         happens in the controller's update_mapping_alignment() method.
         Commands use _no_history methods that don't emit.
         """
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project = populated_controller.project
+        assert project is not None
+        project.create_mapping("sprite_01.png", "capture_A")
 
         collector = SignalCollector()
         collector.connect_signals(populated_controller, ["alignment_updated"])

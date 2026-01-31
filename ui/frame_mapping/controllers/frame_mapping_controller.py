@@ -625,12 +625,6 @@ class FrameMappingController(QObject):
         """
         return self._mappings.create_mapping(ai_frame_id, game_frame_id)
 
-    def _create_mapping_no_history(self, ai_frame_id: str, game_frame_id: str) -> None:
-        """Internal: Create mapping without undo history (for command execution)."""
-        if self._project is None:
-            return
-        self._project.create_mapping(ai_frame_id, game_frame_id)
-
     def get_existing_link_for_game_frame(self, game_frame_id: str) -> str | None:
         """Get the AI frame ID currently linked to a game frame.
 
@@ -663,12 +657,6 @@ class FrameMappingController(QObject):
             True if a mapping was removed
         """
         return self._mappings.remove_mapping(ai_frame_id)
-
-    def _remove_mapping_no_history(self, ai_frame_id: str) -> bool:
-        """Internal: Remove mapping without undo history (for command execution)."""
-        if self._project is None:
-            return False
-        return self._project.remove_mapping_for_ai_frame(ai_frame_id)
 
     def update_mapping_alignment(
         self,
@@ -714,24 +702,6 @@ class FrameMappingController(QObject):
             set_edited=set_edited,
             drag_start_alignment=drag_start_alignment,
         )
-
-    def _update_alignment_no_history(self, ai_frame_id: str, alignment: AlignmentState) -> bool:
-        """Internal: Update alignment without undo history (for command execution)."""
-        if self._project is None:
-            return False
-        return self._alignment_service.apply_alignment_to_project(
-            self._project, ai_frame_id, alignment, set_edited=True
-        )
-
-    def _set_mapping_status_no_history(self, ai_frame_id: str, status: str) -> bool:
-        """Internal: Set mapping status without undo history (for command execution)."""
-        if self._project is None:
-            return False
-        mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping is None:
-            return False
-        mapping.status = status
-        return True
 
     def apply_transforms_to_all_mappings(
         self,
@@ -967,10 +937,6 @@ class FrameMappingController(QObject):
         """
         return self._ai_frames.reorder(ai_frame_id, new_index)
 
-    def _reorder_ai_frame_no_history(self, ai_frame_id: str, new_index: int) -> bool:
-        """Internal: Reorder AI frame without undo history (for command execution)."""
-        return self._ai_frames.reorder_no_history(ai_frame_id, new_index)
-
     def update_game_frame_compression(self, frame_id: str, compression_type: str) -> bool:
         """Update compression type for a game frame.
 
@@ -1160,14 +1126,6 @@ class FrameMappingController(QObject):
         """
         return self._ai_frames.rename_frame(frame_id, display_name)
 
-    def _rename_frame_no_history(self, frame_id: str, display_name: str | None) -> bool:
-        """Internal: Rename frame without undo history (for command execution)."""
-        if self._project is None:
-            return False
-        return self._organization_service._rename_frame_no_history(
-            project=self._project, frame_id=frame_id, display_name=display_name
-        )
-
     def add_frame_tag(self, frame_id: str, tag: str) -> bool:
         """Add a tag to an AI frame.
 
@@ -1203,14 +1161,6 @@ class FrameMappingController(QObject):
             True if frame was found and tag toggled
         """
         return self._ai_frames.toggle_tag(frame_id, tag)
-
-    def _toggle_frame_tag_no_history(self, frame_id: str, tag: str) -> bool:
-        """Internal: Toggle frame tag without undo history (for command execution)."""
-        if self._project is None:
-            return False
-        return self._organization_service._toggle_frame_tag_no_history(
-            project=self._project, frame_id=frame_id, tag=tag
-        )
 
     def set_frame_tags(self, frame_id: str, tags: frozenset[str]) -> bool:
         """Set all tags for an AI frame (replace existing).
@@ -1279,14 +1229,6 @@ class FrameMappingController(QObject):
             True if renamed successfully.
         """
         return self._game_frames.rename_capture(game_frame_id, new_name)
-
-    def _rename_capture_no_history(self, game_frame_id: str, display_name: str | None) -> bool:
-        """Internal: Rename capture without undo history (for command execution)."""
-        if self._project is None:
-            return False
-        return self._organization_service._rename_capture_no_history(
-            project=self._project, game_frame_id=game_frame_id, display_name=display_name
-        )
 
     def get_capture_display_name(self, game_frame_id: str) -> str | None:
         """Get display name for a game frame (capture).

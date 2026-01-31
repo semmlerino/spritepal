@@ -10,7 +10,7 @@ that was previously embedded in MappingPanel. The manager handles:
 from __future__ import annotations
 
 
-class SelectionStateManager:
+class BatchSelectionManager:
     """Manages AI frame selection state for batch injection.
 
     Selection behavior:
@@ -21,7 +21,7 @@ class SelectionStateManager:
     """
 
     def __init__(self) -> None:
-        """Initialize the selection state manager."""
+        """Initialize the batch selection manager."""
         # None = use default behavior (check all mapped frames)
         # set[str] = explicit user selections (even if empty)
         self._user_checked_ids: set[str] | None = None

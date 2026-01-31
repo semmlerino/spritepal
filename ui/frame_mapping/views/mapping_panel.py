@@ -41,7 +41,7 @@ from ui.frame_mapping.services.thumbnail_service import (
     AsyncThumbnailLoader,
     create_quantized_thumbnail,
 )
-from ui.frame_mapping.state.selection_state_manager import SelectionStateManager
+from ui.frame_mapping.state.batch_selection_manager import BatchSelectionManager
 from ui.frame_mapping.views.status_colors import get_status_color
 from utils.logging_config import get_logger
 
@@ -87,7 +87,7 @@ class MappingPanel(QWidget):
         self._game_frame_previews: dict[str, QPixmap] = {}
         self._drop_target_row: int | None = None
         # Selection state manager handles checkbox tracking for batch injection
-        self._selection_state = SelectionStateManager()
+        self._selection_state = BatchSelectionManager()
         # Sheet palette for quantized AI frame thumbnails
         self._sheet_palette: SheetPalette | None = None
         # Cache for quantized+scaled game frame icons

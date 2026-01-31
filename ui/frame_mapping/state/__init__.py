@@ -4,6 +4,6 @@ This module contains managers for stateful business logic that was
 previously embedded in view classes.
 """
 
-from ui.frame_mapping.state.selection_state_manager import SelectionStateManager
+from ui.frame_mapping.state.batch_selection_manager import BatchSelectionManager
 
-__all__ = ["SelectionStateManager"]
+__all__ = ["BatchSelectionManager"]

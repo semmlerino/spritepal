@@ -120,11 +120,13 @@ class TestCreateMappingCommand:
         assert project is not None
 
         # Create initial mapping with all alignment properties
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project.create_mapping("sprite_01.png", "capture_A")
         prev_alignment = AlignmentState(
             offset_x=10, offset_y=20, flip_h=True, flip_v=False, scale=0.5, sharpen=1.5, resampling="nearest"
         )
-        populated_controller._update_alignment_no_history("sprite_01.png", prev_alignment)
+        populated_controller._alignment_service.apply_alignment_to_project(
+            project, "sprite_01.png", prev_alignment, set_edited=True
+        )
 
         # Command to remap to different game frame (capture all properties)
         cmd = CreateMappingCommand(
@@ -172,7 +174,7 @@ class TestRemoveMappingCommand:
         assert project is not None
 
         # Create a mapping first
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project.create_mapping("sprite_01.png", "capture_A")
         assert project.get_mapping_for_ai_frame("sprite_01.png") is not None
 
         cmd = RemoveMappingCommand(
@@ -191,11 +193,13 @@ class TestRemoveMappingCommand:
         assert project is not None
 
         # Create and configure a mapping with all alignment properties
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project.create_mapping("sprite_01.png", "capture_A")
         removed_alignment = AlignmentState(
             offset_x=5, offset_y=10, flip_h=False, flip_v=True, scale=0.75, sharpen=2.0, resampling="nearest"
         )
-        populated_controller._update_alignment_no_history("sprite_01.png", removed_alignment)
+        populated_controller._alignment_service.apply_alignment_to_project(
+            project, "sprite_01.png", removed_alignment, set_edited=True
+        )
 
         cmd = RemoveMappingCommand(
             ctx=get_ctx(populated_controller),
@@ -246,7 +250,7 @@ class TestUpdateAlignmentCommand:
         assert project is not None
 
         # Create a mapping first
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project.create_mapping("sprite_01.png", "capture_A")
 
         cmd = UpdateAlignmentCommand(
             ctx=get_ctx(populated_controller),
@@ -275,7 +279,7 @@ class TestUpdateAlignmentCommand:
         assert project is not None
 
         # Create a mapping first
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project.create_mapping("sprite_01.png", "capture_A")
 
         cmd = UpdateAlignmentCommand(
             ctx=get_ctx(populated_controller),
@@ -310,11 +314,13 @@ class TestUpdateAlignmentCommand:
         assert project is not None
 
         # Create a mapping with specific sharpen/resampling values
-        populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
+        project.create_mapping("sprite_01.png", "capture_A")
         initial_alignment = AlignmentState(
             offset_x=0, offset_y=0, flip_h=False, flip_v=False, scale=1.0, sharpen=2.5, resampling="nearest"
         )
-        populated_controller._update_alignment_no_history("sprite_01.png", initial_alignment)
+        populated_controller._alignment_service.apply_alignment_to_project(
+            project, "sprite_01.png", initial_alignment, set_edited=True
+        )
 
         # Verify initial state
         mapping = project.get_mapping_for_ai_frame("sprite_01.png")
@@ -394,7 +400,9 @@ class TestRenameAIFrameCommand:
         assert project is not None
 
         # Set initial name
-        populated_controller._rename_frame_no_history("sprite_01.png", "Idle")
+        populated_controller._organization_service._rename_frame_no_history(
+            project=project, frame_id="sprite_01.png", display_name="Idle"
+        )
 
         cmd = RenameAIFrameCommand(
             ctx=get_ctx(populated_controller),
@@ -437,7 +445,9 @@ class TestRenameCaptureCommand:
         assert project is not None
 
         # Set initial name
-        populated_controller._rename_capture_no_history("capture_A", "Frame 1")
+        populated_controller._organization_service._rename_capture_no_history(
+            project=project, game_frame_id="capture_A", display_name="Frame 1"
+        )
 
         cmd = RenameCaptureCommand(
             ctx=get_ctx(populated_controller),
