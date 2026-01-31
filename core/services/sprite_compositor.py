@@ -95,6 +95,9 @@ class SpriteCompositor:
                   it. AI content composites on top of the original.
         """
         self._uncovered_policy: Literal["transparent", "original"] = uncovered_policy
+        # Cache for rendered original sprites keyed by (capture_id, frozenset of selected entries).
+        # Avoids re-rendering when only transform changes (e.g. during drag).
+        self._original_sprite_cache: dict[tuple[int, frozenset[int] | None], Image.Image] = {}
 
     def composite_frame(
         self,
@@ -138,9 +141,16 @@ class SpriteCompositor:
         # Filter capture to selected entries if specified
         filtered_capture = self._filter_capture(capture_result, selected_entry_ids)
 
-        # Render original sprite from capture
-        renderer = CaptureRenderer(filtered_capture)
-        original_sprite = renderer.render_selection()
+        # Render original sprite from capture (with caching for drag performance)
+        # Cache key: (capture identity, frozenset of selected entries or None)
+        entry_key = frozenset(selected_entry_ids) if selected_entry_ids else None
+        cache_key = (id(capture_result), entry_key)
+        if cache_key in self._original_sprite_cache:
+            original_sprite = self._original_sprite_cache[cache_key]
+        else:
+            renderer = CaptureRenderer(filtered_capture)
+            original_sprite = renderer.render_selection()
+            self._original_sprite_cache[cache_key] = original_sprite
 
         # Get canvas dimensions from bounding box
         bbox = filtered_capture.bounding_box

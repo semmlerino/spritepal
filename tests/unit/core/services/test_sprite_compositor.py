@@ -1057,3 +1057,86 @@ class TestPaletteInvariantAssertions:
 
         assert result is not None
         assert result.composited_image is not None
+
+
+class TestOriginalSpriteCache:
+    """Test caching of original sprite rendering for drag performance."""
+
+    def test_cache_hit_on_same_capture(self) -> None:
+        """Calling composite_frame multiple times with same capture uses cache."""
+        from unittest.mock import patch
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        ai_image = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
+
+        entry = MockEntry(id=0, x=0, y=0, width=16, height=16)
+        capture = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16})
+
+        transform1 = TransformParams(offset_x=0, offset_y=0)
+        transform2 = TransformParams(offset_x=2, offset_y=2)  # Different offset
+
+        # Patch CaptureRenderer to track calls
+        with patch("core.services.sprite_compositor.CaptureRenderer") as mock_renderer:
+            mock_instance = mock_renderer.return_value
+            mock_instance.render_selection.return_value = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+
+            # First call - should create renderer
+            compositor.composite_frame(ai_image, capture, transform1, quantize=False)
+            assert mock_renderer.call_count == 1
+
+            # Second call with same capture but different transform - should use cache
+            compositor.composite_frame(ai_image, capture, transform2, quantize=False)
+            assert mock_renderer.call_count == 1, "Should reuse cached sprite, not re-render"
+
+    def test_cache_miss_on_different_capture(self) -> None:
+        """Different capture_result causes cache miss."""
+        from unittest.mock import patch
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        ai_image = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
+
+        entry = MockEntry(id=0, x=0, y=0, width=16, height=16)
+        capture1 = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16})
+        capture2 = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16})  # Different object
+
+        transform = TransformParams()
+
+        with patch("core.services.sprite_compositor.CaptureRenderer") as mock_renderer:
+            mock_instance = mock_renderer.return_value
+            mock_instance.render_selection.return_value = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+
+            compositor.composite_frame(ai_image, capture1, transform, quantize=False)
+            assert mock_renderer.call_count == 1
+
+            # Different capture object - should NOT use cache
+            compositor.composite_frame(ai_image, capture2, transform, quantize=False)
+            assert mock_renderer.call_count == 2, "Different capture should trigger re-render"
+
+    def test_cache_miss_on_different_selected_entries(self) -> None:
+        """Different selected_entry_ids causes cache miss."""
+        from unittest.mock import patch
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        ai_image = Image.new("RGBA", (16, 16), (255, 0, 0, 255))
+
+        entry1 = MockEntry(id=0, x=0, y=0, width=8, height=8)
+        entry2 = MockEntry(id=1, x=8, y=0, width=8, height=8)
+        capture = MockCaptureResult(entries=[entry1, entry2], palettes={0: [(0, 0, 0)] * 16})
+
+        transform = TransformParams()
+
+        with patch("core.services.sprite_compositor.CaptureRenderer") as mock_renderer:
+            mock_instance = mock_renderer.return_value
+            mock_instance.render_selection.return_value = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+
+            # First call with entry 0 selected
+            compositor.composite_frame(ai_image, capture, transform, selected_entry_ids=[0], quantize=False)
+            assert mock_renderer.call_count == 1
+
+            # Second call with entry 1 selected - different selection, should miss cache
+            compositor.composite_frame(ai_image, capture, transform, selected_entry_ids=[1], quantize=False)
+            assert mock_renderer.call_count == 2, "Different selected entries should trigger re-render"
+
+            # Third call with entry 0 again - should hit cache
+            compositor.composite_frame(ai_image, capture, transform, selected_entry_ids=[0], quantize=False)
+            assert mock_renderer.call_count == 2, "Same selection should use cache"
