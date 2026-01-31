@@ -503,6 +503,10 @@ class MappingPanel(QWidget):
         Args:
             palette: SheetPalette to use, or None to show original colors
         """
+        # Skip if palette is unchanged (same object or both None)
+        if palette is self._sheet_palette:
+            return
+
         self._sheet_palette = palette
         # Clear quantized icon cache since palette changed
         self._quantized_icon_cache.clear()
