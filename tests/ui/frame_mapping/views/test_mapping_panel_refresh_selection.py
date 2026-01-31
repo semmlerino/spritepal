@@ -226,3 +226,137 @@ class TestRefreshPreservesSelection:
 
         # No spurious signals
         assert signal_emissions == [], f"Unexpected signals: {signal_emissions}"
+
+
+class TestRefreshPreservesCheckboxState:
+    """Tests for MappingPanel.refresh() checkbox state preservation.
+
+    Issue: After injection, user-modified checkbox states were being reset.
+    These tests verify that checkbox state is preserved across refresh() calls.
+    """
+
+    def test_refresh_preserves_unchecked_state(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Unchecked checkboxes should remain unchecked after refresh.
+
+        Scenario: User unchecks some mapped frames, then refresh is called.
+        Expected: The unchecked state is preserved.
+        """
+        from PySide6.QtCore import Qt
+
+        from core.frame_mapping_project import FrameMapping, GameFrame
+
+        panel = MappingPanel()
+        qtbot.addWidget(panel)
+
+        project = create_test_project(tmp_path, num_frames=3)
+        # Add mappings so all frames are initially checked
+        project.game_frames = [GameFrame(id="GF001")]
+        project.mappings = [
+            FrameMapping(ai_frame_id=f.id, game_frame_id="GF001", offset_x=0, offset_y=0)
+            for f in project.ai_frames
+        ]
+        project._invalidate_mapping_index()
+
+        panel.set_project(project)
+        panel.refresh()
+
+        # Initially all mapped frames should be checked
+        for row in range(3):
+            checkbox = panel._table.item(row, 0)
+            assert checkbox is not None
+            assert checkbox.checkState() == Qt.CheckState.Checked
+
+        # User unchecks the second frame
+        checkbox_1 = panel._table.item(1, 0)
+        assert checkbox_1 is not None
+        checkbox_1.setCheckState(Qt.CheckState.Unchecked)
+
+        # Refresh (simulating project_changed during injection)
+        panel.refresh()
+
+        # Checkbox states should be preserved
+        checkbox_0 = panel._table.item(0, 0)
+        checkbox_1 = panel._table.item(1, 0)
+        checkbox_2 = panel._table.item(2, 0)
+        assert checkbox_0 is not None
+        assert checkbox_1 is not None
+        assert checkbox_2 is not None
+        assert checkbox_0.checkState() == Qt.CheckState.Checked, "Frame 0 should be checked"
+        assert checkbox_1.checkState() == Qt.CheckState.Unchecked, "Frame 1 should remain unchecked"
+        assert checkbox_2.checkState() == Qt.CheckState.Checked, "Frame 2 should be checked"
+
+    def test_multiple_refreshes_preserve_checkbox_state(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """Multiple rapid refreshes should all preserve checkbox state.
+
+        Scenario: During batch injection, multiple project_changed signals
+        trigger multiple refresh() calls. Checkbox state must be preserved.
+        """
+        from PySide6.QtCore import Qt
+
+        from core.frame_mapping_project import FrameMapping, GameFrame
+
+        panel = MappingPanel()
+        qtbot.addWidget(panel)
+
+        project = create_test_project(tmp_path, num_frames=5)
+        project.game_frames = [GameFrame(id="GF001")]
+        project.mappings = [
+            FrameMapping(ai_frame_id=f.id, game_frame_id="GF001", offset_x=0, offset_y=0)
+            for f in project.ai_frames
+        ]
+        project._invalidate_mapping_index()
+
+        panel.set_project(project)
+        panel.refresh()
+
+        # User unchecks frames 1 and 3
+        panel._table.item(1, 0).setCheckState(Qt.CheckState.Unchecked)
+        panel._table.item(3, 0).setCheckState(Qt.CheckState.Unchecked)
+
+        # Simulate multiple refresh calls (like during batch injection)
+        for _ in range(10):
+            panel.refresh()
+
+        # Checkbox states should still be preserved
+        assert panel._table.item(0, 0).checkState() == Qt.CheckState.Checked
+        assert panel._table.item(1, 0).checkState() == Qt.CheckState.Unchecked
+        assert panel._table.item(2, 0).checkState() == Qt.CheckState.Checked
+        assert panel._table.item(3, 0).checkState() == Qt.CheckState.Unchecked
+        assert panel._table.item(4, 0).checkState() == Qt.CheckState.Checked
+
+    def test_set_sheet_palette_same_object_skips_refresh(self, qtbot: QtBot, tmp_path: Path) -> None:
+        """set_sheet_palette with same object should skip refresh.
+
+        Scenario: During project_changed, set_sheet_palette is called with
+        the same palette object. No refresh should occur, preserving state.
+        """
+        from PySide6.QtCore import Qt
+
+        from core.frame_mapping_project import FrameMapping, GameFrame, SheetPalette
+
+        panel = MappingPanel()
+        qtbot.addWidget(panel)
+
+        project = create_test_project(tmp_path, num_frames=3)
+        project.game_frames = [GameFrame(id="GF001")]
+        project.mappings = [
+            FrameMapping(ai_frame_id=f.id, game_frame_id="GF001", offset_x=0, offset_y=0)
+            for f in project.ai_frames
+        ]
+        project._invalidate_mapping_index()
+
+        # Set initial palette and refresh
+        palette = SheetPalette(colors=[(0, 0, 0), (255, 255, 255)], color_mappings={})
+        panel.set_project(project)
+        panel.set_sheet_palette(palette)
+
+        # User unchecks second frame
+        panel._table.item(1, 0).setCheckState(Qt.CheckState.Unchecked)
+
+        # Simulate project_changed calling set_sheet_palette with SAME palette
+        panel.set_sheet_palette(palette)  # Should skip refresh (identity check)
+
+        # Checkbox state should be preserved (no refresh occurred)
+        assert panel._table.item(0, 0).checkState() == Qt.CheckState.Checked
+        assert panel._table.item(1, 0).checkState() == Qt.CheckState.Unchecked
+        assert panel._table.item(2, 0).checkState() == Qt.CheckState.Checked
