@@ -41,6 +41,7 @@ from ui.frame_mapping.services.thumbnail_service import (
     AsyncThumbnailLoader,
     create_quantized_thumbnail,
 )
+from ui.frame_mapping.state.selection_state_manager import SelectionStateManager
 from ui.frame_mapping.views.status_colors import get_status_color
 from utils.logging_config import get_logger
 
@@ -85,9 +86,8 @@ class MappingPanel(QWidget):
         self._project: FrameMappingProject | None = None
         self._game_frame_previews: dict[str, QPixmap] = {}
         self._drop_target_row: int | None = None
-        # Track user-toggled checkbox state by AI frame ID (stable across reloads)
-        # None = use default (checked if mapped), set = explicit user choices
-        self._user_checked_ai_frame_ids: set[str] | None = None
+        # Selection state manager handles checkbox tracking for batch injection
+        self._selection_state = SelectionStateManager()
         # Sheet palette for quantized AI frame thumbnails
         self._sheet_palette: SheetPalette | None = None
         # Cache for quantized+scaled game frame icons
@@ -257,7 +257,7 @@ class MappingPanel(QWidget):
         """
         self._project = project
         # Reset checkbox state when loading a new project
-        self._user_checked_ai_frame_ids = None
+        self._selection_state.reset()
 
     def set_game_frame_previews(self, previews: dict[str, QPixmap]) -> None:
         """Set the game frame preview pixmaps for thumbnail display.
@@ -514,17 +514,11 @@ class MappingPanel(QWidget):
         # Store current selection by ID (stable across reordering)
         current_selection_id = self.get_selected_ai_frame_id()
 
-        # Capture current checkbox state by AI frame ID (stable across index changes)
-        # Only capture if user has modified checkboxes (_user_checked_ai_frame_ids is not None)
-        # or if there's existing data to preserve
+        # Capture current checkbox state (stable across index changes)
+        # Only update if user has explicitly modified checkboxes
         if self._project is not None and self._table.rowCount() > 0:
             captured_checked_ids = self._capture_checkbox_state()
-            # Once user has interacted with checkboxes, preserve their choices
-            if self._user_checked_ai_frame_ids is not None:
-                # Update with any new checked items, remove unchecked items
-                self._user_checked_ai_frame_ids = captured_checked_ids
-            # Note: if _user_checked_ai_frame_ids is None, we use default behavior
-            # (checked = mapped) until user explicitly changes a checkbox
+            self._selection_state.update_from_refresh(captured_checked_ids)
 
         # Block signals during rebuild to prevent spurious selection events
         self._table.blockSignals(True)
@@ -551,13 +545,8 @@ class MappingPanel(QWidget):
                 checkbox_item = QTableWidgetItem()
                 checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
 
-                # Determine checkbox state:
-                # - If user has toggled checkboxes, use their explicit choices
-                # - Otherwise, default to checked if mapped
-                if self._user_checked_ai_frame_ids is not None:
-                    should_check = ai_frame.id in self._user_checked_ai_frame_ids
-                else:
-                    should_check = is_mapped
+                # Determine checkbox state via selection manager
+                should_check = self._selection_state.should_check(ai_frame.id, is_mapped)
 
                 checkbox_item.setCheckState(Qt.CheckState.Checked if should_check else Qt.CheckState.Unchecked)
                 checkbox_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
@@ -1377,10 +1366,8 @@ class MappingPanel(QWidget):
         if self._project is None:
             return
 
-        # Initialize tracking if not already done
-        if self._user_checked_ai_frame_ids is None:
-            self._user_checked_ai_frame_ids = set()
-
+        # Collect mapped frame IDs and update selection state
+        mapped_ids: set[str] = set()
         self._table.blockSignals(True)
         try:
             for row in range(self._table.rowCount()):
@@ -1390,17 +1377,15 @@ class MappingPanel(QWidget):
                     # Only check mapped frames (use ID-based lookup)
                     if ai_frame_id and self._project.get_mapping_for_ai_frame(ai_frame_id):
                         checkbox_item.setCheckState(Qt.CheckState.Checked)
-                        self._user_checked_ai_frame_ids.add(ai_frame_id)
+                        mapped_ids.add(ai_frame_id)
         finally:
             self._table.blockSignals(False)
 
+        self._selection_state.select_all(mapped_ids)
         self._update_inject_selected_state()
 
     def _on_deselect_all(self) -> None:
         """Uncheck all frames."""
-        # Initialize tracking and clear all
-        self._user_checked_ai_frame_ids = set()
-
         self._table.blockSignals(True)
         try:
             for row in range(self._table.rowCount()):
@@ -1410,24 +1395,23 @@ class MappingPanel(QWidget):
         finally:
             self._table.blockSignals(False)
 
+        self._selection_state.deselect_all()
         self._update_inject_selected_state()
 
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
         """Handle item changes (checkbox state changes)."""
         # Only care about checkbox column (column 0)
         if item.column() == 0:
-            # User has explicitly toggled a checkbox - start tracking their choices
-            if self._user_checked_ai_frame_ids is None:
-                # First user interaction - capture current state as baseline
-                self._user_checked_ai_frame_ids = self._capture_checkbox_state()
-            else:
-                # Update the tracked set based on this change
-                ai_frame_id = item.data(Qt.ItemDataRole.UserRole + 1)
-                if ai_frame_id is not None:
-                    if item.checkState() == Qt.CheckState.Checked:
-                        self._user_checked_ai_frame_ids.add(ai_frame_id)
-                    else:
-                        self._user_checked_ai_frame_ids.discard(ai_frame_id)
+            ai_frame_id = item.data(Qt.ItemDataRole.UserRole + 1)
+            if ai_frame_id is not None:
+                # First user interaction captures baseline state
+                if not self._selection_state.is_tracking_user_selections():
+                    self._selection_state.set_baseline(self._capture_checkbox_state())
+
+                # Update tracked state
+                checked = item.checkState() == Qt.CheckState.Checked
+                self._selection_state.toggle_checked(ai_frame_id, checked)
+
             self._update_inject_selected_state()
 
     def _capture_checkbox_state(self) -> set[str]:
