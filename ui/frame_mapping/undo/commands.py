@@ -49,19 +49,15 @@ class CreateMappingCommand:
         return f"Link {self.ai_frame_id} to {self.game_frame_id}"
 
     def execute(self) -> None:
-        self.ctx.mapping_service.create_mapping_no_history(
-            self.ctx.project, self.ai_frame_id, self.game_frame_id
-        )
+        self.ctx.project.create_mapping(self.ai_frame_id, self.game_frame_id)
 
     def undo(self) -> None:
         # Remove the mapping we just created
-        self.ctx.mapping_service.remove_mapping_no_history(self.ctx.project, self.ai_frame_id)
+        self.ctx.project.remove_mapping_for_ai_frame(self.ai_frame_id)
 
         # Restore previous AI frame mapping if it existed
         if self.prev_ai_mapping_game_id is not None:
-            self.ctx.mapping_service.create_mapping_no_history(
-                self.ctx.project, self.ai_frame_id, self.prev_ai_mapping_game_id
-            )
+            self.ctx.project.create_mapping(self.ai_frame_id, self.prev_ai_mapping_game_id)
             if self.prev_ai_mapping_alignment is not None:
                 self.ctx.alignment_service.apply_alignment_to_project(
                     self.ctx.project, self.ai_frame_id, self.prev_ai_mapping_alignment
@@ -71,9 +67,7 @@ class CreateMappingCommand:
 
         # Restore previous game frame mapping if it existed
         if self.prev_game_mapping_ai_id is not None:
-            self.ctx.mapping_service.create_mapping_no_history(
-                self.ctx.project, self.prev_game_mapping_ai_id, self.game_frame_id
-            )
+            self.ctx.project.create_mapping(self.prev_game_mapping_ai_id, self.game_frame_id)
             if self.prev_game_mapping_alignment is not None:
                 self.ctx.alignment_service.apply_alignment_to_project(
                     self.ctx.project, self.prev_game_mapping_ai_id, self.prev_game_mapping_alignment
@@ -102,21 +96,19 @@ class RemoveMappingCommand:
         return f"Unlink {self.ai_frame_id}"
 
     def execute(self) -> None:
-        self.ctx.mapping_service.remove_mapping_no_history(self.ctx.project, self.ai_frame_id)
+        self.ctx.project.remove_mapping_for_ai_frame(self.ai_frame_id)
 
     def undo(self) -> None:
         if self.removed_game_frame_id is not None:
-            self.ctx.mapping_service.create_mapping_no_history(
-                self.ctx.project, self.ai_frame_id, self.removed_game_frame_id
-            )
+            self.ctx.project.create_mapping(self.ai_frame_id, self.removed_game_frame_id)
             if self.removed_alignment is not None:
                 self.ctx.alignment_service.apply_alignment_to_project(
                     self.ctx.project, self.ai_frame_id, self.removed_alignment
                 )
             # Restore status
-            self.ctx.mapping_service.set_mapping_status_no_history(
-                self.ctx.project, self.ai_frame_id, self.removed_status
-            )
+            mapping = self.ctx.project.get_mapping_for_ai_frame(self.ai_frame_id)
+            if mapping is not None:
+                mapping.status = self.removed_status
             # Emit signals so UI updates
             self.ctx.signal_emitter.emit_mapping_created(self.ai_frame_id, self.removed_game_frame_id)
             self.ctx.signal_emitter.emit_alignment_updated(self.ai_frame_id)
@@ -146,9 +138,9 @@ class UpdateAlignmentCommand:
             self.ctx.project, self.ai_frame_id, self.old_alignment
         )
         # Restore original status
-        self.ctx.mapping_service.set_mapping_status_no_history(
-            self.ctx.project, self.ai_frame_id, self.old_status
-        )
+        mapping = self.ctx.project.get_mapping_for_ai_frame(self.ai_frame_id)
+        if mapping is not None:
+            mapping.status = self.old_status
         # Emit signal so UI updates
         self.ctx.signal_emitter.emit_alignment_updated(self.ai_frame_id)
 
