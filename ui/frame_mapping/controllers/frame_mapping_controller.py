@@ -32,6 +32,8 @@ from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
 from core.services.palette_offset_calculator import PaletteOffsetCalculator
+from ui.frame_mapping.facades.controller_context import ControllerContext
+from ui.frame_mapping.facades.mappings_facade import MappingsFacade
 from ui.frame_mapping.services.ai_frame_service import AIFrameService
 from ui.frame_mapping.services.alignment_service import AlignmentService
 from ui.frame_mapping.services.async_game_frame_preview_service import (
@@ -46,11 +48,8 @@ from ui.frame_mapping.services.preview_service import PreviewService
 from ui.frame_mapping.services.stale_entry_detector import AsyncStaleEntryDetector
 from ui.frame_mapping.undo import (
     CommandContext,
-    CreateMappingCommand,
-    RemoveMappingCommand,
     ReorderAIFrameCommand,
     UndoRedoStack,
-    UpdateAlignmentCommand,
 )
 from ui.frame_mapping.views.workbench_types import AlignmentState
 from utils.logging_config import get_logger
@@ -123,7 +122,8 @@ class FrameMappingController(QObject):
         palette_offset_calculator: PaletteOffsetCalculator | None = None,
     ) -> None:
         super().__init__(parent)
-        self._project: FrameMappingProject | None = None
+        # Use list as mutable holder so context and controller share same reference
+        self._project_holder: list[FrameMappingProject | None] = [None]
         # Shared capture repository for parsed capture file caching (thread-safe)
         # Both PreviewService and AsyncStaleEntryDetector use this to avoid duplicate parsing
         self._capture_repository = capture_repository or CaptureResultRepository()
@@ -177,16 +177,46 @@ class FrameMappingController(QObject):
         self._undo_stack = UndoRedoStack(parent=self)
         self._undo_stack.can_undo_changed.connect(self.can_undo_changed)
         self._undo_stack.can_redo_changed.connect(self.can_redo_changed)
+        # Controller context for facades (shared state)
+        # Pass the project holder so context and controller share same reference
+        self._controller_context = ControllerContext(
+            _project_holder=self._project_holder,
+            undo_stack=self._undo_stack,
+            capture_repository=self._capture_repository,
+        )
+        # Domain facades (thin wrappers grouping related methods)
+        self._mappings = MappingsFacade(
+            context=self._controller_context,
+            signals=self,  # Controller implements MappingsSignals protocol
+            mapping_service=self._mapping_service,
+            alignment_service=self._alignment_service,
+            get_command_context=self._get_command_context,
+        )
+
+    @property
+    def _project(self) -> FrameMappingProject | None:
+        """Internal project accessor via holder."""
+        return self._project_holder[0]
+
+    @_project.setter
+    def _project(self, value: FrameMappingProject | None) -> None:
+        """Internal project setter via holder."""
+        self._project_holder[0] = value
 
     @property
     def project(self) -> FrameMappingProject | None:
         """Get the current project."""
-        return self._project
+        return self._project_holder[0]
+
+    @project.setter
+    def project(self, value: FrameMappingProject | None) -> None:
+        """Set the current project (for testing - prefer new_project/load_project)."""
+        self._project_holder[0] = value
 
     @property
     def has_project(self) -> bool:
         """Check if a project is loaded."""
-        return self._project is not None
+        return self._project_holder[0] is not None
 
     @property
     def capture_repository(self) -> CaptureResultRepository:
@@ -266,6 +296,18 @@ class FrameMappingController(QObject):
     def emit_ai_frame_moved(self, ai_frame_id: str, from_index: int, to_index: int) -> None:
         """Emit ai_frame_moved signal."""
         self.ai_frame_moved.emit(ai_frame_id, from_index, to_index)
+
+    def emit_error(self, message: str) -> None:
+        """Emit error_occurred signal."""
+        self.error_occurred.emit(message)
+
+    def emit_save_requested(self) -> None:
+        """Emit save_requested signal."""
+        self.save_requested.emit()
+
+    def emit_project_changed(self) -> None:
+        """Emit project_changed signal."""
+        self.project_changed.emit()
 
     # ─── Undo/Redo Public API ──────────────────────────────────────────────────
 
@@ -577,40 +619,7 @@ class FrameMappingController(QObject):
         Returns:
             True if mapping was created
         """
-        if self._project is None:
-            self.error_occurred.emit("No project loaded")
-            return False
-
-        # Validate both frames exist
-        is_valid, error_msg = self._mapping_service.validate_mapping_frames(self._project, ai_frame_id, game_frame_id)
-        if not is_valid:
-            self.error_occurred.emit(error_msg)
-            return False
-
-        # Capture previous state for undo
-        (
-            prev_ai_game_id,
-            prev_game_ai_id,
-            prev_ai_alignment,
-            prev_game_alignment,
-        ) = self._mapping_service.capture_create_mapping_undo_state(self._project, ai_frame_id, game_frame_id)
-
-        # Create and execute command via undo stack
-        command = CreateMappingCommand(
-            ctx=self._get_command_context(),
-            ai_frame_id=ai_frame_id,
-            game_frame_id=game_frame_id,
-            prev_ai_mapping_game_id=prev_ai_game_id,
-            prev_game_mapping_ai_id=prev_game_ai_id,
-            prev_ai_mapping_alignment=prev_ai_alignment,
-            prev_game_mapping_alignment=prev_game_alignment,
-        )
-        self._undo_stack.push(command)
-
-        self.mapping_created.emit(ai_frame_id, game_frame_id)
-        self.save_requested.emit()
-        logger.info("Created mapping: AI frame %s -> Game frame %s", ai_frame_id, game_frame_id)
-        return True
+        return self._mappings.create_mapping(ai_frame_id, game_frame_id)
 
     def _create_mapping_no_history(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Internal: Create mapping without undo history (for command execution)."""
@@ -627,7 +636,7 @@ class FrameMappingController(QObject):
         Returns:
             AI frame ID if game frame is linked, None otherwise
         """
-        return self._mapping_service.get_link_for_game_frame(self._project, game_frame_id)
+        return self._mappings.get_existing_link_for_game_frame(game_frame_id)
 
     def get_existing_link_for_ai_frame(self, ai_frame_id: str) -> str | None:
         """Get the game frame ID currently linked to an AI frame.
@@ -638,7 +647,7 @@ class FrameMappingController(QObject):
         Returns:
             Game frame ID if AI frame is linked, None otherwise
         """
-        return self._mapping_service.get_link_for_ai_frame(self._project, ai_frame_id)
+        return self._mappings.get_existing_link_for_ai_frame(ai_frame_id)
 
     def remove_mapping(self, ai_frame_id: str) -> bool:
         """Remove a mapping for an AI frame.
@@ -649,30 +658,7 @@ class FrameMappingController(QObject):
         Returns:
             True if a mapping was removed
         """
-        if self._project is None:
-            return False
-
-        # Capture state for undo
-        undo_state = self._mapping_service.capture_remove_mapping_undo_state(self._project, ai_frame_id)
-        if undo_state is None:
-            return False
-
-        removed_game_id, removed_alignment, removed_status = undo_state
-
-        # Create and execute command via undo stack
-        command = RemoveMappingCommand(
-            ctx=self._get_command_context(),
-            ai_frame_id=ai_frame_id,
-            removed_game_frame_id=removed_game_id,
-            removed_alignment=removed_alignment,
-            removed_status=removed_status,
-        )
-        self._undo_stack.push(command)
-
-        self.mapping_removed.emit(ai_frame_id)
-        self.save_requested.emit()
-        logger.info("Removed mapping for AI frame %s", ai_frame_id)
-        return True
+        return self._mappings.remove_mapping(ai_frame_id)
 
     def _remove_mapping_no_history(self, ai_frame_id: str) -> bool:
         """Internal: Remove mapping without undo history (for command execution)."""
@@ -712,10 +698,8 @@ class FrameMappingController(QObject):
         Returns:
             True if alignment was updated
         """
-        if self._project is None:
-            return False
-
-        new_alignment = AlignmentState(
+        return self._mappings.update_alignment(
+            ai_frame_id=ai_frame_id,
             offset_x=offset_x,
             offset_y=offset_y,
             flip_h=flip_h,
@@ -723,49 +707,9 @@ class FrameMappingController(QObject):
             scale=scale,
             sharpen=sharpen,
             resampling=resampling,
+            set_edited=set_edited,
+            drag_start_alignment=drag_start_alignment,
         )
-
-        # Only record undo for explicit user edits, not auto-centering
-        if set_edited:
-            # Capture state for undo
-            undo_state = self._alignment_service.capture_alignment_undo_state(
-                self._project, ai_frame_id, drag_start_alignment
-            )
-            if undo_state is None:
-                return False
-
-            old_alignment, old_status = undo_state
-
-            # Create and execute command via undo stack
-            command = UpdateAlignmentCommand(
-                ctx=self._get_command_context(),
-                ai_frame_id=ai_frame_id,
-                new_alignment=new_alignment,
-                old_alignment=old_alignment,
-                old_status=old_status,
-            )
-            self._undo_stack.push(command)
-        else:
-            # Auto-centering - update directly without history
-            self._alignment_service.apply_alignment_to_project(
-                self._project, ai_frame_id, new_alignment, set_edited=False
-            )
-
-        # Use targeted signal to avoid full UI refresh (which blanks canvas)
-        self.alignment_updated.emit(ai_frame_id)
-        self.save_requested.emit()
-        logger.info(
-            "Updated alignment for AI frame %s: offset=(%d, %d), flip=(%s, %s), scale=%.2f, sharpen=%.1f, resampling=%s",
-            ai_frame_id,
-            offset_x,
-            offset_y,
-            flip_h,
-            flip_v,
-            scale,
-            sharpen,
-            resampling,
-        )
-        return True
 
     def _update_alignment_no_history(self, ai_frame_id: str, alignment: AlignmentState) -> bool:
         """Internal: Update alignment without undo history (for command execution)."""
@@ -803,18 +747,12 @@ class FrameMappingController(QObject):
         Returns:
             Number of mappings updated
         """
-        if self._project is None:
-            return 0
-
-        updated_count = self._alignment_service.apply_transforms_to_all(
-            self._project, offset_x, offset_y, scale, exclude_ai_frame_id
+        return self._mappings.apply_transforms_to_all(
+            offset_x=offset_x,
+            offset_y=offset_y,
+            scale=scale,
+            exclude_ai_frame_id=exclude_ai_frame_id,
         )
-
-        if updated_count > 0:
-            self.project_changed.emit()
-            self.save_requested.emit()
-
-        return updated_count
 
     def get_game_frame_preview(self, frame_id: str) -> QPixmap | None:
         """Get the rendered preview pixmap for a game frame.
