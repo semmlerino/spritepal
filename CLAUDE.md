@@ -82,6 +82,68 @@ state_mgr = context.application_state_manager
 
 ---
 
+## Agent Delegation
+
+**Default to agents for implementation.** After planning/analysis, delegate execution to agents. This preserves orchestrator context for verification and synthesis. Also delegate high-volume operations (full test runs, extensive exploration) to keep verbose output isolated.
+
+### When to Delegate
+
+| Delegate | Handle Directly |
+|----------|-----------------|
+| Phase is well-defined (know exactly what changes) | Tight exploration loop (reading informs next read) |
+| Implementation is mechanical, even single-file | Complex reasoning required mid-edit |
+| Prompt can fully specify the work | Need to adapt based on what you find |
+| Independent files (parallelize with multiple agents) | Changes are sequential/dependent |
+
+### Planning with Agents
+
+When writing implementation plans, specify **agent** and **model** for each phase:
+
+```markdown
+## Phase N: Description
+**Agent:** python-implementation-specialist | **Model:** haiku
+**Parallel:** Yes (with Phase M) | No
+**Rationale:** [why this agent + model]
+```
+
+### Built-in Agent Selection
+
+| Work Type | Agent | Model |
+|-----------|-------|-------|
+| Codebase questions, understanding flow | `Explore` | haiku |
+| Architecture design, tradeoff analysis | `Plan` | sonnet |
+| Mechanical changes (delete, rename, pattern replace) | `python-implementation-specialist` | haiku |
+| Standard implementation | `python-implementation-specialist` | sonnet |
+| Complex patterns (metaclasses, protocols, decorators) | `python-expert-architect` | sonnet |
+| Cross-cutting refactors, architecture changes | `python-expert-architect` | opus |
+| Code review (routine) | `python-code-reviewer` | haiku |
+| Code review (correctness matters) | `python-code-reviewer` | sonnet |
+| Heisenbugs, security analysis | Orchestrator + specialists | opus |
+
+**Model tradeoff:** Haiku is ~10x cheaper/faster. Use when prompt fully specifies work. Sonnet when judgment required. Opus for genuinely hard problems.
+
+### Prompt Quality
+
+Agents execute what you specify—vague prompts yield vague results.
+
+- **Context-aware agents** see full conversation history—reference earlier context instead of repeating it
+- Include file paths, symbol names, line numbers
+- For parallel agents: "You own ONLY: file_a.py, file_b.py"
+- Specify verification: "verify syntax after each edit"
+
+### Background and Resume
+
+- Use `run_in_background: true` for long-running verification (test suite, type checking) while continuing other work
+- **Resume agents** for follow-up work on the same task—preserves full context from previous execution
+- Check background results with `Read` on the output file
+- Subagents cannot spawn other subagents—chain from the main conversation instead
+
+### Post-Implementation
+
+Spawn `python-code-reviewer` after multi-file or non-obvious changes, before committing. Skip for trivial single-file edits where correctness is obvious.
+
+---
+
 ## Gotchas
 
 Qt/PySide6 pitfalls from real bugs:
