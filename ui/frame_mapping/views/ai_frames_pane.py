@@ -680,12 +680,18 @@ class AIFramesPane(QWidget):
             frame_id: The AI frame ID
             pixmap: The loaded thumbnail pixmap
         """
-        # Find the list item with this frame ID and update its icon
+        # Find ALL list items with this frame ID and update their icons
+        # (handles duplicate filenames in the project)
+        found = False
         for row in range(self._list.count()):
             item = self._list.item(row)
             if item and item.data(Qt.ItemDataRole.UserRole) == frame_id:
                 item.setIcon(QIcon(pixmap))
-                break
+                logger.debug("AIFramesPane: set icon for %s at row %d", frame_id, row)
+                found = True
+                # Don't break - continue to find all duplicates
+        if not found:
+            logger.debug("AIFramesPane: no item found for frame_id=%s (list has %d items)", frame_id, self._list.count())
 
     def _show_rename_dialog(self, frame_id: str) -> None:
         """Show rename dialog for a frame."""

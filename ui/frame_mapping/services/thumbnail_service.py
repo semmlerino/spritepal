@@ -445,16 +445,23 @@ class AsyncThumbnailLoader(QObject):
         Args:
             frame_id: The frame identifier
             qimage: The generated thumbnail image
-            request_id: The request batch ID (stale if != _current_request_id)
+            request_id: The request batch ID (unused - kept for signal signature)
         """
+        # Note: We intentionally do NOT filter by request_id here.
+        # Thumbnails are looked up by stable frame_id (filename), not row index,
+        # so thumbnails from a "cancelled" batch are still valid for the current
+        # table state. Filtering caused race conditions where rapid refresh()
+        # calls would discard valid thumbnails (worker didn't stop in time).
+        _ = request_id  # Unused but kept for signal signature compatibility
         if self._destroyed:
-            return
-        # Filter stale results from cancelled batches
-        if request_id != self._current_request_id:
+            logger.debug("AsyncThumbnailLoader._on_thumbnail_ready: destroyed, ignoring %s", frame_id)
             return
         if not qimage.isNull():
             pixmap = QPixmap.fromImage(qimage)
+            logger.debug("AsyncThumbnailLoader emitting thumbnail_ready for %s", frame_id)
             self.thumbnail_ready.emit(frame_id, pixmap)
+        else:
+            logger.debug("AsyncThumbnailLoader: null qimage for %s", frame_id)
 
     def _on_worker_finished(self) -> None:
         """Clean up after worker finishes."""
@@ -579,11 +586,15 @@ class _ThumbnailWorker(QObject):
         try:
             for frame_id, frame_path in self._requests:
                 if self._is_stop_requested():
+                    logger.debug("Thumbnail worker stopped early at frame_id=%s", frame_id)
                     break
 
                 qimage = self._generate_thumbnail(frame_path)
                 if qimage is not None and not qimage.isNull():
+                    logger.debug("Worker emitting thumbnail_ready for %s (%dx%d)", frame_id, qimage.width(), qimage.height())
                     self.thumbnail_ready.emit(frame_id, qimage, self._request_id)
+                else:
+                    logger.debug("Worker failed to generate thumbnail for %s", frame_id)
         except Exception as e:
             logger.warning("Thumbnail worker error: %s", e, exc_info=True)
         finally:

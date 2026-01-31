@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PySide6.QtCore import QEvent, QMimeData, QObject, QPoint, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QMimeData, QObject, QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -36,6 +37,7 @@ from PySide6.QtWidgets import (
 
 from ui.common.mime_constants import MIME_AI_FRAME_REORDER, MIME_GAME_FRAME
 from ui.frame_mapping.services.thumbnail_service import (
+    AsyncThumbnailLoader,
     create_quantized_thumbnail,
     quantize_qpixmap,
 )
@@ -95,6 +97,15 @@ class MappingPanel(QWidget):
         self._drag_source_row: int | None = None
         self._drag_start_pos: QPoint | None = None
         self._drop_insert_index: int | None = None
+        # Async thumbnail loader for AI frames (avoids UI blocking during refresh)
+        self._thumbnail_loader = AsyncThumbnailLoader(self)
+        self._thumbnail_loader.thumbnail_ready.connect(self._on_thumbnail_ready)
+        # Visibility-based thumbnail loading state
+        self._last_visible_range: tuple[int, int] = (-1, -1)
+        self._visible_thumbnail_timer = QTimer(self)
+        self._visible_thumbnail_timer.timeout.connect(self._load_visible_thumbnails)
+        self._visible_thumbnail_timer.setInterval(100)  # 100ms debounce
+        self._visible_thumbnail_timer.setSingleShot(True)
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -160,6 +171,8 @@ class MappingPanel(QWidget):
 
         self._table.itemSelectionChanged.connect(self._on_selection_changed)
         self._table.itemChanged.connect(self._on_item_changed)
+        # Connect scroll bar to trigger visibility-based thumbnail loading
+        self._table.verticalScrollBar().valueChanged.connect(self._on_scroll)
         layout.addWidget(self._table, 1)
 
         # Selection controls row
@@ -297,6 +310,93 @@ class MappingPanel(QWidget):
                 if game_item is not None:
                     game_item.setIcon(QIcon(scaled))
 
+    def _on_thumbnail_ready(self, frame_id: str, pixmap: QPixmap) -> None:
+        """Handle async thumbnail ready signal.
+
+        Finds the row for the given AI frame ID and sets its thumbnail icon.
+
+        Args:
+            frame_id: The AI frame ID
+            pixmap: The generated thumbnail QPixmap
+        """
+        # Find ALL rows with matching AI frame ID and update their icons
+        # (handles duplicate filenames in the project)
+        found = False
+        for row in range(self._table.rowCount()):
+            ai_item = self._table.item(row, 2)  # AI Frame column
+            if ai_item is None:
+                continue
+            item_frame_id = ai_item.data(Qt.ItemDataRole.UserRole + 1)
+            if item_frame_id == frame_id:
+                ai_item.setIcon(QIcon(pixmap))
+                logger.debug("MappingPanel: set icon for %s at row %d", frame_id, row)
+                found = True
+                # Don't break - continue to find all duplicates
+        if not found:
+            logger.debug("MappingPanel: no row found for frame_id=%s (table has %d rows)", frame_id, self._table.rowCount())
+
+    def _on_scroll(self) -> None:
+        """Handle scroll events - debounce thumbnail loading."""
+        self._visible_thumbnail_timer.start()
+
+    def _load_visible_thumbnails(self) -> None:
+        """Load thumbnails only for visible rows + buffer.
+
+        This implements visibility-based lazy loading following the pattern
+        from SpriteGalleryWidget._update_visible_thumbnails().
+        """
+        if self._project is None:
+            return
+
+        # Get visible viewport bounds
+        viewport = self._table.viewport()
+        viewport_rect = viewport.rect()
+
+        # Find first and last visible rows using table row/column mapping
+        first_row = self._table.rowAt(viewport_rect.top())
+        last_row = self._table.rowAt(viewport_rect.bottom())
+
+        # Handle edge cases
+        first_row = max(first_row, 0)
+        if last_row < 0:
+            last_row = self._table.rowCount() - 1
+
+        # Add buffer rows above and below viewport (5 rows)
+        buffer_rows = 5
+        first_row = max(0, first_row - buffer_rows)
+        last_row = min(self._table.rowCount() - 1, last_row + buffer_rows)
+
+        # Skip if range hasn't changed
+        if (first_row, last_row) == self._last_visible_range:
+            return
+        self._last_visible_range = (first_row, last_row)
+
+        # Collect thumbnail requests for visible rows only
+        thumbnail_requests: list[tuple[str, Path]] = []
+        for row in range(first_row, last_row + 1):
+            ai_item = self._table.item(row, 2)  # AI Frame column
+            if ai_item is None:
+                continue
+
+            # Skip if already has an icon (thumbnail loaded)
+            if not ai_item.icon().isNull():
+                continue
+
+            # Get AI frame ID from item data
+            frame_id = ai_item.data(Qt.ItemDataRole.UserRole + 1)
+            if frame_id is None:
+                continue
+
+            # Find the corresponding AI frame in project
+            ai_frame = self._project.get_ai_frame_by_id(frame_id)
+            if ai_frame is not None:
+                thumbnail_requests.append((ai_frame.id, ai_frame.path))
+
+        # Request thumbnails for visible items only
+        if thumbnail_requests:
+            logger.debug("Requesting %d thumbnails for rows %d-%d", len(thumbnail_requests), first_row, last_row)
+            self._thumbnail_loader.load_thumbnails(thumbnail_requests, self._sheet_palette, THUMBNAIL_SIZE)
+
     def _get_quantized_scaled_icon(self, game_frame_id: str, preview: QPixmap) -> QPixmap:
         """Get cached or generate quantized+scaled icon for a game frame.
 
@@ -374,6 +474,8 @@ class MappingPanel(QWidget):
         self._table.blockSignals(True)
         try:
             self._table.setRowCount(0)
+            # Reset visible range tracking since table was rebuilt
+            self._last_visible_range = (-1, -1)
 
             if self._project is None:
                 self._status_label.setText("No project")
@@ -413,14 +515,11 @@ class MappingPanel(QWidget):
                 self._table.setItem(row, 1, num_item)
 
                 # AI Frame column with thumbnail - column 2
+                # Thumbnails are loaded asynchronously via visibility-based lazy loading
                 ai_item = QTableWidgetItem(ai_frame.path.name)
                 ai_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
                 # Also store AI frame ID for ID-based lookups
                 ai_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
-                # Load thumbnail (palette-quantized if sheet palette is set)
-                thumbnail = create_quantized_thumbnail(ai_frame.path, self._sheet_palette, THUMBNAIL_SIZE)
-                if thumbnail is not None:
-                    ai_item.setIcon(QIcon(thumbnail))
                 self._table.setItem(row, 2, ai_item)
 
                 # Game Frame column - column 3
@@ -470,6 +569,10 @@ class MappingPanel(QWidget):
             mapped = self._project.mapped_count
             total = self._project.total_ai_frames
             self._status_label.setText(f"{mapped}/{total} mapped")
+
+            # Trigger visibility-based thumbnail loading after table is fully built
+            # Use QTimer.singleShot to allow Qt to layout the table first
+            QTimer.singleShot(0, self._load_visible_thumbnails)
 
         finally:
             self._table.blockSignals(False)
