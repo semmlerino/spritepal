@@ -34,6 +34,7 @@ from core.services.injection_results import InjectionRequest
 from core.services.palette_offset_calculator import PaletteOffsetCalculator
 from ui.frame_mapping.facades.ai_frames_facade import AIFramesFacade
 from ui.frame_mapping.facades.controller_context import ControllerContext
+from ui.frame_mapping.facades.game_frames_facade import GameFramesFacade
 from ui.frame_mapping.facades.mappings_facade import MappingsFacade
 from ui.frame_mapping.services.ai_frame_service import AIFrameService
 from ui.frame_mapping.services.alignment_service import AlignmentService
@@ -200,6 +201,14 @@ class FrameMappingController(QObject):
             undo_stack=self._undo_stack,
             get_command_context=self._get_command_context,
         )
+        self._game_frames = GameFramesFacade(
+            context=self._controller_context,
+            signals=self,  # Controller implements GameFramesSignals protocol
+            preview_service=self._preview_service,
+            organization_service=self._organization_service,
+            undo_stack=self._undo_stack,
+            get_command_context=self._get_command_context,
+        )
 
     @property
     def _project(self) -> FrameMappingProject | None:
@@ -312,6 +321,10 @@ class FrameMappingController(QObject):
     def emit_ai_frame_added(self, frame_id: str) -> None:
         """Emit ai_frame_added signal."""
         self.ai_frame_added.emit(frame_id)
+
+    def emit_game_frame_removed(self, frame_id: str) -> None:
+        """Emit game_frame_removed signal."""
+        self.game_frame_removed.emit(frame_id)
 
     def emit_error(self, message: str) -> None:
         """Emit error_occurred signal."""
@@ -795,9 +808,7 @@ class FrameMappingController(QObject):
 
     def get_game_frames(self) -> list[GameFrame]:
         """Get all game frames from the current project."""
-        if self._project is None:
-            return []
-        return self._project.game_frames
+        return self._game_frames.get_frames()
 
     # --- Sheet Palette Methods ---
 
@@ -900,18 +911,7 @@ class FrameMappingController(QObject):
         Returns:
             True if the frame was found and removed.
         """
-        if self._project is None:
-            return False
-
-        # Clear preview cache for this frame
-        self._preview_service.invalidate(frame_id)
-
-        if self._project.remove_game_frame(frame_id):
-            self.game_frame_removed.emit(frame_id)
-            self.project_changed.emit()
-            logger.info("Removed game frame %s", frame_id)
-            return True
-        return False
+        return self._game_frames.remove(frame_id)
 
     def remove_ai_frame(self, frame_id: str) -> bool:
         """Remove an AI frame from the project.
@@ -947,38 +947,15 @@ class FrameMappingController(QObject):
 
         Updates the compression type for all ROM offsets in the game frame.
         By design, compression is a single setting per game frame, not per offset.
-        This routes compression changes through the controller instead of
-        directly mutating game frame state.
 
         Args:
-            frame_id: ID of the game frame
-            compression_type: New compression type ('raw' or 'hal')
+            frame_id: ID of the game frame.
+            compression_type: New compression type ('raw' or 'hal').
 
         Returns:
-            True if the update was successful
+            True if the update was successful.
         """
-        if self._project is None:
-            self.error_occurred.emit("No project loaded")
-            return False
-
-        game_frame = self._project.get_game_frame_by_id(frame_id)
-        if game_frame is None:
-            self.error_occurred.emit(f"Game frame {frame_id} not found")
-            return False
-
-        # Update compression type for all ROM offsets
-        for rom_offset in game_frame.rom_offsets:
-            game_frame.compression_types[rom_offset] = compression_type
-
-        self.project_changed.emit()
-        self.save_requested.emit()
-        logger.info(
-            "Updated compression type for game frame %s to %s (%d offsets)",
-            frame_id,
-            compression_type,
-            len(game_frame.rom_offsets),
-        )
-        return True
+        return self._game_frames.update_compression(frame_id, compression_type)
 
     def create_injection_copy(self, rom_path: Path) -> Path | None:
         """Create a numbered copy of the ROM for injection (public API).
@@ -1364,24 +1341,13 @@ class FrameMappingController(QObject):
         """Set display name for a game frame (capture).
 
         Args:
-            game_frame_id: ID of the game frame to rename
-            new_name: New display name (empty or None to clear)
+            game_frame_id: ID of the game frame to rename.
+            new_name: New display name (empty or None to clear).
 
         Returns:
-            True if renamed successfully, False otherwise
+            True if renamed successfully.
         """
-        if self._project is None:
-            return False
-
-        result = self._organization_service.rename_capture(
-            ctx=self._get_command_context(),
-            undo_stack=self._undo_stack,
-            game_frame_id=game_frame_id,
-            new_name=new_name,
-        )
-        if result:
-            self.save_requested.emit()
-        return result
+        return self._game_frames.rename_capture(game_frame_id, new_name)
 
     def _rename_capture_no_history(self, game_frame_id: str, display_name: str | None) -> bool:
         """Internal: Rename capture without undo history (for command execution)."""
@@ -1395,11 +1361,9 @@ class FrameMappingController(QObject):
         """Get display name for a game frame (capture).
 
         Args:
-            game_frame_id: ID of the game frame
+            game_frame_id: ID of the game frame.
 
         Returns:
-            Display name if set, None otherwise
+            Display name if set, None otherwise.
         """
-        if self._project is None:
-            return None
-        return self._organization_service.get_capture_display_name(project=self._project, game_frame_id=game_frame_id)
+        return self._game_frames.get_display_name(game_frame_id)
