@@ -62,16 +62,14 @@ class _HighlightWorker(QObject):
         super().__init__()
         self._state_mutex = QMutex()
         self._target_request_id = 0
-        self._stop_requested = False
 
     def set_target_request_id(self, req_id: int) -> None:
-        """Update the target request ID and request stop of current work.
+        """Update the target request ID to cancel stale requests.
 
         Thread-safe. Called from main thread.
         """
         with QMutexLocker(self._state_mutex):
             self._target_request_id = req_id
-            self._stop_requested = True
 
     def _should_cancel(self, request_id: int) -> bool:
         """Check if this request should be cancelled.
@@ -82,14 +80,6 @@ class _HighlightWorker(QObject):
         with QMutexLocker(self._state_mutex):
             return request_id != self._target_request_id
 
-    def _clear_stop_flag(self) -> None:
-        """Clear stop flag at start of valid request processing.
-
-        Thread-safe. Called from worker thread.
-        """
-        with QMutexLocker(self._state_mutex):
-            self._stop_requested = False
-
     @Slot(HighlightRequest)
     def process_request(self, request: HighlightRequest) -> None:
         """Generate highlight mask for the request. Runs in Worker Thread."""
@@ -98,9 +88,6 @@ class _HighlightWorker(QObject):
         # Fast rejection if this request is already stale
         if self._should_cancel(request_id):
             return
-
-        # Clear stop flag for this new valid request
-        self._clear_stop_flag()
 
         try:
             ai_image = request.ai_image
@@ -246,8 +233,8 @@ class AsyncHighlightService(QObject):
         self._cached_image_id: int | None = None  # id() of source ai_image
 
         # Create persistent thread and worker
-        self._thread = QThread()
-        self._worker = _HighlightWorker()
+        self._thread: QThread | None = QThread()
+        self._worker: _HighlightWorker | None = _HighlightWorker()
         self._worker.moveToThread(self._thread)
 
         # Connect signals
@@ -365,7 +352,7 @@ class AsyncHighlightService(QObject):
 
         try:
             # Block signals first to prevent emission during cleanup
-            if is_valid_qt(self._worker):
+            if self._worker is not None and is_valid_qt(self._worker):
                 self._worker.blockSignals(True)
                 try:
                     self._worker.highlight_ready.disconnect()
@@ -374,11 +361,11 @@ class AsyncHighlightService(QObject):
                     pass  # Already disconnected or never connected
 
             # Clean up thread via WorkerManager
-            if is_valid_qt(self._thread):
+            if self._thread is not None and is_valid_qt(self._thread):
                 WorkerManager.cleanup_worker(self._thread, timeout=3000)
                 self._thread = None
 
-            if is_valid_qt(self._worker):
+            if self._worker is not None and is_valid_qt(self._worker):
                 self._worker.deleteLater()
                 self._worker = None
         except RuntimeError:

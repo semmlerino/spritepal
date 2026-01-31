@@ -62,16 +62,14 @@ class _PreviewWorker(QObject):
         super().__init__()
         self._state_mutex = QMutex()
         self._target_request_id = 0
-        self._stop_requested = False
 
     def set_target_request_id(self, req_id: int) -> None:
-        """Update the target request ID and request stop of current work.
+        """Update the target request ID to cancel stale requests.
 
         Thread-safe. Called from main thread.
         """
         with QMutexLocker(self._state_mutex):
             self._target_request_id = req_id
-            self._stop_requested = True
 
     def _should_cancel(self, request_id: int) -> bool:
         """Check if this request should be cancelled.
@@ -82,14 +80,6 @@ class _PreviewWorker(QObject):
         with QMutexLocker(self._state_mutex):
             return request_id != self._target_request_id
 
-    def _clear_stop_flag(self) -> None:
-        """Clear stop flag at start of valid request processing.
-
-        Thread-safe. Called from worker thread.
-        """
-        with QMutexLocker(self._state_mutex):
-            self._stop_requested = False
-
     @Slot(PreviewRequest)
     def process_request(self, request: PreviewRequest) -> None:
         """Process preview request. Called from worker thread via signal."""
@@ -98,9 +88,6 @@ class _PreviewWorker(QObject):
         # Fast rejection if this request is already stale
         if self._should_cancel(request_id):
             return
-
-        # Clear stop flag for this new valid request
-        self._clear_stop_flag()
 
         try:
             # Create compositor and generate preview
