@@ -144,6 +144,11 @@ class AsyncInjectionService(QObject):
     injection_progress = Signal(str, str)  # ai_frame_id, message
     injection_finished = Signal(str, bool, str, object)  # ai_frame_id, success, message, result
 
+    # Class-level set to prevent GC of orphaned threads that didn't stop in time
+    _orphaned_threads: set[QThread] = set()
+    # Class-level set to keep threads alive between cleanup attempts
+    _pending_cleanup_threads: set[QThread] = set()
+
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._current_request_id = 0
@@ -197,9 +202,7 @@ class AsyncInjectionService(QObject):
                 messages=(),
                 error=f"Missing mapping or frame data for {ai_frame_id}",
             )
-            self.injection_finished.emit(
-                ai_frame_id, False, result.error or "Snapshot creation failed", result
-            )
+            self.injection_finished.emit(ai_frame_id, False, result.error or "Snapshot creation failed", result)
             return
 
         self._current_request_id += 1
@@ -231,6 +234,7 @@ class AsyncInjectionService(QObject):
         # Create worker and thread
         self._worker = _InjectionWorker()
         self._thread = QThread()
+        self._thread.setObjectName(f"AsyncInjectionService-{request.request_id}")
         self._worker.moveToThread(self._thread)
 
         # Connect signals
@@ -300,24 +304,42 @@ class AsyncInjectionService(QObject):
             if thread.isRunning():
                 thread.quit()
                 if not thread.wait(100):
+                    AsyncInjectionService._pending_cleanup_threads.add(thread)
                     QTimer.singleShot(500, lambda: self._finish_cleanup(thread, worker))
                     self._thread = None
                     self._worker = None
                     return
+            elif not thread.isFinished():
+                # Thread not fully started yet - defer cleanup to avoid premature deletion
+                AsyncInjectionService._pending_cleanup_threads.add(thread)
+                QTimer.singleShot(200, lambda: self._finish_cleanup(thread, worker))
+                self._thread = None
+                self._worker = None
+                return
 
         self._do_cleanup(thread, worker)
 
     def _finish_cleanup(self, thread: QThread, worker: QObject | None) -> None:
         """Complete cleanup after delayed wait."""
+        AsyncInjectionService._pending_cleanup_threads.discard(thread)
         if thread.isRunning():
             logger.warning(f"Thread {thread.__class__.__name__} still running after initial wait")
             thread.quit()
             if not thread.wait(3000):
+                # Keep reference in class-level set to prevent GC while running
+                AsyncInjectionService._pending_cleanup_threads.discard(thread)
+                AsyncInjectionService._orphaned_threads.add(thread)
                 logger.critical(
-                    f"Thread {thread.__class__.__name__} won't stop - orphaning to avoid Qt corruption"
+                    f"Thread {thread.__class__.__name__} won't stop - keeping alive to avoid Qt corruption "
+                    f"(orphaned count: {len(AsyncInjectionService._orphaned_threads)})"
                 )
-                # Don't terminate or delete - let it orphan safely
+                thread.finished.connect(lambda t=thread: AsyncInjectionService._orphaned_threads.discard(t))
                 return
+        elif not thread.isFinished():
+            # Thread hasn't finished yet (startup race) - retry shortly
+            AsyncInjectionService._pending_cleanup_threads.add(thread)
+            QTimer.singleShot(200, lambda: self._finish_cleanup(thread, worker))
+            return
         self._do_cleanup(thread, worker)
 
     def _do_cleanup(self, thread: QThread | None, worker: QObject | None) -> None:

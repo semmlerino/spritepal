@@ -129,7 +129,7 @@ class WorkerManager:
 
             if not isValid(worker):
                 return True
-            
+
             # Block signals FIRST to prevent race conditions with queued signals
             # This ensures no callbacks fire on deleted objects during cleanup
             worker.blockSignals(True)
@@ -184,9 +184,6 @@ class WorkerManager:
                 "to avoid Qt corruption. Consider reviewing worker cancellation logic."
             )
 
-        # Remove from registry
-        WorkerManager._worker_registry.discard(worker)
-
         # CRITICAL: Only schedule for deletion if thread has actually stopped.
         # Calling deleteLater on a still-running thread can cause crashes
         # when the thread tries to access the deleted object.
@@ -194,6 +191,8 @@ class WorkerManager:
         # signal that the thread has stopped. If wait() returned True, the thread
         # is definitely stopped.
         if stopped_cleanly:
+            # Remove from registry only after a clean stop
+            WorkerManager._worker_registry.discard(worker)
             # Additional wait to ensure thread has fully exited
             if worker.isFinished():
                 worker.wait(50)  # Extra 50ms to ensure thread exit is complete
@@ -202,7 +201,7 @@ class WorkerManager:
         else:
             logger.warning(
                 f"{worker_name}: NOT scheduling for deletion - thread did not stop cleanly. "
-                "This may leak memory but prevents potential crash."
+                "Keeping reference to avoid QThread destruction while running."
             )
 
         return stopped_cleanly

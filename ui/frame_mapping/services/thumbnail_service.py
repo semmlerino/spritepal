@@ -21,6 +21,7 @@ from core.palette_utils import (
     quantize_with_mappings,
 )
 from core.services.image_utils import pil_to_qimage, pil_to_qpixmap
+from ui.common import WorkerManager
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -354,6 +355,12 @@ class AsyncThumbnailLoader(QObject):
     # Signal emitted when all thumbnails are loaded
     finished = Signal()
 
+    # Class-level set to prevent GC of orphaned threads that didn't stop in time
+    # This prevents "QThread: Destroyed while thread is still running" crashes
+    _orphaned_threads: set[QThread] = set()
+    # Class-level set to keep threads alive between cleanup attempts
+    _pending_cleanup_threads: set[QThread] = set()
+
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._worker: _ThumbnailWorker | None = None
@@ -421,6 +428,7 @@ class AsyncThumbnailLoader(QObject):
         # Create worker and thread for cache misses
         self._worker = _ThumbnailWorker(cache_misses, sheet_palette, size, self._current_request_id)
         self._thread = QThread()
+        self._thread.setObjectName(f"AsyncThumbnailLoader-{self._current_request_id}")
         self._worker.moveToThread(self._thread)
 
         # Connect signals
@@ -428,8 +436,8 @@ class AsyncThumbnailLoader(QObject):
         self._worker.thumbnail_ready.connect(self._on_thumbnail_ready)
         self._worker.finished.connect(self._on_worker_finished)
 
-        # Start loading
-        self._thread.start()
+        # Start loading (use WorkerManager for lifecycle tracking)
+        WorkerManager.start_worker(self._thread)
 
     def _on_thumbnail_ready(self, frame_id: str, qimage: QImage, request_id: int) -> None:
         """Convert QImage to QPixmap in main thread and emit signal.
@@ -476,40 +484,60 @@ class AsyncThumbnailLoader(QObject):
 
         # Block signals first to prevent emission during cleanup
         if worker is not None:
-            worker.blockSignals(True)
             try:
-                worker.thumbnail_ready.disconnect()
-                worker.finished.disconnect()
-            except (RuntimeError, TypeError):
-                pass  # Already disconnected or never connected
+                from shiboken6 import isValid
+
+                if isValid(worker):
+                    worker.blockSignals(True)
+                    worker.thumbnail_ready.disconnect()
+                    worker.finished.disconnect()
+            except (ImportError, RuntimeError, TypeError, AttributeError):
+                pass  # Already disconnected or invalid
 
         if thread is not None:
-            if thread.isRunning():
-                thread.quit()
-                if not thread.wait(100):  # Short initial wait
-                    # Schedule delayed cleanup instead of blocking UI
-                    QTimer.singleShot(500, lambda: self._finish_cleanup(thread, worker, destroyed))
-                    self._thread = None
-                    self._worker = None
-                    return
+            # Ensure worker is deleted once the thread finishes
+            if worker is not None and not destroyed:
+                try:
+                    thread.finished.connect(worker.deleteLater)
+                except (RuntimeError, TypeError):
+                    pass
+
+            stopped_cleanly = WorkerManager.cleanup_worker(thread, timeout=100)
+            if not stopped_cleanly:
+                # Keep reference in class-level set to prevent GC while running
+                AsyncThumbnailLoader._orphaned_threads.add(thread)
+                try:
+                    thread.finished.connect(lambda t=thread: AsyncThumbnailLoader._orphaned_threads.discard(t))
+                except (RuntimeError, TypeError):
+                    pass
+                self._thread = None
+                self._worker = None
+                return
 
         self._do_cleanup(thread, worker, destroyed)
 
     def _finish_cleanup(self, thread: QThread, worker: QObject | None, destroyed: bool) -> None:
         """Complete cleanup after delayed wait."""
-        if thread.isRunning():
-            thread.terminate()
-            thread.wait(100)
         self._do_cleanup(thread, worker, destroyed)
 
     def _do_cleanup(self, thread: QThread | None, worker: QObject | None, destroyed: bool) -> None:
         """Perform actual cleanup of thread and worker objects."""
-        if thread is not None:
-            if not destroyed:
-                thread.deleteLater()
-        if worker is not None:
-            if not destroyed:
-                worker.deleteLater()
+        if thread is not None and not destroyed:
+            try:
+                from shiboken6 import isValid
+
+                if isValid(thread) and not thread.isRunning():
+                    thread.deleteLater()
+            except (ImportError, RuntimeError, TypeError):
+                pass
+        if worker is not None and not destroyed:
+            try:
+                from shiboken6 import isValid
+
+                if isValid(worker):
+                    worker.deleteLater()
+            except (ImportError, RuntimeError, TypeError):
+                pass
         self._thread = None
         self._worker = None
 
