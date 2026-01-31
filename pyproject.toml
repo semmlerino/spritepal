@@ -283,7 +283,6 @@ ignore = [
 "mesen2_integration/*.py" = ["E722", "B904", "T201", "T20", "S", "TD", "FIX"]
 "scripts/*.py" = ["E722", "B904", "F401", "T201", "T20", "INP001", "RUF", "TD", "FIX"]
 "compile_hal_tools.py" = ["T201", "T20", "INP001"]  # CLI script that prints to user
-"assemble_from_capture.py" = ["T201", "T20"]
 "assemble_heavy_lobster_v3.py" = ["T201", "T20"]
 "reconstruct_heavy_lobster.py" = ["T201", "T20"]
 "test_stride_fix.py" = ["T201", "T20"]
