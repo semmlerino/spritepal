@@ -1398,11 +1398,8 @@ class FrameMappingWorkspace(QWidget):
             return
         mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         if mapping:
-            self._mapping_panel.update_row_alignment(
-                ai_frame_id, mapping.offset_x, mapping.offset_y, mapping.flip_h, mapping.flip_v
-            )
-            # Also update the status column (alignment changes set status="edited")
-            self._mapping_panel.update_row_status(ai_frame_id, mapping.status)
+            # Delegate to logic helper for consistent update logic
+            self._logic.update_single_mapping_panel_row(ai_frame_id)
 
         # Fix P1: Update canvas if the modified frame is currently selected
         # This ensures programmatic alignment changes (not from user drag) are visible
@@ -1624,7 +1621,10 @@ class FrameMappingWorkspace(QWidget):
         from PySide6.QtGui import QPixmap
 
         if not isinstance(pixmap, QPixmap):
+            print(f"[DEBUG] _on_game_frame_preview_ready: pixmap is not QPixmap for {frame_id}")
             return
+
+        print(f"[DEBUG] _on_game_frame_preview_ready: {frame_id}, pixmap null={pixmap.isNull()}")
 
         # Update mapping panel with the fresh preview
         self._mapping_panel.update_game_frame_preview(frame_id, pixmap)
