@@ -32,6 +32,7 @@ from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
 from core.services.palette_offset_calculator import PaletteOffsetCalculator
+from ui.frame_mapping.facades.ai_frames_facade import AIFramesFacade
 from ui.frame_mapping.facades.controller_context import ControllerContext
 from ui.frame_mapping.facades.mappings_facade import MappingsFacade
 from ui.frame_mapping.services.ai_frame_service import AIFrameService
@@ -48,7 +49,6 @@ from ui.frame_mapping.services.preview_service import PreviewService
 from ui.frame_mapping.services.stale_entry_detector import AsyncStaleEntryDetector
 from ui.frame_mapping.undo import (
     CommandContext,
-    ReorderAIFrameCommand,
     UndoRedoStack,
 )
 from ui.frame_mapping.views.workbench_types import AlignmentState
@@ -192,6 +192,14 @@ class FrameMappingController(QObject):
             alignment_service=self._alignment_service,
             get_command_context=self._get_command_context,
         )
+        self._ai_frames = AIFramesFacade(
+            context=self._controller_context,
+            signals=self,  # Controller implements AIFramesSignals protocol
+            ai_frame_service=self._ai_frame_service,
+            organization_service=self._organization_service,
+            undo_stack=self._undo_stack,
+            get_command_context=self._get_command_context,
+        )
 
     @property
     def _project(self) -> FrameMappingProject | None:
@@ -296,6 +304,14 @@ class FrameMappingController(QObject):
     def emit_ai_frame_moved(self, ai_frame_id: str, from_index: int, to_index: int) -> None:
         """Emit ai_frame_moved signal."""
         self.ai_frame_moved.emit(ai_frame_id, from_index, to_index)
+
+    def emit_ai_frames_loaded(self, count: int) -> None:
+        """Emit ai_frames_loaded signal."""
+        self.ai_frames_loaded.emit(count)
+
+    def emit_ai_frame_added(self, frame_id: str) -> None:
+        """Emit ai_frame_added signal."""
+        self.ai_frame_added.emit(frame_id)
 
     def emit_error(self, message: str) -> None:
         """Emit error_occurred signal."""
@@ -432,39 +448,7 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             self.new_project()
-
-        if not directory.is_dir():
-            self.error_occurred.emit(f"Not a directory: {directory}")
-            return 0
-
-        # Delegate to service for frame creation
-        frames, _orphan_count = self._ai_frame_service.load_frames_from_directory(
-            self._project,
-            directory,  # type: ignore[arg-type]
-        )
-        if not frames:
-            self.error_occurred.emit(f"No PNG files found in {directory}")
-            return 0
-
-        # Replace AI frames using facade (handles index invalidation)
-        self._project.replace_ai_frames(frames, directory)  # type: ignore[union-attr]
-
-        # Clear undo history: old commands reference deleted frame IDs
-        self.clear_undo_history()
-
-        # Prune orphaned mappings that reference non-existent AI frame IDs
-        valid_ids = {f.id for f in frames}
-        removed = self._project.filter_mappings_by_valid_ai_ids(valid_ids)  # type: ignore[union-attr]
-        if removed > 0:
-            logger.info(
-                "Pruning %d orphaned mappings after AI frames reload",
-                removed,
-            )
-
-        self.ai_frames_loaded.emit(len(frames))
-        self.project_changed.emit()
-        logger.info("Loaded %d AI frames from %s", len(frames), directory)
-        return len(frames)
+        return self._ai_frames.load_from_directory(directory, clear_undo=self.clear_undo_history)
 
     def add_ai_frame_from_file(self, file_path: Path) -> bool:
         """Add a single AI frame from a PNG file.
@@ -477,35 +461,7 @@ class FrameMappingController(QObject):
         """
         if self._project is None:
             self.new_project()
-
-        if not file_path.is_file() or file_path.suffix.lower() != ".png":
-            self.error_occurred.emit(f"Not a PNG file: {file_path}")
-            return False
-
-        # Delegate to service for frame creation
-        frame = self._ai_frame_service.create_frame_from_file(
-            self._project,
-            file_path,  # type: ignore[arg-type]
-        )
-
-        if frame is None:
-            # Frame already exists - just refresh UI
-            existing_count = len(self._project.ai_frames) if self._project else 0
-            self.ai_frames_loaded.emit(existing_count)
-            return True
-
-        # Add to project (may raise ValueError for duplicate ID)
-        try:
-            self._project.add_ai_frame(frame)  # type: ignore[union-attr]
-        except ValueError as e:
-            self.error_occurred.emit(f"Cannot add frame: {e}")
-            return False
-
-        self.ai_frames_loaded.emit(len(self._project.ai_frames))  # type: ignore[union-attr]
-        # Emit targeted signal instead of project_changed to avoid full refresh
-        self.ai_frame_added.emit(frame.id)
-        logger.info("Added AI frame: %s", file_path)
-        return True
+        return self._ai_frames.add_from_file(file_path)
 
     def import_mesen_capture(self, capture_path: Path) -> None:
         """Parse a Mesen 2 capture file and emit signal for sprite selection.
@@ -835,7 +791,7 @@ class FrameMappingController(QObject):
 
     def get_ai_frames(self) -> list[AIFrame]:
         """Get all AI frames from the current project."""
-        return self._ai_frame_service.get_frames(self._project)
+        return self._ai_frames.get_frames()
 
     def get_game_frames(self) -> list[GameFrame]:
         """Get all game frames from the current project."""
@@ -968,14 +924,7 @@ class FrameMappingController(QObject):
         Returns:
             True if the frame was found and removed.
         """
-        if self._project is None:
-            return False
-
-        if self._project.remove_ai_frame(frame_id):
-            self.project_changed.emit()
-            logger.info("Removed AI frame %s", frame_id)
-            return True
-        return False
+        return self._ai_frames.remove(frame_id)
 
     def reorder_ai_frame(self, ai_frame_id: str, new_index: int) -> bool:
         """Reorder an AI frame to a new position (undoable).
@@ -987,45 +936,11 @@ class FrameMappingController(QObject):
         Returns:
             True if the frame was moved.
         """
-        if self._project is None:
-            return False
-
-        # Delegate to service for validation
-        result = self._ai_frame_service.validate_reorder(self._project, ai_frame_id, new_index)
-        if result is None:
-            return False  # Invalid or no-op
-
-        current_index, clamped_index = result
-
-        # Create and execute command
-        command = ReorderAIFrameCommand(
-            ctx=self._get_command_context(),
-            ai_frame_id=ai_frame_id,
-            old_index=current_index,
-            new_index=clamped_index,
-        )
-        self._undo_stack.push(command)
-        # Emit signal for UI update (command emits in undo)
-        self.ai_frame_moved.emit(ai_frame_id, current_index, clamped_index)
-        return True
+        return self._ai_frames.reorder(ai_frame_id, new_index)
 
     def _reorder_ai_frame_no_history(self, ai_frame_id: str, new_index: int) -> bool:
         """Internal: Reorder AI frame without undo history (for command execution)."""
-        if self._project is None:
-            return False
-
-        # Find current index before reordering
-        old_index = self._ai_frame_service.find_frame_index(self._project, ai_frame_id)
-        if old_index == -1:
-            return False
-
-        if self._project.reorder_ai_frame(ai_frame_id, new_index):
-            # Emit with actual target index (may be clamped)
-            actual_new_index = self._ai_frame_service.find_frame_index(self._project, ai_frame_id)
-            self.ai_frame_moved.emit(ai_frame_id, old_index, actual_new_index)
-            logger.info("Reordered AI frame %s from %d to %d", ai_frame_id, old_index, actual_new_index)
-            return True
-        return False
+        return self._ai_frames.reorder_no_history(ai_frame_id, new_index)
 
     def update_game_frame_compression(self, frame_id: str, compression_type: str) -> bool:
         """Update compression type for a game frame.
@@ -1335,18 +1250,7 @@ class FrameMappingController(QObject):
         Returns:
             True if frame was found and renamed
         """
-        if self._project is None:
-            return False
-
-        result = self._organization_service.rename_frame(
-            ctx=self._get_command_context(),
-            undo_stack=self._undo_stack,
-            frame_id=frame_id,
-            display_name=display_name,
-        )
-        if result:
-            self.save_requested.emit()
-        return result
+        return self._ai_frames.rename_frame(frame_id, display_name)
 
     def _rename_frame_no_history(self, frame_id: str, display_name: str | None) -> bool:
         """Internal: Rename frame without undo history (for command execution)."""
@@ -1366,9 +1270,7 @@ class FrameMappingController(QObject):
         Returns:
             True if frame was found and tag added
         """
-        if self._project is None:
-            return False
-        return self._organization_service.add_frame_tag(project=self._project, frame_id=frame_id, tag=tag)
+        return self._ai_frames.add_tag(frame_id, tag)
 
     def remove_frame_tag(self, frame_id: str, tag: str) -> bool:
         """Remove a tag from an AI frame.
@@ -1380,9 +1282,7 @@ class FrameMappingController(QObject):
         Returns:
             True if frame was found and tag removed
         """
-        if self._project is None:
-            return False
-        return self._organization_service.remove_frame_tag(project=self._project, frame_id=frame_id, tag=tag)
+        return self._ai_frames.remove_tag(frame_id, tag)
 
     def toggle_frame_tag(self, frame_id: str, tag: str) -> bool:
         """Toggle a tag on an AI frame.
@@ -1394,18 +1294,7 @@ class FrameMappingController(QObject):
         Returns:
             True if frame was found and tag toggled
         """
-        if self._project is None:
-            return False
-
-        result = self._organization_service.toggle_frame_tag(
-            ctx=self._get_command_context(),
-            undo_stack=self._undo_stack,
-            frame_id=frame_id,
-            tag=tag,
-        )
-        if result:
-            self.save_requested.emit()
-        return result
+        return self._ai_frames.toggle_tag(frame_id, tag)
 
     def _toggle_frame_tag_no_history(self, frame_id: str, tag: str) -> bool:
         """Internal: Toggle frame tag without undo history (for command execution)."""
@@ -1425,9 +1314,7 @@ class FrameMappingController(QObject):
         Returns:
             True if frame was found and tags updated
         """
-        if self._project is None:
-            return False
-        return self._organization_service.set_frame_tags(project=self._project, frame_id=frame_id, tags=tags)
+        return self._ai_frames.set_tags(frame_id, tags)
 
     def get_frame_tags(self, frame_id: str) -> frozenset[str]:
         """Get tags for an AI frame.
@@ -1438,9 +1325,7 @@ class FrameMappingController(QObject):
         Returns:
             Set of tags (empty if frame not found)
         """
-        if self._project is None:
-            return frozenset()
-        return self._organization_service.get_frame_tags(project=self._project, frame_id=frame_id)
+        return self._ai_frames.get_tags(frame_id)
 
     def get_frame_display_name(self, frame_id: str) -> str | None:
         """Get display name for an AI frame.
@@ -1451,9 +1336,7 @@ class FrameMappingController(QObject):
         Returns:
             Display name if set, None otherwise
         """
-        if self._project is None:
-            return None
-        return self._organization_service.get_frame_display_name(project=self._project, frame_id=frame_id)
+        return self._ai_frames.get_display_name(frame_id)
 
     def get_frames_with_tag(self, tag: str) -> list[AIFrame]:
         """Get all AI frames with a specific tag.
@@ -1464,9 +1347,7 @@ class FrameMappingController(QObject):
         Returns:
             List of AIFrame objects with the tag
         """
-        if self._project is None:
-            return []
-        return self._organization_service.get_frames_with_tag(project=self._project, tag=tag)
+        return self._ai_frames.get_frames_with_tag(tag)
 
     @staticmethod
     def get_available_tags() -> frozenset[str]:
@@ -1475,7 +1356,7 @@ class FrameMappingController(QObject):
         Returns:
             Set of valid tag names
         """
-        return OrganizationService.get_available_tags()
+        return AIFramesFacade.get_available_tags()
 
     # ─── Capture (GameFrame) Organization ──────────────────────────────────────
 
