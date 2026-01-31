@@ -27,6 +27,8 @@ def handle_exception(
     exc_traceback: TracebackType | None,
 ) -> None:
     """Global exception handler to log unhandled exceptions"""
+    import traceback
+
     if issubclass(exc_type, KeyboardInterrupt):
         # Allow KeyboardInterrupt to work normally
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
@@ -35,10 +37,16 @@ def handle_exception(
     # Get logger (setup_logging should have been called by now)
     logger = get_logger("global_exception_handler")
 
-    # Log the unhandled exception
-    logger.critical("Unhandled exception occurred!", exc_info=(exc_type, exc_value, exc_traceback))
+    # Format traceback explicitly to capture all available info
+    tb_lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    tb_str = "".join(tb_lines)
+
+    logger.critical("=" * 80)
+    logger.critical("UNHANDLED EXCEPTION - Full traceback:")
+    logger.critical(tb_str)
     logger.critical(f"Exception type: {exc_type.__name__}")
-    logger.critical(f"Exception value: {exc_value}")
+    logger.critical(f"Exception value: {exc_value!r}")
+    logger.critical(f"Exception args: {getattr(exc_value, 'args', 'N/A')}")
     logger.critical("=" * 80)
     logger.critical("CRASH DETECTED - Application will likely terminate")
     logger.critical("=" * 80)

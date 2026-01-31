@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
-from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QThread, Signal
 from PySide6.QtGui import QImage, QPixmap
 
 from core.palette_utils import (
@@ -170,14 +170,21 @@ def _cached_quantized_thumbnail_bytes(
 
 
 def _compute_palette_hash(sheet_palette: SheetPalette | None) -> int:
-    """Compute a hash for the palette for cache key."""
+    """Compute a hash for the palette for cache key.
+
+    Returns a 32-bit compatible hash to avoid OverflowError when passed
+    through Qt signals (which use C++ int, typically 32-bit).
+    """
     if sheet_palette is None:
         return 0
     colors_hash = hash(tuple(sheet_palette.colors))
     if sheet_palette.color_mappings:
         mappings_hash = hash(tuple(sorted(sheet_palette.color_mappings.items())))
-        return hash((colors_hash, mappings_hash))
-    return colors_hash
+        full_hash = hash((colors_hash, mappings_hash))
+    else:
+        full_hash = colors_hash
+    # Constrain to 32-bit signed int range for Qt signal compatibility
+    return full_hash & 0x7FFFFFFF
 
 
 def create_quantized_thumbnail(

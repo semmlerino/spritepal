@@ -53,10 +53,14 @@ class SheetPalette:
 
         Returns a stable hash based on colors and color_mappings. Two palettes
         with identical content will have the same version_hash.
+
+        The hash is constrained to 32-bit signed int range to avoid OverflowError
+        when passed through Qt signals (which use C++ int, typically 32-bit).
         """
         colors_tuple = tuple(self.colors)
         mappings_tuple = tuple(sorted(self.color_mappings.items()))
-        return hash((colors_tuple, mappings_tuple))
+        full_hash = hash((colors_tuple, mappings_tuple))
+        return full_hash & 0x7FFFFFFF
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to dictionary for JSON storage."""
