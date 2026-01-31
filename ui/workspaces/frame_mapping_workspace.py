@@ -29,6 +29,7 @@ from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -41,6 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.app_context import get_app_context
+from ui.components.inputs.file_selector import FileSelector
 from ui.frame_mapping.auto_save_manager import AutoSaveManager
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.dialog_coordinator import DialogCoordinator
@@ -130,6 +132,9 @@ class FrameMappingWorkspace(QWidget):
         # Auto-load last project if available
         self._auto_load_last_project()
 
+        # Auto-load last ROM if not set by MainWindow
+        self._auto_load_rom()
+
         logger.debug("FrameMappingWorkspace initialized with 4-zone layout")
 
     def set_message_service(self, service: StatusBarManager | None) -> None:
@@ -141,7 +146,7 @@ class FrameMappingWorkspace(QWidget):
     def set_rom_path(self, rom_path: Path | None) -> None:
         """Set ROM path for injection.
 
-        Called when switching from sprite editor workspace.
+        Called when switching from sprite editor workspace or user selection.
         Resets the modified ROM path since a new original ROM is being used.
 
         Args:
@@ -151,6 +156,10 @@ class FrameMappingWorkspace(QWidget):
             logger.info("FrameMapping ROM path updated: %s", rom_path)
             self._state.rom_path = rom_path
             self._state.modified_rom_path = None
+
+            # Sync widget display if ROM selector exists
+            if hasattr(self, "_rom_selector"):
+                self._rom_selector.set_path(str(rom_path) if rom_path else "")
 
     def _create_default_controller(self) -> FrameMappingController:
         """Create controller with workspace as parent for Qt ownership.
@@ -170,7 +179,7 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(
                 self,
                 "Injection Requirement",
-                "No ROM loaded.\n\nPlease load a ROM in the Sprite Editor workspace first.",
+                "No ROM loaded.\n\nPlease select a ROM using the ROM selector in the header.",
             )
             return False
 
@@ -184,6 +193,52 @@ class FrameMappingWorkspace(QWidget):
             return False
 
         return True
+
+    def _on_rom_selector_changed(self, path_str: str) -> None:
+        """Handle ROM selection from header widget."""
+        if not path_str:
+            return
+
+        rom_path = Path(path_str)
+
+        # Validate file exists
+        if not rom_path.exists():
+            QMessageBox.warning(self, "Invalid ROM", f"File not found: {rom_path}")
+            return
+
+        # Validate extension
+        if rom_path.suffix.lower() not in (".sfc", ".smc", ".bin"):
+            QMessageBox.warning(self, "Invalid ROM", "File must be .sfc, .smc, or .bin")
+            return
+
+        # Update state
+        self._state.rom_path = rom_path
+        self._state.modified_rom_path = None  # Clear - new source = fresh start
+        self._state.last_injected_rom = None
+
+        # Persist to settings
+        context = get_app_context()
+        context.application_state_manager.set("rom_injection", "last_input_rom", str(rom_path))
+
+        logger.info("ROM selected from header: %s", rom_path)
+
+    def _auto_load_rom(self) -> None:
+        """Auto-load last used ROM if not set by MainWindow."""
+        if self._state.rom_path is not None:
+            # Already set by MainWindow - sync display
+            self._rom_selector.set_path(str(self._state.rom_path))
+            return
+
+        # Try to load from settings
+        context = get_app_context()
+        last_rom_str = str(context.application_state_manager.get("rom_injection", "last_input_rom", ""))
+
+        if last_rom_str:
+            last_rom = Path(last_rom_str)
+            if last_rom.exists():
+                self._state.rom_path = last_rom
+                self._rom_selector.set_path(last_rom_str)
+                logger.info("Auto-loaded ROM from settings: %s", last_rom)
 
     def _setup_ui(self) -> None:
         """Setup the UI layout."""
@@ -253,6 +308,32 @@ class FrameMappingWorkspace(QWidget):
         self._project_label = QLabel("")
         self._project_label.setStyleSheet("font-size: 12px; color: #888;")
         layout.addWidget(self._project_label)
+
+        # Separator before ROM selector
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.VLine)
+        separator.setStyleSheet("color: #666;")
+        layout.addWidget(separator)
+
+        # ROM selector
+        rom_label = QLabel("ROM:")
+        rom_label.setStyleSheet("color: #aaa;")
+        layout.addWidget(rom_label)
+
+        context = get_app_context()
+        self._rom_selector = FileSelector(
+            parent=header,
+            placeholder="No ROM selected",
+            dialog_title="Select ROM File",
+            file_filter="SNES ROM Files (*.sfc *.smc);;All Files (*.*)",
+            mode="open",
+            read_only=True,  # Browse only, no typing
+            settings_manager=context.application_state_manager,
+        )
+        self._rom_selector.setMinimumWidth(200)
+        self._rom_selector.setMaximumWidth(400)
+        self._rom_selector.path_changed.connect(self._on_rom_selector_changed)
+        layout.addWidget(self._rom_selector)
 
         layout.addStretch()
 
