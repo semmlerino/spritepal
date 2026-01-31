@@ -171,7 +171,7 @@ class InjectionOrchestrator:
 
         # 2. Load and prepare images
         try:
-            composite_data = self._prepare_images(ai_frame, game_frame, mapping, project, request, debug)
+            composite_data = self._prepare_images(ai_frame, game_frame, mapping, request, debug)
             if isinstance(composite_data, InjectionResult):
                 return composite_data
 
@@ -329,17 +329,25 @@ class InjectionOrchestrator:
 
         # Create palette wrapper for internal methods
         class _Palette:
-            """Minimal palette holder with typed colors attribute."""
+            """Minimal palette holder mimicking SheetPalette interface."""
 
-            def __init__(self, colors: list[tuple[int, int, int]]) -> None:
+            def __init__(
+                self,
+                colors: list[tuple[int, int, int]],
+                color_mappings: dict[tuple[int, int, int], int],
+            ) -> None:
                 self.colors = colors
+                self.color_mappings = color_mappings
 
         class _PaletteHolder:
             """Wrapper mimicking project's sheet_palette attribute."""
 
             def __init__(self, palette_snapshot: PaletteSnapshot | None) -> None:
                 if palette_snapshot is not None:
-                    self.sheet_palette: _Palette | None = _Palette(list(palette_snapshot.colors))
+                    self.sheet_palette: _Palette | None = _Palette(
+                        colors=list(palette_snapshot.colors),
+                        color_mappings=dict(palette_snapshot.color_mappings),
+                    )
                 else:
                     self.sheet_palette = None
 
@@ -356,15 +364,11 @@ class InjectionOrchestrator:
 
         if not game_frame.capture_path or not game_frame.capture_path.exists():
             logger.warning("Capture file missing: %s", game_frame.capture_path)
-            return InjectionResult.failure(
-                f"Capture file missing (required for masking): {game_frame.capture_path}"
-            )
+            return InjectionResult.failure(f"Capture file missing (required for masking): {game_frame.capture_path}")
 
         if not game_frame.rom_offsets:
             logger.warning("Game frame %s has no ROM offsets", game_frame.id)
-            return InjectionResult.failure(
-                f"Game frame {game_frame.id} has no ROM offsets associated"
-            )
+            return InjectionResult.failure(f"Game frame {game_frame.id} has no ROM offsets associated")
 
         logger.info(
             "Injection from snapshot: AI frame '%s' -> Game frame '%s' (offsets: %s)",
@@ -390,10 +394,14 @@ class InjectionOrchestrator:
             scale=mapping.scale,
         )
 
-        # Prepare images (pass palette_holder as "project" for compatibility)
+        # Prepare images
         try:
             composite_data = self._prepare_images(
-                ai_frame, game_frame, mapping, palette_holder, request, debug  # type: ignore[arg-type]
+                ai_frame,
+                game_frame,
+                mapping,
+                request,
+                debug,
             )
             if isinstance(composite_data, InjectionResult):
                 return composite_data
@@ -411,9 +419,7 @@ class InjectionOrchestrator:
             injection_rom_path = request.output_path
             logger.info("Using existing output ROM: %s", injection_rom_path)
         else:
-            injection_rom_path = self._staging_manager.create_injection_copy(
-                request.rom_path, request.output_path
-            )
+            injection_rom_path = self._staging_manager.create_injection_copy(request.rom_path, request.output_path)
             if injection_rom_path is None:
                 return InjectionResult.failure("Failed to create ROM copy for injection")
             logger.info("Created injection ROM copy: %s", injection_rom_path)
@@ -453,9 +459,7 @@ class InjectionOrchestrator:
                 # Inject palette if offset provided
                 messages = list(result.messages)
                 if request.palette_rom_offset is not None and palette_holder.sheet_palette is not None:
-                    palette_colors = [
-                        snap_to_snes_color(c) for c in palette_holder.sheet_palette.colors
-                    ]
+                    palette_colors = [snap_to_snes_color(c) for c in palette_holder.sheet_palette.colors]
                     success, msg = self._rom_injector.inject_palette_to_rom(
                         rom_path=str(injection_rom_path),
                         output_path=str(injection_rom_path),
@@ -479,16 +483,12 @@ class InjectionOrchestrator:
                     new_mapping_status="injected",
                 )
             else:
-                self._staging_manager.cleanup_on_failure(
-                    session, injection_rom_path, using_existing_output
-                )
+                self._staging_manager.cleanup_on_failure(session, injection_rom_path, using_existing_output)
                 return result
 
         except Exception as e:
             logger.exception("Injection process failed")
-            self._staging_manager.cleanup_on_failure(
-                session, injection_rom_path, using_existing_output
-            )
+            self._staging_manager.cleanup_on_failure(session, injection_rom_path, using_existing_output)
             return InjectionResult.failure(f"Injection process failed: {e}")
 
     def _validate_mapping(
@@ -535,7 +535,6 @@ class InjectionOrchestrator:
         ai_frame: AIFrame,
         game_frame: GameFrame,
         mapping: FrameMapping,
-        project: FrameMappingProject,
         request: InjectionRequest,
         debug: InjectionDebugContext,
     ) -> tuple[Image.Image, CaptureResult, list[OAMEntry], np.ndarray | None] | InjectionResult:

@@ -54,9 +54,10 @@ class GameFrameSnapshot:
 
 @dataclass(frozen=True)
 class PaletteSnapshot:
-    """Immutable snapshot of sheet palette colors."""
+    """Immutable snapshot of sheet palette colors and mappings."""
 
     colors: tuple[tuple[int, int, int], ...]
+    color_mappings: tuple[tuple[tuple[int, int, int], int], ...]  # Frozen dict as tuple of pairs
 
 
 @dataclass(frozen=True)
@@ -137,7 +138,8 @@ class InjectionSnapshot:
         if project.sheet_palette is not None:
             # Cast each color tuple to fixed 3-tuple for type safety
             palette_snapshot = PaletteSnapshot(
-                colors=tuple((c[0], c[1], c[2]) for c in project.sheet_palette.colors)
+                colors=tuple((c[0], c[1], c[2]) for c in project.sheet_palette.colors),
+                color_mappings=tuple(project.sheet_palette.color_mappings.items()),
             )
 
         return cls(
