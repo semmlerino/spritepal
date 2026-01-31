@@ -11,8 +11,8 @@ from PySide6.QtCore import QObject, Signal
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
-    from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
     from ui.frame_mapping.undo import UndoRedoStack
+    from ui.frame_mapping.undo.command_context import CommandContext
 
 from core.frame_mapping_project import FRAME_TAGS, AIFrame
 from ui.frame_mapping.undo import (
@@ -45,25 +45,23 @@ class OrganizationService(QObject):
 
     def rename_frame(
         self,
-        project: FrameMappingProject,
+        ctx: CommandContext,
         undo_stack: UndoRedoStack,
-        controller: FrameMappingController,
         frame_id: str,
         display_name: str | None,
     ) -> bool:
         """Set display name for an AI frame.
 
         Args:
-            project: Frame mapping project
+            ctx: Command context with project and services
             undo_stack: Undo stack for command
-            controller: Controller instance (needed by undo command)
             frame_id: ID of the AI frame (filename)
             display_name: New display name, or None to clear
 
         Returns:
             True if frame was found and renamed
         """
-        frame = project.get_ai_frame_by_id(frame_id)
+        frame = ctx.project.get_ai_frame_by_id(frame_id)
         if frame is None:
             return False
 
@@ -72,7 +70,7 @@ class OrganizationService(QObject):
 
         # Create and execute command via undo stack
         command = RenameAIFrameCommand(
-            controller=controller,
+            ctx=ctx,
             frame_id=frame_id,
             new_name=display_name,
             old_name=old_name,
@@ -130,25 +128,23 @@ class OrganizationService(QObject):
 
     def toggle_frame_tag(
         self,
-        project: FrameMappingProject,
+        ctx: CommandContext,
         undo_stack: UndoRedoStack,
-        controller: FrameMappingController,
         frame_id: str,
         tag: str,
     ) -> bool:
         """Toggle a tag on an AI frame.
 
         Args:
-            project: Frame mapping project
+            ctx: Command context with project and services
             undo_stack: Undo stack for command
-            controller: Controller instance (needed by undo command)
             frame_id: ID of the AI frame (filename)
             tag: Tag to toggle (must be in FRAME_TAGS)
 
         Returns:
             True if frame was found and tag toggled
         """
-        frame = project.get_ai_frame_by_id(frame_id)
+        frame = ctx.project.get_ai_frame_by_id(frame_id)
         if frame is None:
             return False
 
@@ -157,7 +153,7 @@ class OrganizationService(QObject):
 
         # Create and execute command via undo stack
         command = ToggleFrameTagCommand(
-            controller=controller,
+            ctx=ctx,
             frame_id=frame_id,
             tag=tag,
             was_present=was_present,
@@ -251,25 +247,23 @@ class OrganizationService(QObject):
 
     def rename_capture(
         self,
-        project: FrameMappingProject,
+        ctx: CommandContext,
         undo_stack: UndoRedoStack,
-        controller: FrameMappingController,
         game_frame_id: str,
         new_name: str | None,
     ) -> bool:
         """Set display name for a game frame (capture).
 
         Args:
-            project: Frame mapping project
+            ctx: Command context with project and services
             undo_stack: Undo stack for command
-            controller: Controller instance (needed by undo command)
             game_frame_id: ID of the game frame to rename
             new_name: New display name (empty or None to clear)
 
         Returns:
             True if renamed successfully, False otherwise
         """
-        frame = project.get_game_frame_by_id(game_frame_id)
+        frame = ctx.project.get_game_frame_by_id(game_frame_id)
         if frame is None:
             return False
 
@@ -283,7 +277,7 @@ class OrganizationService(QObject):
 
         # Create and execute command via undo stack
         command = RenameCaptureCommand(
-            controller=controller,
+            ctx=ctx,
             game_frame_id=game_frame_id,
             new_name=display_name,
             old_name=old_name,

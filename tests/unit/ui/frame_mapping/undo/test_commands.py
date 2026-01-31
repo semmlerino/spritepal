@@ -12,6 +12,7 @@ import pytest
 
 from core.frame_mapping_project import AIFrame, GameFrame
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
+from ui.frame_mapping.undo.command_context import CommandContext
 from ui.frame_mapping.undo.commands import (
     CreateMappingCommand,
     RemoveMappingCommand,
@@ -55,13 +56,18 @@ def populated_controller(controller: FrameMappingController, tmp_path: Path) -> 
     return controller
 
 
+def get_ctx(controller: FrameMappingController) -> CommandContext:
+    """Get command context from controller."""
+    return controller._get_command_context()
+
+
 class TestCreateMappingCommand:
     """Tests for CreateMappingCommand."""
 
     def test_description(self, populated_controller: FrameMappingController) -> None:
         """Command has descriptive string."""
         cmd = CreateMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             game_frame_id="capture_A",
         )
@@ -74,7 +80,7 @@ class TestCreateMappingCommand:
         assert project is not None
 
         cmd = CreateMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             game_frame_id="capture_A",
         )
@@ -95,7 +101,7 @@ class TestCreateMappingCommand:
         assert project is not None
 
         cmd = CreateMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             game_frame_id="capture_A",
         )
@@ -122,7 +128,7 @@ class TestCreateMappingCommand:
 
         # Command to remap to different game frame (capture all properties)
         cmd = CreateMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             game_frame_id="capture_B",
             prev_ai_mapping_game_id="capture_A",
@@ -155,7 +161,7 @@ class TestRemoveMappingCommand:
     def test_description(self, populated_controller: FrameMappingController) -> None:
         """Command has descriptive string."""
         cmd = RemoveMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
         )
         assert "sprite_01.png" in cmd.description
@@ -170,7 +176,7 @@ class TestRemoveMappingCommand:
         assert project.get_mapping_for_ai_frame("sprite_01.png") is not None
 
         cmd = RemoveMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
         )
 
@@ -192,7 +198,7 @@ class TestRemoveMappingCommand:
         populated_controller._update_alignment_no_history("sprite_01.png", removed_alignment)
 
         cmd = RemoveMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             removed_game_frame_id="capture_A",
             removed_alignment=removed_alignment,
@@ -223,7 +229,7 @@ class TestUpdateAlignmentCommand:
     def test_description(self, populated_controller: FrameMappingController) -> None:
         """Command has descriptive string."""
         cmd = UpdateAlignmentCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             new_alignment=AlignmentState(
                 offset_x=10, offset_y=20, flip_h=True, flip_v=False, scale=0.5, sharpen=0.0, resampling="lanczos"
@@ -243,7 +249,7 @@ class TestUpdateAlignmentCommand:
         populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
 
         cmd = UpdateAlignmentCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             new_alignment=AlignmentState(
                 offset_x=10, offset_y=20, flip_h=True, flip_v=False, scale=0.5, sharpen=0.0, resampling="lanczos"
@@ -272,7 +278,7 @@ class TestUpdateAlignmentCommand:
         populated_controller._create_mapping_no_history("sprite_01.png", "capture_A")
 
         cmd = UpdateAlignmentCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             new_alignment=AlignmentState(
                 offset_x=10, offset_y=20, flip_h=True, flip_v=False, scale=0.5, sharpen=0.0, resampling="lanczos"
@@ -318,7 +324,7 @@ class TestUpdateAlignmentCommand:
 
         # Create command that changes sharpen and resampling
         cmd = UpdateAlignmentCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             new_alignment=AlignmentState(
                 offset_x=10, offset_y=10, flip_h=False, flip_v=False, scale=1.0, sharpen=0.0, resampling="lanczos"
@@ -350,7 +356,7 @@ class TestRenameAIFrameCommand:
     def test_description_with_new_name(self, populated_controller: FrameMappingController) -> None:
         """Description shows new name when setting."""
         cmd = RenameAIFrameCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             frame_id="sprite_01.png",
             new_name="Walking Left",
         )
@@ -359,7 +365,7 @@ class TestRenameAIFrameCommand:
     def test_description_when_clearing(self, populated_controller: FrameMappingController) -> None:
         """Description indicates clearing when no new name."""
         cmd = RenameAIFrameCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             frame_id="sprite_01.png",
             new_name=None,
         )
@@ -371,7 +377,7 @@ class TestRenameAIFrameCommand:
         assert project is not None
 
         cmd = RenameAIFrameCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             frame_id="sprite_01.png",
             new_name="Walking Left",
         )
@@ -391,7 +397,7 @@ class TestRenameAIFrameCommand:
         populated_controller._rename_frame_no_history("sprite_01.png", "Idle")
 
         cmd = RenameAIFrameCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             frame_id="sprite_01.png",
             new_name="Walking Left",
             old_name="Idle",
@@ -414,7 +420,7 @@ class TestRenameCaptureCommand:
         assert project is not None
 
         cmd = RenameCaptureCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             game_frame_id="capture_A",
             new_name="Running Animation",
         )
@@ -434,7 +440,7 @@ class TestRenameCaptureCommand:
         populated_controller._rename_capture_no_history("capture_A", "Frame 1")
 
         cmd = RenameCaptureCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             game_frame_id="capture_A",
             new_name="Running Animation",
             old_name="Frame 1",
@@ -454,7 +460,7 @@ class TestToggleFrameTagCommand:
     def test_description_when_adding(self, populated_controller: FrameMappingController) -> None:
         """Description shows Add when tag was not present."""
         cmd = ToggleFrameTagCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             frame_id="sprite_01.png",
             tag="keep",
             was_present=False,
@@ -464,7 +470,7 @@ class TestToggleFrameTagCommand:
     def test_description_when_removing(self, populated_controller: FrameMappingController) -> None:
         """Description shows Remove when tag was present."""
         cmd = ToggleFrameTagCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             frame_id="sprite_01.png",
             tag="keep",
             was_present=True,
@@ -481,7 +487,7 @@ class TestToggleFrameTagCommand:
         assert "keep" not in frame.tags
 
         cmd = ToggleFrameTagCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             frame_id="sprite_01.png",
             tag="keep",
         )
@@ -498,7 +504,7 @@ class TestToggleFrameTagCommand:
         assert project is not None
 
         cmd = ToggleFrameTagCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             frame_id="sprite_01.png",
             tag="keep",
         )

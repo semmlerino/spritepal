@@ -3,6 +3,9 @@
 Each command encapsulates a single undoable action with its state
 before and after execution. Commands use structural typing (duck typing)
 to implement the FrameMappingCommand protocol.
+
+Commands use CommandContext to access services for mutations and
+signal emitter for undo notifications.
 """
 
 from __future__ import annotations
@@ -11,9 +14,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ui.frame_mapping.views.workbench_types import AlignmentState
+from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
+    from ui.frame_mapping.undo.command_context import CommandContext
+
+logger = get_logger(__name__)
 
 
 # =============================================================================
@@ -29,7 +35,7 @@ class CreateMappingCommand:
     game frame (if it was previously linked to another AI frame).
     """
 
-    controller: FrameMappingController
+    ctx: CommandContext
     ai_frame_id: str
     game_frame_id: str
     # Previous state for undo
@@ -43,40 +49,48 @@ class CreateMappingCommand:
         return f"Link {self.ai_frame_id} to {self.game_frame_id}"
 
     def execute(self) -> None:
-        self.controller._create_mapping_no_history(self.ai_frame_id, self.game_frame_id)
+        self.ctx.mapping_service.create_mapping_no_history(
+            self.ctx.project, self.ai_frame_id, self.game_frame_id
+        )
 
     def undo(self) -> None:
         # Remove the mapping we just created
-        self.controller._remove_mapping_no_history(self.ai_frame_id)
+        self.ctx.mapping_service.remove_mapping_no_history(self.ctx.project, self.ai_frame_id)
 
         # Restore previous AI frame mapping if it existed
         if self.prev_ai_mapping_game_id is not None:
-            self.controller._create_mapping_no_history(self.ai_frame_id, self.prev_ai_mapping_game_id)
+            self.ctx.mapping_service.create_mapping_no_history(
+                self.ctx.project, self.ai_frame_id, self.prev_ai_mapping_game_id
+            )
             if self.prev_ai_mapping_alignment is not None:
-                self.controller._update_alignment_no_history(self.ai_frame_id, self.prev_ai_mapping_alignment)
+                self.ctx.alignment_service.apply_alignment_to_project(
+                    self.ctx.project, self.ai_frame_id, self.prev_ai_mapping_alignment
+                )
             # Emit signal for restored AI frame mapping
-            self.controller.mapping_created.emit(self.ai_frame_id, self.prev_ai_mapping_game_id)
+            self.ctx.signal_emitter.emit_mapping_created(self.ai_frame_id, self.prev_ai_mapping_game_id)
 
         # Restore previous game frame mapping if it existed
         if self.prev_game_mapping_ai_id is not None:
-            self.controller._create_mapping_no_history(self.prev_game_mapping_ai_id, self.game_frame_id)
+            self.ctx.mapping_service.create_mapping_no_history(
+                self.ctx.project, self.prev_game_mapping_ai_id, self.game_frame_id
+            )
             if self.prev_game_mapping_alignment is not None:
-                self.controller._update_alignment_no_history(
-                    self.prev_game_mapping_ai_id, self.prev_game_mapping_alignment
+                self.ctx.alignment_service.apply_alignment_to_project(
+                    self.ctx.project, self.prev_game_mapping_ai_id, self.prev_game_mapping_alignment
                 )
             # Emit signal for restored game frame mapping
-            self.controller.mapping_created.emit(self.prev_game_mapping_ai_id, self.game_frame_id)
+            self.ctx.signal_emitter.emit_mapping_created(self.prev_game_mapping_ai_id, self.game_frame_id)
 
         # If no mapping was restored, emit removal signal
         if self.prev_ai_mapping_game_id is None:
-            self.controller.mapping_removed.emit(self.ai_frame_id)
+            self.ctx.signal_emitter.emit_mapping_removed(self.ai_frame_id)
 
 
 @dataclass
 class RemoveMappingCommand:
     """Command to remove a mapping for an AI frame."""
 
-    controller: FrameMappingController
+    ctx: CommandContext
     ai_frame_id: str
     # Previous state for undo
     removed_game_frame_id: str | None = None
@@ -88,25 +102,31 @@ class RemoveMappingCommand:
         return f"Unlink {self.ai_frame_id}"
 
     def execute(self) -> None:
-        self.controller._remove_mapping_no_history(self.ai_frame_id)
+        self.ctx.mapping_service.remove_mapping_no_history(self.ctx.project, self.ai_frame_id)
 
     def undo(self) -> None:
         if self.removed_game_frame_id is not None:
-            self.controller._create_mapping_no_history(self.ai_frame_id, self.removed_game_frame_id)
+            self.ctx.mapping_service.create_mapping_no_history(
+                self.ctx.project, self.ai_frame_id, self.removed_game_frame_id
+            )
             if self.removed_alignment is not None:
-                self.controller._update_alignment_no_history(self.ai_frame_id, self.removed_alignment)
+                self.ctx.alignment_service.apply_alignment_to_project(
+                    self.ctx.project, self.ai_frame_id, self.removed_alignment
+                )
             # Restore status
-            self.controller._set_mapping_status_no_history(self.ai_frame_id, self.removed_status)
+            self.ctx.mapping_service.set_mapping_status_no_history(
+                self.ctx.project, self.ai_frame_id, self.removed_status
+            )
             # Emit signals so UI updates
-            self.controller.mapping_created.emit(self.ai_frame_id, self.removed_game_frame_id)
-            self.controller.alignment_updated.emit(self.ai_frame_id)
+            self.ctx.signal_emitter.emit_mapping_created(self.ai_frame_id, self.removed_game_frame_id)
+            self.ctx.signal_emitter.emit_alignment_updated(self.ai_frame_id)
 
 
 @dataclass
 class UpdateAlignmentCommand:
     """Command to update alignment for a mapping."""
 
-    controller: FrameMappingController
+    ctx: CommandContext
     ai_frame_id: str
     new_alignment: AlignmentState
     old_alignment: AlignmentState
@@ -117,14 +137,20 @@ class UpdateAlignmentCommand:
         return f"Adjust alignment for {self.ai_frame_id}"
 
     def execute(self) -> None:
-        self.controller._update_alignment_no_history(self.ai_frame_id, self.new_alignment)
+        self.ctx.alignment_service.apply_alignment_to_project(
+            self.ctx.project, self.ai_frame_id, self.new_alignment
+        )
 
     def undo(self) -> None:
-        self.controller._update_alignment_no_history(self.ai_frame_id, self.old_alignment)
+        self.ctx.alignment_service.apply_alignment_to_project(
+            self.ctx.project, self.ai_frame_id, self.old_alignment
+        )
         # Restore original status
-        self.controller._set_mapping_status_no_history(self.ai_frame_id, self.old_status)
+        self.ctx.mapping_service.set_mapping_status_no_history(
+            self.ctx.project, self.ai_frame_id, self.old_status
+        )
         # Emit signal so UI updates
-        self.controller.alignment_updated.emit(self.ai_frame_id)
+        self.ctx.signal_emitter.emit_alignment_updated(self.ai_frame_id)
 
 
 # =============================================================================
@@ -136,7 +162,7 @@ class UpdateAlignmentCommand:
 class RenameAIFrameCommand:
     """Command to rename an AI frame (set display name)."""
 
-    controller: FrameMappingController
+    ctx: CommandContext
     frame_id: str
     new_name: str | None
     old_name: str | None = None
@@ -148,19 +174,23 @@ class RenameAIFrameCommand:
         return f"Clear name for {self.frame_id}"
 
     def execute(self) -> None:
-        self.controller._rename_frame_no_history(self.frame_id, self.new_name)
+        self.ctx.organization_service._rename_frame_no_history(
+            self.ctx.project, self.frame_id, self.new_name
+        )
 
     def undo(self) -> None:
-        self.controller._rename_frame_no_history(self.frame_id, self.old_name)
+        self.ctx.organization_service._rename_frame_no_history(
+            self.ctx.project, self.frame_id, self.old_name
+        )
         # Emit signal so UI updates
-        self.controller.frame_renamed.emit(self.frame_id)
+        self.ctx.signal_emitter.emit_frame_renamed(self.frame_id)
 
 
 @dataclass
 class RenameCaptureCommand:
     """Command to rename a game frame (capture)."""
 
-    controller: FrameMappingController
+    ctx: CommandContext
     game_frame_id: str
     new_name: str | None
     old_name: str | None = None
@@ -172,19 +202,23 @@ class RenameCaptureCommand:
         return f"Clear name for {self.game_frame_id}"
 
     def execute(self) -> None:
-        self.controller._rename_capture_no_history(self.game_frame_id, self.new_name)
+        self.ctx.organization_service._rename_capture_no_history(
+            self.ctx.project, self.game_frame_id, self.new_name
+        )
 
     def undo(self) -> None:
-        self.controller._rename_capture_no_history(self.game_frame_id, self.old_name)
+        self.ctx.organization_service._rename_capture_no_history(
+            self.ctx.project, self.game_frame_id, self.old_name
+        )
         # Emit signal so UI updates
-        self.controller.capture_renamed.emit(self.game_frame_id)
+        self.ctx.signal_emitter.emit_capture_renamed(self.game_frame_id)
 
 
 @dataclass
 class ToggleFrameTagCommand:
     """Command to toggle a tag on an AI frame."""
 
-    controller: FrameMappingController
+    ctx: CommandContext
     frame_id: str
     tag: str
     was_present: bool = False
@@ -196,20 +230,24 @@ class ToggleFrameTagCommand:
 
     def execute(self) -> None:
         # Toggle adds if not present, removes if present
-        self.controller._toggle_frame_tag_no_history(self.frame_id, self.tag)
+        self.ctx.organization_service._toggle_frame_tag_no_history(
+            self.ctx.project, self.frame_id, self.tag
+        )
 
     def undo(self) -> None:
         # Toggle again to reverse
-        self.controller._toggle_frame_tag_no_history(self.frame_id, self.tag)
+        self.ctx.organization_service._toggle_frame_tag_no_history(
+            self.ctx.project, self.frame_id, self.tag
+        )
         # Emit signal so UI updates
-        self.controller.frame_tags_changed.emit(self.frame_id)
+        self.ctx.signal_emitter.emit_frame_tags_changed(self.frame_id)
 
 
 @dataclass
 class ReorderAIFrameCommand:
     """Command to reorder an AI frame to a new position."""
 
-    controller: FrameMappingController
+    ctx: CommandContext
     ai_frame_id: str
     old_index: int
     new_index: int
@@ -219,9 +257,12 @@ class ReorderAIFrameCommand:
         return f"Move frame from position {self.old_index + 1} to {self.new_index + 1}"
 
     def execute(self) -> None:
-        self.controller._reorder_ai_frame_no_history(self.ai_frame_id, self.new_index)
+        success, _old, actual_new = self.ctx.reorder_ai_frame_no_history(self.ai_frame_id, self.new_index)
+        if success:
+            logger.info("Reordered AI frame %s to index %d", self.ai_frame_id, actual_new)
 
     def undo(self) -> None:
-        self.controller._reorder_ai_frame_no_history(self.ai_frame_id, self.old_index)
-        # Emit signal so UI updates (new_index, old_index params are from undo perspective)
-        self.controller.ai_frame_moved.emit(self.ai_frame_id, self.new_index, self.old_index)
+        success, _old, actual_old = self.ctx.reorder_ai_frame_no_history(self.ai_frame_id, self.old_index)
+        if success:
+            # Emit signal so UI updates (new_index, old_index params are from undo perspective)
+            self.ctx.signal_emitter.emit_ai_frame_moved(self.ai_frame_id, self.new_index, actual_old)

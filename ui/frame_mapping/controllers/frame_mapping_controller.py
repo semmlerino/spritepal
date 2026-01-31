@@ -45,6 +45,7 @@ from ui.frame_mapping.services.palette_service import PaletteService
 from ui.frame_mapping.services.preview_service import PreviewService
 from ui.frame_mapping.services.stale_entry_detector import AsyncStaleEntryDetector
 from ui.frame_mapping.undo import (
+    CommandContext,
     CreateMappingCommand,
     RemoveMappingCommand,
     ReorderAIFrameCommand,
@@ -166,9 +167,7 @@ class FrameMappingController(QObject):
         self._stale_entry_detector = AsyncStaleEntryDetector(parent=self, capture_repository=self._capture_repository)
         self._stale_entry_detector.stale_entries_detected.connect(self.stale_entries_on_load)
         # Capture import service (handles parsing and importing Mesen captures)
-        self._capture_import_service = CaptureImportService(
-            preview_service=self._preview_service, parent=self
-        )
+        self._capture_import_service = CaptureImportService(preview_service=self._preview_service, parent=self)
         self._capture_import_service.import_requested.connect(self._on_capture_import_requested)
         self._capture_import_service.import_completed.connect(self._on_capture_import_completed)
         self._capture_import_service.import_failed.connect(self.error_occurred)
@@ -216,6 +215,57 @@ class FrameMappingController(QObject):
         except RuntimeError:
             # AppContext not initialized (common in tests)
             return None
+
+    # ─── Command Context (for undo commands) ───────────────────────────────────
+
+    def _get_command_context(self) -> CommandContext:
+        """Get command context for undo commands.
+
+        Returns:
+            CommandContext with services and signal emitter
+
+        Raises:
+            ValueError: If no project is loaded
+        """
+        if self._project is None:
+            raise ValueError("No project loaded")
+        return CommandContext(
+            project=self._project,
+            mapping_service=self._mapping_service,
+            alignment_service=self._alignment_service,
+            organization_service=self._organization_service,
+            ai_frame_service=self._ai_frame_service,
+            signal_emitter=self,
+        )
+
+    # CommandSignalEmitter protocol implementation
+    def emit_mapping_created(self, ai_frame_id: str, game_frame_id: str) -> None:
+        """Emit mapping_created signal."""
+        self.mapping_created.emit(ai_frame_id, game_frame_id)
+
+    def emit_mapping_removed(self, ai_frame_id: str) -> None:
+        """Emit mapping_removed signal."""
+        self.mapping_removed.emit(ai_frame_id)
+
+    def emit_alignment_updated(self, ai_frame_id: str) -> None:
+        """Emit alignment_updated signal."""
+        self.alignment_updated.emit(ai_frame_id)
+
+    def emit_frame_renamed(self, frame_id: str) -> None:
+        """Emit frame_renamed signal."""
+        self.frame_renamed.emit(frame_id)
+
+    def emit_frame_tags_changed(self, frame_id: str) -> None:
+        """Emit frame_tags_changed signal."""
+        self.frame_tags_changed.emit(frame_id)
+
+    def emit_capture_renamed(self, game_frame_id: str) -> None:
+        """Emit capture_renamed signal."""
+        self.capture_renamed.emit(game_frame_id)
+
+    def emit_ai_frame_moved(self, ai_frame_id: str, from_index: int, to_index: int) -> None:
+        """Emit ai_frame_moved signal."""
+        self.ai_frame_moved.emit(ai_frame_id, from_index, to_index)
 
     # ─── Undo/Redo Public API ──────────────────────────────────────────────────
 
@@ -347,7 +397,8 @@ class FrameMappingController(QObject):
 
         # Delegate to service for frame creation
         frames, _orphan_count = self._ai_frame_service.load_frames_from_directory(
-            self._project, directory  # type: ignore[arg-type]
+            self._project,
+            directory,  # type: ignore[arg-type]
         )
         if not frames:
             self.error_occurred.emit(f"No PNG files found in {directory}")
@@ -391,7 +442,8 @@ class FrameMappingController(QObject):
 
         # Delegate to service for frame creation
         frame = self._ai_frame_service.create_frame_from_file(
-            self._project, file_path  # type: ignore[arg-type]
+            self._project,
+            file_path,  # type: ignore[arg-type]
         )
 
         if frame is None:
@@ -456,14 +508,10 @@ class FrameMappingController(QObject):
             return None
 
         # Update service with current frame IDs for uniqueness checking
-        self._capture_import_service.update_existing_frame_ids(
-            {gf.id for gf in self._project.game_frames}
-        )
+        self._capture_import_service.update_existing_frame_ids({gf.id for gf in self._project.game_frames})
 
         # Delegate to capture import service
-        frame = self._capture_import_service.complete_import(
-            capture_path, capture_result, selected_entries
-        )
+        frame = self._capture_import_service.complete_import(capture_path, capture_result, selected_entries)
 
         # If successful, add to project and emit signals
         if frame is not None:
@@ -534,9 +582,7 @@ class FrameMappingController(QObject):
             return False
 
         # Validate both frames exist
-        is_valid, error_msg = self._mapping_service.validate_mapping_frames(
-            self._project, ai_frame_id, game_frame_id
-        )
+        is_valid, error_msg = self._mapping_service.validate_mapping_frames(self._project, ai_frame_id, game_frame_id)
         if not is_valid:
             self.error_occurred.emit(error_msg)
             return False
@@ -547,13 +593,11 @@ class FrameMappingController(QObject):
             prev_game_ai_id,
             prev_ai_alignment,
             prev_game_alignment,
-        ) = self._mapping_service.capture_create_mapping_undo_state(
-            self._project, ai_frame_id, game_frame_id
-        )
+        ) = self._mapping_service.capture_create_mapping_undo_state(self._project, ai_frame_id, game_frame_id)
 
         # Create and execute command via undo stack
         command = CreateMappingCommand(
-            controller=self,
+            ctx=self._get_command_context(),
             ai_frame_id=ai_frame_id,
             game_frame_id=game_frame_id,
             prev_ai_mapping_game_id=prev_ai_game_id,
@@ -609,9 +653,7 @@ class FrameMappingController(QObject):
             return False
 
         # Capture state for undo
-        undo_state = self._mapping_service.capture_remove_mapping_undo_state(
-            self._project, ai_frame_id
-        )
+        undo_state = self._mapping_service.capture_remove_mapping_undo_state(self._project, ai_frame_id)
         if undo_state is None:
             return False
 
@@ -619,7 +661,7 @@ class FrameMappingController(QObject):
 
         # Create and execute command via undo stack
         command = RemoveMappingCommand(
-            controller=self,
+            ctx=self._get_command_context(),
             ai_frame_id=ai_frame_id,
             removed_game_frame_id=removed_game_id,
             removed_alignment=removed_alignment,
@@ -696,7 +738,7 @@ class FrameMappingController(QObject):
 
             # Create and execute command via undo stack
             command = UpdateAlignmentCommand(
-                controller=self,
+                ctx=self._get_command_context(),
                 ai_frame_id=ai_frame_id,
                 new_alignment=new_alignment,
                 old_alignment=old_alignment,
@@ -1011,9 +1053,7 @@ class FrameMappingController(QObject):
             return False
 
         # Delegate to service for validation
-        result = self._ai_frame_service.validate_reorder(
-            self._project, ai_frame_id, new_index
-        )
+        result = self._ai_frame_service.validate_reorder(self._project, ai_frame_id, new_index)
         if result is None:
             return False  # Invalid or no-op
 
@@ -1021,12 +1061,14 @@ class FrameMappingController(QObject):
 
         # Create and execute command
         command = ReorderAIFrameCommand(
-            controller=self,
+            ctx=self._get_command_context(),
             ai_frame_id=ai_frame_id,
             old_index=current_index,
             new_index=clamped_index,
         )
         self._undo_stack.push(command)
+        # Emit signal for UI update (command emits in undo)
+        self.ai_frame_moved.emit(ai_frame_id, current_index, clamped_index)
         return True
 
     def _reorder_ai_frame_no_history(self, ai_frame_id: str, new_index: int) -> bool:
@@ -1041,9 +1083,7 @@ class FrameMappingController(QObject):
 
         if self._project.reorder_ai_frame(ai_frame_id, new_index):
             # Emit with actual target index (may be clamped)
-            actual_new_index = self._ai_frame_service.find_frame_index(
-                self._project, ai_frame_id
-            )
+            actual_new_index = self._ai_frame_service.find_frame_index(self._project, ai_frame_id)
             self.ai_frame_moved.emit(ai_frame_id, old_index, actual_new_index)
             logger.info("Reordered AI frame %s from %d to %d", ai_frame_id, old_index, actual_new_index)
             return True
@@ -1361,9 +1401,8 @@ class FrameMappingController(QObject):
             return False
 
         result = self._organization_service.rename_frame(
-            project=self._project,
+            ctx=self._get_command_context(),
             undo_stack=self._undo_stack,
-            controller=self,
             frame_id=frame_id,
             display_name=display_name,
         )
@@ -1421,9 +1460,8 @@ class FrameMappingController(QObject):
             return False
 
         result = self._organization_service.toggle_frame_tag(
-            project=self._project,
+            ctx=self._get_command_context(),
             undo_stack=self._undo_stack,
-            controller=self,
             frame_id=frame_id,
             tag=tag,
         )
@@ -1517,9 +1555,8 @@ class FrameMappingController(QObject):
             return False
 
         result = self._organization_service.rename_capture(
-            project=self._project,
+            ctx=self._get_command_context(),
             undo_stack=self._undo_stack,
-            controller=self,
             game_frame_id=game_frame_id,
             new_name=new_name,
         )

@@ -25,6 +25,7 @@ from tests.infrastructure.signal_trace_recorder import (
     assert_trace_contains,
 )
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
+from ui.frame_mapping.undo.command_context import CommandContext
 from ui.frame_mapping.undo.commands import (
     CreateMappingCommand,
     RemoveMappingCommand,
@@ -65,6 +66,11 @@ def populated_controller(controller: FrameMappingController, tmp_path: Path) -> 
     return controller
 
 
+def get_ctx(controller: FrameMappingController) -> CommandContext:
+    """Get command context from controller."""
+    return controller._get_command_context()
+
+
 class TestCreateMappingUndoSignals:
     """Verify CreateMappingCommand.undo() emits correct signals."""
 
@@ -80,7 +86,7 @@ class TestCreateMappingUndoSignals:
         collector.connect_signals(populated_controller, ["mapping_created", "mapping_removed"])
 
         cmd = CreateMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             game_frame_id="capture_A",
         )
@@ -111,7 +117,7 @@ class TestCreateMappingUndoSignals:
 
         # Command remaps to different game frame
         cmd = CreateMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             game_frame_id="capture_B",
             prev_ai_mapping_game_id="capture_A",  # Record prior state
@@ -155,7 +161,7 @@ class TestRemoveMappingUndoSignals:
         collector.connect_signals(populated_controller, ["mapping_created", "mapping_removed", "alignment_updated"])
 
         cmd = RemoveMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             removed_game_frame_id="capture_A",
             removed_alignment=alignment,
@@ -181,7 +187,7 @@ class TestRemoveMappingUndoSignals:
         collector.connect_signals(populated_controller, ["mapping_created", "alignment_updated"])
 
         cmd = RemoveMappingCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             removed_game_frame_id=None,  # Nothing was removed
         )
@@ -228,7 +234,7 @@ class TestUpdateAlignmentUndoSignals:
         )
 
         cmd = UpdateAlignmentCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             new_alignment=new_alignment,
             old_alignment=old_alignment,
@@ -274,7 +280,7 @@ class TestUpdateAlignmentUndoSignals:
         )
 
         cmd = UpdateAlignmentCommand(
-            controller=populated_controller,
+            ctx=get_ctx(populated_controller),
             ai_frame_id="sprite_01.png",
             new_alignment=new_alignment,
             old_alignment=old_alignment,

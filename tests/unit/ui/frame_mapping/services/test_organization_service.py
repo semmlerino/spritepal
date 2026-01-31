@@ -38,9 +38,11 @@ def mock_undo_stack():
 
 
 @pytest.fixture
-def mock_controller():
-    """Create mock controller (QObject)."""
-    return QObject()
+def mock_command_context(mock_project):
+    """Create mock CommandContext with real project mock."""
+    ctx = MagicMock()
+    ctx.project = mock_project
+    return ctx
 
 
 @pytest.fixture
@@ -81,14 +83,16 @@ def sample_game_frame(tmp_path):
 # ─── AI Frame Renaming ─────────────────────────────────────────────────────
 
 
-def test_rename_frame_success(organization_service, mock_project, mock_undo_stack, mock_controller, sample_ai_frame):
+def test_rename_frame_success(
+    organization_service, mock_project, mock_undo_stack, mock_command_context, sample_ai_frame
+):
     """Test successful frame rename with undo."""
     mock_project.get_ai_frame_by_id.return_value = sample_ai_frame
+    mock_command_context.project = mock_project
 
     result = organization_service.rename_frame(
-        project=mock_project,
+        ctx=mock_command_context,
         undo_stack=mock_undo_stack,
-        controller=mock_controller,
         frame_id="test_frame.png",
         display_name="New Name",
     )
@@ -102,14 +106,14 @@ def test_rename_frame_success(organization_service, mock_project, mock_undo_stac
     assert isinstance(pushed_command, RenameAIFrameCommand)
 
 
-def test_rename_frame_not_found(organization_service, mock_project, mock_undo_stack, mock_controller):
+def test_rename_frame_not_found(organization_service, mock_project, mock_undo_stack, mock_command_context):
     """Test rename fails when frame not found."""
     mock_project.get_ai_frame_by_id.return_value = None
+    mock_command_context.project = mock_project
 
     result = organization_service.rename_frame(
-        project=mock_project,
+        ctx=mock_command_context,
         undo_stack=mock_undo_stack,
-        controller=mock_controller,
         frame_id="nonexistent.png",
         display_name="New Name",
     )
@@ -118,14 +122,16 @@ def test_rename_frame_not_found(organization_service, mock_project, mock_undo_st
     mock_undo_stack.push.assert_not_called()
 
 
-def test_rename_frame_clear_name(organization_service, mock_project, mock_undo_stack, mock_controller, sample_ai_frame):
+def test_rename_frame_clear_name(
+    organization_service, mock_project, mock_undo_stack, mock_command_context, sample_ai_frame
+):
     """Test clearing frame display name (set to None)."""
     mock_project.get_ai_frame_by_id.return_value = sample_ai_frame
+    mock_command_context.project = mock_project
 
     result = organization_service.rename_frame(
-        project=mock_project,
+        ctx=mock_command_context,
         undo_stack=mock_undo_stack,
-        controller=mock_controller,
         frame_id="test_frame.png",
         display_name=None,
     )
@@ -135,16 +141,16 @@ def test_rename_frame_clear_name(organization_service, mock_project, mock_undo_s
 
 
 def test_rename_frame_signal_emitted(
-    qtbot, organization_service, mock_project, mock_undo_stack, mock_controller, sample_ai_frame
+    qtbot, organization_service, mock_project, mock_undo_stack, mock_command_context, sample_ai_frame
 ):
     """Test frame_renamed signal is emitted."""
     mock_project.get_ai_frame_by_id.return_value = sample_ai_frame
+    mock_command_context.project = mock_project
 
     with qtbot.waitSignal(organization_service.frame_renamed, timeout=1000) as blocker:
         organization_service.rename_frame(
-            project=mock_project,
+            ctx=mock_command_context,
             undo_stack=mock_undo_stack,
-            controller=mock_controller,
             frame_id="test_frame.png",
             display_name="New Name",
         )
@@ -218,15 +224,15 @@ def test_remove_frame_tag_signal_emitted(qtbot, organization_service, mock_proje
 
 
 def test_toggle_frame_tag_success(
-    organization_service, mock_project, mock_undo_stack, mock_controller, sample_ai_frame
+    organization_service, mock_project, mock_undo_stack, mock_command_context, sample_ai_frame
 ):
     """Test toggling tag with undo."""
     mock_project.get_ai_frame_by_id.return_value = sample_ai_frame
+    mock_command_context.project = mock_project
 
     result = organization_service.toggle_frame_tag(
-        project=mock_project,
+        ctx=mock_command_context,
         undo_stack=mock_undo_stack,
-        controller=mock_controller,
         frame_id="test_frame.png",
         tag="action",
     )
@@ -239,14 +245,14 @@ def test_toggle_frame_tag_success(
     assert isinstance(pushed_command, ToggleFrameTagCommand)
 
 
-def test_toggle_frame_tag_not_found(organization_service, mock_project, mock_undo_stack, mock_controller):
+def test_toggle_frame_tag_not_found(organization_service, mock_project, mock_undo_stack, mock_command_context):
     """Test toggle fails when frame not found."""
     mock_project.get_ai_frame_by_id.return_value = None
+    mock_command_context.project = mock_project
 
     result = organization_service.toggle_frame_tag(
-        project=mock_project,
+        ctx=mock_command_context,
         undo_stack=mock_undo_stack,
-        controller=mock_controller,
         frame_id="nonexistent.png",
         tag="action",
     )
@@ -256,16 +262,16 @@ def test_toggle_frame_tag_not_found(organization_service, mock_project, mock_und
 
 
 def test_toggle_frame_tag_signal_emitted(
-    qtbot, organization_service, mock_project, mock_undo_stack, mock_controller, sample_ai_frame
+    qtbot, organization_service, mock_project, mock_undo_stack, mock_command_context, sample_ai_frame
 ):
     """Test frame_tags_changed signal is emitted when tag toggled."""
     mock_project.get_ai_frame_by_id.return_value = sample_ai_frame
+    mock_command_context.project = mock_project
 
     with qtbot.waitSignal(organization_service.frame_tags_changed, timeout=1000) as blocker:
         organization_service.toggle_frame_tag(
-            project=mock_project,
+            ctx=mock_command_context,
             undo_stack=mock_undo_stack,
-            controller=mock_controller,
             frame_id="test_frame.png",
             tag="action",
         )
@@ -370,15 +376,15 @@ def test_get_available_tags():
 
 
 def test_rename_capture_success(
-    organization_service, mock_project, mock_undo_stack, mock_controller, sample_game_frame
+    organization_service, mock_project, mock_undo_stack, mock_command_context, sample_game_frame
 ):
     """Test successful capture rename with undo."""
     mock_project.get_game_frame_by_id.return_value = sample_game_frame
+    mock_command_context.project = mock_project
 
     result = organization_service.rename_capture(
-        project=mock_project,
+        ctx=mock_command_context,
         undo_stack=mock_undo_stack,
-        controller=mock_controller,
         game_frame_id="capture_001",
         new_name="New Capture Name",
     )
@@ -392,14 +398,14 @@ def test_rename_capture_success(
     assert isinstance(pushed_command, RenameCaptureCommand)
 
 
-def test_rename_capture_not_found(organization_service, mock_project, mock_undo_stack, mock_controller):
+def test_rename_capture_not_found(organization_service, mock_project, mock_undo_stack, mock_command_context):
     """Test rename fails when capture not found."""
     mock_project.get_game_frame_by_id.return_value = None
+    mock_command_context.project = mock_project
 
     result = organization_service.rename_capture(
-        project=mock_project,
+        ctx=mock_command_context,
         undo_stack=mock_undo_stack,
-        controller=mock_controller,
         game_frame_id="nonexistent",
         new_name="New Name",
     )
@@ -409,15 +415,15 @@ def test_rename_capture_not_found(organization_service, mock_project, mock_undo_
 
 
 def test_rename_capture_empty_string_to_none(
-    organization_service, mock_project, mock_undo_stack, mock_controller, sample_game_frame
+    organization_service, mock_project, mock_undo_stack, mock_command_context, sample_game_frame
 ):
     """Test empty string is normalized to None."""
     mock_project.get_game_frame_by_id.return_value = sample_game_frame
+    mock_command_context.project = mock_project
 
     result = organization_service.rename_capture(
-        project=mock_project,
+        ctx=mock_command_context,
         undo_stack=mock_undo_stack,
-        controller=mock_controller,
         game_frame_id="capture_001",
         new_name="   ",  # Whitespace only
     )
@@ -431,16 +437,16 @@ def test_rename_capture_empty_string_to_none(
 
 
 def test_rename_capture_signal_emitted(
-    qtbot, organization_service, mock_project, mock_undo_stack, mock_controller, sample_game_frame
+    qtbot, organization_service, mock_project, mock_undo_stack, mock_command_context, sample_game_frame
 ):
     """Test capture_renamed signal is emitted."""
     mock_project.get_game_frame_by_id.return_value = sample_game_frame
+    mock_command_context.project = mock_project
 
     with qtbot.waitSignal(organization_service.capture_renamed, timeout=1000) as blocker:
         organization_service.rename_capture(
-            project=mock_project,
+            ctx=mock_command_context,
             undo_stack=mock_undo_stack,
-            controller=mock_controller,
             game_frame_id="capture_001",
             new_name="New Name",
         )
