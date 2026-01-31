@@ -37,6 +37,7 @@ from ui.frame_mapping.facades.controller_context import ControllerContext
 from ui.frame_mapping.facades.game_frames_facade import GameFramesFacade
 from ui.frame_mapping.facades.mappings_facade import MappingsFacade
 from ui.frame_mapping.facades.palette_facade import PaletteFacade
+from ui.frame_mapping.facades.preview_facade import PreviewFacade
 from ui.frame_mapping.services.ai_frame_service import AIFrameService
 from ui.frame_mapping.services.alignment_service import AlignmentService
 from ui.frame_mapping.services.async_game_frame_preview_service import (
@@ -215,6 +216,12 @@ class FrameMappingController(QObject):
             signals=self,  # Controller implements PaletteSignals protocol
             palette_service=self._palette_service,
         )
+        self._preview = PreviewFacade(
+            context=self._controller_context,
+            signals=self,  # Controller implements PreviewSignals protocol
+            preview_service=self._preview_service,
+            async_preview_service=self._async_preview_service,
+        )
 
     @property
     def _project(self) -> FrameMappingProject | None:
@@ -331,6 +338,10 @@ class FrameMappingController(QObject):
     def emit_game_frame_removed(self, frame_id: str) -> None:
         """Emit game_frame_removed signal."""
         self.game_frame_removed.emit(frame_id)
+
+    def emit_game_frame_previews_finished(self) -> None:
+        """Emit game_frame_previews_finished signal."""
+        self.game_frame_previews_finished.emit()
 
     def emit_error(self, message: str) -> None:
         """Emit error_occurred signal."""
@@ -735,12 +746,12 @@ class FrameMappingController(QObject):
         Delegates to preview service for caching and rendering.
 
         Args:
-            frame_id: Game frame ID
+            frame_id: Game frame ID.
 
         Returns:
-            QPixmap preview or None if not available
+            QPixmap preview or None if not available.
         """
-        return self._preview_service.get_preview(frame_id, self._project)
+        return self._preview.get_preview(frame_id)
 
     def get_cached_game_frame_preview(self, frame_id: str) -> QPixmap | None:
         """Get cached preview without triggering regeneration.
@@ -750,12 +761,12 @@ class FrameMappingController(QObject):
         Call request_game_frame_previews_async() for any cache misses.
 
         Args:
-            frame_id: Game frame ID
+            frame_id: Game frame ID.
 
         Returns:
-            Cached QPixmap or None if not available/stale
+            Cached QPixmap or None if not available/stale.
         """
-        return self._preview_service.get_cached_preview(frame_id, self._project)
+        return self._preview.get_cached_preview(frame_id)
 
     def get_capture_result_for_game_frame(self, frame_id: str) -> tuple[CaptureResult | None, bool]:
         """Get the CaptureResult for a game frame.
@@ -763,14 +774,14 @@ class FrameMappingController(QObject):
         Delegates to preview service for capture parsing and filtering.
 
         Args:
-            frame_id: Game frame ID
+            frame_id: Game frame ID.
 
         Returns:
             Tuple of (CaptureResult or None, used_fallback flag).
             used_fallback is True if the stored entry IDs were stale and
             rom_offset filtering was used instead.
         """
-        return self._preview_service.get_capture_result_for_game_frame(frame_id, self._project)
+        return self._preview.get_capture_result(frame_id)
 
     def request_game_frame_previews_async(self, frame_ids: list[str]) -> None:
         """Request async preview generation for specified game frames.
@@ -779,13 +790,9 @@ class FrameMappingController(QObject):
         for each completed preview.
 
         Args:
-            frame_ids: List of game frame IDs to generate previews for
+            frame_ids: List of game frame IDs to generate previews for.
         """
-        if self._project is None:
-            self.game_frame_previews_finished.emit()
-            return
-
-        self._async_preview_service.request_previews(frame_ids, self._project)
+        self._preview.request_previews_async(frame_ids)
 
     def _on_async_preview_ready(self, frame_id: str, pixmap: QPixmap) -> None:
         """Handle async preview completion.
