@@ -890,19 +890,6 @@ class FrameMappingWorkspace(QWidget):
         """Handle edit frame palette request. Delegates to PaletteCoordinator."""
         self._palette.handle_edit_frame_palette(ai_frame_id)
 
-    # -------------------------------------------------------------------------
-    # Palette Editor Properties (for backward compatibility)
-    # -------------------------------------------------------------------------
-
-    @property
-    def _palette_editors(self) -> dict:  # type: ignore[type-arg]
-        """Access palette editors dict via PaletteCoordinator.
-
-        Note: This property allows existing code referencing self._palette_editors
-        to continue working. New code should use self._palette.palette_editors.
-        """
-        return self._palette.palette_editors
-
     @signal_error_boundary()
     def _on_editor_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle palette color change from palette editor window. Delegates to PaletteCoordinator."""

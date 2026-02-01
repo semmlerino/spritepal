@@ -174,8 +174,8 @@ class TestEditorPaletteSyncOnPaletteChange:
         mock_editor2._canvas = MagicMock()
 
         # Register mock editors
-        workspace._palette_editors["frame1.png"] = mock_editor1
-        workspace._palette_editors["frame2.png"] = mock_editor2
+        workspace._palette.palette_editors["frame1.png"] = mock_editor1
+        workspace._palette.palette_editors["frame2.png"] = mock_editor2
 
         # Change palette color (this should trigger _on_sheet_palette_changed)
         workspace.controller.set_sheet_palette_color(5, (255, 0, 0))
@@ -203,7 +203,7 @@ class TestEditorPaletteSyncOnPaletteChange:
         workspace.controller.set_sheet_palette(palette)
 
         # No editors registered (empty dict)
-        assert len(workspace._palette_editors) == 0
+        assert len(workspace._palette.palette_editors) == 0
 
         # Change palette color - should not crash
         workspace.controller.set_sheet_palette_color(5, (255, 0, 0))
@@ -231,7 +231,7 @@ class TestEditorPaletteSyncOnPaletteChange:
         mock_editor._controller.get_indexed_data.return_value = None  # No data
         mock_editor._canvas = MagicMock()
 
-        workspace._palette_editors["frame1.png"] = mock_editor
+        workspace._palette.palette_editors["frame1.png"] = mock_editor
 
         # Change palette color (palette service may create new palette object)
         workspace.controller.set_sheet_palette_color(5, (255, 0, 0))
