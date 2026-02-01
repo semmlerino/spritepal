@@ -470,6 +470,8 @@ class WorkbenchCanvas(QWidget):
         # Tile geometry cache (invalidated on set_game_frame)
         # Caches _compute_tile_rects() results since it's called multiple times per alignment
         self._cached_tile_rects: list[tuple[int, int, int, int]] | None = None
+        # Unscaled tile metadata cache (x, y, w, h, rom_offset) - source of truth for tile geometry
+        self._cached_tile_metadata: list[tuple[int, int, int, int, int | None]] | None = None
         # QRect cache - avoids creating new QRect list on every drag tick
         self._cached_tile_qrects: list[QRect] | None = None
 
@@ -1313,43 +1315,23 @@ class WorkbenchCanvas(QWidget):
             self._stale_entries_warning_label.setVisible(visible)
 
     def _update_tile_overlay(self) -> None:
-        """Update tile overlay from capture result."""
+        """Update tile overlay from cached tile metadata."""
         if self._capture_result is None:
             self._tile_overlay_item.set_tile_rects([])
             return
 
-        # Build tile metadata from OAM entries
-        tiles: list[TileMetadata] = []
-        bbox = self._capture_result.bounding_box
+        # Build scaled TileMetadata from cached unscaled data
+        metadata = self._get_cached_tile_metadata()
+        scale = self._display_scale
+        tile_size = 8 * scale
 
-        for entry in self._capture_result.entries:
-            # Calculate relative position within the sprite bounds
-            rel_x = (entry.x - bbox.x) * self._display_scale
-            rel_y = (entry.y - bbox.y) * self._display_scale
-            width = entry.width * self._display_scale
-            height = entry.height * self._display_scale
-
-            # For larger sprites (16x16 or 32x32), break into 8x8 tiles
-            tile_size = 8 * self._display_scale
-            tile_idx = 0
-            for ty in range(0, height, tile_size):
-                for tx in range(0, width, tile_size):
-                    # Get rom_offset from tile data if available
-                    rom_offset: int | None = None
-                    if tile_idx < len(entry.tiles):
-                        rom_offset = entry.tiles[tile_idx].rom_offset
-                    tiles.append(
-                        TileMetadata(
-                            rect=QRectF(
-                                rel_x + tx,
-                                rel_y + ty,
-                                tile_size,
-                                tile_size,
-                            ),
-                            rom_offset=rom_offset,
-                        )
-                    )
-                    tile_idx += 1
+        tiles = [
+            TileMetadata(
+                rect=QRectF(x * scale, y * scale, tile_size, tile_size),
+                rom_offset=rom_offset,
+            )
+            for x, y, _, _, rom_offset in metadata
+        ]
 
         self._tile_overlay_item.set_tiles(tiles)
 
@@ -1764,27 +1746,49 @@ class WorkbenchCanvas(QWidget):
         logger.warning("Failed to generate preview: %s", error_message)
         self._preview_item.setVisible(False)
 
-    def _compute_tile_rects(self) -> list[tuple[int, int, int, int]]:
-        """Compute 8x8 tile rectangles from OAM entries in scene coordinates.
+    def _compute_tile_metadata(self) -> list[tuple[int, int, int, int, int | None]]:
+        """Compute unscaled 8x8 tile metadata from OAM entries.
 
         Returns:
-            List of (x, y, width, height) tuples relative to game frame origin.
+            List of (x, y, width, height, rom_offset) tuples relative to game frame origin.
+            rom_offset is None if tile data is not available for the entry.
         """
         if self._capture_result is None:
             return []
 
-        tile_rects: list[tuple[int, int, int, int]] = []
+        tiles: list[tuple[int, int, int, int, int | None]] = []
         bbox = self._capture_result.bounding_box
 
         for entry in self._capture_result.entries:
             rel_x = entry.x - bbox.x
             rel_y = entry.y - bbox.y
 
+            # Break larger sprites into 8x8 tiles
+            tile_idx = 0
             for ty in range(0, entry.height, 8):
                 for tx in range(0, entry.width, 8):
-                    tile_rects.append((rel_x + tx, rel_y + ty, 8, 8))
+                    rom_offset: int | None = None
+                    if tile_idx < len(entry.tiles):
+                        rom_offset = entry.tiles[tile_idx].rom_offset
+                    tiles.append((rel_x + tx, rel_y + ty, 8, 8, rom_offset))
+                    tile_idx += 1
 
-        return tile_rects
+        return tiles
+
+    def _get_cached_tile_metadata(self) -> list[tuple[int, int, int, int, int | None]]:
+        """Get tile metadata, using cache if available."""
+        if self._cached_tile_metadata is None:
+            self._cached_tile_metadata = self._compute_tile_metadata()
+        return self._cached_tile_metadata
+
+    def _compute_tile_rects(self) -> list[tuple[int, int, int, int]]:
+        """Compute 8x8 tile rectangles from cached metadata.
+
+        Returns:
+            List of (x, y, width, height) tuples relative to game frame origin.
+        """
+        metadata = self._get_cached_tile_metadata()
+        return [(x, y, w, h) for x, y, w, h, _ in metadata]
 
     def _get_cached_tile_rects(self) -> list[tuple[int, int, int, int]]:
         """Get tile rects, using cache if available.
@@ -1819,6 +1823,7 @@ class WorkbenchCanvas(QWidget):
 
         Called when game frame changes and tile rects need to be recomputed.
         """
+        self._cached_tile_metadata = None
         self._cached_tile_rects = None
         self._cached_tile_qrects = None
 
