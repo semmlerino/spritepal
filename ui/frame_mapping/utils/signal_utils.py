@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 @contextmanager
 def block_signals(*widgets: QObject) -> Iterator[None]:
-    """Temporarily block signals from widgets. Exception-safe.
+    """Temporarily block signals from widgets. Exception-safe. Uses try/finally for cleanup.
 
     Args:
         *widgets: One or more QObject instances to block signals on.
