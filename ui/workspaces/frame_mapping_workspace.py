@@ -244,6 +244,7 @@ class FrameMappingWorkspace(QWidget):
 
         return True
 
+    @signal_error_boundary()
     def _on_rom_selector_changed(self, path_str: str) -> None:
         """Handle ROM selection from header widget."""
         if not path_str:
@@ -545,6 +546,7 @@ class FrameMappingWorkspace(QWidget):
         """Get the currently selected game frame ID."""
         return self._logic.get_selected_game_id()
 
+    @signal_error_boundary()
     def _on_undo(self) -> None:
         """Handle Ctrl+Z - undo last action."""
         desc = self._controller.undo()
@@ -560,6 +562,7 @@ class FrameMappingWorkspace(QWidget):
         elif self._message_service:
             self._message_service.show_message("Nothing to undo", 1500)
 
+    @signal_error_boundary()
     def _on_redo(self) -> None:
         """Handle Ctrl+Y - redo last undone action."""
         desc = self._controller.redo()
@@ -579,11 +582,13 @@ class FrameMappingWorkspace(QWidget):
     # Event Handlers
     # -------------------------------------------------------------------------
 
+    @signal_error_boundary()
     def _on_auto_advance_changed(self, enabled: bool) -> None:
         """Handle auto-advance toggle change."""
         self._state.auto_advance_enabled = enabled
         logger.debug("Auto-advance %s", "enabled" if enabled else "disabled")
 
+    @signal_error_boundary()
     def _on_project_changed(self) -> None:
         """Handle project changes.
 
@@ -638,6 +643,7 @@ class FrameMappingWorkspace(QWidget):
         self._refresh_game_frame_link_status()
         self._update_mapping_panel_previews()
 
+    @signal_error_boundary()
     def _on_ai_frames_loaded(self, count: int) -> None:
         """Handle AI frames loaded."""
         # Reset batch selection to defaults (all mapped = checked)
@@ -645,11 +651,13 @@ class FrameMappingWorkspace(QWidget):
         if self._message_service:
             self._message_service.show_message(f"Loaded {count} AI frames")
 
+    @signal_error_boundary()
     def _on_game_frame_added(self, frame_id: str) -> None:
         """Handle game frame added."""
         if self._message_service:
             self._message_service.show_message(f"Imported game frame: {frame_id}")
 
+    @signal_error_boundary()
     def _on_game_frame_removed(self, frame_id: str) -> None:
         """Handle game frame removed - remove from captures pane.
 
@@ -658,6 +666,7 @@ class FrameMappingWorkspace(QWidget):
         """
         self._captures_pane.remove_game_frame(frame_id)
 
+    @signal_error_boundary()
     def _on_mapping_created(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Handle mapping created - targeted UI update.
 
@@ -674,6 +683,7 @@ class FrameMappingWorkspace(QWidget):
         self._update_single_game_frame_link_status(game_frame_id)
         self._update_single_mapping_panel_row(ai_frame_id)
 
+    @signal_error_boundary()
     def _on_mapping_removed(self, ai_frame_id: str) -> None:
         """Handle mapping removed - targeted UI update.
 
@@ -697,11 +707,13 @@ class FrameMappingWorkspace(QWidget):
         if ai_frame_id == self._state.selected_ai_frame_id:
             self._alignment_canvas.set_browsing_mode(False)
 
+    @signal_error_boundary()
     def _on_error(self, message: str) -> None:
         """Handle error from controller."""
         logger.error("Frame mapping error: %s", message)
         QMessageBox.warning(self, "Error", message)
 
+    @signal_error_boundary()
     def _on_status_update(self, message: str) -> None:
         """Handle status update from controller."""
         logger.info("Frame mapping status received: %s", message)
@@ -711,22 +723,27 @@ class FrameMappingWorkspace(QWidget):
         else:
             logger.warning("No message service set - status update not shown in UI")
 
+    @signal_error_boundary()
     def _on_ai_frame_selected(self, frame_id: str) -> None:
         """Handle AI frame selection in left pane."""
         self._logic.handle_ai_frame_selected(frame_id)
 
+    @signal_error_boundary()
     def _on_game_frame_selected(self, frame_id: str) -> None:
         """Handle game frame selection in captures library."""
         self._logic.handle_game_frame_selected(frame_id)
 
+    @signal_error_boundary()
     def _on_mapping_selected(self, ai_frame_id: str) -> None:
         """Handle mapping row selection in drawer."""
         self._logic.handle_mapping_selected(ai_frame_id)
 
+    @signal_error_boundary()
     def _on_map_selected(self) -> None:
         """Handle map button click in AI frames pane."""
         self._logic.handle_map_selected()
 
+    @signal_error_boundary()
     def _on_drop_game_frame(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Handle game frame dropped onto drawer row."""
         self._logic.handle_drop_game_frame(ai_frame_id, game_frame_id)
@@ -736,6 +753,7 @@ class FrameMappingWorkspace(QWidget):
         """Handle alignment change from canvas (auto-save)."""
         self._logic.handle_alignment_changed(state)
 
+    @signal_error_boundary()
     def _on_compression_type_changed(self, compression_type: str) -> None:
         """Handle compression type change from canvas.
 
@@ -752,6 +770,7 @@ class FrameMappingWorkspace(QWidget):
         # Route through controller for proper signal emission and auto-save
         self._controller.update_game_frame_compression(self._state.current_canvas_game_id, compression_type)
 
+    @signal_error_boundary()
     def _on_apply_transforms_to_all(self, offset_x: int, offset_y: int, scale: float) -> None:
         """Handle apply transformations to all request from canvas.
 
@@ -804,6 +823,7 @@ class FrameMappingWorkspace(QWidget):
         self._mapping_panel.refresh()
         self._refresh_mapping_status()
 
+    @signal_error_boundary()
     def _on_adjust_alignment(self, ai_frame_id: str) -> None:
         """Handle adjust alignment request - focus the canvas.
 
@@ -828,10 +848,12 @@ class FrameMappingWorkspace(QWidget):
         if self._message_service:
             self._message_service.show_message("Use arrow keys to adjust alignment")
 
+    @signal_error_boundary()
     def _on_edit_frame(self, ai_frame_id: str) -> None:
         """Handle edit AI frame request."""
         self._frame_ops.handle_edit_frame(ai_frame_id)
 
+    @signal_error_boundary()
     def _on_edit_game_frame(self, frame_id: str) -> None:
         """Handle edit game frame request from captures library."""
         self._frame_ops.handle_edit_game_frame(frame_id)
@@ -854,6 +876,7 @@ class FrameMappingWorkspace(QWidget):
         """
         return self._palette.palette_editors
 
+    @signal_error_boundary()
     def _on_editor_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle palette color change from palette editor window. Delegates to PaletteCoordinator."""
         self._palette._handle_editor_palette_color_changed(index, color)
@@ -863,6 +886,7 @@ class FrameMappingWorkspace(QWidget):
         """Handle delete capture request."""
         self._frame_ops.handle_delete_capture(frame_id)
 
+    @signal_error_boundary()
     def _on_show_capture_details(self, frame_id: str) -> None:
         """Handle show details request for capture."""
         self._frame_ops.handle_show_capture_details(frame_id)
@@ -872,10 +896,12 @@ class FrameMappingWorkspace(QWidget):
         """Handle remove AI frame from project request."""
         self._frame_ops.handle_remove_ai_frame(ai_frame_id)
 
+    @signal_error_boundary()
     def _on_remove_mapping(self, ai_frame_id: str) -> None:
         """Handle remove mapping request."""
         self._frame_ops.handle_remove_mapping(ai_frame_id)
 
+    @signal_error_boundary()
     def _on_row_reorder_requested(self, ai_frame_id: str, target_index: int) -> None:
         """Handle row reorder request from mapping panel drag/drop.
 
@@ -885,6 +911,7 @@ class FrameMappingWorkspace(QWidget):
         """
         self._controller.reorder_ai_frame(ai_frame_id, target_index)
 
+    @signal_error_boundary()
     def _on_ai_frame_moved(self, ai_frame_id: str, from_index: int, to_index: int) -> None:
         """Handle AI frame moved signal from controller.
 
@@ -902,6 +929,7 @@ class FrameMappingWorkspace(QWidget):
         # Update state to track the moved frame
         self._state.selected_ai_frame_id = ai_frame_id
 
+    @signal_error_boundary()
     def _on_ai_frame_added(self, ai_frame_id: str) -> None:
         """Handle single AI frame added signal from controller.
 
@@ -942,14 +970,17 @@ class FrameMappingWorkspace(QWidget):
         """Handle inject all mapped frames request (async). Delegates to InjectionCoordinator."""
         self._injection.inject_all()
 
+    @signal_error_boundary()
     def _on_mapping_injected(self, ai_frame_id: str, message: str) -> None:
         """Handle successful injection signal. Delegates to InjectionCoordinator."""
         self._injection.handle_mapping_injected(ai_frame_id, message)
 
+    @signal_error_boundary()
     def _on_stale_entries_warning(self, frame_id: str) -> None:
         """Handle stale entry ID warning from controller. Delegates to InjectionCoordinator."""
         self._injection.handle_stale_entries_warning(frame_id)
 
+    @signal_error_boundary()
     def _on_stale_entries_detected_on_load(self, stale_frame_ids: list[str]) -> None:
         """Show warning when project loads with stale capture entries. Delegates to InjectionCoordinator."""
         self._injection.handle_stale_entries_on_load(stale_frame_ids)
@@ -958,14 +989,17 @@ class FrameMappingWorkspace(QWidget):
     # Async Injection Handlers (Issue 8 Performance Fix)
     # -------------------------------------------------------------------------
 
+    @signal_error_boundary()
     def _on_async_injection_started(self, ai_frame_id: str) -> None:
         """Handle async injection started signal. Delegates to InjectionCoordinator."""
         self._injection.handle_async_injection_started(ai_frame_id)
 
+    @signal_error_boundary()
     def _on_async_injection_progress(self, ai_frame_id: str, message: str) -> None:
         """Handle async injection progress signal. Delegates to InjectionCoordinator."""
         self._injection.handle_async_injection_progress(ai_frame_id, message)
 
+    @signal_error_boundary()
     def _on_async_injection_finished(self, ai_frame_id: str, success: bool, message: str) -> None:
         """Handle async injection completion signal. Delegates to InjectionCoordinator."""
         self._injection.handle_async_injection_finished(ai_frame_id, success, message)
@@ -1010,6 +1044,7 @@ class FrameMappingWorkspace(QWidget):
         """Handle request to extract palette from AI sheet. Delegates to PaletteCoordinator."""
         self._palette.handle_palette_extract_requested()
 
+    @signal_error_boundary()
     def _on_palette_clear_requested(self) -> None:
         """Handle request to clear the sheet palette. Delegates to PaletteCoordinator."""
         self._palette.handle_palette_clear_requested()
@@ -1019,22 +1054,27 @@ class FrameMappingWorkspace(QWidget):
         """Handle sheet palette change from controller. Delegates to PaletteCoordinator."""
         self._palette.handle_sheet_palette_changed()
 
+    @signal_error_boundary()
     def _on_pixel_hovered(self, x: int, y: int, rgb: object, palette_index: int) -> None:
         """Handle pixel hover on workbench. Delegates to PaletteCoordinator."""
         self._palette.handle_pixel_hovered(x, y, rgb, palette_index)
 
+    @signal_error_boundary()
     def _on_pixel_left(self) -> None:
         """Handle mouse leaving workbench. Delegates to PaletteCoordinator."""
         self._palette.handle_pixel_left()
 
+    @signal_error_boundary()
     def _on_eyedropper_picked(self, rgb: object, palette_index: int) -> None:
         """Handle eyedropper pick. Delegates to PaletteCoordinator."""
         self._palette.handle_eyedropper_picked(rgb, palette_index)
 
+    @signal_error_boundary()
     def _on_palette_color_changed(self, index: int, rgb: object) -> None:
         """Handle palette color change. Delegates to PaletteCoordinator."""
         self._palette.handle_palette_color_changed(index, rgb)
 
+    @signal_error_boundary()
     def _on_palette_swatch_hovered(self, index: object) -> None:
         """Handle palette swatch hover. Delegates to PaletteCoordinator."""
         self._palette.handle_palette_swatch_hovered(index)
@@ -1138,6 +1178,7 @@ class FrameMappingWorkspace(QWidget):
     # Capture Import Handler
     # -------------------------------------------------------------------------
 
+    @signal_error_boundary()
     def _on_capture_import_requested(self, capture_result: CaptureResult, capture_path: object) -> None:
         """Handle capture import request - delegate to dialog coordinator.
 
@@ -1158,6 +1199,7 @@ class FrameMappingWorkspace(QWidget):
         if self._dialog_coordinator.get_queue_size() == 1:
             self._dialog_coordinator.process_capture_import_queue(self, self._controller)
 
+    @signal_error_boundary()
     def _on_capture_queue_finished(self, import_count: int) -> None:
         """Handle completion of capture import queue.
 
@@ -1167,6 +1209,7 @@ class FrameMappingWorkspace(QWidget):
         if self._message_service and import_count > 0:
             self._message_service.show_message(f"Imported {import_count} captures")
 
+    @signal_error_boundary()
     def _on_directory_import_started(self, total_files: int) -> None:
         """Handle directory import started signal.
 
@@ -1178,6 +1221,7 @@ class FrameMappingWorkspace(QWidget):
                 f"Parsing {total_files} capture file{'s' if total_files != 1 else ''}..."
             )
 
+    @signal_error_boundary()
     def _on_directory_import_finished(self, parsed_count: int) -> None:
         """Handle directory import finished signal.
 
@@ -1210,6 +1254,7 @@ class FrameMappingWorkspace(QWidget):
             self._ai_frames_pane.set_current_tab_folder(path)
             self._controller.load_ai_frames_from_directory(path)
 
+    @signal_error_boundary()
     def _on_ai_folder_dropped(self, path: object) -> None:
         """Load AI frames from dropped folder.
 
@@ -1230,6 +1275,7 @@ class FrameMappingWorkspace(QWidget):
 
         self._controller.load_ai_frames_from_directory(path)
 
+    @signal_error_boundary()
     def _on_ai_file_dropped(self, path: object) -> None:
         """Add a single AI frame from dropped PNG file.
 
@@ -1240,6 +1286,7 @@ class FrameMappingWorkspace(QWidget):
             return
         self._controller.add_ai_frame_from_file(path)
 
+    @signal_error_boundary()
     def _on_ai_tab_folder_changed(self, path: object) -> None:
         """Reload frames when tab changes.
 
@@ -1256,6 +1303,7 @@ class FrameMappingWorkspace(QWidget):
             self._controller.clear_undo_history()  # Clear undo: old commands reference deleted frames
             self._controller.project_changed.emit()
 
+    @signal_error_boundary()
     def _on_frame_rename_requested(self, frame_id: str, display_name: str) -> None:
         """Handle frame rename request from AI Frames pane.
 
@@ -1267,6 +1315,7 @@ class FrameMappingWorkspace(QWidget):
         name = display_name if display_name else None
         self._controller.rename_frame(frame_id, name)
 
+    @signal_error_boundary()
     def _on_frame_tag_toggled(self, frame_id: str, tag: str) -> None:
         """Handle frame tag toggle request from AI Frames pane.
 
@@ -1276,6 +1325,7 @@ class FrameMappingWorkspace(QWidget):
         """
         self._controller.toggle_frame_tag(frame_id, tag)
 
+    @signal_error_boundary()
     def _on_frame_organization_changed(self, frame_id: str) -> None:
         """Handle frame rename/tag change - refresh UI.
 
@@ -1284,6 +1334,7 @@ class FrameMappingWorkspace(QWidget):
         """
         self._ai_frames_pane.refresh_frame(frame_id)
 
+    @signal_error_boundary()
     def _on_capture_rename_requested(self, frame_id: str, new_name: str) -> None:
         """Handle capture rename request from Captures Library pane.
 
@@ -1293,6 +1344,7 @@ class FrameMappingWorkspace(QWidget):
         """
         self._controller.rename_capture(frame_id, new_name)
 
+    @signal_error_boundary()
     def _on_capture_organization_changed(self, frame_id: str) -> None:
         """Handle capture rename - refresh UI.
 
