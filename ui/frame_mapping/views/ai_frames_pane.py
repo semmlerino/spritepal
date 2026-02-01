@@ -316,6 +316,7 @@ class AIFramesPane(QWidget):
         super().__init__(parent)
         self._ai_frames: list[AIFrame] = []
         self._mapping_status: dict[str, str] = {}  # ai_frame_id -> status
+        self._id_to_row: dict[str, int] = {}  # ai_frame_id -> list row (O(1) lookup)
         self._show_unmapped_only = False
         self._search_text: str = ""
         self._tag_filter: str = ""  # Empty = show all, or specific tag to filter
@@ -505,30 +506,34 @@ class AIFramesPane(QWidget):
         # Update internal status map
         self._mapping_status[ai_frame_id] = status
 
-        # Find and update the list item
-        for row in range(self._list.count()):
-            item = self._list.item(row)
-            if item is not None and item.data(Qt.ItemDataRole.UserRole) == ai_frame_id:  # type: ignore[reportUnnecessaryComparison]
-                # Get the frame to reconstruct display text
-                frame = next((f for f in self._ai_frames if f.id == ai_frame_id), None)
-                if frame is None:
-                    break
+        # Find the list item using O(1) lookup
+        row = self._id_to_row.get(ai_frame_id)
+        if row is None:
+            return
 
-                # Update status indicator and text
-                status_indicator = "●" if status != "unmapped" else "○"
-                display_text = frame.name
+        item = self._list.item(row)
+        if item is None:  # type: ignore[reportUnnecessaryComparison]
+            return
 
-                # Add tag chips as suffix
-                if frame.tags:
-                    tag_str = " ".join(f"[{t}]" for t in sorted(frame.tags))
-                    display_text = f"{display_text}  {tag_str}"
+        # Get the frame to reconstruct display text
+        frame = next((f for f in self._ai_frames if f.id == ai_frame_id), None)
+        if frame is None:
+            return
 
-                item.setText(f"{status_indicator} {display_text}")
+        # Update status indicator and text
+        status_indicator = "●" if status != "unmapped" else "○"
+        display_text = frame.name
 
-                # Update color
-                color = get_status_color(status)
-                item.setForeground(QBrush(color))
-                break
+        # Add tag chips as suffix
+        if frame.tags:
+            tag_str = " ".join(f"[{t}]" for t in sorted(frame.tags))
+            display_text = f"{display_text}  {tag_str}"
+
+        item.setText(f"{status_indicator} {display_text}")
+
+        # Update color
+        color = get_status_color(status)
+        item.setForeground(QBrush(color))
 
     def get_selected_index(self) -> int | None:
         """Get the currently selected AI frame index.
@@ -637,6 +642,7 @@ class AIFramesPane(QWidget):
         """Clear all AI frames and reset tabs."""
         self._ai_frames = []
         self._mapping_status = {}
+        self._id_to_row.clear()
         self._list.clear()
         self._count_label.setText("No frames")
         self._palette_widget.set_palette(None)
@@ -873,6 +879,15 @@ class AIFramesPane(QWidget):
                 self._list.setCurrentRow(-1)
                 self._list.clearSelection()
 
+            # Rebuild ID-to-row lookup after populating the list
+            self._id_to_row = {}
+            for row in range(self._list.count()):
+                item = self._list.item(row)
+                if item is not None:  # type: ignore[reportUnnecessaryComparison]
+                    frame_id = item.data(Qt.ItemDataRole.UserRole)
+                    if frame_id is not None:
+                        self._id_to_row[frame_id] = row
+
         # Start async thumbnail loading (UI remains responsive)
         self._thumbnail_loader.load_thumbnails(thumbnail_requests, self._sheet_palette, THUMBNAIL_SIZE)
 
@@ -1019,6 +1034,14 @@ class AIFramesPane(QWidget):
                 if affected_item is not None:  # type: ignore[reportUnnecessaryComparison]
                     affected_item.setData(Qt.ItemDataRole.UserRole + 1, row)
 
+            # Update ID-to-row lookup for affected range
+            for row in range(start, end + 1):
+                affected_item = self._list.item(row)
+                if affected_item is not None:  # type: ignore[reportUnnecessaryComparison]
+                    frame_id = affected_item.data(Qt.ItemDataRole.UserRole)
+                    if frame_id is not None:
+                        self._id_to_row[frame_id] = row
+
             # Select the moved item
             self._list.setCurrentRow(to_index)
 
@@ -1075,6 +1098,10 @@ class AIFramesPane(QWidget):
         item.setForeground(QBrush(color))
 
         self._list.addItem(item)
+
+        # Update ID-to-row lookup with the newly added row
+        row = self._list.count() - 1
+        self._id_to_row[frame.id] = row
 
         # Request thumbnail for async loading
         self._thumbnail_loader.load_thumbnails([(frame.id, frame.path)], self._sheet_palette, THUMBNAIL_SIZE)
