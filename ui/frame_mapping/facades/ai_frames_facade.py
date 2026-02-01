@@ -219,7 +219,6 @@ class AIFramesFacade:
         self._signals.emit_ai_frame_moved(ai_frame_id, current_index, clamped_index)
         return True
 
-
     def get_frames(self) -> list[AIFrame]:
         """Get all AI frames from the current project."""
         return self._ai_frame_service.get_frames(self._context.project)

@@ -678,9 +678,7 @@ class PreviewWorkerPool(QObject):
             # If worker is still running after cleanup, do NOT call deleteLater()
             # which would crash with "QThread: Destroyed while thread is still running"
             if worker.isRunning():
-                logger.warning(
-                    "Worker still running after cleanup, keeping reference to prevent crash"
-                )
+                logger.warning("Worker still running after cleanup, keeping reference to prevent crash")
                 # Keep reference to prevent GC (leak is better than crash)
                 # Decrement worker count so we can create a replacement
                 if self._worker_count > 0:
@@ -748,9 +746,7 @@ class PreviewWorkerPool(QObject):
                             worker.quit()
                             if not worker.wait(300):  # Additional 300ms after quit
                                 # Do NOT call deleteLater() if still running - would crash
-                                logger.warning(
-                                    "Worker not responding to quit, keeping reference to prevent crash"
-                                )
+                                logger.warning("Worker not responding to quit, keeping reference to prevent crash")
                                 continue  # Skip deleteLater for this worker
 
                     # Only schedule for deletion if thread has stopped

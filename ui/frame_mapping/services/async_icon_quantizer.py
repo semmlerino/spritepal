@@ -307,9 +307,7 @@ class AsyncIconQuantizer(QObject):
                 # Thread did not stop in time - do NOT call deleteLater()
                 # which would crash with "QThread: Destroyed while thread is still running"
                 # Keep reference to prevent GC (leak is better than crash)
-                logger.warning(
-                    "Icon quantizer thread did not stop in time, keeping reference to prevent crash"
-                )
+                logger.warning("Icon quantizer thread did not stop in time, keeping reference to prevent crash")
                 # Note: self._thread is intentionally NOT set to None
                 # The thread reference is "leaked" to prevent GC from destroying it while running
 

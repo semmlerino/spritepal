@@ -481,7 +481,6 @@ class FrameMappingProject:
         """Invalidate AI frame index (call after modifying ai_frames)."""
         self._ai_frame_index_by_id = {f.id: f for f in self.ai_frames}
 
-
     def replace_ai_frames(self, frames: list[AIFrame], ai_frames_dir: Path | None = None) -> None:
         """Replace all AI frames and update internal indices.
 
@@ -515,7 +514,6 @@ class FrameMappingProject:
         # O(1) incremental update instead of O(N) rebuild
         self._ai_frame_index_by_id[frame.id] = frame
         return frame
-
 
     def add_game_frame(self, frame: GameFrame) -> GameFrame:
         """Add a game frame to the project.

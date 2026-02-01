@@ -189,7 +189,9 @@ class TestRefreshPreservesSelection:
             panel.refresh()
 
         # Selection should still be preserved
-        assert panel.get_selected_ai_frame_id() == "frame_002.png", "Selection was not preserved after multiple refreshes"
+        assert panel.get_selected_ai_frame_id() == "frame_002.png", (
+            "Selection was not preserved after multiple refreshes"
+        )
 
         # No spurious signals
         assert signal_emissions == [], f"Unexpected signals: {signal_emissions}"
