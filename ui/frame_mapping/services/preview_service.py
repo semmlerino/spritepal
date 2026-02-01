@@ -380,14 +380,6 @@ class PreviewService(QObject):
                 # Force regeneration (bypasses stale-return optimization)
                 self.force_regenerate_preview(frame_id, project)
 
-    def get_stale_count(self) -> int:
-        """Get the number of stale preview entries.
-
-        Returns:
-            Number of previews marked as stale
-        """
-        return len(self._stale_previews)
-
     def set_preview_cache(self, frame_id: str, pixmap: QPixmap, mtime: float, entry_ids: tuple[int, ...]) -> None:
         """Manually set preview cache entry (used during capture import).
 

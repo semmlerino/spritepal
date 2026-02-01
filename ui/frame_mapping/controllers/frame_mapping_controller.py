@@ -1533,34 +1533,6 @@ class FrameMappingController(QObject):
         """
         return self._injection.create_injection_copy(rom_path)
 
-    def _calculate_palette_rom_offset(self, rom_path: Path, game_frame_id: str) -> int | None:
-        """Calculate palette ROM offset from game config and frame's palette index.
-
-        First checks for character-specific palette offsets (e.g., King Dedede),
-        then falls back to the generic palette calculation.
-
-        Args:
-            rom_path: Path to the ROM file.
-            game_frame_id: ID of the game frame being injected.
-
-        Returns:
-            ROM offset where the palette should be written, or None if not available.
-        """
-        if self._project is None:
-            return None
-
-        game_frame = self._project.get_game_frame_by_id(game_frame_id)
-        if game_frame is None:
-            logger.debug("Cannot calculate palette offset: game_frame %s not found", game_frame_id)
-            return None
-
-        calculator = self.palette_offset_calculator
-        if calculator is None:
-            logger.debug("Cannot calculate palette offset: calculator not available (AppContext not initialized)")
-            return None
-
-        return calculator.calculate(rom_path, game_frame)
-
     def inject_mapping(
         self,
         ai_frame_id: str,
