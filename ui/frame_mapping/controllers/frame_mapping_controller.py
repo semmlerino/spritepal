@@ -8,13 +8,9 @@ from __future__ import annotations
 
 from json import JSONDecodeError
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
-
-if TYPE_CHECKING:
-    from core.frame_mapping_project import FrameMappingProject
 
 from core.frame_mapping_project import (
     AIFrame,

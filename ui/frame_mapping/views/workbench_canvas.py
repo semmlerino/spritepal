@@ -1485,7 +1485,7 @@ class WorkbenchCanvas(QWidget):
         self._emit_alignment_changed()
 
     @signal_error_boundary()
-    def _on_flip_changed(self) -> None:
+    def _on_flip_changed(self, checked: bool = False) -> None:
         """Handle flip checkbox change."""
         if self._updating_from_external:
             return

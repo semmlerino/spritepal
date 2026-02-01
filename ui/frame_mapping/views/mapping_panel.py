@@ -361,6 +361,12 @@ class MappingPanel(QWidget):
         self._selection_state.reset()
         logger.debug("set_project: selection state RESET")
 
+    def closeEvent(self, event: QEvent) -> None:
+        """Handle close event - cancel async operations."""
+        self._thumbnail_loader.cancel()
+        self._icon_quantizer.cancel()
+        super().closeEvent(event)
+
     def reset_batch_selection(self) -> None:
         """Reset batch selection to default behavior.
 
