@@ -138,6 +138,17 @@ Agents execute what you specify—vague prompts yield vague results.
 - Check background results with `Read` on the output file
 - Subagents cannot spawn other subagents—chain from the main conversation instead
 
+### Orchestrator Verification
+
+**After each agent completes, verify before proceeding.** Agents can misunderstand prompts, make incorrect changes, or miss edge cases. The orchestrator must verify their work.
+
+Verification steps (run directly, not delegated):
+1. **Lint/typecheck changed files:** `ruff check <files> && basedpyright <files>`
+2. **Run targeted tests:** `pytest tests/path/to/relevant_tests.py -v --tb=short`
+3. **Spot-check critical changes:** Read key modified sections if the agent made judgment calls
+
+Only proceed to the next phase after verification passes. If issues found, either fix directly or re-prompt the agent with specific corrections.
+
 ### Post-Implementation
 
 Spawn `python-code-reviewer` after multi-file or non-obvious changes, before committing. Skip for trivial single-file edits where correctness is obvious.
