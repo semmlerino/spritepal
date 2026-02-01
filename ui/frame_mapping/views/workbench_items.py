@@ -412,6 +412,15 @@ class AIFrameItem(QGraphicsObject):
                 # Scale down (1% default, 5% with Shift)
                 self._adjust_scale(-scale_step)
                 event.accept()
+            elif key == Qt.Key.Key_Escape:
+                # Cancel drag and restore original position
+                if self._is_dragging and self._drag_start_alignment is not None:
+                    start_x, start_y, start_scale = self._drag_start_alignment
+                    self.setPos(start_x, start_y)
+                    self.set_scale_factor(start_scale)
+                    self.end_drag()
+                    logger.debug("Drag cancelled via Escape, restored to: %s", self._drag_start_alignment)
+                event.accept()
             else:
                 event.ignore()
 

@@ -2066,6 +2066,17 @@ class WorkbenchCanvas(QWidget):
         """Clear drag start alignment after it's been consumed for undo."""
         self._drag_start_alignment = None
 
+    def cancel_drag(self) -> None:
+        """Cancel any in-progress drag and clear drag state.
+
+        Call this when a drag needs to be aborted (e.g., on escape or when
+        the canvas loses focus during a drag).
+        """
+        if self._drag_in_progress:
+            self._drag_in_progress = False
+            self.clear_drag_start_alignment()
+            logger.debug("Drag cancelled and state cleared")
+
     @signal_error_boundary()
     def _on_ai_frame_transform_changed(self, offset_x: int, offset_y: int, scale: float) -> None:
         """Handle transform change from AI frame item."""
