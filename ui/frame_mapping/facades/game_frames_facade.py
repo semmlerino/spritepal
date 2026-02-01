@@ -88,9 +88,7 @@ class GameFramesFacade:
             return False
 
         # Capture affected AI frame IDs BEFORE removal (mappings will be deleted)
-        affected_ai_ids = [
-            m.ai_frame_id for m in project.mappings if m.game_frame_id == frame_id
-        ]
+        affected_ai_ids = [m.ai_frame_id for m in project.mappings if m.game_frame_id == frame_id]
 
         # Clear preview cache for this frame
         self._preview_service.invalidate(frame_id)

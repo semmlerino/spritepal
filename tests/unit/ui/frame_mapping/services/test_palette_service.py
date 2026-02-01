@@ -241,6 +241,7 @@ class TestCopyGamePaletteToSheet:
     def test_copies_palette_from_game_frame(self, palette_service, mock_project, tmp_path):
         """Should copy palette from game frame capture."""
         capture_path = tmp_path / "capture.json"
+        capture_path.touch()  # File must exist for repository mtime check
         game_frame = Mock(spec=GameFrame)
         game_frame.capture_path = capture_path
         game_frame.palette_index = 0
@@ -249,19 +250,16 @@ class TestCopyGamePaletteToSheet:
         mock_capture = Mock(spec=CaptureResult)
         mock_capture.palettes = {0: [(31, 0, 0), (0, 31, 0)]}  # BGR555 format
 
-        # Patch the parser instance on the service (created in __init__)
-        mock_parser = Mock()
-        mock_parser.parse_file.return_value = mock_capture
-        palette_service._parser = mock_parser
+        # Patch the repository's get_or_parse to return mock capture
+        with patch.object(palette_service._capture_repository, "get_or_parse", return_value=mock_capture):
+            with patch("ui.frame_mapping.services.palette_service.snes_palette_to_rgb") as mock_convert:
+                with patch.object(palette_service, "extract_sheet_colors") as mock_extract:
+                    with patch("ui.frame_mapping.services.palette_service.find_nearest_palette_index") as mock_find:
+                        mock_convert.return_value = [(248, 0, 0), (0, 248, 0)]
+                        mock_extract.return_value = {(100, 100, 100): 10}
+                        mock_find.return_value = 0
 
-        with patch("ui.frame_mapping.services.palette_service.snes_palette_to_rgb") as mock_convert:
-            with patch.object(palette_service, "extract_sheet_colors") as mock_extract:
-                with patch("ui.frame_mapping.services.palette_service.find_nearest_palette_index") as mock_find:
-                    mock_convert.return_value = [(248, 0, 0), (0, 248, 0)]
-                    mock_extract.return_value = {(100, 100, 100): 10}
-                    mock_find.return_value = 0
-
-                    result = palette_service.copy_game_palette_to_sheet(mock_project, "frame1")
+                        result = palette_service.copy_game_palette_to_sheet(mock_project, "frame1")
 
         assert result is not None
         assert len(result.colors) == 16  # Padded to 16
@@ -301,15 +299,16 @@ class TestGetGamePalettes:
         mock_capture2 = Mock(spec=CaptureResult)
         mock_capture2.palettes = {1: [(0, 31, 0)]}
 
-        # Patch the parser instance on the service (created in __init__)
-        mock_parser = Mock()
-        mock_parser.parse_file.side_effect = [mock_capture1, mock_capture2]
-        palette_service._parser = mock_parser
+        # Patch the repository's get_or_parse to return mock captures
+        with patch.object(
+            palette_service._capture_repository,
+            "get_or_parse",
+            side_effect=[mock_capture1, mock_capture2],
+        ):
+            with patch("ui.frame_mapping.services.palette_service.snes_palette_to_rgb") as mock_convert:
+                mock_convert.side_effect = [[(248, 0, 0)], [(0, 248, 0)]]
 
-        with patch("ui.frame_mapping.services.palette_service.snes_palette_to_rgb") as mock_convert:
-            mock_convert.side_effect = [[(248, 0, 0)], [(0, 248, 0)]]
-
-            result = palette_service.get_game_palettes(mock_project)
+                result = palette_service.get_game_palettes(mock_project)
 
         assert len(result) == 2
         assert "frame1" in result

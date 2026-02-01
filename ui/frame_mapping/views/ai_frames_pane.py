@@ -695,11 +695,7 @@ class AIFramesPane(QWidget):
 
         # Start async thumbnail loading with new palette
         if thumbnail_requests:
-            self._thumbnail_loader.load_thumbnails(
-                thumbnail_requests,
-                self._sheet_palette,
-                THUMBNAIL_SIZE
-            )
+            self._thumbnail_loader.load_thumbnails(thumbnail_requests, self._sheet_palette, THUMBNAIL_SIZE)
 
     def get_sheet_palette(self) -> SheetPalette | None:
         """Get the current sheet palette.

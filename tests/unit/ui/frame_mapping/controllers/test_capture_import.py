@@ -97,7 +97,9 @@ class TestImportMesenCapture:
         # A project should now exist
         assert controller._project is not None
 
-    def test_emits_capture_import_requested(self, controller: FrameMappingController, capture_file: Path, qtbot: object) -> None:
+    def test_emits_capture_import_requested(
+        self, controller: FrameMappingController, capture_file: Path, qtbot: object
+    ) -> None:
         """import_mesen_capture emits capture_import_requested signal."""
         requested: list[tuple] = []
         controller.capture_import_requested.connect(lambda capture, path: requested.append((capture, path)))
@@ -162,7 +164,9 @@ class TestImportMesenCapture:
         assert len(errors) == 1
         assert "no sprite entries" in errors[0].lower()
 
-    def test_malformed_capture_data_emits_error(self, controller: FrameMappingController, tmp_path: Path, qtbot: object) -> None:
+    def test_malformed_capture_data_emits_error(
+        self, controller: FrameMappingController, tmp_path: Path, qtbot: object
+    ) -> None:
         """import_mesen_capture emits error for malformed capture data."""
         malformed = {"frameNumber": 1234}  # Missing required fields
         malformed_file = tmp_path / "malformed.json"
