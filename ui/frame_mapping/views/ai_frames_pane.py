@@ -673,11 +673,33 @@ class AIFramesPane(QWidget):
         """
         self._sheet_palette = palette
         self._palette_widget.set_palette(palette)
-        # Refresh thumbnails to show quantized colors
-        self._refresh_list(is_frame_list_change=False)
+        # Refresh thumbnails only - no list rebuild needed for palette change
+        self.refresh_thumbnails_only()
         # Force Qt to repaint the list viewport to ensure icon updates are visible
         # This fixes a Qt issue where icon caching can prevent visual updates
         self._list.viewport().update()
+
+    def refresh_thumbnails_only(self) -> None:
+        """Refresh only the thumbnails for existing list items.
+
+        More efficient than _refresh_list() when only the palette changed -
+        keeps items, selection, and scroll position, just re-loads icons.
+        """
+        # Collect thumbnail requests for all current items
+        thumbnail_requests: list[tuple[str, Path]] = []
+
+        for frame in self._ai_frames:
+            # Check if item is visible in list (passes filters)
+            if frame.id in self._id_to_row:
+                thumbnail_requests.append((frame.id, frame.path))
+
+        # Start async thumbnail loading with new palette
+        if thumbnail_requests:
+            self._thumbnail_loader.load_thumbnails(
+                thumbnail_requests,
+                self._sheet_palette,
+                THUMBNAIL_SIZE
+            )
 
     def get_sheet_palette(self) -> SheetPalette | None:
         """Get the current sheet palette.

@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtWidgets import QMessageBox, QWidget
 
-from ui.frame_mapping.services.thumbnail_service import clear_thumbnail_cache
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -191,9 +190,6 @@ class PaletteCoordinator:
             return
 
         palette = self._controller.get_sheet_palette()
-
-        # Clear thumbnail cache to regenerate with new palette colors
-        clear_thumbnail_cache()
 
         if self._ai_frames_pane:
             self._ai_frames_pane.set_sheet_palette(palette)

@@ -348,6 +348,7 @@ class TestRefreshPreservesCheckboxState:
         # Set initial palette and refresh
         palette = SheetPalette(colors=[(0, 0, 0), (255, 255, 255)], color_mappings={})
         panel.set_project(project)
+        panel.refresh()  # Populate the table
         panel.set_sheet_palette(palette)
 
         # User unchecks second frame

@@ -633,12 +633,25 @@ class MappingPanel(QWidget):
             logger.debug("set_sheet_palette: SKIPPED (same object)")
             return
 
-        logger.debug("set_sheet_palette: palette CHANGED, will refresh")
+        logger.debug("set_sheet_palette: palette CHANGED, refreshing thumbnails only")
         self._sheet_palette = palette
         # Clear quantized icon cache since palette changed
         self._quantized_icon_cache.clear()
-        # Refresh to apply new palette to thumbnails
-        self.refresh()
+        # Refresh thumbnails only - no full table rebuild needed
+        self.refresh_thumbnails_only()
+
+    def refresh_thumbnails_only(self) -> None:
+        """Refresh only the thumbnails for existing table rows.
+
+        More efficient than refresh() when only the palette changed -
+        keeps table structure, just re-loads quantized AI frame icons.
+        """
+        # Clear quantized icon cache since palette changed
+        self._quantized_icon_cache.clear()
+        # Reset visible range to force reload
+        self._last_visible_range = (-1, -1)
+        # Trigger visibility-based thumbnail loading
+        QTimer.singleShot(0, self._load_visible_thumbnails)
 
     def refresh(self) -> None:
         """Refresh the mapping table from the current project."""
