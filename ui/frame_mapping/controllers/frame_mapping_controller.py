@@ -12,6 +12,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 
+from core.exceptions import CaptureImportError
 from core.frame_mapping_project import (
     AIFrame,
     FrameMappingProject,
@@ -27,7 +28,6 @@ from core.repositories.frame_mapping_repository import FrameMappingRepository
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.palette_offset_calculator import PaletteOffsetCalculator
 from core.types import CompressionType
-from core.exceptions import CaptureImportError
 from ui.frame_mapping.facades.ai_frames_facade import AIFramesFacade
 from ui.frame_mapping.facades.controller_context import ControllerContext
 from ui.frame_mapping.facades.game_frames_facade import GameFramesFacade
