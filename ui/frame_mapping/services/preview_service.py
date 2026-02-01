@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 
-from core.frame_mapping_exceptions import CaptureParseError
+from core.exceptions import CaptureParseError
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
 from core.repositories.capture_result_repository import CaptureResultRepository
 from utils.logging_config import get_logger
@@ -157,10 +157,7 @@ class PreviewService(QObject):
             logger.warning("Failed to regenerate preview for game frame %s: %s", frame_id, e)
             return None
 
-
-    def get_cached_preview(
-        self, frame_id: str, project: FrameMappingProject | None
-    ) -> QPixmap | None:
+    def get_cached_preview(self, frame_id: str, project: FrameMappingProject | None) -> QPixmap | None:
         """Get cached preview if available and valid, without generating on miss.
 
         This method is intended for UI refreshes where blocking to regenerate

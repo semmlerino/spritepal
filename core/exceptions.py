@@ -47,5 +47,17 @@ class FileFormatError(SpritePalError):
     """Raised for unsupported or invalid file formats."""
 
 
+class CaptureParseError(FileFormatError):
+    """Error parsing Mesen capture file.
+
+    Raised when:
+    - Capture file is malformed JSON
+    - Required fields are missing
+    - Entry data is invalid
+    """
+
+    pass
+
+
 class TileError(SpritePalError):
     """Raised for tile processing errors."""
