@@ -367,17 +367,8 @@ class WorkbenchCanvas(QWidget):
         super().__init__(parent)
 
         # Configuration (with defaults if not provided)
-        if config is None:
-            config = CanvasConfig(
-                size=300,
-                display_scale=2,
-                tile_calc_debounce_ms=100,
-                preview_debounce_ms=150,
-                pixel_hover_debounce_ms=50,
-                pixel_highlight_debounce_ms=100,
-            )
-        self._config = config
-        self._display_scale = config.display_scale
+        self._config = config if config is not None else CanvasConfig()
+        self._display_scale = self._config.display_scale
 
         self._current_ai_frame: AIFrame | None = None
         self._current_game_frame: GameFrame | None = None
