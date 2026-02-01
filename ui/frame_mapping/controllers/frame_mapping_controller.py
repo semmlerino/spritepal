@@ -1411,24 +1411,18 @@ class FrameMappingController(QObject):
         self._palette.set_sheet_palette_color(index, rgb)
 
     def _invalidate_previews_on_palette_change(self) -> None:
-        """Mark all previews as stale and trigger async regeneration.
+        """Mark all previews as stale for lazy regeneration.
 
         BUG-2 FIX: Game frame previews may use the sheet palette for rendering.
         When the palette changes, cached previews become stale and must be
         regenerated to reflect the new colors.
 
-        PERF FIX (Issue 3): After marking stale, trigger async regeneration for
-        all game frames so previews auto-update without user interaction.
+        PERF: We only mark previews as stale here. Actual regeneration happens
+        lazily when previews are accessed (e.g., when MappingPanel requests them).
+        This avoids regenerating ALL previews when the user might only view a few.
         """
         logger.debug("Marking preview cache stale due to palette change")
         self._preview_service.mark_all_stale()
-
-        # Trigger async regeneration for all game frames
-        if self._project is not None:
-            frame_ids = [gf.id for gf in self._project.game_frames]
-            if frame_ids:
-                logger.debug("Requesting async preview regeneration for %d frames", len(frame_ids))
-                self._async_preview_service.request_previews(frame_ids, self._project)
 
     def extract_sheet_colors(self) -> dict[tuple[int, int, int], int]:
         """Extract unique colors from all AI frames in the project.
