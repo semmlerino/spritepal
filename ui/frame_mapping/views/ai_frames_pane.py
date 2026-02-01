@@ -30,6 +30,8 @@ from ui.frame_mapping.services.thumbnail_service import (
     DEFAULT_THUMBNAIL_SIZE,
     AsyncThumbnailLoader,
 )
+from ui.frame_mapping.signal_error_handling import signal_error_boundary
+from ui.frame_mapping.utils.signal_utils import block_signals
 from ui.frame_mapping.views.sheet_palette_widget import SheetPaletteWidget
 from ui.frame_mapping.views.status_colors import get_status_color
 from utils.logging_config import get_logger
@@ -389,12 +391,9 @@ class AIFramesPane(QWidget):
 
         Blocks signals during clearing to prevent feedback loops.
         """
-        self._list.blockSignals(True)
-        try:
+        with block_signals(self._list):
             self._list.setCurrentRow(-1)
             self._list.clearSelection()
-        finally:
-            self._list.blockSignals(False)
 
     def has_visible_item(self, frame_id: str) -> bool:
         """Check if a frame is visible in the filtered list.
@@ -478,16 +477,19 @@ class AIFramesPane(QWidget):
         """
         self._palette_widget.select_index(index)
 
+    @signal_error_boundary()
     def _on_search_changed(self, text: str) -> None:
         """Handle search text change."""
         self._search_text = text.lower()
         self._refresh_list()
 
+    @signal_error_boundary()
     def _on_filter_changed(self, checked: bool) -> None:
         """Handle filter checkbox toggle."""
         self._show_unmapped_only = checked
         self._refresh_list()
 
+    @signal_error_boundary()
     def _on_selection_changed(self, row: int) -> None:
         """Handle AI frame selection change."""
         if row < 0:
@@ -501,6 +503,7 @@ class AIFramesPane(QWidget):
         if frame_id is not None:
             self.ai_frame_selected.emit(frame_id)
 
+    @signal_error_boundary()
     def _on_context_menu(self, pos: object) -> None:
         """Show context menu for AI frames."""
         from PySide6.QtCore import QPoint
@@ -574,8 +577,7 @@ class AIFramesPane(QWidget):
         # Collect thumbnail requests for async loading
         thumbnail_requests: list[tuple[str, Path]] = []
 
-        self._list.blockSignals(True)
-        try:
+        with block_signals(self._list):
             self._list.clear()
 
             visible_count = 0
@@ -650,8 +652,6 @@ class AIFramesPane(QWidget):
             if not selection_restored:
                 self._list.setCurrentRow(-1)
                 self._list.clearSelection()
-        finally:
-            self._list.blockSignals(False)
 
         # Start async thumbnail loading (UI remains responsive)
         self._thumbnail_loader.load_thumbnails(thumbnail_requests, self._sheet_palette, THUMBNAIL_SIZE)
@@ -668,11 +668,13 @@ class AIFramesPane(QWidget):
                 # so state manager must be notified to clear the stale selection.
                 self.ai_frame_selected.emit("")
 
+    @signal_error_boundary()
     def _on_tag_filter_changed(self, index: int) -> None:
         """Handle tag filter combo box change."""
         self._tag_filter = self._tag_filter_combo.currentData() or ""
         self._refresh_list()
 
+    @signal_error_boundary()
     def _on_thumbnail_ready(self, frame_id: str, pixmap: QPixmap) -> None:
         """Update list item icon when async thumbnail is ready.
 
@@ -714,6 +716,7 @@ class AIFramesPane(QWidget):
             display_name = new_name.strip() if new_name.strip() else None
             self.frame_rename_requested.emit(frame_id, display_name or "")
 
+    @signal_error_boundary()
     def _on_item_double_clicked(self, item: QListWidgetItem) -> None:
         """Handle double-click on list item - show rename dialog."""
         frame_id = item.data(Qt.ItemDataRole.UserRole)
@@ -778,8 +781,7 @@ class AIFramesPane(QWidget):
         if to_index < 0 or to_index >= item_count:
             return
 
-        self._list.blockSignals(True)
-        try:
+        with block_signals(self._list):
             # Take the item from its current position
             item = self._list.takeItem(from_index)
             if item is None:  # type: ignore[reportUnnecessaryComparison]
@@ -799,8 +801,6 @@ class AIFramesPane(QWidget):
 
             # Select the moved item
             self._list.setCurrentRow(to_index)
-        finally:
-            self._list.blockSignals(False)
 
     def add_single_item(self, frame: AIFrame) -> None:
         """Add a single AI frame to the list without full refresh.
@@ -999,6 +999,7 @@ class AIFramesPane(QWidget):
             return None
         return self._tab_folders[index]
 
+    @signal_error_boundary()
     def _on_tab_changed(self, index: int) -> None:
         """Handle tab selection change."""
         if self._suppress_tab_signal:
@@ -1008,10 +1009,12 @@ class AIFramesPane(QWidget):
         folder = self._tab_folders[index]
         self.tab_folder_changed.emit(folder)
 
+    @signal_error_boundary()
     def _on_tab_close_requested(self, index: int) -> None:
         """Handle tab close button click."""
         self.close_tab(index)
 
+    @signal_error_boundary()
     def _on_add_tab_clicked(self) -> None:
         """Handle add tab button click."""
         self._suppress_tab_signal = True

@@ -58,6 +58,8 @@ from core.services.tile_sampling_service import TileSamplingService
 from ui.frame_mapping.services.async_highlight_service import AsyncHighlightService
 from ui.frame_mapping.services.async_preview_service import AsyncPreviewService
 from ui.frame_mapping.services.canvas_config_service import CanvasConfig
+from ui.frame_mapping.signal_error_handling import signal_error_boundary
+from ui.frame_mapping.utils.signal_utils import block_signals
 from ui.frame_mapping.views.workbench_items import (
     AIFrameItem,
     ClippingOverlayItem,
@@ -778,11 +780,10 @@ class WorkbenchCanvas(QWidget):
             first_offset = frame.rom_offsets[0]
             compression_type = frame.compression_types.get(first_offset, "raw")
         # Block signals to prevent triggering change handler during UI update
-        self._compression_combo.blockSignals(True)
-        index = self._compression_combo.findData(compression_type)
-        if index >= 0:
-            self._compression_combo.setCurrentIndex(index)
-        self._compression_combo.blockSignals(False)
+        with block_signals(self._compression_combo):
+            index = self._compression_combo.findData(compression_type)
+            if index >= 0:
+                self._compression_combo.setCurrentIndex(index)
 
     def _has_multiple_palettes(self) -> bool:
         """Check if capture has multiple distinct palettes.
@@ -903,32 +904,27 @@ class WorkbenchCanvas(QWidget):
             self._ai_frame_item.set_flip(flip_h, flip_v)
 
             # Update controls
-            self._flip_h_checkbox.blockSignals(True)
-            self._flip_v_checkbox.blockSignals(True)
-            self._scale_slider.blockSignals(True)
-            self._sharpen_slider.blockSignals(True)
-            self._resampling_combo.blockSignals(True)
+            with block_signals(
+                self._flip_h_checkbox,
+                self._flip_v_checkbox,
+                self._scale_slider,
+                self._sharpen_slider,
+                self._resampling_combo,
+            ):
+                self._flip_h_checkbox.setChecked(flip_h)
+                self._flip_v_checkbox.setChecked(flip_v)
+                self._scale_slider.setValue(int(scale * 1000))
+                self._scale_value.setText(f"{scale:.3f}x")
+                self._offset_label.setText(f"Offset: ({offset_x}, {offset_y})")
 
-            self._flip_h_checkbox.setChecked(flip_h)
-            self._flip_v_checkbox.setChecked(flip_v)
-            self._scale_slider.setValue(int(scale * 1000))
-            self._scale_value.setText(f"{scale:.3f}x")
-            self._offset_label.setText(f"Offset: ({offset_x}, {offset_y})")
+                # Set sharpen slider (0-40 -> 0.0-4.0)
+                self._sharpen_slider.setValue(int(sharpen * 10))
+                self._sharpen_value.setText(f"{sharpen:.1f}")
 
-            # Set sharpen slider (0-40 -> 0.0-4.0)
-            self._sharpen_slider.setValue(int(sharpen * 10))
-            self._sharpen_value.setText(f"{sharpen:.1f}")
-
-            # Set resampling combo
-            index = self._resampling_combo.findData(resampling)
-            if index >= 0:
-                self._resampling_combo.setCurrentIndex(index)
-
-            self._flip_h_checkbox.blockSignals(False)
-            self._flip_v_checkbox.blockSignals(False)
-            self._scale_slider.blockSignals(False)
-            self._sharpen_slider.blockSignals(False)
-            self._resampling_combo.blockSignals(False)
+                # Set resampling combo
+                index = self._resampling_combo.findData(resampling)
+                if index >= 0:
+                    self._resampling_combo.setCurrentIndex(index)
 
             # Schedule tile touch status update
             self._schedule_tile_touch_update()
@@ -1332,11 +1328,13 @@ class WorkbenchCanvas(QWidget):
         if self._clipping_overlay_item is not None:
             self._clipping_overlay_item.set_clipped_rects([])
 
+    @signal_error_boundary()
     def _on_opacity_changed(self, value: int) -> None:
         """Handle opacity slider change."""
         self._opacity_value.setText(f"{value}%")
         self._ai_frame_item.set_overlay_opacity(value / 100.0)
 
+    @signal_error_boundary()
     def _on_scale_slider_changed(self, value: int) -> None:
         """Handle scale slider change, preserving center position."""
         if self._updating_from_external:
@@ -1365,6 +1363,7 @@ class WorkbenchCanvas(QWidget):
         self._schedule_preview_update()
         self._emit_alignment_changed()
 
+    @signal_error_boundary()
     def _on_flip_changed(self) -> None:
         """Handle flip checkbox change."""
         if self._updating_from_external:
@@ -1375,18 +1374,22 @@ class WorkbenchCanvas(QWidget):
         self._schedule_preview_update()
         self._emit_alignment_changed()
 
+    @signal_error_boundary()
     def _on_tile_overlay_toggled(self, checked: bool) -> None:
         """Handle tile overlay toggle."""
         self._tile_overlay_item.set_overlay_visible(checked)
 
+    @signal_error_boundary()
     def _on_tile_addresses_toggled(self, checked: bool) -> None:
         """Handle tile addresses toggle."""
         self._tile_overlay_item.set_show_addresses(checked)
 
+    @signal_error_boundary()
     def _on_grid_toggled(self, checked: bool) -> None:
         """Handle grid toggle."""
         self._grid_overlay_item.set_grid_visible(checked)
 
+    @signal_error_boundary()
     def _on_preview_toggled(self, checked: bool) -> None:
         """Handle preview toggle.
 
@@ -1407,16 +1410,19 @@ class WorkbenchCanvas(QWidget):
         # Update game frame visibility based on preview + preserve sprite state
         self._update_game_frame_visibility()
 
+    @signal_error_boundary()
     def _on_ai_frame_toggled(self, checked: bool) -> None:
         """Handle AI frame visibility toggle."""
         self._ai_frame_item.setVisible(checked)
 
+    @signal_error_boundary()
     def _on_compression_changed(self, index: int) -> None:
         """Handle compression type combo change."""
         compression_type = self._compression_combo.currentData()
         if compression_type and self._current_game_frame is not None:
             self.compression_type_changed.emit(compression_type)
 
+    @signal_error_boundary()
     def _on_preserve_sprite_toggled(self, checked: bool) -> None:
         """Handle preserve sprite checkbox toggle.
 
@@ -1427,6 +1433,7 @@ class WorkbenchCanvas(QWidget):
         # Update game frame visibility based on preview + preserve sprite state
         self._update_game_frame_visibility()
 
+    @signal_error_boundary()
     def _on_sharpen_changed(self, value: int) -> None:
         """Handle sharpen slider value change."""
         if self._updating_from_external:
@@ -1436,6 +1443,7 @@ class WorkbenchCanvas(QWidget):
         self._schedule_preview_update()
         self._emit_alignment_changed()
 
+    @signal_error_boundary()
     def _on_resampling_changed(self, index: int) -> None:
         """Handle resampling combo box change."""
         if self._updating_from_external:
@@ -1459,6 +1467,7 @@ class WorkbenchCanvas(QWidget):
             # Show game frame for alignment or when preserving original
             self._game_frame_item.setVisible(True)
 
+    @signal_error_boundary()
     def _on_apply_transforms_to_all(self) -> None:
         """Handle Apply Transformations to All button click.
 
@@ -1565,6 +1574,7 @@ class WorkbenchCanvas(QWidget):
             display_scale=self._display_scale,
         )
 
+    @signal_error_boundary()
     def _on_async_preview_ready(self, qimage: QImage, width: int, height: int) -> None:
         """Handle async preview completion.
 
@@ -1581,6 +1591,7 @@ class WorkbenchCanvas(QWidget):
         self._preview_item.setPixmap(scaled_pixmap)
         self._preview_item.setVisible(True)
 
+    @signal_error_boundary()
     def _on_async_preview_failed(self, error_message: str) -> None:
         """Handle async preview failure.
 
@@ -1781,6 +1792,7 @@ class WorkbenchCanvas(QWidget):
         logger.warning("Scipy optimization failed, using fallback")
         return (result.offset_x, result.offset_y, result.scale)
 
+    @signal_error_boundary()
     def _on_auto_align(self) -> None:
         """Handle auto-align button click.
 
@@ -1906,6 +1918,7 @@ class WorkbenchCanvas(QWidget):
             self._match_scale_checkbox.setChecked(original_state)
         return True
 
+    @signal_error_boundary()
     def _on_drag_started(self) -> None:
         """Handle drag start from AI frame item."""
         self._drag_in_progress = True
@@ -1913,6 +1926,7 @@ class WorkbenchCanvas(QWidget):
         self._drag_start_alignment = self.get_alignment()
         logger.debug("Drag started, captured alignment: %s", self._drag_start_alignment)
 
+    @signal_error_boundary()
     def _on_drag_finished(self) -> None:
         """Handle drag end from AI frame item."""
         self._drag_in_progress = False
@@ -1931,6 +1945,7 @@ class WorkbenchCanvas(QWidget):
         """Clear drag start alignment after it's been consumed for undo."""
         self._drag_start_alignment = None
 
+    @signal_error_boundary()
     def _on_ai_frame_transform_changed(self, offset_x: int, offset_y: int, scale: float) -> None:
         """Handle transform change from AI frame item."""
         if self._updating_from_external:
@@ -1944,10 +1959,9 @@ class WorkbenchCanvas(QWidget):
 
         # Update UI (always update for visual feedback during drag)
         self._offset_label.setText(f"Offset: ({actual_x}, {actual_y})")
-        self._scale_slider.blockSignals(True)
-        self._scale_slider.setValue(int(scale * 1000))
-        self._scale_value.setText(f"{scale:.3f}x")
-        self._scale_slider.blockSignals(False)
+        with block_signals(self._scale_slider):
+            self._scale_slider.setValue(int(scale * 1000))
+            self._scale_value.setText(f"{scale:.3f}x")
 
         # Schedule tile touch update (already debounced)
         self._schedule_tile_touch_update()
@@ -2024,6 +2038,7 @@ class WorkbenchCanvas(QWidget):
         # Regenerate preview with updated palette colors
         self._schedule_preview_update()
 
+    @signal_error_boundary()
     def _on_scene_mouse_moved(self, scene_x: float, scene_y: float) -> None:
         """Handle mouse move over the scene - schedule pixel lookup.
 
@@ -2032,6 +2047,7 @@ class WorkbenchCanvas(QWidget):
         self._pending_hover_pos = (scene_x, scene_y)
         self._pixel_hover_timer.start(self._config.pixel_hover_debounce_ms)
 
+    @signal_error_boundary()
     def _on_scene_mouse_left(self) -> None:
         """Handle mouse leaving the canvas."""
         self._pending_hover_pos = None
@@ -2204,6 +2220,7 @@ class WorkbenchCanvas(QWidget):
         else:
             self._view.unsetCursor()
 
+    @signal_error_boundary()
     def _on_eyedropper_toggled(self, checked: bool) -> None:
         """Handle eyedropper button toggle."""
         self.set_eyedropper_mode(checked)
@@ -2365,6 +2382,7 @@ class WorkbenchCanvas(QWidget):
             logger.warning("Failed to generate pixel highlight mask: %s", e)
             self._pixel_highlight_item.setVisible(False)
 
+    @signal_error_boundary()
     def _on_async_highlight_ready(self, qimage: QImage) -> None:
         """Handle async highlight mask ready from worker.
 
@@ -2386,6 +2404,7 @@ class WorkbenchCanvas(QWidget):
         self._pixel_highlight_item.setPos(self._ai_frame_item.pos())
         self._pixel_highlight_item.setVisible(True)
 
+    @signal_error_boundary()
     def _on_async_highlight_failed(self, error_message: str) -> None:
         """Handle async highlight generation failure.
 
@@ -2396,6 +2415,7 @@ class WorkbenchCanvas(QWidget):
         if self._pixel_highlight_item is not None:
             self._pixel_highlight_item.setVisible(False)
 
+    @signal_error_boundary()
     def _on_scene_clicked(self, scene_x: float, scene_y: float) -> None:
         """Handle click on the scene - pick color or select tile.
 

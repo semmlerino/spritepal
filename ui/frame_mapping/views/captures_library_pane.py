@@ -23,6 +23,8 @@ from PySide6.QtWidgets import (
 )
 
 from ui.common.mime_constants import MIME_GAME_FRAME
+from ui.frame_mapping.signal_error_handling import signal_error_boundary
+from ui.frame_mapping.utils.signal_utils import block_signals
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -262,25 +264,19 @@ class CapturesLibraryPane(QWidget):
         Args:
             frame_id: The game frame ID to select
         """
-        self._list.blockSignals(True)
-        try:
+        with block_signals(self._list):
             for row in range(self._list.count()):
                 item = self._list.item(row)
                 if item is not None and item.data(Qt.ItemDataRole.UserRole) == frame_id:  # type: ignore[reportUnnecessaryComparison]
                     self._list.setCurrentRow(row)
                     self._list.scrollToItem(item)
                     break
-        finally:
-            self._list.blockSignals(False)
 
     def clear_selection(self) -> None:
         """Clear the current selection without emitting signals."""
-        self._list.blockSignals(True)
-        try:
+        with block_signals(self._list):
             self._list.clearSelection()
             self._list.setCurrentRow(-1)
-        finally:
-            self._list.blockSignals(False)
 
     def clear(self) -> None:
         """Clear all game frames."""
@@ -335,16 +331,19 @@ class CapturesLibraryPane(QWidget):
                     ids.append(frame_id)
         return ids
 
+    @signal_error_boundary()
     def _on_search_changed(self, text: str) -> None:
         """Handle search text change."""
         self._search_text = text.lower()
         self._refresh_list()
 
+    @signal_error_boundary()
     def _on_filter_changed(self, checked: bool) -> None:
         """Handle filter checkbox toggle."""
         self._show_unlinked_only = checked
         self._refresh_list()
 
+    @signal_error_boundary()
     def _on_selection_changed(self, row: int) -> None:
         """Handle game frame selection change."""
         if row < 0:
@@ -358,6 +357,7 @@ class CapturesLibraryPane(QWidget):
         if frame_id is not None:
             self.game_frame_selected.emit(frame_id)
 
+    @signal_error_boundary()
     def _on_context_menu(self, pos: object) -> None:
         """Show context menu for captures."""
         if not isinstance(pos, QPoint):
@@ -428,8 +428,7 @@ class CapturesLibraryPane(QWidget):
         current_selection = self.get_selected_id()
         selection_restored = False
 
-        self._list.blockSignals(True)
-        try:
+        with block_signals(self._list):
             self._list.clear()
 
             visible_count = 0
@@ -508,8 +507,6 @@ class CapturesLibraryPane(QWidget):
             if not selection_restored:
                 self._list.setCurrentRow(-1)
                 self._list.clearSelection()
-        finally:
-            self._list.blockSignals(False)
 
         # NOTE: Do NOT emit empty string when selection is lost due to filtering.
         # The workspace state manager is the source of truth for selection,
@@ -533,6 +530,7 @@ class CapturesLibraryPane(QWidget):
         if ok:
             self.capture_rename_requested.emit(frame_id, new_name)
 
+    @signal_error_boundary()
     def _on_item_double_clicked(self, item: QListWidgetItem) -> None:
         """Handle double-click to rename a capture."""
         frame_id = item.data(Qt.ItemDataRole.UserRole)

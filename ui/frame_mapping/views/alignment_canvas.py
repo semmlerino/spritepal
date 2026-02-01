@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.frame_mapping.services.canvas_config_service import CanvasConfig
+from ui.frame_mapping.utils.signal_utils import block_signals
 from ui.frame_mapping.views.base_overlay_canvas import BaseOverlayCanvas
 from utils.logging_config import get_logger
 
@@ -302,17 +303,12 @@ class AlignmentCanvas(QWidget):
         self._set_controls_enabled(True)
 
         # Block signals to prevent feedback loop
-        self._flip_h_checkbox.blockSignals(True)
-        self._flip_v_checkbox.blockSignals(True)
-
-        self._canvas.set_offset(offset_x, offset_y)
-        self._canvas.set_flip(flip_h, flip_v)
-        self._flip_h_checkbox.setChecked(flip_h)
-        self._flip_v_checkbox.setChecked(flip_v)
-        self._offset_label.setText(f"Offset: ({offset_x}, {offset_y})")
-
-        self._flip_h_checkbox.blockSignals(False)
-        self._flip_v_checkbox.blockSignals(False)
+        with block_signals(self._flip_h_checkbox, self._flip_v_checkbox):
+            self._canvas.set_offset(offset_x, offset_y)
+            self._canvas.set_flip(flip_h, flip_v)
+            self._flip_h_checkbox.setChecked(flip_h)
+            self._flip_v_checkbox.setChecked(flip_v)
+            self._offset_label.setText(f"Offset: ({offset_x}, {offset_y})")
 
         self._update_status()
 

@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.components.base.dialog_base import DialogBase
+from ui.frame_mapping.utils.signal_utils import block_signals
 from ui.frame_mapping.views.base_overlay_canvas import BaseOverlayCanvas
 
 # Preview canvas size
@@ -318,12 +319,9 @@ class AlignmentDialog(DialogBase):
     def _on_canvas_offset_changed(self, x: int, y: int) -> None:
         """Handle offset changes from canvas drag."""
         # Block signals to prevent feedback loop
-        self._offset_x_spin.blockSignals(True)
-        self._offset_y_spin.blockSignals(True)
-        self._offset_x_spin.setValue(x)
-        self._offset_y_spin.setValue(y)
-        self._offset_x_spin.blockSignals(False)
-        self._offset_y_spin.blockSignals(False)
+        with block_signals(self._offset_x_spin, self._offset_y_spin):
+            self._offset_x_spin.setValue(x)
+            self._offset_y_spin.setValue(y)
         self._emit_alignment_changed()
 
     def _on_reset_clicked(self) -> None:

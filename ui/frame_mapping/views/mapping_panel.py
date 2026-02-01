@@ -41,7 +41,9 @@ from ui.frame_mapping.services.thumbnail_service import (
     AsyncThumbnailLoader,
     create_quantized_thumbnail,
 )
+from ui.frame_mapping.signal_error_handling import signal_error_boundary
 from ui.frame_mapping.state.batch_selection_manager import BatchSelectionManager
+from ui.frame_mapping.utils.signal_utils import block_signals
 from ui.frame_mapping.views.status_colors import get_status_color
 from utils.logging_config import get_logger
 
@@ -322,6 +324,7 @@ class MappingPanel(QWidget):
                 if game_item is not None:
                     game_item.setIcon(QIcon(scaled))
 
+    @signal_error_boundary()
     def _on_thumbnail_ready(self, frame_id: str, pixmap: QPixmap) -> None:
         """Handle async thumbnail ready signal.
 
@@ -349,6 +352,7 @@ class MappingPanel(QWidget):
                 "MappingPanel: no row found for frame_id=%s (table has %d rows)", frame_id, self._table.rowCount()
             )
 
+    @signal_error_boundary()
     def _on_quantized_icon_ready(self, game_frame_id: str, pixmap: QPixmap, palette_hash: int) -> None:
         """Handle async quantized icon ready signal.
 
@@ -382,6 +386,7 @@ class MappingPanel(QWidget):
                 if game_item is not None:
                     game_item.setIcon(QIcon(pixmap))
 
+    @signal_error_boundary()
     def _on_scroll(self) -> None:
         """Handle scroll events - debounce thumbnail loading."""
         self._visible_thumbnail_timer.start()
@@ -548,8 +553,7 @@ class MappingPanel(QWidget):
             )
 
         # Block signals during rebuild to prevent spurious selection events
-        self._table.blockSignals(True)
-        try:
+        with block_signals(self._table):
             self._table.setRowCount(0)
             # Reset visible range tracking since table was rebuilt
             self._last_visible_range = (-1, -1)
@@ -646,9 +650,6 @@ class MappingPanel(QWidget):
             # Use QTimer.singleShot to allow Qt to layout the table first
             QTimer.singleShot(0, self._load_visible_thumbnails)
 
-        finally:
-            self._table.blockSignals(False)
-
         # Restore selection by ID (stable across reordering)
         if current_selection_id is not None:
             self.select_row_by_ai_id(current_selection_id)
@@ -690,16 +691,13 @@ class MappingPanel(QWidget):
         Args:
             ai_frame_id: AI frame ID (filename) to select
         """
-        self._table.blockSignals(True)
-        try:
+        with block_signals(self._table):
             for row in range(self._table.rowCount()):
                 checkbox_item = self._table.item(row, 0)  # Checkbox column stores ID in UserRole+1
                 if checkbox_item is not None and checkbox_item.data(Qt.ItemDataRole.UserRole + 1) == ai_frame_id:
                     self._table.selectRow(row)
                     self._table.scrollToItem(checkbox_item)
                     break
-        finally:
-            self._table.blockSignals(False)
         # Update button states since signals were blocked during selection
         self._update_button_states()
 
@@ -838,8 +836,7 @@ class MappingPanel(QWidget):
         if to_index < 0 or to_index >= row_count:
             return
 
-        self._table.blockSignals(True)
-        try:
+        with block_signals(self._table):
             # Collect all items from the source row
             col_count = self._table.columnCount()
             items: list[QTableWidgetItem | None] = []
@@ -877,8 +874,6 @@ class MappingPanel(QWidget):
 
             # Select the moved row
             self._table.selectRow(to_index)
-        finally:
-            self._table.blockSignals(False)
 
     def add_row(self, ai_frame: AIFrame) -> None:
         """Add a single row for a new AI frame without full refresh.
@@ -892,8 +887,7 @@ class MappingPanel(QWidget):
         if self._project is None:
             return
 
-        self._table.blockSignals(True)
-        try:
+        with block_signals(self._table):
             row = self._table.rowCount()
             self._table.insertRow(row)
 
@@ -946,9 +940,6 @@ class MappingPanel(QWidget):
             total = self._project.total_ai_frames
             self._status_label.setText(f"{mapped}/{total} mapped")
 
-        finally:
-            self._table.blockSignals(False)
-
         # Update inject selected button state
         self._update_inject_selected_state()
 
@@ -957,11 +948,8 @@ class MappingPanel(QWidget):
 
         Blocks signals to prevent feedback loops.
         """
-        self._table.blockSignals(True)
-        try:
+        with block_signals(self._table):
             self._table.clearSelection()
-        finally:
-            self._table.blockSignals(False)
         # Update button states since signals were blocked during selection clear
         self._update_button_states()
 
@@ -985,6 +973,7 @@ class MappingPanel(QWidget):
         self._remove_button.setEnabled(has_mapping)
         self._inject_button.setEnabled(has_mapping)
 
+    @signal_error_boundary()
     def _on_selection_changed(self) -> None:
         """Handle selection change in the mapping table."""
         self._update_button_states()
@@ -995,30 +984,35 @@ class MappingPanel(QWidget):
             # Notify listeners of cleared selection
             self.mapping_selected.emit("")
 
+    @signal_error_boundary()
     def _on_edit_clicked(self) -> None:
         """Handle edit button click."""
         ai_frame_id = self.get_selected_ai_frame_id()
         if ai_frame_id is not None:
             self.edit_frame_requested.emit(ai_frame_id)
 
+    @signal_error_boundary()
     def _on_remove_clicked(self) -> None:
         """Handle remove button click."""
         ai_frame_id = self.get_selected_ai_frame_id()
         if ai_frame_id is not None:
             self.remove_mapping_requested.emit(ai_frame_id)
 
+    @signal_error_boundary()
     def _on_align_clicked(self) -> None:
         """Handle adjust alignment button click."""
         ai_frame_id = self.get_selected_ai_frame_id()
         if ai_frame_id is not None:
             self.adjust_alignment_requested.emit(ai_frame_id)
 
+    @signal_error_boundary()
     def _on_inject_clicked(self) -> None:
         """Handle inject button click."""
         ai_frame_id = self.get_selected_ai_frame_id()
         if ai_frame_id is not None:
             self.inject_mapping_requested.emit(ai_frame_id)
 
+    @signal_error_boundary()
     def _on_context_menu(self, pos: QPoint) -> None:
         """Show context menu for mappings."""
         item = self._table.itemAt(pos)
@@ -1391,6 +1385,7 @@ class MappingPanel(QWidget):
         painter.drawLine(0, y, viewport.width(), y)
         painter.end()
 
+    @signal_error_boundary()
     def _on_select_all(self) -> None:
         """Check all mapped frames for injection."""
         if self._project is None:
@@ -1398,8 +1393,7 @@ class MappingPanel(QWidget):
 
         # Collect mapped frame IDs and update selection state
         mapped_ids: set[str] = set()
-        self._table.blockSignals(True)
-        try:
+        with block_signals(self._table):
             for row in range(self._table.rowCount()):
                 checkbox_item = self._table.item(row, 0)
                 if checkbox_item:
@@ -1408,26 +1402,23 @@ class MappingPanel(QWidget):
                     if ai_frame_id and self._project.get_mapping_for_ai_frame(ai_frame_id):
                         checkbox_item.setCheckState(Qt.CheckState.Checked)
                         mapped_ids.add(ai_frame_id)
-        finally:
-            self._table.blockSignals(False)
 
         self._selection_state.select_all(mapped_ids)
         self._update_inject_selected_state()
 
+    @signal_error_boundary()
     def _on_deselect_all(self) -> None:
         """Uncheck all frames."""
-        self._table.blockSignals(True)
-        try:
+        with block_signals(self._table):
             for row in range(self._table.rowCount()):
                 checkbox_item = self._table.item(row, 0)
                 if checkbox_item:
                     checkbox_item.setCheckState(Qt.CheckState.Unchecked)
-        finally:
-            self._table.blockSignals(False)
 
         self._selection_state.deselect_all()
         self._update_inject_selected_state()
 
+    @signal_error_boundary()
     def _on_item_changed(self, item: QTableWidgetItem) -> None:
         """Handle item changes (checkbox state changes)."""
         # Only care about checkbox column (column 0)
@@ -1467,6 +1458,7 @@ class MappingPanel(QWidget):
                     checked_ids.add(ai_frame_id)
         return checked_ids
 
+    @signal_error_boundary()
     def _on_inject_selected_clicked(self) -> None:
         """Handle inject selected button click."""
         self.inject_selected_requested.emit()

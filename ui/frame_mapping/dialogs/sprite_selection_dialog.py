@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.components.base.dialog_base import DialogBase
+from ui.frame_mapping.utils.signal_utils import block_signals
 
 if TYPE_CHECKING:
     from PIL import Image
@@ -191,16 +192,14 @@ class SpriteSelectionDialog(DialogBase):
         if self._sprite_tree is None:
             return
 
-        self._sprite_tree.blockSignals(True)
-        self._sprite_tree.clear()
-        self._clusters = []
+        with block_signals(self._sprite_tree):
+            self._sprite_tree.clear()
+            self._clusters = []
 
-        # Add all entries as top-level items
-        for entry in self._capture.entries:
-            item = self._create_entry_item(entry, is_child=False)
-            self._sprite_tree.addTopLevelItem(item)
-
-        self._sprite_tree.blockSignals(False)
+            # Add all entries as top-level items
+            for entry in self._capture.entries:
+                item = self._create_entry_item(entry, is_child=False)
+                self._sprite_tree.addTopLevelItem(item)
 
     def _populate_tree_grouped(self, palette_index: int) -> None:
         """Populate tree with clusters for specific palette.
@@ -215,9 +214,6 @@ class SpriteSelectionDialog(DialogBase):
             CaptureToArrangementConverter,
         )
 
-        self._sprite_tree.blockSignals(True)
-        self._sprite_tree.clear()
-
         # Get clusters for this palette
         converter = CaptureToArrangementConverter()
         all_clusters = converter.get_sprite_clusters(
@@ -228,20 +224,21 @@ class SpriteSelectionDialog(DialogBase):
         # Filter to only clusters matching the palette
         self._clusters = [c for c in all_clusters if c.palette_index == palette_index]
 
-        # Create items for each cluster
-        for cluster in self._clusters:
-            if cluster.entry_count == 1:
-                # Single entry - show as flat item
-                item = self._create_entry_item(cluster.entries[0], is_child=False)
-                item.setData(0, ROLE_CLUSTER_ID, cluster.id)
-                self._sprite_tree.addTopLevelItem(item)
-            else:
-                # Multiple entries - create group item with children
-                group_item = self._create_group_item(cluster)
-                self._sprite_tree.addTopLevelItem(group_item)
-                group_item.setExpanded(True)
+        with block_signals(self._sprite_tree):
+            self._sprite_tree.clear()
 
-        self._sprite_tree.blockSignals(False)
+            # Create items for each cluster
+            for cluster in self._clusters:
+                if cluster.entry_count == 1:
+                    # Single entry - show as flat item
+                    item = self._create_entry_item(cluster.entries[0], is_child=False)
+                    item.setData(0, ROLE_CLUSTER_ID, cluster.id)
+                    self._sprite_tree.addTopLevelItem(item)
+                else:
+                    # Multiple entries - create group item with children
+                    group_item = self._create_group_item(cluster)
+                    self._sprite_tree.addTopLevelItem(group_item)
+                    group_item.setExpanded(True)
 
     def _create_group_item(self, cluster: SpriteCluster) -> QTreeWidgetItem:
         """Create expandable group item for a cluster.
@@ -336,15 +333,13 @@ class SpriteSelectionDialog(DialogBase):
             return
 
         # Block signals to avoid multiple preview updates
-        self._sprite_tree.blockSignals(True)
+        with block_signals(self._sprite_tree):
+            # Iterate all top-level items
+            for i in range(self._sprite_tree.topLevelItemCount()):
+                item = self._sprite_tree.topLevelItem(i)
+                if item is not None:
+                    item.setCheckState(0, Qt.CheckState.Checked)
 
-        # Iterate all top-level items
-        for i in range(self._sprite_tree.topLevelItemCount()):
-            item = self._sprite_tree.topLevelItem(i)
-            if item is not None:
-                item.setCheckState(0, Qt.CheckState.Checked)
-
-        self._sprite_tree.blockSignals(False)
         self._update_preview()
 
     def _select_no_sprites(self) -> None:
@@ -353,15 +348,13 @@ class SpriteSelectionDialog(DialogBase):
             return
 
         # Block signals to avoid multiple preview updates
-        self._sprite_tree.blockSignals(True)
+        with block_signals(self._sprite_tree):
+            # Iterate all top-level items
+            for i in range(self._sprite_tree.topLevelItemCount()):
+                item = self._sprite_tree.topLevelItem(i)
+                if item is not None:
+                    item.setCheckState(0, Qt.CheckState.Unchecked)
 
-        # Iterate all top-level items
-        for i in range(self._sprite_tree.topLevelItemCount()):
-            item = self._sprite_tree.topLevelItem(i)
-            if item is not None:
-                item.setCheckState(0, Qt.CheckState.Unchecked)
-
-        self._sprite_tree.blockSignals(False)
         self._update_preview()
 
     def _get_entry_by_id(self, entry_id: int) -> OAMEntry | None:
