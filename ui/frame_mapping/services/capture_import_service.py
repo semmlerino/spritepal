@@ -15,18 +15,18 @@ from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtGui import QPixmap
 
 from core.exceptions import CaptureImportError
 from core.frame_mapping_project import GameFrame
-from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import (
     CaptureResult,
     MesenCaptureParser,
     OAMEntry,
 )
-from core.services.image_utils import pil_to_qpixmap
 from core.types import CompressionType
 from ui.common import WorkerManager
+from ui.frame_mapping.services.preview_renderer import PreviewRenderer
 
 if TYPE_CHECKING:
     from ui.frame_mapping.services.preview_service import PreviewService
@@ -229,11 +229,9 @@ class CaptureImportService(QObject):
             rom_offsets = filtered_capture.unique_rom_offsets
 
             # Render preview using filtered capture (cropped to bounding box)
-            renderer = CaptureRenderer(filtered_capture)
-            preview_img = renderer.render_selection()
-
-            # Convert PIL Image to QPixmap and cache with mtime + entry IDs for invalidation
-            pixmap = pil_to_qpixmap(preview_img)
+            qimage = PreviewRenderer.render_preview_qimage(filtered_capture)
+            # Convert QImage to QPixmap for caching
+            pixmap = QPixmap.fromImage(qimage) if qimage is not None else None
             if pixmap is not None and self._preview_service is not None:
                 mtime = capture_path.stat().st_mtime if capture_path.exists() else 0.0
                 entry_ids = tuple(entry.id for entry in selected_entries)
