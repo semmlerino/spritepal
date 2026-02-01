@@ -107,13 +107,6 @@ class CaptureImportService(QObject):
         self._capture_parse_worker: CaptureParseWorker | None = None
         self._existing_frame_ids: set[str] = set()
 
-    def set_preview_service(self, preview_service: PreviewService) -> None:
-        """Set the preview service for caching imported frame previews.
-
-        Args:
-            preview_service: The preview service instance
-        """
-        self._preview_service = preview_service
 
     def update_existing_frame_ids(self, frame_ids: set[str]) -> None:
         """Update the set of existing frame IDs for uniqueness checks.

@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QEvent, QMimeData, QObject, QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QBrush,
+    QCloseEvent,
     QColor,
     QDrag,
     QDragEnterEvent,
@@ -361,7 +362,8 @@ class MappingPanel(QWidget):
         self._selection_state.reset()
         logger.debug("set_project: selection state RESET")
 
-    def closeEvent(self, event: QEvent) -> None:
+    @override
+    def closeEvent(self, event: QCloseEvent) -> None:
         """Handle close event - cancel async operations."""
         self._thumbnail_loader.cancel()
         self._icon_quantizer.shutdown()

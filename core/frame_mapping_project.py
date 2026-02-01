@@ -481,9 +481,6 @@ class FrameMappingProject:
         """Invalidate AI frame index (call after modifying ai_frames)."""
         self._ai_frame_index_by_id = {f.id: f for f in self.ai_frames}
 
-    def _invalidate_game_frame_index(self) -> None:
-        """Invalidate game frame index (call after modifying game_frames)."""
-        self._game_frame_index_by_id = {f.id: f for f in self.game_frames}
 
     def replace_ai_frames(self, frames: list[AIFrame], ai_frames_dir: Path | None = None) -> None:
         """Replace all AI frames and update internal indices.
@@ -519,33 +516,6 @@ class FrameMappingProject:
         self._ai_frame_index_by_id[frame.id] = frame
         return frame
 
-    def add_ai_frames_batch(self, frames: list[AIFrame]) -> int:
-        """Add multiple AI frames in batch (O(N) total instead of O(N²)).
-
-        This method is more efficient than calling add_ai_frame() in a loop
-        because it performs a single index rebuild at the end.
-
-        Args:
-            frames: List of AIFrame objects to add
-
-        Returns:
-            Number of frames successfully added
-
-        Raises:
-            ValueError: If any frame ID already exists (no frames are added)
-        """
-        # Validate all frames first (fail-fast)
-        for frame in frames:
-            if self.get_ai_frame_by_id(frame.id) is not None:
-                raise ValueError(f"AI frame with ID '{frame.id}' already exists")
-
-        # Add all frames
-        self.ai_frames.extend(frames)
-
-        # Single index rebuild (O(N) total instead of O(N²) for N frames)
-        self._invalidate_ai_frame_index()
-
-        return len(frames)
 
     def add_game_frame(self, frame: GameFrame) -> GameFrame:
         """Add a game frame to the project.

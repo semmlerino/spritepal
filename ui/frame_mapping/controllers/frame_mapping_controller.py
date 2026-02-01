@@ -612,7 +612,6 @@ class FrameMappingController(QObject):
         # Capture import service (handles parsing and importing Mesen captures)
         self._capture_import_service = CaptureImportService(preview_service=self._preview_service, parent=self)
         self._capture_import_service.import_requested.connect(self._on_capture_import_requested)
-        self._capture_import_service.import_completed.connect(self._on_capture_import_completed)
         self._capture_import_service.import_failed.connect(self.error_occurred)
         self._capture_import_service.directory_import_started.connect(self.directory_import_started)
         self._capture_import_service.directory_import_finished.connect(self.directory_import_finished)
@@ -1055,14 +1054,6 @@ class FrameMappingController(QObject):
             capture_path: Path to the capture file
         """
         self.capture_import_requested.emit(capture_result, capture_path)
-
-    def _on_capture_import_completed(self, frame_id: str) -> None:
-        """Handle successful capture import from service.
-
-        Args:
-            frame_id: ID of the imported game frame
-        """
-        logger.debug("Capture import completed: %s", frame_id)
 
     def create_mapping(self, ai_frame_id: str, game_frame_id: str) -> bool:
         """Create a mapping between an AI frame and a game frame.

@@ -219,24 +219,6 @@ class AIFramesFacade:
         self._signals.emit_ai_frame_moved(ai_frame_id, current_index, clamped_index)
         return True
 
-    def reorder_no_history(self, ai_frame_id: str, new_index: int) -> bool:
-        """Internal: Reorder AI frame without undo history (for command execution)."""
-        project = self._context.project
-        if project is None:
-            return False
-
-        # Find current index before reordering
-        old_index = self._ai_frame_service.find_frame_index(project, ai_frame_id)
-        if old_index == -1:
-            return False
-
-        if project.reorder_ai_frame(ai_frame_id, new_index):
-            # Emit with actual target index (may be clamped)
-            actual_new_index = self._ai_frame_service.find_frame_index(project, ai_frame_id)
-            self._signals.emit_ai_frame_moved(ai_frame_id, old_index, actual_new_index)
-            logger.info("Reordered AI frame %s from %d to %d", ai_frame_id, old_index, actual_new_index)
-            return True
-        return False
 
     def get_frames(self) -> list[AIFrame]:
         """Get all AI frames from the current project."""
