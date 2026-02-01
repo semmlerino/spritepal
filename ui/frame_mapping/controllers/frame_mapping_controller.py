@@ -821,8 +821,14 @@ class FrameMappingController(QObject):
         """Undo the last command.
 
         Returns:
-            Description of the undone command, or None if nothing to undo
+            Description of the undone command, or None if nothing to undo.
+            Returns None without undoing if async injection is in progress.
         """
+        if self.async_injection_busy:
+            logger.warning("Undo blocked: injection in progress")
+            self.status_update.emit("Cannot undo while injection is in progress")
+            return None
+
         desc = self._undo_stack.undo()
         if desc:
             logger.info("Undo: %s", desc)
@@ -834,8 +840,14 @@ class FrameMappingController(QObject):
         """Redo the last undone command.
 
         Returns:
-            Description of the redone command, or None if nothing to redo
+            Description of the redone command, or None if nothing to redo.
+            Returns None without redoing if async injection is in progress.
         """
+        if self.async_injection_busy:
+            logger.warning("Redo blocked: injection in progress")
+            self.status_update.emit("Cannot redo while injection is in progress")
+            return None
+
         desc = self._undo_stack.redo()
         if desc:
             logger.info("Redo: %s", desc)
