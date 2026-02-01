@@ -4,141 +4,121 @@
   "ai_frames_dir": "M\\dedede_project\\framesV2\\v3\\sprites",
   "ai_frames": [
     {
+      "path": "M\\v\\hf_20260128_223306_0b3793e8-78de-4d02-965b-ae52b674fd11_transparent.png",
+      "index": 18,
+      "width": 768,
+      "height": 1376
+    },
+    {
+      "path": "m3.png",
+      "index": 1,
+      "width": 1024,
+      "height": 1536
+    },
+    {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_00_edited.png",
-      "index": 0,
+      "index": 2,
       "width": 259,
       "height": 345
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_01.png",
-      "index": 2,
-      "width": 258,
-      "height": 363
-    },
-    {
-      "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_01_edited.png",
       "index": 3,
       "width": 258,
       "height": 363
     },
     {
-      "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_02.png",
+      "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_01_edited.png",
       "index": 4,
+      "width": 258,
+      "height": 363
+    },
+    {
+      "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_02.png",
+      "index": 5,
       "width": 259,
       "height": 370
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_03.png",
-      "index": 5,
+      "index": 6,
       "width": 300,
       "height": 360
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_04.png",
-      "index": 6,
+      "index": 7,
       "width": 253,
       "height": 365
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_05.png",
-      "index": 7,
+      "index": 8,
       "width": 264,
       "height": 377
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_06.png",
-      "index": 8,
+      "index": 9,
       "width": 399,
       "height": 457
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_07.png",
-      "index": 9,
+      "index": 10,
       "width": 424,
       "height": 398
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_08.png",
-      "index": 10,
+      "index": 11,
       "width": 260,
       "height": 357
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_09.png",
-      "index": 11,
+      "index": 12,
       "width": 339,
       "height": 300
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_10.png",
-      "index": 12,
+      "index": 13,
       "width": 338,
       "height": 385
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_11.png",
-      "index": 13,
+      "index": 14,
       "width": 279,
       "height": 285
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_12.png",
-      "index": 14,
+      "index": 15,
       "width": 318,
       "height": 334
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_13.png",
-      "index": 15,
+      "index": 16,
       "width": 392,
       "height": 326
     },
     {
       "path": "M\\dedede_project\\framesV2\\v3\\sprites\\sprite_14.png",
-      "index": 16,
+      "index": 17,
       "width": 314,
       "height": 173
+    },
+    {
+      "path": "M\\v\\hf_20260128_223306_0b3793e8-78de-4d02-965b-ae52b674fd11_transparent.png",
+      "index": 18,
+      "width": 768,
+      "height": 1376
     }
   ],
   "game_frames": [
-    {
-      "id": "capture_1769108997",
-      "rom_offsets": [
-        2629656,
-        2629720,
-        2629784,
-        2629848,
-        2629912,
-        2629976,
-        2630040,
-        2630552
-      ],
-      "capture_path": "mesen2_exchange\\capture_1769108997.json",
-      "palette_index": 0,
-      "width": 40,
-      "height": 48,
-      "selected_entry_ids": [
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13
-      ],
-      "compression_types": {
-        "2629656": "raw",
-        "2629720": "raw",
-        "2629784": "raw",
-        "2629848": "raw",
-        "2629912": "raw",
-        "2629976": "raw",
-        "2630040": "raw",
-        "2630552": "raw"
-      },
-      "display_name": "standingOpenMouth"
-    },
     {
       "id": "capture_1769108964",
       "rom_offsets": [
@@ -176,44 +156,6 @@
         "2628504": "raw"
       },
       "display_name": "Walk1"
-    },
-    {
-      "id": "capture_1769108991",
-      "rom_offsets": [
-        2629656,
-        2629720,
-        2629784,
-        2629848,
-        2629912,
-        2629976,
-        2630040,
-        2630552
-      ],
-      "capture_path": "mesen2_exchange\\capture_1769108991.json",
-      "palette_index": 0,
-      "width": 40,
-      "height": 48,
-      "selected_entry_ids": [
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13
-      ],
-      "compression_types": {
-        "2629656": "raw",
-        "2629720": "raw",
-        "2629784": "raw",
-        "2629848": "raw",
-        "2629912": "raw",
-        "2629976": "raw",
-        "2630040": "raw",
-        "2630552": "raw"
-      },
-      "display_name": "standingClosedMouth"
     },
     {
       "id": "capture_1769108962",
@@ -323,28 +265,130 @@
         "2628472": "raw"
       },
       "display_name": "Fallen"
+    },
+    {
+      "id": "capture_1769721724",
+      "rom_offsets": [
+        94849,
+        94913,
+        94977,
+        95041,
+        95105,
+        95169,
+        95233,
+        95745
+      ],
+      "capture_path": "mesen2_exchange\\capture_1769721724.json",
+      "palette_index": 7,
+      "width": 40,
+      "height": 48,
+      "selected_entry_ids": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "compression_types": {
+        "94849": "raw",
+        "94913": "raw",
+        "94977": "raw",
+        "95041": "raw",
+        "95105": "raw",
+        "95169": "raw",
+        "95233": "raw",
+        "95745": "raw"
+      }
+    },
+    {
+      "id": "capture_1769721778",
+      "rom_offsets": [
+        95873,
+        95937,
+        96001,
+        96065,
+        96129,
+        96193,
+        96257,
+        96769
+      ],
+      "capture_path": "mesen2_exchange\\capture_1769721778.json",
+      "palette_index": 7,
+      "width": 40,
+      "height": 48,
+      "selected_entry_ids": [
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "compression_types": {
+        "95873": "raw",
+        "95937": "raw",
+        "96001": "raw",
+        "96065": "raw",
+        "96129": "raw",
+        "96193": "raw",
+        "96257": "raw",
+        "96769": "raw"
+      }
     }
   ],
   "mappings": [
     {
-      "ai_frame_id": "sprite_01.png",
+      "ai_frame_id": "hf_20260128_223306_0b3793e8-78de-4d02-965b-ae52b674fd11_transparent.png",
+      "game_frame_id": "capture_1769721778",
+      "status": "injected",
+      "offset_x": 2,
+      "offset_y": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "scale": 0.03899999999999999,
+      "sharpen": 0.0,
+      "resampling": "lanczos"
+    },
+    {
+      "ai_frame_id": "m3.png",
+      "game_frame_id": "capture_1769721724",
+      "status": "injected",
+      "offset_x": -11,
+      "offset_y": -16,
+      "flip_h": false,
+      "flip_v": false,
+      "scale": 0.05216366525423729,
+      "sharpen": 0.0,
+      "resampling": "lanczos"
+    },
+    {
+      "ai_frame_id": "sprite_09.png",
+      "game_frame_id": "capture_1769108252",
+      "status": "injected",
+      "offset_x": 7,
+      "offset_y": 16,
+      "flip_h": false,
+      "flip_v": false,
+      "scale": 0.10249410377358492,
+      "sharpen": 0.0,
+      "resampling": "lanczos"
+    },
+    {
+      "ai_frame_id": "sprite_10.png",
       "game_frame_id": "capture_1769108964",
       "status": "injected",
       "offset_x": 0,
       "offset_y": 0,
       "flip_h": false,
       "flip_v": false,
-      "scale": 0.12769886363636365
-    },
-    {
-      "ai_frame_id": "sprite_00_edited.png",
-      "game_frame_id": "capture_1769108997",
-      "status": "edited",
-      "offset_x": 8,
-      "offset_y": 0,
-      "flip_h": false,
-      "flip_v": false,
-      "scale": 0.1272078804347826
+      "scale": 1.0,
+      "sharpen": 0.0,
+      "resampling": "lanczos"
     }
   ],
   "sheet_palette": {
