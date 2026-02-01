@@ -1507,38 +1507,41 @@ class FrameMappingWorkspace(QWidget):
         """Handle workspace close event with unsaved changes check.
 
         Shows a dialog if there are unsaved changes, offering Save/Discard/Cancel options.
+        Skips the dialog if the widget is not visible (e.g., during test teardown).
 
         Args:
             event: The close event
         """
-        if self._state.dirty:
-            reply = QMessageBox.question(
-                self,
-                "Unsaved Changes",
-                "You have unsaved changes. Do you want to save before closing?",
-                QMessageBox.StandardButton.Save
-                | QMessageBox.StandardButton.Discard
-                | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save,
-            )
-
-            if reply == QMessageBox.StandardButton.Save:
-                # Trigger manual save
-                self._on_save_project()
-                # Only accept close if save succeeded (dirty flag cleared)
-                if not self._state.dirty:
-                    event.accept()
-                else:
-                    event.ignore()
-            elif reply == QMessageBox.StandardButton.Discard:
-                # Discard changes and close
-                event.accept()
-            else:  # Cancel
-                # Abort close
-                event.ignore()
-        else:
-            # No unsaved changes, close normally
+        # Skip dialog if widget isn't visible (e.g., during test teardown)
+        # or if there are no unsaved changes
+        if not self.isVisible() or not self._state.dirty:
             event.accept()
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Unsaved Changes",
+            "You have unsaved changes. Do you want to save before closing?",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save,
+        )
+
+        if reply == QMessageBox.StandardButton.Save:
+            # Trigger manual save
+            self._on_save_project()
+            # Only accept close if save succeeded (dirty flag cleared)
+            if not self._state.dirty:
+                event.accept()
+            else:
+                event.ignore()
+        elif reply == QMessageBox.StandardButton.Discard:
+            # Discard changes and close
+            event.accept()
+        else:  # Cancel
+            # Abort close
+            event.ignore()
 
     # -------------------------------------------------------------------------
     # Properties
