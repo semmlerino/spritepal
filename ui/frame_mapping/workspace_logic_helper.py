@@ -387,9 +387,12 @@ class WorkspaceLogicHelper:
 
         # Update game frame preview if applicable
         if mapping.game_frame_id:
-            preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
+            preview = self._controller.get_cached_game_frame_preview(mapping.game_frame_id)
             if preview:
                 self._mapping_panel.update_game_frame_preview(mapping.game_frame_id, preview)
+            else:
+                # Request async generation if not cached
+                self._controller.request_game_frame_previews_async([mapping.game_frame_id])
 
     # ===== Phase 2c: Selection handlers =====
 
@@ -438,7 +441,9 @@ class WorkspaceLogicHelper:
         mapping = project.get_mapping_for_ai_frame(frame_id) if frame else None
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
-            preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
+            preview = self._controller.get_cached_game_frame_preview(mapping.game_frame_id)
+            if preview is None:
+                self._controller.request_game_frame_previews_async([mapping.game_frame_id])
             capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
             self._alignment_canvas.set_alignment(
@@ -501,7 +506,9 @@ class WorkspaceLogicHelper:
         # Show preview in canvas if AI frame is selected
         if self._state.selected_ai_frame_id is not None:
             game_frame = project.get_game_frame_by_id(frame_id)
-            preview = self._controller.get_game_frame_preview(frame_id)
+            preview = self._controller.get_cached_game_frame_preview(frame_id)
+            if preview is None:
+                self._controller.request_game_frame_previews_async([frame_id])
             capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
             self._state.current_canvas_game_id = frame_id
@@ -557,7 +564,9 @@ class WorkspaceLogicHelper:
         mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         if mapping:
             game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
-            preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
+            preview = self._controller.get_cached_game_frame_preview(mapping.game_frame_id)
+            if preview is None:
+                self._controller.request_game_frame_previews_async([mapping.game_frame_id])
             capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
             self._alignment_canvas.set_alignment(
@@ -679,7 +688,9 @@ class WorkspaceLogicHelper:
 
         # Load the game frame into the canvas for auto-alignment
         game_frame = project.get_game_frame_by_id(game_frame_id)
-        preview = self._controller.get_game_frame_preview(game_frame_id)
+        preview = self._controller.get_cached_game_frame_preview(game_frame_id)
+        if preview is None:
+            self._controller.request_game_frame_previews_async([game_frame_id])
         capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(game_frame_id)
         self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
 
@@ -862,7 +873,9 @@ class WorkspaceLogicHelper:
             if self._state.current_canvas_game_id != mapping.game_frame_id:
                 game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
                 if game_frame:
-                    preview = self._controller.get_game_frame_preview(mapping.game_frame_id)
+                    preview = self._controller.get_cached_game_frame_preview(mapping.game_frame_id)
+                    if preview is None:
+                        self._controller.request_game_frame_previews_async([mapping.game_frame_id])
                     capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(
                         mapping.game_frame_id
                     )
