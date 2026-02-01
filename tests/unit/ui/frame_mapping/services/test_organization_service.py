@@ -9,6 +9,7 @@ import pytest
 from PySide6.QtCore import QObject
 
 from core.frame_mapping_project import AIFrame, GameFrame
+from core.types import CompressionType
 from ui.frame_mapping.services.organization_service import OrganizationService
 from ui.frame_mapping.undo import (
     RenameAIFrameCommand,
@@ -75,7 +76,7 @@ def sample_game_frame(tmp_path):
         width=32,
         height=32,
         selected_entry_ids=[1, 2, 3],
-        compression_types={0x8000: "hal"},
+        compression_types={0x8000: CompressionType.HAL},
         display_name="Test Capture",
     )
 

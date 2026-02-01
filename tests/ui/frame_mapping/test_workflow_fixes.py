@@ -17,6 +17,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.frame_mapping_project import AIFrame, FrameMappingProject, GameFrame
+from core.types import CompressionType
 from tests.fixtures.frame_mapping_helpers import create_test_project
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.views.mapping_panel import MappingPanel
@@ -126,7 +127,7 @@ class TestBatchInjectionSignalCoalescing:
             width=8,
             height=8,
             selected_entry_ids=[],
-            compression_types={0x1000: "raw"},
+            compression_types={0x1000: CompressionType.RAW},
         )
         project.add_game_frame(game_frame)
         project.create_mapping(ai_frame_id, game_frame.id)
@@ -170,7 +171,7 @@ class TestBatchInjectionSignalCoalescing:
             width=8,
             height=8,
             selected_entry_ids=[],
-            compression_types={0x1000: "raw"},
+            compression_types={0x1000: CompressionType.RAW},
         )
         project.add_game_frame(game_frame)
         project.create_mapping(ai_frame_id, game_frame.id)
@@ -277,18 +278,18 @@ class TestControllerRoutedCompressionUpdates:
             width=8,
             height=8,
             selected_entry_ids=[],
-            compression_types={0x1000: "raw", 0x2000: "raw", 0x3000: "raw"},
+            compression_types={0x1000: CompressionType.RAW, 0x2000: CompressionType.RAW, 0x3000: CompressionType.RAW},
         )
         project.add_game_frame(game_frame)
         controller._project = project
 
         # Update compression type
-        result = controller.update_game_frame_compression("test_game", "hal")
+        result = controller.update_game_frame_compression("test_game", CompressionType.HAL)
 
         assert result is True
-        assert game_frame.compression_types[0x1000] == "hal"
-        assert game_frame.compression_types[0x2000] == "hal"
-        assert game_frame.compression_types[0x3000] == "hal"
+        assert game_frame.compression_types[0x1000] == CompressionType.HAL
+        assert game_frame.compression_types[0x2000] == CompressionType.HAL
+        assert game_frame.compression_types[0x3000] == CompressionType.HAL
 
     def test_update_game_frame_compression_emits_signals(self, qtbot: QtBot, tmp_path: Path) -> None:
         """Controller method should emit project_changed and save_requested."""
@@ -305,7 +306,7 @@ class TestControllerRoutedCompressionUpdates:
             width=8,
             height=8,
             selected_entry_ids=[],
-            compression_types={0x1000: "raw"},
+            compression_types={0x1000: CompressionType.RAW},
         )
         project.add_game_frame(game_frame)
         controller._project = project
@@ -317,7 +318,7 @@ class TestControllerRoutedCompressionUpdates:
         controller.save_requested.connect(lambda: save_requested_emissions.append(None))
 
         # Update compression
-        controller.update_game_frame_compression("test_game", "hal")
+        controller.update_game_frame_compression("test_game", CompressionType.HAL)
 
         assert len(project_changed_emissions) == 1, "Should emit project_changed"
         assert len(save_requested_emissions) == 1, "Should emit save_requested"
@@ -330,7 +331,7 @@ class TestControllerRoutedCompressionUpdates:
         project = create_test_project(tmp_path, num_frames=1)
         controller._project = project
 
-        result = controller.update_game_frame_compression("nonexistent", "hal")
+        result = controller.update_game_frame_compression("nonexistent", CompressionType.HAL)
 
         assert result is False
 
@@ -401,7 +402,7 @@ class TestSplitBrainFixes:
             width=8,
             height=8,
             selected_entry_ids=[],
-            compression_types={0x1000: "raw"},
+            compression_types={0x1000: CompressionType.RAW},
         )
         capture_b = GameFrame(
             id="capture_b",
@@ -425,14 +426,14 @@ class TestSplitBrainFixes:
         workspace._state.current_canvas_game_id = "capture_b"  # What canvas displays (user previewing)
 
         # User changes compression type via canvas
-        workspace._on_compression_type_changed("hal")
+        workspace._on_compression_type_changed(CompressionType.HAL)
 
         # Compression should be applied to capture_b (what canvas shows),
         # NOT capture_a (what was selected for linking)
-        assert capture_b.compression_types[0x2000] == "hal", (
+        assert capture_b.compression_types[0x2000] == CompressionType.HAL, (
             "Compression should apply to canvas frame (capture_b), not selected frame (capture_a)"
         )
-        assert capture_a.compression_types[0x1000] == "raw", "Selected frame (capture_a) should remain unchanged"
+        assert capture_a.compression_types[0x1000] == CompressionType.RAW, "Selected frame (capture_a) should remain unchanged"
 
     def test_alignment_blocked_shows_user_feedback(self, qtbot: QtBot, tmp_path: Path, app_context: object) -> None:
         """When alignment edit is blocked, user should get status bar feedback.
@@ -466,7 +467,7 @@ class TestSplitBrainFixes:
             width=8,
             height=8,
             selected_entry_ids=[],
-            compression_types={0x1000: "raw"},
+            compression_types={0x1000: CompressionType.RAW},
         )
         capture_b = GameFrame(
             id="capture_b",

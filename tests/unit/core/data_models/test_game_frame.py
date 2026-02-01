@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from core.frame_mapping_project import GameFrame
+from core.types import CompressionType
 
 
 class TestGameFrame:
@@ -77,9 +78,9 @@ class TestGameFrame:
         """GameFrame accepts explicit compression_types."""
         frame = GameFrame(
             id="G001",
-            compression_types={0x35000: "raw", 0x36000: "hal"},
+            compression_types={0x35000: CompressionType.RAW, 0x36000: CompressionType.HAL},
         )
-        assert frame.compression_types == {0x35000: "raw", 0x36000: "hal"}
+        assert frame.compression_types == {0x35000: CompressionType.RAW, 0x36000: CompressionType.HAL}
 
     def test_game_frame_compression_types_roundtrip(self) -> None:
         """compression_types survives to_dict/from_dict cycle with int keys."""
@@ -87,7 +88,7 @@ class TestGameFrame:
             id="G001",
             rom_offsets=[0x35000, 0x36000],
             capture_path=Path("/tmp/capture.json"),
-            compression_types={0x35000: "raw", 0x36000: "hal"},
+            compression_types={0x35000: CompressionType.RAW, 0x36000: CompressionType.HAL},
         )
         data = frame.to_dict()
         # JSON serializes int keys as strings
@@ -95,7 +96,7 @@ class TestGameFrame:
 
         restored = GameFrame.from_dict(data)
         # Keys should be converted back to ints
-        assert restored.compression_types == {0x35000: "raw", 0x36000: "hal"}
+        assert restored.compression_types == {0x35000: CompressionType.RAW, 0x36000: CompressionType.HAL}
 
     def test_game_frame_compression_types_backward_compatibility(self) -> None:
         """Old project files without compression_types load correctly."""
@@ -112,7 +113,7 @@ class TestGameFrame:
         """to_dict() includes compression_types field."""
         frame = GameFrame(
             id="G001",
-            compression_types={0x50000: "raw"},
+            compression_types={0x50000: CompressionType.RAW},
         )
         data = frame.to_dict()
         assert "compression_types" in data

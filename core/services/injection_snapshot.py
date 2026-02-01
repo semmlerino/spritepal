@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from core.types import CompressionType
+
 if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
 
@@ -47,7 +49,7 @@ class GameFrameSnapshot:
     capture_path: Path | None
     palette_index: int
     selected_entry_ids: tuple[int, ...]
-    compression_types: dict[int, str]
+    compression_types: dict[int, CompressionType]
     width: int
     height: int
 

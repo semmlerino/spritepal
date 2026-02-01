@@ -17,6 +17,7 @@ from core.frame_mapping_project import (
     SheetPalette,
 )
 from core.repositories.frame_mapping_repository import FrameMappingRepository
+from core.types import CompressionType
 
 
 class TestFrameMappingRepositorySaveLoad:
@@ -363,7 +364,7 @@ class TestRepositoryErrorHandling:
                 palette_index=3,
                 width=32,
                 height=32,
-                compression_types={0x1000: "hal"},
+                compression_types={0x1000: CompressionType.HAL},
                 display_name="Game Frame 1",
             )
         )

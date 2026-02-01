@@ -864,8 +864,8 @@ class InjectionOrchestrator:
             )
 
         # Select compression strategy
-        stored_compression = game_frame.compression_types.get(rom_offset, "raw")
-        is_raw = force_raw or stored_compression == "raw"
+        stored_compression = game_frame.compression_types.get(rom_offset, CompressionType.RAW)
+        is_raw = force_raw or stored_compression == CompressionType.RAW
         compression_strategy = get_compression_strategy(is_raw)
 
         # Detect original tile count using strategy

@@ -15,6 +15,7 @@ from PIL import Image
 
 from core.frame_mapping_project import AIFrame, FrameMapping, FrameMappingProject, GameFrame
 from core.services.rom_verification_service import ROMVerificationResult
+from core.types import CompressionType
 from tests.fixtures.frame_mapping_helpers import create_test_capture
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 
@@ -700,7 +701,7 @@ class TestAllowFallbackParameter:
                 capture_path=capture_path,
                 rom_offsets=[rom_offset],
                 selected_entry_ids=[99],  # Stale ID
-                compression_types={rom_offset: "raw"},
+                compression_types={rom_offset: CompressionType.RAW},
             )
         )
         project.mappings.append(FrameMapping(ai_frame_id="ai_frame.png", game_frame_id="F001", offset_x=0, offset_y=0))

@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from core.frame_mapping_project import AIFrame, FrameMapping, FrameMappingProject, GameFrame
+from core.types import CompressionType
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 
 
@@ -340,18 +341,18 @@ class TestUpdateGameFrameCompression:
             GameFrame(
                 id="G001",
                 rom_offsets=[0x1000, 0x2000, 0x3000],
-                compression_types={0x1000: "raw", 0x2000: "raw", 0x3000: "raw"},
+                compression_types={0x1000: CompressionType.RAW, 0x2000: CompressionType.RAW, 0x3000: CompressionType.RAW},
             )
         ]
         project._rebuild_indices()
         controller._project = project
 
-        result = controller.update_game_frame_compression("G001", "hal")
+        result = controller.update_game_frame_compression("G001", CompressionType.HAL)
 
         assert result is True
         frame = project.get_game_frame_by_id("G001")
         assert frame is not None
-        assert frame.compression_types == {0x1000: "hal", 0x2000: "hal", 0x3000: "hal"}
+        assert frame.compression_types == {0x1000: CompressionType.HAL, 0x2000: CompressionType.HAL, 0x3000: CompressionType.HAL}
 
     def test_update_compression_nonexistent_frame_returns_false(self, qtbot) -> None:
         """update_game_frame_compression returns False for nonexistent frame."""
@@ -359,7 +360,7 @@ class TestUpdateGameFrameCompression:
         project = FrameMappingProject(name="test")
         controller._project = project
 
-        result = controller.update_game_frame_compression("NONEXISTENT", "hal")
+        result = controller.update_game_frame_compression("NONEXISTENT", CompressionType.HAL)
 
         assert result is False
 
@@ -441,7 +442,7 @@ class TestControllerNullProjectHandling:
         errors: list[str] = []
         controller.error_occurred.connect(errors.append)
 
-        result = controller.update_game_frame_compression("G001", "hal")
+        result = controller.update_game_frame_compression("G001", CompressionType.HAL)
 
         assert result is False
         assert len(errors) == 1
