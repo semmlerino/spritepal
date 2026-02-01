@@ -62,7 +62,9 @@ def setup_logging(log_dir: Path | None = None, log_level: str = "INFO") -> loggi
     logger = logging.getLogger("spritepal")
     logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
 
-    # Remove existing handlers to avoid duplicates
+    # Remove existing handlers to avoid duplicates and ResourceWarnings
+    for handler in logger.handlers[:]:
+        handler.close()
     logger.handlers.clear()
 
     # Console handler - use detailed format if debug mode is enabled
