@@ -456,6 +456,9 @@ class FrameMappingWorkspace(QWidget):
         self._controller.alignment_updated.connect(self._on_alignment_updated)
         self._controller.preview_cache_invalidated.connect(self._on_preview_cache_invalidated)
         self._controller.capture_import_requested.connect(self._on_capture_import_requested)
+        self._controller.directory_import_started.connect(self._on_directory_import_started)
+        self._controller.directory_import_finished.connect(self._on_directory_import_finished)
+        self._controller.game_frame_removed.connect(self._on_game_frame_removed)
         # Async game frame preview signals (Phase 6 perf improvement)
         self._controller.game_frame_preview_ready.connect(self._on_game_frame_preview_ready)
         self._controller.game_frame_previews_finished.connect(self._on_game_frame_previews_finished)
@@ -646,6 +649,14 @@ class FrameMappingWorkspace(QWidget):
         """Handle game frame added."""
         if self._message_service:
             self._message_service.show_message(f"Imported game frame: {frame_id}")
+
+    def _on_game_frame_removed(self, frame_id: str) -> None:
+        """Handle game frame removed - remove from captures pane.
+
+        Args:
+            frame_id: ID of the game frame that was removed
+        """
+        self._captures_pane.remove_game_frame(frame_id)
 
     def _on_mapping_created(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Handle mapping created - targeted UI update.
@@ -1155,6 +1166,27 @@ class FrameMappingWorkspace(QWidget):
         """
         if self._message_service and import_count > 0:
             self._message_service.show_message(f"Imported {import_count} captures")
+
+    def _on_directory_import_started(self, total_files: int) -> None:
+        """Handle directory import started signal.
+
+        Args:
+            total_files: Total number of files to parse
+        """
+        if self._message_service:
+            self._message_service.show_message(f"Parsing {total_files} capture file{'s' if total_files != 1 else ''}...")
+
+    def _on_directory_import_finished(self, parsed_count: int) -> None:
+        """Handle directory import finished signal.
+
+        Args:
+            parsed_count: Number of successfully parsed captures
+        """
+        if self._message_service:
+            if parsed_count > 0:
+                self._message_service.show_message(f"Parsed {parsed_count} capture{'s' if parsed_count != 1 else ''}")
+            else:
+                self._message_service.show_message("No valid captures found in directory")
 
     # -------------------------------------------------------------------------
     # File Operations
