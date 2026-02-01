@@ -361,6 +361,19 @@ class FrameMappingController(QObject):
         - AIFramesPane → appends frame to list
     """
 
+    ai_frame_removed = Signal(str)
+    """Emitted when an AI frame is removed from the project.
+
+    Args:
+        ai_frame_id: ID of the removed AI frame
+
+    Emitted by:
+        - AIFramesFacade.remove() → after deletion
+
+    Triggers:
+        - FrameMappingWorkspace → updates mapping panel
+    """
+
     capture_renamed = Signal(str)
     """Emitted when a game frame's (capture's) display name changes.
 
@@ -766,6 +779,10 @@ class FrameMappingController(QObject):
     def emit_ai_frame_added(self, frame_id: str) -> None:
         """Emit ai_frame_added signal."""
         self.ai_frame_added.emit(frame_id)
+
+    def emit_ai_frame_removed(self, frame_id: str) -> None:
+        """Emit ai_frame_removed signal."""
+        self.ai_frame_removed.emit(frame_id)
 
     def emit_game_frame_removed(self, frame_id: str) -> None:
         """Emit game_frame_removed signal."""

@@ -475,6 +475,7 @@ class FrameMappingWorkspace(QWidget):
         self._controller.directory_import_started.connect(self._on_directory_import_started)
         self._controller.directory_import_finished.connect(self._on_directory_import_finished)
         self._controller.game_frame_removed.connect(self._on_game_frame_removed)
+        self._controller.ai_frame_removed.connect(self._on_ai_frame_removed)
         # Async game frame preview signals (Phase 6 perf improvement)
         self._controller.game_frame_preview_ready.connect(self._on_game_frame_preview_ready)
         self._controller.game_frame_previews_finished.connect(self._on_game_frame_previews_finished)
@@ -693,6 +694,15 @@ class FrameMappingWorkspace(QWidget):
             frame_id: ID of the game frame that was removed
         """
         self._captures_pane.remove_game_frame(frame_id)
+
+    @signal_error_boundary()
+    def _on_ai_frame_removed(self, ai_frame_id: str) -> None:
+        """Handle AI frame removed - refresh mapping panel to remove stale row.
+
+        Args:
+            ai_frame_id: ID of the AI frame that was removed
+        """
+        self._mapping_panel.refresh()
 
     @signal_error_boundary()
     def _on_mapping_created(self, ai_frame_id: str, game_frame_id: str) -> None:
