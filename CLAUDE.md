@@ -147,12 +147,13 @@ This prevents agents from reverting each other's uncommitted work.
 
 **After each agent completes, verify and commit before proceeding.** Agents can misunderstand prompts, make incorrect changes, or miss edge cases. The orchestrator must verify their work. Uncommitted changes from one agent can be reverted by subsequent agents.
 
+**Automatic lint/typecheck:** A `SubagentStop` hook automatically runs `ruff` and `basedpyright` on changed files when agents complete. If issues are found, the agent receives feedback and fixes them before finishing. Manual lint/typecheck is only needed for final verification before committing.
+
 Verification steps (run directly, not delegated):
 1. **Verify change counts:** `grep -c "pattern" <file>` to confirm expected number of changes
-2. **Lint/typecheck changed files:** `ruff check <files> && basedpyright <files>`
-3. **Run targeted tests:** `pytest tests/path/to/relevant_tests.py -v --tb=short`
-4. **Spot-check critical changes:** Read key modified sections if the agent made judgment calls
-5. **Commit immediately:** If verification passes, commit before spawning the next agent
+2. **Run targeted tests:** `pytest tests/path/to/relevant_tests.py -v --tb=short`
+3. **Spot-check critical changes:** Read key modified sections if the agent made judgment calls
+4. **Commit immediately:** If verification passes, commit before spawning the next agent
 
 Only proceed to the next phase after verification passes AND changes are committed. If issues found, either fix directly or re-prompt the agent with specific corrections.
 
@@ -162,13 +163,15 @@ Spawn `python-code-reviewer` after multi-file or non-obvious changes, before com
 
 ### Task Completion Checklist
 
-Before reporting task completion, verify ALL of the following:
+Before reporting task completion, the orchestrator must verify ALL of the following:
 
-1. Tests pass (`uv run pytest` on affected areas)
-2. Lint passes (`uv run ruff check .`)
-3. Types pass (`uv run basedpyright core ui utils`)
-4. **Committed** (if checks pass and work is coherent)
+1. **Tests pass** (`uv run pytest` on affected areas)
+2. **Lint/types pass** (`uv run ruff check . && basedpyright core ui utils`)
+3. **Review agent work** — spot-check that changes match the original intent, not just that they pass checks
+4. **Committed** (if all verification passes)
 5. Then report completion
+
+Agents auto-fix lint/type issues via hook, but the orchestrator is responsible for final verification that the task was completed correctly—not just that the code is clean.
 
 **NEVER report "done" or give a summary before committing.** The commit is part of completing the task, not a follow-up action.
 
