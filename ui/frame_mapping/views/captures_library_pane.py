@@ -56,11 +56,73 @@ class CapturesLibraryPane(QWidget):
         capture_rename_requested: Emitted when user wants to rename (frame_id, new_name)
     """
 
-    game_frame_selected = Signal(str)  # Game frame ID
-    edit_in_sprite_editor_requested = Signal(str)  # Game frame ID
-    delete_capture_requested = Signal(str)  # Game frame ID
-    show_details_requested = Signal(str)  # Game frame ID
-    capture_rename_requested = Signal(str, str)  # Game frame ID, new display name
+    game_frame_selected = Signal(str)
+    """Emitted when user selects a game frame (capture) in the library.
+
+    Args:
+        game_frame_id: ID of the selected game frame
+
+    Emitted by:
+        - _on_selection_changed() → when user clicks list item
+
+    Triggers:
+        - FrameMappingWorkspace → updates mapping panel and workbench
+    """
+
+    edit_in_sprite_editor_requested = Signal(str)
+    """Emitted when user requests to open a game frame in sprite editor.
+
+    Args:
+        game_frame_id: ID of the game frame to edit
+
+    Emitted by:
+        - _on_context_menu() → when user clicks context menu item
+
+    Triggers:
+        - FrameMappingWorkspace → opens sprite editor with frame
+    """
+
+    delete_capture_requested = Signal(str)
+    """Emitted when user requests to delete a game frame from the project.
+
+    Args:
+        game_frame_id: ID of the game frame to delete
+
+    Emitted by:
+        - _on_context_menu() → when user clicks delete context menu item
+
+    Triggers:
+        - FrameMappingWorkspace → removes frame after confirmation
+    """
+
+    show_details_requested = Signal(str)
+    """Emitted when user requests to see game frame details.
+
+    Args:
+        game_frame_id: ID of the game frame to show details for
+
+    Emitted by:
+        - _on_context_menu() → when user clicks details context menu item
+
+    Triggers:
+        - FrameMappingWorkspace → shows frame details dialog
+    """
+
+    capture_rename_requested = Signal(str, str)
+    """Emitted when user renames a game frame's display name.
+
+    Part of capture organization support.
+
+    Args:
+        game_frame_id: ID of the game frame being renamed
+        new_display_name: New display name (or empty string to clear)
+
+    Emitted by:
+        - _on_context_menu() → after user edits in dialog
+
+    Triggers:
+        - FrameMappingWorkspace → updates frame display name
+    """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

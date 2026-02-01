@@ -94,9 +94,52 @@ class WorkbenchGraphicsView(QGraphicsView):
         scene_mouse_left: Emitted when mouse leaves the viewport
     """
 
-    scene_mouse_moved = Signal(float, float)  # scene_x, scene_y
+    scene_mouse_moved = Signal(float, float)
+    """Emitted when mouse moves over the canvas scene.
+
+    Used for cursor position tracking and eyedropper mode.
+
+    Args:
+        scene_x: X coordinate in scene space
+        scene_y: Y coordinate in scene space
+
+    Emitted by:
+        - mouseMoveEvent() → while mouse is over viewport
+
+    Triggers:
+        - WorkbenchCanvas → updates cursor info display
+    """
+
     scene_mouse_left = Signal()
-    scene_clicked = Signal(float, float)  # scene_x, scene_y
+    """Emitted when mouse leaves the canvas viewport.
+
+    Used to clear cursor position display and hide helpers.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - leaveEvent() → when mouse exits viewport
+
+    Triggers:
+        - WorkbenchCanvas → clears position display
+    """
+
+    scene_clicked = Signal(float, float)
+    """Emitted when user left-clicks on the canvas scene.
+
+    Used for eyedropper mode and other point-selection operations.
+
+    Args:
+        scene_x: X coordinate in scene space where click occurred
+        scene_y: Y coordinate in scene space where click occurred
+
+    Emitted by:
+        - mousePressEvent() → when left button is clicked
+
+    Triggers:
+        - WorkbenchCanvas → handles eyedropper or other click mode operation
+    """
 
     def __init__(self, scene: QGraphicsScene, canvas_size: int, parent: QWidget | None = None) -> None:
         super().__init__(scene, parent)
@@ -226,12 +269,98 @@ class WorkbenchCanvas(QWidget):
     """
 
     alignment_changed = Signal(AlignmentState)
-    compression_type_changed = Signal(str)  # "raw" or "hal"
-    apply_transforms_to_all_requested = Signal(int, int, float)  # offset_x, offset_y, scale
-    # Pixel inspection signals
-    pixel_hovered = Signal(int, int, object, int)  # x, y, rgb (tuple or None), palette_index
-    pixel_left = Signal()  # mouse left the canvas
-    eyedropper_picked = Signal(object, int)  # rgb (tuple), palette_index
+    """Emitted when the AI frame alignment changes.
+
+    Emitted on mouse drag, keyboard nudge, or programmatic update.
+    Contains the complete alignment state (offset, flip, scale, sharpen, resampling).
+
+    Args:
+        state: AlignmentState dataclass with all alignment parameters
+
+    Emitted by:
+        - _on_ai_frame_item_moved() → after drag completes
+        - _on_scale_handle_moved() → after scale operation
+        - _on_nudge_key_pressed() → after keyboard nudge
+
+    Triggers:
+        - FrameMappingWorkspace → updates controller and mapping panel
+    """
+
+    compression_type_changed = Signal(str)
+    """Emitted when compression type selection changes.
+
+    Args:
+        compression_type: "raw" for uncompressed or "hal" for HAL3 compression
+
+    Emitted by:
+        - _on_compression_type_changed() → when user selects compression option
+
+    Triggers:
+        - FrameMappingWorkspace → updates game frame compression setting
+    """
+
+    apply_transforms_to_all_requested = Signal(int, int, float)
+    """Emitted when user requests to apply alignment to all mapped frames.
+
+    Args:
+        offset_x: X offset to apply to all frames
+        offset_y: Y offset to apply to all frames
+        scale: Scale factor to apply to all frames
+
+    Emitted by:
+        - _on_apply_to_all_clicked() → when user clicks "Apply to All" button
+
+    Triggers:
+        - FrameMappingWorkspace → applies transforms to all mappings
+    """
+
+    pixel_hovered = Signal(int, int, object, int)
+    """Emitted when mouse hovers over a pixel in the AI frame.
+
+    Used for pixel inspection and eyedropper mode. Emitted with debouncing
+    to avoid excessive updates during dragging.
+
+    Args:
+        x: X coordinate of the pixel in the AI frame
+        y: Y coordinate of the pixel in the AI frame
+        rgb: RGB tuple (r, g, b) or None if transparent/out of bounds
+        palette_index: Palette index if the pixel is from an indexed image
+
+    Emitted by:
+        - _emit_pixel_hovered() → after debounce timer
+
+    Triggers:
+        - FrameMappingWorkspace → updates pixel info display, eyedropper selection
+    """
+
+    pixel_left = Signal()
+    """Emitted when mouse leaves the canvas.
+
+    Used to clear pixel inspection display.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - leaveEvent() → when mouse exits canvas
+
+    Triggers:
+        - FrameMappingWorkspace → clears pixel info display
+    """
+
+    eyedropper_picked = Signal(object, int)
+    """Emitted when user picks a color in eyedropper mode.
+
+    Args:
+        rgb: RGB tuple (r, g, b) of the picked color
+        palette_index: Palette index if available
+
+    Emitted by:
+        - _on_eyedropper_mode_click() → when user clicks with eyedropper active
+
+    Triggers:
+        - FrameMappingWorkspace → sets sheet palette color at selected index
+    """
 
     def __init__(self, parent: QWidget | None = None, config: CanvasConfig | None = None) -> None:
         super().__init__(parent)

@@ -77,43 +77,484 @@ class FrameMappingController(QObject):
     """
 
     project_changed = Signal()
-    ai_frames_loaded = Signal(int)  # count
-    game_frame_added = Signal(str)  # game frame ID
-    game_frame_removed = Signal(str)  # game frame ID
-    mapping_created = Signal(str, str)  # ai_frame_id, game_frame_id
-    mapping_removed = Signal(str)  # ai_frame_id
-    mapping_injected = Signal(str, str)  # ai_frame_id, message
-    error_occurred = Signal(str)  # error message
-    status_update = Signal(str)  # status message for UI feedback
-    save_requested = Signal()  # Emitted when auto-save should occur (e.g., after injection)
-    stale_entries_warning = Signal(str)  # frame_id - Emitted when stored entry IDs are stale
-    stale_entries_on_load = Signal(list)  # list[str] of game_frame_ids - Emitted when project loads with stale entries
-    alignment_updated = Signal(str)  # ai_frame_id - Emitted when alignment changes (not structural)
-    sheet_palette_changed = Signal()  # Emitted when sheet palette is set/cleared
-    # AI Frame Organization signals (V4)
-    frame_renamed = Signal(str)  # ai_frame_id - display name changed
-    frame_tags_changed = Signal(str)  # ai_frame_id - tags changed
-    ai_frame_moved = Signal(str, int, int)  # (ai_frame_id, from_index, to_index)
-    ai_frame_added = Signal(str)  # ai_frame_id - Emitted when a single AI frame is added
-    # Capture Organization signals
-    capture_renamed = Signal(str)  # game_frame_id - display name changed
-    # Preview cache signal - emitted when a preview is regenerated (mtime/entries changed)
-    preview_cache_invalidated = Signal(str)  # game_frame_id - preview was regenerated
-    # Capture import signal - emitted when capture parsed, workspace shows dialog
-    capture_import_requested = Signal(object, object)  # (CaptureResult, capture_path: Path)
-    # Directory import signals - for background parsing progress
-    directory_import_started = Signal(int)  # total_files - Emitted when directory import begins
-    directory_import_finished = Signal(int)  # parsed_count - Emitted when directory import completes
-    # Undo/Redo signals
+    """Emitted when project is loaded, created, or has structural changes.
+
+    Use this to refresh all UI sections after project operations like load, new, or undo/redo.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - new_project()
+        - load_project()
+        - undo()
+        - redo()
+
+    Triggers:
+        - FrameMappingWorkspace._on_project_changed() → refresh all views
+    """
+
+    ai_frames_loaded = Signal(int)
+    """Emitted when AI frames are loaded from directory.
+
+    Args:
+        count: Number of AI frames loaded
+
+    Emitted by:
+        - AIFramesFacade.load_from_directory()
+
+    Triggers:
+        - FrameMappingWorkspace → updates AI frames pane
+    """
+
+    game_frame_added = Signal(str)
+    """Emitted when a game frame (capture) is added to the project.
+
+    Args:
+        game_frame_id: ID of the newly added game frame
+
+    Emitted by:
+        - complete_capture_import() → after import completes
+        - GameFramesFacade (internal)
+
+    Triggers:
+        - FrameMappingWorkspace → updates captures pane
+    """
+
+    game_frame_removed = Signal(str)
+    """Emitted when a game frame is removed from the project.
+
+    Args:
+        game_frame_id: ID of the removed game frame
+
+    Emitted by:
+        - GameFramesFacade.remove() → after deletion
+
+    Triggers:
+        - FrameMappingWorkspace → updates captures pane and workspace
+    """
+
+    mapping_created = Signal(str, str)
+    """Emitted when an AI frame is linked to a game frame.
+
+    Args:
+        ai_frame_id: ID of the AI frame being mapped
+        game_frame_id: ID of the game frame being linked
+
+    Emitted by:
+        - MappingsFacade.create_mapping()
+        - LinkFramesCommand.redo()
+
+    Triggers:
+        - FrameMappingWorkspace._on_mapping_created() → highlights mapping
+    """
+
+    mapping_removed = Signal(str)
+    """Emitted when a mapping is removed or an AI frame is unlinked.
+
+    Args:
+        ai_frame_id: ID of the AI frame that was unmapped
+
+    Emitted by:
+        - MappingsFacade.remove_mapping()
+        - RemoveMappingCommand.redo()
+
+    Triggers:
+        - FrameMappingWorkspace._on_mapping_removed() → updates workspace
+    """
+
+    mapping_injected = Signal(str, str)
+    """Emitted when a mapping is successfully injected into the ROM.
+
+    Args:
+        ai_frame_id: ID of the AI frame that was injected
+        message: Multi-line status message from injection pipeline
+
+    Emitted by:
+        - InjectionFacade.inject_mapping() → after successful injection
+        - _on_async_injection_finished() → after async injection succeeds
+
+    Triggers:
+        - FrameMappingWorkspace → shows success notification
+    """
+
+    error_occurred = Signal(str)
+    """Emitted when an error occurs in any operation.
+
+    Used for displaying error messages to the user.
+
+    Args:
+        message: Human-readable error message
+
+    Emitted by:
+        - load_project() → on file read errors
+        - save_project() → on write errors
+        - Various service operations → on validation/processing errors
+
+    Triggers:
+        - FrameMappingWorkspace → displays error dialog
+    """
+
+    status_update = Signal(str)
+    """Emitted for general status messages (non-error).
+
+    Use for progress updates, confirmations, or informational feedback.
+
+    Args:
+        message: Status message to display
+
+    Emitted by:
+        - Various operations → progress updates
+
+    Triggers:
+        - FrameMappingWorkspace._on_status_update() → updates status bar
+    """
+
+    save_requested = Signal()
+    """Emitted when the project should be auto-saved.
+
+    Triggered after significant mutations (mapping changes, injection, etc.)
+    to signal that the workspace should persist the project to disk.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - complete_capture_import() → after adding game frame
+        - undo() → after undoing changes
+        - redo() → after redoing changes
+        - InjectionFacade.inject_mapping() → after successful injection
+        - _on_async_injection_finished() → after async injection succeeds
+
+    Triggers:
+        - FrameMappingWorkspace._on_save_requested() → saves project file
+    """
+
+    stale_entries_warning = Signal(str)
+    """Emitted when stored OAM entry IDs are detected as stale.
+
+    Stale entries occur when the ROM changes but capture metadata references
+    old entry indices. This signal alerts the UI to warn the user or trigger
+    fallback filtering logic.
+
+    Args:
+        frame_id: ID of the game frame with stale entries
+
+    Emitted by:
+        - PreviewService (via signal relay) → during preview generation
+        - _on_async_injection_finished() → when injection detects staleness
+
+    Triggers:
+        - FrameMappingWorkspace → shows user confirmation dialog
+    """
+
+    stale_entries_on_load = Signal(list)
+    """Emitted when project loads and stale entries are detected in game frames.
+
+    This is emitted asynchronously after project load completes, allowing the
+    UI to warn the user about potentially corrupted capture metadata without
+    blocking the main thread.
+
+    Args:
+        stale_frame_ids: List of game frame IDs with stale entries
+
+    Emitted by:
+        - AsyncStaleEntryDetector.run() → after async detection completes
+
+    Triggers:
+        - FrameMappingWorkspace → shows batch stale entries warning
+    """
+
+    alignment_updated = Signal(str)
+    """Emitted when mapping alignment changes (offset, flip, scale, sharpen).
+
+    This is NOT emitted for structural changes (creation/deletion), only for
+    transform updates to existing mappings.
+
+    Args:
+        ai_frame_id: ID of the AI frame whose alignment changed
+
+    Emitted by:
+        - MappingsFacade.update_alignment()
+        - UpdateAlignmentCommand.redo()
+
+    Triggers:
+        - WorkbenchCanvas._on_alignment_updated() → redraws preview
+        - MappingPanel → updates UI values
+    """
+
+    sheet_palette_changed = Signal()
+    """Emitted when the sheet palette is set, modified, or cleared.
+
+    The sheet palette is a 16-color palette used for rendering AI frame
+    previews. Changes trigger cache invalidation and regeneration.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - PaletteService (via signal relay) → after palette operation
+
+    Triggers:
+        - FrameMappingController → invalidates preview cache
+        - Workspace → refreshes palette display
+    """
+
+    frame_renamed = Signal(str)
+    """Emitted when an AI frame's display name changes.
+
+    Part of frame organization support (V4).
+
+    Args:
+        ai_frame_id: ID of the AI frame that was renamed
+
+    Emitted by:
+        - OrganizationService (via signal relay) → after rename operation
+
+    Triggers:
+        - AIFramesPane → updates frame list display
+    """
+
+    frame_tags_changed = Signal(str)
+    """Emitted when an AI frame's tags are added, removed, or modified.
+
+    Part of frame organization support (V4). Tags allow grouping/filtering of frames.
+
+    Args:
+        ai_frame_id: ID of the AI frame whose tags changed
+
+    Emitted by:
+        - OrganizationService (via signal relay) → after tag operation
+
+    Triggers:
+        - AIFramesPane → updates frame tags display
+    """
+
+    ai_frame_moved = Signal(str, int, int)
+    """Emitted when an AI frame is reordered in the list.
+
+    Args:
+        ai_frame_id: ID of the AI frame that moved
+        from_index: Original position (0-based)
+        to_index: New position (0-based)
+
+    Emitted by:
+        - AIFramesFacade.reorder()
+        - ReorderAIFrameCommand.redo()
+
+    Triggers:
+        - AIFramesPane → updates frame list order
+    """
+
+    ai_frame_added = Signal(str)
+    """Emitted when a single AI frame is added to the project.
+
+    Distinct from ai_frames_loaded, which is emitted for batch directory loads.
+    This is used for incremental additions.
+
+    Args:
+        ai_frame_id: ID of the newly added AI frame
+
+    Emitted by:
+        - AIFramesFacade.add_from_file()
+
+    Triggers:
+        - AIFramesPane → appends frame to list
+    """
+
+    capture_renamed = Signal(str)
+    """Emitted when a game frame's (capture's) display name changes.
+
+    Part of capture organization support.
+
+    Args:
+        game_frame_id: ID of the game frame that was renamed
+
+    Emitted by:
+        - OrganizationService (via signal relay) → after rename operation
+
+    Triggers:
+        - CapturesLibraryPane → updates capture name display
+    """
+
+    preview_cache_invalidated = Signal(str)
+    """Emitted when a game frame's preview is regenerated due to cache miss.
+
+    This occurs when the capture file's mtime or selected OAM entries change,
+    indicating that cached preview data is now stale.
+
+    Args:
+        game_frame_id: ID of the game frame whose preview was regenerated
+
+    Emitted by:
+        - PreviewService (via signal relay) → after cache miss regeneration
+
+    Triggers:
+        - Various handlers → request async regeneration if needed
+    """
+
+    capture_import_requested = Signal(object, object)
+    """Emitted when a capture file is parsed and awaits user sprite selection.
+
+    The workspace shows a sprite selection dialog and calls
+    complete_capture_import() with the user's selection.
+
+    Args:
+        capture_result: CaptureResult object with parsed sprite data
+        capture_path: Path object pointing to the capture JSON file
+
+    Emitted by:
+        - CaptureImportService (via signal relay) → after parsing completes
+
+    Triggers:
+        - FrameMappingWorkspace._on_capture_import_requested() → shows dialog
+    """
+
+    directory_import_started = Signal(int)
+    """Emitted when batch capture directory import begins.
+
+    Signals the start of background parsing for a directory of captures.
+    Used to show progress UI to the user.
+
+    Args:
+        total_files: Number of files to parse in the directory
+
+    Emitted by:
+        - CaptureImportService (via signal relay) → when parsing starts
+
+    Triggers:
+        - FrameMappingWorkspace → shows progress indicator
+    """
+
+    directory_import_finished = Signal(int)
+    """Emitted when batch capture directory import completes.
+
+    Signals the end of background parsing for a directory of captures.
+    Used to hide progress UI and refresh the captures pane.
+
+    Args:
+        parsed_count: Number of captures successfully parsed
+
+    Emitted by:
+        - CaptureImportService (via signal relay) → when parsing completes
+
+    Triggers:
+        - FrameMappingWorkspace → hides progress indicator, refreshes pane
+    """
+
     can_undo_changed = Signal(bool)
+    """Emitted when the undo stack state changes.
+
+    Indicates whether undo is available, used to enable/disable UI buttons.
+
+    Args:
+        can_undo: True if undo is available
+
+    Emitted by:
+        - UndoRedoStack → whenever undo state changes
+
+    Triggers:
+        - FrameMappingWorkspace → enables/disables undo button
+    """
+
     can_redo_changed = Signal(bool)
-    # Async game frame preview signals (for batch preview generation)
-    game_frame_preview_ready = Signal(str, QPixmap)  # frame_id, pixmap
+    """Emitted when the redo stack state changes.
+
+    Indicates whether redo is available, used to enable/disable UI buttons.
+
+    Args:
+        can_redo: True if redo is available
+
+    Emitted by:
+        - UndoRedoStack → whenever redo state changes
+
+    Triggers:
+        - FrameMappingWorkspace → enables/disables redo button
+    """
+
+    game_frame_preview_ready = Signal(str, QPixmap)
+    """Emitted when an async-generated game frame preview is ready.
+
+    Part of batch async preview generation. Each preview completion
+    triggers this signal; use game_frame_previews_finished to detect batch completion.
+
+    Args:
+        frame_id: ID of the game frame
+        pixmap: QPixmap of the rendered preview
+
+    Emitted by:
+        - AsyncGameFramePreviewService (via signal relay) → for each completed preview
+
+    Triggers:
+        - WorkbenchCanvas → updates frame display
+        - CapturesLibraryPane → updates thumbnail
+    """
+
     game_frame_previews_finished = Signal()
-    # Async injection signals
-    async_injection_started = Signal(str)  # ai_frame_id
-    async_injection_progress = Signal(str, str)  # ai_frame_id, message
-    async_injection_finished = Signal(str, bool, str)  # ai_frame_id, success, message
+    """Emitted when batch async preview generation completes.
+
+    Signals that all requested previews have been generated. Use with
+    game_frame_preview_ready for progress tracking.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - AsyncGameFramePreviewService (via signal relay) → after batch finishes
+
+    Triggers:
+        - Workspace → can resume other operations
+    """
+
+    async_injection_started = Signal(str)
+    """Emitted when an async injection operation begins.
+
+    Signals the start of a background injection. Multiple injections
+    can be queued and processed sequentially.
+
+    Args:
+        ai_frame_id: ID of the AI frame being injected
+
+    Emitted by:
+        - AsyncInjectionService (via signal relay) → when injection starts
+
+    Triggers:
+        - Workspace → shows progress indicator
+    """
+
+    async_injection_progress = Signal(str, str)
+    """Emitted to report progress during an async injection.
+
+    Allows UI to show detailed progress updates during long-running injections.
+
+    Args:
+        ai_frame_id: ID of the AI frame being injected
+        message: Progress message or status update
+
+    Emitted by:
+        - AsyncInjectionService (via signal relay) → during injection processing
+
+    Triggers:
+        - Workspace → updates progress message display
+    """
+
+    async_injection_finished = Signal(str, bool, str)
+    """Emitted when an async injection operation completes.
+
+    Signals successful or failed completion of an injection. The workspace
+    uses this to update the mapping status and show results to the user.
+
+    Args:
+        ai_frame_id: ID of the AI frame that was injected
+        success: True if injection succeeded, False otherwise
+        message: Human-readable status message
+
+    Emitted by:
+        - _on_async_injection_finished() → after service completes
+
+    Triggers:
+        - Workspace → hides progress indicator, shows result notification
+    """
 
     def __init__(
         self,

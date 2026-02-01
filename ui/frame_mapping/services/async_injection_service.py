@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, cast
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QThread, QTimer, Signal, Slot
 
 if TYPE_CHECKING:
-    from typing_extensions import override
+    from typing import override
 else:
 
     def override(f):
@@ -57,10 +57,41 @@ class AsyncInjectionRequest:
 class _InjectionWorker(QObject):
     """Worker that performs injection in a background thread."""
 
-    # Signal: (request_id, ai_frame_id, result)
-    injection_finished = Signal(int, str, object)  # result is InjectionResult
-    # Signal: (request_id, ai_frame_id, message)
+    injection_finished = Signal(int, str, object)
+    """Emitted when injection completes in worker thread.
+
+    Internal signal used to communicate from worker thread to service.
+    The service relays this as injection_finished with public args format.
+
+    Args:
+        request_id: Internal request ID for tracking
+        ai_frame_id: ID of the AI frame that was injected
+        result: InjectionResult object with operation details
+
+    Emitted by:
+        - process_request() → after injection completes or fails
+
+    Triggers:
+        - AsyncInjectionService._on_injection_finished()
+    """
+
     progress = Signal(int, str, str)
+    """Emitted to report progress from worker thread.
+
+    Internal signal used to communicate progress from worker thread to service.
+    The service relays this as injection_progress with public args format.
+
+    Args:
+        request_id: Internal request ID for tracking
+        ai_frame_id: ID of the AI frame being injected
+        message: Progress message or status update
+
+    Emitted by:
+        - process_request() → during injection processing
+
+    Triggers:
+        - AsyncInjectionService._on_progress()
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -149,9 +180,60 @@ class AsyncInjectionService(AsyncServiceBase):
         injection_finished: (ai_frame_id, success, message) - emitted when complete
     """
 
-    injection_started = Signal(str)  # ai_frame_id
-    injection_progress = Signal(str, str)  # ai_frame_id, message
-    injection_finished = Signal(str, bool, str, object)  # ai_frame_id, success, message, result
+    injection_started = Signal(str)
+    """Emitted when an injection is queued and processing begins.
+
+    This signal is emitted immediately when queue_injection() is called,
+    before the background thread actually starts processing.
+
+    Args:
+        ai_frame_id: ID of the AI frame being injected
+
+    Emitted by:
+        - queue_injection() → when request is added to queue
+
+    Triggers:
+        - FrameMappingController.async_injection_started
+        - Workspace → shows progress UI
+    """
+
+    injection_progress = Signal(str, str)
+    """Emitted to report progress during injection processing.
+
+    Allows UI to show detailed status updates as the injection operation
+    progresses through parsing, compositing, and ROM writing.
+
+    Args:
+        ai_frame_id: ID of the AI frame being injected
+        message: Progress message or status update
+
+    Emitted by:
+        - _on_progress() → relayed from worker thread
+
+    Triggers:
+        - FrameMappingController.async_injection_progress
+        - Workspace → updates progress message display
+    """
+
+    injection_finished = Signal(str, bool, str, object)
+    """Emitted when injection completes or fails.
+
+    Signals completion of the injection operation. The result object contains
+    detailed error messages, new mapping status, and any stale entry warnings.
+
+    Args:
+        ai_frame_id: ID of the AI frame that was injected
+        success: True if injection succeeded, False otherwise
+        message: Human-readable status message
+        result: InjectionResult object with detailed operation information
+
+    Emitted by:
+        - _on_injection_finished() → after worker completes
+
+    Triggers:
+        - FrameMappingController._on_async_injection_finished()
+        - Workspace → updates mapping status, shows result notification
+    """
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)

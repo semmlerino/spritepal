@@ -21,7 +21,7 @@ from PySide6.QtCore import QMutex, QMutexLocker, QObject, QThread, Signal, Slot
 from PySide6.QtGui import QImage, QPixmap
 
 if TYPE_CHECKING:
-    from typing_extensions import override
+    from typing import override
 else:
 
     def override(f):
@@ -60,10 +60,39 @@ class BatchPreviewRequest:
 class _GameFramePreviewWorker(QObject):
     """Worker that generates game frame previews in a background thread."""
 
-    # Signal: (request_id, frame_id, qimage)
     preview_ready = Signal(int, str, QImage)
-    # Signal: (request_id) - emitted when batch is complete
+    """Emitted when a single preview is generated in worker thread.
+
+    Internal signal used to communicate from worker thread to service.
+    The service converts QImage to QPixmap and relays as public preview_ready signal.
+
+    Args:
+        request_id: Internal request ID for tracking (used to cancel stale requests)
+        frame_id: ID of the game frame
+        qimage: QImage of the rendered preview (thread-safe)
+
+    Emitted by:
+        - process_batch() → for each successfully generated preview
+
+    Triggers:
+        - AsyncGameFramePreviewService._on_preview_ready()
+    """
+
     batch_finished = Signal(int)
+    """Emitted when all previews in a batch are generated.
+
+    Internal signal used to signal batch completion from worker thread.
+    The service relays this as the public batch_finished signal.
+
+    Args:
+        request_id: Internal request ID for tracking (used to cancel stale requests)
+
+    Emitted by:
+        - process_batch() → after all previews are generated or batch is cancelled
+
+    Triggers:
+        - AsyncGameFramePreviewService._on_batch_finished()
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -158,8 +187,41 @@ class AsyncGameFramePreviewService(AsyncServiceBase):
         batch_finished: () - emitted when batch is complete
     """
 
-    preview_ready = Signal(str, QPixmap)  # frame_id, pixmap
+    preview_ready = Signal(str, QPixmap)
+    """Emitted when a game frame preview is ready for display.
+
+    Part of batch async preview generation. Emitted incrementally for each
+    completed preview. Use with batch_finished to detect overall batch completion.
+
+    Args:
+        frame_id: ID of the game frame
+        pixmap: QPixmap of the rendered preview (safe for main thread use)
+
+    Emitted by:
+        - _on_preview_ready() → after converting worker's QImage to QPixmap
+
+    Triggers:
+        - FrameMappingController.game_frame_preview_ready
+        - WorkbenchCanvas → updates frame display
+        - CapturesLibraryPane → updates thumbnail
+    """
+
     batch_finished = Signal()
+    """Emitted when batch async preview generation completes.
+
+    Signals completion of the entire batch. All requested previews have been
+    generated (or batch was cancelled). Use with preview_ready for progress tracking.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - _on_batch_finished() → after all previews in batch are generated
+
+    Triggers:
+        - FrameMappingController.game_frame_previews_finished
+        - Workspace → can resume other operations
+    """
 
     def __init__(
         self,

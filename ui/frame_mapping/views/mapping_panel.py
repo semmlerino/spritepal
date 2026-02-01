@@ -73,15 +73,113 @@ class MappingPanel(QWidget):
         inject_mapping_requested: Emitted when user requests injection (ai_frame_index)
     """
 
-    # ID-based signals (stable across index changes)
-    mapping_selected = Signal(str)  # AI frame ID (filename)
-    edit_frame_requested = Signal(str)  # AI frame ID
-    remove_mapping_requested = Signal(str)  # AI frame ID
-    adjust_alignment_requested = Signal(str)  # AI frame ID
-    drop_game_frame_requested = Signal(str, str)  # AI frame ID, game frame ID
-    inject_mapping_requested = Signal(str)  # AI frame ID
-    inject_selected_requested = Signal()  # Request to inject selected frames
-    row_reorder_requested = Signal(str, int)  # AI frame ID, target index
+    mapping_selected = Signal(str)
+    """Emitted when user selects a mapping row in the table.
+
+    Args:
+        ai_frame_id: ID of the AI frame (filename)
+
+    Emitted by:
+        - _on_row_selected() → when user clicks table row
+
+    Triggers:
+        - FrameMappingWorkspace → updates workbench and canvas display
+    """
+
+    edit_frame_requested = Signal(str)
+    """Emitted when user clicks "Edit Frame" button for a mapping.
+
+    Args:
+        ai_frame_id: ID of the AI frame to edit
+
+    Emitted by:
+        - _on_edit_frame_clicked() → when user clicks button
+
+    Triggers:
+        - FrameMappingWorkspace → opens sprite editor
+    """
+
+    remove_mapping_requested = Signal(str)
+    """Emitted when user requests to remove a mapping.
+
+    Args:
+        ai_frame_id: ID of the AI frame whose mapping should be removed
+
+    Emitted by:
+        - _on_remove_mapping_clicked() → when user clicks context menu item
+
+    Triggers:
+        - FrameMappingWorkspace → removes mapping after confirmation
+    """
+
+    adjust_alignment_requested = Signal(str)
+    """Emitted when user clicks "Adjust Alignment" for a mapping.
+
+    Args:
+        ai_frame_id: ID of the AI frame to adjust
+
+    Emitted by:
+        - _on_adjust_alignment_clicked() → when user clicks button
+
+    Triggers:
+        - FrameMappingWorkspace → focuses canvas for alignment editing
+    """
+
+    drop_game_frame_requested = Signal(str, str)
+    """Emitted when user drops a game frame on a mapping row.
+
+    Used to change the game frame linked to an AI frame mapping.
+
+    Args:
+        ai_frame_id: ID of the AI frame in the row
+        game_frame_id: ID of the dropped game frame
+
+    Emitted by:
+        - dropEvent() → when drag-drop completes on row
+
+    Triggers:
+        - FrameMappingWorkspace → updates mapping to link new game frame
+    """
+
+    inject_mapping_requested = Signal(str)
+    """Emitted when user requests to inject a single mapping.
+
+    Args:
+        ai_frame_id: ID of the AI frame mapping to inject
+
+    Emitted by:
+        - _on_inject_clicked() → when user clicks inject button
+
+    Triggers:
+        - FrameMappingWorkspace → injects mapping into ROM
+    """
+
+    inject_selected_requested = Signal()
+    """Emitted when user requests to inject all selected mappings.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - _on_inject_selected_clicked() → when user clicks inject all button
+
+    Triggers:
+        - FrameMappingWorkspace → injects all selected mappings
+    """
+
+    row_reorder_requested = Signal(str, int)
+    """Emitted when user drags a mapping row to reorder.
+
+    Args:
+        ai_frame_id: ID of the AI frame being moved
+        target_index: New position (0-based) for the frame
+
+    Emitted by:
+        - dropEvent() → when drag-drop completes on table
+
+    Triggers:
+        - FrameMappingWorkspace → reorders AI frame in project
+    """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, cast
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 
 if TYPE_CHECKING:
-    from typing_extensions import override
+    from typing import override
 else:
 
     def override(f):
@@ -53,8 +53,22 @@ class _StaleEntryWorker(QObject):
     Runs in a separate thread to avoid blocking the UI.
     """
 
-    # Signal: (stale_frame_ids, request_id)
     detection_complete = Signal(list, int)
+    """Emitted when stale entry detection completes.
+
+    Internal signal used to communicate from worker thread to service.
+    The service relays this as the public stale_entries_detected signal.
+
+    Args:
+        stale_frame_ids: List of game frame IDs that have stale OAM entry references
+        request_id: Internal request ID for tracking (used to cancel stale batches)
+
+    Emitted by:
+        - run() → after detection completes
+
+    Triggers:
+        - AsyncStaleEntryDetector._on_detection_complete()
+    """
 
     def __init__(self, request: StaleDetectionRequest) -> None:
         super().__init__()
@@ -97,11 +111,38 @@ class AsyncStaleEntryDetector(AsyncServiceBase):
         detection_finished: Emitted when detection completes (even if no stale entries).
     """
 
-    # Signal: list of stale frame IDs
     stale_entries_detected = Signal(list)
+    """Emitted when stale OAM entry IDs are detected in game frames.
 
-    # Signal: emitted when detection completes
+    Signals completion of stale entry detection with a list of affected frame IDs.
+    Only emitted if stale entries are found (not emitted for clean batches).
+
+    Args:
+        stale_frame_ids: List of game frame IDs with stale OAM entry references
+
+    Emitted by:
+        - _on_detection_complete() → when stale_ids is non-empty
+
+    Triggers:
+        - FrameMappingController.stale_entries_on_load
+        - Workspace → shows batch warning dialog
+    """
+
     detection_finished = Signal()
+    """Emitted when stale entry detection completes, regardless of results.
+
+    Signals completion of a detection batch, whether stale entries were found or not.
+    Use this to update UI state that depends on detection completing.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - _on_detection_complete() → after detection completes
+
+    Triggers:
+        - Workspace → can resume other operations
+    """
 
     def __init__(
         self,

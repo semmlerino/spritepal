@@ -70,27 +70,247 @@ class AIFramesPane(QWidget):
         remove_from_project_requested: Emitted when user requests removal (index)
     """
 
-    ai_frame_selected = Signal(str)  # AI frame ID (filename)
-    map_requested = Signal()  # User wants to map selected frames
-    auto_advance_changed = Signal(bool)  # Auto-advance toggle state changed
-    edit_in_sprite_editor_requested = Signal(str)  # AI frame ID
-    edit_frame_palette_requested = Signal(str)  # AI frame ID - open palette index editor
-    remove_from_project_requested = Signal(str)  # AI frame ID
-    # Sheet palette signals
-    palette_edit_requested = Signal()  # User wants to edit sheet palette
-    palette_extract_requested = Signal()  # User wants to extract palette from sheet
-    palette_clear_requested = Signal()  # User wants to clear sheet palette
-    # Sheet palette interactive signals (for bidirectional highlighting)
-    palette_index_selected = Signal(int)  # User clicked a swatch
-    palette_color_changed = Signal(int, object)  # index, rgb tuple - user edited a color
-    palette_swatch_hovered = Signal(object)  # int index or None - user hovered swatch
-    # Drag-and-drop / tab signals
-    folder_dropped = Signal(object)  # Path - emitted when folder dropped
-    file_dropped = Signal(object)  # Path - emitted when single PNG file dropped
-    tab_folder_changed = Signal(object)  # Path | None - active tab's folder changed
-    # Frame organization signals (V4)
-    frame_rename_requested = Signal(str, str)  # frame_id, new_display_name
-    frame_tag_toggled = Signal(str, str)  # frame_id, tag
+    ai_frame_selected = Signal(str)
+    """Emitted when user selects an AI frame in the list.
+
+    Args:
+        ai_frame_id: ID of the selected AI frame (filename)
+
+    Emitted by:
+        - _on_frame_selected() → when user clicks list item
+
+    Triggers:
+        - FrameMappingWorkspace → updates workbench and mapping panel
+    """
+
+    map_requested = Signal()
+    """Emitted when user clicks the "Map Selected" button.
+
+    Signals intent to create a mapping between the selected AI frame
+    and the selected game frame (in captures pane).
+
+    Args:
+        (none)
+
+    Emitted by:
+        - _on_map_requested() → when user clicks Map button
+
+    Triggers:
+        - FrameMappingWorkspace → initiates mapping creation
+    """
+
+    auto_advance_changed = Signal(bool)
+    """Emitted when auto-advance toggle state changes.
+
+    Auto-advance enables automatic selection of next frame after mapping.
+
+    Args:
+        enabled: True if auto-advance is enabled
+
+    Emitted by:
+        - _on_auto_advance_toggled() → when user toggles checkbox
+
+    Triggers:
+        - FrameMappingWorkspace → updates auto-advance setting
+    """
+
+    edit_in_sprite_editor_requested = Signal(str)
+    """Emitted when user requests to open AI frame in sprite editor.
+
+    Args:
+        ai_frame_id: ID of the AI frame to edit
+
+    Emitted by:
+        - _on_edit_in_sprite_editor_clicked() → when user clicks context menu item
+
+    Triggers:
+        - FrameMappingWorkspace → opens sprite editor with frame
+    """
+
+    edit_frame_palette_requested = Signal(str)
+    """Emitted when user wants to edit palette indices for an AI frame.
+
+    Args:
+        ai_frame_id: ID of the AI frame
+
+    Emitted by:
+        - _on_edit_frame_palette_requested() → when user clicks context menu item
+
+    Triggers:
+        - FrameMappingWorkspace → opens palette index editor
+    """
+
+    remove_from_project_requested = Signal(str)
+    """Emitted when user requests to remove an AI frame from the project.
+
+    Args:
+        ai_frame_id: ID of the AI frame to remove
+
+    Emitted by:
+        - _on_remove_clicked() → when user clicks context menu item
+
+    Triggers:
+        - FrameMappingWorkspace → removes frame after confirmation
+    """
+
+    palette_edit_requested = Signal()
+    """Emitted when user clicks "Edit Palette" button in sheet palette widget.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - SheetPaletteWidget.palette_edit_requested (relayed)
+
+    Triggers:
+        - FrameMappingWorkspace → opens palette editor dialog
+    """
+
+    palette_extract_requested = Signal()
+    """Emitted when user clicks "Extract Colors" in sheet palette widget.
+
+    Triggers palette generation from AI frame colors.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - SheetPaletteWidget.palette_extract_requested (relayed)
+
+    Triggers:
+        - FrameMappingWorkspace → extracts and generates palette
+    """
+
+    palette_clear_requested = Signal()
+    """Emitted when user clicks "Clear" in sheet palette widget.
+
+    Args:
+        (none)
+
+    Emitted by:
+        - SheetPaletteWidget.palette_clear_requested (relayed)
+
+    Triggers:
+        - FrameMappingWorkspace → clears sheet palette
+    """
+
+    palette_index_selected = Signal(int)
+    """Emitted when user clicks a palette swatch for selection/highlighting.
+
+    Used for bidirectional palette highlighting (selecting a swatch also
+    highlights palette indices in AI frames).
+
+    Args:
+        index: Palette index (0-15) of the clicked swatch
+
+    Emitted by:
+        - SheetPaletteWidget.palette_index_selected (relayed)
+
+    Triggers:
+        - FrameMappingWorkspace → highlights palette index in AI frame
+    """
+
+    palette_color_changed = Signal(int, object)
+    """Emitted when user edits a palette color in the sheet palette widget.
+
+    Args:
+        index: Palette index (0-15) that was edited
+        rgb_tuple: (r, g, b) color tuple
+
+    Emitted by:
+        - SheetPaletteWidget.palette_color_changed (relayed)
+
+    Triggers:
+        - FrameMappingWorkspace → updates palette in project
+    """
+
+    palette_swatch_hovered = Signal(object)
+    """Emitted when user hovers over a palette swatch.
+
+    Used for visual feedback (highlighting palette indices in AI frames).
+
+    Args:
+        index: Palette index if hovering, None if left the swatch
+
+    Emitted by:
+        - SheetPaletteWidget.palette_swatch_hovered (relayed)
+
+    Triggers:
+        - FrameMappingWorkspace → highlights/unhighlights palette indices
+    """
+
+    folder_dropped = Signal(object)
+    """Emitted when user drops a folder onto the pane.
+
+    Args:
+        path: Path object pointing to the dropped folder
+
+    Emitted by:
+        - dropEvent() → when folder drop is detected
+
+    Triggers:
+        - FrameMappingWorkspace → loads AI frames from folder
+    """
+
+    file_dropped = Signal(object)
+    """Emitted when user drops a single PNG file onto the pane.
+
+    Args:
+        path: Path object pointing to the dropped file
+
+    Emitted by:
+        - dropEvent() → when single file drop is detected
+
+    Triggers:
+        - FrameMappingWorkspace → adds AI frame from file
+    """
+
+    tab_folder_changed = Signal(object)
+    """Emitted when the active tab's folder changes.
+
+    Signals the current tab's folder context, used to populate open dialogs.
+
+    Args:
+        path: Path object pointing to folder, or None if no folder set
+
+    Emitted by:
+        - _on_tab_changed() → when user switches tabs
+
+    Triggers:
+        - FrameMappingWorkspace → updates file browser context
+    """
+
+    frame_rename_requested = Signal(str, str)
+    """Emitted when user renames an AI frame's display name.
+
+    Part of frame organization support (V4).
+
+    Args:
+        ai_frame_id: ID of the frame being renamed
+        new_display_name: New display name (or empty string to clear)
+
+    Emitted by:
+        - _on_rename_frame_requested() → after user edits in dialog
+
+    Triggers:
+        - FrameMappingWorkspace → updates frame display name
+    """
+
+    frame_tag_toggled = Signal(str, str)
+    """Emitted when user toggles a tag on an AI frame.
+
+    Part of frame organization support (V4). Tags are toggled via context menu.
+
+    Args:
+        ai_frame_id: ID of the frame being tagged
+        tag: Tag name that was toggled
+
+    Emitted by:
+        - _on_tag_toggled() → when user selects tag in context menu
+
+    Triggers:
+        - FrameMappingWorkspace → updates frame tags
+    """
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

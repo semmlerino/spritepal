@@ -54,9 +54,41 @@ class _PreviewWorker(QObject):
     must convert to QPixmap.
     """
 
-    # Signal: (request_id, qimage, preview_width, preview_height)
     preview_ready = Signal(int, QImage, int, int)
-    error = Signal(int, str)  # (request_id, error_message)
+    """Emitted when preview generation completes in worker thread.
+
+    Internal signal used to communicate from worker thread to service.
+    The service relays this as the public preview_ready signal.
+
+    Args:
+        request_id: Internal request ID for tracking (used to cancel stale requests)
+        qimage: QImage of the composited preview (thread-safe)
+        width: Logical width of the preview image
+        height: Logical height of the preview image
+
+    Emitted by:
+        - process_request() → after compositor completes and image is scaled
+
+    Triggers:
+        - AsyncPreviewService._on_preview_ready()
+    """
+
+    error = Signal(int, str)
+    """Emitted when preview generation fails in worker thread.
+
+    Internal signal used to communicate errors from worker thread to service.
+    The service relays this as the public preview_failed signal.
+
+    Args:
+        request_id: Internal request ID for tracking (used to cancel stale requests)
+        error_message: Human-readable error message
+
+    Emitted by:
+        - process_request() → on conversion or composition errors
+
+    Triggers:
+        - AsyncPreviewService._on_error()
+    """
 
     def __init__(self) -> None:
         super().__init__()
@@ -147,11 +179,55 @@ class AsyncPreviewService(QObject):
             Args: (error_message: str)
     """
 
-    preview_ready = Signal(QImage, int, int)  # qimage, width, height
-    preview_failed = Signal(str)  # error_message
+    preview_ready = Signal(QImage, int, int)
+    """Emitted when a workbench canvas preview is ready for display.
 
-    # Internal signal to trigger worker
+    Signals successful completion of preview generation. The QImage is
+    thread-safe and ready for main thread use.
+
+    Args:
+        qimage: QImage of the composited preview (scaled for display)
+        width: Logical width of the original preview
+        height: Logical height of the original preview
+
+    Emitted by:
+        - _on_preview_ready() → after worker completes and request is current
+
+    Triggers:
+        - WorkbenchCanvas → converts to QPixmap and updates display
+    """
+
+    preview_failed = Signal(str)
+    """Emitted when preview generation fails.
+
+    Signals error condition during preview generation (compositor or conversion errors).
+    Used to alert the UI and potentially show error messages.
+
+    Args:
+        error_message: Human-readable error description
+
+    Emitted by:
+        - _on_error() → when worker encounters an error
+
+    Triggers:
+        - WorkbenchCanvas → may show error notification
+    """
+
     _start_worker = Signal(PreviewRequest)
+    """Internal signal to trigger worker processing.
+
+    Not meant for external use. Used internally to dispatch work from main
+    thread to worker thread.
+
+    Args:
+        request: PreviewRequest containing all parameters for processing
+
+    Emitted by:
+        - request_preview() → to trigger worker thread processing
+
+    Triggers:
+        - _PreviewWorker.process_request()
+    """
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
