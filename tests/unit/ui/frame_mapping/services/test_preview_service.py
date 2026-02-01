@@ -175,11 +175,16 @@ class TestPreviewServiceCaching:
                     os.utime(capture_path, (new_mtime, new_mtime))
 
                     # Second call - cache invalidated due to mtime change
-                    with qtbot.waitSignal(preview_service.preview_cache_invalidated, timeout=signal_timeout()) as blocker:
+                    with qtbot.waitSignal(
+                        preview_service.preview_cache_invalidated, timeout=signal_timeout()
+                    ) as blocker:
                         preview_service.get_preview("frame1", project)
 
                     assert blocker.signal_triggered
-                    assert blocker.args == ["frame1"]
+                    # Now includes pixmap as second argument
+                    assert len(blocker.args) == 2
+                    assert blocker.args[0] == "frame1"
+                    assert isinstance(blocker.args[1], QPixmap)
                     # Repository called twice (cache invalidated)
                     assert mock_get_or_parse.call_count == 2
 
@@ -207,7 +212,9 @@ class TestPreviewServiceCaching:
                     game_frame.selected_entry_ids = [1, 2]  # Changed from [1, 2, 3]
 
                     # Second call - cache invalidated due to entry ID change
-                    with qtbot.waitSignal(preview_service.preview_cache_invalidated, timeout=signal_timeout()) as blocker:
+                    with qtbot.waitSignal(
+                        preview_service.preview_cache_invalidated, timeout=signal_timeout()
+                    ) as blocker:
                         preview_service.get_preview("frame1", project)
 
                     assert blocker.signal_triggered
@@ -232,7 +239,7 @@ class TestPreviewServiceInvalidation:
             preview_service.invalidate("frame1")
 
         assert blocker.signal_triggered
-        assert blocker.args == ["frame1"]
+        assert blocker.args == ["frame1", None]  # Now includes pixmap (None for invalidate)
         assert "frame1" not in preview_service._game_frame_previews
 
     def test_invalidate_nonexistent_entry_no_signal(self, preview_service, qtbot):

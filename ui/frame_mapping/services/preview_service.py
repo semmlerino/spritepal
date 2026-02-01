@@ -33,7 +33,7 @@ class PreviewService(QObject):
         stale_entries_warning: Emitted when stored entry IDs are stale (str: game_frame_id)
     """
 
-    preview_cache_invalidated = Signal(str)  # game_frame_id
+    preview_cache_invalidated = Signal(str, object)  # (frame_id, pixmap)
     stale_entries_warning = Signal(str)  # game_frame_id
 
     def __init__(
@@ -146,7 +146,7 @@ class PreviewService(QObject):
 
             # Notify if this was a cache invalidation (not first-time generation)
             if cache_was_invalidated or is_stale:
-                self.preview_cache_invalidated.emit(frame_id)
+                self.preview_cache_invalidated.emit(frame_id, pixmap)
 
             return pixmap
 
@@ -301,7 +301,7 @@ class PreviewService(QObject):
         """
         if frame_id in self._game_frame_previews:
             del self._game_frame_previews[frame_id]
-            self.preview_cache_invalidated.emit(frame_id)
+            self.preview_cache_invalidated.emit(frame_id, None)
         # Also clear capture result cache and stale flag
         if frame_id in self._capture_result_cache:
             del self._capture_result_cache[frame_id]

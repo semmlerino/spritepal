@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
+from PySide6.QtGui import QCloseEvent, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -1143,7 +1143,7 @@ class FrameMappingWorkspace(QWidget):
         self._logic.sync_canvas_alignment_from_model()
 
     @signal_error_boundary()
-    def _on_preview_cache_invalidated(self, frame_id: str) -> None:
+    def _on_preview_cache_invalidated(self, frame_id: str, pixmap: QPixmap | None) -> None:
         """Handle preview cache invalidation for a specific game frame.
 
         Updates the mapping panel, captures pane, and workbench canvas (if displaying
@@ -1151,8 +1151,10 @@ class FrameMappingWorkspace(QWidget):
 
         Args:
             frame_id: The game frame ID whose preview was regenerated
+            pixmap: The new preview pixmap (or None if invalidated without regeneration)
         """
-        preview = self._controller.get_game_frame_preview(frame_id)
+        # Use provided pixmap if available, otherwise fetch it
+        preview = pixmap if pixmap is not None else self._controller.get_game_frame_preview(frame_id)
         if preview:
             # Update mapping panel with the fresh preview
             self._mapping_panel.update_game_frame_preview(frame_id, preview)

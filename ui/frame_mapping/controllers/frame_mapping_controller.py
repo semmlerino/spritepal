@@ -389,7 +389,7 @@ class FrameMappingController(QObject):
         - CapturesLibraryPane → updates capture name display
     """
 
-    preview_cache_invalidated = Signal(str)
+    preview_cache_invalidated = Signal(str, object)  # (frame_id, pixmap)
     """Emitted when a game frame's preview is regenerated due to cache miss.
 
     This occurs when the capture file's mtime or selected OAM entries change,
@@ -397,6 +397,7 @@ class FrameMappingController(QObject):
 
     Args:
         game_frame_id: ID of the game frame whose preview was regenerated
+        pixmap: The new preview pixmap (or None if invalidated without regeneration)
 
     Emitted by:
         - PreviewService (via signal relay) → after cache miss regeneration
