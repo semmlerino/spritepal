@@ -33,7 +33,6 @@ from ui.frame_mapping.facades.controller_context import ControllerContext
 from ui.frame_mapping.facades.game_frames_facade import GameFramesFacade
 from ui.frame_mapping.facades.injection_facade import InjectionFacade
 from ui.frame_mapping.facades.palette_facade import PaletteFacade
-from ui.frame_mapping.facades.preview_facade import PreviewFacade
 from ui.frame_mapping.services.ai_frame_service import AIFrameService
 from ui.frame_mapping.services.alignment_service import AlignmentService
 from ui.frame_mapping.services.async_game_frame_preview_service import (
@@ -647,12 +646,6 @@ class FrameMappingController(QObject):
             context=self._controller_context,
             signals=self,  # Controller implements PaletteSignals protocol
             palette_service=self._palette_service,
-        )
-        self._preview = PreviewFacade(
-            context=self._controller_context,
-            signals=self,  # Controller implements PreviewSignals protocol
-            preview_service=self._preview_service,
-            async_preview_service=self._async_preview_service,
         )
         self._injection = InjectionFacade(
             context=self._controller_context,
@@ -1294,7 +1287,7 @@ class FrameMappingController(QObject):
         Returns:
             QPixmap preview or None if not available.
         """
-        return self._preview.get_preview(frame_id)
+        return self._preview_service.get_preview(frame_id, self._project)
 
     def get_cached_game_frame_preview(self, frame_id: str) -> QPixmap | None:
         """Get cached preview without triggering regeneration.
@@ -1309,7 +1302,7 @@ class FrameMappingController(QObject):
         Returns:
             Cached QPixmap or None if not available/stale.
         """
-        return self._preview.get_cached_preview(frame_id)
+        return self._preview_service.get_cached_preview(frame_id, self._project)
 
     def get_capture_result_for_game_frame(self, frame_id: str) -> tuple[CaptureResult | None, bool]:
         """Get the CaptureResult for a game frame.
@@ -1324,7 +1317,7 @@ class FrameMappingController(QObject):
             used_fallback is True if the stored entry IDs were stale and
             rom_offset filtering was used instead.
         """
-        return self._preview.get_capture_result(frame_id)
+        return self._preview_service.get_capture_result_for_game_frame(frame_id, self._project)
 
     def request_game_frame_previews_async(self, frame_ids: list[str]) -> None:
         """Request async preview generation for specified game frames.
@@ -1335,7 +1328,10 @@ class FrameMappingController(QObject):
         Args:
             frame_ids: List of game frame IDs to generate previews for.
         """
-        self._preview.request_previews_async(frame_ids)
+        if self._project is None:
+            self.game_frame_previews_finished.emit()
+            return
+        self._async_preview_service.request_previews(frame_ids, self._project)
 
     def _on_async_preview_ready(self, frame_id: str, pixmap: QPixmap) -> None:
         """Handle async preview completion.
