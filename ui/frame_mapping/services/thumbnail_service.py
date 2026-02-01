@@ -559,9 +559,17 @@ class AsyncThumbnailLoader(QObject):
 class _ThumbnailWorker(QObject):
     """Worker that generates thumbnails in a background thread."""
 
-    # Signal includes request_id to filter stale results
-    thumbnail_ready = Signal(str, QImage, int)  # frame_id, qimage, request_id
+    thumbnail_ready = Signal(str, QImage, int)
+    """Emitted when a thumbnail is successfully generated.
+
+    Args:
+        frame_id: The frame identifier
+        qimage: Generated thumbnail as QImage (thread-safe)
+        request_id: Request batch ID for filtering stale results
+    """
+
     finished = Signal()
+    """Emitted when worker completes all thumbnail processing."""
 
     def __init__(
         self,

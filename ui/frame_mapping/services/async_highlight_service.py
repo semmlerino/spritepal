@@ -52,11 +52,24 @@ class _HighlightWorker(QObject):
     must convert to QPixmap.
     """
 
-    # Signal: (request_id, qimage, offset_x, offset_y)
-    # offset_x/y are for positioning the highlight overlay
     highlight_ready = Signal(int, QImage)
-    error = Signal(int, str)  # (request_id, error_message)
+    """Emitted when highlight mask generation completes.
+
+    Args:
+        request_id: Internal request ID for tracking stale requests
+        qimage: QImage of the highlight mask (thread-safe)
+    """
+
+    error = Signal(int, str)
+    """Emitted when highlight generation fails.
+
+    Args:
+        request_id: Internal request ID
+        error_message: Description of the error
+    """
+
     finished = Signal()
+    """Emitted when worker completes all processing."""
 
     def __init__(self) -> None:
         super().__init__()

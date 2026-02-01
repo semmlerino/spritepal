@@ -44,9 +44,24 @@ class _QuantizeWorker(QObject):
     must convert to QPixmap.
     """
 
-    # Signal: (request_id, game_frame_id, qimage, palette_hash)
     result_ready = Signal(int, str, QImage, int)
-    error = Signal(int, str, str)  # (request_id, game_frame_id, error_message)
+    """Emitted when icon quantization completes.
+
+    Args:
+        request_id: Internal request ID for tracking stale requests
+        game_frame_id: The game frame identifier
+        qimage: Quantized QImage (thread-safe)
+        palette_hash: Hash of the palette used
+    """
+
+    error = Signal(int, str, str)
+    """Emitted when quantization fails.
+
+    Args:
+        request_id: Internal request ID
+        game_frame_id: The game frame identifier
+        error_message: Description of the error
+    """
 
     def __init__(self) -> None:
         super().__init__()
