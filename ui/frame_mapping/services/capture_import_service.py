@@ -253,6 +253,14 @@ class CaptureImportService(QObject):
                 if all(e.palette == first_palette for e in selected_entries):
                     palette_idx = first_palette
 
+            # Clamp to valid SNES palette range (0-7)
+            if not (0 <= palette_idx <= 7):
+                logger.warning(
+                    "Capture entry has invalid palette index %d, clamping to [0, 7]",
+                    palette_idx,
+                )
+                palette_idx = max(0, min(7, palette_idx))
+
             # Create game frame with selected entry IDs for filtering on retrieval
             bbox = filtered_capture.bounding_box
             # Default all ROM offsets to RAW compression (user can change in workbench)

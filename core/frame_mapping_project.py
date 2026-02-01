@@ -332,11 +332,21 @@ class GameFrame:
                 logger.warning("Unknown compression type '%s', defaulting to RAW", v)
                 compression_types[int(k)] = CompressionType.RAW
 
+        palette_index = cast(int, data.get("palette_index", 0))
+        # Validate palette index is within SNES palette range (0-7)
+        if not (0 <= palette_index <= 7):
+            logger.warning(
+                "Invalid palette_index %d for GameFrame %s, clamping to [0, 7]",
+                palette_index,
+                data.get("id", "unknown"),
+            )
+            palette_index = max(0, min(7, palette_index))
+
         return cls(
             id=cast(str, data["id"]),
             rom_offsets=cast(list[int], data.get("rom_offsets", [])),
             capture_path=capture_path,
-            palette_index=cast(int, data.get("palette_index", 0)),
+            palette_index=palette_index,
             width=cast(int, data.get("width", 0)),
             height=cast(int, data.get("height", 0)),
             selected_entry_ids=cast(list[int], data.get("selected_entry_ids", [])),
