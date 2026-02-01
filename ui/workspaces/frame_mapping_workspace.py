@@ -46,6 +46,7 @@ from ui.components.inputs.file_selector import FileSelector
 from ui.frame_mapping.auto_save_manager import AutoSaveManager
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.dialog_coordinator import DialogCoordinator
+from ui.frame_mapping.frame_operations_coordinator import FrameOperationsCoordinator
 from ui.frame_mapping.injection_coordinator import InjectionCoordinator
 from ui.frame_mapping.palette_coordinator import PaletteCoordinator
 from ui.frame_mapping.signal_error_handling import signal_error_boundary
@@ -125,12 +126,19 @@ class FrameMappingWorkspace(QWidget):
         self._palette.set_state(self._state)
         self._palette.set_parent_widget(self)
 
+        # Frame operations coordinator handles delete, remove, edit operations
+        self._frame_ops = FrameOperationsCoordinator()
+        self._frame_ops.set_controller(self._controller)
+        self._frame_ops.set_state(self._state)
+        self._frame_ops.set_parent_widget(self)
+
         # Wire message service to coordinators if provided at construction time
         if message_service is not None:
             self._auto_save_manager.set_message_service(message_service.show_message)
             self._logic.set_message_service(message_service)
             self._injection.set_message_service(message_service)
             self._palette.set_message_service(message_service)
+            self._frame_ops.set_message_service(message_service)
 
         self._setup_ui()
 
@@ -159,6 +167,12 @@ class FrameMappingWorkspace(QWidget):
             on_ai_frame_selected=self._on_ai_frame_selected,
         )
 
+        self._frame_ops.set_panes(self._alignment_canvas, self._captures_pane)
+        self._frame_ops.set_callbacks(
+            update_map_button_state=self._update_map_button_state,
+            request_edit_in_sprite_editor=self.edit_in_sprite_editor_requested.emit,
+        )
+
         self._connect_signals()
         self._setup_shortcuts()
 
@@ -177,6 +191,7 @@ class FrameMappingWorkspace(QWidget):
         self._logic.set_message_service(service)
         self._injection.set_message_service(service)
         self._palette.set_message_service(service)
+        self._frame_ops.set_message_service(service)
 
     def set_rom_path(self, rom_path: Path | None) -> None:
         """Set ROM path for injection.
@@ -803,49 +818,12 @@ class FrameMappingWorkspace(QWidget):
             self._message_service.show_message("Use arrow keys to adjust alignment")
 
     def _on_edit_frame(self, ai_frame_id: str) -> None:
-        """Handle edit AI frame request.
-
-        Args:
-            ai_frame_id: AI frame ID (filename)
-        """
-        project = self._controller.project
-        if project is None:
-            return
-
-        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
-        if ai_frame is None:
-            return
-
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        rom_offsets: list[int] = []
-        if mapping:
-            game_frame = project.get_game_frame_by_id(mapping.game_frame_id)
-            if game_frame:
-                rom_offsets = game_frame.rom_offsets
-
-        self.edit_in_sprite_editor_requested.emit(ai_frame.path, rom_offsets)
+        """Handle edit AI frame request."""
+        self._frame_ops.handle_edit_frame(ai_frame_id)
 
     def _on_edit_game_frame(self, frame_id: str) -> None:
         """Handle edit game frame request from captures library."""
-        project = self._controller.project
-        if project is None:
-            return
-
-        game_frame = project.get_game_frame_by_id(frame_id)
-        if game_frame is None:
-            return
-
-        # Find if there's a linked AI frame (use ID-based method)
-        linked_ai_id = project.get_ai_frame_linked_to_game_frame(frame_id)
-        if linked_ai_id is not None:
-            ai_frame = project.get_ai_frame_by_id(linked_ai_id)
-            if ai_frame:
-                self.edit_in_sprite_editor_requested.emit(ai_frame.path, game_frame.rom_offsets)
-                return
-
-        # No linked AI frame - emit with empty path (will need handling in main window)
-        if self._message_service:
-            self._message_service.show_message("No AI frame linked to this capture", 3000)
+        self._frame_ops.handle_edit_game_frame(frame_id)
 
     @signal_error_boundary()
     def _on_edit_frame_palette(self, ai_frame_id: str) -> None:
@@ -872,130 +850,20 @@ class FrameMappingWorkspace(QWidget):
     @signal_error_boundary()
     def _on_delete_capture(self, frame_id: str) -> None:
         """Handle delete capture request."""
-        project = self._controller.project
-        if project is None:
-            return
-
-        # Check if linked (use ID-based method) - capture before deletion
-        linked_ai_id = project.get_ai_frame_linked_to_game_frame(frame_id)
-        was_mapped_to_selected = linked_ai_id is not None and linked_ai_id == self._state.selected_ai_frame_id
-
-        if linked_ai_id is not None:
-            ai_frame = project.get_ai_frame_by_id(linked_ai_id)
-            ai_name = ai_frame.name if ai_frame else linked_ai_id
-            reply = QMessageBox.question(
-                self,
-                "Delete Capture",
-                f"This capture is linked to AI frame '{ai_name}'.\nDeleting will also remove the mapping.\n\nContinue?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-
-        # Remove the game frame (also removes any associated mapping)
-        if self._controller.remove_game_frame(frame_id):
-            # Clear selection if deleted frame was selected
-            if self._state.selected_game_id == frame_id:
-                self._state.selected_game_id = None
-                self._update_map_button_state()
-
-            # Clear canvas if deleted frame was currently displayed
-            # (may be displayed without being selected, e.g., during preview)
-            if self._state.current_canvas_game_id == frame_id:
-                self._state.current_canvas_game_id = None
-                self._alignment_canvas.set_game_frame(None)
-                self._alignment_canvas.clear_alignment()
-
-            # Clear browsing mode if the deleted capture was mapped to the selected AI frame
-            # This handles the case where user is browsing a different capture and deletes
-            # the mapped capture - the mapping is now gone so there's nothing to browse from
-            if was_mapped_to_selected:
-                self._alignment_canvas.set_browsing_mode(False)
-
-            if self._message_service:
-                self._message_service.show_message(f"Deleted capture: {frame_id}")
+        self._frame_ops.handle_delete_capture(frame_id)
 
     def _on_show_capture_details(self, frame_id: str) -> None:
         """Handle show details request for capture."""
-        project = self._controller.project
-        if project is None:
-            return
-
-        game_frame = project.get_game_frame_by_id(frame_id)
-        if game_frame is None:
-            return
-
-        # Build details text
-        details = [f"ID: {game_frame.id}"]
-        if game_frame.capture_path:
-            details.append(f"Source: {game_frame.capture_path.name}")
-        if game_frame.rom_offsets:
-            offset_str = ", ".join(f"0x{o:06X}" for o in game_frame.rom_offsets)
-            details.append(f"ROM Offsets: {offset_str}")
-        if game_frame.width and game_frame.height:
-            details.append(f"Size: {game_frame.width}x{game_frame.height}")
-
-        QMessageBox.information(self, "Capture Details", "\n".join(details))
+        self._frame_ops.handle_show_capture_details(frame_id)
 
     @signal_error_boundary()
     def _on_remove_ai_frame(self, ai_frame_id: str) -> None:
         """Handle remove AI frame from project request."""
-        project = self._controller.project
-        if project is None:
-            return
-
-        # Get frame info for display and confirmation
-        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
-        if ai_frame is None:
-            return
-
-        frame_name = ai_frame.name
-
-        # Check if frame is mapped - warn user
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        if mapping is not None:
-            reply = QMessageBox.question(
-                self,
-                "Remove Mapped Frame?",
-                f"'{frame_name}' is mapped to a game capture.\n\n"
-                "Removing it will also delete the mapping.\n\n"
-                "Continue?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-
-        # Remove the AI frame (also removes mapping)
-        if self._controller.remove_ai_frame(ai_frame_id):
-            # Clear canvas and selection if deleted frame was selected
-            if self._state.selected_ai_frame_id == ai_frame_id:
-                self._state.selected_ai_frame_id = None
-                self._state.current_canvas_game_id = None
-                self._alignment_canvas.set_ai_frame(None)
-                self._alignment_canvas.set_game_frame(None)  # Also clear game frame since context is lost
-                self._alignment_canvas.clear_alignment()
-                self._update_map_button_state()
-
-            if self._message_service:
-                self._message_service.show_message(f"Removed: {frame_name}")
+        self._frame_ops.handle_remove_ai_frame(ai_frame_id)
 
     def _on_remove_mapping(self, ai_frame_id: str) -> None:
-        """Handle remove mapping request.
-
-        Args:
-            ai_frame_id: AI frame ID (filename)
-        """
-        # remove_mapping() emits mapping_removed signal which triggers _on_mapping_removed()
-        # That handler already does: map button state, AI frame status, game frame link status,
-        # and mapping panel row clear. We only need the canvas/state cleanup here.
-        self._controller.remove_mapping(ai_frame_id)
-        self._alignment_canvas.clear_alignment()
-        self._alignment_canvas.set_game_frame(None)
-        self._captures_pane.clear_selection()
-        self._state.selected_game_id = None
-        self._state.current_canvas_game_id = None
+        """Handle remove mapping request."""
+        self._frame_ops.handle_remove_mapping(ai_frame_id)
 
     def _on_row_reorder_requested(self, ai_frame_id: str, target_index: int) -> None:
         """Handle row reorder request from mapping panel drag/drop.
