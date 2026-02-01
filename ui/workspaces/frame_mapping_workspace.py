@@ -361,6 +361,14 @@ class FrameMappingWorkspace(QWidget):
         self._project_label.setStyleSheet("font-size: 12px; color: #888;")
         layout.addWidget(self._project_label)
 
+        # Save status indicator (hidden by default, shown on save failure)
+        self._save_status_label = QLabel("⚠ Save Failed")
+        self._save_status_label.setStyleSheet(
+            "background-color: #a33; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;"
+        )
+        self._save_status_label.hide()
+        layout.addWidget(self._save_status_label)
+
         # Separator before ROM selector
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.VLine)
@@ -443,6 +451,10 @@ class FrameMappingWorkspace(QWidget):
 
         Signal flow documentation: docs/frame_mapping_signals.md
         """
+        # Auto-save manager signals
+        self._auto_save_manager.save_failed.connect(self._on_save_failed)
+        self._auto_save_manager.save_succeeded.connect(self._on_save_succeeded)
+
         # Controller signals
         self._controller.project_changed.connect(self._on_project_changed)
         self._controller.ai_frames_loaded.connect(self._on_ai_frames_loaded)
@@ -583,6 +595,18 @@ class FrameMappingWorkspace(QWidget):
     # -------------------------------------------------------------------------
     # Event Handlers
     # -------------------------------------------------------------------------
+
+    @signal_error_boundary()
+    def _on_save_failed(self) -> None:
+        """Handle save failure - show persistent indicator."""
+        self._save_status_label.show()
+        logger.debug("Save failure indicator displayed")
+
+    @signal_error_boundary()
+    def _on_save_succeeded(self) -> None:
+        """Handle save success - hide failure indicator."""
+        self._save_status_label.hide()
+        logger.debug("Save failure indicator hidden")
 
     @signal_error_boundary()
     def _on_auto_advance_changed(self, enabled: bool) -> None:

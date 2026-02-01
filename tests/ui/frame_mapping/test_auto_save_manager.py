@@ -329,3 +329,66 @@ class TestSaveLock:
 
         # Should be done after completion
         assert not manager.is_save_in_progress
+
+
+class TestSaveSignals:
+    """Test save_failed and save_succeeded signals."""
+
+    def test_save_succeeded_signal_emitted_on_success(
+        self, mock_project_path: Path, mock_timer: QTimer, qtbot: QtBot
+    ) -> None:
+        """save_succeeded signal is emitted when save completes successfully."""
+        manager = AutoSaveManager(
+            timer=mock_timer,
+            get_project_path=lambda: mock_project_path,
+            save_project=MagicMock(),
+        )
+
+        with qtbot.waitSignal(manager.save_succeeded, timeout=5000):
+            manager.perform_save()
+
+    def test_save_failed_signal_emitted_on_failure(
+        self, mock_project_path: Path, mock_timer: QTimer, qtbot: QtBot
+    ) -> None:
+        """save_failed signal is emitted when save fails."""
+        save_fn = MagicMock(side_effect=RuntimeError("Save failed"))
+        manager = AutoSaveManager(
+            timer=mock_timer,
+            get_project_path=lambda: mock_project_path,
+            save_project=save_fn,
+            parent_widget=None,  # No dialog
+        )
+
+        with qtbot.waitSignal(manager.save_failed, timeout=5000):
+            manager.perform_save()
+
+    def test_save_succeeded_emitted_before_message(
+        self, mock_project_path: Path, mock_timer: QTimer, qtbot: QtBot
+    ) -> None:
+        """save_succeeded signal is emitted before status message is shown."""
+        msg_fn = MagicMock()
+        manager = AutoSaveManager(
+            timer=mock_timer,
+            get_project_path=lambda: mock_project_path,
+            save_project=MagicMock(),
+            show_message=msg_fn,
+        )
+
+        signal_emitted = False
+
+        def on_signal() -> None:
+            nonlocal signal_emitted
+            signal_emitted = True
+            # At signal time, message should not have been shown yet
+            msg_fn.assert_not_called()
+
+        manager.save_succeeded.connect(on_signal)
+
+        manager.perform_save()
+        _wait_for_threadpool(qtbot)
+
+        def check_signal() -> bool:
+            return signal_emitted
+
+        qtbot.waitUntil(check_signal, timeout=1000)
+        assert signal_emitted

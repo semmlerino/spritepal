@@ -53,6 +53,10 @@ class AutoSaveManager(QObject):
     Inherits from QObject to ensure signal handlers run on the main thread
     when receiving signals from background workers.
 
+    Signals:
+        save_failed: Emitted when a save operation fails
+        save_succeeded: Emitted when a save operation succeeds
+
     Attributes:
         _timer: QTimer for debouncing (owned externally, connected to perform_save)
         _get_project_path: Callable returning current project path or None
@@ -61,6 +65,9 @@ class AutoSaveManager(QObject):
         _parent_widget: Optional parent widget for error dialogs
         _save_lock: Threading lock to prevent concurrent saves (auto vs manual)
     """
+
+    save_failed = Signal()
+    save_succeeded = Signal()
 
     def __init__(
         self,
@@ -193,12 +200,14 @@ class AutoSaveManager(QObject):
         self.release_save_lock()  # Release lock after save completes
 
         if success:
+            self.save_succeeded.emit()
             if self._on_save_success:
                 self._on_save_success()
             if self._show_message:
                 self._show_message("Project auto-saved", 2000)
             logger.info("Auto-saved project to %s", self._get_project_path())
         else:
+            self.save_failed.emit()
             logger.exception("Failed to auto-save project: %s", error_message)
             if self._parent_widget:
                 QMessageBox.warning(
