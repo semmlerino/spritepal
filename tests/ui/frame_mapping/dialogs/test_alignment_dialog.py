@@ -296,9 +296,12 @@ class TestOverlayCanvasDrag:
             from PySide6.QtCore import QPointF
             from PySide6.QtGui import QMouseEvent
 
+            # Use modern constructor with globalPos to avoid DeprecationWarning
+            pos = QPointF(100 + DISPLAY_SCALE * 5, 100 + DISPLAY_SCALE * 3)
             move_event = QMouseEvent(
                 QMouseEvent.Type.MouseMove,
-                QPointF(100 + DISPLAY_SCALE * 5, 100 + DISPLAY_SCALE * 3),
+                pos,
+                pos,  # globalPos
                 Qt.MouseButton.LeftButton,
                 Qt.MouseButton.LeftButton,
                 Qt.KeyboardModifier.NoModifier,
@@ -316,9 +319,12 @@ class TestOverlayCanvasDrag:
         from PySide6.QtCore import QPointF
         from PySide6.QtGui import QMouseEvent
 
+        # Use modern constructor with globalPos to avoid DeprecationWarning
+        pos = QPointF(100, 100)
         press_event = QMouseEvent(
             QMouseEvent.Type.MouseButtonPress,
-            QPointF(100, 100),
+            pos,
+            pos,  # globalPos
             Qt.MouseButton.LeftButton,
             Qt.MouseButton.LeftButton,
             Qt.KeyboardModifier.NoModifier,
@@ -360,9 +366,12 @@ class TestOverlayCanvasDrag:
         from PySide6.QtGui import QMouseEvent
 
         # Try to move way past the limit
+        # Use modern constructor with globalPos to avoid DeprecationWarning
+        pos = QPointF(100 + DISPLAY_SCALE * 50, 100)
         move_event = QMouseEvent(
             QMouseEvent.Type.MouseMove,
-            QPointF(100 + DISPLAY_SCALE * 50, 100),  # Would be +50, so 170 total
+            pos,
+            pos,  # globalPos
             Qt.MouseButton.LeftButton,
             Qt.MouseButton.LeftButton,
             Qt.KeyboardModifier.NoModifier,

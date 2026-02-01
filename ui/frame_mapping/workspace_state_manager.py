@@ -342,8 +342,7 @@ class WorkspaceStateManager:
             pane_ai_selection = ai_pane.get_selected_id()
             if pane_ai_selection != self._selected_ai_frame_id:
                 logger.warning(
-                    "STATE SYNC: AI frame selection mismatch - "
-                    "pane=%r, cached=%r",
+                    "STATE SYNC: AI frame selection mismatch - pane=%r, cached=%r",
                     pane_ai_selection,
                     self._selected_ai_frame_id,
                 )
@@ -353,8 +352,7 @@ class WorkspaceStateManager:
             pane_game_selection = captures_pane.get_selected_id()
             if pane_game_selection != self._selected_game_id:
                 logger.warning(
-                    "STATE SYNC: Game frame selection mismatch - "
-                    "pane=%r, cached=%r",
+                    "STATE SYNC: Game frame selection mismatch - pane=%r, cached=%r",
                     pane_game_selection,
                     self._selected_game_id,
                 )

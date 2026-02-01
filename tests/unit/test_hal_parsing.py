@@ -91,10 +91,13 @@ class TestCompressionRatioValidation:
 
         from core.hal_compression import HALCompressor
         from core.rom_injector import ROMInjector
+        from utils.logging_config import set_category_enabled
 
         # Explicitly set level for spritepal logger to ensure DEBUG messages are captured
         # even if setup_logging was called earlier in the same worker process.
         caplog.set_level("DEBUG", logger="spritepal")
+        # Ensure the category is enabled, as it might be disabled by default configuration
+        set_category_enabled("core.rom_injector", True)
 
         injector = ROMInjector()
 

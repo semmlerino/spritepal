@@ -177,9 +177,7 @@ class TestPreviewServiceCaching:
                 os.utime(capture_path, (new_mtime, new_mtime))
 
                 # Second call - cache invalidated due to mtime change
-                with qtbot.waitSignal(
-                    preview_service.preview_cache_invalidated, timeout=signal_timeout()
-                ) as blocker:
+                with qtbot.waitSignal(preview_service.preview_cache_invalidated, timeout=signal_timeout()) as blocker:
                     preview_service.get_preview("frame1", project)
 
                 assert blocker.signal_triggered
@@ -212,9 +210,7 @@ class TestPreviewServiceCaching:
                 game_frame.selected_entry_ids = [1, 2]  # Changed from [1, 2, 3]
 
                 # Second call - cache invalidated due to entry ID change
-                with qtbot.waitSignal(
-                    preview_service.preview_cache_invalidated, timeout=signal_timeout()
-                ) as blocker:
+                with qtbot.waitSignal(preview_service.preview_cache_invalidated, timeout=signal_timeout()) as blocker:
                     preview_service.get_preview("frame1", project)
 
                 assert blocker.signal_triggered

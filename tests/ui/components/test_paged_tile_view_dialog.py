@@ -17,22 +17,23 @@ from ui.dialogs.paged_tile_view_dialog import PagedTileViewDialog
 
 class MockWorker(QObject):
     """Mock worker to avoid threading issues in tests."""
+
     page_ready = Signal(int, object, int, int)
     error = Signal(str, object)
     operation_finished = Signal(bool, str)
 
     def __init__(self, *args, **kwargs):
         super().__init__()
-    
+
     def start(self):
         pass
-    
+
     def cancel(self):
         pass
-        
+
     def wait(self, timeout=None):
         return True
-    
+
     def isRunning(self):
         return False
 
@@ -43,8 +44,10 @@ class TestPagedTileViewDialog:
     @pytest.fixture(autouse=True)
     def mock_workers(self):
         """Mock the worker classes to prevent threading crashes."""
-        with patch("ui.widgets.paged_tile_view.PagedTileViewWorker", MockWorker), \
-             patch("ui.widgets.paged_tile_view.DecompressedPageWorker", MockWorker):
+        with (
+            patch("ui.widgets.paged_tile_view.PagedTileViewWorker", MockWorker),
+            patch("ui.widgets.paged_tile_view.DecompressedPageWorker", MockWorker),
+        ):
             yield
 
     @pytest.fixture

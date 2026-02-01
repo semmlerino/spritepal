@@ -64,9 +64,7 @@ class FrameOperationsCoordinator:
         """Set the status bar manager for messages."""
         self._message_service = service
 
-    def set_panes(
-        self, alignment_canvas: WorkbenchCanvas, captures_pane: CapturesLibraryPane
-    ) -> None:
+    def set_panes(self, alignment_canvas: WorkbenchCanvas, captures_pane: CapturesLibraryPane) -> None:
         """Set the UI panes needed for state updates."""
         self._alignment_canvas = alignment_canvas
         self._captures_pane = captures_pane
@@ -94,9 +92,7 @@ class FrameOperationsCoordinator:
 
         # Check if linked (use ID-based method) - capture before deletion
         linked_ai_id = project.get_ai_frame_linked_to_game_frame(frame_id)
-        was_mapped_to_selected = (
-            linked_ai_id is not None and linked_ai_id == self._state.selected_ai_frame_id
-        )
+        was_mapped_to_selected = linked_ai_id is not None and linked_ai_id == self._state.selected_ai_frame_id
 
         if linked_ai_id is not None:
             ai_frame = project.get_ai_frame_by_id(linked_ai_id)

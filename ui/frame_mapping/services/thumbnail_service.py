@@ -598,7 +598,9 @@ class _ThumbnailWorker(QObject):
 
                 qimage = self._generate_thumbnail(frame_path)
                 if qimage is not None and not qimage.isNull():
-                    logger.debug("Worker emitting thumbnail_ready for %s (%dx%d)", frame_id, qimage.width(), qimage.height())
+                    logger.debug(
+                        "Worker emitting thumbnail_ready for %s (%dx%d)", frame_id, qimage.width(), qimage.height()
+                    )
                     self.thumbnail_ready.emit(frame_id, qimage, self._request_id)
                 else:
                     logger.debug("Worker failed to generate thumbnail for %s", frame_id)

@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import override
 
-from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Signal
+from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtWidgets import QMessageBox, QWidget
 
 from utils.logging_config import get_logger
@@ -42,12 +42,15 @@ class _SaveWorker(QRunnable):
             self.signals.finished.emit(False, str(e))
 
 
-class AutoSaveManager:
+class AutoSaveManager(QObject):
     """Debounced auto-save for Frame Mapping projects.
 
     Timer is owned by the workspace; this class manages the save logic.
     Uses a debounce pattern: multiple rapid changes only trigger one save
     after activity stops.
+
+    Inherits from QObject to ensure signal handlers run on the main thread
+    when receiving signals from background workers.
 
     Attributes:
         _timer: QTimer for debouncing (owned externally, connected to perform_save)
@@ -74,6 +77,7 @@ class AutoSaveManager:
             show_message: Optional callable for status messages (message, duration_ms)
             parent_widget: Optional parent widget for error dialogs
         """
+        super().__init__(parent_widget)
         self._timer = timer
         self._get_project_path = get_project_path
         self._save_project = save_project
@@ -134,7 +138,8 @@ class AutoSaveManager:
         # Create and run worker in background thread
         # Keep reference to prevent GC during signal emission
         self._current_worker = _SaveWorker(self._save_project, project_path)
-        self._current_worker.signals.finished.connect(self._on_save_finished)
+        # Use QueuedConnection to ensure handler runs on main thread (required for QMessageBox)
+        self._current_worker.signals.finished.connect(self._on_save_finished, Qt.ConnectionType.QueuedConnection)
         QThreadPool.globalInstance().start(self._current_worker)
 
     def _on_save_finished(self, success: bool, error_message: str) -> None:

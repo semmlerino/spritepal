@@ -56,8 +56,8 @@ class TestGridArrangementUXFixes:
 
     def test_export_button_presence(self, dialog: GridArrangementDialog, qtbot: QtBot):
         """Verify Export button is present in button box and initially disabled."""
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         assert dialog.export_btn is not None
         assert not dialog.export_btn.isEnabled()
@@ -90,8 +90,8 @@ class TestGridArrangementUXFixes:
 
     def test_enter_key_adds_selection(self, dialog: GridArrangementDialog, qtbot: QtBot):
         """Verify Enter key calls _add_selection() as advertised in legend."""
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Select a tile first (add to grid_view selection)
         tile = TilePosition(0, 0)
@@ -106,8 +106,8 @@ class TestGridArrangementUXFixes:
 
     def test_target_width_affects_auto_placement(self, dialog: GridArrangementDialog, qtbot: QtBot):
         """Verify Target Sheet Width spinbox affects tile auto-placement."""
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Set width to 2 via spinbox - this triggers signal to update manager
         dialog.width_spin.setValue(2)
@@ -132,8 +132,8 @@ class TestGridArrangementUXFixes:
 
     def test_c_key_toggles_palette(self, dialog: GridArrangementDialog, qtbot: QtBot):
         """Verify C key toggles palette mode."""
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Initial state
         initial_mode = dialog.colorizer.is_palette_mode()
@@ -144,8 +144,8 @@ class TestGridArrangementUXFixes:
 
     def test_legend_shows_mouse_shortcuts(self, dialog: GridArrangementDialog, qtbot: QtBot):
         """Verify legend contains mouse interaction shortcuts."""
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Check that legend is visible via public API
         assert dialog.is_legend_visible()
@@ -160,8 +160,8 @@ class TestGridArrangementUXFixes:
 
     def test_legend_collapsible(self, dialog: GridArrangementDialog, qtbot: QtBot):
         """Verify legend can be collapsed and expanded."""
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Initially expanded - verify via public API
         assert dialog.is_legend_visible()
@@ -178,8 +178,8 @@ class TestGridArrangementUXFixes:
 
     def test_palette_toggle_button(self, dialog: GridArrangementDialog, qtbot: QtBot):
         """Verify palette toggle button works and syncs with C key."""
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         # Verify button exists
         assert hasattr(dialog, "palette_toggle_btn")

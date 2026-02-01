@@ -129,14 +129,10 @@ class UpdateAlignmentCommand:
         return f"Adjust alignment for {self.ai_frame_id}"
 
     def execute(self) -> None:
-        self.ctx.alignment_service.apply_alignment_to_project(
-            self.ctx.project, self.ai_frame_id, self.new_alignment
-        )
+        self.ctx.alignment_service.apply_alignment_to_project(self.ctx.project, self.ai_frame_id, self.new_alignment)
 
     def undo(self) -> None:
-        self.ctx.alignment_service.apply_alignment_to_project(
-            self.ctx.project, self.ai_frame_id, self.old_alignment
-        )
+        self.ctx.alignment_service.apply_alignment_to_project(self.ctx.project, self.ai_frame_id, self.old_alignment)
         # Restore original status
         mapping = self.ctx.project.get_mapping_for_ai_frame(self.ai_frame_id)
         if mapping is not None:
@@ -166,14 +162,10 @@ class RenameAIFrameCommand:
         return f"Clear name for {self.frame_id}"
 
     def execute(self) -> None:
-        self.ctx.organization_service._rename_frame_no_history(
-            self.ctx.project, self.frame_id, self.new_name
-        )
+        self.ctx.organization_service._rename_frame_no_history(self.ctx.project, self.frame_id, self.new_name)
 
     def undo(self) -> None:
-        self.ctx.organization_service._rename_frame_no_history(
-            self.ctx.project, self.frame_id, self.old_name
-        )
+        self.ctx.organization_service._rename_frame_no_history(self.ctx.project, self.frame_id, self.old_name)
         # Emit signal so UI updates
         self.ctx.signal_emitter.emit_frame_renamed(self.frame_id)
 
@@ -194,14 +186,10 @@ class RenameCaptureCommand:
         return f"Clear name for {self.game_frame_id}"
 
     def execute(self) -> None:
-        self.ctx.organization_service._rename_capture_no_history(
-            self.ctx.project, self.game_frame_id, self.new_name
-        )
+        self.ctx.organization_service._rename_capture_no_history(self.ctx.project, self.game_frame_id, self.new_name)
 
     def undo(self) -> None:
-        self.ctx.organization_service._rename_capture_no_history(
-            self.ctx.project, self.game_frame_id, self.old_name
-        )
+        self.ctx.organization_service._rename_capture_no_history(self.ctx.project, self.game_frame_id, self.old_name)
         # Emit signal so UI updates
         self.ctx.signal_emitter.emit_capture_renamed(self.game_frame_id)
 
@@ -222,15 +210,11 @@ class ToggleFrameTagCommand:
 
     def execute(self) -> None:
         # Toggle adds if not present, removes if present
-        self.ctx.organization_service._toggle_frame_tag_no_history(
-            self.ctx.project, self.frame_id, self.tag
-        )
+        self.ctx.organization_service._toggle_frame_tag_no_history(self.ctx.project, self.frame_id, self.tag)
 
     def undo(self) -> None:
         # Toggle again to reverse
-        self.ctx.organization_service._toggle_frame_tag_no_history(
-            self.ctx.project, self.frame_id, self.tag
-        )
+        self.ctx.organization_service._toggle_frame_tag_no_history(self.ctx.project, self.frame_id, self.tag)
         # Emit signal so UI updates
         self.ctx.signal_emitter.emit_frame_tags_changed(self.frame_id)
 

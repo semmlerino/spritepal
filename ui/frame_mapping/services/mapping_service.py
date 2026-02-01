@@ -184,4 +184,3 @@ class MappingService(QObject):
         )
 
         return mapping.game_frame_id, alignment, mapping.status
-

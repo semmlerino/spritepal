@@ -84,9 +84,7 @@ class MappingsFacade:
             return False
 
         # Validate both frames exist
-        is_valid, error_msg = self._mapping_service.validate_mapping_frames(
-            project, ai_frame_id, game_frame_id
-        )
+        is_valid, error_msg = self._mapping_service.validate_mapping_frames(project, ai_frame_id, game_frame_id)
         if not is_valid:
             self._signals.emit_error(error_msg)
             return False
@@ -97,9 +95,7 @@ class MappingsFacade:
             prev_game_ai_id,
             prev_ai_alignment,
             prev_game_alignment,
-        ) = self._mapping_service.capture_create_mapping_undo_state(
-            project, ai_frame_id, game_frame_id
-        )
+        ) = self._mapping_service.capture_create_mapping_undo_state(project, ai_frame_id, game_frame_id)
 
         # Create and execute command via undo stack
         command = CreateMappingCommand(
@@ -219,9 +215,7 @@ class MappingsFacade:
             self._context.require_undo_stack().push(command)
         else:
             # Auto-centering - update directly without history
-            self._alignment_service.apply_alignment_to_project(
-                project, ai_frame_id, new_alignment, set_edited=False
-            )
+            self._alignment_service.apply_alignment_to_project(project, ai_frame_id, new_alignment, set_edited=False)
 
         # Use targeted signal to avoid full UI refresh (which blanks canvas)
         self._signals.emit_alignment_updated(ai_frame_id)

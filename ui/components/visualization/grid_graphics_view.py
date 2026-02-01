@@ -233,7 +233,7 @@ class GridGraphicsView(QGraphicsView):
 
         # Check for interactive items at this position (e.g. overlay)
         # We want to prioritize items that have the ItemIsMovable flag
-        scene_pos = self.mapToScene(event.pos())
+        scene_pos = self.mapToScene(event.position().toPoint())
         items = self.scene().items(scene_pos) if self.scene() else []
 
         # Filter for items that should handle events instead of the grid
@@ -250,7 +250,7 @@ class GridGraphicsView(QGraphicsView):
             return
 
         if event.button() == Qt.MouseButton.LeftButton:
-            pos = self.mapToScene(event.pos())
+            pos = self.mapToScene(event.position().toPoint())
             tile_pos = self._pos_to_tile(pos)
 
             # Check modifiers
@@ -289,7 +289,7 @@ class GridGraphicsView(QGraphicsView):
                     self.tile_clicked.emit(tile_pos)
 
                     # Prepare for drag
-                    self._drag_start_pos = event.pos()
+                    self._drag_start_pos = event.position().toPoint()
                     self._drag_tile = tile_pos
                     return
 
@@ -302,7 +302,7 @@ class GridGraphicsView(QGraphicsView):
         elif event.button() == Qt.MouseButton.MiddleButton:
             # Middle mouse button for panning
             self.is_panning = True
-            self.last_pan_point = event.pos()
+            self.last_pan_point = event.position().toPoint()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
         super().mousePressEvent(event)
@@ -315,19 +315,19 @@ class GridGraphicsView(QGraphicsView):
 
         if self.is_panning and self.last_pan_point is not None:
             # Pan the view
-            delta = event.pos() - self.last_pan_point
+            delta = event.position().toPoint() - self.last_pan_point
             h_bar = self.horizontalScrollBar()
             v_bar = self.verticalScrollBar()
             if h_bar:
                 h_bar.setValue(h_bar.value() - delta.x())
             if v_bar:
                 v_bar.setValue(v_bar.value() - delta.y())
-            self.last_pan_point = event.pos()
+            self.last_pan_point = event.position().toPoint()
             return
 
         if self._marquee_active:
             # Update marquee selection during drag
-            pos = self.mapToScene(event.pos())
+            pos = self.mapToScene(event.position().toPoint())
             self._update_marquee_selection(pos)
             return
 
@@ -335,12 +335,12 @@ class GridGraphicsView(QGraphicsView):
         if (
             event.buttons() & Qt.MouseButton.LeftButton
             and self._drag_start_pos is not None
-            and (event.pos() - self._drag_start_pos).manhattanLength() > QApplication.startDragDistance()
+            and (event.position().toPoint() - self._drag_start_pos).manhattanLength() > QApplication.startDragDistance()
         ):
             self._execute_drag()
             return
 
-        pos = self.mapToScene(event.pos())
+        pos = self.mapToScene(event.position().toPoint())
         tile_pos = self._pos_to_tile(pos)
 
         # Update hover
@@ -449,7 +449,7 @@ class GridGraphicsView(QGraphicsView):
             event.acceptProposedAction()
 
             # Update drop placeholder
-            pos = self.mapToScene(event.pos())
+            pos = self.mapToScene(event.position().toPoint())
             target_tile = self._pos_to_tile(pos)
 
             scene = self.scene()
@@ -519,7 +519,7 @@ class GridGraphicsView(QGraphicsView):
             self.drop_placeholder = None
 
         if event.mimeData().hasFormat(MIME_TILES):
-            pos = self.mapToScene(event.pos())
+            pos = self.mapToScene(event.position().toPoint())
             target_tile = self._pos_to_tile(pos)
 
             if target_tile and self._is_valid_tile(target_tile):
@@ -692,7 +692,7 @@ class GridGraphicsView(QGraphicsView):
                 # Finish marquee selection
                 # Shift held = add to existing selection
                 add_to = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
-                pos = self.mapToScene(event.pos())
+                pos = self.mapToScene(event.position().toPoint())
                 self._finish_marquee_selection(pos, add_to)
                 return
 

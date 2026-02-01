@@ -297,7 +297,6 @@ class WorkspaceLogicHelper:
             else:
                 missing_ids.append(game_frame.id)
 
-
         # Update UI with cached previews immediately
         self._mapping_panel.set_game_frame_previews(previews)
         self._mapping_panel.refresh()

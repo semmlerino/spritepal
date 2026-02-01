@@ -216,9 +216,7 @@ class TestGenerateLibraryThumbnail:
         img.putpalette([i % 256 for i in range(768)])
         flat_palette = [i % 256 for i in range(768)]
 
-        result = service.generate_library_thumbnail(
-            0x10000, edited_pixels=(img, flat_palette)
-        )
+        result = service.generate_library_thumbnail(0x10000, edited_pixels=(img, flat_palette))
 
         assert result is not None
         assert isinstance(result, Image.Image)

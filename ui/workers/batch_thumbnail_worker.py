@@ -746,32 +746,30 @@ class BatchThumbnailWorker(QObject):
                 )
 
     def _clear_rom_data(self) -> None:
-        """Clear ROM data from memory with logging."""
+        """Clear ROM data from memory with proper resource management."""
+        # Clear cached HAL data FIRST to release memoryview references to mmap
+        # This prevents BufferError: cannot close exported pointers exist
+        self._rom_data_for_hal = None
+
+        # Close memory map independently
         if self._rom_mmap is not None:
             try:
-                rom_size = len(self._rom_mmap)
-
-                # Clear cached HAL data FIRST to release memoryview references to mmap
-                # This prevents BufferError: cannot close exported pointers exist
-                self._rom_data_for_hal = None
-
-                # Close memory map
                 if hasattr(self._rom_mmap, "close") and callable(getattr(self._rom_mmap, "close", None)):
                     self._rom_mmap.close()
-                self._rom_mmap = None
-
-                # Close file handle
-                if self._rom_file:
-                    self._rom_file.close()
-                    self._rom_file = None
-
-                # Reset SMC offset
-                self._smc_offset = 0
-
-                if rom_size > 0:
-                    logger.debug(f"Cleared ROM data: freed {rom_size} bytes")
             except Exception as e:
-                logger.warning(f"Error clearing ROM data: {e}")
+                logger.debug(f"Error closing mmap: {e}")
+            self._rom_mmap = None
+
+        # Close file handle independently
+        if self._rom_file is not None:
+            try:
+                self._rom_file.close()
+            except Exception as e:
+                logger.debug(f"Error closing file: {e}")
+            self._rom_file = None
+
+        # Reset SMC offset
+        self._smc_offset = 0
 
     def cleanup(self) -> None:
         """Clean up the worker resources properly. Safe to call multiple times."""

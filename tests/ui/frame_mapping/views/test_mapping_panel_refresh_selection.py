@@ -252,8 +252,7 @@ class TestRefreshPreservesCheckboxState:
         # Add mappings so all frames are initially checked
         project.game_frames = [GameFrame(id="GF001")]
         project.mappings = [
-            FrameMapping(ai_frame_id=f.id, game_frame_id="GF001", offset_x=0, offset_y=0)
-            for f in project.ai_frames
+            FrameMapping(ai_frame_id=f.id, game_frame_id="GF001", offset_x=0, offset_y=0) for f in project.ai_frames
         ]
         project._invalidate_mapping_index()
 
@@ -301,8 +300,7 @@ class TestRefreshPreservesCheckboxState:
         project = create_test_project(tmp_path, num_frames=5)
         project.game_frames = [GameFrame(id="GF001")]
         project.mappings = [
-            FrameMapping(ai_frame_id=f.id, game_frame_id="GF001", offset_x=0, offset_y=0)
-            for f in project.ai_frames
+            FrameMapping(ai_frame_id=f.id, game_frame_id="GF001", offset_x=0, offset_y=0) for f in project.ai_frames
         ]
         project._invalidate_mapping_index()
 
@@ -340,8 +338,7 @@ class TestRefreshPreservesCheckboxState:
         project = create_test_project(tmp_path, num_frames=3)
         project.game_frames = [GameFrame(id="GF001")]
         project.mappings = [
-            FrameMapping(ai_frame_id=f.id, game_frame_id="GF001", offset_x=0, offset_y=0)
-            for f in project.ai_frames
+            FrameMapping(ai_frame_id=f.id, game_frame_id="GF001", offset_x=0, offset_y=0) for f in project.ai_frames
         ]
         project._invalidate_mapping_index()
 

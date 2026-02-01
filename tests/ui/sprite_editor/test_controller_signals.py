@@ -219,12 +219,15 @@ class TestMultiPaletteTabClickableLabelFix:
         # Wait for clicked signal with correct index
         with qtbot.waitSignal(label.clicked, timeout=signal_timeout()) as blocker:
             # Simulate mouse press
-            from PySide6.QtCore import QPoint, Qt
+            from PySide6.QtCore import QPointF, Qt
             from PySide6.QtGui import QMouseEvent
 
+            # Use modern constructor with globalPos to avoid DeprecationWarning
+            pos = QPointF(10, 10)
             event = QMouseEvent(
                 QMouseEvent.Type.MouseButtonPress,
-                QPoint(10, 10),
+                pos,
+                pos,  # globalPos
                 Qt.MouseButton.LeftButton,
                 Qt.MouseButton.LeftButton,
                 Qt.KeyboardModifier.NoModifier,

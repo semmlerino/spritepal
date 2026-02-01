@@ -691,7 +691,9 @@ class AIFramesPane(QWidget):
                 found = True
                 # Don't break - continue to find all duplicates
         if not found:
-            logger.debug("AIFramesPane: no item found for frame_id=%s (list has %d items)", frame_id, self._list.count())
+            logger.debug(
+                "AIFramesPane: no item found for frame_id=%s (list has %d items)", frame_id, self._list.count()
+            )
 
     def _show_rename_dialog(self, frame_id: str) -> None:
         """Show rename dialog for a frame."""

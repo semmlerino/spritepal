@@ -105,13 +105,15 @@ class InjectingMockROMInjector:
         """
         img = Image.open(sprite_path)
         self.injected_images.append(img.copy())
-        self.inject_calls.append({
-            "sprite_path": Path(sprite_path),
-            "rom_path": Path(rom_path),
-            "output_path": Path(output_path),
-            "sprite_offset": sprite_offset,
-            **kwargs,
-        })
+        self.inject_calls.append(
+            {
+                "sprite_path": Path(sprite_path),
+                "rom_path": Path(rom_path),
+                "output_path": Path(output_path),
+                "sprite_offset": sprite_offset,
+                **kwargs,
+            }
+        )
         return (self._success, self._error_message)
 
     @property

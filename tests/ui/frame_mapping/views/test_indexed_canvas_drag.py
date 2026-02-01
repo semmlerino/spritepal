@@ -26,44 +26,24 @@ def canvas_view(qtbot):
 
 def test_left_click_enables_dragging(canvas_view, qtbot):
     """Left-click inside image bounds should enable dragging mode."""
-    from PySide6.QtCore import QEvent
-    from PySide6.QtGui import QMouseEvent
-
     # Use position (1, 1) in scene coords, convert to viewport
     scene_pos = QPointF(1, 1)
     viewport_pos = canvas_view.mapFromScene(scene_pos)
 
-    event = QMouseEvent(
-        QEvent.Type.MouseButtonPress,
-        QPointF(viewport_pos),
-        Qt.MouseButton.LeftButton,
-        Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
-
-    canvas_view.mousePressEvent(event)
+    # Use qtbot to simulate click
+    qtbot.mousePress(canvas_view.viewport(), Qt.MouseButton.LeftButton, pos=viewport_pos)
 
     assert canvas_view._is_dragging is True
 
 
 def test_right_click_does_not_enable_dragging(canvas_view, qtbot):
     """Right-click should NOT enable dragging mode - sample only."""
-    from PySide6.QtCore import QEvent
-    from PySide6.QtGui import QMouseEvent
-
     # Use position (1, 1) in scene coords, convert to viewport
     scene_pos = QPointF(1, 1)
     viewport_pos = canvas_view.mapFromScene(scene_pos)
 
-    event = QMouseEvent(
-        QEvent.Type.MouseButtonPress,
-        QPointF(viewport_pos),
-        Qt.MouseButton.RightButton,
-        Qt.MouseButton.RightButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
-
-    canvas_view.mousePressEvent(event)
+    # Use qtbot to simulate click
+    qtbot.mousePress(canvas_view.viewport(), Qt.MouseButton.RightButton, pos=viewport_pos)
 
     # Right-click should NOT set dragging
     assert canvas_view._is_dragging is False
@@ -71,9 +51,6 @@ def test_right_click_does_not_enable_dragging(canvas_view, qtbot):
 
 def test_right_click_does_not_emit_drag_signal_on_move(canvas_view, qtbot):
     """Right-click drag should NOT emit pixel_dragged signal."""
-    from PySide6.QtCore import QEvent
-    from PySide6.QtGui import QMouseEvent
-
     # Setup signal spy
     drag_signals = []
     canvas_view.pixel_dragged.connect(lambda x, y: drag_signals.append((x, y)))
@@ -83,26 +60,14 @@ def test_right_click_does_not_emit_drag_signal_on_move(canvas_view, qtbot):
     viewport_pos = canvas_view.mapFromScene(scene_pos)
 
     # Right-click press
-    press_event = QMouseEvent(
-        QEvent.Type.MouseButtonPress,
-        QPointF(viewport_pos),
-        Qt.MouseButton.RightButton,
-        Qt.MouseButton.RightButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
-    canvas_view.mousePressEvent(press_event)
+    qtbot.mousePress(canvas_view.viewport(), Qt.MouseButton.RightButton, pos=viewport_pos)
 
     # Move to a different position
     move_scene_pos = QPointF(5, 5)
     move_viewport_pos = canvas_view.mapFromScene(move_scene_pos)
-    move_event = QMouseEvent(
-        QEvent.Type.MouseMove,
-        QPointF(move_viewport_pos),
-        Qt.MouseButton.NoButton,
-        Qt.MouseButton.RightButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
-    canvas_view.mouseMoveEvent(move_event)
+
+    # Use qtbot to simulate move while holding right button
+    qtbot.mouseMove(canvas_view.viewport(), pos=move_viewport_pos, delay=-1)
 
     # Should NOT have emitted pixel_dragged because dragging wasn't enabled
     assert len(drag_signals) == 0
@@ -110,9 +75,6 @@ def test_right_click_does_not_emit_drag_signal_on_move(canvas_view, qtbot):
 
 def test_left_click_drag_emits_signal(canvas_view, qtbot):
     """Left-click drag should emit pixel_dragged signal."""
-    from PySide6.QtCore import QEvent
-    from PySide6.QtGui import QMouseEvent
-
     # Setup signal spy
     drag_signals = []
     canvas_view.pixel_dragged.connect(lambda x, y: drag_signals.append((x, y)))
@@ -122,14 +84,7 @@ def test_left_click_drag_emits_signal(canvas_view, qtbot):
     viewport_pos = canvas_view.mapFromScene(scene_pos)
 
     # Left-click press - should enable dragging
-    press_event = QMouseEvent(
-        QEvent.Type.MouseButtonPress,
-        QPointF(viewport_pos),
-        Qt.MouseButton.LeftButton,
-        Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
-    canvas_view.mousePressEvent(press_event)
+    qtbot.mousePress(canvas_view.viewport(), Qt.MouseButton.LeftButton, pos=viewport_pos)
 
     # Verify dragging is enabled
     assert canvas_view._is_dragging is True
@@ -137,14 +92,11 @@ def test_left_click_drag_emits_signal(canvas_view, qtbot):
     # Move to a different position
     move_scene_pos = QPointF(5, 5)
     move_viewport_pos = canvas_view.mapFromScene(move_scene_pos)
-    move_event = QMouseEvent(
-        QEvent.Type.MouseMove,
-        QPointF(move_viewport_pos),
-        Qt.MouseButton.NoButton,
-        Qt.MouseButton.LeftButton,
-        Qt.KeyboardModifier.NoModifier,
-    )
-    canvas_view.mouseMoveEvent(move_event)
+
+    # Use qtbot to simulate move while holding left button
+    # Note: qtbot.mouseMove doesn't support 'buttons' parameter easily,
+    # but QGraphicsView logic usually depends on internal state set by mousePress
+    qtbot.mouseMove(canvas_view.viewport(), pos=move_viewport_pos, delay=-1)
 
     # Should have emitted pixel_dragged
     assert len(drag_signals) > 0

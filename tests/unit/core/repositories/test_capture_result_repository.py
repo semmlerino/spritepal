@@ -67,9 +67,7 @@ def repository() -> CaptureResultRepository:
 class TestCaptureResultRepository:
     """Tests for CaptureResultRepository."""
 
-    def test_get_or_parse_returns_capture_result(
-        self, repository: CaptureResultRepository, capture_json: Path
-    ) -> None:
+    def test_get_or_parse_returns_capture_result(self, repository: CaptureResultRepository, capture_json: Path) -> None:
         """Test that get_or_parse returns a valid CaptureResult."""
         result = repository.get_or_parse(capture_json)
 
@@ -77,9 +75,7 @@ class TestCaptureResultRepository:
         assert result.frame == 100
         assert len(result.entries) == 1
 
-    def test_cache_hit_returns_same_object(
-        self, repository: CaptureResultRepository, capture_json: Path
-    ) -> None:
+    def test_cache_hit_returns_same_object(self, repository: CaptureResultRepository, capture_json: Path) -> None:
         """Test that repeated calls return the same cached object."""
         result1 = repository.get_or_parse(capture_json)
         result2 = repository.get_or_parse(capture_json)
@@ -88,9 +84,7 @@ class TestCaptureResultRepository:
         assert result1 is result2
         assert repository.cache_size() == 1
 
-    def test_mtime_change_invalidates_cache(
-        self, repository: CaptureResultRepository, capture_json: Path
-    ) -> None:
+    def test_mtime_change_invalidates_cache(self, repository: CaptureResultRepository, capture_json: Path) -> None:
         """Test that file modification invalidates cache."""
         result1 = repository.get_or_parse(capture_json)
         original_frame = result1.frame
@@ -141,9 +135,7 @@ class TestCaptureResultRepository:
         result = repository.get_if_cached(capture_json)
         assert result is None
 
-    def test_invalidate_removes_entry(
-        self, repository: CaptureResultRepository, capture_json: Path
-    ) -> None:
+    def test_invalidate_removes_entry(self, repository: CaptureResultRepository, capture_json: Path) -> None:
         """Test invalidate removes cache entry."""
         repository.get_or_parse(capture_json)
         assert repository.cache_size() == 1
@@ -161,9 +153,7 @@ class TestCaptureResultRepository:
         removed = repository.invalidate(capture_json)
         assert removed is False
 
-    def test_invalidate_all_clears_cache(
-        self, repository: CaptureResultRepository, tmp_path: Path
-    ) -> None:
+    def test_invalidate_all_clears_cache(self, repository: CaptureResultRepository, tmp_path: Path) -> None:
         """Test invalidate_all clears entire cache."""
         # Create multiple capture files
         for i in range(3):
@@ -186,9 +176,7 @@ class TestCaptureResultRepository:
         assert count == 3
         assert repository.cache_size() == 0
 
-    def test_thread_safety(
-        self, repository: CaptureResultRepository, capture_json: Path
-    ) -> None:
+    def test_thread_safety(self, repository: CaptureResultRepository, capture_json: Path) -> None:
         """Test concurrent access from multiple threads."""
         results: list[CaptureResult] = []
         errors: list[Exception] = []
@@ -215,14 +203,10 @@ class TestCaptureResultRepository:
         for result in results[1:]:
             assert result is first
 
-    def test_concurrent_access_with_executor(
-        self, repository: CaptureResultRepository, capture_json: Path
-    ) -> None:
+    def test_concurrent_access_with_executor(self, repository: CaptureResultRepository, capture_json: Path) -> None:
         """Test concurrent access using ThreadPoolExecutor."""
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [
-                executor.submit(repository.get_or_parse, capture_json) for _ in range(20)
-            ]
+            futures = [executor.submit(repository.get_or_parse, capture_json) for _ in range(20)]
             results = [f.result() for f in futures]
 
         # All should be same object

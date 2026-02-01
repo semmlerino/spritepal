@@ -132,7 +132,7 @@ class OverlayCanvas(BaseOverlayCanvas):
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         """Update offset while dragging."""
         if self._dragging and self._drag_start is not None:
-            delta = event.pos() - self._drag_start
+            delta = event.position().toPoint() - self._drag_start
             # Convert screen pixels to sprite pixels
             new_offset_x = self._drag_start_offset_x + delta.x() // DISPLAY_SCALE
             new_offset_y = self._drag_start_offset_y + delta.y() // DISPLAY_SCALE

@@ -188,9 +188,7 @@ class InjectionCoordinator:
 
         frame_count = len(selected_ids)
         # Prepare injection target ROM
-        target_rom = self._prepare_injection_target(
-            f"{frame_count} selected frames", rom_path, "Inject Selected"
-        )
+        target_rom = self._prepare_injection_target(f"{frame_count} selected frames", rom_path, "Inject Selected")
         if target_rom is None:
             return
 
@@ -222,9 +220,7 @@ class InjectionCoordinator:
         ]
 
         # Prepare injection target ROM
-        target_rom = self._prepare_injection_target(
-            f"{project.mapped_count} mapped frames", rom_path, "Inject All"
-        )
+        target_rom = self._prepare_injection_target(f"{project.mapped_count} mapped frames", rom_path, "Inject All")
         if target_rom is None:
             return
 

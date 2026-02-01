@@ -188,8 +188,8 @@ class TestImportMesenCapture:
 
     def test_import_button_exists(self, dialog: GridArrangementDialog, qtbot: QtBot) -> None:
         """Import Capture button is present."""
-        dialog.show()
-        qtbot.waitForWindowShown(dialog)
+        with qtbot.waitExposed(dialog):
+            dialog.show()
 
         assert hasattr(dialog, "import_capture_btn")
         assert dialog.import_capture_btn is not None

@@ -47,13 +47,9 @@ class TestCapturesLibraryPaneEmitsOnClear:
         # Directly call the handler with row=-1 (simulates list becoming empty or cleared)
         pane._on_selection_changed(-1)
 
-        assert "" in emissions, (
-            "CapturesLibraryPane._on_selection_changed(-1) should emit empty string."
-        )
+        assert "" in emissions, "CapturesLibraryPane._on_selection_changed(-1) should emit empty string."
 
-    def test_captures_pane_handler_previously_returned_early_on_minus_one(
-        self, qtbot: QtBot
-    ) -> None:
+    def test_captures_pane_handler_previously_returned_early_on_minus_one(self, qtbot: QtBot) -> None:
         """Verify the fix: handler no longer returns early on row=-1.
 
         Before the fix, _on_selection_changed would return early when row < 0,
@@ -79,9 +75,7 @@ class TestCapturesLibraryPaneEmitsOnClear:
 class TestMappingPanelEmitsOnClear:
     """Tests for MappingPanel emitting signal on selection clear."""
 
-    def test_mapping_panel_handler_emits_empty_when_no_selection(
-        self, qtbot: QtBot
-    ) -> None:
+    def test_mapping_panel_handler_emits_empty_when_no_selection(self, qtbot: QtBot) -> None:
         """MappingPanel._on_selection_changed should emit empty when no selection."""
         from ui.frame_mapping.views.mapping_panel import MappingPanel
 
@@ -96,13 +90,9 @@ class TestMappingPanelEmitsOnClear:
         # (get_selected_ai_frame_id returns None)
         panel._on_selection_changed()
 
-        assert "" in emissions, (
-            "MappingPanel._on_selection_changed should emit empty string when no selection."
-        )
+        assert "" in emissions, "MappingPanel._on_selection_changed should emit empty string when no selection."
 
-    def test_mapping_panel_emits_empty_after_selection_cleared(
-        self, qtbot: QtBot, tmp_path: Path
-    ) -> None:
+    def test_mapping_panel_emits_empty_after_selection_cleared(self, qtbot: QtBot, tmp_path: Path) -> None:
         """MappingPanel should emit empty string when table selection is cleared."""
         from ui.frame_mapping.views.mapping_panel import MappingPanel
 
@@ -139,9 +129,7 @@ class TestMappingPanelEmitsOnClear:
         panel._on_selection_changed()
 
         # Should emit empty string to notify listeners
-        assert "" in emissions, (
-            "MappingPanel should emit empty string when selection is cleared."
-        )
+        assert "" in emissions, "MappingPanel should emit empty string when selection is cleared."
 
 
 class TestBatchSelectionResetsOnAIReload:
@@ -151,9 +139,7 @@ class TestBatchSelectionResetsOnAIReload:
         """MappingPanel should have reset_batch_selection method."""
         from ui.frame_mapping.views.mapping_panel import MappingPanel
 
-        assert hasattr(MappingPanel, "reset_batch_selection"), (
-            "MappingPanel should have reset_batch_selection method"
-        )
+        assert hasattr(MappingPanel, "reset_batch_selection"), "MappingPanel should have reset_batch_selection method"
 
     def test_reset_batch_selection_clears_tracking(self, qtbot: QtBot) -> None:
         """reset_batch_selection should reset to default behavior."""
@@ -173,9 +159,7 @@ class TestBatchSelectionResetsOnAIReload:
             "reset_batch_selection should clear user selection tracking"
         )
 
-    def test_workspace_calls_reset_on_ai_frames_loaded(
-        self, qtbot: QtBot
-    ) -> None:
+    def test_workspace_calls_reset_on_ai_frames_loaded(self, qtbot: QtBot) -> None:
         """FrameMappingWorkspace should reset batch selection when AI frames loaded."""
         from unittest.mock import patch
 
@@ -199,9 +183,7 @@ class TestBatchSelectionResetsOnAIReload:
 class TestHandleMappingSelectedClearPath:
     """Tests for handle_mapping_selected handling empty AI frame ID."""
 
-    def test_handle_mapping_selected_clears_state_on_empty_id(
-        self, qtbot: QtBot
-    ) -> None:
+    def test_handle_mapping_selected_clears_state_on_empty_id(self, qtbot: QtBot) -> None:
         """handle_mapping_selected should clear state when ai_frame_id is empty."""
         from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
         from ui.workspaces.frame_mapping_workspace import WorkspaceStateManager
@@ -225,17 +207,13 @@ class TestHandleMappingSelectedClearPath:
         logic.handle_mapping_selected("")
 
         # Should have cleared state
-        assert state.selected_ai_frame_id is None, (
-            "handle_mapping_selected('') should clear selected_ai_frame_id"
-        )
+        assert state.selected_ai_frame_id is None, "handle_mapping_selected('') should clear selected_ai_frame_id"
 
         # Should have cleared canvas
         alignment_canvas.set_ai_frame.assert_called_with(None)
         alignment_canvas.clear_alignment.assert_called_once()
 
-    def test_handle_mapping_selected_updates_button_state_on_clear(
-        self, qtbot: QtBot
-    ) -> None:
+    def test_handle_mapping_selected_updates_button_state_on_clear(self, qtbot: QtBot) -> None:
         """handle_mapping_selected should update button state when cleared."""
         from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
         from ui.workspaces.frame_mapping_workspace import WorkspaceStateManager

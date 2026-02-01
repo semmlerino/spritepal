@@ -181,8 +181,8 @@ def test_ready_for_inject_hidden_in_rom_mode(qtbot):
 
     page = ROMWorkflowPage()
     qtbot.addWidget(page)
-    page.show()
-    qtbot.waitForWindowShown(page)
+    with qtbot.waitExposed(page):
+        page.show()
 
     # Check initial state
     assert not page.workspace.is_inject_button_visible, "Ready for Inject button should be hidden in ROM mode"

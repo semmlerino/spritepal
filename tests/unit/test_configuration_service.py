@@ -130,9 +130,9 @@ class TestConfigurationServicePaths:
         assert service.settings_file == tmp_path.resolve() / ".spritepal_settings.json"
         assert service.settings_file.name == ".spritepal_settings.json"
 
-    def test_log_directory_property(self, service):
-        """log_directory should be in user's home directory."""
-        assert service.log_directory == Path.home() / ".spritepal/logs"
+    def test_log_directory_property(self, service, tmp_path):
+        """log_directory should be in app_root/logs directory."""
+        assert service.log_directory == tmp_path.resolve() / "logs"
 
     def test_cache_directory_property(self, service):
         """cache_directory should be in user's home directory by default."""
