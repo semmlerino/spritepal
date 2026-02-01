@@ -75,6 +75,27 @@ class WorkspaceStateManager:
         self._batch_injection_success: set[str] = set()
         self._batch_injection_failed_stale: set[str] = set()
 
+        # Dirty flag for unsaved changes tracking
+        self._dirty: bool = False
+
+    # -------------------------------------------------------------------------
+    # Dirty State Tracking
+    # -------------------------------------------------------------------------
+
+    @property
+    def dirty(self) -> bool:
+        """Check if there are unsaved changes."""
+        return self._dirty
+
+    @dirty.setter
+    def dirty(self, value: bool) -> None:
+        """Set the dirty flag."""
+        self._dirty = value
+
+    def mark_dirty(self) -> None:
+        """Mark workspace as having unsaved changes."""
+        self._dirty = True
+
     # -------------------------------------------------------------------------
     # Directory History Properties
     # -------------------------------------------------------------------------
