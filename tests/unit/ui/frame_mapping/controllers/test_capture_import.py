@@ -97,12 +97,16 @@ class TestImportMesenCapture:
         # A project should now exist
         assert controller._project is not None
 
-    def test_emits_capture_import_requested(self, controller: FrameMappingController, capture_file: Path) -> None:
+    def test_emits_capture_import_requested(self, controller: FrameMappingController, capture_file: Path, qtbot: object) -> None:
         """import_mesen_capture emits capture_import_requested signal."""
         requested: list[tuple] = []
         controller.capture_import_requested.connect(lambda capture, path: requested.append((capture, path)))
 
         controller.import_mesen_capture(capture_file)
+
+        # Wait for async worker to complete and signal to be emitted
+        with qtbot.waitSignal(controller.capture_import_requested, timeout=5000):
+            pass
 
         assert len(requested) == 1
         capture_result, path = requested[0]
@@ -119,7 +123,7 @@ class TestImportMesenCapture:
         assert len(errors) == 1
         assert "not found" in errors[0].lower()
 
-    def test_invalid_json_emits_error(self, controller: FrameMappingController, tmp_path: Path) -> None:
+    def test_invalid_json_emits_error(self, controller: FrameMappingController, tmp_path: Path, qtbot: object) -> None:
         """import_mesen_capture emits error for invalid JSON."""
         bad_file = tmp_path / "bad.json"
         bad_file.write_text("{not valid json")
@@ -129,11 +133,15 @@ class TestImportMesenCapture:
 
         controller.import_mesen_capture(bad_file)
 
+        # Wait for async worker to complete and error to be emitted
+        with qtbot.waitSignal(controller.error_occurred, timeout=5000):
+            pass
+
         assert len(errors) == 1
         assert "invalid" in errors[0].lower() or "format" in errors[0].lower()
 
     def test_empty_entries_emits_error(
-        self, controller: FrameMappingController, tmp_path: Path, valid_capture_json: dict
+        self, controller: FrameMappingController, tmp_path: Path, valid_capture_json: dict, qtbot: object
     ) -> None:
         """import_mesen_capture emits error when capture has no entries."""
         valid_capture_json["entries"] = []  # No entries (v2.1 schema uses 'entries')
@@ -147,10 +155,14 @@ class TestImportMesenCapture:
 
         controller.import_mesen_capture(empty_file)
 
+        # Wait for async worker to complete and error to be emitted
+        with qtbot.waitSignal(controller.error_occurred, timeout=5000):
+            pass
+
         assert len(errors) == 1
         assert "no sprite entries" in errors[0].lower()
 
-    def test_malformed_capture_data_emits_error(self, controller: FrameMappingController, tmp_path: Path) -> None:
+    def test_malformed_capture_data_emits_error(self, controller: FrameMappingController, tmp_path: Path, qtbot: object) -> None:
         """import_mesen_capture emits error for malformed capture data."""
         malformed = {"frameNumber": 1234}  # Missing required fields
         malformed_file = tmp_path / "malformed.json"
@@ -160,6 +172,10 @@ class TestImportMesenCapture:
         controller.error_occurred.connect(errors.append)
 
         controller.import_mesen_capture(malformed_file)
+
+        # Wait for async worker to complete and error to be emitted
+        with qtbot.waitSignal(controller.error_occurred, timeout=5000):
+            pass
 
         assert len(errors) == 1
 

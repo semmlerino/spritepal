@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, override
 from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtGui import QPixmap
 
-from core.exceptions import CaptureImportError
 from core.frame_mapping_project import GameFrame
 from core.mesen_integration.click_extractor import (
     CaptureResult,
@@ -106,6 +105,8 @@ class CaptureImportService(QObject):
         self._preview_service = preview_service
         self._capture_parse_worker: CaptureParseWorker | None = None
         self._existing_frame_ids: set[str] = set()
+        self._is_single_file_import: bool = False
+        self._single_file_error_emitted: bool = False
 
 
     def update_existing_frame_ids(self, frame_ids: set[str]) -> None:
@@ -143,43 +144,32 @@ class CaptureImportService(QObject):
     def import_mesen_capture(self, capture_path: Path) -> None:
         """Parse a Mesen 2 capture file and emit signal for sprite selection.
 
+        Uses background thread to avoid blocking UI during JSON parsing.
         The workspace handles showing the sprite selection dialog and calls
         complete_import() with the user's selection.
 
         Args:
             capture_path: Path to capture JSON file
-
-        Raises:
-            CaptureImportError: When capture file is missing, cannot be parsed, or has no valid entries
         """
-        try:
-            # Parse the capture file
-            parser = MesenCaptureParser()
-            capture_result = parser.parse_file(capture_path)
-
-            if not capture_result.has_entries:
-                self.import_failed.emit(f"No sprite entries in capture: {capture_path}")
-                return
-
-            # Emit signal for workspace to show sprite selection dialog
-            self.import_requested.emit(capture_result, capture_path)
-
-        except FileNotFoundError as e:
-            logger.warning("Capture file not found: %s", capture_path)
+        if not capture_path.exists():
             self.import_failed.emit(f"Capture file not found: {capture_path}")
-            raise CaptureImportError(f"Capture file is missing: {capture_path}") from e
-        except JSONDecodeError as e:
-            logger.exception("Invalid JSON in capture file: %s", capture_path)
-            self.import_failed.emit(f"Invalid capture file format: {e}")
-            raise CaptureImportError(f"Capture file cannot be parsed: {e}") from e
-        except (KeyError, ValueError) as e:
-            logger.exception("Malformed capture data in %s", capture_path)
-            self.import_failed.emit(f"Malformed capture data: {e}")
-            raise CaptureImportError(f"Capture file cannot be parsed: {e}") from e
-        except OSError as e:
-            logger.exception("Failed to read capture file: %s", capture_path)
-            self.import_failed.emit(f"Failed to read capture: {e}")
-            raise CaptureImportError(f"Capture file cannot be parsed: {e}") from e
+            return
+
+        # Cancel any existing parsing operation
+        self._cancel_existing_worker()
+
+        # Track that this is a single-file import (affects error handling)
+        self._is_single_file_import = True
+        self._single_file_error_emitted = False
+
+        # Create and start background worker with single file
+        self._capture_parse_worker = CaptureParseWorker([capture_path], parent=self)
+        self._capture_parse_worker.file_parsed.connect(self._on_capture_file_parsed)
+        self._capture_parse_worker.parse_error.connect(self._on_capture_parse_error)
+        self._capture_parse_worker.finished_all.connect(self._on_single_file_finished)
+
+        # Use WorkerManager for proper lifecycle tracking
+        WorkerManager.start_worker(self._capture_parse_worker)
 
     def complete_import(
         self,
@@ -288,6 +278,29 @@ class CaptureImportService(QObject):
             self.import_failed.emit(f"Failed to import capture: {e}")
             return None
 
+    def _cancel_existing_worker(self) -> None:
+        """Cancel any existing parsing operation and clean up worker."""
+        if self._capture_parse_worker is not None:
+            # Disconnect signals FIRST to prevent stale emissions from old worker
+            try:
+                self._capture_parse_worker.file_parsed.disconnect(self._on_capture_file_parsed)
+                self._capture_parse_worker.parse_error.disconnect(self._on_capture_parse_error)
+                # Try both possible finished handlers (directory or single-file)
+                try:
+                    self._capture_parse_worker.finished_all.disconnect(self._on_capture_directory_finished)
+                except RuntimeError:
+                    pass
+                try:
+                    self._capture_parse_worker.finished_all.disconnect(self._on_single_file_finished)
+                except RuntimeError:
+                    pass
+            except RuntimeError:
+                pass  # Signals may not be connected
+
+            # Use WorkerManager for proper cleanup (handles wait, deleteLater, registry)
+            WorkerManager.cleanup_worker(self._capture_parse_worker, timeout=1000)
+            self._capture_parse_worker = None
+
     def import_directory(self, directory: Path) -> None:
         """Parse all captures from a directory in background and emit signals.
 
@@ -311,18 +324,7 @@ class CaptureImportService(QObject):
             return
 
         # Cancel any existing parsing operation
-        if self._capture_parse_worker is not None:
-            # Disconnect signals FIRST to prevent stale emissions from old worker
-            try:
-                self._capture_parse_worker.file_parsed.disconnect(self._on_capture_file_parsed)
-                self._capture_parse_worker.parse_error.disconnect(self._on_capture_parse_error)
-                self._capture_parse_worker.finished_all.disconnect(self._on_capture_directory_finished)
-            except RuntimeError:
-                pass  # Signals may not be connected
-
-            # Use WorkerManager for proper cleanup (handles wait, deleteLater, registry)
-            WorkerManager.cleanup_worker(self._capture_parse_worker, timeout=1000)
-            self._capture_parse_worker = None
+        self._cancel_existing_worker()
 
         # Create and start background worker
         self._capture_parse_worker = CaptureParseWorker(json_files, parent=self)
@@ -355,6 +357,10 @@ class CaptureImportService(QObject):
             error_message: Error description
         """
         logger.warning("Failed to parse capture %s: %s", capture_path, error_message)
+        # For single-file imports, emit error signal immediately
+        if self._is_single_file_import:
+            self.import_failed.emit(f"Invalid capture file format: {error_message}")
+            self._single_file_error_emitted = True
 
     def _on_capture_directory_finished(self, parsed_count: int) -> None:
         """Handle completion of directory capture parsing.
@@ -366,15 +372,20 @@ class CaptureImportService(QObject):
         self.directory_import_finished.emit(parsed_count)
         self._capture_parse_worker = None
 
+    def _on_single_file_finished(self, parsed_count: int) -> None:
+        """Handle completion of single-file import.
+
+        Args:
+            parsed_count: Number of files parsed (typically 0 or 1 for single-file)
+        """
+        logger.debug("Single file import finished: %d parsed", parsed_count)
+        # If no files were parsed and no error was emitted yet, it means the file had no entries
+        if parsed_count == 0 and self._is_single_file_import and not self._single_file_error_emitted:
+            self.import_failed.emit("No sprite entries in capture file")
+        self._is_single_file_import = False
+        self._single_file_error_emitted = False
+        self._capture_parse_worker = None
+
     def cancel_directory_import(self) -> None:
         """Cancel any ongoing directory import operation."""
-        if self._capture_parse_worker is not None:
-            try:
-                self._capture_parse_worker.file_parsed.disconnect(self._on_capture_file_parsed)
-                self._capture_parse_worker.parse_error.disconnect(self._on_capture_parse_error)
-                self._capture_parse_worker.finished_all.disconnect(self._on_capture_directory_finished)
-            except RuntimeError:
-                pass
-
-            WorkerManager.cleanup_worker(self._capture_parse_worker, timeout=1000)
-            self._capture_parse_worker = None
+        self._cancel_existing_worker()
