@@ -159,8 +159,7 @@ class AIFramesFacade:
             self._signals.emit_error(f"Cannot add frame: {e}")
             return False
 
-        self._signals.emit_ai_frames_loaded(len(project.ai_frames))
-        # Emit targeted signal instead of project_changed to avoid full refresh
+        # Emit targeted signal - handlers will add to AI pane and mapping panel
         self._signals.emit_ai_frame_added(frame.id)
         logger.info("Added AI frame: %s", file_path)
         return True
