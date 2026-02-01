@@ -59,5 +59,22 @@ class CaptureParseError(FileFormatError):
     pass
 
 
+# Frame mapping exceptions
+class FrameMappingError(SpritePalError):
+    """Base exception for frame mapping operations."""
+
+
+class CaptureImportError(FrameMappingError):
+    """Error during capture import.
+
+    Raised when:
+    - Capture file is missing
+    - Capture file cannot be parsed
+    - Capture has no valid entries
+    """
+
+    pass
+
+
 class TileError(SpritePalError):
     """Raised for tile processing errors."""

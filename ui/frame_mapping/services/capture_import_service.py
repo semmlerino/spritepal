@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QObject, QThread, Signal
 
+from core.exceptions import CaptureImportError
 from core.frame_mapping_project import GameFrame
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import (
@@ -154,6 +155,9 @@ class CaptureImportService(QObject):
 
         Args:
             capture_path: Path to capture JSON file
+
+        Raises:
+            CaptureImportError: When capture file is missing, cannot be parsed, or has no valid entries
         """
         try:
             # Parse the capture file
@@ -167,18 +171,22 @@ class CaptureImportService(QObject):
             # Emit signal for workspace to show sprite selection dialog
             self.import_requested.emit(capture_result, capture_path)
 
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             logger.warning("Capture file not found: %s", capture_path)
             self.import_failed.emit(f"Capture file not found: {capture_path}")
+            raise CaptureImportError(f"Capture file is missing: {capture_path}") from e
         except JSONDecodeError as e:
             logger.exception("Invalid JSON in capture file: %s", capture_path)
             self.import_failed.emit(f"Invalid capture file format: {e}")
+            raise CaptureImportError(f"Capture file cannot be parsed: {e}") from e
         except (KeyError, ValueError) as e:
             logger.exception("Malformed capture data in %s", capture_path)
             self.import_failed.emit(f"Malformed capture data: {e}")
+            raise CaptureImportError(f"Capture file cannot be parsed: {e}") from e
         except OSError as e:
             logger.exception("Failed to read capture file: %s", capture_path)
             self.import_failed.emit(f"Failed to read capture: {e}")
+            raise CaptureImportError(f"Capture file cannot be parsed: {e}") from e
 
     def complete_import(
         self,
