@@ -5,6 +5,7 @@ Provides debounced auto-save functionality to avoid saving on every small change
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import override
@@ -58,6 +59,7 @@ class AutoSaveManager(QObject):
         _save_project: Callable to save project to a path (returns bool)
         _show_message: Optional callable to show status messages
         _parent_widget: Optional parent widget for error dialogs
+        _save_lock: Threading lock to prevent concurrent saves (auto vs manual)
     """
 
     def __init__(
@@ -67,6 +69,7 @@ class AutoSaveManager(QObject):
         save_project: Callable[[Path], bool],
         show_message: Callable[[str, int], None] | None = None,
         parent_widget: QWidget | None = None,
+        on_save_success: Callable[[], None] | None = None,
     ) -> None:
         """Initialize the auto-save manager.
 
@@ -76,6 +79,7 @@ class AutoSaveManager(QObject):
             save_project: Callable that saves the project to a given path
             show_message: Optional callable for status messages (message, duration_ms)
             parent_widget: Optional parent widget for error dialogs
+            on_save_success: Optional callback invoked after successful save
         """
         super().__init__(parent_widget)
         self._timer = timer
@@ -83,9 +87,12 @@ class AutoSaveManager(QObject):
         self._save_project = save_project
         self._show_message = show_message
         self._parent_widget = parent_widget
+        self._on_save_success = on_save_success
         self._save_in_progress = False
         # Keep reference to current worker to prevent GC during signal emission
         self._current_worker: _SaveWorker | None = None
+        # Lock to prevent concurrent saves from auto-save and manual save
+        self._save_lock = threading.Lock()
 
     def set_message_service(self, show_message: Callable[[str, int], None] | None) -> None:
         """Set the message service for status updates.
@@ -102,6 +109,38 @@ class AutoSaveManager(QObject):
             widget: Parent widget or None
         """
         self._parent_widget = widget
+
+    def set_on_save_success(self, callback: Callable[[], None] | None) -> None:
+        """Set the on_save_success callback for deferred injection.
+
+        Args:
+            callback: Callback to invoke after successful save, or None to disable
+        """
+        self._on_save_success = callback
+
+    def try_acquire_save_lock(self) -> bool:
+        """Try to acquire the save lock without blocking.
+
+        Returns:
+            True if lock was acquired, False if save already in progress
+        """
+        return self._save_lock.acquire(blocking=False)
+
+    def release_save_lock(self) -> None:
+        """Release the save lock.
+
+        Should only be called if try_acquire_save_lock returned True.
+        """
+        self._save_lock.release()
+
+    @property
+    def is_save_in_progress(self) -> bool:
+        """Check if a save operation is currently in progress.
+
+        Returns:
+            True if save in progress (lock held), False otherwise
+        """
+        return self._save_in_progress
 
     def schedule_save(self) -> None:
         """Schedule an auto-save with debouncing.
@@ -128,9 +167,9 @@ class AutoSaveManager(QObject):
         if not project_path:
             return
 
-        # Avoid concurrent saves
-        if self._save_in_progress:
-            logger.debug("Save already in progress, skipping")
+        # Try to acquire lock - if already held (by manual save), skip
+        if not self.try_acquire_save_lock():
+            logger.debug("Save lock held, skipping auto-save")
             return
 
         self._save_in_progress = True
@@ -151,8 +190,11 @@ class AutoSaveManager(QObject):
         """
         self._save_in_progress = False
         self._current_worker = None  # Release reference
+        self.release_save_lock()  # Release lock after save completes
 
         if success:
+            if self._on_save_success:
+                self._on_save_success()
             if self._show_message:
                 self._show_message("Project auto-saved", 2000)
             logger.info("Auto-saved project to %s", self._get_project_path())

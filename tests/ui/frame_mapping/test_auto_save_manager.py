@@ -252,3 +252,80 @@ class TestSetParentWidget:
         auto_save_manager.set_parent_widget(mock_widget)
 
         assert auto_save_manager._parent_widget is mock_widget
+
+
+class TestSaveLock:
+    """Test save lock prevents concurrent auto/manual saves."""
+
+    def test_try_acquire_save_lock_succeeds_when_not_held(self, auto_save_manager: AutoSaveManager) -> None:
+        """try_acquire_save_lock returns True when lock is not held."""
+        result = auto_save_manager.try_acquire_save_lock()
+
+        assert result is True
+        # Cleanup
+        auto_save_manager.release_save_lock()
+
+    def test_try_acquire_save_lock_fails_when_already_held(self, auto_save_manager: AutoSaveManager) -> None:
+        """try_acquire_save_lock returns False when lock is already held."""
+        # Acquire lock first time
+        first_acquire = auto_save_manager.try_acquire_save_lock()
+        assert first_acquire is True
+
+        # Second acquire should fail
+        second_acquire = auto_save_manager.try_acquire_save_lock()
+        assert second_acquire is False
+
+        # Cleanup
+        auto_save_manager.release_save_lock()
+
+    def test_perform_save_skips_when_lock_held(self, mock_project_path: Path, mock_timer: QTimer) -> None:
+        """perform_save skips if lock is already held (manual save in progress)."""
+        save_fn = MagicMock()
+        manager = AutoSaveManager(
+            timer=mock_timer,
+            get_project_path=lambda: mock_project_path,
+            save_project=save_fn,
+        )
+
+        # Simulate manual save holding the lock
+        lock_acquired = manager.try_acquire_save_lock()
+        assert lock_acquired is True
+
+        # Auto-save should skip
+        manager.perform_save()
+
+        # Should not have called save_project since lock is held
+        save_fn.assert_not_called()
+
+        # Cleanup
+        manager.release_save_lock()
+
+    def test_is_save_in_progress_reflects_save_state(
+        self, mock_project_path: Path, mock_timer: QTimer, qtbot: QtBot
+    ) -> None:
+        """is_save_in_progress property reflects the current save state."""
+        manager = AutoSaveManager(
+            timer=mock_timer,
+            get_project_path=lambda: mock_project_path,
+            save_project=MagicMock(),
+        )
+
+        # Initially not in progress
+        assert not manager.is_save_in_progress
+
+        # Start save
+        manager.perform_save()
+
+        # Should be in progress immediately
+        assert manager.is_save_in_progress
+
+        # Wait for completion
+        _wait_for_threadpool(qtbot)
+
+        def check_completed() -> bool:
+            return not manager.is_save_in_progress
+
+        qtbot.waitUntil(check_completed, timeout=1000)
+
+        # Should be done after completion
+        assert not manager.is_save_in_progress

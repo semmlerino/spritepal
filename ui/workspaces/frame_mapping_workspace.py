@@ -22,10 +22,10 @@ Four-zone layout:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -105,6 +105,7 @@ class FrameMappingWorkspace(QWidget):
             get_project_path=lambda: self._state.project_path,
             save_project=self._controller.save_project,
             parent_widget=self,
+            on_save_success=lambda: setattr(self._state, "dirty", False),
         )
         self._auto_save_timer.timeout.connect(self._auto_save_manager.perform_save)
 
@@ -452,6 +453,7 @@ class FrameMappingWorkspace(QWidget):
         self._controller.error_occurred.connect(self._on_error)
         self._controller.status_update.connect(self._on_status_update)
         self._controller.save_requested.connect(self._auto_save_manager.schedule_save)
+        self._controller.save_requested.connect(self._state.mark_dirty)
         self._controller.stale_entries_warning.connect(self._on_stale_entries_warning)
         self._controller.stale_entries_on_load.connect(self._on_stale_entries_detected_on_load)
         self._controller.alignment_updated.connect(self._on_alignment_updated)
@@ -1409,6 +1411,12 @@ class FrameMappingWorkspace(QWidget):
             QMessageBox.information(self, "Save Project", "No project to save.")
             return
 
+        # Check if auto-save is in progress
+        if self._auto_save_manager.is_save_in_progress:
+            if self._message_service:
+                self._message_service.show_message("Auto-save in progress, please wait...", 2000)
+            return
+
         path_to_save = self._state.project_path
 
         if not path_to_save:
@@ -1422,11 +1430,22 @@ class FrameMappingWorkspace(QWidget):
                 path_to_save = Path(file_path)
 
         if path_to_save:
-            if self._controller.save_project(path_to_save):
-                self._state.project_path = path_to_save
-                self._set_last_project_path(path_to_save)
+            # Acquire lock before saving to prevent auto-save from running
+            if not self._auto_save_manager.try_acquire_save_lock():
                 if self._message_service:
-                    self._message_service.show_message(f"Project saved to {path_to_save.name}")
+                    self._message_service.show_message("Save in progress, please wait...", 2000)
+                return
+
+            try:
+                if self._controller.save_project(path_to_save):
+                    self._state.project_path = path_to_save
+                    self._set_last_project_path(path_to_save)
+                    self._state.dirty = False  # Clear dirty flag on successful save
+                    if self._message_service:
+                        self._message_service.show_message(f"Project saved to {path_to_save.name}")
+            finally:
+                # Always release lock, even if save fails
+                self._auto_save_manager.release_save_lock()
 
     # -------------------------------------------------------------------------
     # Project Persistence
@@ -1454,6 +1473,48 @@ class FrameMappingWorkspace(QWidget):
         """Save the last used project path to settings."""
         ctx = get_app_context()
         ctx.application_state_manager.set("frame_mapping", "last_project_path", str(path))
+
+    # -------------------------------------------------------------------------
+    # Close Event Handler
+    # -------------------------------------------------------------------------
+
+    @override
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Handle workspace close event with unsaved changes check.
+
+        Shows a dialog if there are unsaved changes, offering Save/Discard/Cancel options.
+
+        Args:
+            event: The close event
+        """
+        if self._state.dirty:
+            reply = QMessageBox.question(
+                self,
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save before closing?",
+                QMessageBox.StandardButton.Save
+                | QMessageBox.StandardButton.Discard
+                | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Save,
+            )
+
+            if reply == QMessageBox.StandardButton.Save:
+                # Trigger manual save
+                self._on_save_project()
+                # Only accept close if save succeeded (dirty flag cleared)
+                if not self._state.dirty:
+                    event.accept()
+                else:
+                    event.ignore()
+            elif reply == QMessageBox.StandardButton.Discard:
+                # Discard changes and close
+                event.accept()
+            else:  # Cancel
+                # Abort close
+                event.ignore()
+        else:
+            # No unsaved changes, close normally
+            event.accept()
 
     # -------------------------------------------------------------------------
     # Properties
