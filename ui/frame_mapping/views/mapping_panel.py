@@ -498,7 +498,7 @@ class MappingPanel(QWidget):
                     game_item.setIcon(QIcon(pixmap))
 
     @signal_error_boundary()
-    def _on_scroll(self) -> None:
+    def _on_scroll(self, _value: int) -> None:
         """Handle scroll events - debounce thumbnail loading."""
         self._visible_thumbnail_timer.start()
 
