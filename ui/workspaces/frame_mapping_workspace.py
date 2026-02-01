@@ -1174,7 +1174,9 @@ class FrameMappingWorkspace(QWidget):
             total_files: Total number of files to parse
         """
         if self._message_service:
-            self._message_service.show_message(f"Parsing {total_files} capture file{'s' if total_files != 1 else ''}...")
+            self._message_service.show_message(
+                f"Parsing {total_files} capture file{'s' if total_files != 1 else ''}..."
+            )
 
     def _on_directory_import_finished(self, parsed_count: int) -> None:
         """Handle directory import finished signal.

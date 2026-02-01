@@ -580,3 +580,14 @@ class CapturesLibraryPane(QWidget):
                     item.setToolTip(f"{tooltip}\n{tooltip_suffix}" if tooltip else tooltip_suffix)
 
                 break
+
+    def remove_game_frame(self, frame_id: str) -> None:
+        """Remove a game frame from display without full rebuild.
+
+        Args:
+            frame_id: ID of the frame to remove
+        """
+        self._game_frames = [f for f in self._game_frames if f.id != frame_id]
+        self._game_frame_previews.pop(frame_id, None)
+        self._link_status.pop(frame_id, None)
+        self._refresh_list()
