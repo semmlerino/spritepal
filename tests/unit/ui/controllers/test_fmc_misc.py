@@ -341,7 +341,11 @@ class TestUpdateGameFrameCompression:
             GameFrame(
                 id="G001",
                 rom_offsets=[0x1000, 0x2000, 0x3000],
-                compression_types={0x1000: CompressionType.RAW, 0x2000: CompressionType.RAW, 0x3000: CompressionType.RAW},
+                compression_types={
+                    0x1000: CompressionType.RAW,
+                    0x2000: CompressionType.RAW,
+                    0x3000: CompressionType.RAW,
+                },
             )
         ]
         project._rebuild_indices()
@@ -352,7 +356,11 @@ class TestUpdateGameFrameCompression:
         assert result is True
         frame = project.get_game_frame_by_id("G001")
         assert frame is not None
-        assert frame.compression_types == {0x1000: CompressionType.HAL, 0x2000: CompressionType.HAL, 0x3000: CompressionType.HAL}
+        assert frame.compression_types == {
+            0x1000: CompressionType.HAL,
+            0x2000: CompressionType.HAL,
+            0x3000: CompressionType.HAL,
+        }
 
     def test_update_compression_nonexistent_frame_returns_false(self, qtbot) -> None:
         """update_game_frame_compression returns False for nonexistent frame."""

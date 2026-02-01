@@ -1510,9 +1510,7 @@ class FrameMappingWorkspace(QWidget):
             self,
             "Unsaved Changes",
             "You have unsaved changes. Do you want to save before closing?",
-            QMessageBox.StandardButton.Save
-            | QMessageBox.StandardButton.Discard
-            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel,
             QMessageBox.StandardButton.Save,
         )
 

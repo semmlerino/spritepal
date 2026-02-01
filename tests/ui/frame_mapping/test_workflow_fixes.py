@@ -433,7 +433,9 @@ class TestSplitBrainFixes:
         assert capture_b.compression_types[0x2000] == CompressionType.HAL, (
             "Compression should apply to canvas frame (capture_b), not selected frame (capture_a)"
         )
-        assert capture_a.compression_types[0x1000] == CompressionType.RAW, "Selected frame (capture_a) should remain unchanged"
+        assert capture_a.compression_types[0x1000] == CompressionType.RAW, (
+            "Selected frame (capture_a) should remain unchanged"
+        )
 
     def test_alignment_blocked_shows_user_feedback(self, qtbot: QtBot, tmp_path: Path, app_context: object) -> None:
         """When alignment edit is blocked, user should get status bar feedback.
