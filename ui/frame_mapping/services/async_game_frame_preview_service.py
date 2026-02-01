@@ -15,12 +15,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QThread, Signal, Slot
 from PySide6.QtGui import QImage, QPixmap
 
+if TYPE_CHECKING:
+    from typing_extensions import override
+else:
+
+    def override(f):
+        return f
+
+
 from core.repositories.capture_result_repository import CaptureResultRepository
+from ui.frame_mapping.services.async_service_base import AsyncServiceBase
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -138,7 +147,7 @@ class _GameFramePreviewWorker(QObject):
         return PreviewRenderer.render_preview_qimage(capture_result)
 
 
-class AsyncGameFramePreviewService(QObject):
+class AsyncGameFramePreviewService(AsyncServiceBase):
     """Service for async batch game frame preview generation.
 
     Generates previews for multiple game frames in a background thread,
@@ -152,11 +161,6 @@ class AsyncGameFramePreviewService(QObject):
     preview_ready = Signal(str, QPixmap)  # frame_id, pixmap
     batch_finished = Signal()
 
-    # Class-level set to prevent GC of orphaned threads that didn't stop in time
-    _orphaned_threads: set[QThread] = set()
-    # Class-level set to keep threads alive between cleanup attempts
-    _pending_cleanup_threads: set[QThread] = set()
-
     def __init__(
         self,
         parent: QObject | None = None,
@@ -166,20 +170,29 @@ class AsyncGameFramePreviewService(QObject):
         super().__init__(parent)
         self._capture_repository = capture_repository
         self._current_request_id = 0
-        self._worker: _GameFramePreviewWorker | None = None
-        self._thread: QThread | None = None
-        self._destroyed = False
 
-        if parent is not None:
-            parent.destroyed.connect(self._on_parent_destroyed)
+    @override
+    def _get_final_wait_timeout(self) -> int:
+        """Use 1000ms final wait instead of default 3000ms."""
+        return 1000
 
-    @Slot()
-    def _on_parent_destroyed(self) -> None:
-        """Handle parent destruction."""
-        self._destroyed = True
-        # Use getattr to handle case where __init__ hasn't completed
-        if getattr(self, "_worker", None) is not None or getattr(self, "_thread", None) is not None:
-            self.cancel()
+    @override
+    def _cleanup_current_work(self) -> None:
+        """Cancel in-progress batch."""
+        worker = cast(_GameFramePreviewWorker | None, getattr(self, "_worker", None))
+        if worker is not None:
+            worker.set_target_request_id(self._current_request_id + 1)
+
+    @override
+    def _disconnect_worker_signals(self) -> None:
+        """Disconnect worker-specific signals."""
+        worker = cast(_GameFramePreviewWorker | None, getattr(self, "_worker", None))
+        if worker is not None:
+            try:
+                worker.preview_ready.disconnect()
+                worker.batch_finished.disconnect()
+            except (RuntimeError, TypeError):
+                pass
 
     def request_previews(
         self,
@@ -272,77 +285,5 @@ class AsyncGameFramePreviewService(QObject):
 
     def cancel(self) -> None:
         """Cancel any in-progress batch."""
-        if self._worker is not None:
-            self._worker.set_target_request_id(self._current_request_id + 1)
+        self._cleanup_current_work()
         self._cleanup_thread()
-
-    def _cleanup_thread(self) -> None:
-        """Clean up thread resources without blocking UI."""
-        worker = self._worker
-        thread = self._thread
-
-        if worker is not None:
-            worker.blockSignals(True)
-            try:
-                worker.preview_ready.disconnect()
-                worker.batch_finished.disconnect()
-            except (RuntimeError, TypeError):
-                pass
-
-        if thread is not None:
-            if thread.isRunning():
-                thread.quit()
-                if not thread.wait(100):
-                    # Schedule delayed cleanup
-                    from PySide6.QtCore import QTimer
-
-                    AsyncGameFramePreviewService._pending_cleanup_threads.add(thread)
-                    QTimer.singleShot(500, lambda: self._finish_cleanup(thread, worker))
-                    self._thread = None
-                    self._worker = None
-                    return
-            elif not thread.isFinished():
-                # Thread not fully started yet - defer cleanup to avoid premature deletion
-                from PySide6.QtCore import QTimer
-
-                AsyncGameFramePreviewService._pending_cleanup_threads.add(thread)
-                QTimer.singleShot(200, lambda: self._finish_cleanup(thread, worker))
-                self._thread = None
-                self._worker = None
-                return
-
-        self._do_cleanup(thread, worker)
-
-    def _finish_cleanup(self, thread: QThread, worker: QObject | None) -> None:
-        """Complete cleanup after delayed wait."""
-        AsyncGameFramePreviewService._pending_cleanup_threads.discard(thread)
-        if thread.isRunning():
-            # Try one more wait - NEVER use terminate() as it corrupts Qt state
-            thread.quit()
-            if not thread.wait(1000):
-                # Thread is unresponsive - keep reference to prevent GC while running
-                AsyncGameFramePreviewService._pending_cleanup_threads.discard(thread)
-                AsyncGameFramePreviewService._orphaned_threads.add(thread)
-                logger.warning(
-                    f"AsyncGameFramePreviewService: Thread did not stop after 1.5s total. "
-                    f"Thread will be kept alive to avoid Qt corruption (orphaned count: {len(AsyncGameFramePreviewService._orphaned_threads)})."
-                )
-                thread.finished.connect(lambda t=thread: AsyncGameFramePreviewService._orphaned_threads.discard(t))
-                return
-        elif not thread.isFinished():
-            # Thread hasn't finished yet (startup race) - retry shortly
-            from PySide6.QtCore import QTimer
-
-            AsyncGameFramePreviewService._pending_cleanup_threads.add(thread)
-            QTimer.singleShot(200, lambda: self._finish_cleanup(thread, worker))
-            return
-        self._do_cleanup(thread, worker)
-
-    def _do_cleanup(self, thread: QThread | None, worker: QObject | None) -> None:
-        """Perform actual cleanup."""
-        if thread is not None and not self._destroyed:
-            thread.deleteLater()
-        if worker is not None and not self._destroyed:
-            worker.deleteLater()
-        self._thread = None
-        self._worker = None

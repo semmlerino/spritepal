@@ -13,14 +13,23 @@ Key design:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QThread, QTimer, Signal, Slot
+
+if TYPE_CHECKING:
+    from typing_extensions import override
+else:
+
+    def override(f):
+        return f
+
 
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest, InjectionResult
 from core.services.injection_snapshot import InjectionSnapshot
+from ui.frame_mapping.services.async_service_base import AsyncServiceBase
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -128,7 +137,7 @@ class _InjectionWorker(QObject):
                 self.injection_finished.emit(request_id, ai_frame_id, result)
 
 
-class AsyncInjectionService(QObject):
+class AsyncInjectionService(AsyncServiceBase):
     """Service for async injection operations.
 
     Runs injections in a background thread with a serial queue to ensure
@@ -144,30 +153,38 @@ class AsyncInjectionService(QObject):
     injection_progress = Signal(str, str)  # ai_frame_id, message
     injection_finished = Signal(str, bool, str, object)  # ai_frame_id, success, message, result
 
-    # Class-level set to prevent GC of orphaned threads that didn't stop in time
-    _orphaned_threads: set[QThread] = set()
-    # Class-level set to keep threads alive between cleanup attempts
-    _pending_cleanup_threads: set[QThread] = set()
-
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._current_request_id = 0
-        self._worker: _InjectionWorker | None = None
-        self._thread: QThread | None = None
-        self._destroyed = False
         self._pending_queue: list[AsyncInjectionRequest] = []
         self._is_processing = False
 
-        if parent is not None:
-            parent.destroyed.connect(self._on_parent_destroyed)
-
+    @override
     @Slot()
     def _on_parent_destroyed(self) -> None:
         """Handle parent destruction."""
-        self._destroyed = True
+        super()._on_parent_destroyed()
+
+    @override
+    def _cleanup_current_work(self) -> None:
+        """Cancel all pending and current injections."""
         # Use getattr to handle case where __init__ hasn't completed
         if getattr(self, "_pending_queue", None) is not None:
-            self.cancel_all()
+            self._pending_queue.clear()
+        worker = cast(_InjectionWorker | None, getattr(self, "_worker", None))
+        if worker is not None:
+            worker.request_stop()
+
+    @override
+    def _disconnect_worker_signals(self) -> None:
+        """Disconnect worker-specific signals."""
+        worker = cast(_InjectionWorker | None, getattr(self, "_worker", None))
+        if worker is not None:
+            try:
+                worker.progress.disconnect()
+                worker.injection_finished.disconnect()
+            except (RuntimeError, TypeError):
+                pass
 
     def queue_injection(
         self,
@@ -281,75 +298,9 @@ class AsyncInjectionService(QObject):
 
     def cancel_all(self) -> None:
         """Cancel all pending and current injections."""
-        self._pending_queue.clear()
-        if self._worker is not None:
-            self._worker.request_stop()
+        self._cleanup_current_work()
         self._cleanup_thread()
         self._is_processing = False
-
-    def _cleanup_thread(self) -> None:
-        """Clean up thread resources without blocking UI."""
-        worker = self._worker
-        thread = self._thread
-
-        if worker is not None:
-            worker.blockSignals(True)
-            try:
-                worker.progress.disconnect()
-                worker.injection_finished.disconnect()
-            except (RuntimeError, TypeError):
-                pass
-
-        if thread is not None:
-            if thread.isRunning():
-                thread.quit()
-                if not thread.wait(100):
-                    AsyncInjectionService._pending_cleanup_threads.add(thread)
-                    QTimer.singleShot(500, lambda: self._finish_cleanup(thread, worker))
-                    self._thread = None
-                    self._worker = None
-                    return
-            elif not thread.isFinished():
-                # Thread not fully started yet - defer cleanup to avoid premature deletion
-                AsyncInjectionService._pending_cleanup_threads.add(thread)
-                QTimer.singleShot(200, lambda: self._finish_cleanup(thread, worker))
-                self._thread = None
-                self._worker = None
-                return
-
-        self._do_cleanup(thread, worker)
-
-    def _finish_cleanup(self, thread: QThread, worker: QObject | None) -> None:
-        """Complete cleanup after delayed wait."""
-        AsyncInjectionService._pending_cleanup_threads.discard(thread)
-        if thread.isRunning():
-            logger.warning(f"Thread {thread.__class__.__name__} still running after initial wait")
-            thread.quit()
-            if not thread.wait(3000):
-                # Keep reference in class-level set to prevent GC while running
-                AsyncInjectionService._pending_cleanup_threads.discard(thread)
-                AsyncInjectionService._orphaned_threads.add(thread)
-                logger.critical(
-                    f"Thread {thread.__class__.__name__} won't stop - keeping alive to avoid Qt corruption "
-                    f"(orphaned count: {len(AsyncInjectionService._orphaned_threads)})"
-                )
-                thread.finished.connect(lambda t=thread: AsyncInjectionService._orphaned_threads.discard(t))
-                return
-        elif not thread.isFinished():
-            # Thread hasn't finished yet (startup race) - retry shortly
-            AsyncInjectionService._pending_cleanup_threads.add(thread)
-            QTimer.singleShot(200, lambda: self._finish_cleanup(thread, worker))
-            return
-        self._do_cleanup(thread, worker)
-
-    def _do_cleanup(self, thread: QThread | None, worker: QObject | None) -> None:
-        """Perform actual cleanup."""
-        if thread is not None and not self._destroyed:
-            thread.deleteLater()
-        if worker is not None and not self._destroyed:
-            worker.deleteLater()
-        self._thread = None
-        self._worker = None
 
     @property
     def is_busy(self) -> bool:

@@ -8,13 +8,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
-from PySide6.QtCore import QObject, QThread, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, QThread, Signal, Slot
+
+if TYPE_CHECKING:
+    from typing_extensions import override
+else:
+
+    def override(f):
+        return f
+
 
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
 from core.repositories.capture_result_repository import CaptureResultRepository
 from core.services.stale_entry_logic import detect_stale_frame_ids
+from ui.frame_mapping.services.async_service_base import AsyncServiceBase
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -78,7 +87,7 @@ class _StaleEntryWorker(QObject):
             self.detection_complete.emit(stale_ids, self._request.request_id)
 
 
-class AsyncStaleEntryDetector(QObject):
+class AsyncStaleEntryDetector(AsyncServiceBase):
     """Async service for detecting stale entries in game frames.
 
     Runs detection in a background thread to avoid UI freezes during project load.
@@ -94,11 +103,6 @@ class AsyncStaleEntryDetector(QObject):
     # Signal: emitted when detection completes
     detection_finished = Signal()
 
-    # Class-level set to prevent GC of orphaned threads that didn't stop in time
-    _orphaned_threads: set[QThread] = set()
-    # Class-level set to keep threads alive between cleanup attempts
-    _pending_cleanup_threads: set[QThread] = set()
-
     def __init__(
         self,
         parent: QObject | None = None,
@@ -106,20 +110,30 @@ class AsyncStaleEntryDetector(QObject):
         capture_repository: CaptureResultRepository | None = None,
     ) -> None:
         super().__init__(parent)
-        self._worker: _StaleEntryWorker | None = None
-        self._thread: QThread | None = None
-        self._destroyed = False
         self._current_request_id = 0
         self._capture_repository = capture_repository
 
-        if parent is not None:
-            parent.destroyed.connect(self._on_parent_destroyed)
+    @override
+    def _get_final_wait_timeout(self) -> int:
+        """Use 1000ms final wait instead of default 3000ms."""
+        return 1000
 
-    @Slot()
-    def _on_parent_destroyed(self) -> None:
-        """Handle parent destruction - cancel any running work."""
-        self._destroyed = True
-        self.cancel()
+    @override
+    def _cleanup_current_work(self) -> None:
+        """Request worker to stop processing."""
+        worker = cast(_StaleEntryWorker | None, getattr(self, "_worker", None))
+        if worker:
+            worker.request_stop()
+
+    @override
+    def _disconnect_worker_signals(self) -> None:
+        """Disconnect worker-specific signals."""
+        worker = cast(_StaleEntryWorker | None, getattr(self, "_worker", None))
+        if worker is not None:
+            try:
+                worker.detection_complete.disconnect()
+            except (RuntimeError, TypeError):
+                pass
 
     def detect_stale_entries(self, game_frames: list[GameFrame]) -> None:
         """Start async stale entry detection.
@@ -181,79 +195,5 @@ class AsyncStaleEntryDetector(QObject):
 
     def cancel(self) -> None:
         """Cancel any in-progress detection."""
-        worker = getattr(self, "_worker", None)
-        if worker:
-            worker.request_stop()
+        self._cleanup_current_work()
         self._cleanup_thread()
-
-    def _cleanup_thread(self) -> None:
-        """Clean up thread resources without blocking UI.
-
-        Uses a short initial wait (100ms) followed by a deferred cleanup
-        to avoid blocking the UI thread for up to 5 seconds.
-        """
-        worker = getattr(self, "_worker", None)
-        thread = getattr(self, "_thread", None)
-        destroyed = getattr(self, "_destroyed", True)
-
-        # Block signals first to prevent emission during cleanup
-        if worker is not None:
-            worker.blockSignals(True)
-            try:
-                worker.detection_complete.disconnect()
-            except (RuntimeError, TypeError):
-                pass  # Already disconnected or never connected
-
-        if thread is not None:
-            if thread.isRunning():
-                thread.quit()
-                if not thread.wait(100):  # Short initial wait
-                    # Schedule delayed cleanup instead of blocking UI
-                    AsyncStaleEntryDetector._pending_cleanup_threads.add(thread)
-                    QTimer.singleShot(500, lambda: self._finish_cleanup(thread, worker, destroyed))
-                    self._thread = None
-                    self._worker = None
-                    return
-            elif not thread.isFinished():
-                # Thread not fully started yet - defer cleanup to avoid premature deletion
-                AsyncStaleEntryDetector._pending_cleanup_threads.add(thread)
-                QTimer.singleShot(200, lambda: self._finish_cleanup(thread, worker, destroyed))
-                self._thread = None
-                self._worker = None
-                return
-
-        self._do_cleanup(thread, worker, destroyed)
-
-    def _finish_cleanup(self, thread: QThread, worker: QObject | None, destroyed: bool) -> None:
-        """Complete cleanup after delayed wait."""
-        AsyncStaleEntryDetector._pending_cleanup_threads.discard(thread)
-        if thread.isRunning():
-            # Try one more wait - NEVER use terminate() as it corrupts Qt state
-            thread.quit()
-            if not thread.wait(1000):
-                # Thread is unresponsive - keep reference to prevent GC while running
-                AsyncStaleEntryDetector._pending_cleanup_threads.discard(thread)
-                AsyncStaleEntryDetector._orphaned_threads.add(thread)
-                logger.warning(
-                    f"StaleEntryDetector: Thread did not stop after 1.5s total. "
-                    f"Thread will be kept alive to avoid Qt corruption (orphaned count: {len(AsyncStaleEntryDetector._orphaned_threads)})."
-                )
-                thread.finished.connect(lambda t=thread: AsyncStaleEntryDetector._orphaned_threads.discard(t))
-                return
-        elif not thread.isFinished():
-            # Thread hasn't finished yet (startup race) - retry shortly
-            AsyncStaleEntryDetector._pending_cleanup_threads.add(thread)
-            QTimer.singleShot(200, lambda: self._finish_cleanup(thread, worker, destroyed))
-            return
-        self._do_cleanup(thread, worker, destroyed)
-
-    def _do_cleanup(self, thread: QThread | None, worker: QObject | None, destroyed: bool) -> None:
-        """Perform actual cleanup of thread and worker objects."""
-        if thread is not None:
-            if not destroyed:
-                thread.deleteLater()
-        if worker is not None:
-            if not destroyed:
-                worker.deleteLater()
-        self._thread = None
-        self._worker = None
