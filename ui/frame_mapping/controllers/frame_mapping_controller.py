@@ -141,7 +141,7 @@ class FrameMappingController(QObject):
         game_frame_id: ID of the game frame being linked
 
     Emitted by:
-        - MappingsFacade.create_mapping()
+        - FrameMappingController.create_mapping()
         - LinkFramesCommand.redo()
 
     Triggers:
@@ -155,7 +155,7 @@ class FrameMappingController(QObject):
         ai_frame_id: ID of the AI frame that was unmapped
 
     Emitted by:
-        - MappingsFacade.remove_mapping()
+        - FrameMappingController.remove_mapping()
         - RemoveMappingCommand.redo()
 
     Triggers:
