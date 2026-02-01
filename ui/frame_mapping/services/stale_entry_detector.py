@@ -20,7 +20,7 @@ else:
         return f
 
 
-from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
+from core.mesen_integration.click_extractor import CaptureResult
 from core.repositories.capture_result_repository import CaptureResultRepository
 from core.services.stale_entry_logic import detect_stale_frame_ids
 from ui.frame_mapping.services.async_service_base import AsyncServiceBase
@@ -74,8 +74,6 @@ class _StaleEntryWorker(QObject):
         super().__init__()
         self._request = request
         self._stop_requested = False
-        # Fallback parser when no repository provided
-        self._parser = MesenCaptureParser() if request.capture_repository is None else None
 
     def request_stop(self) -> None:
         """Request the worker to stop processing."""
@@ -85,11 +83,9 @@ class _StaleEntryWorker(QObject):
         """Run stale detection for all game frames."""
 
         def get_capture(path: Path) -> CaptureResult:
-            """Get capture result from repository or parse directly."""
-            if self._request.capture_repository is not None:
-                return self._request.capture_repository.get_or_parse(path)
-            assert self._parser is not None
-            return self._parser.parse_file(path)
+            """Get capture result from repository."""
+            assert self._request.capture_repository is not None
+            return self._request.capture_repository.get_or_parse(path)
 
         stale_ids = detect_stale_frame_ids(
             self._request.game_frames,

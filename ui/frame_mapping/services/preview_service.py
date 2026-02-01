@@ -12,7 +12,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QPixmap
 
 from core.exceptions import CaptureParseError
-from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
+from core.mesen_integration.click_extractor import CaptureResult
 from core.repositories.capture_result_repository import CaptureResultRepository
 from utils.logging_config import get_logger
 
@@ -40,14 +40,13 @@ class PreviewService(QObject):
         self,
         parent: QObject | None = None,
         *,
-        capture_repository: CaptureResultRepository | None = None,
+        capture_repository: CaptureResultRepository,
     ) -> None:
         """Initialize preview service.
 
         Args:
             parent: Optional Qt parent object
             capture_repository: Shared repository for caching parsed capture files.
-                If None, creates a local parser (no caching shared with other services).
         """
         super().__init__(parent)
         # Cache stores (pixmap, mtime, selected_entry_ids) for invalidation on change
@@ -57,10 +56,8 @@ class PreviewService(QObject):
         self._capture_result_cache: dict[str, tuple[CaptureResult, float, tuple[int, ...]]] = {}
         # Track stale entries (need regeneration but keep cached for display)
         self._stale_previews: set[str] = set()
-        # Shared repository for raw capture parsing (optional)
+        # Shared repository for raw capture parsing
         self._capture_repository = capture_repository
-        # Fallback parser when no repository provided
-        self._parser = MesenCaptureParser() if capture_repository is None else None
 
     def get_preview(self, frame_id: str, project: FrameMappingProject | None) -> QPixmap | None:
         """Get the rendered preview pixmap for a game frame.
@@ -257,12 +254,8 @@ class PreviewService(QObject):
             # Cache miss due to mtime or entry change - will re-parse below
 
         try:
-            # Use shared repository if available, otherwise parse directly
-            if self._capture_repository is not None:
-                capture_result = self._capture_repository.get_or_parse(capture_path)
-            else:
-                assert self._parser is not None
-                capture_result = self._parser.parse_file(capture_path)
+            # Use shared repository
+            capture_result = self._capture_repository.get_or_parse(capture_path)
 
             if not capture_result.has_entries:
                 return (None, False)

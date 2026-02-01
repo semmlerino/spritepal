@@ -10,13 +10,15 @@ from PIL import Image
 
 from core.frame_mapping_project import AIFrame, FrameMappingProject, GameFrame, SheetPalette
 from core.mesen_integration.click_extractor import CaptureResult
+from core.repositories.capture_result_repository import CaptureResultRepository
 from ui.frame_mapping.services.palette_service import PaletteService
 
 
 @pytest.fixture
 def palette_service():
     """Create a PaletteService for testing."""
-    service = PaletteService()
+    capture_repository = CaptureResultRepository()
+    service = PaletteService(capture_repository=capture_repository)
     return service
 
 

@@ -54,7 +54,7 @@ class BatchPreviewRequest:
 
     request_id: int
     requests: list[GameFramePreviewRequest]
-    capture_repository: CaptureResultRepository | None
+    capture_repository: CaptureResultRepository
 
 
 class _GameFramePreviewWorker(QObject):
@@ -151,7 +151,7 @@ class _GameFramePreviewWorker(QObject):
     def _generate_preview(
         self,
         req: GameFramePreviewRequest,
-        capture_repository: CaptureResultRepository | None,
+        capture_repository: CaptureResultRepository,
     ) -> QImage | None:
         """Generate preview for a single game frame.
 
@@ -227,7 +227,7 @@ class AsyncGameFramePreviewService(AsyncServiceBase):
         self,
         parent: QObject | None = None,
         *,
-        capture_repository: CaptureResultRepository | None = None,
+        capture_repository: CaptureResultRepository,
     ) -> None:
         super().__init__(parent)
         self._capture_repository = capture_repository

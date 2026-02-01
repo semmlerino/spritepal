@@ -9,6 +9,7 @@ from PySide6.QtGui import QImage, QPixmap
 from core.frame_mapping_project import FrameMappingProject, GameFrame
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import CaptureResult, OAMEntry
+from core.repositories.capture_result_repository import CaptureResultRepository
 from tests.fixtures.timeouts import signal_timeout
 from ui.frame_mapping.services.preview_service import PreviewService
 
@@ -16,7 +17,8 @@ from ui.frame_mapping.services.preview_service import PreviewService
 @pytest.fixture
 def preview_service(qtbot):
     """Create a PreviewService instance."""
-    service = PreviewService()
+    capture_repository = CaptureResultRepository()
+    service = PreviewService(capture_repository=capture_repository)
     return service
 
 

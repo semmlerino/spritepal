@@ -622,7 +622,11 @@ class FrameMappingController(QObject):
         self._stale_entry_detector = AsyncStaleEntryDetector(parent=self, capture_repository=self._capture_repository)
         self._stale_entry_detector.stale_entries_detected.connect(self.stale_entries_on_load)
         # Capture import service (handles parsing and importing Mesen captures)
-        self._capture_import_service = CaptureImportService(preview_service=self._preview_service, parent=self)
+        self._capture_import_service = CaptureImportService(
+            preview_service=self._preview_service,
+            capture_repository=self._capture_repository,
+            parent=self,
+        )
         self._capture_import_service.import_requested.connect(self._on_capture_import_requested)
         self._capture_import_service.import_failed.connect(self.error_occurred)
         self._capture_import_service.directory_import_started.connect(self.directory_import_started)

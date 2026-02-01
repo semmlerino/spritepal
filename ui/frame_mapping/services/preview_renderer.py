@@ -78,7 +78,7 @@ class PreviewRenderer:
         selected_entry_ids: list[int],
         rom_offsets: list[int],
         frame_id: str,
-        capture_repository: CaptureResultRepository | None = None,
+        capture_repository: CaptureResultRepository,
     ) -> tuple[CaptureResult | None, bool]:
         """Parse a capture file and filter its entries.
 
@@ -87,7 +87,7 @@ class PreviewRenderer:
             selected_entry_ids: Entry IDs to filter (empty = no filtering)
             rom_offsets: ROM offsets for fallback filtering
             frame_id: Frame ID for logging context
-            capture_repository: Optional shared repository for caching
+            capture_repository: Shared repository for caching
 
         Returns:
             Tuple of (filtered CaptureResult or None, used_fallback flag)
@@ -96,14 +96,8 @@ class PreviewRenderer:
             return (None, False)
 
         try:
-            # Parse capture (use repository if available for caching)
-            if capture_repository is not None:
-                capture_result = capture_repository.get_or_parse(capture_path)
-            else:
-                from core.mesen_integration.click_extractor import MesenCaptureParser
-
-                parser = MesenCaptureParser()
-                capture_result = parser.parse_file(capture_path)
+            # Parse capture (use repository for caching)
+            capture_result = capture_repository.get_or_parse(capture_path)
 
             if not capture_result.has_entries:
                 return (None, False)

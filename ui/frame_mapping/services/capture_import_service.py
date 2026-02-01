@@ -18,11 +18,8 @@ from PySide6.QtCore import QObject, QThread, Signal
 from PySide6.QtGui import QPixmap
 
 from core.frame_mapping_project import GameFrame
-from core.mesen_integration.click_extractor import (
-    CaptureResult,
-    MesenCaptureParser,
-    OAMEntry,
-)
+from core.mesen_integration.click_extractor import CaptureResult, OAMEntry
+from core.repositories.capture_result_repository import CaptureResultRepository
 from core.types import CompressionType
 from ui.common import WorkerManager
 from ui.frame_mapping.services.preview_renderer import PreviewRenderer
@@ -40,10 +37,15 @@ class CaptureParseWorker(QThread):
     parse_error = Signal(object, str)  # Path, error message
     finished_all = Signal(int)  # parsed count
 
-    def __init__(self, file_paths: list[Path], parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        file_paths: list[Path],
+        capture_repository: CaptureResultRepository,
+        parent: QObject | None = None,
+    ) -> None:
         super().__init__(parent)
         self._file_paths = file_paths
-        self._parser = MesenCaptureParser()
+        self._capture_repository = capture_repository
 
     @override
     def run(self) -> None:
@@ -53,7 +55,7 @@ class CaptureParseWorker(QThread):
             if self.isInterruptionRequested():
                 break
             try:
-                result = self._parser.parse_file(path)
+                result = self._capture_repository.get_or_parse(path)
                 if result.has_entries:
                     self.file_parsed.emit(result, path)
                     parsed += 1
@@ -93,16 +95,19 @@ class CaptureImportService(QObject):
     def __init__(
         self,
         preview_service: PreviewService | None = None,
+        capture_repository: CaptureResultRepository | None = None,
         parent: QObject | None = None,
     ) -> None:
         """Initialize the capture import service.
 
         Args:
             preview_service: Service for caching preview images
+            capture_repository: Shared repository for caching parsed capture files
             parent: Parent QObject
         """
         super().__init__(parent)
         self._preview_service = preview_service
+        self._capture_repository = capture_repository
         self._capture_parse_worker: CaptureParseWorker | None = None
         self._existing_frame_ids: set[str] = set()
         self._is_single_file_import: bool = False
@@ -163,7 +168,10 @@ class CaptureImportService(QObject):
         self._single_file_error_emitted = False
 
         # Create and start background worker with single file
-        self._capture_parse_worker = CaptureParseWorker([capture_path], parent=self)
+        assert self._capture_repository is not None, "CaptureImportService requires capture_repository"
+        self._capture_parse_worker = CaptureParseWorker(
+            [capture_path], capture_repository=self._capture_repository, parent=self
+        )
         self._capture_parse_worker.file_parsed.connect(self._on_capture_file_parsed)
         self._capture_parse_worker.parse_error.connect(self._on_capture_parse_error)
         self._capture_parse_worker.finished_all.connect(self._on_single_file_finished)
@@ -327,7 +335,10 @@ class CaptureImportService(QObject):
         self._cancel_existing_worker()
 
         # Create and start background worker
-        self._capture_parse_worker = CaptureParseWorker(json_files, parent=self)
+        assert self._capture_repository is not None, "CaptureImportService requires capture_repository"
+        self._capture_parse_worker = CaptureParseWorker(
+            json_files, capture_repository=self._capture_repository, parent=self
+        )
         self._capture_parse_worker.file_parsed.connect(self._on_capture_file_parsed)
         self._capture_parse_worker.parse_error.connect(self._on_capture_parse_error)
         self._capture_parse_worker.finished_all.connect(self._on_capture_directory_finished)
