@@ -1645,7 +1645,6 @@ class FrameMappingController(QObject):
                     mapping.status = result.new_mapping_status
 
                 self.mapping_injected.emit(ai_frame_id, "\n".join(result.messages))
-                self.project_changed.emit()
                 self.save_requested.emit()
             elif result.error:
                 self.error_occurred.emit(result.error)

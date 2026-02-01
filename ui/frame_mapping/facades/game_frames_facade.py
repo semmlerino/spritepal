@@ -32,6 +32,7 @@ class GameFramesSignals(Protocol):
     """Protocol for game frame-related signal emissions."""
 
     def emit_game_frame_removed(self, frame_id: str) -> None: ...
+    def emit_mapping_removed(self, ai_frame_id: str) -> None: ...
     def emit_error(self, message: str) -> None: ...
     def emit_project_changed(self) -> None: ...
     def emit_save_requested(self) -> None: ...
@@ -86,10 +87,19 @@ class GameFramesFacade:
         if project is None:
             return False
 
+        # Capture affected AI frame IDs BEFORE removal (mappings will be deleted)
+        affected_ai_ids = [
+            m.ai_frame_id for m in project.mappings if m.game_frame_id == frame_id
+        ]
+
         # Clear preview cache for this frame
         self._preview_service.invalidate(frame_id)
 
         if project.remove_game_frame(frame_id):
+            # Emit mapping_removed for each orphaned mapping
+            for ai_id in affected_ai_ids:
+                self._signals.emit_mapping_removed(ai_id)
+
             self._signals.emit_game_frame_removed(frame_id)
             self._signals.emit_project_changed()
             logger.info("Removed game frame %s", frame_id)
