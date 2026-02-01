@@ -675,6 +675,7 @@ class FrameMappingWorkspace(QWidget):
         """Handle AI frames loaded."""
         # Reset batch selection to defaults (all mapped = checked)
         self._mapping_panel.reset_batch_selection()
+        self._mapping_panel.refresh()  # Rebuild rows for new AI frames
         if self._message_service:
             self._message_service.show_message(f"Loaded {count} AI frames")
 
@@ -729,10 +730,13 @@ class FrameMappingWorkspace(QWidget):
         # Use targeted clear instead of full refresh (avoids regenerating all thumbnails)
         self._mapping_panel.clear_row_mapping(ai_frame_id)
 
-        # Clear browsing mode if the removed mapping was for the selected AI frame
-        # When a mapping is removed, there's nothing to "browse away from"
+        # Clear canvas state if removed mapping was for selected AI frame
         if ai_frame_id == self._state.selected_ai_frame_id:
             self._alignment_canvas.set_browsing_mode(False)
+            # Clear stale game frame display (mapping no longer exists)
+            if self._state.current_canvas_game_id is not None:
+                self._alignment_canvas.set_game_frame(None)
+                self._state.current_canvas_game_id = None
 
     @signal_error_boundary()
     def _on_error(self, message: str) -> None:
@@ -1178,6 +1182,15 @@ class FrameMappingWorkspace(QWidget):
         self._mapping_panel.update_game_frame_preview(frame_id, pixmap)
         # Update captures pane thumbnail
         self._captures_pane.update_frame_preview(frame_id, pixmap)
+
+        # Also update workbench canvas if this frame is currently displayed
+        if self._state.current_canvas_game_id == frame_id:
+            project = self._controller.project
+            if project:
+                game_frame = project.get_game_frame_by_id(frame_id)
+                if game_frame:
+                    capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
+                    self._alignment_canvas.set_game_frame(game_frame, pixmap, capture_result, used_fallback)
 
     @signal_error_boundary()
     def _on_game_frame_previews_finished(self) -> None:
