@@ -146,6 +146,9 @@ class WorkspaceLogicHelper:
             else:
                 self._ai_frames_pane.select_frame_by_id(frame_id, emit_signal=emit_signal)
 
+        # Debug: Validate selection sync (only when SPRITEPAL_DEBUG_STATE=1)
+        self.validate_selection_state()
+
     def set_game_frame_selection(self, frame_id: str | None) -> None:
         """Centralized method to update game frame selection.
 
@@ -163,6 +166,9 @@ class WorkspaceLogicHelper:
                 self._captures_pane.clear_selection()
             else:
                 self._captures_pane.select_frame(frame_id)
+
+        # Debug: Validate selection sync (only when SPRITEPAL_DEBUG_STATE=1)
+        self.validate_selection_state()
 
     def validate_selection_state(self) -> None:
         """Debug-only: Validate that selection caches match pane state.
@@ -461,6 +467,9 @@ class WorkspaceLogicHelper:
 
         self.update_map_button_state()
 
+        # Debug: Validate selection sync (only when SPRITEPAL_DEBUG_STATE=1)
+        self.validate_selection_state()
+
     def handle_game_frame_selected(self, frame_id: str) -> None:
         """Handle game frame selection in captures library.
 
@@ -501,6 +510,9 @@ class WorkspaceLogicHelper:
             mapping = project.get_mapping_for_ai_frame(self._state.selected_ai_frame_id)
             is_browsing = mapping is not None and frame_id != mapping.game_frame_id
             self._alignment_canvas.set_browsing_mode(is_browsing)
+
+        # Debug: Validate selection sync (only when SPRITEPAL_DEBUG_STATE=1)
+        self.validate_selection_state()
 
     def handle_mapping_selected(self, ai_frame_id: str) -> None:
         """Handle mapping row selection in drawer.
@@ -569,6 +581,9 @@ class WorkspaceLogicHelper:
             self._state.current_canvas_game_id = None
 
         self.update_map_button_state()
+
+        # Debug: Validate selection sync (only when SPRITEPAL_DEBUG_STATE=1)
+        self.validate_selection_state()
 
     # ===== Phase 2d: Linking logic =====
 
