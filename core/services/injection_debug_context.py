@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 import os
-import tempfile
 from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING
@@ -97,9 +96,10 @@ class InjectionDebugContext:
         if not self._enabled:
             return self
 
-        # Create debug directory
-        self._debug_dir = Path(tempfile.gettempdir()) / "inject_debug"
-        self._debug_dir.mkdir(exist_ok=True)
+        # Create debug directory inside spritepal/logs/inject_debug/
+        spritepal_root = Path(__file__).parent.parent.parent
+        self._debug_dir = spritepal_root / "logs" / "inject_debug"
+        self._debug_dir.mkdir(parents=True, exist_ok=True)
 
         # Set up file handler for debug logging
         log_path = self._debug_dir / "inject_debug.log"
@@ -345,4 +345,85 @@ class InjectionDebugContext:
                 compression_used,
                 tile_count,
                 first_bytes_hex,
+            )
+
+    def log_verification_summary(
+        self,
+        corrections: dict[int, int | None],
+        matched_hal: int,
+        matched_raw: int,
+        not_found: int,
+    ) -> None:
+        """Log full verification summary with all corrections.
+
+        Args:
+            corrections: Dict of capture_offset -> rom_offset mappings
+            matched_hal: Tiles found via HAL index
+            matched_raw: Tiles found via raw search
+            not_found: Tiles not found in ROM
+        """
+        if not self._enabled:
+            return
+
+        logger.info("=== VERIFICATION SUMMARY ===")
+        logger.info("HAL matches: %d, RAW matches: %d, Not found: %d", matched_hal, matched_raw, not_found)
+        logger.info("All corrections:")
+
+        # Group by whether offset changed
+        unchanged = []
+        changed = []
+        missing = []
+
+        for capture_off, rom_off in sorted(corrections.items()):
+            if rom_off is None:
+                missing.append(capture_off)
+            elif rom_off == capture_off:
+                unchanged.append(capture_off)
+            else:
+                changed.append((capture_off, rom_off))
+
+        if unchanged:
+            logger.info("  Unchanged offsets: %s", [f"0x{o:X}" for o in unchanged])
+
+        if changed:
+            logger.info("  Changed offsets:")
+            for cap_off, rom_off in changed:
+                delta = cap_off - rom_off
+                logger.info("    0x%06X -> 0x%05X (delta=0x%X)", cap_off, rom_off, delta)
+
+        if missing:
+            logger.info("  Missing offsets: %s", [f"0x{o:X}" for o in missing])
+
+    def log_tile_occurrences(
+        self,
+        capture_offset: int,
+        tile_data_preview: str,
+        occurrences: list[int],
+        chosen: int | None,
+    ) -> None:
+        """Log all occurrences found for a tile in ROM.
+
+        Args:
+            capture_offset: Original capture offset
+            tile_data_preview: First 8 bytes of tile as hex
+            occurrences: All ROM offsets where tile was found
+            chosen: The offset that was chosen (or None if not found)
+        """
+        if not self._enabled:
+            return
+
+        if len(occurrences) > 1:
+            logger.info(
+                "  Tile 0x%06X (%s...): found at %s, chose 0x%05X",
+                capture_offset,
+                tile_data_preview,
+                [f"0x{o:X}" for o in occurrences],
+                chosen if chosen is not None else 0,
+            )
+        elif len(occurrences) == 1:
+            logger.info(
+                "  Tile 0x%06X (%s...): unique at 0x%05X",
+                capture_offset,
+                tile_data_preview,
+                occurrences[0],
             )

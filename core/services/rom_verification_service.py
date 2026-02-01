@@ -149,9 +149,21 @@ class ROMVerificationService:
                             tile.rom_offset,
                             best_match.rom_offset,
                         )
+                # Fallback: raw tile verification
+                # First, check if tile data exists at the capture's original offset
+                # This prevents mis-correction when duplicate tile data exists in ROM
+                elif self._verify_tile_at_offset(tile.data_bytes, tile.rom_offset):
+                    # Capture offset is valid - trust it, no correction needed
+                    corrections[tile.rom_offset] = tile.rom_offset
+                    matched_raw += 1
+                    logger.debug(
+                        "Tile at 0x%X verified at capture offset (raw)",
+                        tile.rom_offset,
+                    )
                 else:
-                    # Fallback: raw search
-                    raw_offset = self._search_raw_tile(tile.data_bytes)
+                    # Capture offset invalid - search for correct location
+                    # Use contiguous block search to avoid scattered duplicate matches
+                    raw_offset = self._search_raw_tile_contiguous(tile.data_bytes, tile.rom_offset, corrections)
                     corrections[tile.rom_offset] = raw_offset
 
                     if raw_offset is not None:
@@ -226,6 +238,101 @@ class ROMVerificationService:
 
         logger.debug("Applied %d offset corrections", corrected_count)
         return corrected_count
+
+    def _verify_tile_at_offset(self, tile_data: bytes, offset: int) -> bool:
+        """Check if tile data exists at a specific ROM offset.
+
+        Args:
+            tile_data: 32 bytes of SNES 4bpp tile data.
+            offset: ROM offset to check.
+
+        Returns:
+            True if tile data matches at offset, False otherwise.
+        """
+        if len(tile_data) != 32:
+            return False
+
+        if self._rom_data is None:
+            return False
+
+        # Account for potential SMC header (512 bytes if ROM size % 0x8000 == 512)
+        smc_header = 512 if len(self._rom_data) % 0x8000 == 512 else 0
+        actual_offset = offset + smc_header
+
+        if actual_offset < 0 or actual_offset + 32 > len(self._rom_data):
+            return False
+
+        return self._rom_data[actual_offset : actual_offset + 32] == tile_data
+
+    def _search_raw_tile_contiguous(
+        self,
+        tile_data: bytes,
+        capture_offset: int,
+        corrections: dict[int, int | None],
+    ) -> int | None:
+        """Search ROM for tile while maintaining spatial consistency.
+
+        When duplicate tile data exists in ROM, this method prefers matches
+        that are contiguous with already-found tiles. This prevents scattered
+        matches that break sprite integrity.
+
+        Args:
+            tile_data: 32 bytes of SNES 4bpp tile data.
+            capture_offset: Original capture offset for this tile.
+            corrections: Already-resolved corrections (capture_offset -> rom_offset).
+
+        Returns:
+            ROM offset where tile was found, or None if not found.
+        """
+        if len(tile_data) != 32 or self._rom_data is None:
+            return None
+
+        # Find ALL occurrences of this tile in ROM
+        occurrences: list[int] = []
+        pos = 0
+        while True:
+            pos = self._rom_data.find(tile_data, pos)
+            if pos < 0:
+                break
+            occurrences.append(pos)
+            pos += 1
+
+        if not occurrences:
+            return None
+
+        if len(occurrences) == 1:
+            return occurrences[0]
+
+        # Multiple matches - prefer one that maintains spatial consistency
+        # with already-corrected tiles
+
+        # Calculate delta from capture offsets to ROM offsets for known corrections
+        known_deltas: list[int] = []
+        for cap_off, rom_off in corrections.items():
+            if rom_off is not None and cap_off != rom_off:
+                known_deltas.append(cap_off - rom_off)
+
+        if known_deltas:
+            # Use the most common delta
+            from collections import Counter
+
+            delta_counts = Counter(known_deltas)
+            best_delta, _ = delta_counts.most_common(1)[0]
+
+            # Prefer occurrence that matches the expected delta
+            expected_rom = capture_offset - best_delta
+            for occ in occurrences:
+                if abs(occ - expected_rom) < 64:  # Within 2 tiles of expected
+                    logger.debug(
+                        "Tile at 0x%X: using occurrence 0x%X (matches delta 0x%X)",
+                        capture_offset,
+                        occ,
+                        best_delta,
+                    )
+                    return occ
+
+        # No delta info yet, or no match near expected - return first occurrence
+        return occurrences[0]
 
     def _search_raw_tile(self, tile_data: bytes) -> int | None:
         """Search ROM for exact 32-byte tile match.
