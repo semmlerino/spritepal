@@ -182,84 +182,22 @@ class InjectionOrchestrator:
             logger.exception("Failed to prepare masked image")
             return InjectionResult.failure(f"Image preparation failed: {e}")
 
-        # 3. Set up ROM staging
-        using_existing_output = request.output_path is not None and request.output_path.exists()
-
-        if using_existing_output and request.output_path is not None:
-            injection_rom_path = request.output_path
-            logger.info("Using existing output ROM: %s", injection_rom_path)
-        else:
-            injection_rom_path = self._staging_manager.create_injection_copy(request.rom_path, request.output_path)
-            if injection_rom_path is None:
-                return InjectionResult.failure("Failed to create ROM copy for injection")
-            logger.info("Created injection ROM copy: %s", injection_rom_path)
-
-        session = self._staging_manager.create_staging(injection_rom_path)
-        if session is None:
-            if not using_existing_output:
-                injection_rom_path.unlink(missing_ok=True)
-            return InjectionResult.failure("Failed to create staging file for injection")
-
-        # 4. Execute injection with staging
-        try:
-            result = self._execute_injection(
-                request=request,
-                project=project,
-                ai_frame=ai_frame,
-                game_frame=game_frame,
-                mapping=mapping,
-                masked_canvas=masked_canvas,
-                filtered_capture=filtered_capture,
-                relevant_entries=relevant_entries,
-                injection_rom_path=injection_rom_path,
-                staging_path=session.staging_path,
-                using_existing_output=using_existing_output,
-                force_raw=force_raw,
-                debug=debug,
-                on_progress=progress,
-                transformed_index_map=transformed_index_map,  # BUG-1 FIX
-            )
-
-            if result.success:
-                # Commit staging
-                if not self._staging_manager.commit(session):
-                    self._staging_manager.rollback(session)
-                    return InjectionResult.failure("Failed to commit staged injection to ROM")
-
-                # Inject palette if offset provided
-                messages = list(result.messages)
-                if request.palette_rom_offset is not None and project.sheet_palette is not None:
-                    palette_colors = [snap_to_snes_color(c) for c in project.sheet_palette.colors]
-                    success, msg = self._rom_injector.inject_palette_to_rom(
-                        rom_path=str(injection_rom_path),
-                        output_path=str(injection_rom_path),
-                        palette_offset=request.palette_rom_offset,
-                        colors=palette_colors,
-                        create_backup=False,  # Already have backup from tile injection
-                        ignore_checksum=True,  # Checksum updated by tile injection
-                    )
-                    if success:
-                        messages.append(f"Palette injected at 0x{request.palette_rom_offset:X}")
-                        logger.info("Palette injected at 0x%X", request.palette_rom_offset)
-                    else:
-                        logger.warning("Palette injection failed: %s", msg)
-                        messages.append(f"WARNING: Palette injection failed: {msg}")
-
-                return InjectionResult(
-                    success=True,
-                    tile_results=result.tile_results,
-                    output_rom_path=injection_rom_path,
-                    messages=tuple(messages),
-                    new_mapping_status="injected",
-                )
-            else:
-                self._staging_manager.cleanup_on_failure(session, injection_rom_path, using_existing_output)
-                return result
-
-        except Exception as e:
-            logger.exception("Injection process failed")
-            self._staging_manager.cleanup_on_failure(session, injection_rom_path, using_existing_output)
-            return InjectionResult.failure(f"Injection process failed: {e}")
+        # 3. Execute with staging
+        return self._execute_with_staging(
+            request=request,
+            sheet_palette=project.sheet_palette,
+            ai_frame=ai_frame,
+            game_frame=game_frame,
+            mapping=mapping,
+            masked_canvas=masked_canvas,
+            filtered_capture=filtered_capture,
+            relevant_entries=relevant_entries,
+            transformed_index_map=transformed_index_map,
+            force_raw=force_raw,
+            debug=debug,
+            on_progress=progress,
+            project=project,
+        )
 
     def execute_from_snapshot(
         self,
@@ -412,6 +350,65 @@ class InjectionOrchestrator:
             logger.exception("Failed to prepare masked image")
             return InjectionResult.failure(f"Image preparation failed: {e}")
 
+        # Execute with staging
+        return self._execute_with_staging(
+            request=request,
+            sheet_palette=palette_holder.sheet_palette,
+            ai_frame=ai_frame,
+            game_frame=game_frame,
+            mapping=mapping,
+            masked_canvas=masked_canvas,
+            filtered_capture=filtered_capture,
+            relevant_entries=relevant_entries,
+            transformed_index_map=transformed_index_map,
+            force_raw=force_raw,
+            debug=debug,
+            on_progress=progress,
+            project=palette_holder,
+        )
+
+    def _execute_with_staging(
+        self,
+        request: InjectionRequest,
+        sheet_palette: object | None,
+        ai_frame: AIFrame,
+        game_frame: GameFrame,
+        mapping: FrameMapping,
+        masked_canvas: Image.Image,
+        filtered_capture: CaptureResult,
+        relevant_entries: list[OAMEntry],
+        transformed_index_map: np.ndarray | None,
+        force_raw: bool,
+        debug: InjectionDebugContext,
+        on_progress: Callable[[str], None],
+        project: object,  # FrameMappingProject or _PaletteHolder
+    ) -> InjectionResult:
+        """Execute injection with ROM staging and palette injection.
+
+        This method handles:
+        1. ROM staging setup (check existing output, create copy, create staging session)
+        2. Call _execute_injection with all the necessary parameters
+        3. On success: commit, inject palette, return success result
+        4. On failure: cleanup and return failure
+
+        Args:
+            request: Immutable injection parameters.
+            sheet_palette: Project's sheet palette or None.
+            ai_frame: AI frame for injection.
+            game_frame: Game frame for injection.
+            mapping: Frame mapping data.
+            masked_canvas: Composited RGBA canvas.
+            filtered_capture: Filtered capture result.
+            relevant_entries: OAM entries to inject.
+            transformed_index_map: Optional palette index map from compositing.
+            force_raw: Whether to force RAW compression.
+            debug: Debug context.
+            on_progress: Progress callback.
+            project: Object with sheet_palette attribute (FrameMappingProject or _PaletteHolder).
+
+        Returns:
+            InjectionResult with success/failure and details.
+        """
         # Set up ROM staging
         using_existing_output = request.output_path is not None and request.output_path.exists()
 
@@ -434,7 +431,7 @@ class InjectionOrchestrator:
         try:
             result = self._execute_injection(
                 request=request,
-                project=palette_holder,  # type: ignore[arg-type]
+                project=project,  # type: ignore[arg-type]
                 ai_frame=ai_frame,
                 game_frame=game_frame,
                 mapping=mapping,
@@ -446,7 +443,7 @@ class InjectionOrchestrator:
                 using_existing_output=using_existing_output,
                 force_raw=force_raw,
                 debug=debug,
-                on_progress=progress,
+                on_progress=on_progress,
                 transformed_index_map=transformed_index_map,
             )
 
@@ -458,15 +455,15 @@ class InjectionOrchestrator:
 
                 # Inject palette if offset provided
                 messages = list(result.messages)
-                if request.palette_rom_offset is not None and palette_holder.sheet_palette is not None:
-                    palette_colors = [snap_to_snes_color(c) for c in palette_holder.sheet_palette.colors]
+                if request.palette_rom_offset is not None and sheet_palette is not None:
+                    palette_colors = [snap_to_snes_color(c) for c in sheet_palette.colors]  # type: ignore[attr-defined]
                     success, msg = self._rom_injector.inject_palette_to_rom(
                         rom_path=str(injection_rom_path),
                         output_path=str(injection_rom_path),
                         palette_offset=request.palette_rom_offset,
                         colors=palette_colors,
-                        create_backup=False,
-                        ignore_checksum=True,
+                        create_backup=False,  # Already have backup from tile injection
+                        ignore_checksum=True,  # Checksum updated by tile injection
                     )
                     if success:
                         messages.append(f"Palette injected at 0x{request.palette_rom_offset:X}")
