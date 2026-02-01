@@ -304,8 +304,8 @@ class WorkspaceLogicHelper:
                 missing_ids.append(game_frame.id)
 
         # Update UI with cached previews immediately
-        self._mapping_panel.set_game_frame_previews(previews)
-        self._mapping_panel.refresh()
+        for frame_id, pixmap in previews.items():
+            self._mapping_panel.update_game_frame_preview(frame_id, pixmap)
         self._captures_pane.set_game_frame_previews(previews)
 
         # Request async generation for ALL missing previews

@@ -382,7 +382,7 @@ class PaletteCoordinator:
 
         # Refresh the mapping panel to show the updated frame
         if self._mapping_panel:
-            self._mapping_panel.refresh()
+            self._mapping_panel.refresh_thumbnails_only()
 
         # Update workbench if this frame is selected
         if self._state.selected_ai_frame_id == new_id and self._on_ai_frame_selected:
