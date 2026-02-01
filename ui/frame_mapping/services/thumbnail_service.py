@@ -375,6 +375,9 @@ class AsyncThumbnailLoader(QObject):
         self._destroyed = False
         self._current_request_id = 0  # Track request batches for stale filtering
 
+        # Metadata for pending requests: request_id -> dict of frame_id -> (path_str, mtime, palette_hash, size)
+        self._request_metadata: dict[int, dict[str, tuple[str, float, int, int]]] = {}
+
         # Ensure cleanup on destruction
         if parent is not None:
             parent.destroyed.connect(self._on_parent_destroyed)
@@ -413,6 +416,7 @@ class AsyncThumbnailLoader(QObject):
         # Check cache first - emit immediately for hits, collect misses
         palette_hash = _compute_palette_hash(sheet_palette)
         cache_misses: list[tuple[str, Path]] = []
+        request_metadata: dict[str, tuple[str, float, int, int]] = {}
 
         for frame_id, frame_path in requests:
             try:
@@ -423,6 +427,8 @@ class AsyncThumbnailLoader(QObject):
                     # Emit immediately for cache hit
                     self.thumbnail_ready.emit(frame_id, cached_pixmap)
                 else:
+                    # Cache miss - store metadata for later cache population
+                    request_metadata[frame_id] = cache_key
                     cache_misses.append((frame_id, frame_path))
             except OSError:
                 cache_misses.append((frame_id, frame_path))
@@ -431,6 +437,9 @@ class AsyncThumbnailLoader(QObject):
         if not cache_misses:
             self.finished.emit()
             return
+
+        # Store metadata for cache population when thumbnails complete
+        self._request_metadata[self._current_request_id] = request_metadata
 
         # Create worker and thread for cache misses
         self._worker = _ThumbnailWorker(cache_misses, sheet_palette, size, self._current_request_id)
@@ -465,6 +474,19 @@ class AsyncThumbnailLoader(QObject):
             return
         if not qimage.isNull():
             pixmap = QPixmap.fromImage(qimage)
+
+            # Populate _pixmap_cache for future cache hits
+            if request_id in self._request_metadata:
+                metadata = self._request_metadata[request_id]
+                if frame_id in metadata:
+                    cache_key = metadata[frame_id]
+                    # Apply same eviction logic as sync path
+                    if len(_pixmap_cache) >= _PIXMAP_CACHE_MAXSIZE:
+                        keys_to_remove = list(_pixmap_cache.keys())[: _PIXMAP_CACHE_MAXSIZE // 4]
+                        for key in keys_to_remove:
+                            _pixmap_cache.pop(key, None)
+                    _pixmap_cache[cache_key] = pixmap
+
             logger.debug("AsyncThumbnailLoader emitting thumbnail_ready for %s", frame_id)
             self.thumbnail_ready.emit(frame_id, pixmap)
         else:
@@ -472,12 +494,16 @@ class AsyncThumbnailLoader(QObject):
 
     def _on_worker_finished(self) -> None:
         """Clean up after worker finishes."""
+        # Clean up metadata for completed request
+        self._request_metadata.pop(self._current_request_id, None)
         self._cleanup_thread()
         if not self._destroyed:
             self.finished.emit()
 
     def cancel(self) -> None:
         """Cancel any in-progress loading."""
+        # Clean up metadata for cancelled requests
+        self._request_metadata.clear()
         if self._worker:
             try:
                 self._worker.request_stop()
