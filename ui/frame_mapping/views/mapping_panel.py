@@ -395,6 +395,11 @@ class MappingPanel(QWidget):
             preview: The new preview QPixmap
         """
         self._game_frame_previews[frame_id] = preview
+
+        # Clear stale quantized icon - preview changed, cached version is stale
+        palette_hash = self._compute_palette_hash()
+        self._quantized_icon_cache.pop((frame_id, palette_hash), None)
+
         self._update_row_game_frame_icon(frame_id, preview)
 
     def _update_row_game_frame_icon(self, game_frame_id: str, preview: QPixmap) -> None:
