@@ -9,6 +9,10 @@ that was previously embedded in MappingPanel. The manager handles:
 
 from __future__ import annotations
 
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class BatchSelectionManager:
     """Manages AI frame selection state for batch injection.
@@ -47,7 +51,19 @@ class BatchSelectionManager:
             True if the checkbox should be checked.
         """
         if self._user_checked_ids is not None:
-            return ai_frame_id in self._user_checked_ids
+            result = ai_frame_id in self._user_checked_ids
+            logger.debug(
+                "should_check: id=%s, in_tracked=%s, result=%s",
+                ai_frame_id,
+                result,
+                result,
+            )
+            return result
+        logger.debug(
+            "should_check: id=%s, is_mapped=%s (default mode)",
+            ai_frame_id,
+            is_mapped,
+        )
         return is_mapped  # Default: check if mapped
 
     def get_checked_ids(self) -> set[str] | None:
@@ -74,12 +90,19 @@ class BatchSelectionManager:
         """
         if self._user_checked_ids is None:
             # First user interaction - caller should provide baseline via set_baseline
+            logger.debug("toggle_checked: FIRST toggle, was_None=True")
             self._user_checked_ids = set()
 
         if checked:
             self._user_checked_ids.add(ai_frame_id)
         else:
             self._user_checked_ids.discard(ai_frame_id)
+        logger.debug(
+            "toggle_checked: id=%s, checked=%s, tracked_ids=%s",
+            ai_frame_id,
+            checked,
+            self._user_checked_ids,
+        )
 
     def set_baseline(self, checked_ids: set[str]) -> None:
         """Set the baseline checked state from current UI.
@@ -90,6 +113,7 @@ class BatchSelectionManager:
         Args:
             checked_ids: Set of currently checked AI frame IDs.
         """
+        logger.debug("set_baseline: captured %d ids: %s", len(checked_ids), checked_ids)
         self._user_checked_ids = checked_ids.copy()
 
     def select_all(self, mapped_frame_ids: set[str]) -> None:
@@ -98,10 +122,12 @@ class BatchSelectionManager:
         Args:
             mapped_frame_ids: Set of AI frame IDs that have mappings.
         """
+        logger.debug("select_all: setting tracked_ids to %s", mapped_frame_ids)
         self._user_checked_ids = mapped_frame_ids.copy()
 
     def deselect_all(self) -> None:
         """Deselect all frames for injection."""
+        logger.debug("deselect_all: setting tracked_ids to empty set")
         self._user_checked_ids = set()
 
     def update_from_refresh(self, current_checked_ids: set[str]) -> None:
@@ -113,11 +139,22 @@ class BatchSelectionManager:
             current_checked_ids: Currently checked IDs from UI.
         """
         if self._user_checked_ids is not None:
+            logger.debug(
+                "update_from_refresh: updating tracked state from %s to %s",
+                self._user_checked_ids,
+                current_checked_ids,
+            )
             self._user_checked_ids = current_checked_ids.copy()
+        else:
+            logger.debug(
+                "update_from_refresh: skipped (not tracking), captured=%s",
+                current_checked_ids,
+            )
 
     def reset(self) -> None:
         """Reset to default behavior.
 
         Called on project change to restore default (all mapped = checked).
         """
+        logger.debug("reset: clearing tracked state, was=%s", self._user_checked_ids)
         self._user_checked_ids = None
