@@ -22,7 +22,7 @@ Four-zone layout:
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QKeySequence, QShortcut
@@ -46,14 +46,14 @@ from ui.components.inputs.file_selector import FileSelector
 from ui.frame_mapping.auto_save_manager import AutoSaveManager
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 from ui.frame_mapping.dialog_coordinator import DialogCoordinator
-from ui.frame_mapping.services.thumbnail_service import clear_thumbnail_cache
+from ui.frame_mapping.injection_coordinator import InjectionCoordinator
+from ui.frame_mapping.palette_coordinator import PaletteCoordinator
 from ui.frame_mapping.signal_error_handling import signal_error_boundary
 from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 from ui.frame_mapping.views.workbench_types import AlignmentState
-from ui.frame_mapping.windows import AIFramePaletteEditorWindow
 from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 from ui.frame_mapping.workspace_state_manager import WorkspaceStateManager
 from utils.logging_config import get_logger
@@ -87,9 +87,6 @@ class FrameMappingWorkspace(QWidget):
         # State manager for UI state
         self._state = WorkspaceStateManager()
 
-        # Track open palette editor windows (frame_id -> editor window)
-        self._palette_editors: dict[str, AIFramePaletteEditorWindow] = {}
-
         # Dialog coordinator for capture imports and confirmations
         self._dialog_coordinator = DialogCoordinator(self)
 
@@ -116,6 +113,25 @@ class FrameMappingWorkspace(QWidget):
         self._logic.set_state(self._state)
         self._logic.set_parent_widget(self)
 
+        # Injection coordinator handles ROM injection operations
+        self._injection = InjectionCoordinator()
+        self._injection.set_controller(self._controller)
+        self._injection.set_state(self._state)
+        self._injection.set_parent_widget(self)
+
+        # Palette coordinator handles palette dialogs and editor windows
+        self._palette = PaletteCoordinator()
+        self._palette.set_controller(self._controller)
+        self._palette.set_state(self._state)
+        self._palette.set_parent_widget(self)
+
+        # Wire message service to coordinators if provided at construction time
+        if message_service is not None:
+            self._auto_save_manager.set_message_service(message_service.show_message)
+            self._logic.set_message_service(message_service)
+            self._injection.set_message_service(message_service)
+            self._palette.set_message_service(message_service)
+
         self._setup_ui()
 
         # Inject panes into logic helper after UI setup
@@ -124,6 +140,23 @@ class FrameMappingWorkspace(QWidget):
             self._captures_pane,
             self._mapping_panel,
             self._alignment_canvas,
+        )
+
+        # Inject panes into coordinators after UI setup
+        self._injection.set_mapping_panel(self._mapping_panel)
+        self._injection.set_alignment_canvas(self._alignment_canvas)
+        self._injection.set_ui_callbacks(
+            get_reuse_rom_enabled=lambda: self._reuse_rom_checkbox.isChecked(),
+            update_frame_status=self._update_single_ai_frame_status,
+        )
+
+        self._palette.set_panes(
+            self._ai_frames_pane,
+            self._mapping_panel,
+            self._alignment_canvas,
+        )
+        self._palette.set_workspace_callbacks(
+            on_ai_frame_selected=self._on_ai_frame_selected,
         )
 
         self._connect_signals()
@@ -142,6 +175,8 @@ class FrameMappingWorkspace(QWidget):
         self._message_service = service
         self._auto_save_manager.set_message_service(service.show_message if service else None)
         self._logic.set_message_service(service)
+        self._injection.set_message_service(service)
+        self._palette.set_message_service(service)
 
     def set_rom_path(self, rom_path: Path | None) -> None:
         """Set ROM path for injection.
@@ -814,134 +849,25 @@ class FrameMappingWorkspace(QWidget):
 
     @signal_error_boundary()
     def _on_edit_frame_palette(self, ai_frame_id: str) -> None:
-        """Handle edit frame palette request - open palette index editor.
+        """Handle edit frame palette request. Delegates to PaletteCoordinator."""
+        self._palette.handle_edit_frame_palette(ai_frame_id)
 
-        Opens a modeless window for editing palette indices of the AI frame
-        before ROM injection.
+    # -------------------------------------------------------------------------
+    # Palette Editor Properties (for backward compatibility)
+    # -------------------------------------------------------------------------
 
-        Args:
-            ai_frame_id: AI frame ID (filename)
+    @property
+    def _palette_editors(self) -> dict:  # type: ignore[type-arg]
+        """Access palette editors dict via PaletteCoordinator.
+
+        Note: This property allows existing code referencing self._palette_editors
+        to continue working. New code should use self._palette.palette_editors.
         """
-        logger.info("_on_edit_frame_palette called with: %s", ai_frame_id)
-        project = self._controller.project
-        if project is None:
-            logger.warning("No project loaded")
-            return
-
-        # Check if editor is already open for this frame
-        if ai_frame_id in self._palette_editors:
-            editor = self._palette_editors[ai_frame_id]
-            editor.raise_()
-            editor.activateWindow()
-            return
-
-        # Get the AI frame
-        ai_frame = project.get_ai_frame_by_id(ai_frame_id)
-        if ai_frame is None:
-            logger.warning("AI frame not found: %s", ai_frame_id)
-            return
-
-        # Get the sheet palette - required for palette editing
-        sheet_palette = project.sheet_palette
-        if sheet_palette is None:
-            QMessageBox.warning(
-                self,
-                "No Palette Set",
-                "Please set a sheet palette before editing palette indices.\n\n"
-                "Right-click on the palette panel and choose 'Edit Palette...' "
-                "or 'Extract from Capture...' to set one.",
-            )
-            return
-
-        # Create the editor window
-        editor = AIFramePaletteEditorWindow(ai_frame, sheet_palette, self)
-
-        # Track the editor window
-        self._palette_editors[ai_frame_id] = editor
-
-        # Connect signals
-        editor.save_requested.connect(self._on_palette_editor_save)
-        editor.closed.connect(lambda fid=ai_frame_id: self._on_palette_editor_closed(fid))
-        editor.palette_color_changed.connect(self._on_editor_palette_color_changed)
-
-        # Show the editor
-        editor.show()
-
-        logger.info("Opened palette editor for: %s", ai_frame_id)
-
-    @signal_error_boundary()
-    def _on_palette_editor_save(self, ai_frame_id: str, indexed_data: object, output_path: str) -> None:
-        """Handle save from palette editor.
-
-        Updates the AIFrame path and refreshes the workspace.
-        When the path changes (e.g., sprite_00.png -> sprite_00_edited.png),
-        all references to the frame ID must be updated.
-
-        Args:
-            ai_frame_id: AI frame ID (old filename)
-            indexed_data: Numpy array of indexed pixel data (unused here)
-            output_path: Path to the saved edited PNG
-        """
-        project = self._controller.project
-        if project is None:
-            return
-
-        # Use project method to update path and fix all references
-        new_id = project.update_ai_frame_path(ai_frame_id, Path(output_path))
-        if new_id is None:
-            logger.warning("Failed to update AI frame path: frame %s not found", ai_frame_id)
-            return
-
-        # Update workspace tracking if ID changed
-        if new_id != ai_frame_id:
-            # Update palette editor tracking
-            if ai_frame_id in self._palette_editors:
-                editor = self._palette_editors.pop(ai_frame_id)
-                self._palette_editors[new_id] = editor
-
-            # Update selection tracking
-            if self._state.selected_ai_frame_id == ai_frame_id:
-                self._state.selected_ai_frame_id = new_id
-
-        # Mark project as modified (will auto-save on next operation)
-        self._controller.project_changed.emit()
-
-        # Refresh the AI frames pane to show updated preview
-        self._ai_frames_pane.refresh_frame(new_id)
-
-        # Refresh the mapping panel to show the updated frame
-        self._mapping_panel.refresh()
-
-        # Update workbench if this frame is selected
-        if self._state.selected_ai_frame_id == new_id:
-            self._on_ai_frame_selected(new_id)
-
-        if self._message_service:
-            self._message_service.show_message(f"Saved edited palette: {Path(output_path).name}", 3000)
-
-    def _on_palette_editor_closed(self, ai_frame_id: str) -> None:
-        """Handle palette editor window closed.
-
-        Removes the editor from tracking dict.
-
-        Args:
-            ai_frame_id: AI frame ID of the closed editor
-        """
-        if ai_frame_id in self._palette_editors:
-            del self._palette_editors[ai_frame_id]
-            logger.debug("Palette editor closed for: %s", ai_frame_id)
+        return self._palette.palette_editors
 
     def _on_editor_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
-        """Handle palette color change from palette editor window.
-
-        Routes the change through the controller to update the project
-        and trigger refresh of all affected UI components.
-
-        Args:
-            index: Palette index that changed
-            color: New RGB color tuple
-        """
-        self._controller.set_sheet_palette_color(index, color)
+        """Handle palette color change from palette editor window. Delegates to PaletteCoordinator."""
+        self._palette._handle_editor_palette_color_changed(index, color)
 
     @signal_error_boundary()
     def _on_delete_capture(self, frame_id: str) -> None:
@@ -1123,356 +1049,47 @@ class FrameMappingWorkspace(QWidget):
 
     @signal_error_boundary()
     def _on_inject_single(self, ai_frame_id: str) -> None:
-        """Handle inject single mapping request (async).
-
-        Uses background thread to avoid UI freeze during ROM I/O.
-
-        Args:
-            ai_frame_id: AI frame ID (filename)
-        """
-        project = self._controller.project
-        if project is None:
-            return
-
-        if not project.get_mapping_for_ai_frame(ai_frame_id):
-            QMessageBox.information(self, "Inject Frame", "Selected frame is not mapped.")
-            return
-
-        if not self._validate_rom_path():
-            return
-
-        # At this point self._state.rom_path is guaranteed not None and exists
-        rom_path = cast(Path, self._state.rom_path)
-
-        # Check if we should reuse the last injected ROM
-        reuse_enabled = self._reuse_rom_checkbox.isChecked()
-        can_reuse = (
-            reuse_enabled and self._state.last_injected_rom is not None and self._state.last_injected_rom.exists()
-        )
-
-        if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-            reply = QMessageBox.question(
-                self,
-                "Confirm Injection",
-                f"Inject AI Frame '{ai_frame_id}'?\n\nReusing existing ROM: {target_rom.name}",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-        else:
-            reply = QMessageBox.question(
-                self,
-                "Confirm Injection",
-                f"Inject AI Frame '{ai_frame_id}'?\n\nA new copy of {rom_path.name} will be created for injection.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        # Clear stale entry tracking before injection
-        self._state.stale_entry_frame_id = None
-
-        # Either reuse existing ROM or create a new copy
-        if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-        else:
-            # Create a new copy for injection
-            target_rom = self._controller.create_injection_copy(rom_path)
-            if target_rom is None:
-                QMessageBox.critical(self, "Inject Frame", "Failed to create ROM copy for injection.")
-                return
-
-        # Track this as a single-frame batch for consistent completion handling
-        self._state.start_batch_injection([ai_frame_id], target_rom)
-
-        # Queue async injection (non-blocking)
-        preserve_sprite = self._alignment_canvas.get_preserve_sprite()
-        self._controller.inject_mapping_async(
-            ai_frame_id,
-            rom_path,
-            output_path=target_rom,
-            preserve_sprite=preserve_sprite,
-        )
+        """Handle inject single mapping request (async). Delegates to InjectionCoordinator."""
+        self._injection.inject_single(ai_frame_id)
 
     @signal_error_boundary()
     def _on_inject_selected(self) -> None:
-        """Handle inject selected frames request (async).
-
-        Uses background thread to avoid UI freeze during batch ROM I/O.
-        """
+        """Handle inject selected frames request (async). Delegates to InjectionCoordinator."""
         selected_ids = self._mapping_panel.get_selected_for_injection()
-
-        if not selected_ids:
-            QMessageBox.information(self, "Inject Selected", "No frames selected for injection.")
-            return
-
-        if not self._validate_rom_path():
-            return
-
-        # At this point self._state.rom_path is guaranteed not None and exists
-        rom_path = cast(Path, self._state.rom_path)
-
-        # Check if we should reuse the last injected ROM
-        reuse_enabled = self._reuse_rom_checkbox.isChecked()
-        can_reuse = (
-            reuse_enabled and self._state.last_injected_rom is not None and self._state.last_injected_rom.exists()
-        )
-
-        frame_count = len(selected_ids)
-        if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-            reply = QMessageBox.question(
-                self,
-                "Confirm Injection",
-                f"Inject {frame_count} selected frames?\n\nReusing existing ROM: {target_rom.name}",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-        else:
-            reply = QMessageBox.question(
-                self,
-                "Confirm Injection",
-                f"Inject {frame_count} selected frames?\n\n"
-                f"A new copy of {rom_path.name} will be created for injection.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        # Either reuse existing ROM or create a new copy
-        if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-        else:
-            target_rom = self._controller.create_injection_copy(rom_path)
-            if target_rom is None:
-                QMessageBox.critical(self, "Inject Selected", "Failed to create ROM copy for injection.")
-                return
-
-        # Track batch injection for completion handling
-        self._state.start_batch_injection(selected_ids, target_rom)
-
-        # Show status message while batch processes
-        if self._message_service:
-            self._message_service.show_message(f"Injecting {frame_count} frames...")
-
-        # Queue all injections asynchronously (processed sequentially by worker)
-        preserve_sprite = self._alignment_canvas.get_preserve_sprite()
-        for ai_frame_id in selected_ids:
-            self._controller.inject_mapping_async(
-                ai_frame_id,
-                rom_path,
-                output_path=target_rom,
-                preserve_sprite=preserve_sprite,
-            )
+        self._injection.inject_selected(selected_ids)
 
     @signal_error_boundary()
     def _on_inject_all(self) -> None:
-        """Handle inject all mapped frames request (async).
-
-        Uses background thread to avoid UI freeze during batch ROM I/O.
-        """
-        project = self._controller.project
-        if project is None or project.mapped_count == 0:
-            QMessageBox.information(self, "Inject All", "No mapped frames to inject.")
-            return
-
-        if not self._validate_rom_path():
-            return
-
-        # At this point self._state.rom_path is guaranteed not None and exists
-        rom_path = cast(Path, self._state.rom_path)
-
-        # Check if we should reuse the last injected ROM
-        reuse_enabled = self._reuse_rom_checkbox.isChecked()
-        can_reuse = (
-            reuse_enabled and self._state.last_injected_rom is not None and self._state.last_injected_rom.exists()
-        )
-
-        if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-            reply = QMessageBox.question(
-                self,
-                "Confirm Injection",
-                f"Inject {project.mapped_count} mapped frames?\n\nReusing existing ROM: {target_rom.name}",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-        else:
-            reply = QMessageBox.question(
-                self,
-                "Confirm Injection",
-                f"Inject {project.mapped_count} mapped frames?\n\n"
-                f"A new copy of {rom_path.name} will be created for injection.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        # Either reuse existing ROM or create a new copy
-        if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-        else:
-            target_rom = self._controller.create_injection_copy(rom_path)
-            if target_rom is None:
-                QMessageBox.critical(self, "Inject All", "Failed to create ROM copy for injection.")
-                return
-
-        # Collect all mapped frame IDs
-        mapped_ids = [
-            ai_frame.id for ai_frame in project.ai_frames if project.get_mapping_for_ai_frame(ai_frame.id) is not None
-        ]
-
-        # Track batch injection for completion handling
-        self._state.start_batch_injection(mapped_ids, target_rom)
-
-        # Show status message while batch processes
-        if self._message_service:
-            self._message_service.show_message(f"Injecting {len(mapped_ids)} frames...")
-
-        # Queue all injections asynchronously (processed sequentially by worker)
-        preserve_sprite = self._alignment_canvas.get_preserve_sprite()
-        for ai_frame_id in mapped_ids:
-            self._controller.inject_mapping_async(
-                ai_frame_id,
-                rom_path,
-                output_path=target_rom,
-                preserve_sprite=preserve_sprite,
-            )
+        """Handle inject all mapped frames request (async). Delegates to InjectionCoordinator."""
+        self._injection.inject_all()
 
     def _on_mapping_injected(self, ai_frame_id: str, message: str) -> None:
-        """Handle successful injection signal."""
-        if self._message_service:
-            self._message_service.show_message(f"Injection successful for frame {ai_frame_id}")
-
-        # Use targeted updates instead of full refresh (avoids regenerating all thumbnails)
-        self._update_single_ai_frame_status(ai_frame_id)
-        self._mapping_panel.update_row_status(ai_frame_id, "injected")
+        """Handle successful injection signal. Delegates to InjectionCoordinator."""
+        self._injection.handle_mapping_injected(ai_frame_id, message)
 
     def _on_stale_entries_warning(self, frame_id: str) -> None:
-        """Handle stale entry ID warning from controller.
-
-        Tracks the frame ID for potential retry with allow_fallback=True.
-        The injection will abort by default, and the caller can offer a retry option.
-
-        Also updates the canvas warning label if the frame matches the current selection.
-        """
-        logger.info("Stale entries detected for frame '%s'", frame_id)
-        self._state.stale_entry_frame_id = frame_id
-
-        # Update canvas warning label if this is the currently selected game frame
-        if self._state.selected_game_id == frame_id:
-            self._alignment_canvas.set_stale_entries_warning_visible(True)
+        """Handle stale entry ID warning from controller. Delegates to InjectionCoordinator."""
+        self._injection.handle_stale_entries_warning(frame_id)
 
     def _on_stale_entries_detected_on_load(self, stale_frame_ids: list[str]) -> None:
-        """Show warning when project loads with stale capture entries.
-
-        Args:
-            stale_frame_ids: Game frame IDs with mismatched entry IDs
-        """
-        count = len(stale_frame_ids)
-        logger.warning("Project loaded with %d stale game frames: %s", count, stale_frame_ids)
-
-        # Show status bar message
-        if self._message_service:
-            self._message_service.show_message(
-                f"⚠ Stale entries detected in {count} frame(s) - preview/injection will use ROM offset fallback",
-                timeout=8000,
-            )
-
-        # Log detailed information
-        logger.info(
-            "Stale entries in frames: %s. "
-            "Capture files may have been re-recorded. "
-            "Preview and injection will fall back to ROM offset filtering.",
-            ", ".join(stale_frame_ids[:5]) + ("..." if count > 5 else ""),
-        )
+        """Show warning when project loads with stale capture entries. Delegates to InjectionCoordinator."""
+        self._injection.handle_stale_entries_on_load(stale_frame_ids)
 
     # -------------------------------------------------------------------------
     # Async Injection Handlers (Issue 8 Performance Fix)
     # -------------------------------------------------------------------------
 
     def _on_async_injection_started(self, ai_frame_id: str) -> None:
-        """Handle async injection started signal.
-
-        Args:
-            ai_frame_id: The AI frame ID being injected
-        """
-        logger.debug("Async injection started for frame '%s'", ai_frame_id)
-        # Update status message to show progress
-        pending = len(self._state.batch_injection_pending)
-        if pending > 1 and self._message_service:
-            self._message_service.show_message(f"Injecting frame {ai_frame_id}... ({pending} remaining)")
+        """Handle async injection started signal. Delegates to InjectionCoordinator."""
+        self._injection.handle_async_injection_started(ai_frame_id)
 
     def _on_async_injection_progress(self, ai_frame_id: str, message: str) -> None:
-        """Handle async injection progress signal.
-
-        Args:
-            ai_frame_id: The AI frame ID being injected
-            message: Progress message
-        """
-        logger.debug("Async injection progress for '%s': %s", ai_frame_id, message)
+        """Handle async injection progress signal. Delegates to InjectionCoordinator."""
+        self._injection.handle_async_injection_progress(ai_frame_id, message)
 
     def _on_async_injection_finished(self, ai_frame_id: str, success: bool, message: str) -> None:
-        """Handle async injection completion signal.
-
-        Updates batch tracking state and shows completion message when all done.
-
-        Args:
-            ai_frame_id: The AI frame ID that was injected
-            success: Whether the injection succeeded
-            message: Result message
-        """
-        # Track stale entry failures for batch reporting
-        stale_entries = self._state.stale_entry_frame_id == ai_frame_id
-        self._state.record_batch_injection_result(ai_frame_id, success, stale_entries)
-
-        # Check if batch is complete
-        if not self._state.is_batch_injection_active():
-            self._on_batch_injection_complete()
-
-    def _on_batch_injection_complete(self) -> None:
-        """Handle completion of batch injection.
-
-        Shows summary message and updates ROM tracking state.
-        """
-        success_count = len(self._state.batch_injection_success)
-        failed_stale_count = len(self._state.batch_injection_failed_stale)
-        total_count = success_count + failed_stale_count
-        target_rom = self._state.batch_injection_target_rom
-
-        # Update last injected ROM if any succeeded
-        if success_count > 0 and target_rom is not None:
-            self._state.last_injected_rom = target_rom
-
-        # Build result message
-        if target_rom is not None:
-            if total_count == 1:
-                # Single frame injection
-                if success_count == 1:
-                    msg = f"Injection successful: {target_rom.name}"
-                else:
-                    msg = "Injection failed due to stale entry selection"
-            else:
-                # Batch injection
-                msg = f"Injected {success_count}/{total_count} frames into {target_rom.name}"
-                if failed_stale_count > 0:
-                    msg += f"\n{failed_stale_count} frame(s) skipped due to outdated entry selection."
-        else:
-            msg = f"Injection complete: {success_count}/{total_count} frames"
-
-        if self._message_service:
-            self._message_service.show_message(msg)
-
-        logger.info("Batch injection complete: %d/%d succeeded", success_count, total_count)
-
-        # Clear batch tracking state
-        self._state.clear_batch_injection()
+        """Handle async injection completion signal. Delegates to InjectionCoordinator."""
+        self._injection.handle_async_injection_finished(ai_frame_id, success, message)
 
     @signal_error_boundary()
     def _on_alignment_updated(self, ai_frame_id: str) -> None:
@@ -1501,138 +1118,47 @@ class FrameMappingWorkspace(QWidget):
         self._update_single_ai_frame_status(ai_frame_id)
 
     # -------------------------------------------------------------------------
-    # Sheet Palette Handlers
+    # Sheet Palette Handlers (delegated to PaletteCoordinator)
     # -------------------------------------------------------------------------
 
     @signal_error_boundary()
     def _on_palette_edit_requested(self) -> None:
-        """Handle request to edit the sheet palette."""
-        from ui.frame_mapping.dialogs.sheet_palette_mapping_dialog import SheetPaletteMappingDialog
-
-        # Extract colors from all AI frames
-        sheet_colors = self._controller.extract_sheet_colors()
-        if not sheet_colors:
-            QMessageBox.information(
-                self,
-                "No AI Frames",
-                "No AI frames loaded. Please load AI frames first to extract colors.",
-            )
-            return
-
-        # Get current palette and available game palettes
-        current_palette = self._controller.get_sheet_palette()
-        game_palettes = self._controller.get_game_palettes()
-
-        # Open dialog
-        dialog = SheetPaletteMappingDialog(
-            sheet_colors=sheet_colors,
-            current_palette=current_palette,
-            game_palettes=game_palettes,
-            parent=self,
-        )
-
-        if dialog.exec():
-            # Apply the result
-            new_palette = dialog.get_result()
-            self._controller.set_sheet_palette(new_palette)
-            if self._message_service:
-                self._message_service.show_message(
-                    f"Sheet palette applied ({len(new_palette.color_mappings)} color mappings)"
-                )
+        """Handle request to edit the sheet palette. Delegates to PaletteCoordinator."""
+        self._palette.handle_palette_edit_requested()
 
     @signal_error_boundary()
     def _on_palette_extract_requested(self) -> None:
-        """Handle request to extract palette from AI sheet."""
-        sheet_colors = self._controller.extract_sheet_colors()
-        if not sheet_colors:
-            QMessageBox.information(
-                self,
-                "No AI Frames",
-                "No AI frames loaded. Please load AI frames first.",
-            )
-            return
-
-        # Generate palette
-        new_palette = self._controller.generate_sheet_palette_from_colors(sheet_colors)
-        self._controller.set_sheet_palette(new_palette)
-
-        if self._message_service:
-            self._message_service.show_message(f"Extracted 16-color palette from {len(sheet_colors)} unique colors")
+        """Handle request to extract palette from AI sheet. Delegates to PaletteCoordinator."""
+        self._palette.handle_palette_extract_requested()
 
     def _on_palette_clear_requested(self) -> None:
-        """Handle request to clear the sheet palette."""
-        if self._controller.get_sheet_palette() is None:
-            return
-
-        reply = QMessageBox.question(
-            self,
-            "Clear Sheet Palette",
-            "Clear the sheet palette?\n\nInjections will use capture palettes instead.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
-            self._controller.set_sheet_palette(None)
-            if self._message_service:
-                self._message_service.show_message("Sheet palette cleared")
+        """Handle request to clear the sheet palette. Delegates to PaletteCoordinator."""
+        self._palette.handle_palette_clear_requested()
 
     @signal_error_boundary()
     def _on_sheet_palette_changed(self) -> None:
-        """Handle sheet palette change from controller.
-
-        BUG-3 FIX: Must explicitly sync all open palette editors because the
-        editor's _on_external_palette_changed uses identity check (is not)
-        which fails when the same palette object is modified in-place.
-        """
-        palette = self._controller.get_sheet_palette()
-
-        # Clear thumbnail cache to regenerate with new palette colors
-        clear_thumbnail_cache()
-
-        self._ai_frames_pane.set_sheet_palette(palette)
-        # Also update the workbench canvas for pixel inspection
-        self._alignment_canvas.set_sheet_palette(palette)
-        # Also update mapping panel to show quantized AI frame thumbnails
-        self._mapping_panel.set_sheet_palette(palette)
-
-        # BUG-3 FIX: Explicitly sync ALL open palette editors
-        # This handles the case where palette colors changed in-place
-        # (same object reference, but different content)
-        if palette is not None:
-            for editor in self._palette_editors.values():
-                # Always update palette reference and refresh UI
-                # (regardless of identity check, since colors may have changed)
-                editor._palette = palette
-                editor._palette_panel.set_palette(palette)
-                editor._update_duplicate_warning()
-                # Refresh canvas with new palette colors
-                data = editor._controller.get_indexed_data()
-                if data is not None:
-                    editor._canvas.set_image(data, palette)
+        """Handle sheet palette change from controller. Delegates to PaletteCoordinator."""
+        self._palette.handle_sheet_palette_changed()
 
     def _on_pixel_hovered(self, x: int, y: int, rgb: object, palette_index: int) -> None:
-        """Handle pixel hover on workbench - highlight palette swatch."""
-        self._ai_frames_pane.highlight_palette_index(palette_index)
+        """Handle pixel hover on workbench. Delegates to PaletteCoordinator."""
+        self._palette.handle_pixel_hovered(x, y, rgb, palette_index)
 
     def _on_pixel_left(self) -> None:
-        """Handle mouse leaving workbench - clear palette highlight."""
-        self._ai_frames_pane.highlight_palette_index(None)
+        """Handle mouse leaving workbench. Delegates to PaletteCoordinator."""
+        self._palette.handle_pixel_left()
 
     def _on_eyedropper_picked(self, rgb: object, palette_index: int) -> None:
-        """Handle eyedropper pick - select palette swatch."""
-        self._ai_frames_pane.select_palette_index(palette_index)
+        """Handle eyedropper pick. Delegates to PaletteCoordinator."""
+        self._palette.handle_eyedropper_picked(rgb, palette_index)
 
     def _on_palette_color_changed(self, index: int, rgb: object) -> None:
-        """Handle palette color change - update controller."""
-        if isinstance(rgb, tuple) and len(rgb) >= 3:
-            rgb_tuple = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
-            self._controller.set_sheet_palette_color(index, rgb_tuple)
+        """Handle palette color change. Delegates to PaletteCoordinator."""
+        self._palette.handle_palette_color_changed(index, rgb)
 
     def _on_palette_swatch_hovered(self, index: object) -> None:
-        """Handle palette swatch hover - highlight pixels on canvas."""
-        if index is None or isinstance(index, int):
-            self._alignment_canvas.highlight_pixels_by_index(index)
+        """Handle palette swatch hover. Delegates to PaletteCoordinator."""
+        self._palette.handle_palette_swatch_hovered(index)
 
     # -------------------------------------------------------------------------
     # Helper Methods (delegated to WorkspaceLogicHelper)
