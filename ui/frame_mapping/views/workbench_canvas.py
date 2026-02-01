@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Literal, override
 
 import numpy as np
 from PIL import Image
-from PySide6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, Signal
+from PySide6.QtCore import QObject, QPointF, QRect, QRectF, Qt, QThread, QTimer, Signal, Slot
 from PySide6.QtGui import QBrush, QColor, QImage, QMouseEvent, QPainter, QPixmap, QWheelEvent
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -81,6 +81,38 @@ if TYPE_CHECKING:
     from core.mesen_integration.click_extractor import CaptureResult
 
 logger = get_logger(__name__)
+
+
+class AlignmentWorker(QThread):
+    """Worker thread for computing optimal alignment."""
+
+    result_ready = Signal(int, int, float, bool)  # offset_x, offset_y, scale, success
+
+    def __init__(
+        self,
+        ai_bbox: tuple[int, int, int, int],
+        tile_rects: list[tuple[int, int, int, int]],
+        parent: QObject | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self._ai_bbox = ai_bbox
+        self._tile_rects = tile_rects
+
+    @override
+    def run(self) -> None:
+        """Run alignment optimization in background thread."""
+        optimizer = AlignmentOptimizer(min_scale=0.01, max_scale=1.0)
+        result = optimizer.compute_optimal_alignment(
+            ai_bbox=self._ai_bbox,
+            tile_rects=self._tile_rects,
+        )
+
+        self.result_ready.emit(
+            result.offset_x,
+            result.offset_y,
+            result.scale,
+            result.success,
+        )
 
 
 class WorkbenchGraphicsView(QGraphicsView):
@@ -394,6 +426,13 @@ class WorkbenchCanvas(QWidget):
         self._preview_enabled = False
         # Snapshot captured when scheduling to ensure preview uses schedule-time values
         self._preview_snapshot: AlignmentState | None = None
+
+        # Alignment worker for background computation
+        self._alignment_worker: AlignmentWorker | None = None
+        # Store pending alignment parameters for when worker completes
+        self._pending_alignment_params: tuple[bool, bool, float, str] | None = (
+            None  # flip_h, flip_v, sharpen, resampling
+        )
 
         self._tile_sampling_service = TileSamplingService()
         self._multi_palette_warning_label: QLabel | None = None
@@ -1062,6 +1101,9 @@ class WorkbenchCanvas(QWidget):
 
     def clear(self) -> None:
         """Clear all content."""
+        # Cancel pending alignment
+        self._pending_alignment_params = None
+
         self._current_ai_frame = None
         self._current_game_frame = None
         self._capture_result = None
@@ -1949,7 +1991,41 @@ class WorkbenchCanvas(QWidget):
 
         # Use optimal alignment when Match Scale is checked
         if self._match_scale_checkbox.isChecked() and ai_content_width > 0 and ai_content_height > 0:
-            offset_x, offset_y, scale = self._compute_optimal_alignment(ai_bbox, flip_h, flip_v)
+            # Cancel any existing worker
+            if self._alignment_worker is not None and self._alignment_worker.isRunning():
+                self._alignment_worker.requestInterruption()
+                self._alignment_worker.quit()
+                self._alignment_worker.wait(1000)
+
+            # Get tile rects and prepare bbox for worker
+            tile_rects = self._get_cached_tile_rects()
+            if not tile_rects:
+                self._status_label.setText("No tile data for alignment")
+                return
+
+            # Apply flips to bbox for worker
+            ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
+            if flip_h:
+                ai_x, ai_x2 = self._ai_image.width - ai_x2, self._ai_image.width - ai_x
+            if flip_v:
+                ai_y, ai_y2 = self._ai_image.height - ai_y2, self._ai_image.height - ai_y
+
+            # Store parameters for when worker completes
+            self._pending_alignment_params = (flip_h, flip_v, sharpen, resampling)
+
+            # Show computing status
+            self._status_label.setText("Computing optimal alignment...")
+            self._auto_align_btn.setEnabled(False)
+
+            # Start worker
+            self._alignment_worker = AlignmentWorker(
+                ai_bbox=(ai_x, ai_y, ai_x2, ai_y2),
+                tile_rects=tile_rects,
+                parent=self,
+            )
+            self._alignment_worker.result_ready.connect(self._on_alignment_worker_finished)
+            self._alignment_worker.start()
+            return  # Don't apply alignment yet - wait for worker
         else:
             # Keep current scale, center on game frame centroid, then adjust for overflow
             scale = self._ai_frame_item.scale_factor()
@@ -2002,6 +2078,39 @@ class WorkbenchCanvas(QWidget):
                 )
 
         # Apply the alignment (preserving sharpen and resampling)
+        self.set_alignment(
+            offset_x,
+            offset_y,
+            flip_h,
+            flip_v,
+            scale,
+            sharpen,
+            resampling,
+        )
+        self._emit_alignment_changed()
+        self._update_scene_for_alignment()
+
+    @Slot(int, int, float, bool)
+    def _on_alignment_worker_finished(self, offset_x: int, offset_y: int, scale: float, success: bool) -> None:
+        """Handle alignment worker completion."""
+        # Re-enable button
+        self._auto_align_btn.setEnabled(True)
+
+        # Check if we still have pending params (could be cleared by clear() or other operations)
+        if self._pending_alignment_params is None:
+            self._status_label.setText("Alignment cancelled")
+            return
+
+        flip_h, flip_v, sharpen, resampling = self._pending_alignment_params
+        self._pending_alignment_params = None
+
+        if not success:
+            logger.warning("Alignment optimization failed, using fallback position")
+            self._status_label.setText("Alignment: using fallback")
+        else:
+            self._status_label.setText("")
+
+        # Apply the alignment
         self.set_alignment(
             offset_x,
             offset_y,
@@ -2607,5 +2716,11 @@ class WorkbenchCanvas(QWidget):
         Called during application close to properly stop background threads
         before Qt objects are destroyed.
         """
+        # Cancel alignment worker if running
+        if self._alignment_worker is not None and self._alignment_worker.isRunning():
+            self._alignment_worker.requestInterruption()
+            self._alignment_worker.quit()
+            self._alignment_worker.wait(1000)
+
         self._async_preview_service.shutdown()
         self._async_highlight_service.shutdown()
