@@ -142,6 +142,18 @@ Agents execute what you specify—vague prompts yield vague results.
 
 Spawn `python-code-reviewer` after multi-file or non-obvious changes, before committing. Skip for trivial single-file edits where correctness is obvious.
 
+### Task Completion Checklist
+
+Before reporting task completion, verify ALL of the following:
+
+1. Tests pass (`uv run pytest` on affected areas)
+2. Lint passes (`uv run ruff check .`)
+3. Types pass (`uv run basedpyright core ui utils`)
+4. **Committed** (if checks pass and work is coherent)
+5. Then report completion
+
+**NEVER report "done" or give a summary before committing.** The commit is part of completing the task, not a follow-up action.
+
 ---
 
 ## Gotchas
