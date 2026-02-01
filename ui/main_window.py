@@ -159,6 +159,7 @@ class MainWindow(QMainWindow):
         self._extracted_files = []
         self._dialog_coordinator = None  # Lazy initialization for dialog service
         self._last_undo_state = (False, False)
+        self._last_frame_mapping_undo_state = (False, False)
 
         # Signal connection management (for per-operation manager connections)
         self._manager_connections: list[object] = []
@@ -592,11 +593,17 @@ class MainWindow(QMainWindow):
 
     def _on_undo(self) -> None:
         """Handle undo action."""
-        self._sprite_editor_workspace.undo()
+        if self.center_stack.currentIndex() == WorkspaceMode.SPRITE_EDITOR:
+            self._sprite_editor_workspace.undo()
+        elif self.center_stack.currentIndex() == WorkspaceMode.FRAME_MAPPING:
+            self._frame_mapping_workspace.controller.undo()
 
     def _on_redo(self) -> None:
         """Handle redo action."""
-        self._sprite_editor_workspace.redo()
+        if self.center_stack.currentIndex() == WorkspaceMode.SPRITE_EDITOR:
+            self._sprite_editor_workspace.redo()
+        elif self.center_stack.currentIndex() == WorkspaceMode.FRAME_MAPPING:
+            self._frame_mapping_workspace.controller.redo()
 
     def _update_undo_redo_state(self, can_undo: bool, can_redo: bool) -> None:
         """Update undo/redo action state.
@@ -619,6 +626,26 @@ class MainWindow(QMainWindow):
             # but we DO NOT overwrite _last_undo_state so we can restore it later
             self.undo_action.setEnabled(False)
             self.redo_action.setEnabled(False)
+
+    def _on_frame_mapping_can_undo_changed(self, can_undo: bool) -> None:
+        """Update frame mapping undo state.
+
+        Args:
+            can_undo: Whether undo is available
+        """
+        self._last_frame_mapping_undo_state = (can_undo, self._last_frame_mapping_undo_state[1])
+        if self.center_stack.currentIndex() == WorkspaceMode.FRAME_MAPPING:
+            self.undo_action.setEnabled(can_undo)
+
+    def _on_frame_mapping_can_redo_changed(self, can_redo: bool) -> None:
+        """Update frame mapping redo state.
+
+        Args:
+            can_redo: Whether redo is available
+        """
+        self._last_frame_mapping_undo_state = (self._last_frame_mapping_undo_state[0], can_redo)
+        if self.center_stack.currentIndex() == WorkspaceMode.FRAME_MAPPING:
+            self.redo_action.setEnabled(can_redo)
 
     def switch_to_workspace(self, workspace_mode: WorkspaceMode, tab_index: int | None = None) -> None:
         """Switch to a specific workspace and optionally a tab within it.
@@ -651,7 +678,10 @@ class MainWindow(QMainWindow):
             # Frame Mapping Mode
             self.center_stack.setCurrentIndex(2)  # Frame Mapping
             self.left_dock.hide()
-            self._update_undo_redo_state(False, False)  # Disable undo
+            # Restore frame mapping undo state
+            can_undo, can_redo = self._last_frame_mapping_undo_state
+            self.undo_action.setEnabled(can_undo)
+            self.redo_action.setEnabled(can_redo)
 
             # Sync ROM path from sprite editor to frame mapping
             rom_path = self._sprite_editor_workspace.rom_workflow_controller.rom_path
@@ -1481,6 +1511,10 @@ class MainWindow(QMainWindow):
         self._sprite_editor_workspace.rom_workflow_controller.capture_offset_adjusted.connect(
             self.rom_extraction_panel.mesen_captures_section.update_capture_offset
         )
+
+        # Connect frame mapping workspace signals
+        self._frame_mapping_workspace.controller.can_undo_changed.connect(self._on_frame_mapping_can_undo_changed)
+        self._frame_mapping_workspace.controller.can_redo_changed.connect(self._on_frame_mapping_can_redo_changed)
 
         # Connect keyboard shortcut manager signals
         self.keyboard_shortcut_manager.tab_switch_requested.connect(self._on_tab_switch_requested)
