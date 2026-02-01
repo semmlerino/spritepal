@@ -65,12 +65,12 @@ class MappingPanel(QWidget):
     Supports drag-drop from CapturesLibraryPane to create/replace mappings.
 
     Signals:
-        mapping_selected: Emitted when a mapping row is selected (ai_frame_index)
-        edit_frame_requested: Emitted when user clicks Edit Frame (ai_frame_index)
+        mapping_selected: Emitted when a mapping row is selected (ai_frame_id)
+        edit_frame_requested: Emitted when user clicks Edit Frame (ai_frame_id)
         remove_mapping_requested: Emitted when user requests to remove a mapping
         adjust_alignment_requested: Emitted when user clicks Adjust Alignment
-        drop_game_frame_requested: Emitted when game frame dropped on row (ai_index, game_id)
-        inject_mapping_requested: Emitted when user requests injection (ai_frame_index)
+        drop_game_frame_requested: Emitted when game frame dropped on row (ai_frame_id, game_frame_id)
+        inject_mapping_requested: Emitted when user requests injection (ai_frame_id)
     """
 
     mapping_selected = Signal(str)
@@ -684,8 +684,7 @@ class MappingPanel(QWidget):
                 should_check = self._selection_state.should_check(ai_frame.id, is_mapped)
 
                 checkbox_item.setCheckState(Qt.CheckState.Checked if should_check else Qt.CheckState.Unchecked)
-                checkbox_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
-                # Also store AI frame ID for stable reference (used by checkbox preservation)
+                # Store AI frame ID for stable reference (used by checkbox preservation)
                 checkbox_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
                 self._table.setItem(row, 0, checkbox_item)
 
@@ -697,8 +696,7 @@ class MappingPanel(QWidget):
                 # AI Frame column with thumbnail - column 2
                 # Thumbnails are loaded asynchronously via visibility-based lazy loading
                 ai_item = QTableWidgetItem(ai_frame.path.name)
-                ai_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
-                # Also store AI frame ID for ID-based lookups
+                # Store AI frame ID for ID-based lookups
                 ai_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
                 self._table.setItem(row, 2, ai_item)
 
@@ -760,17 +758,6 @@ class MappingPanel(QWidget):
 
         # Update inject selected button state
         self._update_inject_selected_state()
-
-    def get_selected_ai_frame_index(self) -> int | None:
-        """Get the AI frame index of the selected mapping row."""
-        selected = self._table.selectedItems()
-        if not selected:
-            return None
-        row = selected[0].row()
-        ai_item = self._table.item(row, 2)  # AI Frame column (shifted due to checkbox)
-        if ai_item is None:
-            return None
-        return ai_item.data(Qt.ItemDataRole.UserRole)
 
     def get_selected_ai_frame_id(self) -> str | None:
         """Get the AI frame ID (filename) of the selected mapping row.
@@ -1000,7 +987,6 @@ class MappingPanel(QWidget):
             checkbox_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
             # New frames default to unchecked
             checkbox_item.setCheckState(Qt.CheckState.Unchecked)
-            checkbox_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
             checkbox_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
             self._table.setItem(row, 0, checkbox_item)
 
@@ -1011,7 +997,6 @@ class MappingPanel(QWidget):
 
             # AI Frame column with thumbnail - column 2
             ai_item = QTableWidgetItem(ai_frame.path.name)
-            ai_item.setData(Qt.ItemDataRole.UserRole, ai_frame.index)
             ai_item.setData(Qt.ItemDataRole.UserRole + 1, ai_frame.id)
             # Load thumbnail
             thumbnail = create_quantized_thumbnail(ai_frame.path, self._sheet_palette, THUMBNAIL_SIZE)

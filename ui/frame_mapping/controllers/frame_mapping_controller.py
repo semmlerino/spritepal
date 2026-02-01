@@ -70,9 +70,9 @@ class FrameMappingController(QObject):
         project_changed: Emitted when project is loaded/created/modified (structural changes)
         ai_frames_loaded: Emitted when AI frames are loaded (count)
         game_frame_added: Emitted when a game frame is added (frame_id)
-        mapping_created: Emitted when a mapping is created (ai_index, game_id)
-        mapping_removed: Emitted when a mapping is removed (ai_index)
-        alignment_updated: Emitted when mapping alignment changes (ai_frame_index)
+        mapping_created: Emitted when a mapping is created (ai_frame_id, game_frame_id)
+        mapping_removed: Emitted when a mapping is removed (ai_frame_id)
+        alignment_updated: Emitted when mapping alignment changes (ai_frame_id)
         error_occurred: Emitted on errors (error_message)
     """
 

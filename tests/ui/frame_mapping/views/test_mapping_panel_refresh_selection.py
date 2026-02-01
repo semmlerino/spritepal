@@ -28,7 +28,7 @@ class TestRefreshPreservesSelection:
         """Refresh should not emit mapping_selected signal.
 
         Bug: refresh() cleared the table without blocking signals, causing
-        itemSelectionChanged to fire and emit mapping_selected with wrong index.
+        itemSelectionChanged to fire and emit mapping_selected with wrong ID.
         """
         # Setup: Create panel with project
         panel = MappingPanel()
@@ -38,18 +38,18 @@ class TestRefreshPreservesSelection:
         panel.set_project(project)
         panel.refresh()
 
-        # Select row 2 (index 2)
+        # Select row 2 (AI frame ID is frame_002.png)
         panel._table.selectRow(2)
-        assert panel.get_selected_ai_frame_index() == 2
+        assert panel.get_selected_ai_frame_id() == "frame_002.png"
 
         # Track signals emitted during refresh
-        signal_emissions: list[int] = []
-        panel.mapping_selected.connect(lambda idx: signal_emissions.append(idx))
+        signal_emissions: list[str] = []
+        panel.mapping_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
 
         # Call refresh (this is the bug path)
         panel.refresh()
 
-        # Bug behavior: mapping_selected would be emitted (possibly with wrong index)
+        # Bug behavior: mapping_selected would be emitted (possibly with wrong ID)
         # Fixed behavior: mapping_selected should NOT be emitted during refresh
         assert signal_emissions == [], f"Expected no signals, but got {signal_emissions}"
 
@@ -65,15 +65,15 @@ class TestRefreshPreservesSelection:
         panel.set_project(project)
         panel.refresh()
 
-        # Select row 3 (AI frame index 3)
+        # Select row 3 (AI frame ID is frame_003.png)
         panel._table.selectRow(3)
-        assert panel.get_selected_ai_frame_index() == 3
+        assert panel.get_selected_ai_frame_id() == "frame_003.png"
 
         # Refresh
         panel.refresh()
 
         # Selection should be preserved
-        assert panel.get_selected_ai_frame_index() == 3, "Selection was not preserved after refresh"
+        assert panel.get_selected_ai_frame_id() == "frame_003.png", "Selection was not preserved after refresh"
 
     def test_refresh_with_no_selection_does_not_emit_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
         """Refresh with no selection should not emit mapping_selected."""
@@ -86,11 +86,11 @@ class TestRefreshPreservesSelection:
 
         # Clear any selection
         panel._table.clearSelection()
-        assert panel.get_selected_ai_frame_index() is None
+        assert panel.get_selected_ai_frame_id() is None
 
         # Track signals
-        signal_emissions: list[int] = []
-        panel.mapping_selected.connect(lambda idx: signal_emissions.append(idx))
+        signal_emissions: list[str] = []
+        panel.mapping_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
 
         # Refresh
         panel.refresh()
@@ -111,24 +111,24 @@ class TestRefreshPreservesSelection:
         panel.set_project(project)
         panel.refresh()
 
-        # Select the last row (index 4)
+        # Select the last row (AI frame ID is frame_004.png)
         panel._table.selectRow(4)
-        assert panel.get_selected_ai_frame_index() == 4
+        assert panel.get_selected_ai_frame_id() == "frame_004.png"
 
         # Reduce to 3 frames (simulating external change)
         project.ai_frames = project.ai_frames[:3]
 
         # Track signals
-        signal_emissions: list[int] = []
-        panel.mapping_selected.connect(lambda idx: signal_emissions.append(idx))
+        signal_emissions: list[str] = []
+        panel.mapping_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
 
         # Refresh - should not crash or emit spurious signals
         panel.refresh()
 
-        # Selection should be cleared since index 4 no longer exists
+        # Selection should be cleared since the frame no longer exists
         # But no spurious signals should be emitted during table rebuild
         # (Any signals emitted should be for valid restoration only)
-        assert panel.get_selected_ai_frame_index() is None
+        assert panel.get_selected_ai_frame_id() is None
 
     def test_set_project_preserves_selection_on_same_project(self, qtbot: QtBot, tmp_path: Path) -> None:
         """Calling set_project with the same project should preserve selection.
@@ -144,13 +144,13 @@ class TestRefreshPreservesSelection:
         panel.set_project(project)
         panel.refresh()  # Caller must call refresh after set_project
 
-        # Select row 2
+        # Select row 2 (AI frame ID is frame_002.png)
         panel._table.selectRow(2)
-        assert panel.get_selected_ai_frame_index() == 2
+        assert panel.get_selected_ai_frame_id() == "frame_002.png"
 
         # Track signals
-        signal_emissions: list[int] = []
-        panel.mapping_selected.connect(lambda idx: signal_emissions.append(idx))
+        signal_emissions: list[str] = []
+        panel.mapping_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
 
         # Call set_project with the same project (simulates project_changed handling)
         # In real usage, workspace calls refresh() separately via _update_mapping_panel_previews
@@ -158,7 +158,7 @@ class TestRefreshPreservesSelection:
         panel.refresh()
 
         # Selection should be preserved
-        assert panel.get_selected_ai_frame_index() == 2, "Selection was not preserved after set_project"
+        assert panel.get_selected_ai_frame_id() == "frame_002.png", "Selection was not preserved after set_project"
 
         # No spurious signals
         assert signal_emissions == [], f"Unexpected signals: {signal_emissions}"
@@ -176,20 +176,20 @@ class TestRefreshPreservesSelection:
         panel.set_project(project)
         panel.refresh()  # Caller must call refresh after set_project
 
-        # Select row 2
+        # Select row 2 (AI frame ID is frame_002.png)
         panel._table.selectRow(2)
-        assert panel.get_selected_ai_frame_index() == 2
+        assert panel.get_selected_ai_frame_id() == "frame_002.png"
 
         # Track signals
-        signal_emissions: list[int] = []
-        panel.mapping_selected.connect(lambda idx: signal_emissions.append(idx))
+        signal_emissions: list[str] = []
+        panel.mapping_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
 
         # Simulate rapid refresh calls (like during drag)
         for _ in range(10):
             panel.refresh()
 
         # Selection should still be preserved
-        assert panel.get_selected_ai_frame_index() == 2, "Selection was not preserved after multiple refreshes"
+        assert panel.get_selected_ai_frame_id() == "frame_002.png", "Selection was not preserved after multiple refreshes"
 
         # No spurious signals
         assert signal_emissions == [], f"Unexpected signals: {signal_emissions}"
@@ -208,13 +208,13 @@ class TestRefreshPreservesSelection:
         panel.set_project(project)
         panel.refresh()  # Initial population
 
-        # Select row 3
+        # Select row 3 (AI frame ID is frame_003.png)
         panel._table.selectRow(3)
-        assert panel.get_selected_ai_frame_index() == 3
+        assert panel.get_selected_ai_frame_id() == "frame_003.png"
 
         # Track signals
-        signal_emissions: list[int] = []
-        panel.mapping_selected.connect(lambda idx: signal_emissions.append(idx))
+        signal_emissions: list[str] = []
+        panel.mapping_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
 
         # Simulate the workspace flow:
         # 1. project_changed causes set_project (does NOT call refresh)
@@ -223,7 +223,7 @@ class TestRefreshPreservesSelection:
         panel.refresh()
 
         # Selection should still be preserved
-        assert panel.get_selected_ai_frame_index() == 3, "Selection was not preserved after double refresh"
+        assert panel.get_selected_ai_frame_id() == "frame_003.png", "Selection was not preserved after double refresh"
 
         # No spurious signals
         assert signal_emissions == [], f"Unexpected signals: {signal_emissions}"
