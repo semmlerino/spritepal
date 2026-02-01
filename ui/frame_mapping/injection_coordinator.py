@@ -154,57 +154,16 @@ class InjectionCoordinator:
         # At this point self._state.rom_path is guaranteed not None and exists
         rom_path = cast(Path, self._state.rom_path)
 
-        # Check if we should reuse the last injected ROM
-        reuse_enabled = self._get_reuse_rom_enabled() if self._get_reuse_rom_enabled else False
-        can_reuse = (
-            reuse_enabled and self._state.last_injected_rom is not None and self._state.last_injected_rom.exists()
-        )
-
-        if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-            reply = QMessageBox.question(
-                self._parent_widget,
-                "Confirm Injection",
-                f"Inject AI Frame '{ai_frame_id}'?\n\nReusing existing ROM: {target_rom.name}",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-        else:
-            reply = QMessageBox.question(
-                self._parent_widget,
-                "Confirm Injection",
-                f"Inject AI Frame '{ai_frame_id}'?\n\nA new copy of {rom_path.name} will be created for injection.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
         # Clear stale entry tracking before injection
         self._state.stale_entry_frame_id = None
 
-        # Either reuse existing ROM or create a new copy
-        if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-        else:
-            # Create a new copy for injection
-            target_rom = self._controller.create_injection_copy(rom_path)
-            if target_rom is None:
-                QMessageBox.critical(self._parent_widget, "Inject Frame", "Failed to create ROM copy for injection.")
-                return
+        # Prepare injection target ROM
+        target_rom = self._prepare_injection_target(f"AI Frame '{ai_frame_id}'", rom_path, "Inject Frame")
+        if target_rom is None:
+            return
 
-        # Track this as a single-frame batch for consistent completion handling
-        self._state.start_batch_injection([ai_frame_id], target_rom)
-
-        # Queue async injection (non-blocking)
-        preserve_sprite = self._alignment_canvas.get_preserve_sprite() if self._alignment_canvas else False
-        self._controller.inject_mapping_async(
-            ai_frame_id,
-            rom_path,
-            output_path=target_rom,
-            preserve_sprite=preserve_sprite,
-        )
+        # Queue the injection
+        self._queue_injection_batch([ai_frame_id], target_rom, rom_path)
 
     def inject_selected(self, selected_ids: list[str]) -> None:
         """Handle inject selected frames request (async).
@@ -227,60 +186,16 @@ class InjectionCoordinator:
         # At this point self._state.rom_path is guaranteed not None and exists
         rom_path = cast(Path, self._state.rom_path)
 
-        # Check if we should reuse the last injected ROM
-        reuse_enabled = self._get_reuse_rom_enabled() if self._get_reuse_rom_enabled else False
-        can_reuse = (
-            reuse_enabled and self._state.last_injected_rom is not None and self._state.last_injected_rom.exists()
-        )
-
         frame_count = len(selected_ids)
-        if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-            reply = QMessageBox.question(
-                self._parent_widget,
-                "Confirm Injection",
-                f"Inject {frame_count} selected frames?\n\nReusing existing ROM: {target_rom.name}",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-        else:
-            reply = QMessageBox.question(
-                self._parent_widget,
-                "Confirm Injection",
-                f"Inject {frame_count} selected frames?\n\n"
-                f"A new copy of {rom_path.name} will be created for injection.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-
-        if reply != QMessageBox.StandardButton.Yes:
+        # Prepare injection target ROM
+        target_rom = self._prepare_injection_target(
+            f"{frame_count} selected frames", rom_path, "Inject Selected"
+        )
+        if target_rom is None:
             return
 
-        # Either reuse existing ROM or create a new copy
-        if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-        else:
-            target_rom = self._controller.create_injection_copy(rom_path)
-            if target_rom is None:
-                QMessageBox.critical(self._parent_widget, "Inject Selected", "Failed to create ROM copy for injection.")
-                return
-
-        # Track batch injection for completion handling
-        self._state.start_batch_injection(selected_ids, target_rom)
-
-        # Show status message while batch processes
-        if self._message_service:
-            self._message_service.show_message(f"Injecting {frame_count} frames...")
-
-        # Queue all injections asynchronously (processed sequentially by worker)
-        preserve_sprite = self._alignment_canvas.get_preserve_sprite() if self._alignment_canvas else False
-        for ai_frame_id in selected_ids:
-            self._controller.inject_mapping_async(
-                ai_frame_id,
-                rom_path,
-                output_path=target_rom,
-                preserve_sprite=preserve_sprite,
-            )
+        # Queue the injections
+        self._queue_injection_batch(selected_ids, target_rom, rom_path, frame_count)
 
     def inject_all(self) -> None:
         """Handle inject all mapped frames request (async).
@@ -301,6 +216,44 @@ class InjectionCoordinator:
         # At this point self._state.rom_path is guaranteed not None and exists
         rom_path = cast(Path, self._state.rom_path)
 
+        # Collect all mapped frame IDs
+        mapped_ids = [
+            ai_frame.id for ai_frame in project.ai_frames if project.get_mapping_for_ai_frame(ai_frame.id) is not None
+        ]
+
+        # Prepare injection target ROM
+        target_rom = self._prepare_injection_target(
+            f"{project.mapped_count} mapped frames", rom_path, "Inject All"
+        )
+        if target_rom is None:
+            return
+
+        # Queue the injections
+        self._queue_injection_batch(mapped_ids, target_rom, rom_path, len(mapped_ids))
+
+    # -------------------------------------------------------------------------
+    # Injection Helper Methods
+    # -------------------------------------------------------------------------
+
+    def _prepare_injection_target(self, description: str, rom_path: Path, action_name: str) -> Path | None:
+        """Prepare injection target ROM by checking reuse eligibility and showing confirmation.
+
+        Handles two scenarios:
+        1. If reuse is enabled and last_injected_rom exists, offers to reuse it
+        2. Otherwise, offers to create a new ROM copy
+
+        Args:
+            description: Human-readable description for the confirmation dialog
+                        (e.g., "AI Frame 'frame_1'", "5 selected frames", "12 mapped frames")
+            rom_path: Current ROM path (guaranteed to exist after validate_rom_path())
+            action_name: Action name for error dialogs (e.g., "Inject Frame", "Inject Selected")
+
+        Returns:
+            Path to target ROM if confirmed, None if cancelled or creation failed.
+        """
+        if self._state is None or self._parent_widget is None or self._controller is None:
+            return None
+
         # Check if we should reuse the last injected ROM
         reuse_enabled = self._get_reuse_rom_enabled() if self._get_reuse_rom_enabled else False
         can_reuse = (
@@ -312,7 +265,7 @@ class InjectionCoordinator:
             reply = QMessageBox.question(
                 self._parent_widget,
                 "Confirm Injection",
-                f"Inject {project.mapped_count} mapped frames?\n\nReusing existing ROM: {target_rom.name}",
+                f"Inject {description}?\n\nReusing existing ROM: {target_rom.name}",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -320,39 +273,56 @@ class InjectionCoordinator:
             reply = QMessageBox.question(
                 self._parent_widget,
                 "Confirm Injection",
-                f"Inject {project.mapped_count} mapped frames?\n\n"
-                f"A new copy of {rom_path.name} will be created for injection.",
+                f"Inject {description}?\n\nA new copy of {rom_path.name} will be created for injection.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
 
         if reply != QMessageBox.StandardButton.Yes:
-            return
+            return None
 
         # Either reuse existing ROM or create a new copy
         if can_reuse:
-            target_rom = cast(Path, self._state.last_injected_rom)
-        else:
-            target_rom = self._controller.create_injection_copy(rom_path)
-            if target_rom is None:
-                QMessageBox.critical(self._parent_widget, "Inject All", "Failed to create ROM copy for injection.")
-                return
+            return cast(Path, self._state.last_injected_rom)
 
-        # Collect all mapped frame IDs
-        mapped_ids = [
-            ai_frame.id for ai_frame in project.ai_frames if project.get_mapping_for_ai_frame(ai_frame.id) is not None
-        ]
+        # Create a new copy for injection
+        target_rom = self._controller.create_injection_copy(rom_path)
+        if target_rom is None:
+            QMessageBox.critical(self._parent_widget, action_name, "Failed to create ROM copy for injection.")
+            return None
+
+        return target_rom
+
+    def _queue_injection_batch(
+        self, frame_ids: list[str], target_rom: Path, rom_path: Path, frame_count: int | None = None
+    ) -> None:
+        """Queue a batch of injections for async processing.
+
+        Tracks batch state and queues all frames for injection with the specified target ROM.
+
+        Args:
+            frame_ids: List of AI frame IDs to inject
+            target_rom: Target ROM path for injection output
+            rom_path: Source ROM path (used when calling inject_mapping_async)
+            frame_count: Optional frame count for status message. If not provided, defaults to len(frame_ids).
+        """
+        if self._state is None or self._controller is None:
+            return
+
+        # Default frame_count to list length if not provided
+        if frame_count is None:
+            frame_count = len(frame_ids)
 
         # Track batch injection for completion handling
-        self._state.start_batch_injection(mapped_ids, target_rom)
+        self._state.start_batch_injection(frame_ids, target_rom)
 
-        # Show status message while batch processes
-        if self._message_service:
-            self._message_service.show_message(f"Injecting {len(mapped_ids)} frames...")
+        # Show status message while batch processes (only for multi-frame batches)
+        if frame_count > 1 and self._message_service:
+            self._message_service.show_message(f"Injecting {frame_count} frames...")
 
         # Queue all injections asynchronously (processed sequentially by worker)
         preserve_sprite = self._alignment_canvas.get_preserve_sprite() if self._alignment_canvas else False
-        for ai_frame_id in mapped_ids:
+        for ai_frame_id in frame_ids:
             self._controller.inject_mapping_async(
                 ai_frame_id,
                 rom_path,
