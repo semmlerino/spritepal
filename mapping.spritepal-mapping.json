@@ -355,30 +355,6 @@
       "resampling": "lanczos"
     },
     {
-      "ai_frame_id": "m3.png",
-      "game_frame_id": "capture_1769721724",
-      "status": "injected",
-      "offset_x": -11,
-      "offset_y": -16,
-      "flip_h": false,
-      "flip_v": false,
-      "scale": 0.05216366525423729,
-      "sharpen": 0.0,
-      "resampling": "lanczos"
-    },
-    {
-      "ai_frame_id": "sprite_09.png",
-      "game_frame_id": "capture_1769108252",
-      "status": "injected",
-      "offset_x": 7,
-      "offset_y": 16,
-      "flip_h": false,
-      "flip_v": false,
-      "scale": 0.10249410377358492,
-      "sharpen": 0.0,
-      "resampling": "lanczos"
-    },
-    {
       "ai_frame_id": "sprite_10.png",
       "game_frame_id": "capture_1769108964",
       "status": "injected",
@@ -387,6 +363,30 @@
       "flip_h": false,
       "flip_v": false,
       "scale": 1.0,
+      "sharpen": 0.0,
+      "resampling": "lanczos"
+    },
+    {
+      "ai_frame_id": "sprite_00_edited.png",
+      "game_frame_id": "capture_1769721724",
+      "status": "injected",
+      "offset_x": 0,
+      "offset_y": 0,
+      "flip_h": false,
+      "flip_v": false,
+      "scale": 1.0,
+      "sharpen": 0.0,
+      "resampling": "lanczos"
+    },
+    {
+      "ai_frame_id": "sprite_01.png",
+      "game_frame_id": "capture_1769108252",
+      "status": "injected",
+      "offset_x": 16,
+      "offset_y": 8,
+      "flip_h": false,
+      "flip_v": false,
+      "scale": 0.0987473665730337,
       "sharpen": 0.0,
       "resampling": "lanczos"
     }
