@@ -55,6 +55,7 @@ from core.services.image_utils import pil_to_qimage
 from core.services.rgb_to_indexed import load_image_preserving_indices
 from core.services.sprite_compositor import TransformParams
 from core.services.tile_sampling_service import TileSamplingService
+from core.types import CompressionType
 from ui.frame_mapping.services.async_highlight_service import AsyncHighlightService
 from ui.frame_mapping.services.async_preview_service import AsyncPreviewService
 from ui.frame_mapping.services.canvas_config_service import CanvasConfig
@@ -286,11 +287,11 @@ class WorkbenchCanvas(QWidget):
         - FrameMappingWorkspace → updates controller and mapping panel
     """
 
-    compression_type_changed = Signal(str)
+    compression_type_changed = Signal(CompressionType)
     """Emitted when compression type selection changes.
 
     Args:
-        compression_type: "raw" for uncompressed or "hal" for HAL3 compression
+        compression_type: CompressionType enum value (RAW or HAL)
 
     Emitted by:
         - _on_compression_type_changed() → when user selects compression option
@@ -683,8 +684,8 @@ class WorkbenchCanvas(QWidget):
         controls2.addWidget(compression_label)
 
         self._compression_combo = QComboBox()
-        self._compression_combo.addItem("RAW", "raw")
-        self._compression_combo.addItem("HAL", "hal")
+        self._compression_combo.addItem("RAW", CompressionType.RAW)
+        self._compression_combo.addItem("HAL", CompressionType.HAL)
         self._compression_combo.setStyleSheet("font-size: 11px;")
         self._compression_combo.setToolTip(
             "Compression type for ROM injection (applies to all offsets in this capture). "
@@ -903,11 +904,11 @@ class WorkbenchCanvas(QWidget):
             self._multi_palette_warning_label.setVisible(has_multiple)
 
         # Update compression type combo from game frame
-        # Use first ROM offset's type, or default to "raw"
-        compression_type = "raw"
+        # Use first ROM offset's type, or default to RAW
+        compression_type = CompressionType.RAW
         if frame.rom_offsets and frame.compression_types:
             first_offset = frame.rom_offsets[0]
-            compression_type = frame.compression_types.get(first_offset, "raw")
+            compression_type = frame.compression_types.get(first_offset, CompressionType.RAW)
         # Block signals to prevent triggering change handler during UI update
         with block_signals(self._compression_combo):
             index = self._compression_combo.findData(compression_type)
@@ -1548,7 +1549,7 @@ class WorkbenchCanvas(QWidget):
     def _on_compression_changed(self, index: int) -> None:
         """Handle compression type combo change."""
         compression_type = self._compression_combo.currentData()
-        if compression_type and self._current_game_frame is not None:
+        if compression_type is not None and self._current_game_frame is not None:
             self.compression_type_changed.emit(compression_type)
 
     @signal_error_boundary()

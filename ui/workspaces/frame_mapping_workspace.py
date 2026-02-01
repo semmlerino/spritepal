@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.app_context import get_app_context
+from core.types import CompressionType
 from ui.components.inputs.file_selector import FileSelector
 from ui.frame_mapping.auto_save_manager import AutoSaveManager
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
@@ -780,7 +781,7 @@ class FrameMappingWorkspace(QWidget):
         self._logic.handle_alignment_changed(state)
 
     @signal_error_boundary()
-    def _on_compression_type_changed(self, compression_type: str) -> None:
+    def _on_compression_type_changed(self, compression_type: CompressionType) -> None:
         """Handle compression type change from canvas.
 
         Routes compression changes through the controller instead of

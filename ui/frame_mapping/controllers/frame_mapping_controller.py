@@ -30,6 +30,7 @@ from core.repositories.capture_result_repository import CaptureResultRepository
 from core.repositories.frame_mapping_repository import FrameMappingRepository
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.palette_offset_calculator import PaletteOffsetCalculator
+from core.types import CompressionType
 from ui.frame_mapping.facades.ai_frames_facade import AIFramesFacade
 from ui.frame_mapping.facades.controller_context import ControllerContext
 from ui.frame_mapping.facades.game_frames_facade import GameFramesFacade
@@ -1378,7 +1379,7 @@ class FrameMappingController(QObject):
         """
         return self._ai_frames.reorder(ai_frame_id, new_index)
 
-    def update_game_frame_compression(self, frame_id: str, compression_type: str) -> bool:
+    def update_game_frame_compression(self, frame_id: str, compression_type: CompressionType) -> bool:
         """Update compression type for a game frame.
 
         Updates the compression type for all ROM offsets in the game frame.
@@ -1386,7 +1387,7 @@ class FrameMappingController(QObject):
 
         Args:
             frame_id: ID of the game frame.
-            compression_type: New compression type ('raw' or 'hal').
+            compression_type: New compression type (CompressionType enum).
 
         Returns:
             True if the update was successful.

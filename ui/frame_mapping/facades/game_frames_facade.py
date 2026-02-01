@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
+from core.types import CompressionType
 from ui.frame_mapping.services.organization_service import OrganizationService
 from ui.frame_mapping.services.preview_service import PreviewService
 from utils.logging_config import get_logger
@@ -102,7 +103,7 @@ class GameFramesFacade:
             return []
         return project.game_frames
 
-    def update_compression(self, frame_id: str, compression_type: str) -> bool:
+    def update_compression(self, frame_id: str, compression_type: CompressionType) -> bool:
         """Update compression type for a game frame.
 
         Updates the compression type for all ROM offsets in the game frame.
@@ -110,7 +111,7 @@ class GameFramesFacade:
 
         Args:
             frame_id: ID of the game frame.
-            compression_type: New compression type ('raw' or 'hal').
+            compression_type: New compression type (CompressionType enum).
 
         Returns:
             True if the update was successful.

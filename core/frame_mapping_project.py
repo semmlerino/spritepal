@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import cast
 
 from core.palette_utils import SNES_PALETTE_SIZE
+from core.types import CompressionType
 
 
 class MappingStatus(str, Enum):
@@ -256,7 +257,7 @@ class GameFrame:
     height: int = 0
     selected_entry_ids: list[int] = field(default_factory=list)  # OAM entry IDs selected during import
     # Stored per-ROM offset, but UI enforces a single compression type per game frame.
-    compression_types: dict[int, str] = field(default_factory=dict)  # ROM offset -> "hal" | "raw"
+    compression_types: dict[int, CompressionType] = field(default_factory=dict)  # ROM offset -> CompressionType
     display_name: str | None = None  # Optional user-defined display name
 
     @property
@@ -282,8 +283,8 @@ class GameFrame:
                 except ValueError:
                     pass
 
-        # Convert int keys to strings for JSON serialization
-        compression_types_str = {str(k): v for k, v in self.compression_types.items()}
+        # Convert int keys to strings and enum values to strings for JSON serialization
+        compression_types_str = {str(k): v.value for k, v in self.compression_types.items()}
 
         result: dict[str, object] = {
             "id": self.id,
@@ -318,9 +319,18 @@ class GameFrame:
         if base_path and capture_path and not capture_path.is_absolute():
             capture_path = base_path / capture_path
 
-        # Convert string keys back to ints for compression_types
+        # Convert string keys back to ints and strings to enum for compression_types
+        # Handle backward compatibility: accept both string values and enum values
         compression_types_raw = cast(dict[str, str], data.get("compression_types", {}))
-        compression_types = {int(k): v for k, v in compression_types_raw.items()}
+        compression_types: dict[int, CompressionType] = {}
+        for k, v in compression_types_raw.items():
+            try:
+                # Try to convert string to enum
+                compression_types[int(k)] = CompressionType(v)
+            except ValueError:
+                # Fallback to RAW for unknown values (defensive)
+                logger.warning("Unknown compression type '%s', defaulting to RAW", v)
+                compression_types[int(k)] = CompressionType.RAW
 
         return cls(
             id=cast(str, data["id"]),

@@ -24,6 +24,7 @@ from core.mesen_integration.click_extractor import (
     OAMEntry,
 )
 from core.services.image_utils import pil_to_qpixmap
+from core.types import CompressionType
 from ui.common import WorkerManager
 
 if TYPE_CHECKING:
@@ -247,7 +248,7 @@ class CaptureImportService(QObject):
             # Create game frame with selected entry IDs for filtering on retrieval
             bbox = filtered_capture.bounding_box
             # Default all ROM offsets to RAW compression (user can change in workbench)
-            default_compression_types = dict.fromkeys(rom_offsets, "raw")
+            default_compression_types = dict.fromkeys(rom_offsets, CompressionType.RAW)
             frame = GameFrame(
                 id=frame_id,
                 rom_offsets=rom_offsets,
