@@ -32,7 +32,6 @@ from ui.frame_mapping.facades.ai_frames_facade import AIFramesFacade
 from ui.frame_mapping.facades.controller_context import ControllerContext
 from ui.frame_mapping.facades.game_frames_facade import GameFramesFacade
 from ui.frame_mapping.facades.injection_facade import InjectionFacade
-from ui.frame_mapping.facades.mappings_facade import MappingsFacade
 from ui.frame_mapping.facades.palette_facade import PaletteFacade
 from ui.frame_mapping.facades.preview_facade import PreviewFacade
 from ui.frame_mapping.services.ai_frame_service import AIFrameService
@@ -49,7 +48,10 @@ from ui.frame_mapping.services.preview_service import PreviewService
 from ui.frame_mapping.services.stale_entry_detector import AsyncStaleEntryDetector
 from ui.frame_mapping.undo import (
     CommandContext,
+    CreateMappingCommand,
+    RemoveMappingCommand,
     UndoRedoStack,
+    UpdateAlignmentCommand,
 )
 from ui.frame_mapping.views.workbench_types import AlignmentState
 from utils.logging_config import get_logger
@@ -626,13 +628,6 @@ class FrameMappingController(QObject):
             capture_repository=self._capture_repository,
         )
         # Domain facades (thin wrappers grouping related methods)
-        self._mappings = MappingsFacade(
-            context=self._controller_context,
-            signals=self,  # Controller implements MappingsSignals protocol
-            mapping_service=self._mapping_service,
-            alignment_service=self._alignment_service,
-            get_command_context=self._get_command_context,
-        )
         self._ai_frames = AIFramesFacade(
             context=self._controller_context,
             signals=self,  # Controller implements AIFramesSignals protocol
@@ -1079,7 +1074,41 @@ class FrameMappingController(QObject):
         Returns:
             True if mapping was created
         """
-        return self._mappings.create_mapping(ai_frame_id, game_frame_id)
+        project = self._project
+        if project is None:
+            self.error_occurred.emit("No project loaded")
+            return False
+
+        # Validate both frames exist
+        is_valid, error_msg = self._mapping_service.validate_mapping_frames(project, ai_frame_id, game_frame_id)
+        if not is_valid:
+            self.error_occurred.emit(error_msg)
+            return False
+
+        # Capture previous state for undo
+        (
+            prev_ai_game_id,
+            prev_game_ai_id,
+            prev_ai_alignment,
+            prev_game_alignment,
+        ) = self._mapping_service.capture_create_mapping_undo_state(project, ai_frame_id, game_frame_id)
+
+        # Create and execute command via undo stack
+        command = CreateMappingCommand(
+            ctx=self._get_command_context(),
+            ai_frame_id=ai_frame_id,
+            game_frame_id=game_frame_id,
+            prev_ai_mapping_game_id=prev_ai_game_id,
+            prev_game_mapping_ai_id=prev_game_ai_id,
+            prev_ai_mapping_alignment=prev_ai_alignment,
+            prev_game_mapping_alignment=prev_game_alignment,
+        )
+        self._undo_stack.push(command)
+
+        self.mapping_created.emit(ai_frame_id, game_frame_id)
+        self.save_requested.emit()
+        logger.info("Created mapping: AI frame %s -> Game frame %s", ai_frame_id, game_frame_id)
+        return True
 
     def get_existing_link_for_game_frame(self, game_frame_id: str) -> str | None:
         """Get the AI frame ID currently linked to a game frame.
@@ -1090,7 +1119,10 @@ class FrameMappingController(QObject):
         Returns:
             AI frame ID if game frame is linked, None otherwise
         """
-        return self._mappings.get_existing_link_for_game_frame(game_frame_id)
+        project = self._project
+        if project is None:
+            return None
+        return self._mapping_service.get_link_for_game_frame(project, game_frame_id)
 
     def get_existing_link_for_ai_frame(self, ai_frame_id: str) -> str | None:
         """Get the game frame ID currently linked to an AI frame.
@@ -1101,7 +1133,10 @@ class FrameMappingController(QObject):
         Returns:
             Game frame ID if AI frame is linked, None otherwise
         """
-        return self._mappings.get_existing_link_for_ai_frame(ai_frame_id)
+        project = self._project
+        if project is None:
+            return None
+        return self._mapping_service.get_link_for_ai_frame(project, ai_frame_id)
 
     def remove_mapping(self, ai_frame_id: str) -> bool:
         """Remove a mapping for an AI frame.
@@ -1112,7 +1147,31 @@ class FrameMappingController(QObject):
         Returns:
             True if a mapping was removed
         """
-        return self._mappings.remove_mapping(ai_frame_id)
+        project = self._project
+        if project is None:
+            return False
+
+        # Capture state for undo
+        undo_state = self._mapping_service.capture_remove_mapping_undo_state(project, ai_frame_id)
+        if undo_state is None:
+            return False
+
+        removed_game_id, removed_alignment, removed_status = undo_state
+
+        # Create and execute command via undo stack
+        command = RemoveMappingCommand(
+            ctx=self._get_command_context(),
+            ai_frame_id=ai_frame_id,
+            removed_game_frame_id=removed_game_id,
+            removed_alignment=removed_alignment,
+            removed_status=removed_status,
+        )
+        self._undo_stack.push(command)
+
+        self.mapping_removed.emit(ai_frame_id)
+        self.save_requested.emit()
+        logger.info("Removed mapping for AI frame %s", ai_frame_id)
+        return True
 
     def update_mapping_alignment(
         self,
@@ -1146,8 +1205,11 @@ class FrameMappingController(QObject):
         Returns:
             True if alignment was updated
         """
-        return self._mappings.update_alignment(
-            ai_frame_id=ai_frame_id,
+        project = self._project
+        if project is None:
+            return False
+
+        new_alignment = AlignmentState(
             offset_x=offset_x,
             offset_y=offset_y,
             flip_h=flip_h,
@@ -1155,9 +1217,48 @@ class FrameMappingController(QObject):
             scale=scale,
             sharpen=sharpen,
             resampling=resampling,
-            set_edited=set_edited,
-            drag_start_alignment=drag_start_alignment,
         )
+
+        # Only record undo for explicit user edits, not auto-centering
+        if set_edited:
+            # Capture state for undo
+            undo_state = self._alignment_service.capture_alignment_undo_state(
+                project, ai_frame_id, drag_start_alignment
+            )
+            if undo_state is None:
+                return False
+
+            old_alignment, old_status = undo_state
+
+            # Create and execute command via undo stack
+            command = UpdateAlignmentCommand(
+                ctx=self._get_command_context(),
+                ai_frame_id=ai_frame_id,
+                new_alignment=new_alignment,
+                old_alignment=old_alignment,
+                old_status=old_status,
+            )
+            self._undo_stack.push(command)
+        else:
+            # Auto-centering - update directly without history
+            self._alignment_service.apply_alignment_to_project(project, ai_frame_id, new_alignment, set_edited=False)
+
+        # Use targeted signal to avoid full UI refresh (which blanks canvas)
+        self.alignment_updated.emit(ai_frame_id)
+        self.save_requested.emit()
+        logger.info(
+            "Updated alignment for AI frame %s: offset=(%d, %d), flip=(%s, %s), "
+            "scale=%.2f, sharpen=%.1f, resampling=%s",
+            ai_frame_id,
+            offset_x,
+            offset_y,
+            flip_h,
+            flip_v,
+            scale,
+            sharpen,
+            resampling,
+        )
+        return True
 
     def apply_transforms_to_all_mappings(
         self,
@@ -1177,12 +1278,19 @@ class FrameMappingController(QObject):
         Returns:
             Number of mappings updated
         """
-        return self._mappings.apply_transforms_to_all(
-            offset_x=offset_x,
-            offset_y=offset_y,
-            scale=scale,
-            exclude_ai_frame_id=exclude_ai_frame_id,
+        project = self._project
+        if project is None:
+            return 0
+
+        updated_count = self._alignment_service.apply_transforms_to_all(
+            project, offset_x, offset_y, scale, exclude_ai_frame_id
         )
+
+        if updated_count > 0:
+            self.project_changed.emit()
+            self.save_requested.emit()
+
+        return updated_count
 
     def get_game_frame_preview(self, frame_id: str) -> QPixmap | None:
         """Get the rendered preview pixmap for a game frame.
