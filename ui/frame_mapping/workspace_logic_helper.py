@@ -248,6 +248,22 @@ class WorkspaceLogicHelper:
 
         self._captures_pane.set_link_status(link_status)
 
+    def set_game_frames_with_link_status(self) -> None:
+        """Set game frames and link status together (single rebuild)."""
+        if self._controller is None or self._captures_pane is None:
+            return
+        project = self._controller.project
+        if project is None:
+            self._captures_pane.clear()
+            return
+
+        link_status: dict[str, str | None] = {}
+        for game_frame in project.game_frames:
+            linked_ai_id = project.get_ai_frame_linked_to_game_frame(game_frame.id)
+            link_status[game_frame.id] = linked_ai_id
+
+        self._captures_pane.set_game_frames_with_link_status(project.game_frames, link_status)
+
     def update_mapping_panel_previews(self, immediate: bool = False) -> None:
         """Update the mapping panel with game frame preview pixmaps.
 

@@ -661,14 +661,13 @@ class FrameMappingWorkspace(QWidget):
             self._ai_frames_pane.set_current_tab_folder(project.ai_frames_dir)
         self._ai_frames_pane.set_sheet_palette(project.sheet_palette)  # Load sheet palette
         self._alignment_canvas.set_sheet_palette(project.sheet_palette)  # Sync canvas palette
-        self._captures_pane.set_game_frames(project.game_frames)
+        self._logic.set_game_frames_with_link_status()
         # Only call set_project on identity change to avoid resetting checkbox state
         if project_identity_changed:
             self._mapping_panel.set_project(project)
         self._mapping_panel.set_sheet_palette(project.sheet_palette)  # Sync mapping panel palette
         self._update_map_button_state()
         self._refresh_mapping_status()
-        self._refresh_game_frame_link_status()
         self._update_mapping_panel_previews()
 
     @signal_error_boundary()

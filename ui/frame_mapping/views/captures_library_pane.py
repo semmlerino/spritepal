@@ -211,6 +211,12 @@ class CapturesLibraryPane(QWidget):
         self._link_status = link_status
         self._refresh_list()
 
+    def set_game_frames_with_link_status(self, frames: list[GameFrame], link_status: dict[str, str | None]) -> None:
+        """Set frames and link status together (single rebuild)."""
+        self._game_frames = frames
+        self._link_status = link_status
+        self._refresh_list()
+
     def update_single_item_link_status(self, game_frame_id: str, linked_ai_id: str | None) -> None:
         """Update link status for one game frame without full refresh.
 
