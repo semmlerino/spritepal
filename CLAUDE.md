@@ -131,6 +131,11 @@ Agents execute what you specify—vague prompts yield vague results.
 - For parallel agents: "You own ONLY: file_a.py, file_b.py"
 - Specify verification: "verify syntax after each edit"
 
+**Critical: Scope boundaries.** Always include this in agent prompts:
+> "Do ONLY what is asked. Do NOT modify, revert, or 'clean up' code outside the scope of this task. If you see unrelated uncommitted changes, leave them alone—they are from other work in progress."
+
+This prevents agents from reverting each other's uncommitted work.
+
 ### Background and Resume
 
 - Use `run_in_background: true` for long-running verification (test suite, type checking) while continuing other work
@@ -140,14 +145,16 @@ Agents execute what you specify—vague prompts yield vague results.
 
 ### Orchestrator Verification
 
-**After each agent completes, verify before proceeding.** Agents can misunderstand prompts, make incorrect changes, or miss edge cases. The orchestrator must verify their work.
+**After each agent completes, verify and commit before proceeding.** Agents can misunderstand prompts, make incorrect changes, or miss edge cases. The orchestrator must verify their work. Uncommitted changes from one agent can be reverted by subsequent agents.
 
 Verification steps (run directly, not delegated):
-1. **Lint/typecheck changed files:** `ruff check <files> && basedpyright <files>`
-2. **Run targeted tests:** `pytest tests/path/to/relevant_tests.py -v --tb=short`
-3. **Spot-check critical changes:** Read key modified sections if the agent made judgment calls
+1. **Verify change counts:** `grep -c "pattern" <file>` to confirm expected number of changes
+2. **Lint/typecheck changed files:** `ruff check <files> && basedpyright <files>`
+3. **Run targeted tests:** `pytest tests/path/to/relevant_tests.py -v --tb=short`
+4. **Spot-check critical changes:** Read key modified sections if the agent made judgment calls
+5. **Commit immediately:** If verification passes, commit before spawning the next agent
 
-Only proceed to the next phase after verification passes. If issues found, either fix directly or re-prompt the agent with specific corrections.
+Only proceed to the next phase after verification passes AND changes are committed. If issues found, either fix directly or re-prompt the agent with specific corrections.
 
 ### Post-Implementation
 
