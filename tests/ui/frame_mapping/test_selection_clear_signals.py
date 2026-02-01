@@ -72,6 +72,7 @@ class TestCapturesLibraryPaneEmitsOnClear:
         assert emissions.count("") == 2
 
 
+@pytest.mark.parallel_unsafe
 class TestMappingPanelEmitsOnClear:
     """Tests for MappingPanel emitting signal on selection clear."""
 

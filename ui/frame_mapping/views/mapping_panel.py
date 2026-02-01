@@ -364,7 +364,7 @@ class MappingPanel(QWidget):
     def closeEvent(self, event: QEvent) -> None:
         """Handle close event - cancel async operations."""
         self._thumbnail_loader.cancel()
-        self._icon_quantizer.cancel()
+        self._icon_quantizer.shutdown()
         super().closeEvent(event)
 
     def reset_batch_selection(self) -> None:

@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
 
 
+@pytest.mark.parallel_unsafe
 class TestRefreshPreservesSelection:
     """Tests for MappingPanel.refresh() selection preservation."""
 

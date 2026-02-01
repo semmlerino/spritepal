@@ -675,19 +675,25 @@ class PreviewWorkerPool(QObject):
             # This handles: requestInterruption, quit, wait, deleteLater
             WorkerManager.cleanup_worker(worker, timeout=1500)
 
-            # If worker is still running after cleanup, force cleanup
+            # If worker is still running after cleanup, do NOT call deleteLater()
+            # which would crash with "QThread: Destroyed while thread is still running"
             if worker.isRunning():
-                logger.warning("Worker still running after cleanup, forcing deleteLater")
-                worker.deleteLater()
+                logger.warning(
+                    "Worker still running after cleanup, keeping reference to prevent crash"
+                )
+                # Keep reference to prevent GC (leak is better than crash)
                 # Decrement worker count so we can create a replacement
                 if self._worker_count > 0:
                     self._worker_count -= 1
 
         except Exception as e:
             logger.warning(f"Error cleaning up worker: {e}")
-            # Try to delete anyway
-            with contextlib.suppress(Exception):
-                worker.deleteLater()
+            # Only delete if not running to avoid crash
+            try:
+                if not worker.isRunning():
+                    worker.deleteLater()
+            except Exception:
+                pass  # Worker object already invalid
 
     def cleanup(self) -> None:
         """Clean up the entire worker pool."""
@@ -741,9 +747,13 @@ class PreviewWorkerPool(QObject):
                             logger.debug("Worker still running, requesting quit")
                             worker.quit()
                             if not worker.wait(300):  # Additional 300ms after quit
-                                logger.warning("Worker not responding to quit, will be cleaned up by Qt")
+                                # Do NOT call deleteLater() if still running - would crash
+                                logger.warning(
+                                    "Worker not responding to quit, keeping reference to prevent crash"
+                                )
+                                continue  # Skip deleteLater for this worker
 
-                    # Schedule for deletion (safe even if still running)
+                    # Only schedule for deletion if thread has stopped
                     worker.deleteLater()
                 except Exception as e:
                     logger.warning(f"Error during worker cleanup: {e}")

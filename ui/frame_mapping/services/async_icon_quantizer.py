@@ -277,24 +277,41 @@ class AsyncIconQuantizer(QObject):
         """Shut down the background thread."""
         # Block signals first to prevent emission during cleanup
         if self._worker is not None:
-            self._worker.blockSignals(True)
             try:
-                self._start_worker.disconnect()
-                self._worker.result_ready.disconnect()
-                self._worker.error.disconnect()
+                self._worker.blockSignals(True)
+                try:
+                    self._start_worker.disconnect()
+                    self._worker.result_ready.disconnect()
+                    self._worker.error.disconnect()
+                except (RuntimeError, TypeError):
+                    pass  # Already disconnected
             except (RuntimeError, TypeError):
-                pass  # Already disconnected
+                # Worker object already deleted (C++ side)
+                logger.debug("AsyncIconQuantizer: worker already deleted during shutdown")
+                self._worker = None
 
         # Schedule worker deletion when thread stops
         if self._worker is not None and self._thread is not None:
-            self._thread.finished.connect(self._worker.deleteLater)
+            try:
+                self._thread.finished.connect(self._worker.deleteLater)
+            except (RuntimeError, TypeError):
+                pass
 
         if self._thread is not None:
             self._thread.quit()
-            if not self._thread.wait(3000):
-                logger.warning("Icon quantizer thread did not stop in time")
-            self._thread.deleteLater()
-            self._thread = None
+            if self._thread.wait(3000):
+                # Thread stopped cleanly, safe to schedule deletion
+                self._thread.deleteLater()
+                self._thread = None
+            else:
+                # Thread did not stop in time - do NOT call deleteLater()
+                # which would crash with "QThread: Destroyed while thread is still running"
+                # Keep reference to prevent GC (leak is better than crash)
+                logger.warning(
+                    "Icon quantizer thread did not stop in time, keeping reference to prevent crash"
+                )
+                # Note: self._thread is intentionally NOT set to None
+                # The thread reference is "leaked" to prevent GC from destroying it while running
 
         self._worker = None
         self._pending_requests.clear()

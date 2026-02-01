@@ -479,7 +479,11 @@ class AsyncThumbnailLoader(QObject):
     def cancel(self) -> None:
         """Cancel any in-progress loading."""
         if self._worker:
-            self._worker.request_stop()
+            try:
+                self._worker.request_stop()
+            except (RuntimeError, TypeError, AttributeError):
+                # Worker already deleted or invalid
+                self._worker = None
         self._cleanup_thread()
 
     def _cleanup_thread(self) -> None:
@@ -516,10 +520,14 @@ class AsyncThumbnailLoader(QObject):
                 except (RuntimeError, TypeError):
                     pass
 
-            stopped_cleanly = WorkerManager.cleanup_worker(thread, timeout=100)
+            stopped_cleanly = WorkerManager.cleanup_worker(thread, timeout=2000)
             if not stopped_cleanly:
                 # Keep reference in class-level set to prevent GC while running
                 AsyncThumbnailLoader._orphaned_threads.add(thread)
+                # Remove from WorkerManager registry to prevent cleanup_all() from
+                # processing this thread again with a shorter timeout, which could
+                # call deleteLater() before the OS thread has fully exited.
+                WorkerManager._worker_registry.discard(thread)
                 try:
                     thread.finished.connect(lambda t=thread: AsyncThumbnailLoader._orphaned_threads.discard(t))
                 except (RuntimeError, TypeError):

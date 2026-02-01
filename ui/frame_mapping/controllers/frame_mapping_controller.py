@@ -27,6 +27,7 @@ from core.repositories.frame_mapping_repository import FrameMappingRepository
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.palette_offset_calculator import PaletteOffsetCalculator
 from core.types import CompressionType
+from core.exceptions import CaptureImportError
 from ui.frame_mapping.facades.ai_frames_facade import AIFramesFacade
 from ui.frame_mapping.facades.controller_context import ControllerContext
 from ui.frame_mapping.facades.game_frames_facade import GameFramesFacade
@@ -979,7 +980,12 @@ class FrameMappingController(QObject):
         )
 
         # Delegate to capture import service
-        self._capture_import_service.import_mesen_capture(capture_path)
+        try:
+            self._capture_import_service.import_mesen_capture(capture_path)
+        except CaptureImportError:
+            # Service already emits error signal, so we just swallow the exception
+            # to prevent it from propagating to the UI/caller
+            pass
 
     def complete_capture_import(
         self,

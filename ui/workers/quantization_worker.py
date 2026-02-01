@@ -205,7 +205,14 @@ class AsyncQuantizationService(QObject):
             if self._thread.isRunning():
                 self._thread.quit()
                 if not self._thread.wait(1000):
-                    logger.warning("Quantization worker thread did not stop within timeout")
+                    # Thread did not stop in time - do NOT call deleteLater()
+                    # which would crash with "QThread: Destroyed while thread is still running"
+                    logger.warning(
+                        "Quantization worker thread did not stop within timeout, keeping reference to prevent crash"
+                    )
+                    # Keep reference to prevent GC (leak is better than crash)
+                    # Note: self._thread is intentionally NOT set to None
+                    return
             if not self._destroyed:
                 self._thread.deleteLater()
             self._thread = None
