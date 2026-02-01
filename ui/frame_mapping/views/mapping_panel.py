@@ -255,8 +255,17 @@ class MappingPanel(QWidget):
         Args:
             project: FrameMappingProject or None to clear
         """
+        logger.debug("set_project called: project=%s", project.name if project else None)
         self._project = project
         # Reset checkbox state when loading a new project
+        self._selection_state.reset()
+        logger.debug("set_project: selection state RESET")
+
+    def reset_batch_selection(self) -> None:
+        """Reset batch selection to default behavior.
+
+        Called when AI frames are reloaded to restore default (all mapped = checked).
+        """
         self._selection_state.reset()
 
     def set_game_frame_previews(self, previews: dict[str, QPixmap]) -> None:
@@ -505,8 +514,10 @@ class MappingPanel(QWidget):
         """
         # Skip if palette is unchanged (same object or both None)
         if palette is self._sheet_palette:
+            logger.debug("set_sheet_palette: SKIPPED (same object)")
             return
 
+        logger.debug("set_sheet_palette: palette CHANGED, will refresh")
         self._sheet_palette = palette
         # Clear quantized icon cache since palette changed
         self._quantized_icon_cache.clear()
@@ -522,7 +533,19 @@ class MappingPanel(QWidget):
         # Only update if user has explicitly modified checkboxes
         if self._project is not None and self._table.rowCount() > 0:
             captured_checked_ids = self._capture_checkbox_state()
+            logger.debug(
+                "refresh: captured %d checked IDs, tracking=%s, tracked_ids=%s",
+                len(captured_checked_ids),
+                self._selection_state.is_tracking_user_selections(),
+                self._selection_state.get_checked_ids(),
+            )
             self._selection_state.update_from_refresh(captured_checked_ids)
+        else:
+            logger.debug(
+                "refresh: skipping capture (project=%s, rowCount=%d)",
+                self._project is not None,
+                self._table.rowCount() if self._project else 0,
+            )
 
         # Block signals during rebuild to prevent spurious selection events
         self._table.blockSignals(True)
@@ -968,6 +991,9 @@ class MappingPanel(QWidget):
         ai_frame_id = self.get_selected_ai_frame_id()
         if ai_frame_id is not None:
             self.mapping_selected.emit(ai_frame_id)
+        else:
+            # Notify listeners of cleared selection
+            self.mapping_selected.emit("")
 
     def _on_edit_clicked(self) -> None:
         """Handle edit button click."""
@@ -1409,8 +1435,16 @@ class MappingPanel(QWidget):
             ai_frame_id = item.data(Qt.ItemDataRole.UserRole + 1)
             if ai_frame_id is not None:
                 # First user interaction captures baseline state
-                if not self._selection_state.is_tracking_user_selections():
-                    self._selection_state.set_baseline(self._capture_checkbox_state())
+                is_tracking = self._selection_state.is_tracking_user_selections()
+                logger.debug(
+                    "_on_item_changed: ai_frame_id=%s, is_tracking=%s",
+                    ai_frame_id,
+                    is_tracking,
+                )
+                if not is_tracking:
+                    captured = self._capture_checkbox_state()
+                    logger.debug("_on_item_changed: calling set_baseline with %s", captured)
+                    self._selection_state.set_baseline(captured)
 
                 # Update tracked state
                 checked = item.checkState() == Qt.CheckState.Checked

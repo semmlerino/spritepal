@@ -518,6 +518,14 @@ class WorkspaceLogicHelper:
         if self._captures_pane is None:
             return
 
+        # Guard against cleared selection
+        if not ai_frame_id:
+            self._state.selected_ai_frame_id = None
+            self._alignment_canvas.set_ai_frame(None)
+            self._alignment_canvas.clear_alignment()
+            self.update_map_button_state()
+            return
+
         project = self._controller.project
         if project is None:
             return

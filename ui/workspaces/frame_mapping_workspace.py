@@ -542,10 +542,17 @@ class FrameMappingWorkspace(QWidget):
         # Check if project identity changed (new project loaded vs content update)
         current_project_id = id(project) if project is not None else None
         project_identity_changed = current_project_id != self._state.previous_project_id
+        logger.debug(
+            "_on_project_changed: prev_id=%s, curr_id=%s, identity_changed=%s",
+            self._state.previous_project_id,
+            current_project_id,
+            project_identity_changed,
+        )
         self._state.previous_project_id = current_project_id
 
         # Only clear canvas on actual project change, not content updates
         if project_identity_changed:
+            logger.debug("_on_project_changed: identity changed - will call set_project()")
             self._alignment_canvas.clear()
 
         if project is None:
@@ -580,6 +587,8 @@ class FrameMappingWorkspace(QWidget):
 
     def _on_ai_frames_loaded(self, count: int) -> None:
         """Handle AI frames loaded."""
+        # Reset batch selection to defaults (all mapped = checked)
+        self._mapping_panel.reset_batch_selection()
         if self._message_service:
             self._message_service.show_message(f"Loaded {count} AI frames")
 

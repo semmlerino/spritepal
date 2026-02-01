@@ -348,6 +348,8 @@ class CapturesLibraryPane(QWidget):
     def _on_selection_changed(self, row: int) -> None:
         """Handle game frame selection change."""
         if row < 0:
+            # Notify listeners of cleared selection (matches AIFramesPane)
+            self.game_frame_selected.emit("")
             return
         item = self._list.item(row)
         if item is None:  # type: ignore[reportUnnecessaryComparison]
