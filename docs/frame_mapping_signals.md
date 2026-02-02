@@ -351,7 +351,6 @@ Preview Cache Invalidation Triggers:
 
 **Key Files:**
 - `ui/frame_mapping/services/preview_service.py:48-124` (get_preview)
-- `ui/workspaces/frame_mapping_workspace.py:1672-1697` (_on_preview_cache_invalidated)
 
 ---
 
