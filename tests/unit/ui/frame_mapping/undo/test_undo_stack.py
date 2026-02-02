@@ -211,23 +211,3 @@ class TestUndoRedoStackSignals:
         assert ("undo", False) in signals_received
         assert ("redo", False) in signals_received
 
-    def test_stack_changed_emitted_on_push(self, qtbot: object) -> None:
-        """stack_changed is emitted on push."""
-        from pytestqt.qtbot import QtBot
-
-        assert isinstance(qtbot, QtBot)
-        stack = UndoRedoStack()
-
-        with qtbot.waitSignal(stack.stack_changed, timeout=1000):
-            stack.push(MockCommand())
-
-    def test_stack_changed_emitted_on_undo(self, qtbot: object) -> None:
-        """stack_changed is emitted on undo."""
-        from pytestqt.qtbot import QtBot
-
-        assert isinstance(qtbot, QtBot)
-        stack = UndoRedoStack()
-        stack.push(MockCommand())
-
-        with qtbot.waitSignal(stack.stack_changed, timeout=1000):
-            stack.undo()

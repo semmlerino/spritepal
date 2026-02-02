@@ -43,7 +43,6 @@ class UndoRedoStack(QObject):
     # Signals for UI state updates
     can_undo_changed = Signal(bool)
     can_redo_changed = Signal(bool)
-    stack_changed = Signal()
 
     DEFAULT_MAX_HISTORY = 50
 
@@ -76,7 +75,6 @@ class UndoRedoStack(QObject):
 
         # Emit signals
         self.can_undo_changed.emit(True)
-        self.stack_changed.emit()
 
     def undo(self) -> str | None:
         """Undo the last command.
@@ -94,7 +92,6 @@ class UndoRedoStack(QObject):
         # Emit signals
         self.can_undo_changed.emit(len(self._undo_stack) > 0)
         self.can_redo_changed.emit(True)
-        self.stack_changed.emit()
 
         return command.description
 
@@ -114,7 +111,6 @@ class UndoRedoStack(QObject):
         # Emit signals
         self.can_undo_changed.emit(True)
         self.can_redo_changed.emit(len(self._redo_stack) > 0)
-        self.stack_changed.emit()
 
         return command.description
 
@@ -124,7 +120,6 @@ class UndoRedoStack(QObject):
         self._redo_stack.clear()
         self.can_undo_changed.emit(False)
         self.can_redo_changed.emit(False)
-        self.stack_changed.emit()
 
     def can_undo(self) -> bool:
         """Check if undo is available."""
