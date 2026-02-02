@@ -22,7 +22,7 @@ from core.palette_utils import (
     quantize_to_palette,
     quantize_with_mappings,
 )
-from core.services.image_utils import pil_to_qimage, pil_to_qpixmap
+from core.services.image_utils import pil_to_qimage
 from ui.common import WorkerManager
 from ui.frame_mapping.services.thumbnail_disk_cache import ThumbnailDiskCache
 from utils.logging_config import get_logger
