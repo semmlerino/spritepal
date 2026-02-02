@@ -21,10 +21,11 @@ Four-zone layout:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
-from PySide6.QtCore import QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QSize, Qt, QTimer, Signal, SignalInstance
 from PySide6.QtGui import QCloseEvent, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -539,6 +540,60 @@ class FrameMappingWorkspace(QWidget):
         self._alignment_canvas.alignment_changed.connect(self._on_alignment_changed)
         self._alignment_canvas.compression_type_changed.connect(self._on_compression_type_changed)
         self._alignment_canvas.apply_transforms_to_all_requested.connect(self._on_apply_transforms_to_all)
+
+    def _disconnect_signals(self) -> None:
+        """Disconnect signals connected in _connect_signals for cleanup.
+
+        Note: Child widget signals (ai_frames_pane, captures_pane, mapping_panel,
+        alignment_canvas) don't need explicit disconnect since the widgets are
+        owned by the workspace and will be destroyed together via Qt parent ownership.
+        """
+
+        def safe_disconnect(signal: SignalInstance, slot: Callable[..., object]) -> None:
+            """Disconnect signal safely, ignoring errors if already disconnected."""
+            try:
+                signal.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
+
+        # Auto-save manager signals
+        safe_disconnect(self._auto_save_manager.save_failed, self._on_save_failed)
+        safe_disconnect(self._auto_save_manager.save_succeeded, self._on_save_succeeded)
+
+        # Controller signals
+        safe_disconnect(self._controller.project_changed, self._on_project_changed)
+        safe_disconnect(self._controller.ai_frames_loaded, self._on_ai_frames_loaded)
+        safe_disconnect(self._controller.game_frame_added, self._on_game_frame_added)
+        safe_disconnect(self._controller.mapping_created, self._on_mapping_created)
+        safe_disconnect(self._controller.mapping_removed, self._on_mapping_removed)
+        safe_disconnect(self._controller.mapping_injected, self._on_mapping_injected)
+        safe_disconnect(self._controller.error_occurred, self._on_error)
+        safe_disconnect(self._controller.status_update, self._on_status_update)
+        safe_disconnect(self._controller.save_requested, self._auto_save_manager.schedule_save)
+        safe_disconnect(self._controller.save_requested, self._state.mark_dirty)
+        safe_disconnect(self._controller.stale_entries_warning, self._on_stale_entries_warning)
+        safe_disconnect(self._controller.stale_entries_on_load, self._on_stale_entries_detected_on_load)
+        safe_disconnect(self._controller.alignment_updated, self._on_alignment_updated)
+        safe_disconnect(self._controller.preview_cache_invalidated, self._on_preview_cache_invalidated)
+        safe_disconnect(self._controller.capture_import_requested, self._on_capture_import_requested)
+        safe_disconnect(self._controller.directory_import_started, self._on_directory_import_started)
+        safe_disconnect(self._controller.directory_import_finished, self._on_directory_import_finished)
+        safe_disconnect(self._controller.game_frame_removed, self._on_game_frame_removed)
+        safe_disconnect(self._controller.ai_frame_removed, self._on_ai_frame_removed)
+        safe_disconnect(self._controller.game_frame_preview_ready, self._on_game_frame_preview_ready)
+        safe_disconnect(self._controller.game_frame_previews_finished, self._on_game_frame_previews_finished)
+        safe_disconnect(self._controller.async_injection_started, self._on_async_injection_started)
+        safe_disconnect(self._controller.async_injection_progress, self._on_async_injection_progress)
+        safe_disconnect(self._controller.async_injection_finished, self._on_async_injection_finished)
+        safe_disconnect(self._controller.sheet_palette_changed, self._on_sheet_palette_changed)
+        safe_disconnect(self._controller.frame_renamed, self._on_frame_organization_changed)
+        safe_disconnect(self._controller.frame_tags_changed, self._on_frame_organization_changed)
+        safe_disconnect(self._controller.capture_renamed, self._on_capture_organization_changed)
+        safe_disconnect(self._controller.ai_frame_moved, self._on_ai_frame_moved)
+        safe_disconnect(self._controller.ai_frame_added, self._on_ai_frame_added)
+
+        # Dialog coordinator signals
+        safe_disconnect(self._dialog_coordinator.queue_processing_finished, self._on_capture_queue_finished)
 
     def _setup_shortcuts(self) -> None:
         """Setup keyboard shortcuts for undo/redo."""
@@ -1571,5 +1626,10 @@ class FrameMappingWorkspace(QWidget):
     def cleanup(self) -> None:
         """Cleanup resources."""
         logger.debug("FrameMappingWorkspace cleanup")
+
+        # Disconnect signals first
+        self._disconnect_signals()
+
+        # Cleanup child widgets
         self._alignment_canvas.cleanup()
         self._ai_frames_pane.cleanup()
