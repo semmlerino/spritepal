@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QDialog, QMessageBox, QWidget
+from PySide6.QtWidgets import QDialog, QWidget
 
 from ui.frame_mapping.dialogs.sprite_selection_dialog import SpriteSelectionDialog
 from utils.logging_config import get_logger
