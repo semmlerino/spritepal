@@ -167,6 +167,24 @@ class FrameMappingRepository:
             sheet_palette=sheet_palette,
         )
 
+        # Remove duplicate AI frames (same ID) - keep first occurrence
+        seen_ids: set[str] = set()
+        unique_frames: list[AIFrame] = []
+        for frame in project.ai_frames:
+            if frame.id not in seen_ids:
+                seen_ids.add(frame.id)
+                unique_frames.append(frame)
+            else:
+                logger.warning("Removed duplicate AI frame: %s", frame.id)
+        if len(unique_frames) != len(project.ai_frames):
+            project.ai_frames = unique_frames
+
+        # Repair corrupted indices (ensure 0, 1, 2, ... sequence)
+        for i, frame in enumerate(project.ai_frames):
+            if frame.index != i:
+                logger.warning("Repaired AI frame index: %s had %d, now %d", frame.id, frame.index, i)
+                frame.index = i
+
         # Prune orphaned mappings (referencing non-existent frames)
         project._prune_orphaned_mappings()
 

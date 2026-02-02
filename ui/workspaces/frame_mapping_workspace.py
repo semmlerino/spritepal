@@ -739,6 +739,9 @@ class FrameMappingWorkspace(QWidget):
         project = self._controller.project
         if project is not None:
             self._ai_frames_pane.set_ai_frames(project.ai_frames)
+            # Ensure mapping panel has current project reference before refresh
+            # (preserves checkbox state unlike set_project())
+            self._mapping_panel.update_project_reference(project)
         # Refresh mapping panel to remove stale row
         self._mapping_panel.refresh()
 

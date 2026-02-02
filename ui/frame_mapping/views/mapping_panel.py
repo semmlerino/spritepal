@@ -362,6 +362,17 @@ class MappingPanel(QWidget):
         self._selection_state.reset()
         logger.debug("set_project: selection state RESET")
 
+    def update_project_reference(self, project: FrameMappingProject | None) -> None:
+        """Update project reference without resetting selection state.
+
+        Use when project content changes but identity stays the same.
+        Unlike set_project(), this preserves checkbox state for batch operations.
+
+        Args:
+            project: FrameMappingProject or None
+        """
+        self._project = project
+
     @override
     def closeEvent(self, event: QCloseEvent) -> None:
         """Handle close event - cancel async operations."""
@@ -769,6 +780,9 @@ class MappingPanel(QWidget):
             # Trigger visibility-based thumbnail loading after table is fully built
             # Use QTimer.singleShot to allow Qt to layout the table first
             QTimer.singleShot(0, self._load_visible_thumbnails)
+
+        # Force visual update after rebuild
+        self._table.viewport().update()
 
         # Restore selection by ID (stable across reordering)
         if current_selection_id is not None:
