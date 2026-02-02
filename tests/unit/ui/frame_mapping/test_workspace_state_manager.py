@@ -21,7 +21,6 @@ class TestWorkspaceStateManagerInit:
 
         # ROM state should be None
         assert manager.rom_path is None
-        assert manager.modified_rom_path is None
         assert manager.last_injected_rom is None
 
         # Selection state should be None
@@ -97,14 +96,6 @@ class TestROMStateManagement:
         manager.rom_path = rom_path
         assert manager.rom_path == rom_path
 
-    def test_set_and_get_modified_rom_path(self, tmp_path: Path) -> None:
-        """Should set and get modified ROM path."""
-        manager = WorkspaceStateManager()
-        modified_path = tmp_path / "game_modified.sfc"
-
-        manager.modified_rom_path = modified_path
-        assert manager.modified_rom_path == modified_path
-
     def test_set_and_get_last_injected_rom(self, tmp_path: Path) -> None:
         """Should set and get last injected ROM path."""
         manager = WorkspaceStateManager()
@@ -117,13 +108,11 @@ class TestROMStateManagement:
         """Should clear all ROM state."""
         manager = WorkspaceStateManager()
         manager.rom_path = tmp_path / "game.sfc"
-        manager.modified_rom_path = tmp_path / "game_mod.sfc"
         manager.last_injected_rom = tmp_path / "game_inj.sfc"
 
         manager.clear_rom_state()
 
         assert manager.rom_path is None
-        assert manager.modified_rom_path is None
         assert manager.last_injected_rom is None
 
     def test_is_rom_valid_when_path_exists(self, tmp_path: Path) -> None:

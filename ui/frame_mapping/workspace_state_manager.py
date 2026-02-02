@@ -52,7 +52,6 @@ class WorkspaceStateManager:
 
         # ROM tracking for injection
         self._rom_path: Path | None = None
-        self._modified_rom_path: Path | None = None
         self._last_injected_rom: Path | None = None
 
         # Selection tracking (ID-based - stable across reloads)
@@ -145,16 +144,6 @@ class WorkspaceStateManager:
         self._rom_path = path
 
     @property
-    def modified_rom_path(self) -> Path | None:
-        """Get the modified ROM path."""
-        return self._modified_rom_path
-
-    @modified_rom_path.setter
-    def modified_rom_path(self, path: Path | None) -> None:
-        """Set the modified ROM path."""
-        self._modified_rom_path = path
-
-    @property
     def last_injected_rom(self) -> Path | None:
         """Get the last injected ROM path."""
         return self._last_injected_rom
@@ -167,7 +156,6 @@ class WorkspaceStateManager:
     def clear_rom_state(self) -> None:
         """Clear all ROM path state."""
         self._rom_path = None
-        self._modified_rom_path = None
         self._last_injected_rom = None
 
     def is_rom_valid(self) -> bool:

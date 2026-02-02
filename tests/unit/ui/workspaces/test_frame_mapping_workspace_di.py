@@ -415,7 +415,6 @@ class TestROMSelector:
         old_rom = tmp_path / "old.sfc"
         old_rom.write_bytes(b"old rom")
         workspace._state.rom_path = old_rom
-        workspace._state.modified_rom_path = tmp_path / "modified.sfc"
         workspace._state.last_injected_rom = tmp_path / "injected.sfc"
 
         # Create new ROM
@@ -427,7 +426,6 @@ class TestROMSelector:
 
         # State should be cleared
         assert workspace._state.rom_path == new_rom
-        assert workspace._state.modified_rom_path is None
         assert workspace._state.last_injected_rom is None
 
     def test_auto_load_rom_from_settings(self, app_context, qtbot, tmp_path) -> None:

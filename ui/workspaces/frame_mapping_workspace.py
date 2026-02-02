@@ -208,7 +208,6 @@ class FrameMappingWorkspace(QWidget):
         if rom_path != self._state.rom_path:
             logger.info("FrameMapping ROM path updated: %s", rom_path)
             self._state.rom_path = rom_path
-            self._state.modified_rom_path = None
 
             # Sync widget display if ROM selector exists
             if hasattr(self, "_rom_selector"):
@@ -221,31 +220,6 @@ class FrameMappingWorkspace(QWidget):
             FrameMappingController instance
         """
         return FrameMappingController(parent=self)
-
-    def _validate_rom_path(self) -> bool:
-        """Validate that the current ROM path is valid and exists.
-
-        Returns:
-            True if valid, False otherwise.
-        """
-        if self._state.rom_path is None:
-            QMessageBox.information(
-                self,
-                "Injection Requirement",
-                "No ROM loaded.\n\nPlease select a ROM using the ROM selector in the header.",
-            )
-            return False
-
-        if not self._state.is_rom_valid():
-            QMessageBox.warning(
-                self,
-                "ROM Not Found",
-                f"The ROM file from Sprite Editor no longer exists:\n{self._state.rom_path}\n\n"
-                "Please reload the ROM in the Sprite Editor workspace.",
-            )
-            return False
-
-        return True
 
     @signal_error_boundary()
     def _on_rom_selector_changed(self, path_str: str) -> None:
@@ -267,7 +241,6 @@ class FrameMappingWorkspace(QWidget):
 
         # Update state
         self._state.rom_path = rom_path
-        self._state.modified_rom_path = None  # Clear - new source = fresh start
         self._state.last_injected_rom = None
 
         # Persist to settings
@@ -982,7 +955,9 @@ class FrameMappingWorkspace(QWidget):
     @signal_error_boundary()
     def _on_remove_ai_frame(self, ai_frame_id: str) -> None:
         """Handle remove AI frame from project request."""
+        logger.info("_on_remove_ai_frame called with: %s", ai_frame_id)
         self._frame_ops.handle_remove_ai_frame(ai_frame_id)
+        logger.info("_on_remove_ai_frame completed")
 
     @signal_error_boundary()
     def _on_remove_mapping(self, ai_frame_id: str) -> None:
