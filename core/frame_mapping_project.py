@@ -47,6 +47,9 @@ class SheetPalette:
 
     colors: list[tuple[int, int, int]]  # 16 RGB colors (index 0 = transparent)
     color_mappings: dict[tuple[int, int, int], int] = field(default_factory=dict)
+    # Background removal settings (chroma key)
+    background_color: tuple[int, int, int] | None = None  # RGB or None=disabled
+    background_tolerance: int = 30  # RGB distance threshold (Euclidean)
 
     @property
     def version_hash(self) -> int:
@@ -60,17 +63,28 @@ class SheetPalette:
         """
         colors_tuple = tuple(self.colors)
         mappings_tuple = tuple(sorted(self.color_mappings.items()))
-        full_hash = hash((colors_tuple, mappings_tuple))
+        full_hash = hash((
+            colors_tuple,
+            mappings_tuple,
+            self.background_color,  # NEW - None-safe
+            self.background_tolerance,  # NEW
+        ))
         return full_hash & 0x7FFFFFFF
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to dictionary for JSON storage."""
         # Convert tuple keys to strings for JSON compatibility
         mappings_serializable = {f"{r},{g},{b}": idx for (r, g, b), idx in self.color_mappings.items()}
-        return {
+        result: dict[str, object] = {
             "colors": [list(c) for c in self.colors],
             "color_mappings": mappings_serializable,
         }
+        # Only serialize background fields if set (backward compatibility)
+        if self.background_color is not None:
+            result["background_color"] = list(self.background_color)
+        if self.background_tolerance != 30:  # Only if non-default
+            result["background_tolerance"] = self.background_tolerance
+        return result
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> SheetPalette:
@@ -140,7 +154,17 @@ class SheetPalette:
                 except ValueError:
                     logger.warning("Invalid color mapping key: %s", key_str)
 
-        return cls(colors=colors, color_mappings=color_mappings)
+        # Parse background removal settings (with defaults for backward compatibility)
+        bg_raw = data.get("background_color")
+        background_color = tuple(bg_raw) if bg_raw else None  # type: ignore[arg-type]
+        background_tolerance = int(data.get("background_tolerance", 30))
+
+        return cls(
+            colors=colors,
+            color_mappings=color_mappings,
+            background_color=background_color,
+            background_tolerance=background_tolerance,
+        )
 
 
 # Preset tags for AI frame organization
