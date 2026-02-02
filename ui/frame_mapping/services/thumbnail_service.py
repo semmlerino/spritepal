@@ -162,12 +162,6 @@ def clear_all_thumbnail_caches() -> None:
     logger.debug("All thumbnail caches cleared")
 
 
-# Backwards compatibility alias
-def clear_thumbnail_cache() -> None:
-    """Deprecated: Use clear_all_thumbnail_caches() instead."""
-    clear_all_thumbnail_caches()
-
-
 @lru_cache(maxsize=_THUMBNAIL_CACHE_MAXSIZE)
 def _cached_quantized_thumbnail_bytes(
     path_str: str,
@@ -311,7 +305,7 @@ def create_quantized_thumbnail(
     1. LRU cache for PNG bytes (survives between calls)
     2. QPixmap cache to avoid redundant PNG decoding
 
-    Call clear_thumbnail_cache() when palette changes to force regeneration.
+    Call clear_all_thumbnail_caches() when palette changes to force regeneration.
 
     Args:
         frame_path: Path to the AI frame PNG file
@@ -413,56 +407,6 @@ def quantize_pil_image(
 
     # Convert indexed back to RGBA for display (preserves palette colors)
     return indexed.convert("RGBA")
-
-
-def quantize_qpixmap(
-    pixmap: QPixmap,
-    sheet_palette: SheetPalette | None,
-) -> QPixmap:
-    """Quantize a QPixmap to match the sheet palette.
-
-    When a sheet palette is set, the pixmap will be quantized to show
-    how the sprite will look when injected. This ensures WYSIWYG behavior
-    between preview thumbnails and actual injection results.
-
-    Args:
-        pixmap: The raw QPixmap to quantize
-        sheet_palette: SheetPalette for quantization, or None to return original
-
-    Returns:
-        Quantized QPixmap if sheet palette is set, otherwise the original
-    """
-    if sheet_palette is None:
-        return pixmap
-
-    try:
-        # Convert QPixmap to PIL Image via QImage
-        qimage = pixmap.toImage()
-        if qimage.isNull():
-            return pixmap
-
-        width = qimage.width()
-        height = qimage.height()
-
-        # Ensure ARGB32 format for consistent byte layout
-        qimage = qimage.convertToFormat(qimage.Format.Format_ARGB32)
-
-        # Get raw bytes and convert to PIL
-        img_data = bytes(qimage.bits())
-        pil_image = Image.frombytes("RGBA", (width, height), img_data, "raw", "BGRA")
-
-        # Quantize to sheet palette
-        pil_image = quantize_pil_image(pil_image, sheet_palette)
-
-        # Convert back to QPixmap
-        result = pil_to_qpixmap(pil_image)
-        if result is None or result.isNull():
-            return pixmap
-        return result
-
-    except Exception:
-        logger.debug("QPixmap quantization failed, using original")
-        return pixmap
 
 
 class AsyncThumbnailLoader(QObject):
