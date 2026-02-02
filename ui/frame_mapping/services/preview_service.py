@@ -29,11 +29,9 @@ class PreviewService(QObject):
     file modification times and selected entry IDs.
 
     Signals:
-        preview_cache_invalidated: Emitted when a cached preview is regenerated (str: game_frame_id)
         stale_entries_warning: Emitted when stored entry IDs are stale (str: game_frame_id)
     """
 
-    preview_cache_invalidated = Signal(str, object)  # (frame_id, pixmap)
     stale_entries_warning = Signal(str)  # game_frame_id
 
     def __init__(
@@ -58,111 +56,6 @@ class PreviewService(QObject):
         self._stale_previews: set[str] = set()
         # Shared repository for raw capture parsing
         self._capture_repository = capture_repository
-
-    def get_preview(self, frame_id: str, project: FrameMappingProject | None) -> QPixmap | None:
-        """Get the rendered preview pixmap for a game frame.
-
-        If the preview is not cached but the capture file exists, attempts to
-        regenerate the preview from the capture file. Respects selected_entry_ids
-        filtering to show only the selected entries in the preview.
-
-        If the preview is marked stale (e.g., after palette change), returns the
-        cached preview immediately but triggers regeneration. This provides
-        responsive UI while keeping previews up-to-date.
-
-        Cache key includes (mtime, selected_entry_ids) to invalidate when either changes.
-        Emits preview_cache_invalidated when a cached preview is regenerated due to
-        mtime or entry ID changes.
-
-        Args:
-            frame_id: Game frame ID
-            project: Current project (needed for game frame lookup)
-
-        Returns:
-            QPixmap preview or None if not available
-        """
-        from ui.frame_mapping.services.preview_renderer import PreviewRenderer
-
-        cache_was_invalidated = False
-        is_stale = frame_id in self._stale_previews
-
-        # Check cache first
-        if frame_id in self._game_frame_previews:
-            cached_pixmap, cached_mtime, cached_entries = self._game_frame_previews[frame_id]
-
-            # Get game frame to validate cache
-            game_frame = project.get_game_frame_by_id(frame_id) if project else None
-            if game_frame:
-                current_entries = tuple(game_frame.selected_entry_ids)
-
-                # If file exists, check both mtime and entries
-                if game_frame.capture_path and game_frame.capture_path.exists():
-                    # Always check actual file mtime for cache validation
-                    # (can't skip stat() here - external changes need detection)
-                    current_mtime = game_frame.capture_path.stat().st_mtime
-                    # Update cached_mtime so it stays in sync for other uses
-                    if game_frame.cached_mtime != current_mtime:
-                        game_frame.cached_mtime = current_mtime
-                    if current_mtime != cached_mtime or current_entries != cached_entries:
-                        cache_was_invalidated = True
-                    elif is_stale:
-                        # Stale entry - return cached immediately for responsive UI
-                        # Caller should schedule async regeneration separately
-                        return cached_pixmap
-                    else:
-                        # Valid cache hit - return immediately
-                        return cached_pixmap
-                else:
-                    # File missing: return cached preview
-                    # This allows previews to persist if the source file is temporarily
-                    # unavailable or deleted, providing a "last known good" view.
-                    return cached_pixmap
-            else:
-                # No project/game_frame - invalidate stale cache entry
-                del self._game_frame_previews[frame_id]
-                self._stale_previews.discard(frame_id)
-                return None
-
-        # Try to regenerate from capture file (with filtering applied)
-        capture_result, _ = self.get_capture_result_for_game_frame(frame_id, project)
-        if capture_result is None or not capture_result.has_entries:
-            return None
-
-        try:
-            # Use shared renderer for consistent behavior
-            qimage = PreviewRenderer.render_preview_qimage(capture_result)
-            if qimage is None:
-                logger.warning("Failed to render preview for frame %s", frame_id)
-                return None
-            pixmap = QPixmap.fromImage(qimage)
-
-            current_mtime = 0.0
-            current_entries: tuple[int, ...] = ()
-            if project is not None:
-                game_frame = project.get_game_frame_by_id(frame_id)
-                if game_frame:
-                    current_entries = tuple(game_frame.selected_entry_ids)
-                    if game_frame.capture_path and game_frame.capture_path.exists():
-                        # Use cached mtime if available, otherwise stat and cache
-                        if game_frame.cached_mtime > 0.0:
-                            current_mtime = game_frame.cached_mtime
-                        else:
-                            current_mtime = game_frame.capture_path.stat().st_mtime
-                            game_frame.cached_mtime = current_mtime
-
-            self._game_frame_previews[frame_id] = (pixmap, current_mtime, current_entries)
-            # Clear stale flag since we just regenerated
-            self._stale_previews.discard(frame_id)
-
-            # Notify if this was a cache invalidation (not first-time generation)
-            if cache_was_invalidated or is_stale:
-                self.preview_cache_invalidated.emit(frame_id, pixmap)
-
-            return pixmap
-
-        except (OSError, ValueError, CaptureParseError, Exception) as e:
-            logger.warning("Failed to regenerate preview for game frame %s: %s", frame_id, e)
-            return None
 
     def get_cached_preview(self, frame_id: str, project: FrameMappingProject | None) -> QPixmap | None:
         """Get cached preview if available and valid, without generating on miss.
@@ -318,7 +211,6 @@ class PreviewService(QObject):
         """
         if frame_id in self._game_frame_previews:
             del self._game_frame_previews[frame_id]
-            self.preview_cache_invalidated.emit(frame_id, None)
         # Also clear capture result cache and stale flag
         if frame_id in self._capture_result_cache:
             del self._capture_result_cache[frame_id]
@@ -357,6 +249,8 @@ class PreviewService(QObject):
         Returns:
             Newly generated QPixmap or None if generation failed
         """
+        from ui.frame_mapping.services.preview_renderer import PreviewRenderer
+
         # Clear from stale set to force regeneration path
         was_stale = frame_id in self._stale_previews
         self._stale_previews.discard(frame_id)
@@ -364,16 +258,54 @@ class PreviewService(QObject):
         # Remove from preview cache to force regeneration
         old_pixmap = self._game_frame_previews.pop(frame_id, None)
 
-        # Regenerate
-        new_pixmap = self.get_preview(frame_id, project)
+        # Try to regenerate from capture file (with filtering applied)
+        capture_result, _ = self.get_capture_result_for_game_frame(frame_id, project)
+        if capture_result is None or not capture_result.has_entries:
+            # If regeneration failed, restore old cached pixmap
+            if old_pixmap is not None:
+                self._game_frame_previews[frame_id] = old_pixmap
+                if was_stale:
+                    self._stale_previews.add(frame_id)
+            return None
 
-        # If regeneration failed, restore old cached pixmap
-        if new_pixmap is None and old_pixmap is not None:
-            self._game_frame_previews[frame_id] = old_pixmap
-            if was_stale:
-                self._stale_previews.add(frame_id)
+        try:
+            # Use shared renderer for consistent behavior
+            qimage = PreviewRenderer.render_preview_qimage(capture_result)
+            if qimage is None:
+                logger.warning("Failed to render preview for frame %s", frame_id)
+                # If regeneration failed, restore old cached pixmap
+                if old_pixmap is not None:
+                    self._game_frame_previews[frame_id] = old_pixmap
+                    if was_stale:
+                        self._stale_previews.add(frame_id)
+                return None
+            pixmap = QPixmap.fromImage(qimage)
 
-        return new_pixmap
+            current_mtime = 0.0
+            current_entries: tuple[int, ...] = ()
+            if project is not None:
+                game_frame = project.get_game_frame_by_id(frame_id)
+                if game_frame:
+                    current_entries = tuple(game_frame.selected_entry_ids)
+                    if game_frame.capture_path and game_frame.capture_path.exists():
+                        # Use cached mtime if available, otherwise stat and cache
+                        if game_frame.cached_mtime > 0.0:
+                            current_mtime = game_frame.cached_mtime
+                        else:
+                            current_mtime = game_frame.capture_path.stat().st_mtime
+                            game_frame.cached_mtime = current_mtime
+
+            self._game_frame_previews[frame_id] = (pixmap, current_mtime, current_entries)
+            return pixmap
+
+        except (OSError, ValueError, CaptureParseError, Exception) as e:
+            logger.warning("Failed to regenerate preview for game frame %s: %s", frame_id, e)
+            # If regeneration failed, restore old cached pixmap
+            if old_pixmap is not None:
+                self._game_frame_previews[frame_id] = old_pixmap
+                if was_stale:
+                    self._stale_previews.add(frame_id)
+            return None
 
     def regenerate_visible_previews(self, visible_frame_ids: list[str], project: FrameMappingProject | None) -> None:
         """Regenerate previews for visible frames first.

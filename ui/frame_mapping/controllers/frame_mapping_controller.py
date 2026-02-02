@@ -1277,19 +1277,6 @@ class FrameMappingController(QObject):
 
         return updated_count
 
-    def get_game_frame_preview(self, frame_id: str) -> QPixmap | None:
-        """Get the rendered preview pixmap for a game frame.
-
-        Delegates to preview service for caching and rendering.
-
-        Args:
-            frame_id: Game frame ID.
-
-        Returns:
-            QPixmap preview or None if not available.
-        """
-        return self._preview_service.get_preview(frame_id, self._project)
-
     def get_cached_game_frame_preview(self, frame_id: str) -> QPixmap | None:
         """Get cached preview without triggering regeneration.
 

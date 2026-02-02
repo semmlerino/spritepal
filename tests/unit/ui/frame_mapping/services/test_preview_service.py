@@ -96,8 +96,12 @@ class TestPreviewServiceCaching:
                     mock_qimage = QImage(expected_width, expected_height, QImage.Format.Format_RGBA8888)
                     mock_pil_to_qimage.return_value = mock_qimage
 
-                    # First call - cache miss
-                    result = preview_service.get_preview("frame1", project)
+                    # First call - cache miss (should return None)
+                    result = preview_service.get_cached_preview("frame1", project)
+                    assert result is None, "Cache miss should return None"
+
+                    # Generate preview via force_regenerate_preview
+                    result = preview_service.force_regenerate_preview("frame1", project)
 
                     # Verify result type and content
                     assert result is not None
@@ -131,11 +135,11 @@ class TestPreviewServiceCaching:
                     mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
                     mock_pil_to_qimage.return_value = mock_qimage
 
-                    # First call - cache miss
-                    result1 = preview_service.get_preview("frame1", project)
+                    # First call - generate and cache
+                    result1 = preview_service.force_regenerate_preview("frame1", project)
 
                     # Second call - cache hit
-                    result2 = preview_service.get_preview("frame1", project)
+                    result2 = preview_service.get_cached_preview("frame1", project)
 
                     assert result1 == result2
                     # Repository should only be called once (first time)
@@ -164,7 +168,7 @@ class TestPreviewServiceCaching:
                     mock_pil_to_qimage.return_value = mock_qimage
 
                     # First call - cache population
-                    preview_service.get_preview("frame1", project)
+                    preview_service.force_regenerate_preview("frame1", project)
 
                     # Ensure mtime actually changes (some filesystems have 1-second resolution)
                     import os
@@ -178,8 +182,12 @@ class TestPreviewServiceCaching:
                     # (In production, this would happen via file watcher or manual refresh)
                     game_frame.cached_mtime = new_mtime
 
-                    # Second call - cache invalidated due to mtime change
-                    preview_service.get_preview("frame1", project)
+                    # Second call - cache invalidated due to mtime change (returns None)
+                    cached = preview_service.get_cached_preview("frame1", project)
+                    assert cached is None, "Cache should be invalid after mtime change"
+
+                    # Force regeneration
+                    preview_service.force_regenerate_preview("frame1", project)
 
                     # Repository called twice (cache invalidated)
                     assert mock_get_or_parse.call_count == 2
@@ -201,14 +209,18 @@ class TestPreviewServiceCaching:
                     mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
                     mock_pil_to_qimage.return_value = mock_qimage
 
-                    # First call - cache miss
-                    preview_service.get_preview("frame1", project)
+                    # First call - generate and cache
+                    preview_service.force_regenerate_preview("frame1", project)
 
                     # Change selected entry IDs
                     game_frame.selected_entry_ids = [1, 2]  # Changed from [1, 2, 3]
 
-                    # Second call - cache invalidated due to entry ID change
-                    preview_service.get_preview("frame1", project)
+                    # Second call - cache invalidated due to entry ID change (returns None)
+                    cached = preview_service.get_cached_preview("frame1", project)
+                    assert cached is None, "Cache should be invalid after entry ID change"
+
+                    # Force regeneration
+                    preview_service.force_regenerate_preview("frame1", project)
 
                     # Repository called twice (cache invalidated)
                     assert mock_get_or_parse.call_count == 2
@@ -309,7 +321,7 @@ class TestPreviewServiceEdgeCases:
 
     def test_no_project_returns_none(self, preview_service):
         """Test that None project returns None."""
-        result = preview_service.get_preview("frame1", None)
+        result = preview_service.get_cached_preview("frame1", None)
         assert result is None
 
     def test_missing_capture_file_returns_cached(self, preview_service, mock_project, qtbot):
@@ -324,7 +336,7 @@ class TestPreviewServiceEdgeCases:
         game_frame.capture_path.unlink()
 
         # Should return cached preview
-        result = preview_service.get_preview("frame1", project)
+        result = preview_service.get_cached_preview("frame1", project)
         assert result is not None
         assert result == mock_pixmap
 
@@ -332,29 +344,25 @@ class TestPreviewServiceEdgeCases:
         """Test that parse error returns None."""
         project, game_frame = mock_project
 
-        # Patch the parser instance on the service
-        mock_parser = Mock()
-        mock_parser.parse_file.side_effect = Exception("Parse error")
-        preview_service._parser = mock_parser
-
-        result = preview_service.get_preview("frame1", project)
-        assert result is None
+        # Patch the repository to raise an error
+        with patch.object(
+            preview_service._capture_repository, "get_or_parse", side_effect=Exception("Parse error")
+        ):
+            result = preview_service.force_regenerate_preview("frame1", project)
+            assert result is None
 
     def test_render_error_returns_none(self, preview_service, mock_project, mock_capture_result, qtbot):
         """Test that render error returns None."""
         project, game_frame = mock_project
 
-        # Patch the parser instance on the service
-        mock_parser = Mock()
-        mock_parser.parse_file.return_value = mock_capture_result
-        preview_service._parser = mock_parser
+        # Patch the repository to return mock capture
+        with patch.object(preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result):
+            with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
+                renderer_inst = MockRenderer.return_value
+                renderer_inst.render_selection.side_effect = Exception("Render error")
 
-        with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
-            renderer_inst = MockRenderer.return_value
-            renderer_inst.render_selection.side_effect = Exception("Render error")
-
-            result = preview_service.get_preview("frame1", project)
-            assert result is None
+                result = preview_service.force_regenerate_preview("frame1", project)
+                assert result is None
 
     def test_set_preview_cache_manual(self, preview_service):
         """Test manual cache setting."""
@@ -455,7 +463,7 @@ class TestPreviewServiceIntegration:
         project.add_game_frame(game_frame)
 
         # Get preview using real rendering (no mocks!)
-        pixmap = preview_service.get_preview("f1", project)
+        pixmap = preview_service.force_regenerate_preview("f1", project)
 
         assert pixmap is not None, "Preview should be generated"
         assert pixmap.width() == 8, f"Expected width 8, got {pixmap.width()}"
