@@ -99,7 +99,6 @@ class GameFramesFacade:
                 self._signals.emit_mapping_removed(ai_id)
 
             self._signals.emit_game_frame_removed(frame_id)
-            self._signals.emit_project_changed()
             logger.info("Removed game frame %s", frame_id)
             return True
         return False

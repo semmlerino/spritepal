@@ -196,7 +196,6 @@ class AIFramesFacade:
                 self._signals.emit_mapping_removed(frame_id)
 
             self._signals.emit_ai_frame_removed(frame_id)
-            self._signals.emit_project_changed()
             logger.info("Removed AI frame %s", frame_id)
             return True
         return False
