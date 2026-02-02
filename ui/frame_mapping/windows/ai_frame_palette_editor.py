@@ -11,13 +11,15 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QAction, QImage, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QGraphicsPixmapItem,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -40,6 +42,8 @@ from ui.frame_mapping.views.indexed_canvas import IndexedCanvas
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import AIFrame, SheetPalette
+    from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
+    from ui.frame_mapping.services.async_preview_service import AsyncPreviewService
 
 logger = logging.getLogger(__name__)
 
@@ -81,11 +85,17 @@ class AIFramePaletteEditorWindow(QMainWindow):
         ai_frame: AIFrame,
         palette: SheetPalette,
         parent: QWidget | None = None,
+        controller: FrameMappingController | None = None,
     ) -> None:
         super().__init__(parent)
         self._ai_frame = ai_frame
         self._palette = palette
         self._controller = PaletteEditorController(self)
+        self._frame_controller = controller
+        self._preview_enabled = False
+        self._preview_item: QGraphicsPixmapItem | None = None
+        self._async_preview_service: AsyncPreviewService | None = None
+        self._debounce_timer: QTimer | None = None
 
         self._setup_ui()
         self._setup_menu()
@@ -97,6 +107,19 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self.setWindowTitle(f"Palette Editor - {ai_frame.display_name or Path(ai_frame.path).name}")
         self.resize(900, 700)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+        # Initialize preview service if controller is available
+        if self._frame_controller is not None:
+            from ui.frame_mapping.services.async_preview_service import AsyncPreviewService
+            self._async_preview_service = AsyncPreviewService(self)
+            self._async_preview_service.preview_ready.connect(self._on_preview_ready)
+            self._async_preview_service.preview_failed.connect(self._on_preview_failed)
+            self._preview_item = self._canvas.get_preview_item()
+
+            self._debounce_timer = QTimer()
+            self._debounce_timer.setSingleShot(True)
+            self._debounce_timer.setInterval(300)
+            self._debounce_timer.timeout.connect(self._generate_preview)
 
     def _setup_ui(self) -> None:
         """Set up the main UI layout."""
@@ -254,6 +277,25 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._grid_btn.setToolTip("Toggle 8x8 grid overlay")
         self._grid_btn.clicked.connect(self._on_grid_toggled)
         layout.addWidget(self._grid_btn)
+
+        # Preview section
+        layout.addSpacing(16)
+        preview_label = QLabel("Preview")
+        preview_label.setStyleSheet("font-weight: bold; color: #AAA;")
+        layout.addWidget(preview_label)
+
+        self._preview_checkbox = QCheckBox("In-Game")
+        self._preview_checkbox.setToolTip(
+            "Show in-game preview (quantized, clipped)\n"
+            "Requires frame to be mapped to a game capture"
+        )
+        self._preview_checkbox.toggled.connect(self._on_preview_toggled)
+        layout.addWidget(self._preview_checkbox)
+
+        # Disable if no controller
+        if self._frame_controller is None:
+            self._preview_checkbox.setEnabled(False)
+            self._preview_checkbox.setToolTip("Preview unavailable (no frame mapping context)")
 
         layout.addStretch()
 
@@ -494,6 +536,10 @@ class AIFramePaletteEditorWindow(QMainWindow):
             # Refresh highlight overlay with new data
             self._canvas.set_highlight_index(self._controller.active_index)
 
+        # Schedule preview update if enabled
+        if self._preview_enabled and self._debounce_timer is not None:
+            self._debounce_timer.start()
+
     def _on_selection_changed(self) -> None:
         """Handle selection change."""
         mask = self._controller.selection_mask
@@ -605,6 +651,105 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._index_label.setText("Index: -")
         # Clear palette highlight
         self._palette_panel.highlight_index(None)
+
+    def _on_preview_toggled(self, checked: bool) -> None:
+        """Handle preview toggle."""
+        self._preview_enabled = checked
+
+        if checked:
+            if self._frame_controller is None:
+                self._preview_checkbox.setChecked(False)
+                return
+
+            project = self._frame_controller.project
+            if project is None:
+                QMessageBox.warning(self, "No Project", "No project loaded.")
+                self._preview_checkbox.setChecked(False)
+                return
+
+            mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
+            if mapping is None:
+                QMessageBox.information(
+                    self, "No Mapping",
+                    f"'{self._ai_frame.display_name or self._ai_frame.name}' "
+                    "is not mapped to a game frame.\n\n"
+                    "Map it in the workspace first to enable preview."
+                )
+                self._preview_checkbox.setChecked(False)
+                return
+
+            self._canvas.set_edit_mode_dimmed(True)
+            self._generate_preview()
+        else:
+            self._canvas.set_edit_mode_dimmed(False)
+            if self._preview_item:
+                self._preview_item.setVisible(False)
+
+    def _generate_preview(self) -> None:
+        """Generate in-game preview asynchronously."""
+        if not self._preview_enabled or self._frame_controller is None or self._async_preview_service is None:
+            return
+
+        project = self._frame_controller.project
+        if project is None:
+            return
+
+        mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
+        if mapping is None:
+            return
+
+        capture_result, _ = self._frame_controller.get_capture_result_for_game_frame(
+            mapping.game_frame_id
+        )
+        if capture_result is None:
+            self._status_bar.showMessage("Capture data not found", 3000)
+            return
+
+        indexed_data = self._controller.get_indexed_data()
+        if indexed_data is None:
+            return
+
+        # Convert indexed to RGBA PIL Image
+        from core.services.rgb_to_indexed import convert_indexed_to_rgb
+        ai_image = convert_indexed_to_rgb(indexed_data, self._palette)
+
+        from core.services.sprite_compositor import TransformParams
+        transform = TransformParams(
+            offset_x=mapping.offset_x,
+            offset_y=mapping.offset_y,
+            flip_h=mapping.flip_h,
+            flip_v=mapping.flip_v,
+            scale=mapping.scale,
+            sharpen=mapping.sharpen,
+            resampling=mapping.resampling,
+        )
+
+        self._async_preview_service.request_preview(
+            ai_image=ai_image,
+            capture_result=capture_result,
+            transform=transform,
+            uncovered_policy="transparent",
+            sheet_palette=self._palette,
+            ai_index_map=indexed_data,
+            display_scale=1,
+        )
+
+    def _on_preview_ready(self, qimage: QImage, width: int, height: int) -> None:
+        """Handle async preview completion."""
+        if not self._preview_enabled or self._preview_item is None:
+            return
+
+        pixmap = QPixmap.fromImage(qimage)
+        self._preview_item.setPixmap(pixmap)
+        self._preview_item.setVisible(True)
+        self._preview_item.setPos(0, 0)
+
+    def _on_preview_failed(self, error_message: str) -> None:
+        """Handle async preview failure."""
+        logger.warning("Preview generation failed: %s", error_message)
+        self._status_bar.showMessage(f"Preview failed: {error_message}", 5000)
+        if self._preview_item:
+            self._preview_item.setVisible(False)
 
     def _on_palette_index_selected(self, index: int) -> None:
         """Handle palette panel selection."""
@@ -759,6 +904,11 @@ class AIFramePaletteEditorWindow(QMainWindow):
             elif result == QMessageBox.StandardButton.Cancel:
                 event.ignore()
                 return
+
+        if self._async_preview_service is not None:
+            self._async_preview_service.shutdown()
+        if self._debounce_timer is not None:
+            self._debounce_timer.stop()
 
         self.closed.emit(self._ai_frame.id)
         event.accept()

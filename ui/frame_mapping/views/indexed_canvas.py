@@ -673,3 +673,17 @@ class IndexedCanvas(QWidget):
         if self._indexed_data is None:
             return (0, 0)
         return (self._indexed_data.shape[1], self._indexed_data.shape[0])
+
+    def get_preview_item(self) -> QGraphicsPixmapItem:
+        """Get or create the preview overlay item."""
+        if not hasattr(self, '_preview_item'):
+            self._preview_item = QGraphicsPixmapItem()
+            self._preview_item.setZValue(100)  # On top of everything
+            self._preview_item.setVisible(False)
+            self._scene.addItem(self._preview_item)
+        return self._preview_item
+
+    def set_edit_mode_dimmed(self, dimmed: bool) -> None:
+        """Dim the indexed image during preview mode."""
+        if self._pixmap_item:
+            self._pixmap_item.setOpacity(0.3 if dimmed else 1.0)

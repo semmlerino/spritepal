@@ -322,7 +322,9 @@ class PaletteCoordinator:
             return
 
         # Create the editor window
-        editor = AIFramePaletteEditorWindow(ai_frame, sheet_palette, self._parent_widget)
+        editor = AIFramePaletteEditorWindow(
+            ai_frame, sheet_palette, self._parent_widget, controller=self._controller
+        )
 
         # Track the editor window
         self._palette_editors[ai_frame_id] = editor
@@ -382,7 +384,12 @@ class PaletteCoordinator:
 
         # Refresh the mapping panel to show the updated frame
         if self._mapping_panel:
-            self._mapping_panel.refresh_thumbnails_only()
+            if new_id != ai_frame_id:
+                # ID changed - need full refresh to update stored IDs in table
+                self._mapping_panel.refresh()
+            else:
+                # Just thumbnail changed - lightweight refresh is sufficient
+                self._mapping_panel.refresh_thumbnails_only()
 
         # Update workbench if this frame is selected
         if self._state.selected_ai_frame_id == new_id and self._on_ai_frame_selected:
