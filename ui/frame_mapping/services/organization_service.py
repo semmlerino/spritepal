@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from ui.frame_mapping.undo import UndoRedoStack
     from ui.frame_mapping.undo.command_context import CommandContext
 
-from core.frame_mapping_project import FRAME_TAGS, AIFrame
+from core.frame_mapping_project import FRAME_TAGS
 from ui.frame_mapping.undo import (
     RenameAIFrameCommand,
     RenameCaptureCommand,
@@ -93,38 +93,6 @@ class OrganizationService(QObject):
             True if frame was found and renamed
         """
         return project.set_frame_display_name(frame_id, display_name)
-
-    def add_frame_tag(self, project: FrameMappingProject, frame_id: str, tag: str) -> bool:
-        """Add a tag to an AI frame.
-
-        Args:
-            project: Frame mapping project
-            frame_id: ID of the AI frame (filename)
-            tag: Tag to add (must be in FRAME_TAGS)
-
-        Returns:
-            True if frame was found and tag added
-        """
-        result = project.add_frame_tag(frame_id, tag)
-        if result:
-            self.frame_tags_changed.emit(frame_id)
-        return result
-
-    def remove_frame_tag(self, project: FrameMappingProject, frame_id: str, tag: str) -> bool:
-        """Remove a tag from an AI frame.
-
-        Args:
-            project: Frame mapping project
-            frame_id: ID of the AI frame (filename)
-            tag: Tag to remove
-
-        Returns:
-            True if frame was found and tag removed
-        """
-        result = project.remove_frame_tag(frame_id, tag)
-        if result:
-            self.frame_tags_changed.emit(frame_id)
-        return result
 
     def toggle_frame_tag(
         self,
@@ -207,33 +175,6 @@ class OrganizationService(QObject):
             return frozenset()
         return frame.tags
 
-    def get_frame_display_name(self, project: FrameMappingProject, frame_id: str) -> str | None:
-        """Get display name for an AI frame.
-
-        Args:
-            project: Frame mapping project
-            frame_id: ID of the AI frame (filename)
-
-        Returns:
-            Display name if set, None otherwise
-        """
-        frame = project.get_ai_frame_by_id(frame_id)
-        if frame is None:
-            return None
-        return frame.display_name
-
-    def get_frames_with_tag(self, project: FrameMappingProject, tag: str) -> list[AIFrame]:
-        """Get all AI frames with a specific tag.
-
-        Args:
-            project: Frame mapping project
-            tag: Tag to filter by
-
-        Returns:
-            List of AIFrame objects with the tag
-        """
-        return project.get_frames_with_tag(tag)
-
     @staticmethod
     def get_available_tags() -> frozenset[str]:
         """Get the set of valid frame tags.
@@ -301,18 +242,3 @@ class OrganizationService(QObject):
             True if frame was found and renamed
         """
         return project.set_capture_display_name(game_frame_id, display_name)
-
-    def get_capture_display_name(self, project: FrameMappingProject, game_frame_id: str) -> str | None:
-        """Get display name for a game frame (capture).
-
-        Args:
-            project: Frame mapping project
-            game_frame_id: ID of the game frame
-
-        Returns:
-            Display name if set, None otherwise
-        """
-        frame = project.get_game_frame_by_id(game_frame_id)
-        if frame is None:
-            return None
-        return frame.display_name
