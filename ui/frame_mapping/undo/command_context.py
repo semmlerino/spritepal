@@ -28,7 +28,7 @@ class CommandSignalEmitter(Protocol):
         """Emit mapping_created signal."""
         ...
 
-    def emit_mapping_removed(self, ai_frame_id: str) -> None:
+    def emit_mapping_removed(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Emit mapping_removed signal."""
         ...
 

@@ -32,7 +32,7 @@ class AIFramesSignals(Protocol):
     def emit_ai_frame_added(self, frame_id: str) -> None: ...
     def emit_ai_frame_removed(self, frame_id: str) -> None: ...
     def emit_ai_frame_moved(self, ai_frame_id: str, from_index: int, to_index: int) -> None: ...
-    def emit_mapping_removed(self, ai_frame_id: str) -> None: ...
+    def emit_mapping_removed(self, ai_frame_id: str, game_frame_id: str) -> None: ...
     def emit_error(self, message: str) -> None: ...
     def emit_project_changed(self) -> None: ...
     def emit_save_requested(self) -> None: ...
@@ -182,8 +182,9 @@ class AIFramesFacade:
             logger.warning("remove: project is None")
             return False
 
-        # Check if frame has a mapping before removal (will be deleted along with frame)
-        had_mapping = project.get_mapping_for_ai_frame(frame_id) is not None
+        # Capture mapping before removal (will be deleted along with frame)
+        mapping = project.get_mapping_for_ai_frame(frame_id)
+        had_mapping = mapping is not None
         logger.info(
             "remove: frame_id=%s, had_mapping=%s, ai_frames_count=%d", frame_id, had_mapping, len(project.ai_frames)
         )
@@ -193,7 +194,7 @@ class AIFramesFacade:
         if result:
             # Emit mapping_removed if the frame was mapped (mapping was deleted)
             if had_mapping:
-                self._signals.emit_mapping_removed(frame_id)
+                self._signals.emit_mapping_removed(frame_id, mapping.game_frame_id)
 
             self._signals.emit_ai_frame_removed(frame_id)
             logger.info("Removed AI frame %s", frame_id)

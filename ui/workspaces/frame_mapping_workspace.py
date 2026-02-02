@@ -751,21 +751,21 @@ class FrameMappingWorkspace(QWidget):
         self._update_single_mapping_panel_row(ai_frame_id)
 
     @signal_error_boundary()
-    def _on_mapping_removed(self, ai_frame_id: str) -> None:
+    def _on_mapping_removed(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Handle mapping removed - targeted UI update.
 
         Only updates the UI elements affected by mapping removal,
         avoiding full project refresh for better performance.
 
-        Note: We use full refresh for game frame link status because
-        the mapping has already been removed and we don't have the
-        game_frame_id that was unlinked.
+        Args:
+            ai_frame_id: ID of the AI frame that was unmapped
+            game_frame_id: ID of the game frame that was unlinked
         """
         self._update_map_button_state()
         # Use targeted update for AI frame status (we know which one changed)
         self._update_single_ai_frame_status(ai_frame_id)
-        # Must use full refresh for captures - we don't know which game frame was unlinked
-        self._refresh_game_frame_link_status()
+        # Use targeted update for game frame link status
+        self._captures_pane.update_single_item_link_status(game_frame_id, None)
         # Use targeted clear instead of full refresh (avoids regenerating all thumbnails)
         self._mapping_panel.clear_row_mapping(ai_frame_id)
 

@@ -99,7 +99,7 @@ class TestCreateMappingUndoSignals:
         cmd.undo()
 
         assert_signal_emitted(collector.trace, "mapping_removed", times=1)
-        assert_signal_args(collector.trace, "mapping_removed", ("sprite_01.png",))
+        assert_signal_args(collector.trace, "mapping_removed", ("sprite_01.png", "capture_A"))
 
     def test_undo_emits_mapping_created_when_restoring_prior_mapping(
         self, populated_controller: FrameMappingController

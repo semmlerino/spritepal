@@ -148,11 +148,12 @@ class FrameMappingController(QObject):
         - FrameMappingWorkspace._on_mapping_created() → highlights mapping
     """
 
-    mapping_removed = Signal(str)
+    mapping_removed = Signal(str, str)
     """Emitted when a mapping is removed or an AI frame is unlinked.
 
     Args:
         ai_frame_id: ID of the AI frame that was unmapped
+        game_frame_id: ID of the game frame that was unlinked
 
     Emitted by:
         - FrameMappingController.remove_mapping()
@@ -718,9 +719,9 @@ class FrameMappingController(QObject):
         """Emit mapping_created signal."""
         self.mapping_created.emit(ai_frame_id, game_frame_id)
 
-    def emit_mapping_removed(self, ai_frame_id: str) -> None:
+    def emit_mapping_removed(self, ai_frame_id: str, game_frame_id: str) -> None:
         """Emit mapping_removed signal."""
-        self.mapping_removed.emit(ai_frame_id)
+        self.mapping_removed.emit(ai_frame_id, game_frame_id)
 
     def emit_alignment_updated(self, ai_frame_id: str) -> None:
         """Emit alignment_updated signal."""
@@ -1135,7 +1136,7 @@ class FrameMappingController(QObject):
         )
         self._undo_stack.push(command)
 
-        self.mapping_removed.emit(ai_frame_id)
+        self.mapping_removed.emit(ai_frame_id, removed_game_id)
         self.save_requested.emit()
         logger.info("Removed mapping for AI frame %s", ai_frame_id)
         return True

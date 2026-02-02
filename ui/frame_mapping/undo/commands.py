@@ -77,7 +77,7 @@ class CreateMappingCommand:
 
         # If no mapping was restored, emit removal signal
         if self.prev_ai_mapping_game_id is None:
-            self.ctx.signal_emitter.emit_mapping_removed(self.ai_frame_id)
+            self.ctx.signal_emitter.emit_mapping_removed(self.ai_frame_id, self.game_frame_id)
 
 
 @dataclass
