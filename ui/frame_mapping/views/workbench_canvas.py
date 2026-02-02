@@ -2013,64 +2013,6 @@ class WorkbenchCanvas(QWidget):
         # No valid position found - return original
         return (initial_offset_x, initial_offset_y, False)
 
-    def _compute_optimal_alignment(
-        self,
-        ai_bbox: tuple[int, int, int, int],
-        flip_h: bool,
-        flip_v: bool,
-    ) -> tuple[int, int, float]:
-        """Compute optimal alignment that maximizes AI size without overflow.
-
-        Uses scipy differential evolution to find the largest scale where
-        AI content fits entirely within tile coverage, with optimal positioning.
-
-        Args:
-            ai_bbox: AI content bounding box (left, top, right, bottom)
-            flip_h: Horizontal flip state
-            flip_v: Vertical flip state
-
-        Returns:
-            Tuple of (offset_x, offset_y, scale)
-        """
-        if self._ai_image is None or self._capture_result is None:
-            return (0, 0, 1.0)
-
-        tile_rects = self._get_cached_tile_rects()
-        if not tile_rects:
-            return (0, 0, 1.0)
-
-        ai_x, ai_y, ai_x2, ai_y2 = ai_bbox
-
-        if ai_x2 - ai_x <= 0 or ai_y2 - ai_y <= 0:
-            return (0, 0, 1.0)
-
-        # Apply flips to bbox coordinates
-        if flip_h:
-            ai_x, ai_x2 = self._ai_image.width - ai_x2, self._ai_image.width - ai_x
-        if flip_v:
-            ai_y, ai_y2 = self._ai_image.height - ai_y2, self._ai_image.height - ai_y
-
-        # Use scipy-based optimizer for global search
-        optimizer = AlignmentOptimizer(min_scale=0.01, max_scale=1.0)
-        result = optimizer.compute_optimal_alignment(
-            ai_bbox=(ai_x, ai_y, ai_x2, ai_y2),
-            tile_rects=tile_rects,
-        )
-
-        if result.success:
-            logger.debug(
-                "Scipy optimal alignment: scale=%.4f, offset=(%d, %d), iterations=%d",
-                result.scale,
-                result.offset_x,
-                result.offset_y,
-                result.iterations,
-            )
-            return (result.offset_x, result.offset_y, result.scale)
-
-        # Fallback: return centered position at minimum scale
-        logger.warning("Scipy optimization failed, using fallback")
-        return (result.offset_x, result.offset_y, result.scale)
-
     @signal_error_boundary()
     def _on_auto_align(self) -> None:
         """Handle auto-align button click.
