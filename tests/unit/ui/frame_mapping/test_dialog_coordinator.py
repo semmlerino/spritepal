@@ -118,48 +118,6 @@ def test_show_sprite_selection_rejected(coordinator, mock_capture_result):
         mock_dialog.exec.assert_called_once()
 
 
-def test_confirm_injection_accepted(coordinator):
-    """Test injection confirmation when user accepts."""
-    with patch("ui.frame_mapping.dialog_coordinator.QMessageBox.question") as mock_question:
-        mock_question.return_value = 0x00004000  # QMessageBox.StandardButton.Yes
-
-        result = coordinator.confirm_injection(coordinator, 5)
-
-        assert result is True
-        mock_question.assert_called_once()
-
-
-def test_confirm_injection_rejected(coordinator):
-    """Test injection confirmation when user rejects."""
-    with patch("ui.frame_mapping.dialog_coordinator.QMessageBox.question") as mock_question:
-        mock_question.return_value = 0x00010000  # QMessageBox.StandardButton.No
-
-        result = coordinator.confirm_injection(coordinator, 5)
-
-        assert result is False
-        mock_question.assert_called_once()
-
-
-def test_confirm_replace_link(coordinator):
-    """Test replace link confirmation dialog."""
-    with patch("ui.frame_mapping.dialog_coordinator.confirm_replace_link") as mock_confirm:
-        mock_confirm.return_value = True
-
-        result = coordinator.confirm_replace_link(coordinator, "game_01", "old_ai.png", "new_ai.png")
-
-        assert result is True
-        mock_confirm.assert_called_once_with(coordinator, "game_01", "old_ai.png", "new_ai.png")
-
-
-def test_confirm_replace_ai_frame_link(coordinator):
-    """Test replace AI frame link confirmation dialog."""
-    with patch("ui.frame_mapping.dialog_coordinator.confirm_replace_ai_frame_link") as mock_confirm:
-        mock_confirm.return_value = False
-
-        result = coordinator.confirm_replace_ai_frame_link(coordinator, "ai.png", "old_game", "new_game")
-
-        assert result is False
-        mock_confirm.assert_called_once_with(coordinator, "ai.png", "old_game", "new_game")
 
 
 def test_process_empty_queue(qtbot, coordinator, mock_controller):

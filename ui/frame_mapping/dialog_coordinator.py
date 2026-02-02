@@ -12,10 +12,6 @@ from typing import TYPE_CHECKING
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QDialog, QMessageBox, QWidget
 
-from ui.frame_mapping.dialogs.replace_link_dialog import (
-    confirm_replace_ai_frame_link,
-    confirm_replace_link,
-)
 from ui.frame_mapping.dialogs.sprite_selection_dialog import SpriteSelectionDialog
 from utils.logging_config import get_logger
 
@@ -81,65 +77,6 @@ class DialogCoordinator(QObject):
 
         return None
 
-    def confirm_injection(self, parent: QWidget, frame_count: int) -> bool:
-        """Show confirmation dialog for injection operation.
-
-        Args:
-            parent: Parent widget for the dialog
-            frame_count: Number of frames to inject
-
-        Returns:
-            True if user confirmed, False if cancelled
-        """
-        reply = QMessageBox.question(
-            parent,
-            "Confirm Injection",
-            f"Inject {frame_count} frame(s)?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-
-        return reply == QMessageBox.StandardButton.Yes
-
-    def confirm_replace_link(
-        self,
-        parent: QWidget,
-        game_frame_id: str,
-        old_ai_frame_name: str,
-        new_ai_frame_name: str,
-    ) -> bool:
-        """Show confirmation dialog for replacing a game frame link.
-
-        Args:
-            parent: Parent widget for the dialog
-            game_frame_id: ID of the game frame being relinked
-            old_ai_frame_name: Name of currently linked AI frame
-            new_ai_frame_name: Name of new AI frame to link
-
-        Returns:
-            True if user confirmed replacement, False if cancelled
-        """
-        return confirm_replace_link(parent, game_frame_id, old_ai_frame_name, new_ai_frame_name)
-
-    def confirm_replace_ai_frame_link(
-        self,
-        parent: QWidget,
-        ai_frame_name: str,
-        old_game_frame_id: str,
-        new_game_frame_id: str,
-    ) -> bool:
-        """Show confirmation dialog for replacing an AI frame link.
-
-        Args:
-            parent: Parent widget for the dialog
-            ai_frame_name: Name of AI frame being remapped
-            old_game_frame_id: ID of currently linked game frame
-            new_game_frame_id: ID of new game frame to link
-
-        Returns:
-            True if user confirmed replacement, False if cancelled
-        """
-        return confirm_replace_ai_frame_link(parent, ai_frame_name, old_game_frame_id, new_game_frame_id)
 
     # -------------------------------------------------------------------------
     # Queue Management
