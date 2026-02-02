@@ -215,8 +215,19 @@ QApplication.processEvents()
 | AppContext | `core/app_context.py` |
 | Test fixtures | `tests/fixtures/` |
 | Qt mocks | `tests/infrastructure/qt_mocks.py` |
+| **Application log** | `logs/spritepal.log` |
 
 **Project structure:** See [docs/architecture.md](docs/architecture.md)
+
+### Debugging Bug Reports
+
+**When a bug is reported, check the log first.** The log file grows large, so read only the last 50-100 lines:
+
+```bash
+tail -100 logs/spritepal.log
+```
+
+The log includes timestamps, log levels, and module names for tracing signal/event flow.
 
 ### Environment Variables
 
