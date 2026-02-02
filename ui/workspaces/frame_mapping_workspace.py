@@ -697,11 +697,16 @@ class FrameMappingWorkspace(QWidget):
 
     @signal_error_boundary()
     def _on_ai_frame_removed(self, ai_frame_id: str) -> None:
-        """Handle AI frame removed - refresh mapping panel to remove stale row.
+        """Handle AI frame removed - refresh UI panes to remove stale entries.
 
         Args:
             ai_frame_id: ID of the AI frame that was removed
         """
+        # Refresh AI frames pane to remove the deleted frame
+        project = self._controller.project
+        if project is not None:
+            self._ai_frames_pane.set_ai_frames(project.ai_frames)
+        # Refresh mapping panel to remove stale row
         self._mapping_panel.refresh()
 
     @signal_error_boundary()
