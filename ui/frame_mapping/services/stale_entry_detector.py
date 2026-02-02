@@ -104,7 +104,6 @@ class AsyncStaleEntryDetector(AsyncServiceBase):
 
     Signals:
         stale_entries_detected: Emitted with list of stale frame IDs when detection completes.
-        detection_finished: Emitted when detection completes (even if no stale entries).
     """
 
     stale_entries_detected = Signal(list)
@@ -122,22 +121,6 @@ class AsyncStaleEntryDetector(AsyncServiceBase):
     Triggers:
         - FrameMappingController.stale_entries_on_load
         - Workspace → shows batch warning dialog
-    """
-
-    detection_finished = Signal()
-    """Emitted when stale entry detection completes, regardless of results.
-
-    Signals completion of a detection batch, whether stale entries were found or not.
-    Use this to update UI state that depends on detection completing.
-
-    Args:
-        (none)
-
-    Emitted by:
-        - _on_detection_complete() → after detection completes
-
-    Triggers:
-        - Workspace → can resume other operations
     """
 
     def __init__(
@@ -189,7 +172,6 @@ class AsyncStaleEntryDetector(AsyncServiceBase):
 
         if not frames_to_check:
             self.stale_entries_detected.emit([])
-            self.detection_finished.emit()
             return
 
         # Create worker and thread
@@ -228,7 +210,6 @@ class AsyncStaleEntryDetector(AsyncServiceBase):
 
         if stale_ids:
             self.stale_entries_detected.emit(stale_ids)
-        self.detection_finished.emit()
 
     def cancel(self) -> None:
         """Cancel any in-progress detection."""
