@@ -444,7 +444,6 @@ class FrameMappingWorkspace(QWidget):
         self._controller.stale_entries_warning.connect(self._on_stale_entries_warning)
         self._controller.stale_entries_on_load.connect(self._on_stale_entries_detected_on_load)
         self._controller.alignment_updated.connect(self._on_alignment_updated)
-        self._controller.preview_cache_invalidated.connect(self._on_preview_cache_invalidated)
         self._controller.capture_import_requested.connect(self._on_capture_import_requested)
         self._controller.directory_import_started.connect(self._on_directory_import_started)
         self._controller.directory_import_finished.connect(self._on_directory_import_finished)
@@ -937,10 +936,6 @@ class FrameMappingWorkspace(QWidget):
         """Handle edit frame palette request. Delegates to PaletteCoordinator."""
         self._palette.handle_edit_frame_palette(ai_frame_id)
 
-    @signal_error_boundary()
-    def _on_editor_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
-        """Handle palette color change from palette editor window. Delegates to PaletteCoordinator."""
-        self._palette._handle_editor_palette_color_changed(index, color)
 
     @signal_error_boundary()
     def _on_delete_capture(self, frame_id: str) -> None:

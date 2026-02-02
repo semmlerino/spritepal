@@ -127,48 +127,6 @@ class WorkspaceLogicHelper:
             return None
         return self._state.selected_game_id
 
-    def set_ai_frame_selection(self, frame_id: str | None, *, emit_signal: bool = True) -> None:
-        """Centralized method to update AI frame selection.
-
-        Updates BOTH the state manager cache AND the pane selection together.
-        This ensures the two never get out of sync.
-
-        Args:
-            frame_id: AI frame ID to select, or None to clear selection
-            emit_signal: If True, the pane emits ai_frame_selected signal
-        """
-        if self._state is not None:
-            self._state.selected_ai_frame_id = frame_id
-
-        if self._ai_frames_pane is not None:
-            if frame_id is None:
-                self._ai_frames_pane.clear_selection()
-            else:
-                self._ai_frames_pane.select_frame_by_id(frame_id, emit_signal=emit_signal)
-
-        # Debug: Validate selection sync (only when SPRITEPAL_DEBUG_STATE=1)
-        self.validate_selection_state()
-
-    def set_game_frame_selection(self, frame_id: str | None) -> None:
-        """Centralized method to update game frame selection.
-
-        Updates BOTH the state manager cache AND the captures pane selection
-        together. This ensures the two never get out of sync.
-
-        Args:
-            frame_id: Game frame ID to select, or None to clear selection
-        """
-        if self._state is not None:
-            self._state.selected_game_id = frame_id
-
-        if self._captures_pane is not None:
-            if frame_id is None:
-                self._captures_pane.clear_selection()
-            else:
-                self._captures_pane.select_frame(frame_id)
-
-        # Debug: Validate selection sync (only when SPRITEPAL_DEBUG_STATE=1)
-        self.validate_selection_state()
 
     def validate_selection_state(self) -> None:
         """Debug-only: Validate that selection caches match pane state.

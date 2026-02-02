@@ -793,9 +793,6 @@ class FrameMappingController(QObject):
         """Emit game_frame_removed signal."""
         self.game_frame_removed.emit(frame_id)
 
-    def emit_game_frame_previews_finished(self) -> None:
-        """Emit game_frame_previews_finished signal."""
-        self.game_frame_previews_finished.emit()
 
     def emit_error(self, message: str) -> None:
         """Emit error_occurred signal."""

@@ -211,11 +211,6 @@ class WorkspaceStateManager:
         """Set the game frame ID currently displayed on canvas."""
         self._current_canvas_game_id = frame_id
 
-    def clear_selections(self) -> None:
-        """Clear all selection state."""
-        self._selected_ai_frame_id = None
-        self._selected_game_id = None
-        self._current_canvas_game_id = None
 
     # -------------------------------------------------------------------------
     # Auto-Advance Properties

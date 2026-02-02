@@ -165,18 +165,6 @@ class TestSelectionStateManagement:
         manager.current_canvas_game_id = canvas_id
         assert manager.current_canvas_game_id == canvas_id
 
-    def test_clear_selections(self) -> None:
-        """Should clear all selection state."""
-        manager = WorkspaceStateManager()
-        manager.selected_ai_frame_id = "sprite_00.png"
-        manager.selected_game_id = "capture_001"
-        manager.current_canvas_game_id = "capture_002"
-
-        manager.clear_selections()
-
-        assert manager.selected_ai_frame_id is None
-        assert manager.selected_game_id is None
-        assert manager.current_canvas_game_id is None
 
 
 class TestAutoAdvanceState:
