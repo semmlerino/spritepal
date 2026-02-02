@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QImage, QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QAction, QImage, QKeySequence, QPainter, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QGraphicsPixmapItem,
+    QGraphicsScene,
+    QGraphicsView,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -93,7 +95,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._controller = PaletteEditorController(self)
         self._frame_controller = controller
         self._preview_enabled = False
-        self._preview_item: QGraphicsPixmapItem | None = None
         self._async_preview_service: AsyncPreviewService | None = None
         self._debounce_timer: QTimer | None = None
 
@@ -111,10 +112,10 @@ class AIFramePaletteEditorWindow(QMainWindow):
         # Initialize preview service if controller is available
         if self._frame_controller is not None:
             from ui.frame_mapping.services.async_preview_service import AsyncPreviewService
+
             self._async_preview_service = AsyncPreviewService(self)
             self._async_preview_service.preview_ready.connect(self._on_preview_ready)
             self._async_preview_service.preview_failed.connect(self._on_preview_failed)
-            self._preview_item = self._canvas.get_preview_item()
 
             self._debounce_timer = QTimer()
             self._debounce_timer.setSingleShot(True)
@@ -164,6 +165,11 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._palette_panel.set_palette(self._palette)
         self._palette_panel.set_active_index(1)
         main_layout.addWidget(self._palette_panel)
+
+        # Far right: Preview panel (collapsible)
+        self._preview_panel = self._create_preview_panel()
+        self._preview_panel.setVisible(False)  # Hidden by default
+        main_layout.addWidget(self._preview_panel)
 
         # Status bar
         self._status_bar = QStatusBar()
@@ -286,8 +292,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         self._preview_checkbox = QCheckBox("In-Game")
         self._preview_checkbox.setToolTip(
-            "Show in-game preview (quantized, clipped)\n"
-            "Requires frame to be mapped to a game capture"
+            "Show in-game preview (quantized, clipped)\nRequires frame to be mapped to a game capture"
         )
         self._preview_checkbox.toggled.connect(self._on_preview_toggled)
         layout.addWidget(self._preview_checkbox)
@@ -323,6 +328,43 @@ class AIFramePaletteEditorWindow(QMainWindow):
         zoom_100.setToolTip("100% zoom")
         zoom_100.clicked.connect(self._canvas.zoom_100)
         layout.addWidget(zoom_100)
+
+        return panel
+
+    def _create_preview_panel(self) -> QWidget:
+        """Create the collapsible preview panel."""
+        panel = QWidget()
+        panel.setFixedWidth(200)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(4)
+
+        # Header
+        header = QLabel("In-Game Preview")
+        header.setStyleSheet("font-weight: bold; color: #AAA;")
+        layout.addWidget(header)
+
+        # Preview display area with graphics view
+        self._preview_scene = QGraphicsScene(self)
+        self._preview_view = QGraphicsView(self._preview_scene)
+        self._preview_view.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+        self._preview_view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
+        self._preview_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._preview_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._preview_view.setStyleSheet("background-color: #2A2A2A; border: 1px solid #444;")
+        self._preview_view.setMinimumHeight(150)
+
+        # Pixmap item for preview
+        self._preview_pixmap_item = QGraphicsPixmapItem()
+        self._preview_scene.addItem(self._preview_pixmap_item)
+
+        layout.addWidget(self._preview_view, 1)
+
+        # Info label
+        self._preview_info_label = QLabel("Shows quantized result\nas it appears in-game")
+        self._preview_info_label.setStyleSheet("color: #666; font-size: 10px;")
+        self._preview_info_label.setWordWrap(True)
+        layout.addWidget(self._preview_info_label)
 
         return panel
 
@@ -670,20 +712,21 @@ class AIFramePaletteEditorWindow(QMainWindow):
             mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
             if mapping is None:
                 QMessageBox.information(
-                    self, "No Mapping",
+                    self,
+                    "No Mapping",
                     f"'{self._ai_frame.display_name or self._ai_frame.name}' "
                     "is not mapped to a game frame.\n\n"
-                    "Map it in the workspace first to enable preview."
+                    "Map it in the workspace first to enable preview.",
                 )
                 self._preview_checkbox.setChecked(False)
                 return
 
-            self._canvas.set_edit_mode_dimmed(True)
+            # Show preview panel and generate preview
+            self._preview_panel.setVisible(True)
             self._generate_preview()
         else:
-            self._canvas.set_edit_mode_dimmed(False)
-            if self._preview_item:
-                self._preview_item.setVisible(False)
+            # Hide preview panel
+            self._preview_panel.setVisible(False)
 
     def _generate_preview(self) -> None:
         """Generate in-game preview asynchronously."""
@@ -698,9 +741,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         if mapping is None:
             return
 
-        capture_result, _ = self._frame_controller.get_capture_result_for_game_frame(
-            mapping.game_frame_id
-        )
+        capture_result, _ = self._frame_controller.get_capture_result_for_game_frame(mapping.game_frame_id)
         if capture_result is None:
             self._status_bar.showMessage("Capture data not found", 3000)
             return
@@ -711,9 +752,11 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         # Convert indexed to RGBA PIL Image
         from core.services.rgb_to_indexed import convert_indexed_to_rgb
+
         ai_image = convert_indexed_to_rgb(indexed_data, self._palette)
 
         from core.services.sprite_compositor import TransformParams
+
         transform = TransformParams(
             offset_x=mapping.offset_x,
             offset_y=mapping.offset_y,
@@ -736,20 +779,20 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _on_preview_ready(self, qimage: QImage, width: int, height: int) -> None:
         """Handle async preview completion."""
-        if not self._preview_enabled or self._preview_item is None:
+        if not self._preview_enabled:
             return
 
         pixmap = QPixmap.fromImage(qimage)
-        self._preview_item.setPixmap(pixmap)
-        self._preview_item.setVisible(True)
-        self._preview_item.setPos(0, 0)
+        self._preview_pixmap_item.setPixmap(pixmap)
+        self._preview_scene.setSceneRect(0, 0, pixmap.width(), pixmap.height())
+        self._preview_view.fitInView(self._preview_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
 
     def _on_preview_failed(self, error_message: str) -> None:
         """Handle async preview failure."""
         logger.warning("Preview generation failed: %s", error_message)
         self._status_bar.showMessage(f"Preview failed: {error_message}", 5000)
-        if self._preview_item:
-            self._preview_item.setVisible(False)
+        # Clear the preview display
+        self._preview_pixmap_item.setPixmap(QPixmap())
 
     def _on_palette_index_selected(self, index: int) -> None:
         """Handle palette panel selection."""
