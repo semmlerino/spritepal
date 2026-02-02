@@ -316,21 +316,6 @@ class PreviewService(QObject):
                     self._stale_previews.add(frame_id)
             return None
 
-    def regenerate_visible_previews(self, visible_frame_ids: list[str], project: FrameMappingProject | None) -> None:
-        """Regenerate previews for visible frames first.
-
-        Prioritizes regenerating stale previews that are currently visible,
-        ensuring the user sees updated content quickly.
-
-        Args:
-            visible_frame_ids: List of frame IDs currently visible in the UI
-            project: Current project
-        """
-        for frame_id in visible_frame_ids:
-            if frame_id in self._stale_previews:
-                # Force regeneration (bypasses stale-return optimization)
-                self.force_regenerate_preview(frame_id, project)
-
     def set_preview_cache(self, frame_id: str, pixmap: QPixmap, mtime: float, entry_ids: tuple[int, ...]) -> None:
         """Manually set preview cache entry (used during capture import).
 
