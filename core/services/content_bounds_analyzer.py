@@ -7,6 +7,8 @@ for content-weighted alignment.
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
@@ -210,3 +212,119 @@ def get_tight_content_bbox(
     bottom = min(image.height, bottom)
 
     return (left, top, right, bottom)
+
+
+def detect_background_color(
+    image: Image.Image,
+    corner_size: int = 5,
+    variance_threshold: float = 30.0,
+) -> tuple[tuple[int, int, int] | None, bool]:
+    """Detect solid background color by sampling image corners.
+
+    Samples the four corners of the image and analyzes nearly-opaque pixels
+    to detect a consistent background color.
+
+    Args:
+        image: PIL Image to analyze
+        corner_size: Size of corner region to sample (pixels)
+        variance_threshold: Maximum RGB variance across corners for high confidence
+
+    Returns:
+        (rgb_color, is_confident):
+        - rgb_color: Detected background color as RGB tuple, or None if transparent
+        - is_confident: True if variance across corners is below threshold
+    """
+    # Convert to RGBA for alpha analysis
+    if image.mode != "RGBA":
+        image = image.convert("RGBA")
+
+    width, height = image.size
+    arr = np.array(image)
+
+    # Check if image has significant transparency (use alpha channel)
+    alpha = arr[:, :, 3]
+    opaque_ratio = np.sum(alpha > 200) / alpha.size
+    if opaque_ratio < 0.5:
+        # Image is mostly transparent - no solid background
+        return None, True
+
+    # Sample 4 corners
+    corner_size = min(corner_size, width // 4, height // 4)
+    corner_size = max(corner_size, 1)
+
+    corners = [
+        arr[:corner_size, :corner_size],  # Top-left
+        arr[:corner_size, -corner_size:],  # Top-right
+        arr[-corner_size:, :corner_size],  # Bottom-left
+        arr[-corner_size:, -corner_size:],  # Bottom-right
+    ]
+
+    # Collect RGB values from nearly-opaque pixels in each corner
+    corner_colors: list[tuple[float, float, float]] = []
+    for corner in corners:
+        # Filter to nearly-opaque pixels (alpha > 200)
+        opaque_mask = corner[:, :, 3] > 200
+        if not np.any(opaque_mask):
+            continue
+        rgb = corner[:, :, :3][opaque_mask]
+        avg_color = rgb.mean(axis=0)
+        corner_colors.append((float(avg_color[0]), float(avg_color[1]), float(avg_color[2])))
+
+    if len(corner_colors) < 2:
+        # Not enough corners with opaque pixels
+        return None, False
+
+    # Compute average color across corners
+    avg_r = sum(c[0] for c in corner_colors) / len(corner_colors)
+    avg_g = sum(c[1] for c in corner_colors) / len(corner_colors)
+    avg_b = sum(c[2] for c in corner_colors) / len(corner_colors)
+
+    # Compute variance (max distance from average)
+    max_variance = 0.0
+    for r, g, b in corner_colors:
+        dist = math.sqrt((r - avg_r) ** 2 + (g - avg_g) ** 2 + (b - avg_b) ** 2)
+        max_variance = max(max_variance, dist)
+
+    # Result
+    detected_color = (round(avg_r), round(avg_g), round(avg_b))
+    is_confident = max_variance < variance_threshold
+
+    return detected_color, is_confident
+
+
+def remove_background(
+    image: Image.Image,
+    background_color: tuple[int, int, int],
+    tolerance: int = 30,
+) -> Image.Image:
+    """Remove background color by setting matching pixels to transparent.
+
+    Uses RGB Euclidean distance to identify background pixels. Pixels within
+    the tolerance threshold have their alpha set to 0.
+
+    Args:
+        image: PIL Image (will be converted to RGBA if needed)
+        background_color: RGB tuple of the background color to remove
+        tolerance: Maximum RGB Euclidean distance for a pixel to be considered background
+
+    Returns:
+        New RGBA image with background removed (input is not modified)
+    """
+    # Convert to RGBA
+    if image.mode != "RGBA":
+        image = image.convert("RGBA")
+    else:
+        image = image.copy()  # Don't modify input
+
+    arr = np.array(image)
+    rgb = arr[:, :, :3].astype(np.float32)
+
+    # Compute Euclidean distance from background color
+    bg = np.array(background_color, dtype=np.float32)
+    dist = np.sqrt(np.sum((rgb - bg) ** 2, axis=2))
+
+    # Set alpha to 0 for pixels within tolerance
+    mask = dist <= tolerance
+    arr[:, :, 3][mask] = 0
+
+    return Image.fromarray(arr)
