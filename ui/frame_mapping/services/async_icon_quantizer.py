@@ -108,18 +108,20 @@ class _QuantizeWorker(QObject):
             if self._should_cancel(request_id):
                 return
 
-            # Quantize to palette
+            # Scale FIRST, then quantize.
+            # Quantization with LAB color space is O(pixels * palette * mappings),
+            # so scaling before quantizing is much faster for large images.
+            pil_image.thumbnail(
+                (request.target_size, request.target_size),
+                Image.Resampling.LANCZOS,
+            )
+
+            # Quantize to palette (now on smaller image)
             quantized_pil = quantize_pil_image(pil_image, request.sheet_palette)
 
             # Check cancellation after heavy work
             if self._should_cancel(request_id):
                 return
-
-            # Scale to target size (maintaining aspect ratio)
-            quantized_pil.thumbnail(
-                (request.target_size, request.target_size),
-                Image.Resampling.LANCZOS,
-            )
 
             # Convert to QImage (thread-safe)
             qimage = pil_to_qimage(quantized_pil, thread_safe=True)

@@ -135,7 +135,12 @@ def _cached_quantized_thumbnail_bytes(
     if pil_image.mode != "RGBA":
         pil_image = pil_image.convert("RGBA")
 
-    # Apply quantization
+    # Scale FIRST, then quantize.
+    # Quantization with LAB color space is O(pixels * palette * mappings),
+    # so scaling before quantizing is much faster for large images.
+    pil_image.thumbnail((size, size), Image.Resampling.LANCZOS)
+
+    # Apply quantization (on smaller scaled image)
     try:
         # Convert tuple to list for quantization functions
         palette_list = list(palette_colors)
@@ -159,9 +164,6 @@ def _cached_quantized_thumbnail_bytes(
     except Exception:
         logger.debug("Failed to quantize image: %s", frame_path)
         # Fall through to use original image
-
-    # Scale the image
-    pil_image.thumbnail((size, size), Image.Resampling.LANCZOS)
 
     # Convert to PNG bytes
     buffer = io.BytesIO()
