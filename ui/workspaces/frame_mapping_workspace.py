@@ -706,7 +706,16 @@ class FrameMappingWorkspace(QWidget):
 
     @signal_error_boundary()
     def _on_game_frame_added(self, frame_id: str) -> None:
-        """Handle game frame added."""
+        """Handle game frame added - add to captures pane."""
+        # Get the frame from project
+        project = self._controller.project
+        if project is None:
+            return
+
+        frame = project.get_game_frame_by_id(frame_id)
+        if frame is not None:
+            self._logic.add_game_frame_to_pane(frame)
+
         if self._message_service:
             self._message_service.show_message(f"Imported game frame: {frame_id}")
 

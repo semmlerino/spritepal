@@ -990,7 +990,6 @@ class FrameMappingController(QObject):
         if frame is not None:
             self._project.add_game_frame(frame)
             self.game_frame_added.emit(frame.id)
-            self.project_changed.emit()
             self.save_requested.emit()
 
         return frame

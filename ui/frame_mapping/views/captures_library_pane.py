@@ -657,3 +657,66 @@ class CapturesLibraryPane(QWidget):
         self._game_frame_previews.pop(frame_id, None)
         self._link_status.pop(frame_id, None)
         self._refresh_list()
+
+    def add_game_frame(self, frame: GameFrame, linked_ai_id: str | None = None) -> None:
+        """Add a single game frame to the display.
+
+        Efficiently adds one frame without rebuilding the entire list.
+
+        Args:
+            frame: The GameFrame to add
+            linked_ai_id: AI frame ID if already linked, None if unlinked
+        """
+        # Update internal state
+        self._game_frames.append(frame)
+        self._link_status[frame.id] = linked_ai_id
+
+        # Check if frame passes current filters
+        if self._show_unlinked_only and linked_ai_id is not None:
+            # Frame is linked but we're showing unlinked only - don't display
+            self._update_count_label()
+            return
+
+        if self._search_text:
+            search_target = f"{frame.name.lower()} {frame.id.lower()}"
+            if self._search_text not in search_target:
+                # Frame doesn't match search - don't display
+                self._update_count_label()
+                return
+
+        # Create and add the item
+        item = QListWidgetItem()
+        display_text = frame.name
+
+        if frame.display_name:
+            tooltip = f"Original ID: {frame.id}"
+        else:
+            tooltip = ""
+
+        if linked_ai_id is not None:
+            color = STATUS_COLORS["linked"]
+            item.setText(f"✓ {display_text}")
+            tooltip_suffix = f"Linked to AI frame #{linked_ai_id}"
+            item.setToolTip(f"{tooltip}\n{tooltip_suffix}" if tooltip else tooltip_suffix)
+        else:
+            color = STATUS_COLORS["unlinked"]
+            item.setText(display_text)
+            tooltip_suffix = "Unlinked - drag to mapping drawer to link"
+            item.setToolTip(f"{tooltip}\n{tooltip_suffix}" if tooltip else tooltip_suffix)
+
+        item.setData(Qt.ItemDataRole.UserRole, frame.id)
+        item.setForeground(QBrush(color))
+
+        # Preview will be added later via update_frame_preview
+        self._list.addItem(item)
+        self._update_count_label()
+
+    def _update_count_label(self) -> None:
+        """Update the count label with current visible/total counts."""
+        visible_count = self._list.count()
+        total_count = len(self._game_frames)
+
+        if self._show_unlinked_only or self._search_text:
+            self._count_label.setText(f"{visible_count}/{total_count}")
+        else:
+            self._count_label.setText(f"{total_count} capture{'s' if total_count != 1 else ''}")

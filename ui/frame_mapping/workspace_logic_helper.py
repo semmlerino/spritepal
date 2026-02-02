@@ -20,6 +20,7 @@ from utils.logging_config import get_logger
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
+    from core.frame_mapping_project import GameFrame
     from ui.frame_mapping.controllers.frame_mapping_controller import (
         FrameMappingController,
     )
@@ -366,6 +367,23 @@ class WorkspaceLogicHelper:
             else:
                 # Request async generation if not cached
                 self._controller.request_game_frame_previews_async([mapping.game_frame_id])
+
+    def add_game_frame_to_pane(self, frame: GameFrame) -> None:
+        """Add a single game frame to the captures pane.
+
+        Args:
+            frame: The GameFrame to add
+        """
+        if self._controller is None or self._captures_pane is None:
+            return
+
+        project = self._controller.project
+        if project is None:
+            return
+
+        # Get link status for this frame
+        linked_ai_id = project.get_ai_frame_linked_to_game_frame(frame.id)
+        self._captures_pane.add_game_frame(frame, linked_ai_id)
 
     # ===== Phase 2c: Selection handlers =====
 
