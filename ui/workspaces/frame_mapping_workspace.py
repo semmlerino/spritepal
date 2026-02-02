@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal, SignalInstance
-from PySide6.QtGui import QCloseEvent, QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -546,7 +546,6 @@ class FrameMappingWorkspace(QWidget):
         safe_disconnect(self._controller.stale_entries_warning, self._on_stale_entries_warning)
         safe_disconnect(self._controller.stale_entries_on_load, self._on_stale_entries_detected_on_load)
         safe_disconnect(self._controller.alignment_updated, self._on_alignment_updated)
-        safe_disconnect(self._controller.preview_cache_invalidated, self._on_preview_cache_invalidated)
         safe_disconnect(self._controller.capture_import_requested, self._on_capture_import_requested)
         safe_disconnect(self._controller.directory_import_started, self._on_directory_import_started)
         safe_disconnect(self._controller.directory_import_finished, self._on_directory_import_finished)
@@ -1174,40 +1173,11 @@ class FrameMappingWorkspace(QWidget):
         self._logic.sync_canvas_alignment_from_model()
 
     @signal_error_boundary()
-    def _on_preview_cache_invalidated(self, frame_id: str, pixmap: QPixmap | None) -> None:
-        """Handle preview cache invalidation for a specific game frame.
-
-        Updates the mapping panel, captures pane, and workbench canvas (if displaying
-        the invalidated frame) with the fresh preview.
-
-        Args:
-            frame_id: The game frame ID whose preview was regenerated
-            pixmap: The new preview pixmap (or None if invalidated without regeneration)
-        """
-        # Use provided pixmap if available, otherwise fetch it
-        preview = pixmap if pixmap is not None else self._controller.get_game_frame_preview(frame_id)
-        if preview:
-            # Update mapping panel with the fresh preview
-            self._mapping_panel.update_game_frame_preview(frame_id, preview)
-            # Update captures pane thumbnail
-            self._captures_pane.update_frame_preview(frame_id, preview)
-
-            # Also update workbench canvas if this frame is currently displayed
-            if self._state.current_canvas_game_id == frame_id:
-                project = self._controller.project
-                if project:
-                    game_frame = project.get_game_frame_by_id(frame_id)
-                    if game_frame:
-                        capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
-                        self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
-
-            logger.debug("Updated thumbnails for invalidated preview: %s", frame_id)
-
-    @signal_error_boundary()
     def _on_game_frame_preview_ready(self, frame_id: str, pixmap: object) -> None:
         """Handle async game frame preview completion.
 
-        Updates the mapping panel and captures pane with the newly generated preview.
+        This is the primary and only preview update path after consolidation.
+        Updates the mapping panel, captures pane, and workbench canvas with newly generated previews.
 
         Args:
             frame_id: The game frame ID
