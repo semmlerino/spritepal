@@ -194,15 +194,13 @@ class TestDiskCacheInvalidationOnMtimeChange:
 class TestAsyncLoaderUsesDiskCache:
     """Test AsyncThumbnailLoader integrates with disk cache."""
 
-    def test_async_loader_bypasses_disk_cache_on_first_load(
+    def test_async_loader_populates_disk_cache(
         self, tmp_path: Path, app_context: AppContext, qtbot: QtBot
     ) -> None:
-        """Verify AsyncThumbnailLoader behavior with disk cache.
+        """Verify AsyncThumbnailLoader populates disk cache.
 
-        NOTE: Currently AsyncThumbnailLoader's worker thread generates thumbnails
-        directly without writing to disk cache. Only the synchronous
-        create_quantized_thumbnail() path uses disk cache. This test documents
-        current behavior - async loader populates in-memory cache only.
+        The async worker thread uses the disk cache for both reading and writing,
+        enabling faster loads on subsequent application starts.
         """
         # Create multiple test images
         images = [_create_test_image(tmp_path, f"frame_{i}.png", (i * 30, 0, 0, 255)) for i in range(3)]
@@ -211,6 +209,10 @@ class TestAsyncLoaderUsesDiskCache:
 
         # Clear all caches to start fresh
         clear_all_thumbnail_caches()
+
+        # Verify disk cache is empty
+        stats_before = get_disk_cache().get_stats()
+        assert stats_before["entries"] == 0
 
         # Create loader with a QObject parent to avoid GC issues
         parent = QObject()
@@ -234,10 +236,11 @@ class TestAsyncLoaderUsesDiskCache:
         # Verify all thumbnails received
         assert len(received_thumbnails) == len(images)
 
-        # NOTE: AsyncThumbnailLoader currently does NOT populate disk cache
-        # (worker generates thumbnails directly). Disk cache is only populated
-        # by synchronous create_quantized_thumbnail() calls.
-        # This is expected behavior - async path prioritizes throughput over caching.
+        # Verify disk cache now has entries (async loader populates it)
+        stats_after = get_disk_cache().get_stats()
+        assert stats_after["entries"] == len(images), (
+            f"Expected {len(images)} disk cache entries, got {stats_after['entries']}"
+        )
 
         # Clean up loader
         loader.cancel()

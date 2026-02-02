@@ -772,10 +772,49 @@ class _ThumbnailWorker(QObject):
         """Generate a single thumbnail.
 
         Returns QImage (thread-safe) instead of QPixmap.
+        Uses disk cache for persistence across sessions.
         """
         if not frame_path.exists():
             return None
 
+        # Get file mtime for cache key
+        try:
+            mtime = frame_path.stat().st_mtime
+        except OSError:
+            return None
+
+        # Compute cache key parameters
+        if self._sheet_palette is not None:
+            palette_colors = tuple(self._sheet_palette.colors)
+            palette_mappings = dict(self._sheet_palette.color_mappings) if self._sheet_palette.color_mappings else None
+            background_color = self._sheet_palette.background_color
+            background_tolerance = self._sheet_palette.background_tolerance
+        else:
+            palette_colors = ()
+            palette_mappings = None
+            background_color = None
+            background_tolerance = 0
+
+        # Check disk cache first
+        disk_cache = get_disk_cache()
+        cache_key = _compute_cache_key(
+            frame_path,
+            mtime,
+            palette_colors,
+            palette_mappings,
+            background_color,
+            background_tolerance,
+            self._size,
+        )
+        cached_bytes = disk_cache.get(cache_key)
+        if cached_bytes:
+            # Convert PNG bytes to QImage
+            qimage = QImage()
+            if qimage.loadFromData(cached_bytes):
+                return qimage
+            # If loading failed, fall through to regenerate
+
+        # Cache miss - generate thumbnail
         try:
             pil_image = Image.open(frame_path)
         except Exception:
@@ -807,6 +846,20 @@ class _ThumbnailWorker(QObject):
             except Exception:
                 logger.debug("Failed to quantize image: %s", frame_path)
                 # Fall through to use original image
+
+        # Convert to PNG bytes for disk cache
+        buffer = io.BytesIO()
+        pil_image.save(buffer, format="PNG")
+        png_bytes = buffer.getvalue()
+
+        # Save to disk cache
+        metadata = {
+            "path": str(frame_path),
+            "mtime": mtime,
+            "size": self._size,
+            "palette_hash": hash(palette_colors),
+        }
+        disk_cache.put(cache_key, png_bytes, metadata)
 
         # Convert to QImage (thread-safe) - already at thumbnail size
         try:
