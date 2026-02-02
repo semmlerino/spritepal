@@ -8,12 +8,15 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
+    QColorDialog,
     QComboBox,
     QFrame,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QScrollArea,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -282,6 +285,14 @@ class SheetPaletteMappingDialog(DialogBase):
             self._palette_colors = [(0, 0, 0)] * 16
             self._color_mappings: dict[tuple[int, int, int], int] = {}
 
+        # Track background removal settings
+        if current_palette is not None:
+            self._background_color = current_palette.background_color
+            self._background_tolerance = current_palette.background_tolerance
+        else:
+            self._background_color: tuple[int, int, int] | None = None
+            self._background_tolerance = 30
+
         # Detect rare important colors (e.g., eye whites, small highlights)
         self._rare_important_colors = detect_rare_important_colors(
             sheet_colors,
@@ -323,6 +334,8 @@ class SheetPaletteMappingDialog(DialogBase):
         return SheetPalette(
             colors=list(self._palette_colors),
             color_mappings=dict(self._color_mappings),
+            background_color=self._background_color,
+            background_tolerance=self._background_tolerance,
         )
 
     @override
@@ -426,6 +439,53 @@ class SheetPaletteMappingDialog(DialogBase):
 
         actions_layout.addStretch()
         content_layout.addLayout(actions_layout)
+
+        # Background removal section
+        bg_group = QGroupBox("Background Removal")
+        bg_layout = QHBoxLayout(bg_group)
+        bg_layout.setSpacing(8)
+
+        # Background color label
+        bg_label = QLabel("Background color:")
+        bg_layout.addWidget(bg_label)
+
+        # Color swatch
+        self._bg_swatch = QWidget()
+        self._bg_swatch.setFixedSize(32, 32)
+        self._update_bg_swatch()
+        bg_layout.addWidget(self._bg_swatch)
+
+        # Pick button
+        pick_btn = QPushButton("Pick...")
+        pick_btn.setToolTip("Choose background color to remove")
+        pick_btn.clicked.connect(self._on_pick_background)
+        bg_layout.addWidget(pick_btn)
+
+        # Auto button
+        auto_btn = QPushButton("Auto")
+        auto_btn.setToolTip("Auto-detect background color from image corners")
+        auto_btn.clicked.connect(self._on_auto_detect_background)
+        bg_layout.addWidget(auto_btn)
+
+        # Tolerance
+        tol_label = QLabel("Tolerance:")
+        bg_layout.addWidget(tol_label)
+
+        self._tolerance_spin = QSpinBox()
+        self._tolerance_spin.setRange(0, 100)
+        self._tolerance_spin.setValue(self._background_tolerance)
+        self._tolerance_spin.setToolTip("RGB distance threshold (0-100)")
+        self._tolerance_spin.valueChanged.connect(self._on_tolerance_changed)
+        bg_layout.addWidget(self._tolerance_spin)
+
+        # Clear button
+        clear_btn = QPushButton("Clear")
+        clear_btn.setToolTip("Disable background removal")
+        clear_btn.clicked.connect(self._on_clear_background)
+        bg_layout.addWidget(clear_btn)
+
+        bg_layout.addStretch()
+        content_layout.addWidget(bg_group)
 
         # Color mappings section
         mappings_header_layout = QHBoxLayout()
@@ -600,3 +660,60 @@ class SheetPaletteMappingDialog(DialogBase):
     def _on_mapping_changed(self, rgb_color: tuple[int, int, int], palette_index: int) -> None:
         """Handle mapping change from a row."""
         self._color_mappings[rgb_color] = palette_index
+
+    def _update_bg_swatch(self) -> None:
+        """Update the background color swatch display."""
+        if self._background_color is not None:
+            r, g, b = self._background_color
+            self._bg_swatch.setStyleSheet(
+                f"background-color: rgb({r}, {g}, {b}); border: 1px solid #888;"
+            )
+        else:
+            # Checkerboard pattern for "no color"
+            self._bg_swatch.setStyleSheet(
+                "background-color: #ccc; border: 1px solid #888;"
+            )
+
+    def _on_pick_background(self) -> None:
+        """Open color picker for background color."""
+        initial = QColor(*self._background_color) if self._background_color else QColor(255, 255, 255)
+        color = QColorDialog.getColor(initial, self, "Select Background Color")
+        if color.isValid():
+            self._background_color = (color.red(), color.green(), color.blue())
+            self._update_bg_swatch()
+            logger.info("Background color set to RGB(%d, %d, %d)", *self._background_color)
+
+    def _on_auto_detect_background(self) -> None:
+        """Auto-detect background color from sheet colors."""
+        # Try to find a consistent corner color from the source images
+        # For now, use the most common light color (likely background)
+        # In practice, we'd need access to an actual image file
+        # This is a simplified heuristic using sheet colors
+
+        # Find the lightest colors that are likely backgrounds
+        light_colors = [
+            (rgb, count) for rgb, count in self._sheet_colors.items()
+            if sum(rgb) > 600  # Light colors (R+G+B > 600)
+        ]
+
+        if light_colors:
+            # Use the most common light color
+            light_colors.sort(key=lambda x: -x[1])
+            self._background_color = light_colors[0][0]
+            self._update_bg_swatch()
+            logger.info(
+                "Auto-detected background color: RGB(%d, %d, %d)",
+                *self._background_color,
+            )
+        else:
+            logger.warning("Could not auto-detect background color (no light colors found)")
+
+    def _on_tolerance_changed(self, value: int) -> None:
+        """Handle tolerance spinbox change."""
+        self._background_tolerance = value
+
+    def _on_clear_background(self) -> None:
+        """Clear background color (disable removal)."""
+        self._background_color = None
+        self._update_bg_swatch()
+        logger.info("Background removal disabled")

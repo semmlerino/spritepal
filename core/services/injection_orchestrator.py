@@ -46,7 +46,7 @@ from core.types import CompressionType
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
-    from core.frame_mapping_project import AIFrame, FrameMapping, FrameMappingProject, GameFrame
+    from core.frame_mapping_project import AIFrame, FrameMapping, FrameMappingProject, GameFrame, SheetPalette
     from core.mesen_integration.click_extractor import OAMEntry
     from core.services.injection_snapshot import InjectionSnapshot
 
@@ -171,7 +171,10 @@ class InjectionOrchestrator:
 
         # 2. Load and prepare images
         try:
-            composite_data = self._prepare_images(ai_frame, game_frame, mapping, request, debug)
+            composite_data = self._prepare_images(
+                ai_frame, game_frame, mapping, request, debug,
+                sheet_palette=project.sheet_palette,
+            )
             if isinstance(composite_data, InjectionResult):
                 return composite_data
 
@@ -534,6 +537,7 @@ class InjectionOrchestrator:
         mapping: FrameMapping,
         request: InjectionRequest,
         debug: InjectionDebugContext,
+        sheet_palette: SheetPalette | None = None,
     ) -> tuple[Image.Image, CaptureResult, list[OAMEntry], np.ndarray | None] | InjectionResult:
         """Load and composite images for injection.
 
@@ -550,6 +554,15 @@ class InjectionOrchestrator:
                 "Loaded indexed PNG with preserved indices: %s (shape: %s)",
                 ai_frame.path.name,
                 ai_index_map.shape,
+            )
+
+        # Apply background removal if configured in sheet palette
+        if sheet_palette is not None and sheet_palette.background_color is not None:
+            from core.services.content_bounds_analyzer import remove_background
+            ai_img = remove_background(
+                ai_img,
+                sheet_palette.background_color,
+                sheet_palette.background_tolerance,
             )
 
         # Parse capture for tile layout

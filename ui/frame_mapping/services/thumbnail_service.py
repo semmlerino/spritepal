@@ -665,6 +665,18 @@ class _ThumbnailWorker(QObject):
             logger.debug("Failed to load image: %s", frame_path)
             return None
 
+        # Apply background removal if configured in sheet palette
+        if self._sheet_palette is not None and self._sheet_palette.background_color is not None:
+            from core.services.content_bounds_analyzer import remove_background
+            # Convert to RGBA first for background removal
+            if pil_image.mode != "RGBA":
+                pil_image = pil_image.convert("RGBA")
+            pil_image = remove_background(
+                pil_image,
+                self._sheet_palette.background_color,
+                self._sheet_palette.background_tolerance,
+            )
+
         # Apply palette quantization if palette is defined
         if self._sheet_palette is not None:
             try:

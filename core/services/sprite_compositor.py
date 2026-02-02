@@ -138,6 +138,15 @@ class SpriteCompositor:
         if ai_image.mode != "RGBA":
             ai_image = ai_image.convert("RGBA")
 
+        # Apply background removal if configured in sheet palette
+        if sheet_palette is not None and sheet_palette.background_color is not None:
+            from core.services.content_bounds_analyzer import remove_background
+            ai_image = remove_background(
+                ai_image,
+                sheet_palette.background_color,
+                sheet_palette.background_tolerance,
+            )
+
         # Filter capture to selected entries if specified
         filtered_capture = self._filter_capture(capture_result, selected_entry_ids)
 
