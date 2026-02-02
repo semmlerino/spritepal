@@ -314,8 +314,9 @@ class TestLargeImageAutoAlign:
         canvas._match_scale_checkbox.setChecked(True)
         canvas.set_alignment(0, 0, False, False, 1.0)
 
-        # Trigger auto-align
-        canvas._on_auto_align()
+        # Trigger auto-align and wait for worker
+        with qtbot.waitSignal(canvas.alignment_changed, timeout=2000):
+            canvas._on_auto_align()
 
         # Get resulting scale
         actual_scale = canvas._scale_slider.value() / 1000.0
@@ -375,6 +376,9 @@ class TestLargeImageAutoAlign:
 
         # Set scale that makes content larger than tiles (50*0.8=40 > 32)
         canvas.set_alignment(0, 0, False, False, 0.8)
+
+        # Disable Match Scale to test the synchronous _find_non_overflowing_position path
+        canvas._match_scale_checkbox.setChecked(False)
 
         # Trigger auto-align - should still attempt to find best position
         canvas._on_auto_align()
@@ -478,7 +482,10 @@ class TestAutoAlignWithTileGaps:
         # Enable Match Scale and trigger auto-align
         canvas._match_scale_checkbox.setChecked(True)
         canvas.set_alignment(0, 0, False, False, 1.0)
-        canvas._on_auto_align()
+
+        # Wait for async worker to complete
+        with qtbot.waitSignal(canvas.alignment_changed, timeout=5000):
+            canvas._on_auto_align()
 
         # After auto-align, verify position directly (not just warning visibility)
         ai_pos = canvas._ai_frame_item.pos()
@@ -580,7 +587,10 @@ class TestAutoAlignScaleMaximization:
         # Enable Match Scale and trigger auto-align
         canvas._match_scale_checkbox.setChecked(True)
         canvas.set_alignment(0, 0, False, False, 1.0)
-        canvas._on_auto_align()
+
+        # Wait for async worker to complete
+        with qtbot.waitSignal(canvas.alignment_changed, timeout=5000):
+            canvas._on_auto_align()
 
         # Get resulting scale
         actual_scale = canvas._scale_slider.value() / 1000.0
@@ -648,7 +658,10 @@ class TestAutoAlignScaleMaximization:
         # Enable Match Scale and trigger auto-align
         canvas._match_scale_checkbox.setChecked(True)
         canvas.set_alignment(0, 0, False, False, 1.0)
-        canvas._on_auto_align()
+
+        # Wait for async worker to complete
+        with qtbot.waitSignal(canvas.alignment_changed, timeout=5000):
+            canvas._on_auto_align()
 
         # Get resulting scale
         actual_scale = canvas._scale_slider.value() / 1000.0

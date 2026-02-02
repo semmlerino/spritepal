@@ -97,13 +97,11 @@ class PreviewService(QObject):
 
                 # If file exists, check both mtime and entries
                 if game_frame.capture_path and game_frame.capture_path.exists():
-                    # Use cached mtime if available (avoids stat() on UI thread)
-                    if game_frame.cached_mtime > 0.0:
-                        current_mtime = game_frame.cached_mtime
-                    else:
-                        # Fallback to stat() for legacy data or uninitialized cache
-                        current_mtime = game_frame.capture_path.stat().st_mtime
-                        # Update cache for future lookups
+                    # Always check actual file mtime for cache validation
+                    # (can't skip stat() here - external changes need detection)
+                    current_mtime = game_frame.capture_path.stat().st_mtime
+                    # Update cached_mtime so it stays in sync for other uses
+                    if game_frame.cached_mtime != current_mtime:
                         game_frame.cached_mtime = current_mtime
                     if current_mtime != cached_mtime or current_entries != cached_entries:
                         cache_was_invalidated = True
