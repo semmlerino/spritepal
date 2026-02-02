@@ -126,7 +126,7 @@ This document describes all signal chains in the Frame Mapping subsystem with fl
 
 | Signal Name | Source | Purpose | Connected Handlers |
 |-------------|--------|---------|-------------------|
-| `edit_in_sprite_editor_requested` | FrameMappingWorkspace:74 | Request to edit a frame in sprite editor | MainWindow: switches to sprite editor with ROM offsets |
+| `edit_in_sprite_editor_requested` | FrameMappingWorkspace:78 | Request to edit a frame in sprite editor | MainWindow:1537 → `_on_edit_frame_from_mapping()` - switches to sprite editor, jumps to first ROM offset |
 
 ---
 

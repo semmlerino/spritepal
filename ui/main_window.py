@@ -647,6 +647,25 @@ class MainWindow(QMainWindow):
         if self.center_stack.currentIndex() == WorkspaceMode.FRAME_MAPPING:
             self.redo_action.setEnabled(can_redo)
 
+    def _on_edit_frame_from_mapping(self, ai_frame_path: Path, rom_offsets: list[int]) -> None:
+        """Handle edit request from frame mapping workspace.
+
+        Switches to sprite editor and loads first ROM offset for comparison.
+        Full AI frame loading requires converting PNG to indexed format.
+        """
+        self.switch_to_workspace(WorkspaceMode.SPRITE_EDITOR)
+
+        if rom_offsets:
+            # Jump to first ROM offset for side-by-side comparison
+            self._sprite_editor_workspace.jump_to_offset(rom_offsets[0])
+
+        # TODO: Full AI frame loading requires:
+        # 1. Load PNG from ai_frame_path
+        # 2. Get palette from frame mapping project
+        # 3. Quantize PNG to palette-indexed format
+        # 4. Call editing_controller.import_image(indexed_data, palette, str(ai_frame_path))
+        logger.info(f"Edit from frame mapping: {ai_frame_path} with offsets {rom_offsets}")
+
     def switch_to_workspace(self, workspace_mode: WorkspaceMode, tab_index: int | None = None) -> None:
         """Switch to a specific workspace and optionally a tab within it.
 
@@ -1515,6 +1534,9 @@ class MainWindow(QMainWindow):
         # Connect frame mapping workspace signals
         self._frame_mapping_workspace.controller.can_undo_changed.connect(self._on_frame_mapping_can_undo_changed)
         self._frame_mapping_workspace.controller.can_redo_changed.connect(self._on_frame_mapping_can_redo_changed)
+        self._frame_mapping_workspace.edit_in_sprite_editor_requested.connect(
+            self._on_edit_frame_from_mapping
+        )
 
         # Connect keyboard shortcut manager signals
         self.keyboard_shortcut_manager.tab_switch_requested.connect(self._on_tab_switch_requested)
