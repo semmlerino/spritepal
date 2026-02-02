@@ -1604,9 +1604,12 @@ class FrameMappingWorkspace(QWidget):
         """Cleanup resources."""
         logger.debug("FrameMappingWorkspace cleanup")
 
+        # Stop auto-save timer
+        self._auto_save_timer.stop()
+
         # Disconnect signals first
         self._disconnect_signals()
 
-        # Cleanup child widgets
+        # Cleanup child widgets (only those with cleanup methods)
         self._alignment_canvas.cleanup()
         self._ai_frames_pane.cleanup()
