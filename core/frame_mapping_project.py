@@ -259,6 +259,7 @@ class GameFrame:
     # Stored per-ROM offset, but UI enforces a single compression type per game frame.
     compression_types: dict[int, CompressionType] = field(default_factory=dict)  # ROM offset -> CompressionType
     display_name: str | None = None  # Optional user-defined display name
+    cached_mtime: float = 0.0  # Cached mtime of capture_path for cache validation
 
     @property
     def name(self) -> str:
@@ -296,9 +297,11 @@ class GameFrame:
             "selected_entry_ids": self.selected_entry_ids,
             "compression_types": compression_types_str,
         }
-        # Only include display_name if set (keeps file compact)
+        # Only include optional fields if set (keeps file compact)
         if self.display_name is not None:
             result["display_name"] = self.display_name
+        if self.cached_mtime > 0.0:
+            result["cached_mtime"] = self.cached_mtime
         return result
 
     @classmethod
@@ -352,6 +355,7 @@ class GameFrame:
             selected_entry_ids=cast(list[int], data.get("selected_entry_ids", [])),
             compression_types=compression_types,
             display_name=cast(str | None, data.get("display_name")),
+            cached_mtime=cast(float, data.get("cached_mtime", 0.0)),
         )
 
 
