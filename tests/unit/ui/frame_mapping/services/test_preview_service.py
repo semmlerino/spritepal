@@ -273,9 +273,7 @@ class TestPreviewServiceStaleEntries:
         project, game_frame = mock_project
 
         # First, generate and cache a preview
-        with patch.object(
-            preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result
-        ):
+        with patch.object(preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result):
             with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
                 renderer_inst = MockRenderer.return_value
                 mock_pil_img = Mock()
@@ -305,7 +303,9 @@ class TestPreviewServiceStaleEntries:
                     assert cached_after_stale is None, "Stale preview should return None"
 
                     # Verify stale flag was cleared
-                    assert "frame1" not in preview_service._stale_previews, "Stale flag should be cleared after None return"
+                    assert "frame1" not in preview_service._stale_previews, (
+                        "Stale flag should be cleared after None return"
+                    )
 
                     # Subsequent calls should return the old cached pixmap (not None again)
                     # This prevents thrashing - caller should regenerate async
@@ -318,9 +318,7 @@ class TestPreviewServiceStaleEntries:
         """Test that force_regenerate_preview returns new pixmap after stale."""
         project, game_frame = mock_project
 
-        with patch.object(
-            preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result
-        ):
+        with patch.object(preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result):
             with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
                 renderer_inst = MockRenderer.return_value
                 mock_pil_img = Mock()

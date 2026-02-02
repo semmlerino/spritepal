@@ -472,7 +472,7 @@ class FrameMappingController(QObject):
     """Emitted when an async-generated game frame preview is ready.
 
     Part of batch async preview generation. Each preview completion
-    triggers this signal; use game_frame_previews_finished to detect batch completion.
+    triggers this signal.
 
     Args:
         frame_id: ID of the game frame
@@ -484,22 +484,6 @@ class FrameMappingController(QObject):
     Triggers:
         - WorkbenchCanvas → updates frame display
         - CapturesLibraryPane → updates thumbnail
-    """
-
-    game_frame_previews_finished = Signal()
-    """Emitted when batch async preview generation completes.
-
-    Signals that all requested previews have been generated. Use with
-    game_frame_preview_ready for progress tracking.
-
-    Args:
-        (none)
-
-    Emitted by:
-        - AsyncGameFramePreviewService (via signal relay) → after batch finishes
-
-    Triggers:
-        - Workspace → can resume other operations
     """
 
     async_injection_started = Signal(str)
@@ -577,7 +561,6 @@ class FrameMappingController(QObject):
             parent=self, capture_repository=self._capture_repository
         )
         self._async_preview_service.preview_ready.connect(self._on_async_preview_ready)
-        self._async_preview_service.batch_finished.connect(self._on_async_previews_finished)
         # AI frame service for frame loading/management
         self._ai_frame_service = AIFrameService(parent=self)
         # Mapping service for mapping operations
@@ -1316,7 +1299,6 @@ class FrameMappingController(QObject):
             frame_ids: List of game frame IDs to generate previews for.
         """
         if self._project is None:
-            self.game_frame_previews_finished.emit()
             return
         self._async_preview_service.request_previews(frame_ids, self._project)
 
@@ -1336,10 +1318,6 @@ class FrameMappingController(QObject):
                 self._preview_service.set_preview_cache(frame_id, pixmap, mtime, entry_ids)
 
         self.game_frame_preview_ready.emit(frame_id, pixmap)
-
-    def _on_async_previews_finished(self) -> None:
-        """Handle async preview batch completion."""
-        self.game_frame_previews_finished.emit()
 
     def get_ai_frames(self) -> list[AIFrame]:
         """Get all AI frames from the current project."""

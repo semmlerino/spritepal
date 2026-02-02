@@ -219,8 +219,7 @@ class AsyncGameFramePreviewService(AsyncServiceBase):
         - _on_batch_finished() → after all previews in batch are generated
 
     Triggers:
-        - FrameMappingController.game_frame_previews_finished
-        - Workspace → can resume other operations
+        - FrameMappingController._on_async_previews_finished (relay only)
     """
 
     def __init__(

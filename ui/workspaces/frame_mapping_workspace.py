@@ -451,7 +451,6 @@ class FrameMappingWorkspace(QWidget):
         self._controller.ai_frame_removed.connect(self._on_ai_frame_removed)
         # Async game frame preview signals (Phase 6 perf improvement)
         self._controller.game_frame_preview_ready.connect(self._on_game_frame_preview_ready)
-        self._controller.game_frame_previews_finished.connect(self._on_game_frame_previews_finished)
         # Async injection signals (Issue 8 perf improvement)
         self._controller.async_injection_started.connect(self._on_async_injection_started)
         self._controller.async_injection_progress.connect(self._on_async_injection_progress)
@@ -552,7 +551,6 @@ class FrameMappingWorkspace(QWidget):
         safe_disconnect(self._controller.game_frame_removed, self._on_game_frame_removed)
         safe_disconnect(self._controller.ai_frame_removed, self._on_ai_frame_removed)
         safe_disconnect(self._controller.game_frame_preview_ready, self._on_game_frame_preview_ready)
-        safe_disconnect(self._controller.game_frame_previews_finished, self._on_game_frame_previews_finished)
         safe_disconnect(self._controller.async_injection_started, self._on_async_injection_started)
         safe_disconnect(self._controller.async_injection_progress, self._on_async_injection_progress)
         safe_disconnect(self._controller.async_injection_finished, self._on_async_injection_finished)
@@ -1200,15 +1198,6 @@ class FrameMappingWorkspace(QWidget):
                 if game_frame:
                     capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(frame_id)
                     self._alignment_canvas.set_game_frame(game_frame, pixmap, capture_result, used_fallback)
-
-    @signal_error_boundary()
-    def _on_game_frame_previews_finished(self) -> None:
-        """Handle async game frame preview batch completion.
-
-        Currently just logs completion - UI updates happen incrementally
-        via _on_game_frame_preview_ready.
-        """
-        logger.debug("Async game frame preview batch completed")
 
     # -------------------------------------------------------------------------
     # Capture Import Handler
