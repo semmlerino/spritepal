@@ -2360,18 +2360,21 @@ class WorkbenchCanvas(QWidget):
 
         Also regenerates the preview with the updated palette colors.
 
-        IMPORTANT: Clears the AI index map to force color-based quantization.
-        The index map stores indices from the AI frame's embedded palette, which
-        may have colors at different positions than the new sheet palette.
-        Using stale indices with a different palette causes scrambled colors.
+        IMPORTANT: Clears the AI index map AND the AI frame cache to force
+        color-based quantization. The cached index maps store indices from each
+        AI frame's embedded palette, which may have colors at different positions
+        than the new sheet palette. Using stale indices with a different palette
+        causes scrambled colors (e.g., skin → yellow).
 
         Args:
             palette: SheetPalette to use for pixel inspection, or None to clear.
         """
         self._sheet_palette = palette
-        # Clear index map - palette indices are palette-specific, using old indices
-        # with a new palette would map colors to wrong positions (e.g., skin → yellow)
+        # Clear current index map
         self._ai_index_map = None
+        # Clear AI frame cache - cached index maps are palette-specific and now stale
+        # (Without this, clicking to re-select an AI frame would restore the stale index map)
+        self.clear_ai_frame_cache()
         # Regenerate preview with updated palette colors
         self._schedule_preview_update()
 
