@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 from PIL import Image
 
-from core.services.content_bounds_analyzer import ContentBoundsAnalyzer, get_content_bbox
+from core.services.content_bounds_analyzer import (
+    ContentBoundsAnalyzer,
+    detect_background_color,
+    get_content_bbox,
+    remove_background,
+)
 
 
 class TestComputeCentroid:
@@ -156,3 +161,173 @@ class TestGetContentBbox:
 
         # No distinguishable content, return full bounds
         assert bbox == (0, 0, 50, 60)
+
+
+class TestDetectBackgroundColor:
+    """Tests for detect_background_color() function."""
+
+    def test_solid_color_image_high_confidence(self) -> None:
+        """Image with uniform solid background should return high confidence."""
+        # 100x100 white background
+        image = Image.new("RGBA", (100, 100), (255, 255, 255, 255))
+
+        color, is_confident = detect_background_color(image)
+
+        assert color == (255, 255, 255)
+        assert is_confident is True
+
+    def test_transparent_image_returns_none(self) -> None:
+        """Mostly transparent image should return None."""
+        # 100x100 transparent
+        image = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+
+        color, is_confident = detect_background_color(image)
+
+        assert color is None
+        assert is_confident is True  # Confident that there's no solid background
+
+    def test_gradient_corners_low_confidence(self) -> None:
+        """Image with different colors in corners should return low confidence."""
+        image = Image.new("RGBA", (100, 100), (255, 255, 255, 255))
+        # Paint each corner a different color
+        for x in range(10):
+            for y in range(10):
+                image.putpixel((x, y), (255, 0, 0, 255))  # Top-left red
+                image.putpixel((99 - x, y), (0, 255, 0, 255))  # Top-right green
+                image.putpixel((x, 99 - y), (0, 0, 255, 255))  # Bottom-left blue
+                image.putpixel((99 - x, 99 - y), (255, 255, 0, 255))  # Bottom-right yellow
+
+        color, is_confident = detect_background_color(image)
+
+        # Should detect a color (average) but not be confident
+        assert color is not None
+        assert is_confident is False
+
+    def test_mostly_transparent_with_some_opaque(self) -> None:
+        """Image that's mostly transparent but has some opaque content."""
+        # Mostly transparent with small opaque region
+        image = Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+        # Only 30% opaque
+        for x in range(30):
+            for y in range(100):
+                image.putpixel((x, y), (128, 128, 128, 255))
+
+        color, is_confident = detect_background_color(image)
+
+        # Less than 50% opaque, should return None
+        assert color is None
+
+    def test_rgb_mode_converted_to_rgba(self) -> None:
+        """RGB image should be converted and analyzed."""
+        image = Image.new("RGB", (100, 100), (200, 100, 50))
+
+        color, is_confident = detect_background_color(image)
+
+        assert color == (200, 100, 50)
+        assert is_confident is True
+
+
+class TestRemoveBackground:
+    """Tests for remove_background() function."""
+
+    def test_exact_color_match_removed(self) -> None:
+        """Pixels matching background exactly should become transparent."""
+        # White background with black content
+        image = Image.new("RGBA", (10, 10), (255, 255, 255, 255))
+        image.putpixel((5, 5), (0, 0, 0, 255))  # Black pixel
+
+        result = remove_background(image, (255, 255, 255), tolerance=0)
+
+        # Background should be transparent
+        assert result.getpixel((0, 0))[3] == 0
+        assert result.getpixel((9, 9))[3] == 0
+        # Content should be preserved
+        assert result.getpixel((5, 5)) == (0, 0, 0, 255)
+
+    def test_tolerance_threshold(self) -> None:
+        """Pixels within tolerance should become transparent."""
+        # Near-white background (252, 252, 252)
+        image = Image.new("RGBA", (10, 10), (252, 252, 252, 255))
+        image.putpixel((5, 5), (0, 0, 0, 255))  # Black pixel
+
+        # With tolerance=0, should NOT remove near-white
+        result_no_tol = remove_background(image, (255, 255, 255), tolerance=0)
+        assert result_no_tol.getpixel((0, 0))[3] == 255  # Still opaque
+
+        # With tolerance=10, should remove near-white
+        # Distance: sqrt(3^2 + 3^2 + 3^2) = sqrt(27) ≈ 5.2
+        result_with_tol = remove_background(image, (255, 255, 255), tolerance=10)
+        assert result_with_tol.getpixel((0, 0))[3] == 0  # Now transparent
+
+    def test_original_not_modified(self) -> None:
+        """Original image should not be modified."""
+        image = Image.new("RGBA", (10, 10), (255, 255, 255, 255))
+        original_pixel = image.getpixel((0, 0))
+
+        _ = remove_background(image, (255, 255, 255), tolerance=0)
+
+        # Original should be unchanged
+        assert image.getpixel((0, 0)) == original_pixel
+
+    def test_rgb_mode_converted(self) -> None:
+        """RGB image should be converted to RGBA."""
+        image = Image.new("RGB", (10, 10), (255, 255, 255))
+        image.putpixel((5, 5), (0, 0, 0))
+
+        result = remove_background(image, (255, 255, 255), tolerance=0)
+
+        assert result.mode == "RGBA"
+        assert result.getpixel((0, 0))[3] == 0  # Background transparent
+        assert result.getpixel((5, 5))[:3] == (0, 0, 0)  # Content preserved
+
+    def test_green_screen_removal(self) -> None:
+        """Test removing green screen background."""
+        # Green background with red content
+        image = Image.new("RGBA", (20, 20), (0, 255, 0, 255))
+        for x in range(5, 15):
+            for y in range(5, 15):
+                image.putpixel((x, y), (255, 0, 0, 255))
+
+        result = remove_background(image, (0, 255, 0), tolerance=10)
+
+        # Green should be removed
+        assert result.getpixel((0, 0))[3] == 0
+        assert result.getpixel((19, 19))[3] == 0
+        # Red should remain
+        assert result.getpixel((10, 10)) == (255, 0, 0, 255)
+
+
+class TestSheetPaletteBackgroundVersionHash:
+    """Test that SheetPalette.version_hash includes background fields."""
+
+    def test_version_hash_changes_with_background_color(self) -> None:
+        """version_hash should change when background_color changes."""
+        from core.frame_mapping_project import SheetPalette
+
+        palette1 = SheetPalette(
+            colors=[(0, 0, 0)] * 16,
+            background_color=None,
+        )
+        palette2 = SheetPalette(
+            colors=[(0, 0, 0)] * 16,
+            background_color=(255, 255, 255),
+        )
+
+        assert palette1.version_hash != palette2.version_hash
+
+    def test_version_hash_changes_with_background_tolerance(self) -> None:
+        """version_hash should change when background_tolerance changes."""
+        from core.frame_mapping_project import SheetPalette
+
+        palette1 = SheetPalette(
+            colors=[(0, 0, 0)] * 16,
+            background_color=(255, 255, 255),
+            background_tolerance=30,
+        )
+        palette2 = SheetPalette(
+            colors=[(0, 0, 0)] * 16,
+            background_color=(255, 255, 255),
+            background_tolerance=50,
+        )
+
+        assert palette1.version_hash != palette2.version_hash
