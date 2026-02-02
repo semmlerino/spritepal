@@ -295,8 +295,12 @@ class AsyncPreviewService(QObject):
             request_id = self._current_request_id
 
         # Use cached copies if image identity unchanged (avoids repeated copies during drag)
+        # Also invalidate if ai_index_map changes (e.g., cleared when palette changes)
         image_id = id(ai_image)
-        if image_id != self._cached_image_id:
+        index_map_id = id(ai_index_map) if ai_index_map is not None else None
+        cached_index_map_id = id(self._cached_ai_index_map) if self._cached_ai_index_map is not None else None
+
+        if image_id != self._cached_image_id or index_map_id != cached_index_map_id:
             self._cached_ai_image = ai_image.copy()
             self._cached_ai_index_map = ai_index_map.copy() if ai_index_map is not None else None
             self._cached_image_id = image_id
