@@ -404,6 +404,11 @@ class FrameMappingWorkspace(QWidget):
         self._save_btn.clicked.connect(lambda: self._on_save_project())
         toolbar.addWidget(self._save_btn)
 
+        self._save_as_btn = QPushButton("Save As...")
+        self._save_as_btn.setToolTip("Save the current project with a new name")
+        self._save_as_btn.clicked.connect(lambda: self._on_save_project(save_as=True))
+        toolbar.addWidget(self._save_as_btn)
+
         toolbar.addSeparator()
 
         self._reuse_rom_checkbox = QCheckBox("Reuse Last ROM")
@@ -449,6 +454,7 @@ class FrameMappingWorkspace(QWidget):
         self._controller.directory_import_finished.connect(self._on_directory_import_finished)
         self._controller.game_frame_removed.connect(self._on_game_frame_removed)
         self._controller.ai_frame_removed.connect(self._on_ai_frame_removed)
+        self._controller.ai_frames_removed_batch.connect(self._on_ai_frames_removed_batch)
         # Async game frame preview signals (Phase 6 perf improvement)
         self._controller.game_frame_preview_ready.connect(self._on_game_frame_preview_ready)
         # Async injection signals (Issue 8 perf improvement)
@@ -466,6 +472,7 @@ class FrameMappingWorkspace(QWidget):
         self._ai_frames_pane.edit_in_sprite_editor_requested.connect(self._on_edit_frame)
         self._ai_frames_pane.edit_frame_palette_requested.connect(self._on_edit_frame_palette)
         self._ai_frames_pane.remove_from_project_requested.connect(self._on_remove_ai_frame)
+        self._ai_frames_pane.remove_batch_from_project_requested.connect(self._on_remove_ai_frames_batch)
         # Sheet palette signals
         self._ai_frames_pane.palette_edit_requested.connect(self._on_palette_edit_requested)
         self._ai_frames_pane.palette_extract_requested.connect(self._on_palette_extract_requested)
@@ -550,6 +557,7 @@ class FrameMappingWorkspace(QWidget):
         safe_disconnect(self._controller.directory_import_finished, self._on_directory_import_finished)
         safe_disconnect(self._controller.game_frame_removed, self._on_game_frame_removed)
         safe_disconnect(self._controller.ai_frame_removed, self._on_ai_frame_removed)
+        safe_disconnect(self._controller.ai_frames_removed_batch, self._on_ai_frames_removed_batch)
         safe_disconnect(self._controller.game_frame_preview_ready, self._on_game_frame_preview_ready)
         safe_disconnect(self._controller.async_injection_started, self._on_async_injection_started)
         safe_disconnect(self._controller.async_injection_progress, self._on_async_injection_progress)
@@ -744,6 +752,22 @@ class FrameMappingWorkspace(QWidget):
             self._mapping_panel.update_project_reference(project)
         # Refresh mapping panel to remove stale row
         self._mapping_panel.refresh()
+
+    @signal_error_boundary()
+    def _on_ai_frames_removed_batch(self, ai_frame_ids: list[str]) -> None:
+        """Handle batch AI frames removed - refresh UI efficiently.
+
+        Args:
+            ai_frame_ids: List of IDs of the AI frames that were removed
+        """
+        project = self._controller.project
+        if project is not None:
+            # Single refresh for the whole batch
+            self._ai_frames_pane.set_ai_frames(project.ai_frames)
+            self._mapping_panel.update_project_reference(project)
+        self._mapping_panel.refresh()
+        if self._message_service:
+            self._message_service.show_message(f"Removed {len(ai_frame_ids)} frames")
 
     @signal_error_boundary()
     def _on_mapping_created(self, ai_frame_id: str, game_frame_id: str) -> None:
@@ -959,6 +983,17 @@ class FrameMappingWorkspace(QWidget):
         logger.info("_on_remove_ai_frame called with: %s", ai_frame_id)
         self._frame_ops.handle_remove_ai_frame(ai_frame_id)
         logger.info("_on_remove_ai_frame completed")
+
+    @signal_error_boundary()
+    def _on_remove_ai_frames_batch(self, ai_frame_ids: list[str]) -> None:
+        """Handle batch remove AI frames from project request.
+
+        Args:
+            ai_frame_ids: List of AI frame IDs to remove
+        """
+        logger.info("_on_remove_ai_frames_batch called with %d IDs", len(ai_frame_ids))
+        self._frame_ops.handle_remove_ai_frames_batch(ai_frame_ids)
+        logger.info("_on_remove_ai_frames_batch completed")
 
     @signal_error_boundary()
     def _on_remove_mapping(self, ai_frame_id: str) -> None:
@@ -1440,8 +1475,12 @@ class FrameMappingWorkspace(QWidget):
                 self._set_last_project_path(path)
 
     @signal_error_boundary()
-    def _on_save_project(self) -> None:
-        """Handle save project button click."""
+    def _on_save_project(self, save_as: bool = False) -> None:
+        """Handle save project button click.
+
+        Args:
+            save_as: If True, always show file dialog (Save As...)
+        """
         if not self._controller.has_project:
             QMessageBox.information(self, "Save Project", "No project to save.")
             return
@@ -1452,7 +1491,7 @@ class FrameMappingWorkspace(QWidget):
                 self._message_service.show_message("Auto-save in progress, please wait...", 2000)
             return
 
-        path_to_save = self._state.project_path
+        path_to_save = self._state.project_path if not save_as else None
 
         if not path_to_save:
             file_path, _ = QFileDialog.getSaveFileName(

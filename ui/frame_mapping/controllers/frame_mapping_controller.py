@@ -375,6 +375,19 @@ class FrameMappingController(QObject):
         - FrameMappingWorkspace → updates mapping panel
     """
 
+    ai_frames_removed_batch = Signal(list)
+    """Emitted when multiple AI frames are removed from the project.
+
+    Args:
+        ai_frame_ids: List of IDs of the removed AI frames
+
+    Emitted by:
+        - AIFramesFacade.remove_batch() → after deletion
+
+    Triggers:
+        - FrameMappingWorkspace → updates mapping panel (efficiently)
+    """
+
     capture_renamed = Signal(str)
     """Emitted when a game frame's (capture's) display name changes.
 
@@ -754,6 +767,10 @@ class FrameMappingController(QObject):
     def emit_ai_frame_removed(self, frame_id: str) -> None:
         """Emit ai_frame_removed signal."""
         self.ai_frame_removed.emit(frame_id)
+
+    def emit_ai_frames_removed_batch(self, frame_ids: list[str]) -> None:
+        """Emit ai_frames_removed_batch signal."""
+        self.ai_frames_removed_batch.emit(frame_ids)
 
     def emit_game_frame_removed(self, frame_id: str) -> None:
         """Emit game_frame_removed signal."""
@@ -1434,6 +1451,19 @@ class FrameMappingController(QObject):
             True if the frame was found and removed.
         """
         return self._ai_frames.remove(frame_id)
+
+    def remove_ai_frames(self, frame_ids: list[str]) -> list[str]:
+        """Remove multiple AI frames from the project.
+
+        Also removes any associated mappings.
+
+        Args:
+            frame_ids: List of AI frame IDs to remove.
+
+        Returns:
+            List of IDs that were successfully removed.
+        """
+        return self._ai_frames.remove_batch(frame_ids)
 
     def reorder_ai_frame(self, ai_frame_id: str, new_index: int) -> bool:
         """Reorder an AI frame to a new position (undoable).

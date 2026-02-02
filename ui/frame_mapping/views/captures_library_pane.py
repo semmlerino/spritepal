@@ -188,6 +188,29 @@ class CapturesLibraryPane(QWidget):
         self._list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._on_context_menu)
         self._list.itemDoubleClicked.connect(self._on_item_double_clicked)
+
+        # Enhanced styling for selection visibility (matching AIFramesPane)
+        from ui.styles.theme import COLORS
+        self._list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {COLORS["darker_gray"]};
+                border: 1px solid {COLORS["border"]};
+                outline: none;
+            }}
+            QListWidget::item {{
+                padding: 4px;
+                border-radius: 4px;
+                margin: 2px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {COLORS["highlight"]};
+                color: white;
+                border: 1px solid {COLORS["highlight_border"]};
+            }}
+            QListWidget::item:hover:!selected {{
+                background-color: {COLORS["surface_hover"]};
+            }}
+        """)
         layout.addWidget(self._list, 1)
 
         # Override startDrag to provide custom MIME data

@@ -184,6 +184,63 @@ class FrameOperationsCoordinator:
             if self._message_service:
                 self._message_service.show_message(f"Removed: {frame_name}")
 
+    def handle_remove_ai_frames_batch(self, ai_frame_ids: list[str]) -> None:
+        """Handle batch remove AI frames from project request.
+
+        Args:
+            ai_frame_ids: List of AI frame IDs to remove
+        """
+        if self._controller is None or self._state is None:
+            return
+        project = self._controller.project
+        if project is None:
+            return
+
+        count = len(ai_frame_ids)
+        if count == 0:
+            return
+
+        # Check if any frames are mapped - warn user
+        mapped_count = 0
+        for frame_id in ai_frame_ids:
+            if project.get_mapping_for_ai_frame(frame_id) is not None:
+                mapped_count += 1
+
+        confirm_msg = f"Remove {count} frames from the project?"
+        if mapped_count > 0:
+            confirm_msg += f"\n\nWarning: {mapped_count} frames are mapped. Removing them will delete their mappings."
+
+        reply = QMessageBox.question(
+            self._parent_widget,
+            "Remove Frames?",
+            confirm_msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Remove the AI frames
+        logger.info("Attempting to remove %d AI frames", count)
+        removed_ids = self._controller.remove_ai_frames(ai_frame_ids)
+        removed_count = len(removed_ids)
+        logger.info("remove_ai_frames returned %d removed", removed_count)
+
+        if removed_count > 0:
+            # Clear canvas/selection if currently selected frame was removed
+            if self._state.selected_ai_frame_id in removed_ids:
+                self._state.selected_ai_frame_id = None
+                self._state.current_canvas_game_id = None
+                if self._alignment_canvas:
+                    self._alignment_canvas.set_ai_frame(None)
+                    self._alignment_canvas.set_game_frame(None)
+                    self._alignment_canvas.clear_alignment()
+                if self._update_map_button_state:
+                    self._update_map_button_state()
+
+            if self._message_service:
+                self._message_service.show_message(f"Removed {removed_count} frames")
+
     def handle_remove_mapping(self, ai_frame_id: str) -> None:
         """Handle remove mapping request.
 

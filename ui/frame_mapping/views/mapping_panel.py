@@ -277,6 +277,34 @@ class MappingPanel(QWidget):
         self._table.itemChanged.connect(self._on_item_changed)
         # Connect scroll bar to trigger visibility-based thumbnail loading
         self._table.verticalScrollBar().valueChanged.connect(self._on_scroll)
+
+        # Enhanced styling for selection visibility
+        from ui.styles.theme import COLORS
+        self._table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: {COLORS["darker_gray"]};
+                border: 1px solid {COLORS["border"]};
+                gridline-color: {COLORS["separator"]};
+                outline: none;
+            }}
+            QTableWidget::item {{
+                padding: 4px;
+            }}
+            QTableWidget::item:selected {{
+                background-color: {COLORS["highlight"]};
+                color: white;
+            }}
+            QTableWidget::item:hover:!selected {{
+                background-color: {COLORS["surface_hover"]};
+            }}
+            QHeaderView::section {{
+                background-color: {COLORS["panel_background"]};
+                color: {COLORS["text_secondary"]};
+                padding: 4px;
+                border: 1px solid {COLORS["border"]};
+                font-weight: bold;
+            }}
+        """)
         layout.addWidget(self._table, 1)
 
         # Selection controls row

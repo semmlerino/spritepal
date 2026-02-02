@@ -142,5 +142,42 @@ class TestBatchInjectionSignalStorm:
                 )
 
 
+class TestBatchRemoval:
+    """Tests for batch removal operations."""
+
+    def test_batch_removal_updates_project_and_signals(self, mock_controller, tmp_path):
+        """Test that removing multiple frames updates project state and emits correct signal."""
+        # Setup spy for batch signal
+        signal_spy = MagicMock()
+        mock_controller.ai_frames_removed_batch.connect(signal_spy)
+        
+        # Select first 3 frames to remove
+        frames_to_remove = [f"frame_{i}.png" for i in range(3)]
+        
+        # Verify initial state
+        assert len(mock_controller.project.ai_frames) == 5
+        assert len(mock_controller.project.mappings) == 5
+        
+        # Perform batch removal
+        removed_ids = mock_controller.remove_ai_frames(frames_to_remove)
+        
+        # Verify return value
+        assert len(removed_ids) == 3
+        assert set(removed_ids) == set(frames_to_remove)
+        
+        # Verify project state updated
+        assert len(mock_controller.project.ai_frames) == 2
+        assert len(mock_controller.project.mappings) == 2
+        
+        # Verify remaining frames are correct
+        remaining_ids = {f.id for f in mock_controller.project.ai_frames}
+        assert remaining_ids == {"frame_3.png", "frame_4.png"}
+        
+        # Verify signal emitted once with list of IDs
+        signal_spy.assert_called_once()
+        args = signal_spy.call_args[0][0]
+        assert set(args) == set(frames_to_remove)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

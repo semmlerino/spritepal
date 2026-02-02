@@ -31,6 +31,7 @@ class AIFramesSignals(Protocol):
     def emit_ai_frames_loaded(self, count: int) -> None: ...
     def emit_ai_frame_added(self, frame_id: str) -> None: ...
     def emit_ai_frame_removed(self, frame_id: str) -> None: ...
+    def emit_ai_frames_removed_batch(self, frame_ids: list[str]) -> None: ...
     def emit_ai_frame_moved(self, ai_frame_id: str, from_index: int, to_index: int) -> None: ...
     def emit_mapping_removed(self, ai_frame_id: str, game_frame_id: str) -> None: ...
     def emit_error(self, message: str) -> None: ...
@@ -200,6 +201,45 @@ class AIFramesFacade:
             logger.info("Removed AI frame %s", frame_id)
             return True
         return False
+
+    def remove_batch(self, frame_ids: list[str]) -> list[str]:
+        """Remove multiple AI frames from the project.
+
+        Also removes any associated mappings.
+
+        Args:
+            frame_ids: List of AI frame IDs to remove.
+
+        Returns:
+            List of IDs that were successfully removed.
+        """
+        project = self._context.project
+        if project is None:
+            logger.warning("remove_batch: project is None")
+            return []
+
+        removed_ids = []
+        mappings_to_remove = []
+
+        # Identify frames and mappings to remove
+        for frame_id in frame_ids:
+            mapping = project.get_mapping_for_ai_frame(frame_id)
+            if mapping:
+                mappings_to_remove.append((frame_id, mapping.game_frame_id))
+
+            if project.remove_ai_frame(frame_id):
+                removed_ids.append(frame_id)
+
+        # Emit signals for removed mappings
+        for ai_id, game_id in mappings_to_remove:
+            self._signals.emit_mapping_removed(ai_id, game_id)
+
+        # Emit batch removal signal if any frames were removed
+        if removed_ids:
+            self._signals.emit_ai_frames_removed_batch(removed_ids)
+            logger.info("Removed %d AI frames in batch", len(removed_ids))
+
+        return removed_ids
 
     def reorder(self, ai_frame_id: str, new_index: int) -> bool:
         """Reorder an AI frame to a new position (undoable).

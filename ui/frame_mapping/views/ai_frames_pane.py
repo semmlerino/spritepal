@@ -153,6 +153,19 @@ class AIFramesPane(QWidget):
         - FrameMappingWorkspace → removes frame after confirmation
     """
 
+    remove_batch_from_project_requested = Signal(list)
+    """Emitted when user requests to remove multiple AI frames from the project.
+
+    Args:
+        ai_frame_ids: List of IDs of the AI frames to remove
+
+    Emitted by:
+        - _on_remove_batch_clicked() → when user clicks context menu item
+
+    Triggers:
+        - FrameMappingWorkspace → removes frames after confirmation
+    """
+
     palette_edit_requested = Signal()
     """Emitted when user clicks "Edit Palette" button in sheet palette widget.
 
@@ -409,13 +422,34 @@ class AIFramesPane(QWidget):
         self._list = QListWidget()
         self._list.setIconSize(QSize(THUMBNAIL_SIZE, THUMBNAIL_SIZE))
         self._list.setViewMode(QListWidget.ViewMode.ListMode)
-        self._list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self._list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self._list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._list.setDragEnabled(False)  # AI frames are not draggable (they ARE rows)
         self._list.currentRowChanged.connect(self._on_selection_changed)
         self._list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._list.customContextMenuRequested.connect(self._on_context_menu)
         self._list.itemDoubleClicked.connect(self._on_item_double_clicked)
+
+        # Enhanced styling for selection visibility
+        from ui.styles.theme import COLORS
+        self._list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {COLORS["darker_gray"]};
+                border: 1px solid {COLORS["border"]};
+                outline: none;
+            }}
+            QListWidget::item {{
+                padding: 4px;
+                border-bottom: 1px solid {COLORS["dark_gray"]};
+            }}
+            QListWidget::item:selected {{
+                background-color: {COLORS["highlight"]};
+                color: white;
+            }}
+            QListWidget::item:hover:!selected {{
+                background-color: {COLORS["surface_hover"]};
+            }}
+        """)
         layout.addWidget(self._list, 1)
 
         # Bottom controls
@@ -532,11 +566,26 @@ class AIFramesPane(QWidget):
         """Get the currently selected AI frame ID (filename).
 
         This is the preferred method as IDs are stable across reloads/reordering.
+        Returns the ID of the current item (the one with focus/last clicked).
         """
         current = self._list.currentItem()
         if current is None:  # type: ignore[reportUnnecessaryComparison]
             return None
         return current.data(Qt.ItemDataRole.UserRole)
+
+    def get_selected_ids(self) -> list[str]:
+        """Get IDs of all selected AI frames.
+
+        Returns:
+            List of selected frame IDs (filenames).
+        """
+        selected_items = self._list.selectedItems()
+        ids = []
+        for item in selected_items:
+            frame_id = item.data(Qt.ItemDataRole.UserRole)
+            if frame_id is not None:
+                ids.append(frame_id)
+        return ids
 
     def select_frame(self, index: int, *, emit_signal: bool = False) -> None:
         """Programmatically select an AI frame by index.
@@ -746,15 +795,21 @@ class AIFramesPane(QWidget):
         if frame_id is None:
             return
 
+        # Get currently selected frames
+        selected_ids = self.get_selected_ids()
+        is_multi_selection = len(selected_ids) > 1
+        num_selected = len(selected_ids)
+        target_frame_id = frame_id # The frame under the cursor
+
         # Get frame to check current tags
-        frame = next((f for f in self._ai_frames if f.id == frame_id), None)
+        frame = next((f for f in self._ai_frames if f.id == target_frame_id), None)
         current_tags = frame.tags if frame else frozenset()
 
         menu = QMenu(self)
 
         # Rename action
         rename_action = menu.addAction("Rename...")
-        rename_action.triggered.connect(partial(self._show_rename_dialog, frame_id))
+        rename_action.triggered.connect(partial(self._show_rename_dialog, target_frame_id))
 
         # Tags submenu
         tags_menu = menu.addMenu("Tags")
@@ -763,25 +818,34 @@ class AIFramesPane(QWidget):
             action.setCheckable(True)
             action.setChecked(tag in current_tags)
             # Use partial with captured tag - triggered signal passes checked as first arg
-            action.triggered.connect(partial(self._emit_tag_toggled, frame_id, tag))
+            action.triggered.connect(partial(self._emit_tag_toggled, target_frame_id, tag))
 
         menu.addSeparator()
 
         edit_action = menu.addAction("Edit in Sprite Editor")
-        edit_action.triggered.connect(partial(self.edit_in_sprite_editor_requested.emit, frame_id))
+        edit_action.triggered.connect(partial(self.edit_in_sprite_editor_requested.emit, target_frame_id))
 
         edit_palette_action = menu.addAction("Edit Palette...")
-        edit_palette_action.triggered.connect(partial(self._emit_edit_palette, frame_id))
+        edit_palette_action.triggered.connect(partial(self._emit_edit_palette, target_frame_id))
 
         menu.addSeparator()
 
-        remove_action = menu.addAction("Remove from Project")
+        # Removal action - adapt text and signal based on selection
+        if is_multi_selection:
+            # Use target_frame_id if it's among selected, otherwise fallback to first selected
+            # This logic isn't strictly needed for batch but good for consistency
+            remove_text = f"Remove {num_selected} frames"
+            remove_action = menu.addAction(remove_text)
+            remove_action.triggered.connect(lambda: self.remove_batch_from_project_requested.emit(selected_ids))
+        else:
+            remove_text = "Remove from Project"
+            remove_action = menu.addAction(remove_text)
 
-        def emit_remove(fid: str) -> None:
-            logger.info("Remove action triggered for frame_id: %s", fid)
-            self.remove_from_project_requested.emit(fid)
+            def emit_remove(fid: str) -> None:
+                logger.info("Remove action triggered for frame_id: %s", fid)
+                self.remove_from_project_requested.emit(fid)
 
-        remove_action.triggered.connect(partial(emit_remove, frame_id))
+            remove_action.triggered.connect(partial(emit_remove, target_frame_id))
 
         menu.exec(self._list.mapToGlobal(pos))
 
