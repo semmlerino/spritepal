@@ -16,9 +16,9 @@ from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingCo
 
 
 class TestGetGameFramePreviewFiltering:
-    """Tests for get_game_frame_preview respecting selected_entry_ids.
+    """Tests for game frame preview generation respecting selected_entry_ids.
 
-    Bug: get_game_frame_preview was rendering full capture instead of filtered
+    Bug: Preview generation was rendering full capture instead of filtered
     entries per selected_entry_ids. Users saw all entries in preview but only
     selected entries got injected.
     """
@@ -54,8 +54,8 @@ class TestGetGameFramePreviewFiltering:
         )
         controller._project = project
 
-        # Get preview from controller
-        preview = controller.get_game_frame_preview("F001")
+        # Generate preview using force_regenerate
+        preview = controller._preview_service.force_regenerate_preview("F001", project)
         assert preview is not None
 
         # Render what the filtered result SHOULD look like (returns tuple)
@@ -110,8 +110,8 @@ class TestGetGameFramePreviewFiltering:
         )
         controller._project = project
 
-        # Get preview
-        preview = controller.get_game_frame_preview("F001")
+        # Generate preview
+        preview = controller._preview_service.force_regenerate_preview("F001", project)
         assert preview is not None
 
         # Get capture result (unfiltered, returns tuple)
@@ -144,10 +144,10 @@ class TestGetGameFramePreviewFiltering:
         )
         controller._project = project
 
-        # First request
-        preview1 = controller.get_game_frame_preview("F001")
+        # First request - generate
+        preview1 = controller._preview_service.force_regenerate_preview("F001", project)
         # Second request should return same object (cached)
-        preview2 = controller.get_game_frame_preview("F001")
+        preview2 = controller.get_cached_game_frame_preview("F001")
 
         assert preview1 is not None
         # Same object returned from cache
@@ -171,17 +171,16 @@ class TestPreviewCacheInvalidation:
 
         controller = FrameMappingController()
         project = FrameMappingProject(name="test")
-        project.add_game_frame(
-            GameFrame(
-                id="F001",
-                capture_path=capture_path,
-                selected_entry_ids=[0, 1],
-            )
+        game_frame = GameFrame(
+            id="F001",
+            capture_path=capture_path,
+            selected_entry_ids=[0, 1],
         )
+        project.add_game_frame(game_frame)
         controller._project = project
 
         # First request caches the preview
-        preview1 = controller.get_game_frame_preview("F001")
+        preview1 = controller._preview_service.force_regenerate_preview("F001", project)
         assert preview1 is not None
 
         # Ensure mtime changes (some filesystems have second-level precision)
@@ -191,8 +190,15 @@ class TestPreviewCacheInvalidation:
         capture_data2 = create_test_capture([0, 1, 2])  # Add a third entry
         capture_path.write_text(json.dumps(capture_data2))
 
-        # Second request should regenerate (different file content/mtime)
-        preview2 = controller.get_game_frame_preview("F001")
+        # Update cached_mtime to trigger invalidation
+        game_frame.cached_mtime = capture_path.stat().st_mtime
+
+        # Cached preview should be invalid now
+        cached = controller.get_cached_game_frame_preview("F001")
+        assert cached is None, "Cache should be invalid after file change"
+
+        # Regenerate
+        preview2 = controller._preview_service.force_regenerate_preview("F001", project)
         assert preview2 is not None
 
         # Should be different pixmap objects (regenerated)
@@ -215,9 +221,10 @@ class TestPreviewCacheInvalidation:
         )
         controller._project = project
 
-        # First and second requests should return same cached object
-        preview1 = controller.get_game_frame_preview("F001")
-        preview2 = controller.get_game_frame_preview("F001")
+        # First request - generate
+        preview1 = controller._preview_service.force_regenerate_preview("F001", project)
+        # Second request should return same cached object
+        preview2 = controller.get_cached_game_frame_preview("F001")
 
         assert preview1 is not None
         assert preview1 is preview2  # Same object from cache
@@ -243,7 +250,7 @@ class TestPreviewCacheInvalidation:
         controller._preview_service.set_preview_cache("F001", cached_pixmap, 0.0, ())
 
         # Should return cached even with no file to compare
-        preview = controller.get_game_frame_preview("F001")
+        preview = controller.get_cached_game_frame_preview("F001")
         assert preview is cached_pixmap
 
     def test_preview_cache_returns_cached_if_file_deleted(self, tmp_path: Path, qtbot) -> None:
@@ -264,14 +271,14 @@ class TestPreviewCacheInvalidation:
         controller._project = project
 
         # First request caches the preview
-        preview1 = controller.get_game_frame_preview("F001")
+        preview1 = controller._preview_service.force_regenerate_preview("F001", project)
         assert preview1 is not None
 
         # Delete the source file
         capture_path.unlink()
 
         # Should return cached since file doesn't exist anymore
-        preview2 = controller.get_game_frame_preview("F001")
+        preview2 = controller.get_cached_game_frame_preview("F001")
         assert preview2 is preview1
 
 

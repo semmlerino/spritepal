@@ -240,7 +240,7 @@ class TestAutoAlignOnMappingCreation:
         mock_controller.project = mock_project
         mock_controller.get_existing_link_for_ai_frame.return_value = None
         mock_controller.get_existing_link_for_game_frame.return_value = None
-        mock_controller.get_game_frame_preview.return_value = None
+        mock_controller.get_cached_game_frame_preview.return_value = None
         mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
 
         # Call attempt_link to create a new mapping

@@ -127,7 +127,6 @@ class WorkspaceLogicHelper:
             return None
         return self._state.selected_game_id
 
-
     def validate_selection_state(self) -> None:
         """Debug-only: Validate that selection caches match pane state.
 

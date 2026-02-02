@@ -98,7 +98,6 @@ class TestUnmappedRowClearsGameSelection:
         mock_controller = MagicMock(spec=FrameMappingController)
         project = create_test_project_with_mapping(tmp_path)
         mock_controller.project = project
-        mock_controller.get_game_frame_preview.return_value = None
         mock_controller.get_cached_game_frame_preview.return_value = None
         mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
 
@@ -141,7 +140,6 @@ class TestUnmappedRowClearsGameSelection:
         mock_controller = MagicMock(spec=FrameMappingController)
         project = create_test_project_with_mapping(tmp_path)
         mock_controller.project = project
-        mock_controller.get_game_frame_preview.return_value = None
         mock_controller.get_cached_game_frame_preview.return_value = None
         mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
 

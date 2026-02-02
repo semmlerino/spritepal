@@ -211,7 +211,6 @@ class WorkspaceStateManager:
         """Set the game frame ID currently displayed on canvas."""
         self._current_canvas_game_id = frame_id
 
-
     # -------------------------------------------------------------------------
     # Auto-Advance Properties
     # -------------------------------------------------------------------------

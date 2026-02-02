@@ -1534,9 +1534,7 @@ class MainWindow(QMainWindow):
         # Connect frame mapping workspace signals
         self._frame_mapping_workspace.controller.can_undo_changed.connect(self._on_frame_mapping_can_undo_changed)
         self._frame_mapping_workspace.controller.can_redo_changed.connect(self._on_frame_mapping_can_redo_changed)
-        self._frame_mapping_workspace.edit_in_sprite_editor_requested.connect(
-            self._on_edit_frame_from_mapping
-        )
+        self._frame_mapping_workspace.edit_in_sprite_editor_requested.connect(self._on_edit_frame_from_mapping)
 
         # Connect keyboard shortcut manager signals
         self.keyboard_shortcut_manager.tab_switch_requested.connect(self._on_tab_switch_requested)

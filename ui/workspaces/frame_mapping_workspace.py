@@ -933,7 +933,6 @@ class FrameMappingWorkspace(QWidget):
         """Handle edit frame palette request. Delegates to PaletteCoordinator."""
         self._palette.handle_edit_frame_palette(ai_frame_id)
 
-
     @signal_error_boundary()
     def _on_delete_capture(self, frame_id: str) -> None:
         """Handle delete capture request."""

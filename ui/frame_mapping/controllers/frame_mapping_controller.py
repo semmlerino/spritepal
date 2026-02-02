@@ -775,7 +775,6 @@ class FrameMappingController(QObject):
         """Emit game_frame_removed signal."""
         self.game_frame_removed.emit(frame_id)
 
-
     def emit_error(self, message: str) -> None:
         """Emit error_occurred signal."""
         self.error_occurred.emit(message)
@@ -1324,9 +1323,9 @@ class FrameMappingController(QObject):
     def _on_async_preview_ready(self, frame_id: str, pixmap: QPixmap) -> None:
         """Handle async preview completion.
 
-        Updates the synchronous preview cache and emits signal to UI.
+        Updates the preview cache and emits signal to UI.
         """
-        # Update synchronous preview cache so get_game_frame_preview() returns this
+        # Update preview cache so get_cached_game_frame_preview() returns this
         if self._project is not None:
             game_frame = self._project.get_game_frame_by_id(frame_id)
             if game_frame is not None:

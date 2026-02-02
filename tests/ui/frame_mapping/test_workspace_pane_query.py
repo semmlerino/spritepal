@@ -66,7 +66,7 @@ class TestStateManagerAsSourceOfTruth:
         mock_controller = MagicMock(spec=FrameMappingController)
         project = create_test_project(tmp_path)
         mock_controller.project = project
-        mock_controller.get_game_frame_preview.return_value = None
+        mock_controller.get_cached_game_frame_preview.return_value = None
         mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
         workspace._controller = mock_controller
 
@@ -156,7 +156,7 @@ class TestStateManagerAsSourceOfTruth:
         mock_controller = MagicMock(spec=FrameMappingController)
         project = create_test_project(tmp_path)
         mock_controller.project = project
-        mock_controller.get_game_frame_preview.return_value = None
+        mock_controller.get_cached_game_frame_preview.return_value = None
         mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
         workspace._controller = mock_controller
         workspace._logic.set_controller(mock_controller)  # Also update logic helper
@@ -185,7 +185,7 @@ class TestStateManagerAsSourceOfTruth:
         mock_controller = MagicMock(spec=FrameMappingController)
         project = create_test_project(tmp_path)
         mock_controller.project = project
-        mock_controller.get_game_frame_preview.return_value = None
+        mock_controller.get_cached_game_frame_preview.return_value = None
         mock_controller.get_capture_result_for_game_frame.return_value = (None, False)
         workspace._controller = mock_controller
         workspace._logic.set_controller(mock_controller)  # Also update logic helper

@@ -84,7 +84,7 @@ class TestUndoRedoSelectionSync:
         project.get_game_frame_by_id.return_value = game_frame
 
         helper._controller.project = project  # type: ignore[union-attr]
-        helper._controller.get_game_frame_preview.return_value = MagicMock()  # type: ignore[union-attr]
+        helper._controller.get_cached_game_frame_preview.return_value = MagicMock()  # type: ignore[union-attr]
         helper._controller.get_capture_result_for_game_frame.return_value = (None, False)  # type: ignore[union-attr]
 
         # AI frame is already selected
@@ -133,7 +133,7 @@ class TestUndoRedoSelectionSync:
         project.get_game_frame_by_id.return_value = game_frame
 
         helper._controller.project = project  # type: ignore[union-attr]
-        helper._controller.get_game_frame_preview.return_value = MagicMock()  # type: ignore[union-attr]
+        helper._controller.get_cached_game_frame_preview.return_value = MagicMock()  # type: ignore[union-attr]
         helper._controller.get_capture_result_for_game_frame.return_value = (None, False)  # type: ignore[union-attr]
 
         helper._state.selected_ai_frame_id = "frame_001.png"  # type: ignore[union-attr]
@@ -172,7 +172,7 @@ class TestUndoRedoSelectionSync:
         project.get_game_frame_by_id.return_value = game_frame
 
         helper._controller.project = project  # type: ignore[union-attr]
-        helper._controller.get_game_frame_preview.return_value = MagicMock()  # type: ignore[union-attr]
+        helper._controller.get_cached_game_frame_preview.return_value = MagicMock()  # type: ignore[union-attr]
         helper._controller.get_capture_result_for_game_frame.return_value = (None, False)  # type: ignore[union-attr]
 
         helper._state.selected_ai_frame_id = "frame_001.png"  # type: ignore[union-attr]

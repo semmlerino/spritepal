@@ -345,9 +345,7 @@ class TestPreviewServiceEdgeCases:
         project, game_frame = mock_project
 
         # Patch the repository to raise an error
-        with patch.object(
-            preview_service._capture_repository, "get_or_parse", side_effect=Exception("Parse error")
-        ):
+        with patch.object(preview_service._capture_repository, "get_or_parse", side_effect=Exception("Parse error")):
             result = preview_service.force_regenerate_preview("frame1", project)
             assert result is None
 

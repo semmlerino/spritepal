@@ -210,4 +210,3 @@ class TestUndoRedoStackSignals:
 
         assert ("undo", False) in signals_received
         assert ("redo", False) in signals_received
-

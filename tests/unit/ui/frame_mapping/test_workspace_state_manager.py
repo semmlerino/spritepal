@@ -166,7 +166,6 @@ class TestSelectionStateManagement:
         assert manager.current_canvas_game_id == canvas_id
 
 
-
 class TestAutoAdvanceState:
     """Test auto-advance state management."""
 
