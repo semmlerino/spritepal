@@ -63,12 +63,14 @@ class SheetPalette:
         """
         colors_tuple = tuple(self.colors)
         mappings_tuple = tuple(sorted(self.color_mappings.items()))
-        full_hash = hash((
-            colors_tuple,
-            mappings_tuple,
-            self.background_color,  # NEW - None-safe
-            self.background_tolerance,  # NEW
-        ))
+        full_hash = hash(
+            (
+                colors_tuple,
+                mappings_tuple,
+                self.background_color,  # NEW - None-safe
+                self.background_tolerance,  # NEW
+            )
+        )
         return full_hash & 0x7FFFFFFF
 
     def to_dict(self) -> dict[str, object]:
@@ -157,7 +159,7 @@ class SheetPalette:
         # Parse background removal settings (with defaults for backward compatibility)
         bg_raw = data.get("background_color")
         background_color = tuple(bg_raw) if bg_raw else None  # type: ignore[arg-type]
-        background_tolerance = int(data.get("background_tolerance", 30))
+        background_tolerance = cast(int, data.get("background_tolerance", 30))
 
         return cls(
             colors=colors,
