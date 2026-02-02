@@ -29,7 +29,16 @@ from typing import TYPE_CHECKING, Literal, NamedTuple, override
 import numpy as np
 from PIL import Image
 from PySide6.QtCore import QObject, QPointF, QRect, QRectF, Qt, QThread, QTimer, Signal, Slot
-from PySide6.QtGui import QBrush, QColor, QImage, QMouseEvent, QPainter, QPixmap, QWheelEvent
+from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QContextMenuEvent,
+    QImage,
+    QMouseEvent,
+    QPainter,
+    QPixmap,
+    QWheelEvent,
+)
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -39,6 +48,7 @@ from PySide6.QtWidgets import (
     QGraphicsView,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QPushButton,
     QSlider,
     QVBoxLayout,
@@ -185,6 +195,19 @@ class WorkbenchGraphicsView(QGraphicsView):
         - WorkbenchCanvas → handles eyedropper or other click mode operation
     """
 
+    context_menu_requested = Signal(QPointF)
+    """Emitted when user right-clicks to request a context menu.
+
+    Args:
+        global_pos: Position in global screen coordinates for menu placement
+
+    Emitted by:
+        - contextMenuEvent() → when right-click is detected
+
+    Triggers:
+        - WorkbenchCanvas → shows context menu with cache clearing options
+    """
+
     def __init__(self, scene: QGraphicsScene, canvas_size: int, parent: QWidget | None = None) -> None:
         super().__init__(scene, parent)
         self.setRenderHint(QPainter.RenderHint.Antialiasing, False)
@@ -294,6 +317,12 @@ class WorkbenchGraphicsView(QGraphicsView):
             event.accept()
         else:
             super().mouseReleaseEvent(event)
+
+    @override
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        """Emit signal for context menu request."""
+        self.context_menu_requested.emit(QPointF(event.globalPos()))
+        event.accept()
 
 
 class WorkbenchCanvas(QWidget):
@@ -864,6 +893,7 @@ class WorkbenchCanvas(QWidget):
         self._view.scene_mouse_moved.connect(self._on_scene_mouse_moved)
         self._view.scene_mouse_left.connect(self._on_scene_mouse_left)
         self._view.scene_clicked.connect(self._on_scene_clicked)
+        self._view.context_menu_requested.connect(self._on_context_menu_requested)
 
         # Internal pixel info label updates
         self.pixel_hovered.connect(self._update_pixel_info_label)
@@ -2771,6 +2801,50 @@ class WorkbenchCanvas(QWidget):
             self._selected_tile_label.setText(f"0x{rom_offset:06X}")
         else:
             self._selected_tile_label.setText(f"#{self._selected_tile_index}")
+
+    # -------------------------------------------------------------------------
+    # Context Menu
+    # -------------------------------------------------------------------------
+
+    @Slot(QPointF)
+    def _on_context_menu_requested(self, global_pos: QPointF) -> None:
+        """Show context menu for the canvas."""
+        menu = QMenu(self)
+
+        # Clear AI frame cache action
+        clear_cache_action = menu.addAction("Clear AI Frame Cache")
+        clear_cache_action.setToolTip(
+            "Clear cached index map and preview data for this AI frame. "
+            "Use if colors appear scrambled after palette changes."
+        )
+        clear_cache_action.triggered.connect(self._clear_current_ai_frame_cache)
+
+        # Only enable if we have an AI frame loaded
+        clear_cache_action.setEnabled(self._ai_image is not None)
+
+        menu.exec(global_pos.toPoint())
+
+    def _clear_current_ai_frame_cache(self) -> None:
+        """Clear cached data for the current AI frame and regenerate preview.
+
+        Clears:
+        - AI index map (palette indices from embedded PNG palette)
+        - Async preview service image cache
+        - Forces preview regeneration with fresh color-based quantization
+        """
+        logger.debug("Clearing AI frame cache on user request")
+
+        # Clear the index map - forces color-based quantization instead of
+        # using cached palette indices that may not match current sheet palette
+        self._ai_index_map = None
+
+        # Clear async preview service cache to ensure fresh copies are used
+        self._async_preview_service.clear_image_cache()
+
+        # Regenerate preview with cleared cache
+        self._schedule_preview_update()
+
+        logger.info("AI frame cache cleared, preview regenerating")
 
     # -------------------------------------------------------------------------
     # Cleanup
