@@ -773,11 +773,9 @@ class FrameMappingWorkspace(QWidget):
 
         # Clear canvas state if removed mapping was for selected AI frame
         if ai_frame_id == self._state.selected_ai_frame_id:
+            # Canvas/state cleanup already done by coordinator
+            # Signal handler only manages browsing mode toggle
             self._alignment_canvas.set_browsing_mode(False)
-            # Clear stale game frame display (mapping no longer exists)
-            if self._state.current_canvas_game_id is not None:
-                self._alignment_canvas.set_game_frame(None)
-                self._state.current_canvas_game_id = None
 
     @signal_error_boundary()
     def _on_error(self, message: str) -> None:
