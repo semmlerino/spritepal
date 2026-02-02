@@ -97,7 +97,14 @@ class PreviewService(QObject):
 
                 # If file exists, check both mtime and entries
                 if game_frame.capture_path and game_frame.capture_path.exists():
-                    current_mtime = game_frame.capture_path.stat().st_mtime
+                    # Use cached mtime if available (avoids stat() on UI thread)
+                    if game_frame.cached_mtime > 0.0:
+                        current_mtime = game_frame.cached_mtime
+                    else:
+                        # Fallback to stat() for legacy data or uninitialized cache
+                        current_mtime = game_frame.capture_path.stat().st_mtime
+                        # Update cache for future lookups
+                        game_frame.cached_mtime = current_mtime
                     if current_mtime != cached_mtime or current_entries != cached_entries:
                         cache_was_invalidated = True
                     elif is_stale:
@@ -138,7 +145,12 @@ class PreviewService(QObject):
                 if game_frame:
                     current_entries = tuple(game_frame.selected_entry_ids)
                     if game_frame.capture_path and game_frame.capture_path.exists():
-                        current_mtime = game_frame.capture_path.stat().st_mtime
+                        # Use cached mtime if available, otherwise stat and cache
+                        if game_frame.cached_mtime > 0.0:
+                            current_mtime = game_frame.cached_mtime
+                        else:
+                            current_mtime = game_frame.capture_path.stat().st_mtime
+                            game_frame.cached_mtime = current_mtime
 
             self._game_frame_previews[frame_id] = (pixmap, current_mtime, current_entries)
             # Clear stale flag since we just regenerated
@@ -186,11 +198,18 @@ class PreviewService(QObject):
 
         # If capture file exists, validate mtime and entries
         if game_frame.capture_path and game_frame.capture_path.exists():
-            try:
-                current_mtime = game_frame.capture_path.stat().st_mtime
-            except OSError:
-                # Can't stat file - treat as miss
-                return None
+            # Use cached mtime if available (avoids stat() on UI thread)
+            if game_frame.cached_mtime > 0.0:
+                current_mtime = game_frame.cached_mtime
+            else:
+                # Fallback to stat() for legacy data or uninitialized cache
+                try:
+                    current_mtime = game_frame.capture_path.stat().st_mtime
+                    # Update cache for future lookups
+                    game_frame.cached_mtime = current_mtime
+                except OSError:
+                    # Can't stat file - treat as miss
+                    return None
 
             if current_mtime != cached_mtime or current_entries != cached_entries:
                 # Cache is stale - return None to trigger regeneration

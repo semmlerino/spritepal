@@ -37,6 +37,7 @@ def mock_project(tmp_path):
     game_frame.capture_path = capture_path
     game_frame.selected_entry_ids = [1, 2, 3]
     game_frame.rom_offsets = frozenset([0x12345, 0x67890])
+    game_frame.cached_mtime = 0.0  # Initialize cached_mtime for the new field
 
     project.get_game_frame_by_id.return_value = game_frame
 
@@ -173,6 +174,9 @@ class TestPreviewServiceCaching:
                     new_mtime = original_mtime + 1.0
                     capture_path.write_text('{"frame": 101}')
                     os.utime(capture_path, (new_mtime, new_mtime))
+                    # Update cached_mtime to simulate detection of file change
+                    # (In production, this would happen via file watcher or manual refresh)
+                    game_frame.cached_mtime = new_mtime
 
                     # Second call - cache invalidated due to mtime change
                     with qtbot.waitSignal(

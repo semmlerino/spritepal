@@ -254,6 +254,8 @@ class CaptureImportService(QObject):
             bbox = filtered_capture.bounding_box
             # Default all ROM offsets to RAW compression (user can change in workbench)
             default_compression_types = dict.fromkeys(rom_offsets, CompressionType.RAW)
+            # Cache mtime at import time to avoid stat() calls during preview updates
+            cached_mtime = capture_path.stat().st_mtime if capture_path.exists() else 0.0
             frame = GameFrame(
                 id=frame_id,
                 rom_offsets=rom_offsets,
@@ -263,6 +265,7 @@ class CaptureImportService(QObject):
                 height=bbox.height,
                 selected_entry_ids=[entry.id for entry in selected_entries],
                 compression_types=default_compression_types,
+                cached_mtime=cached_mtime,
             )
 
             self.import_completed.emit(frame_id)
