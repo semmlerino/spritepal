@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from PIL import Image
-from PySide6.QtCore import QMutex, QMutexLocker, QObject, Qt, QThread, Signal
+from PySide6.QtCore import QMutex, QMutexLocker, QObject, QThread, Signal
 from PySide6.QtGui import QImage, QPixmap
 
 from core.palette_utils import (
@@ -668,6 +668,7 @@ class _ThumbnailWorker(QObject):
         # Apply background removal if configured in sheet palette
         if self._sheet_palette is not None and self._sheet_palette.background_color is not None:
             from core.services.content_bounds_analyzer import remove_background
+
             # Convert to RGBA first for background removal
             if pil_image.mode != "RGBA":
                 pil_image = pil_image.convert("RGBA")
@@ -677,6 +678,11 @@ class _ThumbnailWorker(QObject):
                 self._sheet_palette.background_tolerance,
             )
 
+        # Scale to thumbnail size FIRST, then quantize.
+        # Quantization with LAB color space is O(pixels * palette * mappings),
+        # so scaling a 260x370 image down to 64x64 BEFORE quantizing is ~24x faster.
+        pil_image.thumbnail((self._size, self._size), Image.Resampling.LANCZOS)
+
         # Apply palette quantization if palette is defined
         if self._sheet_palette is not None:
             try:
@@ -685,19 +691,12 @@ class _ThumbnailWorker(QObject):
                 logger.debug("Failed to quantize image: %s", frame_path)
                 # Fall through to use original image
 
-        # Convert to QImage (thread-safe)
+        # Convert to QImage (thread-safe) - already at thumbnail size
         try:
             qimage = pil_to_qimage(pil_image, thread_safe=True)
             if qimage.isNull():
                 return None
-
-            # Scale to thumbnail size using fast transformation (good enough for small thumbnails)
-            return qimage.scaled(
-                self._size,
-                self._size,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            )
+            return qimage
         except Exception:
             logger.debug("Failed to convert/scale image: %s", frame_path)
             return None
