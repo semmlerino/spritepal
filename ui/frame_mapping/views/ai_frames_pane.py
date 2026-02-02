@@ -194,22 +194,6 @@ class AIFramesPane(QWidget):
         - FrameMappingWorkspace → clears sheet palette
     """
 
-    palette_index_selected = Signal(int)
-    """Emitted when user clicks a palette swatch for selection/highlighting.
-
-    Used for bidirectional palette highlighting (selecting a swatch also
-    highlights palette indices in AI frames).
-
-    Args:
-        index: Palette index (0-15) of the clicked swatch
-
-    Emitted by:
-        - SheetPaletteWidget.palette_index_selected (relayed)
-
-    Triggers:
-        - FrameMappingWorkspace → highlights palette index in AI frame
-    """
-
     palette_color_changed = Signal(int, object)
     """Emitted when user edits a palette color in the sheet palette widget.
 
@@ -373,7 +357,6 @@ class AIFramesPane(QWidget):
         self._palette_widget.extract_requested.connect(self.palette_extract_requested.emit)
         self._palette_widget.clear_requested.connect(self.palette_clear_requested.emit)
         # Interactive signals for bidirectional highlighting
-        self._palette_widget.index_selected.connect(self.palette_index_selected.emit)
         self._palette_widget.color_changed.connect(self.palette_color_changed.emit)
         self._palette_widget.swatch_hovered.connect(self.palette_swatch_hovered.emit)
         self._palette_widget.set_buttons_enabled(False)  # Disabled until frames are loaded
@@ -793,7 +776,12 @@ class AIFramesPane(QWidget):
         menu.addSeparator()
 
         remove_action = menu.addAction("Remove from Project")
-        remove_action.triggered.connect(partial(self.remove_from_project_requested.emit, frame_id))
+
+        def emit_remove(fid: str) -> None:
+            logger.info("Remove action triggered for frame_id: %s", fid)
+            self.remove_from_project_requested.emit(fid)
+
+        remove_action.triggered.connect(partial(emit_remove, frame_id))
 
         menu.exec(self._list.mapToGlobal(pos))
 
