@@ -266,6 +266,91 @@ class TestPreviewServiceInvalidation:
 class TestPreviewServiceStaleEntries:
     """Test stale entry ID fallback behavior."""
 
+    def test_stale_previews_return_none_after_mark_all_stale(
+        self, preview_service, mock_project, mock_capture_result, qtbot
+    ):
+        """Test that stale previews return None after mark_all_stale()."""
+        project, game_frame = mock_project
+
+        # First, generate and cache a preview
+        with patch.object(
+            preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result
+        ):
+            with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
+                renderer_inst = MockRenderer.return_value
+                mock_pil_img = Mock()
+                renderer_inst.render_selection.return_value = mock_pil_img
+
+                with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
+                    mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
+                    mock_pil_to_qimage.return_value = mock_qimage
+
+                    # Generate and cache preview
+                    preview1 = preview_service.force_regenerate_preview("frame1", project)
+                    assert preview1 is not None, "Initial preview should be generated"
+
+                    # Verify it's cached and can be retrieved
+                    cached = preview_service.get_cached_preview("frame1", project)
+                    assert cached is not None, "Preview should be cached"
+                    assert cached == preview1, "Cached preview should match original"
+
+                    # Mark all previews as stale (simulating palette change)
+                    preview_service.mark_all_stale()
+
+                    # Verify frame is in stale set
+                    assert "frame1" in preview_service._stale_previews, "Frame should be marked stale"
+
+                    # Now get_cached_preview should return None
+                    cached_after_stale = preview_service.get_cached_preview("frame1", project)
+                    assert cached_after_stale is None, "Stale preview should return None"
+
+                    # Verify stale flag was cleared
+                    assert "frame1" not in preview_service._stale_previews, "Stale flag should be cleared after None return"
+
+                    # Subsequent calls should return the old cached pixmap (not None again)
+                    # This prevents thrashing - caller should regenerate async
+                    cached_second_call = preview_service.get_cached_preview("frame1", project)
+                    assert cached_second_call == preview1, "After stale cleared, should return old cache"
+
+    def test_force_regenerate_after_stale_returns_new_pixmap(
+        self, preview_service, mock_project, mock_capture_result, qtbot
+    ):
+        """Test that force_regenerate_preview returns new pixmap after stale."""
+        project, game_frame = mock_project
+
+        with patch.object(
+            preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result
+        ):
+            with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
+                renderer_inst = MockRenderer.return_value
+                mock_pil_img = Mock()
+                renderer_inst.render_selection.return_value = mock_pil_img
+
+                with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
+                    # First generation
+                    mock_qimage1 = QImage(100, 100, QImage.Format.Format_RGBA8888)
+                    mock_pil_to_qimage.return_value = mock_qimage1
+                    _ = preview_service.force_regenerate_preview("frame1", project)
+
+                    # Mark stale
+                    preview_service.mark_all_stale()
+
+                    # get_cached_preview returns None
+                    assert preview_service.get_cached_preview("frame1", project) is None
+
+                    # Force regeneration should return new pixmap
+                    mock_qimage2 = QImage(200, 200, QImage.Format.Format_RGBA8888)
+                    mock_pil_to_qimage.return_value = mock_qimage2
+                    preview2 = preview_service.force_regenerate_preview("frame1", project)
+
+                    assert preview2 is not None, "Regenerated preview should not be None"
+                    assert preview2.width() == 200, "New pixmap should have updated dimensions"
+
+                    # Now get_cached_preview should return the new one
+                    cached_new = preview_service.get_cached_preview("frame1", project)
+                    assert cached_new is not None
+                    assert cached_new == preview2, "Cached preview should be the regenerated one"
+
     def test_stale_entries_fallback_to_rom_offset(self, preview_service, mock_project, qtbot):
         """Test that stale entry IDs fall back to rom_offset filtering."""
         project, game_frame = mock_project

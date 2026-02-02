@@ -61,16 +61,20 @@ class PreviewService(QObject):
         """Get cached preview if available and valid, without generating on miss.
 
         This method is intended for UI refreshes where blocking to regenerate
-        a preview would cause jank. If the preview is not cached or is invalid,
-        returns None immediately. The caller should trigger async generation
-        separately for any cache misses.
+        a preview would cause jank. If the preview is not cached, is invalid,
+        or is marked stale, returns None immediately. The caller should trigger
+        async generation separately for any cache misses.
+
+        Stale previews (marked by mark_all_stale, e.g. after palette changes)
+        return None to force regeneration. The stale flag is cleared on first
+        None return to prevent repeated None returns for the same frame.
 
         Args:
             frame_id: Game frame ID
             project: Current project (needed for cache validation)
 
         Returns:
-            Cached QPixmap if available and valid, None otherwise
+            Cached QPixmap if available and valid, None for stale/invalid/missing entries
         """
         if frame_id not in self._game_frame_previews:
             return None
@@ -106,8 +110,13 @@ class PreviewService(QObject):
                 # Cache is stale - return None to trigger regeneration
                 return None
 
-        # Stale previews are still returned (they're visually close enough)
-        # The caller should handle async regeneration for stale entries separately
+        # Check if preview is marked stale (e.g., after palette change)
+        if frame_id in self._stale_previews:
+            # Clear stale flag immediately to prevent repeated None returns
+            self._stale_previews.discard(frame_id)
+            # Return None to trigger async regeneration by caller
+            return None
+
         return cached_pixmap
 
     def get_capture_result_for_game_frame(
