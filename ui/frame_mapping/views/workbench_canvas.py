@@ -23,7 +23,8 @@ Scene Structure:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, override
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal, NamedTuple, override
 
 import numpy as np
 from PIL import Image
@@ -81,6 +82,16 @@ if TYPE_CHECKING:
     from core.mesen_integration.click_extractor import CaptureResult
 
 logger = get_logger(__name__)
+
+
+class _AIFrameCacheEntry(NamedTuple):
+    """Cache entry for loaded AI frame data."""
+
+    mtime: float
+    pixmap: QPixmap
+    pil_image: Image.Image
+    index_map: np.ndarray | None
+    content_bbox: tuple[int, int, int, int] | None
 
 
 class AlignmentWorker(QThread):
@@ -478,6 +489,12 @@ class WorkbenchCanvas(QWidget):
         # Content bbox cache (invalidated on set_ai_frame)
         # Caches get_content_bbox() since AI image is unchanged during alignment drag
         self._cached_content_bbox: tuple[int, int, int, int] | None = None
+
+        # AI frame pixmap cache - keyed by path, stores loaded image data
+        # Avoids re-decoding frames when navigating back to previously viewed frames
+        # LRU-style: newest entries at end, evict from front when over limit
+        self._ai_frame_cache: dict[Path, _AIFrameCacheEntry] = {}
+        self._ai_frame_cache_max_size = 10  # Cache up to 10 frames
 
         # Async preview service for offloading compositor to background thread
         self._async_preview_service = AsyncPreviewService(self)
@@ -984,31 +1001,52 @@ class WorkbenchCanvas(QWidget):
             return
 
         if frame.path.exists():
-            # Load once via PIL (preserving index map), then convert to QPixmap
-            # This avoids double-decoding (was: QPixmap load + PIL load separately)
-            try:
-                self._ai_index_map, self._ai_image = load_image_preserving_indices(frame.path)
-                if self._ai_index_map is not None:
-                    logger.debug(
-                        "Loaded AI frame %s with preserved index map (shape: %s)",
-                        frame.path.name,
-                        self._ai_index_map.shape,
-                    )
-                # Cache content bbox for this AI image (used during alignment drag)
-                self._cached_content_bbox = get_content_bbox(self._ai_image)
-                # Convert PIL image to QPixmap (ai_image is always valid after load)
-                qimage = pil_to_qimage(self._ai_image, with_alpha=True)
-                self._ai_pixmap = QPixmap.fromImage(qimage)
-            except Exception as e:
-                logger.warning(
-                    "Failed to load image for %s: %s - auto-align will be disabled",
-                    frame.path,
-                    e,
+            # Check cache first
+            cache_entry = self._get_ai_frame_from_cache(frame.path)
+            if cache_entry is not None:
+                # Cache hit - use cached data
+                self._ai_pixmap = cache_entry.pixmap
+                self._ai_image = cache_entry.pil_image
+                self._ai_index_map = cache_entry.index_map
+                self._cached_content_bbox = cache_entry.content_bbox
+                logger.debug(
+                    "AI frame cache HIT for %s",
+                    frame.path.name,
                 )
-                self._ai_image = None
-                self._ai_index_map = None
-                self._ai_pixmap = None
-                self._cached_content_bbox = None
+            else:
+                # Cache miss - load and cache
+                try:
+                    self._ai_index_map, self._ai_image = load_image_preserving_indices(frame.path)
+                    if self._ai_index_map is not None:
+                        logger.debug(
+                            "Loaded AI frame %s with preserved index map (shape: %s)",
+                            frame.path.name,
+                            self._ai_index_map.shape,
+                        )
+                    # Cache content bbox for this AI image (used during alignment drag)
+                    self._cached_content_bbox = get_content_bbox(self._ai_image)
+                    # Convert PIL image to QPixmap (ai_image is always valid after load)
+                    qimage = pil_to_qimage(self._ai_image, with_alpha=True)
+                    self._ai_pixmap = QPixmap.fromImage(qimage)
+
+                    # Store in cache
+                    self._add_ai_frame_to_cache(
+                        frame.path,
+                        self._ai_pixmap,
+                        self._ai_image,
+                        self._ai_index_map,
+                        self._cached_content_bbox,
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to load image for %s: %s - auto-align will be disabled",
+                        frame.path,
+                        e,
+                    )
+                    self._ai_image = None
+                    self._ai_index_map = None
+                    self._ai_pixmap = None
+                    self._cached_content_bbox = None
         else:
             self._ai_pixmap = None
             self._ai_image = None
@@ -1030,6 +1068,79 @@ class WorkbenchCanvas(QWidget):
         self._update_auto_align_button_state()
         # Update preview if enabled
         self._schedule_preview_update()
+
+    def _get_ai_frame_from_cache(self, path: Path) -> _AIFrameCacheEntry | None:
+        """Get AI frame from cache if valid (exists and mtime matches).
+
+        Args:
+            path: Path to the AI frame image file.
+
+        Returns:
+            Cache entry if valid cache hit, None if miss or stale.
+        """
+        if path not in self._ai_frame_cache:
+            return None
+
+        entry = self._ai_frame_cache[path]
+        try:
+            current_mtime = path.stat().st_mtime
+        except OSError:
+            # File disappeared - remove from cache
+            del self._ai_frame_cache[path]
+            return None
+
+        if entry.mtime != current_mtime:
+            # File modified - cache is stale
+            del self._ai_frame_cache[path]
+            return None
+
+        # Move to end (LRU behavior)
+        del self._ai_frame_cache[path]
+        self._ai_frame_cache[path] = entry
+        return entry
+
+    def _add_ai_frame_to_cache(
+        self,
+        path: Path,
+        pixmap: QPixmap,
+        pil_image: Image.Image,
+        index_map: np.ndarray | None,
+        content_bbox: tuple[int, int, int, int] | None,
+    ) -> None:
+        """Add AI frame to cache, evicting oldest if at capacity.
+
+        Args:
+            path: Path to the AI frame image file.
+            pixmap: The loaded QPixmap.
+            pil_image: The PIL image.
+            index_map: Palette index map if indexed PNG, else None.
+            content_bbox: Content bounding box, or None.
+        """
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            # Can't get mtime, don't cache
+            return
+
+        # Evict oldest entries if at capacity
+        while len(self._ai_frame_cache) >= self._ai_frame_cache_max_size:
+            oldest_key = next(iter(self._ai_frame_cache))
+            del self._ai_frame_cache[oldest_key]
+
+        self._ai_frame_cache[path] = _AIFrameCacheEntry(
+            mtime=mtime,
+            pixmap=pixmap,
+            pil_image=pil_image,
+            index_map=index_map,
+            content_bbox=content_bbox,
+        )
+
+    def clear_ai_frame_cache(self) -> None:
+        """Clear the AI frame pixmap cache.
+
+        Call this when frames are deleted or modified externally.
+        """
+        self._ai_frame_cache.clear()
 
     def set_alignment(
         self,
