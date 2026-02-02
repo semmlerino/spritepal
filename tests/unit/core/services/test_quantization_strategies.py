@@ -230,6 +230,20 @@ class TestSelectQuantizationStrategy:
         # Should fall through to standard since no color_mappings
         assert isinstance(strategy, StandardQuantizationStrategy)
 
+    def test_skips_passthrough_when_indices_exceed_4bpp(self) -> None:
+        """Should not use passthrough when indices exceed 4bpp limit (>15)."""
+        index_map = np.zeros((8, 8), dtype=np.uint8)
+        index_map[0, 0] = 97  # Index exceeds 4bpp limit
+
+        colors = [(248, 0, 0)]
+        colors.extend([(0, 0, 0)] * 15)
+        palette = MockSheetPalette(colors=colors)
+
+        strategy = select_quantization_strategy(index_map, palette, None)
+
+        # Should fall through to standard since indices too high for 4bpp
+        assert isinstance(strategy, StandardQuantizationStrategy)
+
     def test_selects_palette_mapping_when_has_mappings(self) -> None:
         """Should select palette mapping when color_mappings exists."""
         index_map = np.full((8, 8), 255, dtype=np.uint8)  # Invalid index map

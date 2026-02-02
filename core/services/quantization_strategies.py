@@ -216,9 +216,19 @@ def select_quantization_strategy(
     """
     # Check for index passthrough eligibility
     if chunk_index_map is not None and sheet_palette is not None:
-        # Check if index map has valid data (no 255 markers = outside AI frame area)
-        if not np.any(chunk_index_map == 255):
+        # Check if index map has valid data:
+        # - No 255 markers (outside AI frame area)
+        # - All indices within 4bpp range (0-15)
+        max_index = int(np.max(chunk_index_map))
+        has_outside_markers = np.any(chunk_index_map == 255)
+        if not has_outside_markers and max_index <= 15:
             return IndexPassthroughStrategy()
+        elif max_index > 15:
+            logger.debug(
+                "Index passthrough skipped: max index %d exceeds 4bpp limit (0-15), "
+                "falling back to color-based quantization",
+                max_index,
+            )
 
     # Check for palette mapping
     if sheet_palette is not None and sheet_palette.color_mappings:
