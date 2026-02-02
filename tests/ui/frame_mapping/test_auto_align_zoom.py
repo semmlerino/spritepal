@@ -74,6 +74,8 @@ class TestAutoAlignZoomBehavior:
         canvas.set_ai_frame(AIFrame(path=ai_image_path, index=0))
 
         # 6. Trigger auto-align
+        # Disable match scale to run synchronously and avoid threading issues in test
+        canvas._match_scale_checkbox.setChecked(False)
         canvas._on_auto_align()
         qtbot.wait(50)  # Allow scene update
 

@@ -389,23 +389,6 @@ class FrameMappingController(QObject):
         - CapturesLibraryPane → updates capture name display
     """
 
-    preview_cache_invalidated = Signal(str, object)  # (frame_id, pixmap)
-    """Emitted when a game frame's preview is regenerated due to cache miss.
-
-    This occurs when the capture file's mtime or selected OAM entries change,
-    indicating that cached preview data is now stale.
-
-    Args:
-        game_frame_id: ID of the game frame whose preview was regenerated
-        pixmap: The new preview pixmap (or None if invalidated without regeneration)
-
-    Emitted by:
-        - PreviewService (via signal relay) → after cache miss regeneration
-
-    Triggers:
-        - Various handlers → request async regeneration if needed
-    """
-
     capture_import_requested = Signal(object, object)
     """Emitted when a capture file is parsed and awaits user sprite selection.
 
@@ -588,7 +571,6 @@ class FrameMappingController(QObject):
         self._injected_palette_calculator = palette_offset_calculator
         # Preview service for game frame preview cache (uses shared repository)
         self._preview_service = PreviewService(parent=self, capture_repository=self._capture_repository)
-        self._preview_service.preview_cache_invalidated.connect(self.preview_cache_invalidated)
         self._preview_service.stale_entries_warning.connect(self.stale_entries_warning)
         # Async game frame preview service (for batch async preview generation)
         self._async_preview_service = AsyncGameFramePreviewService(

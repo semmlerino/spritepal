@@ -697,18 +697,25 @@ class FrameMappingProject:
         Returns:
             True if the frame was found and removed, False otherwise.
         """
+        logger.info("remove_ai_frame: frame_id=%s, current count=%d", frame_id, len(self.ai_frames))
         frame = self.get_ai_frame_by_id(frame_id)
         if frame is None:
+            logger.warning("remove_ai_frame: frame not found for id=%s", frame_id)
             return False
 
+        logger.info("remove_ai_frame: found frame %s, removing mappings", frame.name)
         # Remove any mapping associated with this AI frame
+        old_mapping_count = len(self.mappings)
         self.mappings = [m for m in self.mappings if m.ai_frame_id != frame_id]
         self._invalidate_mapping_index()
+        logger.info("remove_ai_frame: mappings %d -> %d", old_mapping_count, len(self.mappings))
 
         # Remove the AI frame
+        logger.info("remove_ai_frame: removing frame from list (id in list: %s)", frame in self.ai_frames)
         self.ai_frames.remove(frame)
         # O(1) incremental update instead of O(N) rebuild
         self._ai_frame_index_by_id.pop(frame_id, None)
+        logger.info("remove_ai_frame: done, new count=%d", len(self.ai_frames))
 
         return True
 

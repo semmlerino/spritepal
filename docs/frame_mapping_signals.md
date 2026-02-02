@@ -36,7 +36,6 @@ This document describes all signal chains in the Frame Mapping subsystem with fl
 | `frame_renamed` | FrameMappingController:79 | Emitted when AI frame display name changes | Workspace: `_on_frame_organization_changed()` - refreshes AI pane |
 | `frame_tags_changed` | FrameMappingController:80 | Emitted when AI frame tags change | Workspace: `_on_frame_organization_changed()` - refreshes AI pane |
 | `capture_renamed` | FrameMappingController:82 | Emitted when game frame display name changes | Workspace: `_on_capture_organization_changed()` - refreshes captures pane |
-| `preview_cache_invalidated` | FrameMappingController:84 | Emitted when preview is regenerated | Workspace: `_on_preview_cache_invalidated()` - updates thumbnails |
 | `capture_import_requested` | FrameMappingController:86 | Emitted when capture parsed, workspace shows dialog | Workspace: `_on_capture_import_requested()` - queues dialog |
 | `can_undo_changed` | FrameMappingController:88 | Emitted when undo availability changes | (Future: will enable/disable undo button) |
 | `can_redo_changed` | FrameMappingController:89 | Emitted when redo availability changes | (Future: will enable/disable redo button) |
@@ -45,7 +44,6 @@ This document describes all signal chains in the Frame Mapping subsystem with fl
 
 | Signal Name | Source | Purpose | Connected Handlers |
 |-------------|--------|---------|-------------------|
-| `preview_cache_invalidated` | PreviewService:35 | Emitted when cached preview is regenerated | Controller (forwarded) → Workspace: updates thumbnails |
 | `stale_entries_warning` | PreviewService:36 | Emitted when stored entry IDs are stale | Controller (forwarded) → Workspace: shows warning |
 
 ### Palette Service Signals (PaletteService)
@@ -341,13 +339,7 @@ Request: Get Preview for Game Frame
                     │       │
                     │       ├─→ [CaptureRenderer] render_selection()
                     │       ├─→ Convert PIL Image → QPixmap
-                    │       ├─→ Cache with (pixmap, mtime, entry_ids)
-                    │       └─→ [PreviewService] preview_cache_invalidated.emit(frame_id)
-                    │               └─→ [Controller] (forwards signal)
-                    │                       └─→ [Workspace] _on_preview_cache_invalidated()
-                    │                               ├─→ [MappingPanel] update_game_frame_preview()
-                    │                               ├─→ [CapturesPane] update_frame_preview()
-                    │                               └─→ [Canvas] set_game_frame() if displayed
+                    │       └─→ Cache with (pixmap, mtime, entry_ids)
                     │
                     └─→ Return new pixmap
 
@@ -663,26 +655,6 @@ When user adjusts alignment, avoid full `project_changed` refresh (which would b
 2. `[Workspace] _auto_save_after_injection()` - Workspace:1315
    - Save project to disk (line 1325)
    - Show "Project auto-saved" message (line 1327)
-
----
-
-### Preview Cache Invalidation → Thumbnail Update Cascade
-
-**Trigger Conditions:**
-
-1. Capture file mtime changed
-2. selected_entry_ids changed
-3. Manual invalidation via `invalidate(frame_id)`
-
-**Signal Cascade:**
-
-1. `[PreviewService] preview_cache_invalidated.emit(frame_id)` - PreviewService:118
-2. `[Controller]` (forwards signal) - Controller:96
-3. `[Workspace] _on_preview_cache_invalidated()` - Workspace:1672
-   - Get fresh preview from controller (line 1681)
-   - Update mapping panel thumbnail (line 1684)
-   - Update captures pane thumbnail (line 1686)
-   - If frame currently displayed on canvas: update canvas (line 1689-1695)
 
 ---
 

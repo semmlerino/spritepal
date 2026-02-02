@@ -166,7 +166,10 @@ class FrameOperationsCoordinator:
                 return
 
         # Remove the AI frame (also removes mapping)
-        if self._controller.remove_ai_frame(ai_frame_id):
+        logger.info("Attempting to remove AI frame: %s", ai_frame_id)
+        result = self._controller.remove_ai_frame(ai_frame_id)
+        logger.info("remove_ai_frame returned: %s", result)
+        if result:
             # Clear canvas and selection if deleted frame was selected
             if self._state.selected_ai_frame_id == ai_frame_id:
                 self._state.selected_ai_frame_id = None

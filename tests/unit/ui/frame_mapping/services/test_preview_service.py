@@ -163,7 +163,7 @@ class TestPreviewServiceCaching:
                     mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
                     mock_pil_to_qimage.return_value = mock_qimage
 
-                    # First call - cache population (no signal emitted on initial cache fill)
+                    # First call - cache population
                     preview_service.get_preview("frame1", project)
 
                     # Ensure mtime actually changes (some filesystems have 1-second resolution)
@@ -179,16 +179,8 @@ class TestPreviewServiceCaching:
                     game_frame.cached_mtime = new_mtime
 
                     # Second call - cache invalidated due to mtime change
-                    with qtbot.waitSignal(
-                        preview_service.preview_cache_invalidated, timeout=signal_timeout()
-                    ) as blocker:
-                        preview_service.get_preview("frame1", project)
+                    preview_service.get_preview("frame1", project)
 
-                    assert blocker.signal_triggered
-                    # Now includes pixmap as second argument
-                    assert len(blocker.args) == 2
-                    assert blocker.args[0] == "frame1"
-                    assert isinstance(blocker.args[1], QPixmap)
                     # Repository called twice (cache invalidated)
                     assert mock_get_or_parse.call_count == 2
 
@@ -216,12 +208,8 @@ class TestPreviewServiceCaching:
                     game_frame.selected_entry_ids = [1, 2]  # Changed from [1, 2, 3]
 
                     # Second call - cache invalidated due to entry ID change
-                    with qtbot.waitSignal(
-                        preview_service.preview_cache_invalidated, timeout=signal_timeout()
-                    ) as blocker:
-                        preview_service.get_preview("frame1", project)
+                    preview_service.get_preview("frame1", project)
 
-                    assert blocker.signal_triggered
                     # Repository called twice (cache invalidated)
                     assert mock_get_or_parse.call_count == 2
 
@@ -229,7 +217,7 @@ class TestPreviewServiceCaching:
 class TestPreviewServiceInvalidation:
     """Test cache invalidation methods."""
 
-    def test_invalidate_single_entry(self, preview_service, qtbot):
+    def test_invalidate_single_entry(self, preview_service):
         """Test invalidating a single cache entry."""
         # Manually add cache entry
         mock_pixmap = QPixmap(100, 100)
@@ -238,19 +226,15 @@ class TestPreviewServiceInvalidation:
         # Verify cached
         assert "frame1" in preview_service._game_frame_previews
 
-        # Invalidate and verify signal
-        with qtbot.waitSignal(preview_service.preview_cache_invalidated, timeout=signal_timeout()) as blocker:
-            preview_service.invalidate("frame1")
+        # Invalidate
+        preview_service.invalidate("frame1")
 
-        assert blocker.signal_triggered
-        assert blocker.args == ["frame1", None]  # Now includes pixmap (None for invalidate)
         assert "frame1" not in preview_service._game_frame_previews
 
-    def test_invalidate_nonexistent_entry_no_signal(self, preview_service, qtbot):
-        """Test that invalidating nonexistent entry doesn't emit signal."""
-        # Try to invalidate nonexistent entry
-        with qtbot.assertNotEmitted(preview_service.preview_cache_invalidated, wait=100):
-            preview_service.invalidate("nonexistent")
+    def test_invalidate_nonexistent_entry(self, preview_service):
+        """Test that invalidating nonexistent entry is safe."""
+        # Try to invalidate nonexistent entry (should not raise)
+        preview_service.invalidate("nonexistent")
 
     def test_invalidate_all(self, preview_service):
         """Test clearing entire cache."""
