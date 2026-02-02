@@ -648,7 +648,7 @@ class CapturesLibraryPane(QWidget):
                 break
 
     def remove_game_frame(self, frame_id: str) -> None:
-        """Remove a game frame from display without full rebuild.
+        """Remove a game frame from display and refresh the list.
 
         Args:
             frame_id: ID of the frame to remove
