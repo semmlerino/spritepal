@@ -643,11 +643,9 @@ class MappingPanel(QWidget):
     def refresh_thumbnails_only(self) -> None:
         """Refresh only the thumbnails for existing table rows.
 
-        More efficient than refresh() when only the palette changed -
+        More efficient than refresh() when the canvas state changed -
         keeps table structure, just re-loads quantized AI frame icons.
         """
-        # Clear quantized icon cache since palette changed
-        self._quantized_icon_cache.clear()
         # Reset visible range to force reload
         self._last_visible_range = (-1, -1)
         # Trigger visibility-based thumbnail loading

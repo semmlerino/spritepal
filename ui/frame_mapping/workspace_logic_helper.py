@@ -444,7 +444,6 @@ class WorkspaceLogicHelper:
             return
 
         self._state.selected_ai_frame_id = frame_id
-        self.update_map_button_state()
 
         # Sync drawer selection by ID
         self._mapping_panel.select_row_by_ai_id(frame_id)
