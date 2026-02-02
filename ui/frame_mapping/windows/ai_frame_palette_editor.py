@@ -68,12 +68,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     Signals:
         save_requested: (ai_frame_id, indexed_data, output_path) - Request to save
-        closed: Editor window was closed
+        closed: (ai_frame_id) - Editor window was closed
         palette_color_changed: (index, rgb) - Palette color was edited via right-click
     """
 
     save_requested = Signal(str, object, str)  # ai_frame_id, np.ndarray, output_path
-    closed = Signal()
+    closed = Signal(str)  # ai_frame_id (current, may have changed after save)
     palette_color_changed = Signal(int, tuple)  # index, (r, g, b)
 
     def __init__(
@@ -760,5 +760,5 @@ class AIFramePaletteEditorWindow(QMainWindow):
                 event.ignore()
                 return
 
-        self.closed.emit()
+        self.closed.emit(self._ai_frame.id)
         event.accept()

@@ -329,7 +329,7 @@ class PaletteCoordinator:
 
         # Connect signals - these go back to coordinator methods
         editor.save_requested.connect(self._handle_palette_editor_save)
-        editor.closed.connect(lambda fid=ai_frame_id: self._handle_palette_editor_closed(fid))
+        editor.closed.connect(self._handle_palette_editor_closed)
         editor.palette_color_changed.connect(self._handle_editor_palette_color_changed)
 
         # Show the editor
