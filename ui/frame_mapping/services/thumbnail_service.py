@@ -6,7 +6,9 @@ ensuring WYSIWYG behavior by using the same quantization logic as injection.
 
 from __future__ import annotations
 
+import hashlib
 import io
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -22,12 +24,63 @@ from core.palette_utils import (
 )
 from core.services.image_utils import pil_to_qimage, pil_to_qpixmap
 from ui.common import WorkerManager
+from ui.frame_mapping.services.thumbnail_disk_cache import ThumbnailDiskCache
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import SheetPalette
 
 logger = get_logger(__name__)
+
+
+def _compute_cache_key(
+    path: Path,
+    mtime: float,
+    palette_colors: tuple[tuple[int, int, int], ...],
+    palette_mappings: dict[tuple[int, int, int], int] | None,
+    background_color: tuple[int, int, int] | None,
+    background_tolerance: int,
+    size: int,
+) -> str:
+    """Compute stable SHA-256 cache key for thumbnail parameters.
+
+    Key includes all parameters that affect thumbnail appearance:
+    - Source file path and modification time
+    - Palette colors and mappings (for quantization)
+    - Background removal settings
+    - Thumbnail size
+    """
+    # Build key string from all parameters
+    key_parts = [
+        str(path),
+        str(mtime),
+        str(palette_colors),
+        str(sorted(palette_mappings.items()) if palette_mappings else None),
+        str(background_color),
+        str(background_tolerance),
+        str(size),
+    ]
+    key_string = "|".join(key_parts)
+
+    # Return first 16 chars of SHA-256 hash
+    return hashlib.sha256(key_string.encode()).hexdigest()[:16]
+
+
+_disk_cache: ThumbnailDiskCache | None = None
+
+
+def get_disk_cache() -> ThumbnailDiskCache:
+    """Get or create singleton disk cache instance."""
+    global _disk_cache
+    if _disk_cache is None:
+        from core.app_context import get_app_context
+
+        config = get_app_context().configuration_service
+        cache_dir = config.cache_directory / "thumbnails" / "v1" / "quantized"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        _disk_cache = ThumbnailDiskCache(cache_dir, max_size_mb=100)
+    return _disk_cache
+
 
 # Default thumbnail size for list items and table cells
 DEFAULT_THUMBNAIL_SIZE = 64
@@ -89,16 +142,30 @@ def _cached_thumbnail_bytes(
     return buffer.getvalue()
 
 
-def clear_thumbnail_cache() -> None:
-    """Clear the thumbnail cache.
+def clear_all_thumbnail_caches() -> None:
+    """Clear in-memory and disk thumbnail caches.
 
     Call this when the palette changes to ensure thumbnails are regenerated
     with the new palette colors.
     """
+    # Existing in-memory cache clearing
     _cached_thumbnail_bytes.cache_clear()
     _cached_quantized_thumbnail_bytes.cache_clear()
     _pixmap_cache.clear()
-    logger.debug("Thumbnail cache cleared")
+
+    # Clear disk cache
+    try:
+        get_disk_cache().clear()
+    except Exception as e:
+        logger.warning(f"Failed to clear disk cache: {e}")
+
+    logger.debug("All thumbnail caches cleared")
+
+
+# Backwards compatibility alias
+def clear_thumbnail_cache() -> None:
+    """Deprecated: Use clear_all_thumbnail_caches() instead."""
+    clear_all_thumbnail_caches()
 
 
 @lru_cache(maxsize=_THUMBNAIL_CACHE_MAXSIZE)
@@ -107,6 +174,8 @@ def _cached_quantized_thumbnail_bytes(
     mtime: float,
     palette_colors: tuple[tuple[int, int, int], ...],
     palette_mappings: tuple[tuple[tuple[int, int, int], int], ...] | None,
+    background_color: tuple[int, int, int] | None,
+    background_tolerance: int,
     size: int,
 ) -> bytes | None:
     """Generate and cache a quantized thumbnail as PNG bytes.
@@ -116,6 +185,8 @@ def _cached_quantized_thumbnail_bytes(
         mtime: File modification time (for cache invalidation)
         palette_colors: Tuple of (R, G, B) color tuples
         palette_mappings: Tuple of ((R, G, B), index) mappings, or None
+        background_color: Background color for removal, or None
+        background_tolerance: Tolerance for background removal
         size: Thumbnail size in pixels
 
     Returns:
@@ -124,6 +195,22 @@ def _cached_quantized_thumbnail_bytes(
     frame_path = Path(path_str)
     if not frame_path.exists():
         return None
+
+    # Check disk cache
+    disk_cache = get_disk_cache()
+    palette_mappings_dict = dict(palette_mappings) if palette_mappings else None
+    cache_key = _compute_cache_key(
+        frame_path,
+        mtime,
+        palette_colors,
+        palette_mappings_dict,
+        background_color,
+        background_tolerance,
+        size,
+    )
+    cached_bytes = disk_cache.get(cache_key)
+    if cached_bytes:
+        return cached_bytes
 
     try:
         pil_image = Image.open(frame_path)
@@ -134,6 +221,12 @@ def _cached_quantized_thumbnail_bytes(
     # Ensure RGBA for quantization
     if pil_image.mode != "RGBA":
         pil_image = pil_image.convert("RGBA")
+
+    # Apply background removal if configured
+    if background_color is not None:
+        from core.services.content_bounds_analyzer import remove_background
+
+        pil_image = remove_background(pil_image, background_color, background_tolerance)
 
     # Scale FIRST, then quantize.
     # Quantization with LAB color space is O(pixels * palette * mappings),
@@ -168,7 +261,21 @@ def _cached_quantized_thumbnail_bytes(
     # Convert to PNG bytes
     buffer = io.BytesIO()
     pil_image.save(buffer, format="PNG")
-    return buffer.getvalue()
+    png_bytes = buffer.getvalue()
+
+    # Save to disk cache
+    metadata = {
+        "path": str(frame_path),
+        "mtime": mtime,
+        "size": size,
+        "palette_hash": hash(palette_colors),
+        "created": time.time(),
+        "last_access": time.time(),
+        "file_size": len(png_bytes),
+    }
+    disk_cache.put(cache_key, png_bytes, metadata)
+
+    return png_bytes
 
 
 def _compute_palette_hash(sheet_palette: SheetPalette | None) -> int:
@@ -240,7 +347,15 @@ def create_quantized_thumbnail(
         if sheet_palette.color_mappings:
             palette_mappings = tuple(sorted(sheet_palette.color_mappings.items()))
 
-        png_bytes = _cached_quantized_thumbnail_bytes(path_str, mtime, palette_colors, palette_mappings, size)
+        # Extract background settings
+        background_color = sheet_palette.background_color if hasattr(sheet_palette, "background_color") else None
+        background_tolerance = (
+            sheet_palette.background_tolerance if hasattr(sheet_palette, "background_tolerance") else 0
+        )
+
+        png_bytes = _cached_quantized_thumbnail_bytes(
+            path_str, mtime, palette_colors, palette_mappings, background_color, background_tolerance, size
+        )
     else:
         # No palette - use simpler cache
         png_bytes = _cached_thumbnail_bytes(path_str, mtime, 0, size)

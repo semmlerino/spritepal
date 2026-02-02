@@ -197,6 +197,11 @@ class ConfigurationService:
         """Path to sprite_locations.json configuration file."""
         return self.config_directory / "sprite_locations.json"
 
+    @property
+    def thumbnail_cache_directory(self) -> Path:
+        """Thumbnail cache directory within main cache."""
+        return self.cache_directory / "thumbnails" / "v1"
+
     # === Methods for extensibility ===
 
     def resolve_path(self, path_key: str) -> Path:
