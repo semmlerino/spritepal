@@ -520,34 +520,86 @@ class IndexedCanvas(QWidget):
         self._highlight_index = index
         self._update_highlight_overlay()
 
+    def _compute_boundary_edges(self, mask: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Compute edge segments for pixels matching the highlight mask.
+
+        Returns four boolean arrays indicating which pixels have edges on each side:
+        - top_edges: pixel is selected, pixel above is not (or out of bounds)
+        - bottom_edges: pixel is selected, pixel below is not
+        - left_edges: pixel is selected, pixel to left is not
+        - right_edges: pixel is selected, pixel to right is not
+        """
+        # Pad mask with False to handle boundaries
+        padded = np.pad(mask, 1, mode="constant", constant_values=False)
+
+        # Edge exists where pixel is selected AND neighbor is NOT selected
+        top_edges = mask & ~padded[:-2, 1:-1]
+        bottom_edges = mask & ~padded[2:, 1:-1]
+        left_edges = mask & ~padded[1:-1, :-2]
+        right_edges = mask & ~padded[1:-1, 2:]
+
+        return top_edges, bottom_edges, left_edges, right_edges
+
     def _update_highlight_overlay(self) -> None:
-        """Update the highlight overlay showing pixels with selected index."""
+        """Update the highlight overlay showing edges of pixels with selected index."""
         if self._indexed_data is None or self._highlight_index is None:
             self._highlight_item.setPixmap(QPixmap())
             return
 
         height, width = self._indexed_data.shape
-
-        # Create mask of pixels matching the highlight index
         mask = self._indexed_data == self._highlight_index
 
-        # Create semi-transparent green overlay for highlighted pixels
-        # Use BGRA order for Format_ARGB32
-        overlay = np.zeros((height, width, 4), dtype=np.uint8)
-        overlay[mask] = (0, 200, 0, 100)  # BGRA: Blue=0, Green=200, Red=0, Alpha=100
+        if not np.any(mask):
+            self._highlight_item.setPixmap(QPixmap())
+            return
 
-        overlay = np.ascontiguousarray(overlay)
+        # Compute boundary edges
+        top_edges, bottom_edges, left_edges, right_edges = self._compute_boundary_edges(mask)
 
-        qimage = QImage(
-            overlay.data,
-            width,
-            height,
-            width * 4,
-            QImage.Format.Format_ARGB32,
-        )
-        qimage = qimage.copy()
+        # Create transparent overlay image
+        overlay_image = QImage(width, height, QImage.Format.Format_ARGB32)
+        overlay_image.fill(Qt.GlobalColor.transparent)
 
-        self._highlight_item.setPixmap(QPixmap.fromImage(qimage))
+        painter = QPainter(overlay_image)
+
+        # Configure dashed pen - white for visibility
+        pen = QPen(QColor(255, 255, 255, 230))
+        pen.setWidth(0)  # Hairline (1 device pixel)
+        pen.setStyle(Qt.PenStyle.DashLine)
+        painter.setPen(pen)
+
+        # Draw edges (merge consecutive edges into line segments for efficiency)
+        # Horizontal edges (top and bottom)
+        for edge_mask, y_offset in [(top_edges, 0), (bottom_edges, 1)]:
+            for y in range(height):
+                row = edge_mask[y]
+                if not np.any(row):
+                    continue
+                # Find runs of consecutive edges
+                padded_row = np.concatenate(([False], row, [False]))
+                diff = np.diff(padded_row.astype(int))
+                starts = np.where(diff == 1)[0]
+                ends = np.where(diff == -1)[0]
+                y_coord = y + y_offset
+                for start, end in zip(starts, ends, strict=True):
+                    painter.drawLine(start, y_coord, end, y_coord)
+
+        # Vertical edges (left and right)
+        for edge_mask, x_offset in [(left_edges, 0), (right_edges, 1)]:
+            for x in range(width):
+                col = edge_mask[:, x]
+                if not np.any(col):
+                    continue
+                padded_col = np.concatenate(([False], col, [False]))
+                diff = np.diff(padded_col.astype(int))
+                starts = np.where(diff == 1)[0]
+                ends = np.where(diff == -1)[0]
+                x_coord = x + x_offset
+                for start, end in zip(starts, ends, strict=True):
+                    painter.drawLine(x_coord, start, x_coord, end)
+
+        painter.end()
+        self._highlight_item.setPixmap(QPixmap.fromImage(overlay_image))
 
     def _update_selection_overlay(self) -> None:
         """Update the selection overlay pixmap."""
@@ -676,7 +728,7 @@ class IndexedCanvas(QWidget):
 
     def get_preview_item(self) -> QGraphicsPixmapItem:
         """Get or create the preview overlay item."""
-        if not hasattr(self, '_preview_item'):
+        if not hasattr(self, "_preview_item"):
             self._preview_item = QGraphicsPixmapItem()
             self._preview_item.setZValue(100)  # On top of everything
             self._preview_item.setVisible(False)
