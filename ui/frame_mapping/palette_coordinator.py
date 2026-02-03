@@ -316,15 +316,13 @@ class PaletteCoordinator:
                 self._parent_widget,
                 "No Palette Set",
                 "Please set a sheet palette before editing palette indices.\n\n"
-                "Right-click on the palette panel and choose 'Edit Palette...' "
-                "or 'Extract from Capture...' to set one.",
+                "Use the 'Map Colors...' or 'Extract from Sheet' buttons in the "
+                "Sheet Palette panel to create a palette first.",
             )
             return
 
         # Create the editor window
-        editor = AIFramePaletteEditorWindow(
-            ai_frame, sheet_palette, self._parent_widget, controller=self._controller
-        )
+        editor = AIFramePaletteEditorWindow(ai_frame, sheet_palette, self._parent_widget, controller=self._controller)
 
         # Track the editor window
         self._palette_editors[ai_frame_id] = editor
