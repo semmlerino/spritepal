@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, override
 
 import numpy as np
-from PySide6.QtCore import QPointF, QRect, QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, QRect, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QBrush,
     QColor,
@@ -375,6 +375,12 @@ class IndexedCanvas(QWidget):
         self._show_grid = False
         self._grid_size = 8
 
+        # Marching ants animation state
+        self._dash_offset: float = 0.0
+        self._march_timer = QTimer(self)
+        self._march_timer.setInterval(100)  # 10 FPS animation
+        self._march_timer.timeout.connect(self._on_march_tick)
+
         self._setup_ui()
         self._connect_signals()
 
@@ -520,6 +526,13 @@ class IndexedCanvas(QWidget):
         self._highlight_index = index
         self._update_highlight_overlay()
 
+        # Start/stop marching ants animation
+        if index is not None:
+            self._march_timer.start()
+        else:
+            self._march_timer.stop()
+            self._dash_offset = 0.0
+
     def _compute_boundary_edges(self, mask: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Compute edge segments for pixels matching the highlight mask.
 
@@ -539,6 +552,14 @@ class IndexedCanvas(QWidget):
         right_edges = mask & ~padded[1:-1, 2:]
 
         return top_edges, bottom_edges, left_edges, right_edges
+
+
+    def _on_march_tick(self) -> None:
+        """Advance marching ants animation by one frame."""
+        self._dash_offset += 1.0
+        if self._dash_offset >= 8.0:  # Reset after full dash cycle
+            self._dash_offset = 0.0
+        self._update_highlight_overlay()
 
     def _update_highlight_overlay(self) -> None:
         """Update the highlight overlay showing edges of pixels with selected index."""
@@ -562,10 +583,11 @@ class IndexedCanvas(QWidget):
 
         painter = QPainter(overlay_image)
 
-        # Configure dashed pen - white for visibility
-        pen = QPen(QColor(255, 255, 255, 230))
-        pen.setWidth(0)  # Hairline (1 device pixel)
+        # Configure marching ants pen - black and white dashed line
+        pen = QPen(QColor(255, 255, 255, 255))
+        pen.setWidthF(0.5)
         pen.setStyle(Qt.PenStyle.DashLine)
+        pen.setDashOffset(self._dash_offset)
         painter.setPen(pen)
 
         # Draw edges (merge consecutive edges into line segments for efficiency)
