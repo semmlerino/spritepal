@@ -464,9 +464,27 @@ class TileSamplingService:
         if not cells:
             return []
 
+        # Normalize cells to (x, y) pairs to avoid worker-thread crashes
+        # if unexpected values slip in.
+        try:
+            cell_iter = iter(cells)
+        except TypeError:
+            return []
+
+        normalized_cells: list[tuple[int, int]] = []
+        for cell in cell_iter:
+            try:
+                cell_x, cell_y = cell
+            except (TypeError, ValueError):
+                continue
+            normalized_cells.append((int(cell_x), int(cell_y)))
+
+        if not normalized_cells:
+            return []
+
         # Group cells by row (y coordinate)
         rows: dict[int, list[int]] = {}
-        for cell_x, cell_y in cells:
+        for cell_x, cell_y in normalized_cells:
             if cell_y not in rows:
                 rows[cell_y] = []
             rows[cell_y].append(cell_x)

@@ -7,6 +7,7 @@ during palette changes when many game frame icons need to be re-quantized.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import TYPE_CHECKING
 
 from PIL import Image
@@ -155,6 +156,9 @@ class AsyncIconQuantizer(QObject):
     # Internal signal to trigger worker
     _start_worker = Signal(QuantizeRequest)
 
+    # Keep orphaned threads alive to avoid QThread GC while running
+    _orphaned_threads: set[QThread] = set()
+
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._request_id = 0
@@ -163,14 +167,14 @@ class AsyncIconQuantizer(QObject):
         # Pending requests: game_frame_id -> request_id (for deduplication)
         self._pending_requests: dict[str, int] = {}
 
-        self._setup_worker()
-
         # Clean up thread when parent is destroyed
         if parent is not None:
             parent.destroyed.connect(self._on_parent_destroyed)
 
     def _setup_worker(self) -> None:
         """Set up the background worker thread."""
+        if self._worker is not None and self._thread is not None:
+            return
         self._thread = QThread()
         self._worker = _QuantizeWorker()
         self._worker.moveToThread(self._thread)
@@ -206,8 +210,14 @@ class AsyncIconQuantizer(QObject):
             palette_hash: Hash of the palette (for cache invalidation)
             target_size: Target size for the scaled icon
         """
-        if self._worker is None:
+        if os.environ.get("SPRITEPAL_TESTING"):
+            self._quantize_icon_sync(game_frame_id, raw_pixmap, sheet_palette, palette_hash, target_size)
             return
+
+        if self._worker is None:
+            self._setup_worker()
+            if self._worker is None:
+                return
 
         # Convert QPixmap to QImage on main thread (QPixmap is not thread-safe)
         qimage = raw_pixmap.toImage()
@@ -242,6 +252,54 @@ class AsyncIconQuantizer(QObject):
 
         # Trigger processing in worker thread via signal
         self._start_worker.emit(request)
+
+    def _quantize_icon_sync(
+        self,
+        game_frame_id: str,
+        raw_pixmap: QPixmap,
+        sheet_palette: SheetPalette,
+        palette_hash: int,
+        target_size: int,
+    ) -> None:
+        """Synchronously quantize icon (test mode)."""
+        qimage = raw_pixmap.toImage()
+        if qimage.isNull():
+            return
+
+        qimage = qimage.convertToFormat(QImage.Format.Format_ARGB32)
+        image_bytes = bytes(qimage.bits())
+        width = qimage.width()
+        height = qimage.height()
+
+        self._request_id += 1
+        request_id = self._request_id
+        self._pending_requests[game_frame_id] = request_id
+
+        try:
+            pil_image = Image.frombytes(
+                "RGBA",
+                (width, height),
+                image_bytes,
+                "raw",
+                "BGRA",
+            )
+            pil_image.thumbnail(
+                (target_size, target_size),
+                Image.Resampling.LANCZOS,
+            )
+            quantized_pil = quantize_pil_image(pil_image, sheet_palette)
+            qimage_result = pil_to_qimage(quantized_pil, thread_safe=True)
+        except Exception as e:
+            logger.debug("Icon quantization failed for %s: %s", game_frame_id, e)
+            qimage_result = QImage()
+
+        if game_frame_id in self._pending_requests and self._pending_requests[game_frame_id] == request_id:
+            del self._pending_requests[game_frame_id]
+
+        if not qimage_result.isNull():
+            pixmap = QPixmap.fromImage(qimage_result)
+            if not pixmap.isNull():
+                self.icon_ready.emit(game_frame_id, pixmap, palette_hash)
 
     @Slot(int, str, QImage, int)
     def _on_result_ready(self, request_id: int, game_frame_id: str, qimage: QImage, palette_hash: int) -> None:
@@ -310,8 +368,14 @@ class AsyncIconQuantizer(QObject):
                 # which would crash with "QThread: Destroyed while thread is still running"
                 # Keep reference to prevent GC (leak is better than crash)
                 logger.warning("Icon quantizer thread did not stop in time, keeping reference to prevent crash")
-                # Note: self._thread is intentionally NOT set to None
-                # The thread reference is "leaked" to prevent GC from destroying it while running
+                AsyncIconQuantizer._orphaned_threads.add(self._thread)
+                try:
+                    self._thread.finished.connect(
+                        lambda t=self._thread: AsyncIconQuantizer._orphaned_threads.discard(t)
+                    )
+                except (RuntimeError, TypeError):
+                    pass
+                self._thread = None
 
         self._worker = None
         self._pending_requests.clear()

@@ -137,6 +137,16 @@ class WorkerManager:
             # shiboken6 not available or worker already invalid/deleted
             return True
 
+        # Avoid waiting on the current thread (causes Qt deadlock/segfault).
+        try:
+            if worker is QThread.currentThread():
+                logger.warning("cleanup_worker called from worker thread; skipping wait on itself")
+                worker.requestInterruption()
+                worker.quit()
+                return False
+        except Exception:
+            pass
+
         worker_name = worker.__class__.__name__
 
         if not worker.isRunning():

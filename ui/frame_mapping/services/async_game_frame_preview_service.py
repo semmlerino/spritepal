@@ -29,6 +29,7 @@ else:
 
 
 from core.repositories.capture_result_repository import CaptureResultRepository
+from ui.common import WorkerManager
 from ui.frame_mapping.services.async_service_base import AsyncServiceBase
 from utils.logging_config import get_logger
 
@@ -317,8 +318,8 @@ class AsyncGameFramePreviewService(AsyncServiceBase):
         self._worker.preview_ready.connect(self._on_preview_ready)
         self._worker.batch_finished.connect(self._on_batch_finished)
 
-        # Start processing
-        self._thread.start()
+        # Start processing via WorkerManager for lifecycle tracking
+        WorkerManager.start_worker(self._thread)
 
     @Slot(int, str, QImage)
     def _on_preview_ready(self, request_id: int, frame_id: str, qimage: QImage) -> None:

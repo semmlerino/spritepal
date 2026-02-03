@@ -12,6 +12,7 @@ from PIL import Image
 from PySide6.QtCore import QObject, QThread, Signal
 
 from core.color_quantization import ColorQuantizer, QuantizationResult
+from ui.common import WorkerManager
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -172,8 +173,8 @@ class AsyncQuantizationService(QObject):
         self._worker.error.connect(self._on_error)
         self._worker.finished.connect(self._on_worker_finished)
 
-        # Start
-        self._thread.start()
+        # Start via WorkerManager for lifecycle tracking
+        WorkerManager.start_worker(self._thread)
 
     def _on_result_ready(self, request_id: int, result: QuantizationResult) -> None:
         """Handle result from worker."""

@@ -6,6 +6,7 @@ Handles queue management and priority-based generation.
 from __future__ import annotations
 
 import mmap
+import os
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from typing import TYPE_CHECKING, Any, override
 
 from PIL import Image
 
+from ui.common import WorkerManager
 from ui.common.thumbnail_cache import ThumbnailCache
 
 if TYPE_CHECKING:
@@ -124,7 +126,8 @@ class BatchThumbnailWorker(QObject):
         self._rom_data_for_hal: bytes | memoryview | None = None
 
         # Multi-threading for parallel thumbnail generation
-        self._use_multithreading = True
+        # Disable in tests to avoid flaky threadpool crashes in CI/offscreen.
+        self._use_multithreading = not os.environ.get("SPRITEPAL_TESTING")
         self._thread_pool = None
         self._max_workers = 4  # Optimal for I/O + CPU bound tasks
 
@@ -193,7 +196,14 @@ class BatchThumbnailWorker(QObject):
     def _is_stop_requested(self) -> bool:
         """Check if stop was requested (thread-safe)."""
         with QMutexLocker(self._mutex):
-            return self._stop_requested
+            stop_requested = self._stop_requested
+        if stop_requested:
+            return True
+        try:
+            thread = self.thread()
+            return bool(thread and thread.isInterruptionRequested())
+        except RuntimeError:
+            return False
 
     def _is_pause_requested(self) -> bool:
         """Check if pause was requested (thread-safe)."""
@@ -837,6 +847,7 @@ class ThumbnailWorkerController(QObject):
         # Create worker and thread
         self.worker = BatchThumbnailWorker(rom_path, rom_extractor)
         self._thread = QThread()
+        self._thread.setObjectName("BatchThumbnailWorker")
 
         # Move worker to thread
         self.worker.moveToThread(self._thread)
@@ -852,8 +863,8 @@ class ThumbnailWorkerController(QObject):
         self.worker.progress.connect(self.progress.emit)
         self.worker.error.connect(self.error.emit)
 
-        # Start thread
-        self._thread.start()
+        # Start thread via WorkerManager for lifecycle tracking
+        WorkerManager.start_worker(self._thread)
 
     def _ensure_worker_running(self) -> bool:
         """Ensure worker is running, restarting if needed.
@@ -923,8 +934,13 @@ class ThumbnailWorkerController(QObject):
             return self.worker.invalidate_offset(offset, size)
         return False
 
-    def stop_worker(self) -> None:
-        """Safely stop worker and thread."""
+    def stop_worker(self) -> bool:
+        """Safely stop worker and thread.
+
+        Returns:
+            True if the thread is confirmed stopped (or never started), False otherwise.
+        """
+        stopped = True
         if self.worker:
             self.worker.stop()
         if self._thread:
@@ -941,10 +957,12 @@ class ThumbnailWorkerController(QObject):
                             "Thread did not stop within timeout. "
                             "Thread may be orphaned - check for blocking operations."
                         )
+                        stopped = False
             except RuntimeError:
                 # C++ object already deleted - this is expected when cleanup
                 # is called after the thread has finished and deleteLater executed
                 pass
+        return stopped
 
     def cleanup(self) -> None:
         """Clean up resources. Safe to call multiple times."""
@@ -952,8 +970,13 @@ class ThumbnailWorkerController(QObject):
             return
         self._cleanup_called = True
 
-        self.stop_worker()
-        if self.worker:
+        stopped = self.stop_worker()
+        if self.worker and stopped:
             self.worker.cleanup()
             self.worker = None
-        self._thread = None
+            self._thread = None
+        elif self.worker and not stopped:
+            logger.warning(
+                "Skipping BatchThumbnailWorker cleanup because thread is still running. "
+                "Leaving worker references intact to avoid unsafe resource teardown."
+            )

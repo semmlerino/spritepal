@@ -29,6 +29,7 @@ from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest, InjectionResult
 from core.services.injection_snapshot import InjectionSnapshot
+from ui.common import WorkerManager
 from ui.frame_mapping.services.async_service_base import AsyncServiceBase
 from utils.logging_config import get_logger
 
@@ -343,8 +344,8 @@ class AsyncInjectionService(AsyncServiceBase):
         self._worker.progress.connect(self._on_progress)
         self._worker.injection_finished.connect(self._on_injection_finished)
 
-        # Start processing
-        self._thread.start()
+        # Start processing via WorkerManager for lifecycle tracking
+        WorkerManager.start_worker(self._thread)
 
     @Slot(int, str, str)
     def _on_progress(self, request_id: int, ai_frame_id: str, message: str) -> None:

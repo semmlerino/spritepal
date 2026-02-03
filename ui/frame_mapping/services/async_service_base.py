@@ -51,6 +51,7 @@ class AsyncServiceBase(QObject):
         """Handle parent destruction. Override for service-specific cleanup."""
         self._destroyed = True
         self._cleanup_current_work()
+        self._cleanup_thread()
 
     def _cleanup_current_work(self) -> None:
         """Hook for subclass to cancel pending work. Called before thread cleanup.
@@ -97,8 +98,8 @@ class AsyncServiceBase(QObject):
         3. Retry quit + final wait (default 3000ms)
         4. If still running: orphan thread to prevent Qt corruption
         """
-        worker = self._worker
-        thread = self._thread
+        worker = getattr(self, "_worker", None)
+        thread = getattr(self, "_thread", None)
 
         if worker is not None:
             worker.blockSignals(True)
@@ -148,9 +149,10 @@ class AsyncServiceBase(QObject):
 
     def _do_cleanup(self, thread: QThread | None, worker: QObject | None) -> None:
         """Perform actual cleanup."""
-        if thread is not None and not self._destroyed:
+        destroyed = getattr(self, "_destroyed", False)
+        if thread is not None and not destroyed:
             thread.deleteLater()
-        if worker is not None and not self._destroyed:
+        if worker is not None and not destroyed:
             worker.deleteLater()
         self._thread = None
         self._worker = None

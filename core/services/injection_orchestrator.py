@@ -172,7 +172,11 @@ class InjectionOrchestrator:
         # 2. Load and prepare images
         try:
             composite_data = self._prepare_images(
-                ai_frame, game_frame, mapping, request, debug,
+                ai_frame,
+                game_frame,
+                mapping,
+                request,
+                debug,
                 sheet_palette=project.sheet_palette,
             )
             if isinstance(composite_data, InjectionResult):
@@ -559,6 +563,7 @@ class InjectionOrchestrator:
         # Apply background removal if configured in sheet palette
         if sheet_palette is not None and sheet_palette.background_color is not None:
             from core.services.content_bounds_analyzer import remove_background
+
             ai_img = remove_background(
                 ai_img,
                 sheet_palette.background_color,

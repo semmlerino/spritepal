@@ -22,7 +22,6 @@ Four-zone layout:
 from __future__ import annotations
 
 import warnings
-
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, override

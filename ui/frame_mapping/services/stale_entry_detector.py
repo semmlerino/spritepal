@@ -23,6 +23,7 @@ else:
 from core.mesen_integration.click_extractor import CaptureResult
 from core.repositories.capture_result_repository import CaptureResultRepository
 from core.services.stale_entry_logic import detect_stale_frame_ids
+from ui.common import WorkerManager
 from ui.frame_mapping.services.async_service_base import AsyncServiceBase
 from utils.logging_config import get_logger
 
@@ -189,8 +190,8 @@ class AsyncStaleEntryDetector(AsyncServiceBase):
         self._thread.started.connect(self._worker.run)
         self._worker.detection_complete.connect(self._on_detection_complete)
 
-        # Start detection
-        self._thread.start()
+        # Start detection via WorkerManager for lifecycle tracking
+        WorkerManager.start_worker(self._thread)
 
     @Slot(list, int)
     def _on_detection_complete(self, stale_ids: list[str], request_id: int) -> None:

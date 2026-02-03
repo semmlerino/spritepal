@@ -257,6 +257,12 @@ class AsyncPreviewService(QObject):
         if parent is not None:
             parent.destroyed.connect(self._on_parent_destroyed)
 
+    def __del__(self) -> None:  # pragma: no cover - best-effort Qt cleanup
+        try:
+            self.shutdown()
+        except Exception:
+            pass
+
     def _on_parent_destroyed(self) -> None:
         """Handle parent destruction."""
         self._destroyed = True

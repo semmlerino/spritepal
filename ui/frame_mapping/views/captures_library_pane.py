@@ -191,6 +191,7 @@ class CapturesLibraryPane(QWidget):
 
         # Enhanced styling for selection visibility (matching AIFramesPane)
         from ui.styles.theme import COLORS
+
         self._list.setStyleSheet(f"""
             QListWidget {{
                 background-color: {COLORS["darker_gray"]};

@@ -206,6 +206,7 @@ class MappingPanel(QWidget):
         self._icon_quantizer.icon_ready.connect(self._on_quantized_icon_ready)
         # Visibility-based thumbnail loading state
         self._last_visible_range: tuple[int, int] = (-1, -1)
+        self._shutdown = False
         self._visible_thumbnail_timer = QTimer(self)
         self._visible_thumbnail_timer.timeout.connect(self._load_visible_thumbnails)
         self._visible_thumbnail_timer.setInterval(100)  # 100ms debounce
@@ -280,6 +281,7 @@ class MappingPanel(QWidget):
 
         # Enhanced styling for selection visibility
         from ui.styles.theme import COLORS
+
         self._table.setStyleSheet(f"""
             QTableWidget {{
                 background-color: {COLORS["darker_gray"]};
@@ -404,9 +406,26 @@ class MappingPanel(QWidget):
     @override
     def closeEvent(self, event: QCloseEvent) -> None:
         """Handle close event - cancel async operations."""
-        self._thumbnail_loader.cancel()
-        self._icon_quantizer.shutdown()
+        self.shutdown_async_services()
         super().closeEvent(event)
+
+    @override
+    def deleteLater(self) -> None:
+        self.shutdown_async_services()
+        super().deleteLater()
+
+    def shutdown_async_services(self) -> None:
+        """Stop background workers to avoid QThread leaks."""
+        self._shutdown = True
+        self._visible_thumbnail_timer.stop()
+        self._thumbnail_loader.shutdown()
+        self._icon_quantizer.shutdown()
+
+    @override
+    def event(self, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.Destroy:
+            self.shutdown_async_services()
+        return super().event(event)
 
     def reset_batch_selection(self) -> None:
         """Reset batch selection to default behavior.
@@ -452,6 +471,10 @@ class MappingPanel(QWidget):
             preview: The preview QPixmap (will be quantized and scaled)
         """
         if self._project is None:
+            return
+        from core.app_context import get_app_context_optional
+
+        if get_app_context_optional() is None:
             return
 
         # Get cached or generate quantized+scaled icon
@@ -547,6 +570,8 @@ class MappingPanel(QWidget):
         This implements visibility-based lazy loading following the pattern
         from SpriteGalleryWidget._update_visible_thumbnails().
         """
+        if self._shutdown:
+            return
         if self._project is None:
             return
 
@@ -685,10 +710,14 @@ class MappingPanel(QWidget):
         More efficient than refresh() when the canvas state changed -
         keeps table structure, just re-loads quantized AI frame icons.
         """
+        from core.app_context import get_app_context_optional
+
+        if get_app_context_optional() is None:
+            return
         # Reset visible range to force reload
         self._last_visible_range = (-1, -1)
         # Trigger visibility-based thumbnail loading
-        QTimer.singleShot(0, self._load_visible_thumbnails)
+        self._visible_thumbnail_timer.start(0)
 
     def refresh(self) -> None:
         """Refresh the mapping table from the current project."""
@@ -806,8 +835,11 @@ class MappingPanel(QWidget):
             self._status_label.setText(f"{mapped}/{total} mapped")
 
             # Trigger visibility-based thumbnail loading after table is fully built
-            # Use QTimer.singleShot to allow Qt to layout the table first
-            QTimer.singleShot(0, self._load_visible_thumbnails)
+            # Use debounce timer to allow Qt to layout the table first
+            from core.app_context import get_app_context_optional
+
+            if get_app_context_optional() is not None:
+                self._visible_thumbnail_timer.start(0)
 
         # Force visual update after rebuild
         self._table.viewport().update()
