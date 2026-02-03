@@ -176,6 +176,7 @@ class SheetPaletteWidget(QWidget):
         self._highlighted_index: int | None = None
         self._selected_index: int | None = None
         self._capture_palette_indices: set[int] | None = None
+        self._current_frame_palette_index: int | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -407,17 +408,41 @@ class SheetPaletteWidget(QWidget):
         self._capture_palette_indices = palette_indices
         self._update_status_label()
 
+    def set_current_frame_palette_index(self, index: int | None) -> None:
+        """Set the palette index used by the currently selected frame.
+
+        Args:
+            index: Palette index (0-7) for the current frame, or None to clear
+        """
+        self._current_frame_palette_index = index
+        self._update_status_label()
+
     def _update_status_label(self) -> None:
         """Update status label based on current state."""
         if self._sheet_palette is not None:
-            # Sheet palette defined - show mapping count
+            # Sheet palette defined - build status parts
+            parts: list[str] = []
+
+            # Mapping count
             mapping_count = len(self._sheet_palette.color_mappings)
             if mapping_count > 0:
-                self._status_label.setText(f"Palette defined ({mapping_count} color mappings)")
+                parts.append(f"Palette ({mapping_count} mappings)")
             else:
-                self._status_label.setText("Palette defined (no explicit mappings)")
+                parts.append("Palette defined")
+
+            # Background removal indicator
+            bg = self._sheet_palette.background_color
+            if bg is not None and len(bg) == 3:
+                r, g, b = bg
+                tol = self._sheet_palette.background_tolerance
+                parts.append(f"BG: RGB({r},{g},{b}) ±{tol}")
+
+            self._status_label.setText(" • ".join(parts))
+        elif self._current_frame_palette_index is not None:
+            # No sheet palette but have current frame - show its specific palette index
+            self._status_label.setText(f"Current frame uses palette {self._current_frame_palette_index}")
         elif self._capture_palette_indices:
-            # No sheet palette - show capture palette info
+            # No sheet palette, no current frame - show all capture palette indices
             indices_str = ", ".join(str(i) for i in sorted(self._capture_palette_indices))
             if len(self._capture_palette_indices) > 1:
                 self._status_label.setText(f"No sheet palette - using capture palettes {indices_str} ⚠")

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import override
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QPixmap
+from PIL import Image
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QColorDialog,
@@ -22,8 +24,9 @@ from PySide6.QtWidgets import (
 )
 
 from core.frame_mapping_project import SheetPalette
-from core.palette_utils import find_nearest_palette_index, quantize_colors_to_palette
+from core.palette_utils import find_nearest_palette_index, quantize_colors_to_palette, quantize_with_mappings
 from ui.components.base.dialog_base import DialogBase
+from ui.frame_mapping.services.palette_service import GamePaletteInfo
 from utils.color_distance import detect_rare_important_colors, perceptual_distance
 from utils.logging_config import get_logger
 
@@ -262,20 +265,31 @@ class SheetPaletteMappingDialog(DialogBase):
         self,
         sheet_colors: dict[tuple[int, int, int], int],  # RGB -> pixel count
         current_palette: SheetPalette | None,
-        game_palettes: dict[str, list[tuple[int, int, int]]],  # game_frame_id -> palette
+        game_palettes: dict[str, GamePaletteInfo],  # game_frame_id -> palette info
         parent: QWidget | None = None,
+        *,
+        sample_ai_frame_path: Path | None = None,
     ) -> None:
         """Initialize the dialog.
 
         Args:
             sheet_colors: Dict of unique RGB colors from AI sheet to pixel counts
             current_palette: Current SheetPalette or None
-            game_palettes: Available game palettes to copy from (id -> colors)
+            game_palettes: Available game palettes to copy from (id -> GamePaletteInfo)
             parent: Parent widget
+            sample_ai_frame_path: Optional path to an AI frame image for live preview
         """
         # Store before super().__init__ (DialogBase pattern)
         self._sheet_colors = sheet_colors
         self._game_palettes = game_palettes
+
+        # Load sample image for preview (if provided)
+        self._sample_image: Image.Image | None = None
+        if sample_ai_frame_path is not None and sample_ai_frame_path.exists():
+            try:
+                self._sample_image = Image.open(sample_ai_frame_path).convert("RGBA")
+            except Exception:
+                logger.debug("Could not load sample image for preview: %s", sample_ai_frame_path)
 
         # Initialize palette (copy current or create default)
         if current_palette is not None:
@@ -319,9 +333,19 @@ class SheetPaletteMappingDialog(DialogBase):
         super().__init__(
             parent,
             title="Edit Sheet Palette",
-            min_size=(650, 550),
+            min_size=(700, 600) if self._sample_image else (650, 550),
             with_button_box=True,
         )
+
+        # Debounced preview update timer
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.setInterval(100)
+        self._preview_timer.timeout.connect(self._update_preview)
+
+        # Initial preview
+        if self._sample_image:
+            self._update_preview()
 
         # Customize button box
         if self.button_box:
@@ -427,9 +451,12 @@ class SheetPaletteMappingDialog(DialogBase):
             actions_layout.addWidget(copy_label)
 
             self._game_palette_combo = QComboBox()
-            self._game_palette_combo.setMinimumWidth(120)
+            self._game_palette_combo.setMinimumWidth(160)
             for frame_id in sorted(self._game_palettes.keys()):
-                self._game_palette_combo.addItem(frame_id)
+                info = self._game_palettes[frame_id]
+                # Show display name (falls back to ID if no display name set)
+                display_text = info.display_name
+                self._game_palette_combo.addItem(display_text, frame_id)  # Store ID as item data
             actions_layout.addWidget(self._game_palette_combo)
 
             copy_btn = QPushButton("Copy")
@@ -486,6 +513,51 @@ class SheetPaletteMappingDialog(DialogBase):
 
         bg_layout.addStretch()
         content_layout.addWidget(bg_group)
+
+        # Live preview section (only if sample image provided)
+        if self._sample_image is not None:
+            preview_group = QGroupBox("Live Preview")
+            preview_layout = QHBoxLayout(preview_group)
+            preview_layout.setSpacing(16)
+
+            # Original preview
+            original_frame = QVBoxLayout()
+            original_label = QLabel("Original")
+            original_label.setStyleSheet("font-size: 10px; color: #666;")
+            original_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            original_frame.addWidget(original_label)
+
+            self._original_preview_label = QLabel()
+            self._original_preview_label.setFixedSize(128, 128)
+            self._original_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._original_preview_label.setStyleSheet("background-color: #ccc; border: 1px solid #888;")
+            # Set original image
+            self._set_original_preview()
+            original_frame.addWidget(self._original_preview_label)
+            preview_layout.addLayout(original_frame)
+
+            # Arrow
+            arrow_label = QLabel("→")
+            arrow_label.setStyleSheet("font-size: 24px; font-weight: bold;")
+            arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            preview_layout.addWidget(arrow_label)
+
+            # Quantized preview
+            quantized_frame = QVBoxLayout()
+            quantized_label = QLabel("Quantized")
+            quantized_label.setStyleSheet("font-size: 10px; color: #666;")
+            quantized_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            quantized_frame.addWidget(quantized_label)
+
+            self._quantized_preview_label = QLabel()
+            self._quantized_preview_label.setFixedSize(128, 128)
+            self._quantized_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._quantized_preview_label.setStyleSheet("background-color: #ccc; border: 1px solid #888;")
+            quantized_frame.addWidget(self._quantized_preview_label)
+            preview_layout.addLayout(quantized_frame)
+
+            preview_layout.addStretch()
+            content_layout.addWidget(preview_group)
 
         # Color mappings section
         mappings_header_layout = QHBoxLayout()
@@ -632,19 +704,23 @@ class SheetPaletteMappingDialog(DialogBase):
         else:
             logger.info("Auto-mapped %d colors to nearest palette colors (perceptual LAB)", len(self._sheet_colors))
 
+        # Update preview
+        self._request_preview_update()
+
     def _on_copy_game_palette(self) -> None:
         """Copy palette from selected game frame."""
         if not hasattr(self, "_game_palette_combo"):
             return
 
-        frame_id = self._game_palette_combo.currentText()
-        if frame_id not in self._game_palettes:
+        # Use item data (frame ID) instead of display text
+        frame_id = self._game_palette_combo.currentData()
+        if frame_id is None or frame_id not in self._game_palettes:
             return
 
-        game_palette = self._game_palettes[frame_id]
+        palette_info = self._game_palettes[frame_id]
 
         # Copy colors (ensure 16 colors)
-        self._palette_colors = list(game_palette[:16])
+        self._palette_colors = list(palette_info.colors[:16])
         while len(self._palette_colors) < 16:
             self._palette_colors.append((0, 0, 0))
 
@@ -655,24 +731,21 @@ class SheetPaletteMappingDialog(DialogBase):
         # Re-map to new palette
         self._on_auto_map()
 
-        logger.info("Copied palette from game frame %s", frame_id)
+        logger.info("Copied palette from game frame %s (%s)", frame_id, palette_info.display_name)
 
     def _on_mapping_changed(self, rgb_color: tuple[int, int, int], palette_index: int) -> None:
         """Handle mapping change from a row."""
         self._color_mappings[rgb_color] = palette_index
+        self._request_preview_update()
 
     def _update_bg_swatch(self) -> None:
         """Update the background color swatch display."""
         if self._background_color is not None:
             r, g, b = self._background_color
-            self._bg_swatch.setStyleSheet(
-                f"background-color: rgb({r}, {g}, {b}); border: 1px solid #888;"
-            )
+            self._bg_swatch.setStyleSheet(f"background-color: rgb({r}, {g}, {b}); border: 1px solid #888;")
         else:
             # Checkerboard pattern for "no color"
-            self._bg_swatch.setStyleSheet(
-                "background-color: #ccc; border: 1px solid #888;"
-            )
+            self._bg_swatch.setStyleSheet("background-color: #ccc; border: 1px solid #888;")
 
     def _on_pick_background(self) -> None:
         """Open color picker for background color."""
@@ -681,6 +754,7 @@ class SheetPaletteMappingDialog(DialogBase):
         if color.isValid():
             self._background_color = (color.red(), color.green(), color.blue())
             self._update_bg_swatch()
+            self._request_preview_update()
             logger.info("Background color set to RGB(%d, %d, %d)", *self._background_color)
 
     def _on_auto_detect_background(self) -> None:
@@ -692,7 +766,8 @@ class SheetPaletteMappingDialog(DialogBase):
 
         # Find the lightest colors that are likely backgrounds
         light_colors = [
-            (rgb, count) for rgb, count in self._sheet_colors.items()
+            (rgb, count)
+            for rgb, count in self._sheet_colors.items()
             if sum(rgb) > 600  # Light colors (R+G+B > 600)
         ]
 
@@ -711,9 +786,77 @@ class SheetPaletteMappingDialog(DialogBase):
     def _on_tolerance_changed(self, value: int) -> None:
         """Handle tolerance spinbox change."""
         self._background_tolerance = value
+        self._request_preview_update()
 
     def _on_clear_background(self) -> None:
         """Clear background color (disable removal)."""
         self._background_color = None
         self._update_bg_swatch()
+        self._request_preview_update()
         logger.info("Background removal disabled")
+
+    # ===== Live Preview Methods =====
+
+    def _request_preview_update(self) -> None:
+        """Request a debounced preview update."""
+        if self._sample_image is not None:
+            self._preview_timer.start()
+
+    def _set_original_preview(self) -> None:
+        """Set the original preview image."""
+        if self._sample_image is None:
+            return
+
+        # Scale to fit 128x128 while maintaining aspect ratio
+        img = self._sample_image.copy()
+        img.thumbnail((128, 128), Image.Resampling.NEAREST)
+
+        # Convert to QPixmap
+        qimage = QImage(
+            img.tobytes("raw", "RGBA"),
+            img.width,
+            img.height,
+            img.width * 4,
+            QImage.Format.Format_RGBA8888,
+        )
+        self._original_preview_label.setPixmap(QPixmap.fromImage(qimage))
+
+    def _update_preview(self) -> None:
+        """Update the quantized preview image."""
+        if self._sample_image is None:
+            return
+
+        if not hasattr(self, "_quantized_preview_label"):
+            return
+
+        # Quantize with current mappings
+        quantized_indexed = quantize_with_mappings(
+            self._sample_image,
+            self._palette_colors,
+            self._color_mappings,
+        )
+
+        # Convert indexed image back to RGBA for display
+        quantized_rgba = quantized_indexed.convert("RGBA")
+
+        # Apply background removal (make background transparent) for preview
+        if self._background_color is not None:
+            # Get the palette index that background should map to (usually 0)
+            bg_idx = self._color_mappings.get(self._background_color, 0)
+            if bg_idx == 0:
+                # Set pixels with index 0 to transparent in the RGBA version
+                # This is already handled by quantize_with_mappings for transparent pixels
+                pass
+
+        # Scale to fit 128x128
+        quantized_rgba.thumbnail((128, 128), Image.Resampling.NEAREST)
+
+        # Convert to QPixmap
+        qimage = QImage(
+            quantized_rgba.tobytes("raw", "RGBA"),
+            quantized_rgba.width,
+            quantized_rgba.height,
+            quantized_rgba.width * 4,
+            QImage.Format.Format_RGBA8888,
+        )
+        self._quantized_preview_label.setPixmap(QPixmap.fromImage(qimage))

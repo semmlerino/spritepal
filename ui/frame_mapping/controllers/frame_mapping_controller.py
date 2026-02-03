@@ -42,7 +42,7 @@ from ui.frame_mapping.services.async_injection_service import AsyncInjectionServ
 from ui.frame_mapping.services.capture_import_service import CaptureImportService
 from ui.frame_mapping.services.mapping_service import MappingService
 from ui.frame_mapping.services.organization_service import OrganizationService
-from ui.frame_mapping.services.palette_service import PaletteService
+from ui.frame_mapping.services.palette_service import GamePaletteInfo, PaletteService
 from ui.frame_mapping.services.preview_service import PreviewService
 from ui.frame_mapping.services.stale_entry_detector import AsyncStaleEntryDetector
 from ui.frame_mapping.undo import (
@@ -1418,11 +1418,11 @@ class FrameMappingController(QObject):
         """
         return self._palette.copy_game_palette_to_sheet(game_frame_id)
 
-    def get_game_palettes(self) -> dict[str, list[tuple[int, int, int]]]:
-        """Get palettes from all game frames.
+    def get_game_palettes(self) -> dict[str, GamePaletteInfo]:
+        """Get palettes from all game frames with display info.
 
         Returns:
-            Dict mapping game frame IDs to their RGB palettes.
+            Dict mapping game frame IDs to GamePaletteInfo (colors + display name).
         """
         return self._palette.get_game_palettes()
 

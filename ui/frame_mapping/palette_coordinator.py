@@ -120,12 +120,16 @@ class PaletteCoordinator:
         current_palette = self._controller.get_sheet_palette()
         game_palettes = self._controller.get_game_palettes()
 
+        # Find a sample AI frame for preview
+        sample_ai_frame_path = self._get_sample_ai_frame_path()
+
         # Open dialog
         dialog = SheetPaletteMappingDialog(
             sheet_colors=sheet_colors,
             current_palette=current_palette,
             game_palettes=game_palettes,
             parent=self._parent_widget,
+            sample_ai_frame_path=sample_ai_frame_path,
         )
 
         if dialog.exec():
@@ -159,12 +163,16 @@ class PaletteCoordinator:
         # Get game palettes for dialog
         game_palettes = self._controller.get_game_palettes()
 
+        # Find a sample AI frame for preview
+        sample_ai_frame_path = self._get_sample_ai_frame_path()
+
         # Open dialog with pre-populated palette (same as handle_palette_edit_requested)
         dialog = SheetPaletteMappingDialog(
             sheet_colors=sheet_colors,
             current_palette=extracted_palette,  # Pre-populate with extracted
             game_palettes=game_palettes,
             parent=self._parent_widget,
+            sample_ai_frame_path=sample_ai_frame_path,
         )
 
         if dialog.exec():
@@ -437,6 +445,29 @@ class PaletteCoordinator:
         """
         if self._controller:
             self._controller.set_sheet_palette_color(index, color)
+
+    # -------------------------------------------------------------------------
+    # Helper Methods
+    # -------------------------------------------------------------------------
+
+    def _get_sample_ai_frame_path(self) -> Path | None:
+        """Get path to a sample AI frame for preview.
+
+        Returns the first AI frame that has a valid image path,
+        or None if no AI frames are loaded.
+        """
+        if self._controller is None:
+            return None
+
+        project = self._controller.project
+        if project is None:
+            return None
+
+        for ai_frame in project.ai_frames:
+            if ai_frame.path.exists():
+                return ai_frame.path
+
+        return None
 
     # -------------------------------------------------------------------------
     # Public Access for Workspace

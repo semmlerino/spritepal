@@ -6,12 +6,21 @@ palettes and game frame capture palettes.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from json import JSONDecodeError
 
 from PIL import Image
 from PySide6.QtCore import QObject, Signal
 
 from core.frame_mapping_project import FrameMappingProject, SheetPalette
+
+
+@dataclass
+class GamePaletteInfo:
+    """Information about a game frame's palette for display in dialogs."""
+
+    colors: list[tuple[int, int, int]]
+    display_name: str  # GameFrame.name property (display_name or ID fallback)
 from core.palette_utils import (
     extract_unique_colors,
     find_nearest_palette_index,
@@ -275,19 +284,19 @@ class PaletteService(QObject):
     def get_game_palettes(
         self,
         project: FrameMappingProject | None,
-    ) -> dict[str, list[tuple[int, int, int]]]:
-        """Get palettes from all game frames.
+    ) -> dict[str, GamePaletteInfo]:
+        """Get palettes from all game frames with display info.
 
         Args:
             project: The frame mapping project to query
 
         Returns:
-            Dict mapping game frame IDs to their RGB palettes
+            Dict mapping game frame IDs to GamePaletteInfo (colors + display name)
         """
         if project is None:
             return {}
 
-        result: dict[str, list[tuple[int, int, int]]] = {}
+        result: dict[str, GamePaletteInfo] = {}
 
         for game_frame in project.game_frames:
             if game_frame.capture_path is None or not game_frame.capture_path.exists():
@@ -315,7 +324,10 @@ class PaletteService(QObject):
                 snes_palette = capture_result.palettes.get(palette_index, [])
 
                 if snes_palette:
-                    result[game_frame.id] = snes_palette_to_rgb(snes_palette)
+                    result[game_frame.id] = GamePaletteInfo(
+                        colors=snes_palette_to_rgb(snes_palette),
+                        display_name=game_frame.name,  # Uses display_name or ID fallback
+                    )
             except (OSError, JSONDecodeError, KeyError, ValueError) as e:
                 logger.debug("Could not load palette for %s: %s", game_frame.id, e)
 

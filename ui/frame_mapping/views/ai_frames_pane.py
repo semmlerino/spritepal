@@ -777,6 +777,14 @@ class AIFramesPane(QWidget):
         """
         self._palette_widget.set_capture_palette_info(palette_indices)
 
+    def set_current_frame_palette_index(self, index: int | None) -> None:
+        """Set the palette index used by the currently selected frame.
+
+        Args:
+            index: Palette index (0-7) for the current frame, or None to clear
+        """
+        self._palette_widget.set_current_frame_palette_index(index)
+
     @signal_error_boundary()
     def _on_search_changed(self, text: str) -> None:
         """Handle search text change."""

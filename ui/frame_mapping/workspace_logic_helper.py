@@ -566,6 +566,12 @@ class WorkspaceLogicHelper:
             else:
                 self._ai_frames_pane.set_capture_palette_info(None)
 
+            # Show which palette this specific frame uses
+            if game_frame is not None:
+                self._ai_frames_pane.set_current_frame_palette_index(game_frame.palette_index)
+            else:
+                self._ai_frames_pane.set_current_frame_palette_index(None)
+
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
             self._alignment_canvas.set_alignment(
                 mapping.offset_x,
@@ -585,6 +591,7 @@ class WorkspaceLogicHelper:
             self._alignment_canvas.clear_alignment()
             self._captures_pane.clear_selection()
             self._ai_frames_pane.set_capture_palette_info(None)
+            self._ai_frames_pane.set_current_frame_palette_index(None)
             self._state.selected_game_id = None
             self._state.current_canvas_game_id = None
 

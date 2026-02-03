@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
-from ui.frame_mapping.services.palette_service import PaletteService
+from ui.frame_mapping.services.palette_service import GamePaletteInfo, PaletteService
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
@@ -113,10 +113,10 @@ class PaletteFacade:
         """
         return self._palette_service.copy_game_palette_to_sheet(self._context.project, game_frame_id)
 
-    def get_game_palettes(self) -> dict[str, list[tuple[int, int, int]]]:
-        """Get palettes from all game frames.
+    def get_game_palettes(self) -> dict[str, GamePaletteInfo]:
+        """Get palettes from all game frames with display info.
 
         Returns:
-            Dict mapping game frame IDs to their RGB palettes.
+            Dict mapping game frame IDs to GamePaletteInfo (colors + display name).
         """
         return self._palette_service.get_game_palettes(self._context.project)

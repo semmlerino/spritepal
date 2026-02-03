@@ -313,8 +313,9 @@ class TestGetGamePalettes:
         assert len(result) == 2
         assert "frame1" in result
         assert "frame2" in result
-        assert result["frame1"] == [(248, 0, 0)]
-        assert result["frame2"] == [(0, 248, 0)]
+        # Returns GamePaletteInfo with colors and display_name
+        assert result["frame1"].colors == [(248, 0, 0)]
+        assert result["frame2"].colors == [(0, 248, 0)]
 
     def test_skips_frames_without_captures(self, palette_service, mock_project):
         """Should skip game frames without capture paths."""
