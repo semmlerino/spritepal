@@ -31,6 +31,7 @@ from PIL import Image
 from PySide6.QtCore import QObject, QPointF, QRect, QRectF, Qt, QThread, QTimer, Signal, Slot
 from PySide6.QtGui import (
     QBrush,
+    QCloseEvent,
     QColor,
     QContextMenuEvent,
     QImage,
@@ -535,8 +536,38 @@ class WorkbenchCanvas(QWidget):
         self._async_highlight_service.highlight_ready.connect(self._on_async_highlight_ready)
         self._async_highlight_service.highlight_failed.connect(self._on_async_highlight_failed)
 
+        self._async_services_shutdown = False
+
         self._setup_ui()
         self._connect_signals()
+
+    def _shutdown_async_services(self) -> None:
+        """Shut down background services to avoid QThread leaks."""
+        if self._async_services_shutdown:
+            return
+        self._async_services_shutdown = True
+
+        if self._alignment_worker is not None and self._alignment_worker.isRunning():
+            self._alignment_worker.requestInterruption()
+            self._alignment_worker.quit()
+            self._alignment_worker.wait(1000)
+
+        self._async_preview_service.shutdown()
+        self._async_highlight_service.shutdown()
+
+    def shutdown_async_services(self) -> None:
+        """Public wrapper for async service shutdown."""
+        self._shutdown_async_services()
+
+    @override
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._shutdown_async_services()
+        super().closeEvent(event)
+
+    @override
+    def deleteLater(self) -> None:
+        self._shutdown_async_services()
+        super().deleteLater()
 
     def _setup_ui(self) -> None:
         """Set up the UI layout."""
