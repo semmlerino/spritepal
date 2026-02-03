@@ -212,6 +212,8 @@ class SheetPaletteWidget(QWidget):
         # Create 16 swatches (initially all black/empty)
         for i in range(16):
             swatch = PaletteSwatchWidget((0, 0, 0), i)
+            if i == 0:
+                swatch.setToolTip("[0] Transparent - cannot be edited")
             # Wire swatch signals
             swatch.clicked.connect(self._on_swatch_clicked)
             swatch.double_clicked.connect(self._on_swatch_double_clicked)
@@ -232,7 +234,7 @@ class SheetPaletteWidget(QWidget):
         buttons_layout.setContentsMargins(0, 0, 0, 0)
         buttons_layout.setSpacing(4)
 
-        self._extract_button = QPushButton("Extract from Sheet")
+        self._extract_button = QPushButton("Extract from Sheet...")
         self._extract_button.setToolTip("Generate 16-color palette from all AI frames")
         self._extract_button.setStyleSheet("font-size: 10px;")
         self._extract_button.clicked.connect(self.extract_requested.emit)
@@ -261,6 +263,9 @@ class SheetPaletteWidget(QWidget):
 
     def _on_swatch_double_clicked(self, index: int) -> None:
         """Handle swatch double-click - open color editor."""
+        if index == 0:
+            # Index 0 is always transparent - don't allow editing
+            return
         self.color_edit_requested.emit(index)
         self._open_color_editor(index)
 
@@ -283,6 +288,8 @@ class SheetPaletteWidget(QWidget):
 
     def _open_color_editor(self, index: int) -> None:
         """Open QColorDialog to edit a color at the given index."""
+        if index == 0:
+            return  # Index 0 is transparent, not editable
         if self._sheet_palette is None:
             return
 
