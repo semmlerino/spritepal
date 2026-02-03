@@ -105,7 +105,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._load_image()
 
         # Window settings
-        self.setWindowTitle(f"Palette Editor - {ai_frame.display_name or Path(ai_frame.path).name}")
+        self.setWindowTitle(f"Palette Index Editor - {ai_frame.display_name or Path(ai_frame.path).name}")
         self.resize(900, 700)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
@@ -155,6 +155,19 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._duplicate_warning_label.setWordWrap(True)
         self._duplicate_warning_label.setVisible(False)
         center_layout.addWidget(self._duplicate_warning_label)
+
+        # Global palette editing warning banner (always visible)
+        self._global_edit_warning_label = QLabel(
+            "⚠ Color changes affect ALL frames. Right-click color swatches to edit "
+            "the global sheet palette. This window edits palette indices (which "
+            "pixels use which colors), not the colors themselves."
+        )
+        self._global_edit_warning_label.setStyleSheet(
+            "background-color: #FFCDD2; color: #B71C1C; padding: 6px 8px; "
+            "border-radius: 4px; font-size: 11px;"
+        )
+        self._global_edit_warning_label.setWordWrap(True)
+        center_layout.addWidget(self._global_edit_warning_label)
 
         # Add canvas to center layout
         center_layout.addWidget(self._canvas, 1)
@@ -624,7 +637,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
     def _on_dirty_changed(self, is_dirty: bool) -> None:
         """Handle dirty state change."""
         self._dirty_label.setText("*" if is_dirty else "")
-        title = f"Palette Editor - {self._ai_frame.display_name or Path(self._ai_frame.path).name}"
+        title = f"Palette Index Editor - {self._ai_frame.display_name or Path(self._ai_frame.path).name}"
         if is_dirty:
             title += " *"
         self.setWindowTitle(title)
