@@ -235,37 +235,6 @@ class TestApplyTransformsToAllMappings:
 class TestFrameTagManagement:
     """Tests for frame tag management methods (P0-4)."""
 
-    def test_add_frame_tag_adds_tag(self, qtbot) -> None:
-        """add_frame_tag adds a tag to the AI frame."""
-        controller = FrameMappingController()
-        project = FrameMappingProject(name="test")
-        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0)]
-        project._rebuild_indices()
-        controller._project = project
-
-        result = controller.add_frame_tag("frame_001.png", "keep")
-
-        assert result is True
-        frame = project.get_ai_frame_by_id("frame_001.png")
-        assert frame is not None
-        assert "keep" in frame.tags
-
-    def test_remove_frame_tag_removes_tag(self, qtbot) -> None:
-        """remove_frame_tag removes a tag from the AI frame."""
-        controller = FrameMappingController()
-        project = FrameMappingProject(name="test")
-        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"keep", "wip"}))]
-        project._rebuild_indices()
-        controller._project = project
-
-        result = controller.remove_frame_tag("frame_001.png", "keep")
-
-        assert result is True
-        frame = project.get_ai_frame_by_id("frame_001.png")
-        assert frame is not None
-        assert "keep" not in frame.tags
-        assert "wip" in frame.tags
-
     def test_toggle_frame_tag_toggles_tag(self, qtbot) -> None:
         """toggle_frame_tag toggles tag on/off."""
         controller = FrameMappingController()
@@ -285,39 +254,6 @@ class TestFrameTagManagement:
         frame = project.get_ai_frame_by_id("frame_001.png")
         assert frame is not None
         assert "keep" not in frame.tags
-
-    def test_get_frames_with_tag_returns_matching_frames(self, qtbot) -> None:
-        """get_frames_with_tag returns all frames with the tag."""
-        controller = FrameMappingController()
-        project = FrameMappingProject(name="test")
-        project.ai_frames = [
-            AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"keep"})),
-            AIFrame(path=Path("frame_002.png"), index=1, tags=frozenset({"discard"})),
-            AIFrame(path=Path("frame_003.png"), index=2, tags=frozenset({"keep", "final"})),
-        ]
-        project._rebuild_indices()
-        controller._project = project
-
-        keep_frames = controller.get_frames_with_tag("keep")
-
-        assert len(keep_frames) == 2
-        ids = {f.id for f in keep_frames}
-        assert ids == {"frame_001.png", "frame_003.png"}
-
-    def test_set_frame_tags_replaces_all_tags(self, qtbot) -> None:
-        """set_frame_tags replaces all existing tags."""
-        controller = FrameMappingController()
-        project = FrameMappingProject(name="test")
-        project.ai_frames = [AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"keep", "wip"}))]
-        project._rebuild_indices()
-        controller._project = project
-
-        result = controller.set_frame_tags("frame_001.png", frozenset({"final", "review"}))
-
-        assert result is True
-        frame = project.get_ai_frame_by_id("frame_001.png")
-        assert frame is not None
-        assert frame.tags == frozenset({"final", "review"})
 
     def test_get_available_tags_returns_valid_tags(self, qtbot) -> None:
         """get_available_tags returns the set of valid tag names."""
@@ -406,30 +342,6 @@ class TestCaptureOrganization:
         assert frame is not None
         assert frame.display_name is None
 
-    def test_get_capture_display_name_returns_name(self, qtbot) -> None:
-        """get_capture_display_name returns the display name."""
-        controller = FrameMappingController()
-        project = FrameMappingProject(name="test")
-        project.game_frames = [GameFrame(id="G001", display_name="My Capture")]
-        project._rebuild_indices()
-        controller._project = project
-
-        name = controller.get_capture_display_name("G001")
-
-        assert name == "My Capture"
-
-    def test_get_capture_display_name_returns_none_when_not_set(self, qtbot) -> None:
-        """get_capture_display_name returns None when not set."""
-        controller = FrameMappingController()
-        project = FrameMappingProject(name="test")
-        project.game_frames = [GameFrame(id="G001")]
-        project._rebuild_indices()
-        controller._project = project
-
-        name = controller.get_capture_display_name("G001")
-
-        assert name is None
-
 
 class TestControllerNullProjectHandling:
     """Tests for controller methods with null project (P0-4)."""
@@ -438,11 +350,7 @@ class TestControllerNullProjectHandling:
         """Tag methods return False when no project is loaded."""
         controller = FrameMappingController()
 
-        assert controller.add_frame_tag("frame.png", "keep") is False
-        assert controller.remove_frame_tag("frame.png", "keep") is False
         assert controller.toggle_frame_tag("frame.png", "keep") is False
-        assert controller.set_frame_tags("frame.png", frozenset({"keep"})) is False
-        assert controller.get_frames_with_tag("keep") == []
 
     def test_compression_update_emits_error_without_project(self, qtbot) -> None:
         """update_game_frame_compression emits error without project."""

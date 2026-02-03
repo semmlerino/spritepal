@@ -303,20 +303,6 @@ class AIFramesFacade:
             self._signals.emit_save_requested()
         return result
 
-    def get_display_name(self, frame_id: str) -> str | None:
-        """Get display name for an AI frame.
-
-        Args:
-            frame_id: ID of the AI frame (filename).
-
-        Returns:
-            Display name if set, None otherwise.
-        """
-        project = self._context.project
-        if project is None:
-            return None
-        return self._organization_service.get_frame_display_name(project=project, frame_id=frame_id)
-
     # ─── Frame Tagging ────────────────────────────────────────────────────────
 
     def toggle_tag(self, frame_id: str, tag: str) -> bool:
@@ -342,51 +328,6 @@ class AIFramesFacade:
             self._signals.emit_save_requested()
         return result
 
-    def add_tag(self, frame_id: str, tag: str) -> bool:
-        """Add a tag to an AI frame.
-
-        Args:
-            frame_id: ID of the AI frame (filename).
-            tag: Tag to add (must be in FRAME_TAGS).
-
-        Returns:
-            True if frame was found and tag added.
-        """
-        project = self._context.project
-        if project is None:
-            return False
-        return self._organization_service.add_frame_tag(project=project, frame_id=frame_id, tag=tag)
-
-    def remove_tag(self, frame_id: str, tag: str) -> bool:
-        """Remove a tag from an AI frame.
-
-        Args:
-            frame_id: ID of the AI frame (filename).
-            tag: Tag to remove.
-
-        Returns:
-            True if frame was found and tag removed.
-        """
-        project = self._context.project
-        if project is None:
-            return False
-        return self._organization_service.remove_frame_tag(project=project, frame_id=frame_id, tag=tag)
-
-    def set_tags(self, frame_id: str, tags: frozenset[str]) -> bool:
-        """Set all tags for an AI frame (replace existing).
-
-        Args:
-            frame_id: ID of the AI frame (filename).
-            tags: New set of tags.
-
-        Returns:
-            True if frame was found and tags updated.
-        """
-        project = self._context.project
-        if project is None:
-            return False
-        return self._organization_service.set_frame_tags(project=project, frame_id=frame_id, tags=tags)
-
     def get_tags(self, frame_id: str) -> frozenset[str]:
         """Get tags for an AI frame.
 
@@ -400,20 +341,6 @@ class AIFramesFacade:
         if project is None:
             return frozenset()
         return self._organization_service.get_frame_tags(project=project, frame_id=frame_id)
-
-    def get_frames_with_tag(self, tag: str) -> list[AIFrame]:
-        """Get all AI frames with a specific tag.
-
-        Args:
-            tag: Tag to filter by.
-
-        Returns:
-            List of AIFrame objects with the tag.
-        """
-        project = self._context.project
-        if project is None:
-            return []
-        return self._organization_service.get_frames_with_tag(project=project, tag=tag)
 
     @staticmethod
     def get_available_tags() -> frozenset[str]:

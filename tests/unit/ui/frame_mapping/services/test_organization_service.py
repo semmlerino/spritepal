@@ -174,56 +174,6 @@ def test_rename_frame_no_history(organization_service, mock_project):
 # ─── Frame Tagging ─────────────────────────────────────────────────────────
 
 
-def test_add_frame_tag_success(organization_service, mock_project):
-    """Test adding tag to frame."""
-    mock_project.add_frame_tag.return_value = True
-
-    result = organization_service.add_frame_tag(project=mock_project, frame_id="test_frame.png", tag="action")
-
-    assert result is True
-    mock_project.add_frame_tag.assert_called_once_with("test_frame.png", "action")
-
-
-def test_add_frame_tag_signal_emitted(qtbot, organization_service, mock_project):
-    """Test frame_tags_changed signal is emitted when tag added."""
-    mock_project.add_frame_tag.return_value = True
-
-    with qtbot.waitSignal(organization_service.frame_tags_changed, timeout=1000) as blocker:
-        organization_service.add_frame_tag(project=mock_project, frame_id="test_frame.png", tag="action")
-
-    assert blocker.args == ["test_frame.png"]
-
-
-def test_add_frame_tag_no_signal_on_failure(qtbot, organization_service, mock_project):
-    """Test no signal when tag add fails."""
-    mock_project.add_frame_tag.return_value = False
-
-    # Should not emit signal when operation fails
-    result = organization_service.add_frame_tag(project=mock_project, frame_id="test_frame.png", tag="action")
-
-    assert result is False
-
-
-def test_remove_frame_tag_success(organization_service, mock_project):
-    """Test removing tag from frame."""
-    mock_project.remove_frame_tag.return_value = True
-
-    result = organization_service.remove_frame_tag(project=mock_project, frame_id="test_frame.png", tag="action")
-
-    assert result is True
-    mock_project.remove_frame_tag.assert_called_once_with("test_frame.png", "action")
-
-
-def test_remove_frame_tag_signal_emitted(qtbot, organization_service, mock_project):
-    """Test frame_tags_changed signal is emitted when tag removed."""
-    mock_project.remove_frame_tag.return_value = True
-
-    with qtbot.waitSignal(organization_service.frame_tags_changed, timeout=1000) as blocker:
-        organization_service.remove_frame_tag(project=mock_project, frame_id="test_frame.png", tag="action")
-
-    assert blocker.args == ["test_frame.png"]
-
-
 def test_toggle_frame_tag_success(
     organization_service, mock_project, mock_undo_stack, mock_command_context, sample_ai_frame
 ):
@@ -292,28 +242,6 @@ def test_toggle_frame_tag_no_history(organization_service, mock_project):
     mock_project.toggle_frame_tag.assert_called_once_with("test_frame.png", "action")
 
 
-def test_set_frame_tags_success(organization_service, mock_project):
-    """Test setting all tags for frame."""
-    new_tags = frozenset({"action", "jump"})
-    mock_project.set_frame_tags.return_value = True
-
-    result = organization_service.set_frame_tags(project=mock_project, frame_id="test_frame.png", tags=new_tags)
-
-    assert result is True
-    mock_project.set_frame_tags.assert_called_once_with("test_frame.png", new_tags)
-
-
-def test_set_frame_tags_signal_emitted(qtbot, organization_service, mock_project):
-    """Test frame_tags_changed signal is emitted when tags set."""
-    new_tags = frozenset({"action", "jump"})
-    mock_project.set_frame_tags.return_value = True
-
-    with qtbot.waitSignal(organization_service.frame_tags_changed, timeout=1000) as blocker:
-        organization_service.set_frame_tags(project=mock_project, frame_id="test_frame.png", tags=new_tags)
-
-    assert blocker.args == ["test_frame.png"]
-
-
 def test_get_frame_tags_success(organization_service, mock_project, sample_ai_frame):
     """Test getting tags for frame."""
     mock_project.get_ai_frame_by_id.return_value = sample_ai_frame
@@ -333,36 +261,7 @@ def test_get_frame_tags_not_found(organization_service, mock_project):
     assert tags == frozenset()
 
 
-# ─── Frame Display Names ───────────────────────────────────────────────────
-
-
-def test_get_frame_display_name_success(organization_service, mock_project, sample_ai_frame):
-    """Test getting display name for frame."""
-    mock_project.get_ai_frame_by_id.return_value = sample_ai_frame
-
-    name = organization_service.get_frame_display_name(project=mock_project, frame_id="test_frame.png")
-
-    assert name == "Test Frame"
-
-
-def test_get_frame_display_name_not_found(organization_service, mock_project):
-    """Test getting display name returns None when frame not found."""
-    mock_project.get_ai_frame_by_id.return_value = None
-
-    name = organization_service.get_frame_display_name(project=mock_project, frame_id="nonexistent.png")
-
-    assert name is None
-
-
-def test_get_frames_with_tag(organization_service, mock_project, sample_ai_frame):
-    """Test filtering frames by tag."""
-    mock_project.get_frames_with_tag.return_value = [sample_ai_frame]
-
-    frames = organization_service.get_frames_with_tag(project=mock_project, tag="idle")
-
-    assert len(frames) == 1
-    assert frames[0] == sample_ai_frame
-    mock_project.get_frames_with_tag.assert_called_once_with("idle")
+# ─── Available Tags ────────────────────────────────────────────────────────
 
 
 def test_get_available_tags():
@@ -465,21 +364,3 @@ def test_rename_capture_no_history(organization_service, mock_project):
 
     assert result is True
     mock_project.set_capture_display_name.assert_called_once_with("capture_001", "New Name")
-
-
-def test_get_capture_display_name_success(organization_service, mock_project, sample_game_frame):
-    """Test getting display name for capture."""
-    mock_project.get_game_frame_by_id.return_value = sample_game_frame
-
-    name = organization_service.get_capture_display_name(project=mock_project, game_frame_id="capture_001")
-
-    assert name == "Test Capture"
-
-
-def test_get_capture_display_name_not_found(organization_service, mock_project):
-    """Test getting capture display name returns None when not found."""
-    mock_project.get_game_frame_by_id.return_value = None
-
-    name = organization_service.get_capture_display_name(project=mock_project, game_frame_id="nonexistent")
-
-    assert name is None

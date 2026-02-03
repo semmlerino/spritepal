@@ -171,17 +171,3 @@ class GameFramesFacade:
         if result:
             self._signals.emit_save_requested()
         return result
-
-    def get_display_name(self, game_frame_id: str) -> str | None:
-        """Get display name for a game frame (capture).
-
-        Args:
-            game_frame_id: ID of the game frame.
-
-        Returns:
-            Display name if set, None otherwise.
-        """
-        project = self._context.project
-        if project is None:
-            return None
-        return self._organization_service.get_capture_display_name(project=project, game_frame_id=game_frame_id)

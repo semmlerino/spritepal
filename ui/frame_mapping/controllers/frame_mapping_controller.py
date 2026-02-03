@@ -1637,29 +1637,6 @@ class FrameMappingController(QObject):
         """
         return self._ai_frames.rename_frame(frame_id, display_name)
 
-    def add_frame_tag(self, frame_id: str, tag: str) -> bool:
-        """Add a tag to an AI frame.
-
-        Args:
-            frame_id: ID of the AI frame (filename)
-            tag: Tag to add (must be in FRAME_TAGS)
-
-        Returns:
-            True if frame was found and tag added
-        """
-        return self._ai_frames.add_tag(frame_id, tag)
-
-    def remove_frame_tag(self, frame_id: str, tag: str) -> bool:
-        """Remove a tag from an AI frame.
-
-        Args:
-            frame_id: ID of the AI frame (filename)
-            tag: Tag to remove
-
-        Returns:
-            True if frame was found and tag removed
-        """
-        return self._ai_frames.remove_tag(frame_id, tag)
 
     def toggle_frame_tag(self, frame_id: str, tag: str) -> bool:
         """Toggle a tag on an AI frame.
@@ -1673,18 +1650,6 @@ class FrameMappingController(QObject):
         """
         return self._ai_frames.toggle_tag(frame_id, tag)
 
-    def set_frame_tags(self, frame_id: str, tags: frozenset[str]) -> bool:
-        """Set all tags for an AI frame (replace existing).
-
-        Args:
-            frame_id: ID of the AI frame (filename)
-            tags: New set of tags
-
-        Returns:
-            True if frame was found and tags updated
-        """
-        return self._ai_frames.set_tags(frame_id, tags)
-
     def get_frame_tags(self, frame_id: str) -> frozenset[str]:
         """Get tags for an AI frame.
 
@@ -1695,28 +1660,6 @@ class FrameMappingController(QObject):
             Set of tags (empty if frame not found)
         """
         return self._ai_frames.get_tags(frame_id)
-
-    def get_frame_display_name(self, frame_id: str) -> str | None:
-        """Get display name for an AI frame.
-
-        Args:
-            frame_id: ID of the AI frame (filename)
-
-        Returns:
-            Display name if set, None otherwise
-        """
-        return self._ai_frames.get_display_name(frame_id)
-
-    def get_frames_with_tag(self, tag: str) -> list[AIFrame]:
-        """Get all AI frames with a specific tag.
-
-        Args:
-            tag: Tag to filter by
-
-        Returns:
-            List of AIFrame objects with the tag
-        """
-        return self._ai_frames.get_frames_with_tag(tag)
 
     @staticmethod
     def get_available_tags() -> frozenset[str]:
@@ -1740,14 +1683,3 @@ class FrameMappingController(QObject):
             True if renamed successfully.
         """
         return self._game_frames.rename_capture(game_frame_id, new_name)
-
-    def get_capture_display_name(self, game_frame_id: str) -> str | None:
-        """Get display name for a game frame (capture).
-
-        Args:
-            game_frame_id: ID of the game frame.
-
-        Returns:
-            Display name if set, None otherwise.
-        """
-        return self._game_frames.get_display_name(game_frame_id)
