@@ -175,6 +175,7 @@ class SheetPaletteWidget(QWidget):
         self._swatches: list[PaletteSwatchWidget] = []
         self._highlighted_index: int | None = None
         self._selected_index: int | None = None
+        self._capture_palette_indices: set[int] | None = None
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -380,20 +381,15 @@ class SheetPaletteWidget(QWidget):
                 else:
                     swatch.set_color((0, 0, 0))
 
-            # Update status
-            mapping_count = len(palette.color_mappings)
-            if mapping_count > 0:
-                self._status_label.setText(f"Palette defined ({mapping_count} color mappings)")
-            else:
-                self._status_label.setText("Palette defined (no explicit mappings)")
-
             self._clear_button.setVisible(True)
         else:
             # Reset to black
             for swatch in self._swatches:
                 swatch.set_color((0, 0, 0))
-            self._status_label.setText("No palette defined - using capture palettes")
             self._clear_button.setVisible(False)
+
+        # Update status label (uses both palette and capture info)
+        self._update_status_label()
 
         # Clear selection when palette changes
         self.clear_selection()
@@ -401,6 +397,34 @@ class SheetPaletteWidget(QWidget):
     def get_palette(self) -> SheetPalette | None:
         """Get the current sheet palette."""
         return self._sheet_palette
+
+    def set_capture_palette_info(self, palette_indices: set[int] | None) -> None:
+        """Set which capture palettes are in use (for status display).
+
+        Args:
+            palette_indices: Set of palette indices in use, or None to clear
+        """
+        self._capture_palette_indices = palette_indices
+        self._update_status_label()
+
+    def _update_status_label(self) -> None:
+        """Update status label based on current state."""
+        if self._sheet_palette is not None:
+            # Sheet palette defined - show mapping count
+            mapping_count = len(self._sheet_palette.color_mappings)
+            if mapping_count > 0:
+                self._status_label.setText(f"Palette defined ({mapping_count} color mappings)")
+            else:
+                self._status_label.setText("Palette defined (no explicit mappings)")
+        elif self._capture_palette_indices:
+            # No sheet palette - show capture palette info
+            indices_str = ", ".join(str(i) for i in sorted(self._capture_palette_indices))
+            if len(self._capture_palette_indices) > 1:
+                self._status_label.setText(f"No sheet palette - using capture palettes {indices_str} ⚠")
+            else:
+                self._status_label.setText(f"No sheet palette - using capture palette {indices_str}")
+        else:
+            self._status_label.setText("No palette defined - using capture palettes")
 
     def set_buttons_enabled(self, enabled: bool) -> None:
         """Enable or disable the buttons (when no AI frames are loaded)."""
