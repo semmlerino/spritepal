@@ -142,6 +142,8 @@ class PaletteCoordinator:
         if self._controller is None or self._parent_widget is None:
             return
 
+        from ui.frame_mapping.dialogs.sheet_palette_mapping_dialog import SheetPaletteMappingDialog
+
         sheet_colors = self._controller.extract_sheet_colors()
         if not sheet_colors:
             QMessageBox.information(
@@ -151,12 +153,27 @@ class PaletteCoordinator:
             )
             return
 
-        # Generate palette
-        new_palette = self._controller.generate_sheet_palette_from_colors(sheet_colors)
-        self._controller.set_sheet_palette(new_palette)
+        # Pre-extract palette for dialog
+        extracted_palette = self._controller.generate_sheet_palette_from_colors(sheet_colors)
 
-        if self._message_service:
-            self._message_service.show_message(f"Extracted 16-color palette from {len(sheet_colors)} unique colors")
+        # Get game palettes for dialog
+        game_palettes = self._controller.get_game_palettes()
+
+        # Open dialog with pre-populated palette (same as handle_palette_edit_requested)
+        dialog = SheetPaletteMappingDialog(
+            sheet_colors=sheet_colors,
+            current_palette=extracted_palette,  # Pre-populate with extracted
+            game_palettes=game_palettes,
+            parent=self._parent_widget,
+        )
+
+        if dialog.exec():
+            new_palette = dialog.get_result()
+            self._controller.set_sheet_palette(new_palette)
+            if self._message_service:
+                self._message_service.show_message(
+                    f"Palette applied ({len(new_palette.color_mappings)} color mappings)"
+                )
 
     def handle_palette_clear_requested(self) -> None:
         """Handle request to clear the sheet palette."""
