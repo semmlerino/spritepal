@@ -305,7 +305,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         self._preview_checkbox = QCheckBox("In-Game")
         self._preview_checkbox.setToolTip(
-            "Show in-game preview (quantized, clipped)\nRequires frame to be mapped to a game capture"
+            "Show preview (quantized to sheet palette)\nWith mapping: shows in-game composite"
         )
         self._preview_checkbox.toggled.connect(self._on_preview_toggled)
         layout.addWidget(self._preview_checkbox)
@@ -353,7 +353,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         layout.setSpacing(4)
 
         # Header
-        header = QLabel("In-Game Preview")
+        header = QLabel("Preview")
         header.setStyleSheet("font-weight: bold; color: #AAA;")
         layout.addWidget(header)
 
@@ -592,8 +592,17 @@ class AIFramePaletteEditorWindow(QMainWindow):
             self._canvas.set_highlight_index(self._controller.active_index)
 
         # Schedule preview update if enabled
-        if self._preview_enabled and self._debounce_timer is not None:
-            self._debounce_timer.start()
+        if self._preview_enabled:
+            if self._frame_controller is not None:
+                project = self._frame_controller.project
+                if project is not None:
+                    mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
+                    if mapping is not None and self._debounce_timer is not None:
+                        # Debounced composite preview
+                        self._debounce_timer.start()
+                    else:
+                        # Immediate standalone preview (no async needed)
+                        self._generate_standalone_preview()
 
     def _on_selection_changed(self) -> None:
         """Handle selection change."""
@@ -722,21 +731,20 @@ class AIFramePaletteEditorWindow(QMainWindow):
                 self._preview_checkbox.setChecked(False)
                 return
 
+            # Check if we have a mapping (for full composite preview)
             mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
-            if mapping is None:
-                QMessageBox.information(
-                    self,
-                    "No Mapping",
-                    f"'{self._ai_frame.display_name or self._ai_frame.name}' "
-                    "is not mapped to a game frame.\n\n"
-                    "Map it in the workspace first to enable preview.",
-                )
-                self._preview_checkbox.setChecked(False)
-                return
 
-            # Show preview panel and generate preview
+            # Show preview panel
             self._preview_panel.setVisible(True)
-            self._generate_preview()
+
+            if mapping is not None:
+                # Full composite preview with game sprite
+                self._preview_info_label.setText("In-game composite preview")
+                self._generate_preview()
+            else:
+                # Standalone quantized preview (no mapping required)
+                self._preview_info_label.setText("Quantized preview\n(no mapping - no game sprite)")
+                self._generate_standalone_preview()
         else:
             # Hide preview panel
             self._preview_panel.setVisible(False)
@@ -789,6 +797,29 @@ class AIFramePaletteEditorWindow(QMainWindow):
             ai_index_map=indexed_data,
             display_scale=1,
         )
+
+    def _generate_standalone_preview(self) -> None:
+        """Generate standalone quantized preview (no game sprite background)."""
+        indexed_data = self._controller.get_indexed_data()
+        if indexed_data is None:
+            return
+
+        from core.services.rgb_to_indexed import convert_indexed_to_rgb
+
+        # Convert indexed data to RGBA using sheet palette
+        ai_image = convert_indexed_to_rgb(indexed_data, self._palette)
+
+        # Convert PIL Image to QImage and display
+        from PySide6.QtGui import QImage
+
+        # ai_image is a PIL Image in RGBA mode
+        data = ai_image.tobytes("raw", "RGBA")
+        qimage = QImage(data, ai_image.width, ai_image.height, QImage.Format.Format_RGBA8888)
+
+        pixmap = QPixmap.fromImage(qimage)
+        self._preview_pixmap_item.setPixmap(pixmap)
+        self._preview_scene.setSceneRect(0, 0, pixmap.width(), pixmap.height())
+        self._preview_view.fitInView(self._preview_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
 
     def _on_preview_ready(self, qimage: QImage, width: int, height: int) -> None:
         """Handle async preview completion."""
