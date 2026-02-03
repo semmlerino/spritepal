@@ -23,7 +23,7 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
-class DialogCoordinator(QObject):
+class ExtractionDialogCoordinator(QObject):
     """Coordinates arrangement and editor dialogs.
 
     This service handles dialog-related operations that were previously

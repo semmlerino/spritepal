@@ -47,7 +47,7 @@ from core.types import CompressionType
 from ui.components.inputs.file_selector import FileSelector
 from ui.frame_mapping.auto_save_manager import AutoSaveManager
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
-from ui.frame_mapping.dialog_coordinator import DialogCoordinator
+from ui.frame_mapping.dialog_coordinator import CaptureImportCoordinator
 from ui.frame_mapping.frame_operations_coordinator import FrameOperationsCoordinator
 from ui.frame_mapping.injection_coordinator import InjectionCoordinator
 from ui.frame_mapping.palette_coordinator import PaletteCoordinator
@@ -91,7 +91,7 @@ class FrameMappingWorkspace(QWidget):
         self._state = WorkspaceStateManager()
 
         # Dialog coordinator for capture imports and confirmations
-        self._dialog_coordinator = DialogCoordinator(self)
+        self._dialog_coordinator = CaptureImportCoordinator(self)
 
         # Create or inject controller
         self._controller = controller or self._create_default_controller()

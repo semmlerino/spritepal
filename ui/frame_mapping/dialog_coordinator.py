@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-class DialogCoordinator(QObject):
+class CaptureImportCoordinator(QObject):
     """Coordinates dialog interactions for Frame Mapping workspace.
 
     Handles:

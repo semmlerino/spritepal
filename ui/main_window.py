@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from core.services.rom_cache import ROMCache
     from core.sprite_library import SpriteLibrary
     from ui.injection_dialog import InjectionDialog
-    from ui.services.dialog_coordinator import DialogCoordinator
+    from ui.services.dialog_coordinator import ExtractionDialogCoordinator
     from ui.services.extraction_workflow_coordinator import ExtractionWorkflowCoordinator
     from ui.services.injection_workflow_coordinator import InjectionWorkflowCoordinator
 
@@ -122,7 +122,7 @@ class MainWindow(QMainWindow):
         # Declare instance variables with type hints
         self._output_path: str
         self._extracted_files: list[str]
-        self._dialog_coordinator: DialogCoordinator | None
+        self._dialog_coordinator: ExtractionDialogCoordinator | None
         self._error_handler: ErrorHandler
         self.left_dock: QDockWidget
         self.center_stack: QStackedWidget
@@ -908,7 +908,7 @@ class MainWindow(QMainWindow):
         """Handle open in editor button click."""
         if self._output_path:
             sprite_file = f"{self._output_path}.png"
-            # Use DialogCoordinator directly (Phase 4b: controller removal)
+            # Use ExtractionDialogCoordinator directly (Phase 4b: controller removal)
             self.dialog_coordinator.open_in_editor(
                 sprite_file,
                 status_callback=self.status_bar.showMessage,
@@ -925,7 +925,7 @@ class MainWindow(QMainWindow):
             # Get tiles per row from sprite preview if available
             tiles_per_row = self._get_tiles_per_row_for_dialog()
 
-            # Use DialogCoordinator directly (Phase 4b: controller removal)
+            # Use ExtractionDialogCoordinator directly (Phase 4b: controller removal)
             def _open_arranged_grid(path: str) -> None:
                 self.dialog_coordinator.open_in_editor(path, status_callback=self.status_bar.showMessage)
 
@@ -958,7 +958,7 @@ class MainWindow(QMainWindow):
         """Get tiles per row from sprite preview for dialogs.
 
         Returns:
-            Tiles per row if available, None to let DialogCoordinator calculate.
+            Tiles per row if available, None to let ExtractionDialogCoordinator calculate.
         """
         if self.sprite_preview:
             try:
@@ -2022,16 +2022,16 @@ class MainWindow(QMainWindow):
         return normalized
 
     @property
-    def dialog_coordinator(self) -> DialogCoordinator:
+    def dialog_coordinator(self) -> ExtractionDialogCoordinator:
         """Lazy initialization of dialog coordinator.
 
-        DialogCoordinator handles dialog-related operations (open in editor,
+        ExtractionDialogCoordinator handles dialog-related operations (open in editor,
         row/grid arrangement) that were previously in ExtractionController.
         """
         if self._dialog_coordinator is None:
-            from ui.services.dialog_coordinator import DialogCoordinator
+            from ui.services.dialog_coordinator import ExtractionDialogCoordinator
 
-            self._dialog_coordinator = DialogCoordinator(parent=self)
+            self._dialog_coordinator = ExtractionDialogCoordinator(parent=self)
         return self._dialog_coordinator
 
     @property

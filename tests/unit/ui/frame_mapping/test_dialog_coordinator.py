@@ -1,4 +1,4 @@
-"""Tests for DialogCoordinator.
+"""Tests for CaptureImportCoordinator.
 
 Tests dialog orchestration without GUI interactions by mocking all dialogs.
 """
@@ -9,13 +9,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.mesen_integration.click_extractor import CaptureResult, OAMEntry
-from ui.frame_mapping.dialog_coordinator import DialogCoordinator
+from ui.frame_mapping.dialog_coordinator import CaptureImportCoordinator
 
 
 @pytest.fixture
 def coordinator():
     """Create a dialog coordinator."""
-    return DialogCoordinator()
+    return CaptureImportCoordinator()
 
 
 @pytest.fixture
