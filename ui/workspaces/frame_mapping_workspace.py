@@ -21,6 +21,8 @@ Four-zone layout:
 
 from __future__ import annotations
 
+import warnings
+
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, override
@@ -212,6 +214,26 @@ class FrameMappingWorkspace(QWidget):
             # Sync widget display if ROM selector exists
             if hasattr(self, "_rom_selector"):
                 self._rom_selector.set_path(str(rom_path) if rom_path else "")
+
+    def _get_selected_ai_frame_id(self) -> str | None:
+        """Get the selected AI frame ID from the state manager.
+
+        Returns the cached state value directly to preserve selection even
+        when filters hide the selected item in the pane.
+        """
+        if hasattr(self, "_logic"):
+            return self._logic.get_selected_ai_frame_id()
+        return self._state.selected_ai_frame_id if hasattr(self, "_state") else None
+
+    def _get_selected_game_id(self) -> str | None:
+        """Get the selected game frame ID from the state manager.
+
+        Returns the cached state value directly to preserve selection even
+        when filters hide the selected item in the pane.
+        """
+        if hasattr(self, "_logic"):
+            return self._logic.get_selected_game_id()
+        return self._state.selected_game_id if hasattr(self, "_state") else None
 
     def _create_default_controller(self) -> FrameMappingController:
         """Create controller with workspace as parent for Qt ownership.
@@ -529,10 +551,12 @@ class FrameMappingWorkspace(QWidget):
 
         def safe_disconnect(signal: SignalInstance, slot: Callable[..., object]) -> None:
             """Disconnect signal safely, ignoring errors if already disconnected."""
-            try:
-                signal.disconnect(slot)
-            except (RuntimeError, TypeError):
-                pass
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                try:
+                    signal.disconnect(slot)
+                except (RuntimeError, TypeError):
+                    pass
 
         # Auto-save manager signals
         safe_disconnect(self._auto_save_manager.save_failed, self._on_save_failed)
@@ -1536,6 +1560,15 @@ class FrameMappingWorkspace(QWidget):
         ctx = get_app_context()
         ctx.application_state_manager.set("frame_mapping", "last_project_path", str(path))
 
+    def _shutdown_async_children(self) -> None:
+        """Shut down child async services to avoid QThread leaks."""
+        if hasattr(self, "_ai_frames_pane"):
+            self._ai_frames_pane.shutdown_async_services()
+        if hasattr(self, "_mapping_panel"):
+            self._mapping_panel.shutdown_async_services()
+        if hasattr(self, "_alignment_canvas"):
+            self._alignment_canvas.shutdown_async_services()
+
     # -------------------------------------------------------------------------
     # Close Event Handler
     # -------------------------------------------------------------------------
@@ -1554,6 +1587,7 @@ class FrameMappingWorkspace(QWidget):
         # or if there are no unsaved changes
         if not self.isVisible() or not self._state.dirty:
             event.accept()
+            self._shutdown_async_children()
             return
 
         reply = QMessageBox.question(
@@ -1570,14 +1604,21 @@ class FrameMappingWorkspace(QWidget):
             # Only accept close if save succeeded (dirty flag cleared)
             if not self._state.dirty:
                 event.accept()
+                self._shutdown_async_children()
             else:
                 event.ignore()
         elif reply == QMessageBox.StandardButton.Discard:
             # Discard changes and close
             event.accept()
+            self._shutdown_async_children()
         else:  # Cancel
             # Abort close
             event.ignore()
+
+    @override
+    def deleteLater(self) -> None:
+        self._shutdown_async_children()
+        super().deleteLater()
 
     # -------------------------------------------------------------------------
     # Properties
