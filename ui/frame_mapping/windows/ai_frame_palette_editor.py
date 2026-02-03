@@ -156,19 +156,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._duplicate_warning_label.setVisible(False)
         center_layout.addWidget(self._duplicate_warning_label)
 
-        # Global palette editing warning banner (always visible)
-        self._global_edit_warning_label = QLabel(
-            "⚠ Color changes affect ALL frames. Right-click color swatches to edit "
-            "the global sheet palette. This window edits palette indices (which "
-            "pixels use which colors), not the colors themselves."
-        )
-        self._global_edit_warning_label.setStyleSheet(
-            "background-color: #FFCDD2; color: #B71C1C; padding: 6px 8px; "
-            "border-radius: 4px; font-size: 11px;"
-        )
-        self._global_edit_warning_label.setWordWrap(True)
-        center_layout.addWidget(self._global_edit_warning_label)
-
         # Add canvas to center layout
         center_layout.addWidget(self._canvas, 1)
         main_layout.addLayout(center_layout, 1)
