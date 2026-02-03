@@ -582,18 +582,6 @@ class FrameMappingWorkspace(QWidget):
         redo_shortcut = QShortcut(QKeySequence.StandardKey.Redo, self)
         redo_shortcut.activated.connect(self._on_redo)
 
-    # -------------------------------------------------------------------------
-    # Selection State Helpers (Panes as Source of Truth)
-    # -------------------------------------------------------------------------
-
-    def _get_selected_ai_frame_id(self) -> str | None:
-        """Get the currently selected AI frame ID."""
-        return self._logic.get_selected_ai_frame_id()
-
-    def _get_selected_game_id(self) -> str | None:
-        """Get the currently selected game frame ID."""
-        return self._logic.get_selected_game_id()
-
     @signal_error_boundary()
     def _on_undo(self) -> None:
         """Handle Ctrl+Z - undo last action."""
