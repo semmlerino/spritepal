@@ -229,6 +229,7 @@ class TestInjectionOrchestratorStaleEntries:
         game_frame.capture_path = capture_path
         game_frame.selected_entry_ids = [999]  # Non-existent IDs
         project.get_game_frame_by_id.return_value = game_frame
+        project.sheet_palette = None
 
         orchestrator = InjectionOrchestrator()
         request = InjectionRequest(

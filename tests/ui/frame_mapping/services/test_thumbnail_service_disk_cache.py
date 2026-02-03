@@ -194,9 +194,7 @@ class TestDiskCacheInvalidationOnMtimeChange:
 class TestAsyncLoaderUsesDiskCache:
     """Test AsyncThumbnailLoader integrates with disk cache."""
 
-    def test_async_loader_populates_disk_cache(
-        self, tmp_path: Path, app_context: AppContext, qtbot: QtBot
-    ) -> None:
+    def test_async_loader_populates_disk_cache(self, tmp_path: Path, app_context: AppContext, qtbot: QtBot) -> None:
         """Verify AsyncThumbnailLoader populates disk cache.
 
         The async worker thread uses the disk cache for both reading and writing,

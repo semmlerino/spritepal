@@ -4,7 +4,7 @@ Test sprite preview widget functionality
 This is a real Qt widget test that requires a GUI environment and tests
 actual widget rendering, pixmap handling, and Qt-specific behavior.
 
-Uses session_managers fixture from core_fixtures.py with shared_state_safe marker.
+Uses session_app_context fixture with shared_state_safe marker.
 """
 
 from __future__ import annotations
@@ -25,16 +25,16 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.usefixtures("session_app_context"),
     pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_app_context which owns worker threads"),
 ]
 
-# Note: Uses session_managers fixture via module-level pytestmark
+# Note: Uses session_app_context fixture via module-level pytestmark
 
 
 class TestSpritePreviewWidget:
     """Test the sprite preview widget.
 
-    Uses session_managers fixture via module-level pytestmark.
+    Uses session_app_context fixture via module-level pytestmark.
     """
 
     @pytest.fixture(scope="class")

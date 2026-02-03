@@ -27,6 +27,7 @@ Performance Optimization:
 
 from __future__ import annotations
 
+import os
 from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
@@ -139,6 +140,14 @@ def app_context(tmp_path: Path, _session_services: SessionServices) -> Generator
         # Create isolated settings
         settings_path = tmp_path / ".test_settings.json"
 
+        # Ensure a writable cache directory for tests running outside xdist
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir(exist_ok=True)
+        cache_env_was_set = "SPRITEPAL_CACHE_DIR" in os.environ
+        previous_cache_env = os.environ.get("SPRITEPAL_CACHE_DIR")
+        if not cache_env_was_set:
+            os.environ["SPRITEPAL_CACHE_DIR"] = str(cache_dir)
+
         # Create the context with cached services for performance
         context = create_app_context(
             app_name="TestApp",
@@ -152,6 +161,13 @@ def app_context(tmp_path: Path, _session_services: SessionServices) -> Generator
 
         # Cleanup the test context
         reset_app_context()
+
+        # Restore environment override if we set it
+        if not cache_env_was_set:
+            if previous_cache_env is None:
+                os.environ.pop("SPRITEPAL_CACHE_DIR", None)
+            else:
+                os.environ["SPRITEPAL_CACHE_DIR"] = previous_cache_env
 
         # Process events to ensure cleanup completes
         if app:
@@ -223,6 +239,13 @@ def session_app_context(
     settings_dir = tmp_path_factory.mktemp("session_settings")
     settings_path = settings_dir / ".test_settings.json"
 
+    # Ensure a writable cache directory for tests running outside xdist
+    cache_dir = tmp_path_factory.mktemp("session_cache")
+    cache_env_was_set = "SPRITEPAL_CACHE_DIR" in os.environ
+    previous_cache_env = os.environ.get("SPRITEPAL_CACHE_DIR")
+    if not cache_env_was_set:
+        os.environ["SPRITEPAL_CACHE_DIR"] = str(cache_dir)
+
     # Create the context with cached services for performance
     context = create_app_context(
         app_name="TestApp-Session",
@@ -236,6 +259,13 @@ def session_app_context(
 
     # Cleanup at end of session
     reset_app_context()
+
+    # Restore environment override if we set it
+    if not cache_env_was_set:
+        if previous_cache_env is None:
+            os.environ.pop("SPRITEPAL_CACHE_DIR", None)
+        else:
+            os.environ["SPRITEPAL_CACHE_DIR"] = previous_cache_env
 
     # Process events to ensure cleanup completes
     if app:

@@ -19,7 +19,7 @@ from core.tile_utils import encode_4bpp_tile
 pytestmark = [
     pytest.mark.usefixtures("session_app_context", "mock_hal"),
     pytest.mark.shared_state_safe,
-    pytest.mark.skip_thread_cleanup(reason="Uses session_managers which owns worker threads"),
+    pytest.mark.skip_thread_cleanup(reason="Uses session_app_context which owns worker threads"),
     pytest.mark.headless,
     pytest.mark.integration,
 ]

@@ -365,11 +365,11 @@ class RealComponentFactory:
             leak_msg = f"WorkerManager.cleanup_all() failed: {e}"
             self._leaked_resources.append(leak_msg)
 
-        # Step 2: Manager lifecycle is owned by test fixtures (session_managers,
-        # isolated_managers). RealComponentFactory MUST NOT call cleanup_managers()
+        # Step 2: Manager lifecycle is owned by test fixtures (session_app_context,
+        # app_context/isolated_managers). RealComponentFactory MUST NOT call cleanup_managers()
         # because:
-        # - session_managers: Managers persist for entire session
-        # - isolated_managers: Fixture handles cleanup after test
+        # - session_app_context: Managers persist for entire session
+        # - app_context/isolated_managers: Fixture handles cleanup after test
         # - Neither: Test infrastructure expects consistent state
         # Calling cleanup_managers() here would break fixture contracts and cause
         # "Session managers were cleaned up mid-session" errors.

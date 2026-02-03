@@ -7,15 +7,11 @@ run manually during development. They are skipped by default in CI.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
 
-# Add project root to path for imports
 project_root = Path(__file__).parent.parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -26,11 +22,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="Run Mesen2 integration tests (requires Mesen2 emulator)",
     )
-
-
-def pytest_configure(config: pytest.Config) -> None:
-    """Register custom markers."""
-    config.addinivalue_line("markers", "external_tools: Tests requiring external tools (Mesen2)")
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:

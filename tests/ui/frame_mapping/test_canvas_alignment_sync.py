@@ -78,7 +78,11 @@ class TestCanvasAlignmentSync:
     """Tests for canvas alignment synchronization with model state."""
 
     def test_programmatic_alignment_update_syncs_to_canvas(
-        self, app_context: AppContext, qtbot: QtBot, tmp_path: Path
+        self,
+        app_context: AppContext,
+        qtbot: QtBot,
+        tmp_path: Path,
+        wait_for_signal_processed,
     ) -> None:
         """When alignment is updated programmatically, canvas should reflect new values.
 
@@ -97,12 +101,12 @@ class TestCanvasAlignmentSync:
         controller = workspace._controller
         controller._project = project
         controller.project_changed.emit()
-        qtbot.wait(50)  # Allow UI to update
+        wait_for_signal_processed()
 
         # Select the AI frame (this should load the mapping into the canvas)
         workspace._ai_frames_pane.select_frame(ai_frame.index)
         workspace._on_ai_frame_selected(ai_frame.id)
-        qtbot.wait(50)
+        wait_for_signal_processed()
 
         # Verify initial canvas state
         canvas = workspace._alignment_canvas
@@ -119,7 +123,7 @@ class TestCanvasAlignmentSync:
 
         # Emit the alignment_updated signal (this is what the controller does)
         controller.alignment_updated.emit(ai_frame.id)
-        qtbot.wait(50)
+        wait_for_signal_processed()
 
         # BUG: Canvas still shows old position (10, 20)
         # FIX: Canvas should now show new position (999, 888)
@@ -134,7 +138,11 @@ class TestCanvasAlignmentSync:
         )
 
     def test_alignment_update_for_unselected_frame_does_not_sync_canvas(
-        self, app_context: AppContext, qtbot: QtBot, tmp_path: Path
+        self,
+        app_context: AppContext,
+        qtbot: QtBot,
+        tmp_path: Path,
+        wait_for_signal_processed,
     ) -> None:
         """When alignment is updated for a frame that is NOT selected, canvas should not change.
 
@@ -203,12 +211,12 @@ class TestCanvasAlignmentSync:
         controller = workspace._controller
         controller._project = project
         controller.project_changed.emit()
-        qtbot.wait(50)
+        wait_for_signal_processed()
 
         # Select frame 0
         workspace._ai_frames_pane.select_frame(0)
         workspace._on_ai_frame_selected(ai_frame_0.id)
-        qtbot.wait(50)
+        wait_for_signal_processed()
 
         canvas = workspace._alignment_canvas
         initial_alignment = canvas.get_alignment()
@@ -217,7 +225,7 @@ class TestCanvasAlignmentSync:
         # Now update alignment for frame 1 (NOT the selected frame)
         mapping_1.offset_x = 999
         controller.alignment_updated.emit(ai_frame_1.id)
-        qtbot.wait(50)
+        wait_for_signal_processed()
 
         # Canvas should still show frame 0's alignment (unchanged)
         final_alignment = canvas.get_alignment()

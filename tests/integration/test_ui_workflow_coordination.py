@@ -168,7 +168,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         mock_settings_manager,
         mock_rom_cache,
     ):
-        # DI setup provided by session_managers via pytestmark at module level
+        # DI setup provided by session_app_context via pytestmark at module level
         """Test complete workflow: ROM load -> scan -> thumbnails -> fullscreen view."""
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
@@ -456,7 +456,7 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
         # Test smooth scaling toggle (starts True, toggles to False)
         assert not self.fullscreen_viewer.smooth_scaling  # Should be False after toggle
 
-    @pytest.mark.perf
+    @pytest.mark.performance
     @patch("ui.workers.batch_thumbnail_worker.BatchThumbnailWorker")
     def test_large_rom_performance_workflow(
         self,
@@ -706,7 +706,6 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
 @pytest.mark.gui
 @pytest.mark.integration
 @pytest.mark.performance
-@pytest.mark.perf
 class TestUIWorkflowPerformanceIntegration(QtTestCase):
     """Performance-focused UI workflow tests."""
 

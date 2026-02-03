@@ -407,7 +407,9 @@ pythonpath = ["."]
 # Serial by default for fast TDD iteration (no xdist worker spawn overhead)
 # For full suite parallel runs: pytest -n auto --dist=loadscope
 # Performance/benchmark tests excluded by default (timing-sensitive, prone to CI variance)
-# To run them: uv run pytest -m "performance or benchmark"
+# To run performance tests: uv run pytest -m "performance"
+# To run benchmarks (plugin disabled by default for speed): uv run pytest -m "benchmark" -p benchmark
+# Coverage plugin is disabled by default for speed; enable with: -p cov --cov
 # To also exclude slow tests: uv run pytest -m "not slow"
 addopts = "-v --tb=short -ra --maxfail=3 --strict-markers -m 'not performance and not benchmark' -p no:benchmark -p no:cov"
 
@@ -443,16 +445,16 @@ markers = [
     "gui: GUI tests requiring Qt (run with QT_QPA_PLATFORM=offscreen)",
     "headless: Tests that can run without display",
     "integration: Integration tests (cross-component)",
+    "external_tools: Tests requiring external tools (Mesen2)",
     "benchmark: Performance benchmarking tests",
     "performance: Performance/timing tests",
-    "perf: Performance tests excluded from default runs (run with -m perf)",
     "slow: Slow tests (>1s execution time)",
 
     # Functional markers (affect test behavior)
     "requires_display: Tests requiring real display (skipped in offscreen mode)",
     "qt_no_exception_capture: Disable Qt exception capture for this test",
     "no_manager_setup: Skip manager initialization for this test",
-    "shared_state_safe: REQUIRED when using session_managers fixture",
+    "shared_state_safe: REQUIRED when using session_app_context fixture",
     "allows_registry_state: Allow registry state without manager fixtures",
     "skip_thread_cleanup: Skip thread cleanup verification (requires reason argument)",
     "real_hal: Use real HAL components (requires exhal binary)",

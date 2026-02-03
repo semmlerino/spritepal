@@ -150,29 +150,29 @@ class TestBatchRemoval:
         # Setup spy for batch signal
         signal_spy = MagicMock()
         mock_controller.ai_frames_removed_batch.connect(signal_spy)
-        
+
         # Select first 3 frames to remove
         frames_to_remove = [f"frame_{i}.png" for i in range(3)]
-        
+
         # Verify initial state
         assert len(mock_controller.project.ai_frames) == 5
         assert len(mock_controller.project.mappings) == 5
-        
+
         # Perform batch removal
         removed_ids = mock_controller.remove_ai_frames(frames_to_remove)
-        
+
         # Verify return value
         assert len(removed_ids) == 3
         assert set(removed_ids) == set(frames_to_remove)
-        
+
         # Verify project state updated
         assert len(mock_controller.project.ai_frames) == 2
         assert len(mock_controller.project.mappings) == 2
-        
+
         # Verify remaining frames are correct
         remaining_ids = {f.id for f in mock_controller.project.ai_frames}
         assert remaining_ids == {"frame_3.png", "frame_4.png"}
-        
+
         # Verify signal emitted once with list of IDs
         signal_spy.assert_called_once()
         args = signal_spy.call_args[0][0]

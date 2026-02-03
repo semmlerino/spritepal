@@ -20,11 +20,8 @@ Architecture:
     - Filesystem resources need explicit isolation via tmp_path/worker_temp_root
 
 PARALLEL BY DEFAULT Policy:
-    Tests run in parallel by default. Only these are serialized:
-    1. Tests using session_managers (or dependent fixtures like 'managers')
-    2. Tests marked @pytest.mark.parallel_unsafe
-
-    See pytest_collection_modifyitems in conftest.py for the enforcement logic.
+    Tests run in parallel by default. Only tests marked @pytest.mark.parallel_unsafe
+    are serialized via xdist groups. See pytest_collection_modifyitems in conftest.py.
 """
 
 from __future__ import annotations

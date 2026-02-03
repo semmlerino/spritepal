@@ -15,7 +15,7 @@ Fixture Selection Guide:
     | Need                        | Use                    | Notes                     |
     |-----------------------------|------------------------|---------------------------|
     | Full isolation (default)    | app_context            | Function-scoped, auto-cleanup |
-    | Shared state for perf       | session_app_context    | Requires @pytest.mark.shared_state_safe |
+    | Shared state for performance | session_app_context    | Requires @pytest.mark.shared_state_safe |
     | Test initialization itself  | clean_registry_state   | For lifecycle tests       |
 
 Escape hatches:
@@ -121,7 +121,14 @@ def reset_all_singletons() -> None:
     def cleanup_worker_registry() -> None:
         from core.services.worker_lifecycle import WorkerManager
 
-        WorkerManager.cleanup_all(timeout=500)  # Wait up to 500ms for each worker
+        # Silence logging during session teardown to avoid closed-stream errors.
+        import logging
+
+        logging.disable(logging.CRITICAL)
+        try:
+            WorkerManager.cleanup_all(timeout=2000)  # Wait up to 2000ms for each worker
+        finally:
+            logging.disable(logging.NOTSET)
 
     _try_reset("WorkerManager", cleanup_worker_registry)
 

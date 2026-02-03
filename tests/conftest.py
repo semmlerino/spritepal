@@ -49,6 +49,8 @@ import os
 
 # Set offscreen mode early
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# Explicit test-mode flag for runtime guards (threading, async workers, etc.)
+os.environ.setdefault("SPRITEPAL_TESTING", "1")
 
 import tempfile
 import warnings
