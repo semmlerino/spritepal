@@ -432,6 +432,7 @@ class AIFramesPane(QWidget):
 
         # Enhanced styling for selection visibility
         from ui.styles.theme import COLORS
+
         self._list.setStyleSheet(f"""
             QListWidget {{
                 background-color: {COLORS["darker_gray"]};
@@ -799,7 +800,7 @@ class AIFramesPane(QWidget):
         selected_ids = self.get_selected_ids()
         is_multi_selection = len(selected_ids) > 1
         num_selected = len(selected_ids)
-        target_frame_id = frame_id # The frame under the cursor
+        target_frame_id = frame_id  # The frame under the cursor
 
         # Get frame to check current tags
         frame = next((f for f in self._ai_frames if f.id == target_frame_id), None)
@@ -825,7 +826,7 @@ class AIFramesPane(QWidget):
         edit_action = menu.addAction("Edit in Sprite Editor")
         edit_action.triggered.connect(partial(self.edit_in_sprite_editor_requested.emit, target_frame_id))
 
-        edit_palette_action = menu.addAction("Edit Palette...")
+        edit_palette_action = menu.addAction("Edit Palette Indices...")
         edit_palette_action.triggered.connect(partial(self._emit_edit_palette, target_frame_id))
 
         menu.addSeparator()

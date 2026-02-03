@@ -238,8 +238,8 @@ class SheetPaletteWidget(QWidget):
         self._extract_button.clicked.connect(self.extract_requested.emit)
         buttons_layout.addWidget(self._extract_button)
 
-        self._edit_button = QPushButton("Edit Palette...")
-        self._edit_button.setToolTip("Open palette mapping editor")
+        self._edit_button = QPushButton("Map Colors...")
+        self._edit_button.setToolTip("Map AI sheet colors to palette indices (global for all frames)")
         self._edit_button.setStyleSheet("font-size: 10px;")
         self._edit_button.clicked.connect(self.edit_requested.emit)
         buttons_layout.addWidget(self._edit_button)
