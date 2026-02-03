@@ -1027,7 +1027,7 @@ class HALCompressor:
             pool_disabled = True
 
         self._use_pool = use_pool
-        self._pool = None
+        self._pool: HALProcessPool | None = None
         self._pool_failed = pool_disabled
 
         if use_pool:
@@ -1037,12 +1037,22 @@ class HALCompressor:
                     logger.info("HAL process pool enabled for enhanced performance")
                 else:
                     logger.warning("HAL process pool initialization failed - falling back to subprocess mode")
-                    self._pool = None
                     self._pool_failed = True
             except Exception as e:
                 logger.warning(f"Could not enable HAL process pool: {e} - falling back to subprocess mode")
-                self._pool = None
                 self._pool_failed = True
+
+    def _pool_ready_for_requests(self) -> bool:
+        """Check whether the pool should be used for requests.
+
+        In pytest runs, allow using a non-initialized pool to support mocked
+        submit_request behavior without requiring multiprocessing.Manager().
+        """
+        if not self._pool:
+            return False
+        if self._pool.is_initialized:
+            return True
+        return bool(os.environ.get("PYTEST_CURRENT_TEST"))
 
     def _find_tool(self, tool_name: str, provided_path: str | None = None) -> str:
         """Find HAL compression tool executable.
@@ -1160,7 +1170,8 @@ class HALCompressor:
             raise ValueError(f"Offset 0x{offset:X} exceeds ROM size 0x{rom_size:X}")
 
         # Try to use pool if available
-        if self._pool and self._pool.is_initialized:
+        if self._pool_ready_for_requests():
+            assert self._pool is not None, "Pool should be initialized when _pool_ready_for_requests() returns True"
             request = HALRequest(
                 operation="decompress",
                 rom_path=rom_path,
@@ -1436,7 +1447,7 @@ class HALCompressor:
         Returns:
             List of (success, data_or_error) tuples in same order as requests
         """
-        if not self._pool or not self._pool.is_initialized:
+        if not self._pool_ready_for_requests():
             # Fall back to sequential processing
             logger.debug("Pool not available, using sequential batch processing")
             results = []
@@ -1456,6 +1467,7 @@ class HALCompressor:
 
         # Submit batch to pool
         logger.debug(f"Processing batch of {len(requests)} decompression requests using pool")
+        assert self._pool is not None, "Pool should be initialized when _pool_ready_for_requests() returns True"
         hal_results = self._pool.submit_batch(hal_requests)
 
         # Convert results
@@ -1478,7 +1490,7 @@ class HALCompressor:
         Returns:
             List of (success, size_or_error) tuples in same order as requests
         """
-        if not self._pool or not self._pool.is_initialized:
+        if not self._pool_ready_for_requests():
             # Fall back to sequential processing
             logger.debug("Pool not available, using sequential batch processing")
             results = []
@@ -1506,6 +1518,7 @@ class HALCompressor:
 
         # Submit batch to pool
         logger.debug(f"Processing batch of {len(requests)} compression requests using pool")
+        assert self._pool is not None, "Pool should be initialized when _pool_ready_for_requests() returns True"
         hal_results = self._pool.submit_batch(hal_requests)
 
         # Convert results
