@@ -6,7 +6,7 @@ from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QDragEnterEvent, QDragLeaveEvent, QDropEvent, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -329,6 +329,21 @@ class AIFramesPane(QWidget):
 
         self.setAcceptDrops(True)
         self._setup_ui()
+
+    @override
+    def deleteLater(self) -> None:
+        self.shutdown_async_services()
+        super().deleteLater()
+
+    def shutdown_async_services(self) -> None:
+        """Stop background thumbnail loading to avoid QThread leaks."""
+        self._thumbnail_loader.shutdown()
+
+    @override
+    def event(self, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.Destroy:
+            self.shutdown_async_services()
+        return super().event(event)
 
     def _setup_ui(self) -> None:
         """Setup the UI layout."""
@@ -753,6 +768,14 @@ class AIFramesPane(QWidget):
             index: Palette index to select
         """
         self._palette_widget.select_index(index)
+
+    def set_capture_palette_info(self, palette_indices: set[int] | None) -> None:
+        """Set capture palette info for status display.
+
+        Args:
+            palette_indices: Set of palette indices in use, or None to clear
+        """
+        self._palette_widget.set_capture_palette_info(palette_indices)
 
     @signal_error_boundary()
     def _on_search_changed(self, text: str) -> None:

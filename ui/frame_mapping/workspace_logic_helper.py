@@ -558,6 +558,14 @@ class WorkspaceLogicHelper:
             if preview is None:
                 self._controller.request_game_frame_previews_async([mapping.game_frame_id])
             capture_result, used_fallback = self._controller.get_capture_result_for_game_frame(mapping.game_frame_id)
+
+            # Update capture palette info for sheet palette widget
+            if capture_result is not None and capture_result.entries:
+                palette_indices = {entry.palette for entry in capture_result.entries}
+                self._ai_frames_pane.set_capture_palette_info(palette_indices)
+            else:
+                self._ai_frames_pane.set_capture_palette_info(None)
+
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
             self._alignment_canvas.set_alignment(
                 mapping.offset_x,
@@ -576,6 +584,7 @@ class WorkspaceLogicHelper:
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
             self._captures_pane.clear_selection()
+            self._ai_frames_pane.set_capture_palette_info(None)
             self._state.selected_game_id = None
             self._state.current_canvas_game_id = None
 
