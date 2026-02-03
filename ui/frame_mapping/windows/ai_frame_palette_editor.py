@@ -179,7 +179,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._index_label = QLabel("Index: -")
         self._selection_count_label = QLabel("Selected: 0")
         self._selection_mode_label = QLabel("Mode: Replace")
-        self._tool_label = QLabel("Tool: Pencil")
+        self._tool_label = QLabel("Tool: Brush")
         self._dirty_label = QLabel("")
 
         self._status_bar.addWidget(self._coord_label)
@@ -206,7 +206,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._tool_group.setExclusive(True)
 
         tools = [
-            (EditorTool.PENCIL, "Pencil", "P", "Draw with selected color (P)"),
+            (EditorTool.BRUSH, "Brush", "B", "Draw with selected color (B)"),
             (EditorTool.ERASER, "Eraser", "E", "Erase to transparent (E)"),
             (EditorTool.FILL, "Fill", "F", "Flood fill area (F)"),
             (
@@ -258,8 +258,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
             # Connect to tool selection
             btn.clicked.connect(lambda checked, t=tool: self._on_tool_button_clicked(t))
 
-        # Select pencil by default
-        self._tool_buttons[EditorTool.PENCIL].setChecked(True)
+        # Select brush by default
+        self._tool_buttons[EditorTool.BRUSH].setChecked(True)
 
         layout.addSpacing(16)
 
@@ -437,7 +437,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         """Set up keyboard shortcuts."""
         # Tool shortcuts
         shortcuts = [
-            ("P", EditorTool.PENCIL),
+            ("B", EditorTool.BRUSH),
             ("E", EditorTool.ERASER),
             ("F", EditorTool.FILL),
             ("W", EditorTool.CONTIGUOUS_SELECT),

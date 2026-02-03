@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 class EditorTool(Enum):
     """Available editing tools."""
 
-    PENCIL = auto()
+    BRUSH = auto()
     ERASER = auto()
     FILL = auto()
     CONTIGUOUS_SELECT = auto()
@@ -96,7 +96,7 @@ class PaletteEditorController(QObject):
         self._palette: SheetPalette | None = None
 
         # Tool state
-        self._current_tool = EditorTool.PENCIL
+        self._current_tool = EditorTool.BRUSH
         self._active_index = 1  # Default to index 1 (not transparent)
         self._brush_size = 1
 
@@ -422,8 +422,8 @@ class PaletteEditorController(QObject):
             sel_mode = SelectionMode.REPLACE
 
         # Dispatch to tool handlers
-        if self._current_tool == EditorTool.PENCIL:
-            self._handle_pencil(x, y)
+        if self._current_tool == EditorTool.BRUSH:
+            self._handle_brush(x, y)
         elif self._current_tool == EditorTool.ERASER:
             self._handle_eraser(x, y)
         elif self._current_tool == EditorTool.FILL:
@@ -443,9 +443,9 @@ class PaletteEditorController(QObject):
         if self._image_model is None:
             return
 
-        # Only pencil and eraser work with drag
-        if self._current_tool == EditorTool.PENCIL:
-            self._handle_pencil(x, y)
+        # Only brush and eraser work with drag
+        if self._current_tool == EditorTool.BRUSH:
+            self._handle_brush(x, y)
         elif self._current_tool == EditorTool.ERASER:
             self._handle_eraser(x, y)
 
@@ -464,8 +464,8 @@ class PaletteEditorController(QObject):
 
     # --- Tool Implementations ---
 
-    def _handle_pencil(self, x: int, y: int) -> None:
-        """Handle pencil tool click/drag."""
+    def _handle_brush(self, x: int, y: int) -> None:
+        """Handle brush tool click/drag."""
         if self._image_model is None:
             return
 
