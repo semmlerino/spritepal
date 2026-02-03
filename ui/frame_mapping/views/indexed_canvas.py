@@ -19,12 +19,14 @@ from PySide6.QtGui import (
     QImage,
     QMouseEvent,
     QPainter,
+    QPainterPath,
     QPen,
     QPixmap,
     QWheelEvent,
 )
 from PySide6.QtWidgets import (
     QFrame,
+    QGraphicsPathItem,
     QGraphicsPixmapItem,
     QGraphicsScene,
     QGraphicsView,
@@ -399,7 +401,8 @@ class IndexedCanvas(QWidget):
         self._scene.addItem(self._pixmap_item)
 
         # Add palette highlight overlay (shows pixels using selected index)
-        self._highlight_item = QGraphicsPixmapItem()
+        # Uses QGraphicsPathItem for crisp cosmetic lines at any zoom level
+        self._highlight_item = QGraphicsPathItem()
         self._highlight_item.setZValue(0.5)  # Between image and selection
         self._scene.addItem(self._highlight_item)
 
@@ -564,47 +567,36 @@ class IndexedCanvas(QWidget):
     def _update_highlight_overlay(self) -> None:
         """Update the highlight overlay showing edges of pixels with selected index."""
         if self._indexed_data is None or self._highlight_index is None:
-            self._highlight_item.setPixmap(QPixmap())
+            self._highlight_item.setPath(QPainterPath())
             return
 
         height, width = self._indexed_data.shape
         mask = self._indexed_data == self._highlight_index
 
         if not np.any(mask):
-            self._highlight_item.setPixmap(QPixmap())
+            self._highlight_item.setPath(QPainterPath())
             return
 
         # Compute boundary edges
         top_edges, bottom_edges, left_edges, right_edges = self._compute_boundary_edges(mask)
 
-        # Create transparent overlay image
-        overlay_image = QImage(width, height, QImage.Format.Format_ARGB32)
-        overlay_image.fill(Qt.GlobalColor.transparent)
+        # Build path from boundary edges
+        path = QPainterPath()
 
-        painter = QPainter(overlay_image)
-
-        # Configure marching ants pen - black and white dashed line
-        pen = QPen(QColor(255, 255, 255, 255))
-        pen.setWidthF(0.5)
-        pen.setStyle(Qt.PenStyle.DashLine)
-        pen.setDashOffset(self._dash_offset)
-        painter.setPen(pen)
-
-        # Draw edges (merge consecutive edges into line segments for efficiency)
         # Horizontal edges (top and bottom)
         for edge_mask, y_offset in [(top_edges, 0), (bottom_edges, 1)]:
             for y in range(height):
                 row = edge_mask[y]
                 if not np.any(row):
                     continue
-                # Find runs of consecutive edges
                 padded_row = np.concatenate(([False], row, [False]))
                 diff = np.diff(padded_row.astype(int))
                 starts = np.where(diff == 1)[0]
                 ends = np.where(diff == -1)[0]
                 y_coord = y + y_offset
                 for start, end in zip(starts, ends, strict=True):
-                    painter.drawLine(start, y_coord, end, y_coord)
+                    path.moveTo(start, y_coord)
+                    path.lineTo(end, y_coord)
 
         # Vertical edges (left and right)
         for edge_mask, x_offset in [(left_edges, 0), (right_edges, 1)]:
@@ -618,10 +610,18 @@ class IndexedCanvas(QWidget):
                 ends = np.where(diff == -1)[0]
                 x_coord = x + x_offset
                 for start, end in zip(starts, ends, strict=True):
-                    painter.drawLine(x_coord, start, x_coord, end)
+                    path.moveTo(x_coord, start)
+                    path.lineTo(x_coord, end)
 
-        painter.end()
-        self._highlight_item.setPixmap(QPixmap.fromImage(overlay_image))
+        self._highlight_item.setPath(path)
+
+        # Configure cosmetic pen for marching ants
+        pen = QPen(QColor(255, 255, 255, 255))
+        pen.setWidthF(1.5)  # 1.5 screen pixels
+        pen.setCosmetic(True)  # Constant width regardless of zoom
+        pen.setStyle(Qt.PenStyle.DashLine)
+        pen.setDashOffset(self._dash_offset)
+        self._highlight_item.setPen(pen)
 
     def _update_selection_overlay(self) -> None:
         """Update the selection overlay pixmap."""
