@@ -206,6 +206,7 @@ class InjectionFacade:
         debug: bool = False,
         force_raw: bool = False,
         allow_fallback: bool = False,
+        emit_project_changed: bool = True,
         preserve_sprite: bool = False,
     ) -> None:
         """Queue async injection of a mapped frame into the ROM.
@@ -221,6 +222,7 @@ class InjectionFacade:
             debug: Enable debug mode.
             force_raw: Force RAW (uncompressed) injection for all tiles.
             allow_fallback: Allow fallback to rom_offset filtering.
+            emit_project_changed: If True, emit project_changed after success.
             preserve_sprite: If True, original sprite remains visible.
         """
         project = self._context.project
@@ -243,7 +245,7 @@ class InjectionFacade:
             force_raw=force_raw,
             allow_fallback=allow_fallback,
             preserve_sprite=preserve_sprite,
-            emit_project_changed=True,
+            emit_project_changed=emit_project_changed,
             palette_rom_offset=palette_rom_offset,
         )
 
