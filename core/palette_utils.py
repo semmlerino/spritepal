@@ -12,7 +12,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
-from utils.color_distance import detect_rare_important_colors, rgb_to_lab
+from utils.color_distance import detect_rare_important_colors, perceptual_distance_sq, rgb_to_lab
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -35,6 +35,10 @@ QUANTIZATION_TRANSPARENCY_THRESHOLD = 128
 # This prevents symmetric pixels with near-identical RGB values from mapping to
 # different palette entries due to floating-point decision boundary effects.
 JND_THRESHOLD_SQ = 5.29
+
+# Palette extraction tuning for grouping similar colors and preserving distinct ones.
+PALETTE_CLUSTER_THRESHOLD_SQ = 49.0  # 7.0² LAB units
+PALETTE_DIVERSITY_MIN_DISTANCE = 8.0  # Minimum LAB delta between palette colors
 
 # Cache for palette LAB conversions. Key: tuple of RGB tuples, Value: LAB numpy array.
 # Palettes are typically reused many times during preview updates and interactive editing.
@@ -435,6 +439,17 @@ def snap_to_snes_color(color: tuple[int, int, int]) -> tuple[int, int, int]:
     return (snap_component(color[0]), snap_component(color[1]), snap_component(color[2]))
 
 
+def _snap_color_counts(
+    color_counts: dict[tuple[int, int, int], int],
+) -> dict[tuple[int, int, int], int]:
+    """Snap all colors in a count dict to SNES-valid values, merging counts."""
+    snapped_counts: dict[tuple[int, int, int], int] = {}
+    for color, count in color_counts.items():
+        snapped = snap_to_snes_color(color)
+        snapped_counts[snapped] = snapped_counts.get(snapped, 0) + count
+    return snapped_counts
+
+
 def find_nearest_palette_index(
     color: tuple[int, int, int],
     palette: list[tuple[int, int, int]],
@@ -452,8 +467,6 @@ def find_nearest_palette_index(
     Returns:
         Index of nearest palette color
     """
-    from utils.color_distance import perceptual_distance_sq
-
     min_dist = float("inf")
     best_idx = 1 if skip_zero else 0
 
@@ -589,6 +602,113 @@ def _cluster_similar_colors(
     return result
 
 
+def _dedupe_preserve_order(
+    colors: list[tuple[int, int, int]],
+) -> list[tuple[int, int, int]]:
+    """Deduplicate colors while preserving original order."""
+    seen: set[tuple[int, int, int]] = set()
+    deduped: list[tuple[int, int, int]] = []
+    for color in colors:
+        if color in seen:
+            continue
+        seen.add(color)
+        deduped.append(color)
+    return deduped
+
+
+def _ensure_palette_diversity(
+    palette: list[tuple[int, int, int]],
+    color_counts: dict[tuple[int, int, int], int],
+    *,
+    max_colors: int,
+    protected_colors: set[tuple[int, int, int]],
+    min_distance: float,
+) -> list[tuple[int, int, int]]:
+    """Remove overly similar colors and refill with more distinct choices."""
+    if max_colors <= 0:
+        return []
+
+    if not palette:
+        return [(0, 0, 0)] * max_colors
+
+    transparency = palette[0]
+    palette_colors = [
+        color for color in _dedupe_preserve_order(palette[1:]) if color != transparency
+    ]
+
+    protected_list = [color for color in palette_colors if color in protected_colors]
+    non_protected = [color for color in palette_colors if color not in protected_colors]
+
+    def score(color: tuple[int, int, int]) -> int:
+        bonus = 1_000_000 if color in protected_colors else 0
+        return bonus + color_counts.get(color, 0)
+
+    non_protected.sort(key=lambda color: (score(color), color), reverse=True)
+
+    min_distance_sq = min_distance * min_distance
+    target_count = max(0, max_colors - 1)
+
+    kept: list[tuple[int, int, int]] = []
+    for color in _dedupe_preserve_order(protected_list):
+        if len(kept) >= target_count:
+            break
+        kept.append(color)
+
+    for color in non_protected:
+        if len(kept) >= target_count:
+            break
+        if all(perceptual_distance_sq(color, kept_color) >= min_distance_sq for kept_color in kept):
+            kept.append(color)
+
+    if len(kept) < target_count:
+        candidates = [
+            color
+            for color in color_counts
+            if color != transparency and color not in kept
+        ]
+        candidates.sort(key=lambda color: (-color_counts.get(color, 0), color))
+
+        while len(kept) < target_count and candidates:
+            best_color: tuple[int, int, int] | None = None
+            best_min_distance = -1.0
+            best_count = -1
+
+            for candidate in candidates:
+                if kept:
+                    min_distance_candidate = min(
+                        perceptual_distance_sq(candidate, kept_color) for kept_color in kept
+                    )
+                else:
+                    min_distance_candidate = float("inf")
+
+                count = color_counts.get(candidate, 0)
+                if (
+                    min_distance_candidate > best_min_distance
+                    or (
+                        min_distance_candidate == best_min_distance
+                        and (
+                            count > best_count
+                            or (count == best_count and (best_color is None or candidate < best_color))
+                        )
+                    )
+                ):
+                    best_color = candidate
+                    best_min_distance = min_distance_candidate
+                    best_count = count
+
+            if best_color is None:
+                break
+
+            kept.append(best_color)
+            candidates.remove(best_color)
+
+    diversified = [transparency] + kept
+    while len(diversified) < max_colors:
+        diversified.append((0, 0, 0))
+
+    return diversified
+
+
 def quantize_colors_to_palette(
     color_counts: dict[tuple[int, int, int], int],
     max_colors: int = SNES_PALETTE_SIZE,
@@ -635,114 +755,112 @@ def quantize_colors_to_palette(
         if not color_counts:
             return [(0, 0, 0)] * max_colors
 
-    # Cluster similar colors
-    color_counts = _cluster_similar_colors(color_counts, threshold_sq=25.0)
+    original_counts = dict(color_counts)
 
-    # Detect rare important colors
+    max_reserved = max(0, max_colors - 1)
     rare_colors = detect_rare_important_colors(
-        color_counts,
+        original_counts,
         rarity_threshold=0.01,
-        distinctness_threshold=15.0,  # Lower threshold to catch more
-        max_candidates=3,
+        distinctness_threshold=12.0,
+        max_candidates=min(5, max_reserved),
     )
-    reserved_colors = [rc[0] for rc in rare_colors]  # Extract just the RGB tuples
+    reserved_colors = _dedupe_preserve_order(
+        [rc[0] for rc in rare_colors if rc[0] != (0, 0, 0)]
+    )
 
-    # Optionally snap input colors to SNES-valid values first
-    # This merges similar colors that would map to the same SNES color
     if snap_to_snes:
-        snapped_counts: dict[tuple[int, int, int], int] = {}
-        for color, count in color_counts.items():
-            snapped = snap_to_snes_color(color)
-            snapped_counts[snapped] = snapped_counts.get(snapped, 0) + count
-        color_counts = snapped_counts
-        # Also snap reserved colors
-        reserved_colors = [snap_to_snes_color(c) for c in reserved_colors]
+        reserved_colors = _dedupe_preserve_order(
+            [snap_to_snes_color(color) for color in reserved_colors if color != (0, 0, 0)]
+        )
+        original_counts_snapped = _snap_color_counts(original_counts)
+    else:
+        original_counts_snapped = original_counts
+
+    if len(reserved_colors) > max_reserved:
+        reserved_colors = reserved_colors[:max_reserved]
+
+    # Build working counts for quantization (exclude reserved to avoid wasting slots)
+    color_counts = dict(original_counts_snapped)
+    for color in reserved_colors:
+        color_counts.pop(color, None)
+
+    # Cluster similar colors to group near-duplicates
+    color_counts = _cluster_similar_colors(
+        color_counts,
+        threshold_sq=PALETTE_CLUSTER_THRESHOLD_SQ,
+    )
 
     # Sort colors by frequency
     sorted_colors = sorted(color_counts.items(), key=lambda x: x[1], reverse=True)
 
-    # Reserve slots for rare important colors (dedup in case snapping created duplicates)
     reserved_set = set(reserved_colors)
-    available_slots = max_colors - 1 - len(reserved_set)  # -1 for transparency
+    available_slots = max(0, max_colors - 1 - len(reserved_set))  # -1 for transparency
 
-    # If we have few enough colors after reserving, use them directly
-    if len(sorted_colors) <= available_slots:
-        palette: list[tuple[int, int, int]] = [(0, 0, 0)]
-        # Add reserved colors first
-        for color in reserved_set:
-            if color not in palette:
-                palette.append(color)
-        # Add remaining colors
-        for color, _count in sorted_colors:
-            if color not in palette and len(palette) < max_colors:
-                palette.append(color)
-        # Pad with black if needed
-        while len(palette) < max_colors:
-            palette.append((0, 0, 0))
-        return palette
-
-    # Create a small image with all colors weighted by frequency
-    # This gives better quantization results
-    total_pixels = sum(color_counts.values())
-    img_size = min(256, max(16, int(total_pixels**0.5)))  # Reasonable size
-
-    # Build image data
-    pixel_data: list[tuple[int, int, int]] = []
-    for color, count in sorted_colors:
-        # Add each color proportionally to its frequency
-        weight = max(1, int(count * img_size * img_size / total_pixels))
-        pixel_data.extend([color] * weight)
-
-    # Ensure we have enough pixels
-    while len(pixel_data) < img_size * img_size:
-        pixel_data.append(sorted_colors[0][0])  # Pad with most common color
-
-    # Create image and quantize
-    img = Image.new("RGB", (img_size, img_size))
-    img.putdata(pixel_data[: img_size * img_size])
-
-    # Quantize to available_slots colors (after reserving slots for rare important colors)
-    quantized = img.quantize(colors=available_slots, method=Image.Quantize.MEDIANCUT)
-    raw_palette = quantized.getpalette()
-
-    if raw_palette is None:
-        # Fallback: use most frequent colors (already snapped if snap_to_snes)
+    if available_slots <= 0 or len(sorted_colors) <= available_slots:
         palette = [(0, 0, 0)]
-        # Add reserved colors first
-        for color in reserved_set:
-            if color != (0, 0, 0):
+        for color in reserved_colors:
+            if color != (0, 0, 0) and color not in palette:
                 palette.append(color)
-        # Add most frequent colors
         for color, _count in sorted_colors:
             if color not in palette and len(palette) < max_colors:
                 palette.append(color)
-        while len(palette) < max_colors:
-            palette.append((0, 0, 0))
-        return palette
+    else:
+        # Create a small image with all colors weighted by frequency
+        total_pixels = sum(color_counts.values())
+        img_size = min(256, max(16, int(total_pixels**0.5)))  # Reasonable size
 
-    # Build final palette: [transparent] + [reserved] + [quantized]
-    palette = [(0, 0, 0)]  # Index 0 = transparent
+        # Build image data
+        pixel_data: list[tuple[int, int, int]] = []
+        for color, count in sorted_colors:
+            # Add each color proportionally to its frequency
+            weight = max(1, int(count * img_size * img_size / total_pixels))
+            pixel_data.extend([color] * weight)
 
-    # Add reserved rare colors
-    for color in reserved_set:
-        if color != (0, 0, 0):  # Don't duplicate transparency
-            palette.append(color)
+        # Ensure we have enough pixels
+        while len(pixel_data) < img_size * img_size:
+            pixel_data.append(sorted_colors[0][0])  # Pad with most common color
 
-    # Add quantized colors
-    for i in range(available_slots):
-        if len(palette) >= max_colors:
-            break
-        r = raw_palette[i * 3]
-        g = raw_palette[i * 3 + 1]
-        b = raw_palette[i * 3 + 2]
-        color = (r, g, b)
-        if snap_to_snes:
-            color = snap_to_snes_color(color)
-        if color not in palette:  # Avoid duplicates
-            palette.append(color)
+        # Create image and quantize
+        img = Image.new("RGB", (img_size, img_size))
+        img.putdata(pixel_data[: img_size * img_size])
 
-    # Pad if needed
+        # Quantize to available_slots colors (after reserving slots for rare important colors)
+        quantized = img.quantize(colors=available_slots, method=Image.Quantize.MEDIANCUT)
+        raw_palette = quantized.getpalette()
+
+        if raw_palette is None:
+            palette = [(0, 0, 0)]
+            for color in reserved_colors:
+                if color != (0, 0, 0):
+                    palette.append(color)
+            for color, _count in sorted_colors:
+                if color not in palette and len(palette) < max_colors:
+                    palette.append(color)
+        else:
+            palette = [(0, 0, 0)]  # Index 0 = transparent
+            for color in reserved_colors:
+                if color != (0, 0, 0):
+                    palette.append(color)
+
+            for i in range(available_slots):
+                if len(palette) >= max_colors:
+                    break
+                r = raw_palette[i * 3]
+                g = raw_palette[i * 3 + 1]
+                b = raw_palette[i * 3 + 2]
+                color = (r, g, b)
+                if snap_to_snes:
+                    color = snap_to_snes_color(color)
+                if color not in palette:
+                    palette.append(color)
+
     while len(palette) < max_colors:
         palette.append((0, 0, 0))
 
-    return palette
+    return _ensure_palette_diversity(
+        palette,
+        original_counts_snapped,
+        max_colors=max_colors,
+        protected_colors=reserved_set,
+        min_distance=PALETTE_DIVERSITY_MIN_DISTANCE,
+    )
