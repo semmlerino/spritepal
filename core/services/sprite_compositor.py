@@ -21,6 +21,7 @@ from PIL import Image, ImageFilter
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.palette_utils import (
     QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    quantize_to_index_map,
     quantize_to_palette,
     quantize_with_mappings,
     snap_to_snes_color,
@@ -146,6 +147,17 @@ class SpriteCompositor:
                 ai_image,
                 sheet_palette.background_color,
                 sheet_palette.background_tolerance,
+            )
+
+        # Generate index map from color_mappings on ORIGINAL image (before transforms)
+        # This implements "quantize full-res, scale indexed" for Live Preview parity
+        if ai_index_map is None and sheet_palette is not None and sheet_palette.color_mappings:
+            palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
+            ai_index_map = quantize_to_index_map(
+                ai_image,  # ORIGINAL, before transforms
+                palette_rgb,
+                sheet_palette.color_mappings,
+                transparency_threshold=getattr(sheet_palette, "alpha_threshold", 128),
             )
 
         # Filter capture to selected entries if specified
