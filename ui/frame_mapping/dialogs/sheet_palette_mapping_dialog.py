@@ -15,13 +15,16 @@ from PySide6.QtWidgets import (
     QColorDialog,
     QComboBox,
     QFrame,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QSlider,
     QSpinBox,
+    QToolBox,
     QVBoxLayout,
     QWidget,
 )
@@ -435,6 +438,16 @@ class SheetPaletteMappingDialog(DialogBase):
 
             content_layout.addWidget(warning_frame)
 
+        # Main split layout
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_splitter.setChildrenCollapsible(False)
+
+        # Left panel: palette + actions + compact controls
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(8)
+
         # Palette slots section
         palette_group = QWidget()
         palette_layout = QVBoxLayout(palette_group)
@@ -456,10 +469,12 @@ class SheetPaletteMappingDialog(DialogBase):
         slots_layout.addStretch()
         palette_layout.addLayout(slots_layout)
 
-        content_layout.addWidget(palette_group)
+        left_layout.addWidget(palette_group)
 
         # Action buttons
-        actions_layout = QHBoxLayout()
+        actions_container = QWidget()
+        actions_layout = QHBoxLayout(actions_container)
+        actions_layout.setContentsMargins(0, 0, 0, 0)
         actions_layout.setSpacing(8)
 
         extract_btn = QPushButton("Extract Palette")
@@ -499,15 +514,20 @@ class SheetPaletteMappingDialog(DialogBase):
             actions_layout.addWidget(copy_btn)
 
         actions_layout.addStretch()
-        content_layout.addLayout(actions_layout)
+        left_layout.addWidget(actions_container)
+
+        # Compact controls (accordion)
+        controls_toolbox = QToolBox()
 
         # Extraction tuning controls
-        tuning_group = QGroupBox("Extraction Tuning")
-        tuning_layout = QHBoxLayout(tuning_group)
-        tuning_layout.setSpacing(8)
+        tuning_page = QWidget()
+        tuning_layout = QVBoxLayout(tuning_page)
+        tuning_layout.setContentsMargins(8, 6, 8, 6)
+        tuning_layout.setSpacing(6)
 
+        cluster_row = QHBoxLayout()
         cluster_label = QLabel("Group Similar (ΔE):")
-        tuning_layout.addWidget(cluster_label)
+        cluster_row.addWidget(cluster_label)
 
         self._cluster_threshold_slider = QSlider(Qt.Orientation.Horizontal)
         self._cluster_threshold_slider.setRange(0, 250)
@@ -515,15 +535,18 @@ class SheetPaletteMappingDialog(DialogBase):
         self._cluster_threshold_slider.setToolTip(
             "Merge nearby colors before quantization. Higher values group more similar colors."
         )
-        tuning_layout.addWidget(self._cluster_threshold_slider, 1)
+        cluster_row.addWidget(self._cluster_threshold_slider, 1)
 
         self._cluster_threshold_value = QLabel(f"{self._cluster_threshold:.1f}")
         self._cluster_threshold_value.setMinimumWidth(36)
         self._cluster_threshold_value.setStyleSheet("font-size: 11px;")
-        tuning_layout.addWidget(self._cluster_threshold_value)
+        cluster_row.addWidget(self._cluster_threshold_value)
 
+        tuning_layout.addLayout(cluster_row)
+
+        diversity_row = QHBoxLayout()
         diversity_label = QLabel("Min Palette ΔE:")
-        tuning_layout.addWidget(diversity_label)
+        diversity_row.addWidget(diversity_label)
 
         self._diversity_distance_slider = QSlider(Qt.Orientation.Horizontal)
         self._diversity_distance_slider.setRange(0, 300)
@@ -531,73 +554,73 @@ class SheetPaletteMappingDialog(DialogBase):
         self._diversity_distance_slider.setToolTip(
             "Minimum perceptual distance between palette colors. Higher values enforce distinct hues."
         )
-        tuning_layout.addWidget(self._diversity_distance_slider, 1)
+        diversity_row.addWidget(self._diversity_distance_slider, 1)
 
         self._diversity_distance_value = QLabel(f"{self._diversity_min_distance:.1f}")
         self._diversity_distance_value.setMinimumWidth(36)
         self._diversity_distance_value.setStyleSheet("font-size: 11px;")
-        tuning_layout.addWidget(self._diversity_distance_value)
+        diversity_row.addWidget(self._diversity_distance_value)
 
+        tuning_layout.addLayout(diversity_row)
         tuning_layout.addStretch()
-        content_layout.addWidget(tuning_group)
 
         self._cluster_threshold_slider.valueChanged.connect(self._on_extraction_settings_changed)
         self._diversity_distance_slider.valueChanged.connect(self._on_extraction_settings_changed)
 
+        controls_toolbox.addItem(tuning_page, "Extraction Tuning")
+
         # Background removal section
-        bg_group = QGroupBox("Background Removal")
-        bg_layout = QHBoxLayout(bg_group)
-        bg_layout.setSpacing(8)
+        bg_page = QWidget()
+        bg_layout = QGridLayout(bg_page)
+        bg_layout.setContentsMargins(8, 6, 8, 6)
+        bg_layout.setHorizontalSpacing(8)
+        bg_layout.setVerticalSpacing(6)
 
-        # Background color label
         bg_label = QLabel("Background color:")
-        bg_layout.addWidget(bg_label)
+        bg_layout.addWidget(bg_label, 0, 0)
 
-        # Color swatch
         self._bg_swatch = QWidget()
         self._bg_swatch.setFixedSize(32, 32)
         self._update_bg_swatch()
-        bg_layout.addWidget(self._bg_swatch)
+        bg_layout.addWidget(self._bg_swatch, 0, 1)
 
-        # Pick button
         pick_btn = QPushButton("Pick...")
         pick_btn.setToolTip("Choose background color to remove")
         pick_btn.clicked.connect(self._on_pick_background)
-        bg_layout.addWidget(pick_btn)
+        bg_layout.addWidget(pick_btn, 0, 2)
 
-        # Auto button
         auto_btn = QPushButton("Auto")
         auto_btn.setToolTip("Auto-detect background color from image corners")
         auto_btn.clicked.connect(self._on_auto_detect_background)
-        bg_layout.addWidget(auto_btn)
+        bg_layout.addWidget(auto_btn, 0, 3)
 
-        # Tolerance
         tol_label = QLabel("Tolerance:")
-        bg_layout.addWidget(tol_label)
+        bg_layout.addWidget(tol_label, 1, 0)
 
         self._tolerance_spin = QSpinBox()
         self._tolerance_spin.setRange(0, 100)
         self._tolerance_spin.setValue(self._background_tolerance)
         self._tolerance_spin.setToolTip("RGB distance threshold (0-100)")
         self._tolerance_spin.valueChanged.connect(self._on_tolerance_changed)
-        bg_layout.addWidget(self._tolerance_spin)
+        bg_layout.addWidget(self._tolerance_spin, 1, 1)
 
-        # Clear button
         clear_btn = QPushButton("Clear")
         clear_btn.setToolTip("Disable background removal")
         clear_btn.clicked.connect(self._on_clear_background)
-        bg_layout.addWidget(clear_btn)
+        bg_layout.addWidget(clear_btn, 1, 2)
+        bg_layout.setColumnStretch(4, 1)
 
-        bg_layout.addStretch()
-        content_layout.addWidget(bg_group)
+        controls_toolbox.addItem(bg_page, "Background Removal")
 
         # Quantization detail controls
-        quant_group = QGroupBox("Quantization")
-        quant_layout = QHBoxLayout(quant_group)
-        quant_layout.setSpacing(8)
+        quant_page = QWidget()
+        quant_layout = QVBoxLayout(quant_page)
+        quant_layout.setContentsMargins(8, 6, 8, 6)
+        quant_layout.setSpacing(6)
 
+        dither_row = QHBoxLayout()
         dither_label = QLabel("Dither:")
-        quant_layout.addWidget(dither_label)
+        dither_row.addWidget(dither_label)
 
         self._dither_combo = QComboBox()
         self._dither_combo.addItem("Off", "none")
@@ -608,48 +631,124 @@ class SheetPaletteMappingDialog(DialogBase):
         else:
             self._dither_combo.setCurrentIndex(0)
         self._dither_combo.currentIndexChanged.connect(self._on_dither_mode_changed)
-        quant_layout.addWidget(self._dither_combo)
+        dither_row.addWidget(self._dither_combo)
+        dither_row.addStretch()
+        quant_layout.addLayout(dither_row)
 
+        strength_row = QHBoxLayout()
         strength_label = QLabel("Strength:")
-        quant_layout.addWidget(strength_label)
+        strength_row.addWidget(strength_label)
 
         self._dither_strength_slider = QSlider(Qt.Orientation.Horizontal)
         self._dither_strength_slider.setRange(0, 100)
         self._dither_strength_slider.setValue(int(self._dither_strength * 100))
-        self._dither_strength_slider.setMaximumWidth(80)
         self._dither_strength_slider.setToolTip("Ordered dither strength (0-100%)")
         self._dither_strength_slider.valueChanged.connect(self._on_dither_strength_changed)
-        quant_layout.addWidget(self._dither_strength_slider)
+        strength_row.addWidget(self._dither_strength_slider, 1)
 
         self._dither_strength_value = QLabel(f"{int(self._dither_strength * 100)}%")
         self._dither_strength_value.setStyleSheet("font-size: 11px;")
         self._dither_strength_value.setMinimumWidth(40)
-        quant_layout.addWidget(self._dither_strength_value)
+        strength_row.addWidget(self._dither_strength_value)
+        quant_layout.addLayout(strength_row)
 
-        dither_enabled = self._dither_mode == "bayer"
-        self._dither_strength_slider.setEnabled(dither_enabled)
-        self._dither_strength_value.setEnabled(dither_enabled)
-
-        quant_sep = QFrame()
-        quant_sep.setFrameShape(QFrame.Shape.VLine)
-        quant_sep.setFrameShadow(QFrame.Shadow.Sunken)
-        quant_layout.addWidget(quant_sep)
-
+        alpha_row = QHBoxLayout()
         alpha_label = QLabel("Alpha threshold:")
-        quant_layout.addWidget(alpha_label)
+        alpha_row.addWidget(alpha_label)
 
         self._alpha_threshold_spin = QSpinBox()
         self._alpha_threshold_spin.setRange(0, 255)
         self._alpha_threshold_spin.setValue(self._alpha_threshold)
         self._alpha_threshold_spin.setToolTip("Pixels with alpha below this are transparent")
         self._alpha_threshold_spin.valueChanged.connect(self._on_alpha_threshold_changed)
-        quant_layout.addWidget(self._alpha_threshold_spin)
+        alpha_row.addWidget(self._alpha_threshold_spin)
+        alpha_row.addStretch()
+        quant_layout.addLayout(alpha_row)
 
-        quant_layout.addStretch()
-        content_layout.addWidget(quant_group)
+        dither_enabled = self._dither_mode == "bayer"
+        self._dither_strength_slider.setEnabled(dither_enabled)
+        self._dither_strength_value.setEnabled(dither_enabled)
 
-        # Live preview section (only if sample image provided)
+        controls_toolbox.addItem(quant_page, "Quantization")
+
+        left_layout.addWidget(controls_toolbox)
+        left_layout.addStretch()
+
+        main_splitter.addWidget(left_panel)
+
+        # Mappings panel
+        mappings_panel = QWidget()
+        mappings_layout = QVBoxLayout(mappings_panel)
+        mappings_layout.setContentsMargins(0, 0, 0, 0)
+        mappings_layout.setSpacing(4)
+
+        mappings_header_layout = QHBoxLayout()
+        mappings_label = QLabel("Color Mappings:")
+        mappings_label.setStyleSheet("font-weight: bold;")
+        mappings_header_layout.addWidget(mappings_label)
+
+        legend_label = QLabel("★ = protected  ⚠ = needs review")
+        legend_label.setStyleSheet("font-size: 10px; color: #808080;")
+        mappings_header_layout.addWidget(legend_label)
+        mappings_header_layout.addStretch()
+        mappings_layout.addLayout(mappings_header_layout)
+
+        # Scrollable mapping rows
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setSpacing(2)
+
+        # Sort colors: rare important colors first, then by pixel count
+        sorted_colors = sorted(
+            self._sheet_colors.items(),
+            key=lambda x: (x[0] not in self._rare_color_lookup, -x[1]),  # rare first, then by count
+        )
+
+        # Limit displayed colors
+        max_displayed = 50
+        displayed_colors = sorted_colors[:max_displayed]
+        hidden_count = len(sorted_colors) - len(displayed_colors)
+
+        for color, pixel_count in displayed_colors:
+            initial_idx = self._color_mappings.get(color, 1)
+            is_rare = color in self._rare_color_lookup
+            distinctness = self._rare_color_lookup.get(color, 0.0)
+            row = ColorMappingRowWidget(
+                color,
+                pixel_count,
+                self._palette_colors,
+                initial_idx,
+                is_rare_important=is_rare,
+                distinctness=distinctness,
+            )
+            row.mapping_changed.connect(self._on_mapping_changed)
+            self._mapping_rows.append(row)
+            scroll_layout.addWidget(row)
+
+        scroll_layout.addStretch()
+        scroll.setWidget(scroll_content)
+        mappings_layout.addWidget(scroll, 1)
+
+        # Summary
+        total_colors = len(self._sheet_colors)
+        total_pixels = sum(self._sheet_colors.values())
+        rare_count = len(self._rare_important_colors)
+        if hidden_count > 0:
+            summary = QLabel(
+                f"Showing top {max_displayed} of {total_colors} unique colors "
+                f"({total_pixels} total pixels, {rare_count} rare)\n"
+                f"Note: {hidden_count} minor colors will use nearest-color matching."
+            )
+        else:
+            summary = QLabel(f"Total: {total_colors} unique colors, {total_pixels} pixels, {rare_count} rare important")
+        mappings_layout.addWidget(summary)
+
         if self._sample_image is not None:
+            # Live preview section
             preview_group = QGroupBox("Live Preview")
             preview_group_layout = QVBoxLayout(preview_group)
             preview_group_layout.setSpacing(8)
@@ -714,77 +813,25 @@ class SheetPaletteMappingDialog(DialogBase):
             previews_layout.addLayout(quantized_frame, 1)
 
             preview_group_layout.addLayout(previews_layout)
-            content_layout.addWidget(preview_group)
 
             self._preview_zoom_slider.valueChanged.connect(self._on_preview_zoom_changed)
             self._set_original_preview()
 
-        # Color mappings section
-        mappings_header_layout = QHBoxLayout()
-        mappings_label = QLabel("Color Mappings:")
-        mappings_label.setStyleSheet("font-weight: bold;")
-        mappings_header_layout.addWidget(mappings_label)
+            right_splitter = QSplitter(Qt.Orientation.Vertical)
+            right_splitter.setChildrenCollapsible(False)
+            right_splitter.addWidget(mappings_panel)
+            right_splitter.addWidget(preview_group)
+            right_splitter.setStretchFactor(0, 3)
+            right_splitter.setStretchFactor(1, 2)
 
-        legend_label = QLabel("★ = protected  ⚠ = needs review")
-        legend_label.setStyleSheet("font-size: 10px; color: #808080;")
-        mappings_header_layout.addWidget(legend_label)
-        mappings_header_layout.addStretch()
-        content_layout.addLayout(mappings_header_layout)
-
-        # Scrollable mapping rows
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setSpacing(2)
-
-        # Sort colors: rare important colors first, then by pixel count
-        sorted_colors = sorted(
-            self._sheet_colors.items(),
-            key=lambda x: (x[0] not in self._rare_color_lookup, -x[1]),  # rare first, then by count
-        )
-
-        # Limit displayed colors
-        max_displayed = 50
-        displayed_colors = sorted_colors[:max_displayed]
-        hidden_count = len(sorted_colors) - len(displayed_colors)
-
-        for color, pixel_count in displayed_colors:
-            initial_idx = self._color_mappings.get(color, 1)
-            is_rare = color in self._rare_color_lookup
-            distinctness = self._rare_color_lookup.get(color, 0.0)
-            row = ColorMappingRowWidget(
-                color,
-                pixel_count,
-                self._palette_colors,
-                initial_idx,
-                is_rare_important=is_rare,
-                distinctness=distinctness,
-            )
-            row.mapping_changed.connect(self._on_mapping_changed)
-            self._mapping_rows.append(row)
-            scroll_layout.addWidget(row)
-
-        scroll_layout.addStretch()
-        scroll.setWidget(scroll_content)
-        content_layout.addWidget(scroll, 1)
-
-        # Summary
-        total_colors = len(self._sheet_colors)
-        total_pixels = sum(self._sheet_colors.values())
-        rare_count = len(self._rare_important_colors)
-        if hidden_count > 0:
-            summary = QLabel(
-                f"Showing top {max_displayed} of {total_colors} unique colors "
-                f"({total_pixels} total pixels, {rare_count} rare)\n"
-                f"Note: {hidden_count} minor colors will use nearest-color matching."
-            )
+            main_splitter.addWidget(right_splitter)
         else:
-            summary = QLabel(f"Total: {total_colors} unique colors, {total_pixels} pixels, {rare_count} rare important")
-        content_layout.addWidget(summary)
+            main_splitter.addWidget(mappings_panel)
 
+        main_splitter.setStretchFactor(0, 1)
+        main_splitter.setStretchFactor(1, 3)
+
+        content_layout.addWidget(main_splitter, 1)
         self.set_content_layout(content_layout)
 
     def _on_slot_clicked(self, index: int) -> None:
