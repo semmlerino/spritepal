@@ -407,7 +407,8 @@ class IndexedCanvas(QWidget):
         self._scene.addItem(self._highlight_item)
 
         # Add selection overlay item (on top of image)
-        self._selection_item = QGraphicsPixmapItem()
+        # Uses QGraphicsPathItem for marching ants contours
+        self._selection_item = QGraphicsPathItem()
         self._selection_item.setZValue(1)
         self._scene.addItem(self._selection_item)
 
@@ -519,6 +520,7 @@ class IndexedCanvas(QWidget):
         """
         self._selection_mask = mask
         self._update_selection_overlay()
+        self._update_march_timer()
 
     def set_highlight_index(self, index: int | None) -> None:
         """Highlight all pixels using the specified palette index.
@@ -528,10 +530,16 @@ class IndexedCanvas(QWidget):
         """
         self._highlight_index = index
         self._update_highlight_overlay()
+        self._update_march_timer()
 
-        # Start/stop marching ants animation
-        if index is not None:
-            self._march_timer.start()
+    def _update_march_timer(self) -> None:
+        """Start or stop the marching ants timer based on current overlays."""
+        has_highlight = self._highlight_index is not None
+        has_selection = self._selection_mask is not None and self._selection_mask.has_selection()
+
+        if has_highlight or has_selection:
+            if not self._march_timer.isActive():
+                self._march_timer.start()
         else:
             self._march_timer.stop()
             self._dash_offset = 0.0
@@ -556,31 +564,11 @@ class IndexedCanvas(QWidget):
 
         return top_edges, bottom_edges, left_edges, right_edges
 
-
-    def _on_march_tick(self) -> None:
-        """Advance marching ants animation by one frame."""
-        self._dash_offset += 1.0
-        if self._dash_offset >= 8.0:  # Reset after full dash cycle
-            self._dash_offset = 0.0
-        self._update_highlight_overlay()
-
-    def _update_highlight_overlay(self) -> None:
-        """Update the highlight overlay showing edges of pixels with selected index."""
-        if self._indexed_data is None or self._highlight_index is None:
-            self._highlight_item.setPath(QPainterPath())
-            return
-
-        height, width = self._indexed_data.shape
-        mask = self._indexed_data == self._highlight_index
-
-        if not np.any(mask):
-            self._highlight_item.setPath(QPainterPath())
-            return
-
-        # Compute boundary edges
+    def _create_boundary_path(self, mask: np.ndarray) -> QPainterPath:
+        """Create a QPainterPath for the boundaries of a boolean mask."""
+        height, width = mask.shape
         top_edges, bottom_edges, left_edges, right_edges = self._compute_boundary_edges(mask)
 
-        # Build path from boundary edges
         path = QPainterPath()
 
         # Horizontal edges (top and bottom)
@@ -613,48 +601,52 @@ class IndexedCanvas(QWidget):
                     path.moveTo(x_coord, start)
                     path.lineTo(x_coord, end)
 
-        self._highlight_item.setPath(path)
+        return path
 
-        # Configure cosmetic pen for marching ants
+    def _on_march_tick(self) -> None:
+        """Advance marching ants animation by one frame."""
+        self._dash_offset += 1.0
+        if self._dash_offset >= 8.0:  # Reset after full dash cycle
+            self._dash_offset = 0.0
+        self._update_highlight_overlay()
+        self._update_selection_overlay()
+
+    def _update_highlight_overlay(self) -> None:
+        """Update the highlight overlay showing edges of pixels with selected index."""
+        if self._indexed_data is None or self._highlight_index is None:
+            self._highlight_item.setPath(QPainterPath())
+            return
+
+        mask = self._indexed_data == self._highlight_index
+        if not np.any(mask):
+            self._highlight_item.setPath(QPainterPath())
+            return
+
+        self._highlight_item.setPath(self._create_boundary_path(mask))
+
+        # Configure cosmetic pen for marching ants (white)
         pen = QPen(QColor(255, 255, 255, 255))
-        pen.setWidthF(1.5)  # 1.5 screen pixels
-        pen.setCosmetic(True)  # Constant width regardless of zoom
+        pen.setWidthF(1.5)
+        pen.setCosmetic(True)
         pen.setStyle(Qt.PenStyle.DashLine)
         pen.setDashOffset(self._dash_offset)
         self._highlight_item.setPen(pen)
 
     def _update_selection_overlay(self) -> None:
-        """Update the selection overlay pixmap."""
-        if self._indexed_data is None:
-            self._selection_item.setPixmap(QPixmap())
+        """Update the selection overlay showing edges of selected pixels."""
+        if self._indexed_data is None or self._selection_mask is None or not self._selection_mask.has_selection():
+            self._selection_item.setPath(QPainterPath())
             return
 
-        height, width = self._indexed_data.shape
+        self._selection_item.setPath(self._create_boundary_path(self._selection_mask.mask))
 
-        if self._selection_mask is None or not self._selection_mask.has_selection():
-            self._selection_item.setPixmap(QPixmap())
-            return
-
-        # Create semi-transparent cyan overlay for selected pixels (distinct from green highlight)
-        # Use BGRA order for Format_ARGB32
-        overlay = np.zeros((height, width, 4), dtype=np.uint8)
-
-        for x, y in self._selection_mask.get_selected_pixels():
-            if 0 <= x < width and 0 <= y < height:
-                overlay[y, x] = (255, 255, 0, 120)  # BGRA: Blue=255, Green=255, Red=0, Alpha=120 (cyan)
-
-        overlay = np.ascontiguousarray(overlay)
-
-        qimage = QImage(
-            overlay.data,
-            width,
-            height,
-            width * 4,
-            QImage.Format.Format_ARGB32,
-        )
-        qimage = qimage.copy()
-
-        self._selection_item.setPixmap(QPixmap.fromImage(qimage))
+        # Configure cosmetic pen for selection marching ants (cyan)
+        pen = QPen(QColor(0, 255, 255, 255))
+        pen.setWidthF(1.5)
+        pen.setCosmetic(True)
+        pen.setStyle(Qt.PenStyle.DashLine)
+        pen.setDashOffset(self._dash_offset + 4.0)  # Offset to distinguish from highlight
+        self._selection_item.setPen(pen)
 
     def set_show_grid(self, show: bool) -> None:
         """Toggle grid overlay visibility."""

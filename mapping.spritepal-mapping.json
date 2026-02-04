@@ -10,16 +10,10 @@
       "height": 48
     },
     {
-      "path": "m_reduc.png",
-      "index": 0,
+      "path": "m_reduc_edited.png",
+      "index": 1,
       "width": 33,
       "height": 48
-    },
-    {
-      "path": "M\\v\\maxnew (4)_edited.png",
-      "index": 2,
-      "width": 60,
-      "height": 85
     },
     {
       "path": "M\\v\\maxnew (4)_edited.png",
@@ -258,9 +252,9 @@
   ],
   "mappings": [
     {
-      "ai_frame_id": "m_reduc.png",
+      "ai_frame_id": "m_reduc_edited.png",
       "game_frame_id": "capture_1769721724",
-      "status": "edited",
+      "status": "injected",
       "offset_x": 0,
       "offset_y": 0,
       "flip_h": false,
@@ -270,14 +264,14 @@
       "resampling": "lanczos"
     },
     {
-      "ai_frame_id": "maxnew (4)_edited.png",
+      "ai_frame_id": "m_reduc.png",
       "game_frame_id": "capture_1769721778",
-      "status": "edited",
+      "status": "injected",
       "offset_x": 0,
-      "offset_y": -1,
+      "offset_y": 0,
       "flip_h": false,
       "flip_v": false,
-      "scale": 0.5588884836219881,
+      "scale": 1.0,
       "sharpen": 0.0,
       "resampling": "lanczos"
     }
@@ -305,9 +299,9 @@
         173
       ],
       [
-        255,
-        198,
-        0
+        244,
+        220,
+        38
       ],
       [
         24,
@@ -360,9 +354,9 @@
         8
       ],
       [
-        165,
-        165,
-        156
+        255,
+        255,
+        255
       ]
     ],
     "color_mappings": {
