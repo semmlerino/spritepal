@@ -172,7 +172,8 @@ class SpriteCompositor:
 
         # Create canvas and paste AI at offset
         ai_canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
-        ai_canvas.paste(transformed_ai, (transform.offset_x, transform.offset_y), transformed_ai)
+        # Paste without mask to preserve straight-alpha RGB values for quantization.
+        ai_canvas.paste(transformed_ai, (transform.offset_x, transform.offset_y))
 
         # Get original sprite's alpha channel as mask (for result metadata)
         original_mask = original_sprite.split()[3]

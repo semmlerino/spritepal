@@ -517,6 +517,38 @@ class TestSheetPaletteQuantization:
             f"but got {pixel[:3]}. Sheet palette should take priority."
         )
 
+    def test_color_mappings_respect_straight_alpha(self) -> None:
+        """Semi-transparent pixels should match mappings based on straight RGB."""
+        from core.frame_mapping_project import SheetPalette
+        from core.palette_utils import snap_to_snes_color
+
+        ai_image = Image.new("RGBA", (1, 1), (200, 0, 0, 128))
+
+        entry = MockEntry(width=1, height=1)
+        capture = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16}, width=1, height=1)
+
+        sheet_palette = SheetPalette(
+            colors=[(0, 0, 0), (200, 0, 0), (96, 0, 0)] + [(0, 0, 0)] * 13,
+            color_mappings={(200, 0, 0): 1},
+        )
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        transform = TransformParams(offset_x=0, offset_y=0)
+
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=True,
+            sheet_palette=sheet_palette,
+        )
+
+        pixel = result.composited_image.getpixel((0, 0))
+        expected_color = snap_to_snes_color((200, 0, 0))
+        assert pixel[:3] == expected_color, (
+            f"Expected mapped color {expected_color} to survive quantization, but got {pixel[:3]}."
+        )
+
     def test_capture_palette_used_without_sheet_palette(self) -> None:
         """composite_frame should fall back to capture palette when no sheet_palette."""
         from dataclasses import dataclass, field
