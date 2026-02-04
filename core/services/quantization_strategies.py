@@ -128,8 +128,8 @@ class PaletteMappingStrategy(QuantizationStrategy):
         capture_palette_rgb: list[tuple[int, int, int]] | None,
         rom_offset: int,
     ) -> Image.Image:
-        if sheet_palette is None or not sheet_palette.color_mappings:
-            raise ValueError("PaletteMappingStrategy requires sheet palette with color_mappings")
+        if sheet_palette is None:
+            raise ValueError("PaletteMappingStrategy requires sheet palette")
 
         # Snap palette to SNES-valid colors (matches preview pipeline)
         palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
@@ -147,7 +147,7 @@ class PaletteMappingStrategy(QuantizationStrategy):
             baseline = quantize_with_mappings(
                 chunk_image,
                 palette_rgb,
-                sheet_palette.color_mappings,
+                sheet_palette.color_mappings or {},  # Empty dict = perceptual fallback
                 transparency_threshold=self._alpha_threshold,
                 dither_mode=self._dither_mode,
                 dither_strength=self._dither_strength,
@@ -167,7 +167,7 @@ class PaletteMappingStrategy(QuantizationStrategy):
         return quantize_with_mappings(
             chunk_image,
             palette_rgb,
-            sheet_palette.color_mappings,
+            sheet_palette.color_mappings or {},  # Empty dict = perceptual fallback
             transparency_threshold=self._alpha_threshold,
             dither_mode=self._dither_mode,
             dither_strength=self._dither_strength,
