@@ -175,10 +175,11 @@ class PaletteMappingStrategy(QuantizationStrategy):
 
 
 class StandardQuantizationStrategy(QuantizationStrategy):
-    """K-means quantization to target palette.
+    """Color-mapping quantization to target palette.
 
-    Standard color-matching quantization using the sheet palette.
-    Each pixel is assigned to the nearest palette color.
+    Uses explicit color mappings from sheet_palette when available,
+    with perceptual nearest-color fallback for unmapped colors.
+    This matches the Sheet Palette Editor's Live Preview exactly.
 
     Requires:
     - sheet_palette with colors defined
@@ -199,9 +200,13 @@ class StandardQuantizationStrategy(QuantizationStrategy):
         # Snap palette to SNES-valid colors (matches preview pipeline)
         palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
 
-        return quantize_to_palette(
+        # Use quantize_with_mappings to respect explicit color mappings
+        # This matches the Sheet Palette Editor's Live Preview
+        color_mappings = sheet_palette.color_mappings or {}
+        return quantize_with_mappings(
             chunk_image,
             palette_rgb,
+            color_mappings,
             transparency_threshold=self._alpha_threshold,
             dither_mode=self._dither_mode,
             dither_strength=self._dither_strength,
@@ -265,15 +270,7 @@ def select_quantization_strategy(
     Returns:
         Appropriate QuantizationStrategy instance
     """
-    # Check for palette mapping (explicit user mappings take precedence)
-    if sheet_palette is not None and sheet_palette.color_mappings:
-        return PaletteMappingStrategy(
-            alpha_threshold=alpha_threshold,
-            dither_mode=dither_mode,
-            dither_strength=dither_strength,
-        )
-
-    # Check for index passthrough eligibility (only when no mappings)
+    # Check for index passthrough eligibility first (indexed PNG with valid 4bpp indices)
     if chunk_index_map is not None and sheet_palette is not None:
         # Check if index map has valid data:
         # - No 255 markers (outside AI frame area)
@@ -293,9 +290,10 @@ def select_quantization_strategy(
                 max_index,
             )
 
-    # Check for standard quantization
+    # Use PaletteMappingStrategy when sheet_palette exists
+    # (handles both explicit mappings and empty dict for perceptual fallback)
     if sheet_palette is not None:
-        return StandardQuantizationStrategy(
+        return PaletteMappingStrategy(
             alpha_threshold=alpha_threshold,
             dither_mode=dither_mode,
             dither_strength=dither_strength,

@@ -21,11 +21,18 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import sys
 from pathlib import Path, PureWindowsPath
 
+import numpy as np
 from PIL import Image
+
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from core.palette_utils import quantize_with_mappings, snap_to_snes_color
 
 
 def main() -> None:
@@ -92,29 +99,24 @@ def main() -> None:
         print(f"Error: AI frame file not found: {ai_frame_path}")
         sys.exit(1)
 
-    # Get palette from sheet_palette (user's edited palette)
-    if project.get("sheet_palette") and project["sheet_palette"].get("colors"):
-        palette = [tuple(c) for c in project["sheet_palette"]["colors"]]
-        print(f"Using sheet_palette: {len(palette)} colors")
-    else:
-        # Fallback: load from capture
-        game_frame = next(
-            (f for f in project["game_frames"] if f.get("id") == mapping["game_frame_id"]),
-            None,
-        )
-        if game_frame is None:
-            print("Error: No sheet_palette and game frame not found")
-            sys.exit(1)
+    # Get sheet palette with all settings
+    sp = project.get("sheet_palette")
+    if not sp or not sp.get("colors"):
+        print("Error: No sheet_palette in project")
+        sys.exit(1)
 
-        capture_path = Path(PureWindowsPath(game_frame["capture_path"]).as_posix())
-        palette_idx = game_frame.get("palette_index", 0)
+    palette_colors = [tuple(c) for c in sp["colors"]]
+    color_mappings = {
+        tuple(ast.literal_eval(k) if isinstance(k, str) else k): v
+        for k, v in sp.get("color_mappings", {}).items()
+    }
+    background_color = tuple(sp["background_color"]) if sp.get("background_color") else None
+    background_tolerance = sp.get("background_tolerance", 30)
+    alpha_threshold = sp.get("alpha_threshold", 128)
+    dither_mode = sp.get("dither_mode", "none")
+    dither_strength = float(sp.get("dither_strength", 0.0))
 
-        from core.mesen_integration.click_extractor import MesenCaptureParser
-
-        parser_obj = MesenCaptureParser()
-        capture = parser_obj.parse_file(capture_path)
-        palette = [tuple(c) if isinstance(c, list) else c for c in capture.palettes[palette_idx]]
-        print(f"Using capture palette {palette_idx}: {len(palette)} colors")
+    print(f"Using sheet_palette: {len(palette_colors)} colors, {len(color_mappings)} mappings")
 
     # Load AI frame
     ai_image = Image.open(ai_frame_path).convert("RGBA")
@@ -142,11 +144,35 @@ def main() -> None:
 
     print(f"Transformed size: {transformed.size}")
 
-    # Quantize
-    from core.palette_utils import quantize_to_palette
+    # Apply background removal if configured (matches injection pipeline)
+    image_to_quantize = transformed
+    if background_color is not None:
+        from core.services.content_bounds_analyzer import remove_background
+        image_to_quantize = remove_background(
+            transformed,
+            background_color,
+            background_tolerance,
+        )
+        print(f"Background removed: {background_color} (tolerance {background_tolerance})")
 
-    indexed_img = quantize_to_palette(transformed, palette)
-    quantized = indexed_img.convert("RGBA")
+    # Snap palette to SNES precision (matches injection pipeline)
+    palette_rgb = [snap_to_snes_color(c) for c in palette_colors]
+
+    # Quantize with mappings (matches Sheet Palette Editor and injection pipeline)
+    quantized_indexed = quantize_with_mappings(
+        image_to_quantize,
+        palette_rgb,
+        color_mappings,
+        transparency_threshold=alpha_threshold,
+        dither_mode=dither_mode,
+        dither_strength=dither_strength,
+    )
+
+    # Convert to RGBA with binary alpha (matches SNES hardware)
+    quantized = quantized_indexed.convert("RGBA")
+    idx_array = np.array(quantized_indexed)
+    binary_alpha = np.where(idx_array == 0, 0, 255).astype(np.uint8)
+    quantized.putalpha(Image.fromarray(binary_alpha, mode="L"))
 
     # Scale up for display
     display_scale = args.display_scale

@@ -18,6 +18,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import sys
 from pathlib import Path, PureWindowsPath
@@ -106,7 +107,7 @@ def main() -> None:
 
     palette_colors = [tuple(c) for c in sp["colors"]]
     color_mappings = {
-        tuple(eval(k) if isinstance(k, str) else k): v
+        tuple(ast.literal_eval(k) if isinstance(k, str) else k): v
         for k, v in sp.get("color_mappings", {}).items()
     }
     background_color = tuple(sp["background_color"]) if sp.get("background_color") else None
