@@ -12,6 +12,7 @@ import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 
+from utils.color_distance import detect_rare_important_colors, rgb_to_lab
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -214,6 +215,8 @@ def quantize_to_palette(
     img: Image.Image,
     palette_rgb: list[tuple[int, int, int]],
     transparency_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    dither_mode: str = "none",
+    dither_strength: float = 0.0,
 ) -> Image.Image:
     """Quantize RGBA image to a fixed 16-color indexed palette.
 
@@ -228,6 +231,8 @@ def quantize_to_palette(
         img: PIL Image in RGBA mode
         palette_rgb: List of 16 RGB tuples defining the target palette
         transparency_threshold: Alpha values below this map to index 0
+        dither_mode: Dithering mode ("none" or "bayer", default "none")
+        dither_strength: Dithering strength 0.0-1.0 (default 0.0, disabled)
 
     Returns:
         PIL Image in mode "P" (indexed) with the specified palette
@@ -304,6 +309,8 @@ def quantize_with_mappings(
     palette_rgb: list[tuple[int, int, int]],
     color_mappings: dict[tuple[int, int, int], int],
     transparency_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    dither_mode: str = "none",
+    dither_strength: float = 0.0,
 ) -> Image.Image:
     """Quantize RGBA image using explicit color mappings with perceptual fallback.
 
@@ -317,6 +324,8 @@ def quantize_with_mappings(
         palette_rgb: List of 16 RGB tuples defining the target palette
         color_mappings: Dict mapping RGB tuples to palette indices (user-defined)
         transparency_threshold: Alpha values below this map to index 0
+        dither_mode: Dithering mode ("none" or "bayer", default "none")
+        dither_strength: Dithering strength 0.0-1.0 (default 0.0, disabled)
 
     Returns:
         PIL Image in mode "P" (indexed) with the specified palette
@@ -514,11 +523,81 @@ def extract_unique_colors(
     return color_counts
 
 
+def _cluster_similar_colors(
+    color_counts: dict[tuple[int, int, int], int],
+    threshold_sq: float = 25.0,  # 5.0² LAB units
+) -> dict[tuple[int, int, int], int]:
+    """Merge perceptually similar colors, keeping most frequent as representative.
+
+    Uses greedy frequency-weighted clustering in LAB space.
+
+    Args:
+        color_counts: Dict mapping RGB tuples to pixel counts
+        threshold_sq: Squared LAB distance threshold for merging (default 25.0 = 5.0²)
+
+    Returns:
+        Dict with merged colors and combined pixel counts
+    """
+    if not color_counts:
+        return {}
+
+    # Sort colors by frequency (descending), then by RGB tuple (for determinism)
+    sorted_colors = sorted(
+        color_counts.items(),
+        key=lambda x: (-x[1], x[0]),  # Most frequent first, then by RGB tuple
+    )
+
+    # Convert all colors to LAB once
+    color_to_lab: dict[tuple[int, int, int], tuple[float, float, float]] = {}
+    for color, _count in sorted_colors:
+        color_to_lab[color] = rgb_to_lab(color)
+
+    # Track which colors have been merged
+    merged: set[tuple[int, int, int]] = set()
+    result: dict[tuple[int, int, int], int] = {}
+
+    # For each color (most frequent first)
+    for representative, rep_count in sorted_colors:
+        if representative in merged:
+            continue
+
+        # This color becomes a cluster representative
+        total_count = rep_count
+        rep_lab = color_to_lab[representative]
+
+        # Find all unmerged colors within threshold_sq LAB distance
+        for candidate, cand_count in sorted_colors:
+            if candidate == representative or candidate in merged:
+                continue
+
+            cand_lab = color_to_lab[candidate]
+
+            # Calculate squared LAB distance
+            dL = rep_lab[0] - cand_lab[0]
+            da = rep_lab[1] - cand_lab[1]
+            db = rep_lab[2] - cand_lab[2]
+            dist_sq = dL * dL + da * da + db * db
+
+            if dist_sq <= threshold_sq:
+                # Merge this color into representative
+                total_count += cand_count
+                merged.add(candidate)
+
+        # Store representative with combined count
+        result[representative] = total_count
+
+    return result
+
+
 def quantize_colors_to_palette(
     color_counts: dict[tuple[int, int, int], int],
     max_colors: int = SNES_PALETTE_SIZE,
     *,
     snap_to_snes: bool = True,
+    dither_mode: str = "none",
+    dither_strength: float = 0.0,
+    background_color: tuple[int, int, int] | None = None,
+    background_tolerance: int = 30,
 ) -> list[tuple[int, int, int]]:
     """Quantize colors to a limited palette.
 
@@ -529,6 +608,10 @@ def quantize_colors_to_palette(
         color_counts: Dict mapping RGB tuples to pixel counts
         max_colors: Maximum colors in output palette (default 16 for SNES)
         snap_to_snes: If True, snap colors to SNES-valid values (multiples of 8)
+        dither_mode: Dithering mode ("none" or "bayer", default "none")
+        dither_strength: Dithering strength 0.0-1.0 (default 0.0, disabled)
+        background_color: If provided, colors within tolerance are filtered out
+        background_tolerance: Max RGB component difference to match background (default 30)
 
     Returns:
         List of RGB tuples (max_colors entries, index 0 = transparency)
@@ -536,6 +619,33 @@ def quantize_colors_to_palette(
     if not color_counts:
         # Return empty palette with black at index 0
         return [(0, 0, 0)] * max_colors
+
+    # Filter background colors
+    if background_color is not None:
+        filtered_counts: dict[tuple[int, int, int], int] = {}
+        for color, count in color_counts.items():
+            # Check if color is within tolerance of background
+            dr = abs(color[0] - background_color[0])
+            dg = abs(color[1] - background_color[1])
+            db = abs(color[2] - background_color[2])
+            if dr <= background_tolerance and dg <= background_tolerance and db <= background_tolerance:
+                continue  # Skip background-like colors
+            filtered_counts[color] = count
+        color_counts = filtered_counts
+        if not color_counts:
+            return [(0, 0, 0)] * max_colors
+
+    # Cluster similar colors
+    color_counts = _cluster_similar_colors(color_counts, threshold_sq=25.0)
+
+    # Detect rare important colors
+    rare_colors = detect_rare_important_colors(
+        color_counts,
+        rarity_threshold=0.01,
+        distinctness_threshold=15.0,  # Lower threshold to catch more
+        max_candidates=3,
+    )
+    reserved_colors = [rc[0] for rc in rare_colors]  # Extract just the RGB tuples
 
     # Optionally snap input colors to SNES-valid values first
     # This merges similar colors that would map to the same SNES color
@@ -545,15 +655,27 @@ def quantize_colors_to_palette(
             snapped = snap_to_snes_color(color)
             snapped_counts[snapped] = snapped_counts.get(snapped, 0) + count
         color_counts = snapped_counts
+        # Also snap reserved colors
+        reserved_colors = [snap_to_snes_color(c) for c in reserved_colors]
 
     # Sort colors by frequency
     sorted_colors = sorted(color_counts.items(), key=lambda x: x[1], reverse=True)
 
-    # If we have few enough colors, use them directly
-    if len(sorted_colors) <= max_colors - 1:  # -1 for transparency
-        palette: list[tuple[int, int, int]] = [(0, 0, 0)]  # Index 0 = transparent/black
+    # Reserve slots for rare important colors (dedup in case snapping created duplicates)
+    reserved_set = set(reserved_colors)
+    available_slots = max_colors - 1 - len(reserved_set)  # -1 for transparency
+
+    # If we have few enough colors after reserving, use them directly
+    if len(sorted_colors) <= available_slots:
+        palette: list[tuple[int, int, int]] = [(0, 0, 0)]
+        # Add reserved colors first
+        for color in reserved_set:
+            if color not in palette:
+                palette.append(color)
+        # Add remaining colors
         for color, _count in sorted_colors:
-            palette.append(color)
+            if color not in palette and len(palette) < max_colors:
+                palette.append(color)
         # Pad with black if needed
         while len(palette) < max_colors:
             palette.append((0, 0, 0))
@@ -579,29 +701,48 @@ def quantize_colors_to_palette(
     img = Image.new("RGB", (img_size, img_size))
     img.putdata(pixel_data[: img_size * img_size])
 
-    # Quantize to max_colors - 1 (reserve index 0 for transparency)
-    quantized = img.quantize(colors=max_colors - 1, method=Image.Quantize.MEDIANCUT)
+    # Quantize to available_slots colors (after reserving slots for rare important colors)
+    quantized = img.quantize(colors=available_slots, method=Image.Quantize.MEDIANCUT)
     raw_palette = quantized.getpalette()
 
     if raw_palette is None:
         # Fallback: use most frequent colors (already snapped if snap_to_snes)
         palette = [(0, 0, 0)]
-        for color, _count in sorted_colors[: max_colors - 1]:
-            palette.append(color)
+        # Add reserved colors first
+        for color in reserved_set:
+            if color != (0, 0, 0):
+                palette.append(color)
+        # Add most frequent colors
+        for color, _count in sorted_colors:
+            if color not in palette and len(palette) < max_colors:
+                palette.append(color)
         while len(palette) < max_colors:
             palette.append((0, 0, 0))
         return palette
 
-    # Extract palette colors from quantization result
+    # Build final palette: [transparent] + [reserved] + [quantized]
     palette = [(0, 0, 0)]  # Index 0 = transparent
-    for i in range(max_colors - 1):
+
+    # Add reserved rare colors
+    for color in reserved_set:
+        if color != (0, 0, 0):  # Don't duplicate transparency
+            palette.append(color)
+
+    # Add quantized colors
+    for i in range(available_slots):
+        if len(palette) >= max_colors:
+            break
         r = raw_palette[i * 3]
         g = raw_palette[i * 3 + 1]
         b = raw_palette[i * 3 + 2]
         color = (r, g, b)
-        # Snap quantized colors to SNES-valid values
         if snap_to_snes:
             color = snap_to_snes_color(color)
-        palette.append(color)
+        if color not in palette:  # Avoid duplicates
+            palette.append(color)
+
+    # Pad if needed
+    while len(palette) < max_colors:
+        palette.append((0, 0, 0))
 
     return palette
