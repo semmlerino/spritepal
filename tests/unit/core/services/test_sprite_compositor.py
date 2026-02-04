@@ -1091,6 +1091,219 @@ class TestPaletteInvariantAssertions:
         assert result.composited_image is not None
 
 
+class TestQuantizeFullResScaleIndexed:
+    """Test the "quantize full-res, scale indexed" fix for color_mappings.
+
+    Bug: When color_mappings existed, index_map was ignored, causing scaled pixels
+    to be re-quantized with perceptual matching instead of preserving exact indices.
+
+    Fix: When color_mappings exist, generate index_map from ORIGINAL image before
+    transforms, then use that index_map for quantization after transforms.
+    """
+
+    def test_color_mappings_generates_index_map_before_transforms(self) -> None:
+        """color_mappings should generate an index_map from original image before transforms."""
+        import numpy as np
+
+        from core.frame_mapping_project import SheetPalette
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create an 8x8 AI image with 3 distinct colors
+        ai_image = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+        # Top-left quadrant: red
+        for x in range(4):
+            for y in range(4):
+                ai_image.putpixel((x, y), (255, 0, 0, 255))
+        # Top-right quadrant: green
+        for x in range(4, 8):
+            for y in range(4):
+                ai_image.putpixel((x, y), (0, 255, 0, 255))
+        # Bottom-left quadrant: blue
+        for x in range(4):
+            for y in range(4, 8):
+                ai_image.putpixel((x, y), (0, 0, 255, 255))
+        # Bottom-right remains transparent
+
+        # Sheet palette with color_mappings for each color
+        sheet_palette = SheetPalette(
+            colors=[
+                (0, 0, 0),  # 0: transparent
+                (255, 0, 0),  # 1: red
+                (0, 255, 0),  # 2: green
+                (0, 0, 255),  # 3: blue
+            ]
+            + [(100, 100, 100)] * 12,  # pad to 16
+            color_mappings={
+                (255, 0, 0): 1,
+                (0, 255, 0): 2,
+                (0, 0, 255): 3,
+            },
+        )
+
+        # Create transform that shrinks to 4x4
+        transform = TransformParams(scale=0.5)
+
+        # Mock capture with 8x8 bounding box
+        entry = MockEntry(id=0, x=0, y=0, width=8, height=8)
+        capture = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16}, width=8, height=8)
+
+        # Call composite_frame with ai_index_map=None (should generate internally)
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=True,
+            sheet_palette=sheet_palette,
+            ai_index_map=None,  # Force generation from color_mappings
+        )
+
+        # Verify index_map was generated and returned
+        assert result.index_map is not None, "index_map should be generated from color_mappings"
+
+        # After scaling from 8x8 to 4x4, result.index_map should match transformed size
+        # But wait - we need to check the canvas size. The transform is applied to the AI image,
+        # then pasted onto a canvas. The canvas size is 8x8 (from bounding box).
+        # The transformed AI will be 4x4, pasted at offset (0,0) into 8x8 canvas.
+        assert result.index_map.shape == (8, 8), (
+            f"index_map shape should match canvas size (8x8), got {result.index_map.shape}"
+        )
+
+    def test_index_map_preserves_exact_indices_through_scale(self) -> None:
+        """Scaling with color_mappings should preserve exact palette indices, not use perceptual matching."""
+        import numpy as np
+
+        from core.frame_mapping_project import SheetPalette
+        from core.palette_utils import snap_to_snes_color
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create a 16x16 AI image where ALL pixels are red (should map to index 3)
+        # Use SNES-valid color (206 = valid SNES red channel value)
+        ai_color = (206, 49, 49)
+        ai_image = Image.new("RGBA", (16, 16), (*ai_color, 255))
+
+        # Sheet palette where index 3 is red, but other colors are similar (test exact match)
+        # All colors must be SNES-valid to match after snap
+        sheet_palette = SheetPalette(
+            colors=[
+                (0, 0, 0),  # 0: transparent
+                (222, 41, 41),  # 1: slightly different red (perceptual match might choose this)
+                (181, 57, 57),  # 2: another similar red
+                (206, 49, 49),  # 3: exact match to our AI color
+            ]
+            + [(99, 99, 99)] * 12,  # pad to 16
+            color_mappings={
+                ai_color: 3,  # Map our red to index 3 EXACTLY
+            },
+        )
+
+        # Apply 0.5x scale transform (16x16 -> 8x8)
+        transform = TransformParams(scale=0.5)
+
+        # Mock capture with 16x16 bounding box
+        entry = MockEntry(id=0, x=0, y=0, width=16, height=16)
+        capture = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16}, width=16, height=16)
+
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=True,
+            sheet_palette=sheet_palette,
+        )
+
+        # Extract indices from composited result by checking which palette color each pixel matches
+        composited_array = np.array(result.composited_image)
+
+        # Count pixels with index 3 (should be ALL non-transparent pixels)
+        # Index 3 corresponds to our ai_color after SNES snapping
+        target_color = np.array(snap_to_snes_color(ai_color))
+
+        # Find all opaque pixels
+        opaque_mask = composited_array[:, :, 3] > 128
+        opaque_pixels = composited_array[opaque_mask]
+
+        # All opaque pixels should match the target color (index 3)
+        # Check RGB channels only
+        matches = np.all(opaque_pixels[:, :3] == target_color, axis=1)
+
+        # After scaling, we should have opaque pixels in roughly 8x8 area
+        assert opaque_mask.sum() > 0, "Should have some opaque pixels after compositing"
+
+        # ALL opaque pixels should have index 3 (exact match, not perceptual)
+        assert matches.all(), (
+            f"All opaque pixels should map to index 3 (color {target_color}), "
+            f"but found {matches.sum()}/{len(matches)} matches. "
+            f"If not all match, perceptual quantization was used instead of exact mapping."
+        )
+
+    def test_indexed_png_precedence_over_color_mappings(self) -> None:
+        """Provided ai_index_map should take precedence over color_mappings generation.
+
+        This ensures BUG-1 fix (indexed PNG support) is preserved when BUG-2
+        fix (color_mappings -> index_map) is active.
+        """
+        import numpy as np
+
+        from core.frame_mapping_project import SheetPalette
+        from core.palette_utils import snap_to_snes_color
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create a simple 8x8 AI image (red) - use SNES-valid color
+        ai_image = Image.new("RGBA", (8, 8), (255, 0, 0, 255))
+
+        # Create explicit index map: all pixels should use index 5
+        explicit_index_map = np.full((8, 8), 5, dtype=np.uint8)
+
+        # Sheet palette with BOTH color_mappings (would map red to index 1) AND explicit index_map
+        # Use SNES-valid colors
+        sheet_palette = SheetPalette(
+            colors=[
+                (0, 0, 0),  # 0: transparent
+                (255, 0, 0),  # 1: red (color_mappings would use this)
+                (99, 99, 99),
+                (99, 99, 99),
+                (99, 99, 99),
+                (206, 0, 0),  # 5: dark red (explicit index_map uses this)
+            ]
+            + [(99, 99, 99)] * 10,
+            color_mappings={
+                (255, 0, 0): 1,  # This mapping should be IGNORED when ai_index_map is provided
+            },
+        )
+
+        transform = TransformParams(scale=1.0)  # No scaling
+
+        entry = MockEntry(id=0, x=0, y=0, width=8, height=8)
+        capture = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16}, width=8, height=8)
+
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=True,
+            sheet_palette=sheet_palette,
+            ai_index_map=explicit_index_map,  # Provide explicit map
+        )
+
+        # Verify that the PROVIDED index map was used (index 5), not generated from color_mappings (index 1)
+        composited_array = np.array(result.composited_image)
+
+        # Index 5 corresponds to color (206, 0, 0) after SNES snapping - dark red
+        expected_color = np.array(snap_to_snes_color((206, 0, 0)))
+
+        # Sample center pixel
+        center_pixel = composited_array[4, 4, :3]
+
+        assert np.array_equal(center_pixel, expected_color), (
+            f"Expected index 5 color {expected_color} from provided ai_index_map, "
+            f"but got {center_pixel}. The provided index_map should take precedence "
+            f"over color_mappings generation."
+        )
+
+
 class TestOriginalSpriteCache:
     """Test caching of original sprite rendering for drag performance."""
 
