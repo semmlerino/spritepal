@@ -264,3 +264,34 @@ The injection pipeline converts to RGBA for compositing. Palette indices are re-
 Quick start:
 - Find ROM offset: `run_sprite_rom_finder.bat` → click sprite → read `FILE: 0xNNNNNN`
 - Capture: `run_sprite_capture.bat` → `mesen2_exchange/sprite_capture_*.json`
+
+---
+
+## Debugging & Preview Scripts
+
+### Quantized Preview Capture
+
+Render what an AI frame looks like after palette quantization (without launching the full UI):
+
+```bash
+# Default: mapping.spritepal-mapping.json, first mapping → /tmp/quantized_preview.png
+uv run python scripts/capture_quantized_preview.py
+
+# Specify project and output
+uv run python scripts/capture_quantized_preview.py -p my_project.spritepal-mapping.json -o preview.png
+
+# Different mapping index, larger display scale
+uv run python scripts/capture_quantized_preview.py -m 2 --display-scale 8
+```
+
+Uses `sheet_palette` from the project (falls back to capture palette if not set).
+
+### Workbench Alignment Preview
+
+Render the alignment overlay (AI frame over game frame):
+
+```bash
+uv run python scripts/render_workbench.py -p mapping.spritepal-mapping.json -m 0 --use-saved -o /tmp/workbench.png
+```
+
+See `--help` for options: `--tile-overlay`, `--show-overflow`, `--auto-align`, etc.
