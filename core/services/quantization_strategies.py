@@ -134,6 +134,36 @@ class PaletteMappingStrategy(QuantizationStrategy):
         # Snap palette to SNES-valid colors (matches preview pipeline)
         palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
 
+        # Build palette for PIL (flat list, padded to 256 colors)
+        palette_flat: list[int] = []
+        for r, g, b in palette_rgb:
+            palette_flat.extend([r, g, b])
+        palette_flat.extend([0] * (768 - len(palette_flat)))
+
+        # Use index map where valid (not 255), fall back to quantization elsewhere
+        # This implements "quantize full-res, scale indexed" for injection parity
+        if chunk_index_map is not None and np.any(chunk_index_map != 255):
+            # Baseline quantization for 255-marked regions (outside AI frame)
+            baseline = quantize_with_mappings(
+                chunk_image,
+                palette_rgb,
+                sheet_palette.color_mappings,
+                transparency_threshold=self._alpha_threshold,
+                dither_mode=self._dither_mode,
+                dither_strength=self._dither_strength,
+            )
+
+            # Overlay pre-computed indices where valid
+            pixels = np.array(baseline)
+            mask = chunk_index_map != 255
+            pixels[mask] = chunk_index_map[mask]
+
+            # Rebuild indexed image
+            result = Image.fromarray(pixels, mode="P")
+            result.putpalette(palette_flat)
+            return result
+
+        # No index map - fall back to standard quantization
         return quantize_with_mappings(
             chunk_image,
             palette_rgb,
