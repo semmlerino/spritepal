@@ -1,9 +1,9 @@
 """Quantization strategies for tile injection.
 
 Encapsulates the 4 different quantization paths:
-1. Index passthrough - preserve original palette indices
-2. Palette mapping - use explicit color mappings
-3. Standard quantization - k-means to target palette
+1. Palette mapping - use explicit color mappings
+2. Index passthrough - preserve original palette indices (when no mappings)
+3. Standard quantization - nearest color to target palette
 4. Capture fallback - use capture's original palette
 """
 
@@ -31,6 +31,17 @@ logger = get_logger(__name__)
 
 class QuantizationStrategy(ABC):
     """Base class for quantization strategies."""
+
+    def __init__(
+        self,
+        *,
+        alpha_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD,
+        dither_mode: str = "none",
+        dither_strength: float = 0.0,
+    ) -> None:
+        self._alpha_threshold = max(0, min(255, alpha_threshold))
+        self._dither_mode = dither_mode if dither_mode in {"none", "bayer"} else "none"
+        self._dither_strength = max(0.0, min(1.0, float(dither_strength)))
 
     @abstractmethod
     def quantize(
@@ -127,7 +138,9 @@ class PaletteMappingStrategy(QuantizationStrategy):
             chunk_image,
             palette_rgb,
             sheet_palette.color_mappings,
-            transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+            transparency_threshold=self._alpha_threshold,
+            dither_mode=self._dither_mode,
+            dither_strength=self._dither_strength,
         )
 
 
@@ -159,7 +172,9 @@ class StandardQuantizationStrategy(QuantizationStrategy):
         return quantize_to_palette(
             chunk_image,
             palette_rgb,
-            transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+            transparency_threshold=self._alpha_threshold,
+            dither_mode=self._dither_mode,
+            dither_strength=self._dither_strength,
         )
 
 
@@ -189,7 +204,9 @@ class CapturePaletteFallbackStrategy(QuantizationStrategy):
         return quantize_to_palette(
             chunk_image,
             capture_palette_rgb,
-            transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+            transparency_threshold=self._alpha_threshold,
+            dither_mode=self._dither_mode,
+            dither_strength=self._dither_strength,
         )
 
 
@@ -197,12 +214,16 @@ def select_quantization_strategy(
     chunk_index_map: np.ndarray | None,
     sheet_palette: SheetPalette | None,
     capture_palette_rgb: list[tuple[int, int, int]] | None,
+    *,
+    alpha_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    dither_mode: str = "none",
+    dither_strength: float = 0.0,
 ) -> QuantizationStrategy:
     """Select the appropriate quantization strategy based on available data.
 
     Priority order:
-    1. Index passthrough (if index map valid and sheet palette exists)
-    2. Palette mapping (if sheet palette has color_mappings)
+    1. Palette mapping (if sheet palette has color_mappings)
+    2. Index passthrough (if index map valid and sheet palette exists, and no mappings)
     3. Standard quantization (if sheet palette exists)
     4. Capture palette fallback (last resort)
 
@@ -214,7 +235,15 @@ def select_quantization_strategy(
     Returns:
         Appropriate QuantizationStrategy instance
     """
-    # Check for index passthrough eligibility
+    # Check for palette mapping (explicit user mappings take precedence)
+    if sheet_palette is not None and sheet_palette.color_mappings:
+        return PaletteMappingStrategy(
+            alpha_threshold=alpha_threshold,
+            dither_mode=dither_mode,
+            dither_strength=dither_strength,
+        )
+
+    # Check for index passthrough eligibility (only when no mappings)
     if chunk_index_map is not None and sheet_palette is not None:
         # Check if index map has valid data:
         # - No 255 markers (outside AI frame area)
@@ -222,7 +251,11 @@ def select_quantization_strategy(
         max_index = int(np.max(chunk_index_map))
         has_outside_markers = np.any(chunk_index_map == 255)
         if not has_outside_markers and max_index <= 15:
-            return IndexPassthroughStrategy()
+            return IndexPassthroughStrategy(
+                alpha_threshold=alpha_threshold,
+                dither_mode=dither_mode,
+                dither_strength=dither_strength,
+            )
         elif max_index > 15:
             logger.debug(
                 "Index passthrough skipped: max index %d exceeds 4bpp limit (0-15), "
@@ -230,13 +263,17 @@ def select_quantization_strategy(
                 max_index,
             )
 
-    # Check for palette mapping
-    if sheet_palette is not None and sheet_palette.color_mappings:
-        return PaletteMappingStrategy()
-
     # Check for standard quantization
     if sheet_palette is not None:
-        return StandardQuantizationStrategy()
+        return StandardQuantizationStrategy(
+            alpha_threshold=alpha_threshold,
+            dither_mode=dither_mode,
+            dither_strength=dither_strength,
+        )
 
     # Fallback to capture palette
-    return CapturePaletteFallbackStrategy()
+    return CapturePaletteFallbackStrategy(
+        alpha_threshold=alpha_threshold,
+        dither_mode=dither_mode,
+        dither_strength=dither_strength,
+    )

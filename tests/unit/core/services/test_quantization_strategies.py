@@ -275,8 +275,8 @@ class TestSelectQuantizationStrategy:
 
         assert isinstance(strategy, CapturePaletteFallbackStrategy)
 
-    def test_priority_passthrough_over_mapping(self) -> None:
-        """Index passthrough takes priority over palette mapping."""
+    def test_priority_mapping_over_passthrough(self) -> None:
+        """Palette mapping takes priority over index passthrough when mappings exist."""
         index_map = np.zeros((8, 8), dtype=np.uint8)  # Valid
 
         colors = [(248, 0, 0)]
@@ -285,5 +285,5 @@ class TestSelectQuantizationStrategy:
 
         strategy = select_quantization_strategy(index_map, palette, None)
 
-        # Passthrough wins even though mappings exist
-        assert isinstance(strategy, IndexPassthroughStrategy)
+        # Mappings win even though index map is valid
+        assert isinstance(strategy, PaletteMappingStrategy)

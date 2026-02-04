@@ -143,10 +143,15 @@ class PaletteService(QObject):
         # Update color_mappings: keep existing mappings unchanged
         updated_mappings = dict(palette.color_mappings)
 
-        # Create new palette with updated colors
+        # Preserve non-color settings (background removal + quantization)
         project.sheet_palette = SheetPalette(
             colors=colors,
             color_mappings=updated_mappings,
+            background_color=palette.background_color,
+            background_tolerance=palette.background_tolerance,
+            alpha_threshold=palette.alpha_threshold,
+            dither_mode=palette.dither_mode,
+            dither_strength=palette.dither_strength,
         )
 
         self.sheet_palette_changed.emit()

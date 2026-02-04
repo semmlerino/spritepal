@@ -940,7 +940,10 @@ class InjectionOrchestrator:
 
             # Check for content
             tile_alpha = tile_img.split()[3]
-            has_content = any(p >= QUANTIZATION_TRANSPARENCY_THRESHOLD for p in tile_alpha.getdata())
+            alpha_threshold = QUANTIZATION_TRANSPARENCY_THRESHOLD
+            if project.sheet_palette is not None:
+                alpha_threshold = project.sheet_palette.alpha_threshold
+            has_content = any(p >= alpha_threshold for p in tile_alpha.getdata())
             if not has_content:
                 tile_img = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
 
@@ -988,7 +991,22 @@ class InjectionOrchestrator:
             capture_palette_rgb = snes_palette_to_rgb(snes_palette) if snes_palette else None
 
         # Select and apply quantization strategy
-        quant_strategy = select_quantization_strategy(chunk_index_map, project.sheet_palette, capture_palette_rgb)
+        alpha_threshold = QUANTIZATION_TRANSPARENCY_THRESHOLD
+        dither_mode = "none"
+        dither_strength = 0.0
+        if project.sheet_palette is not None:
+            alpha_threshold = project.sheet_palette.alpha_threshold
+            dither_mode = project.sheet_palette.dither_mode
+            dither_strength = project.sheet_palette.dither_strength
+
+        quant_strategy = select_quantization_strategy(
+            chunk_index_map,
+            project.sheet_palette,
+            capture_palette_rgb,
+            alpha_threshold=alpha_threshold,
+            dither_mode=dither_mode,
+            dither_strength=dither_strength,
+        )
         chunk_img = quant_strategy.quantize(
             chunk_img, chunk_index_map, project.sheet_palette, capture_palette_rgb, rom_offset
         )
