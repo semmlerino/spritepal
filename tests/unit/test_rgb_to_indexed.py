@@ -509,3 +509,74 @@ class TestLoadImagePreservingIndices:
         assert index_map is not None
         # Indices should be preserved exactly, even though colors are the same
         np.testing.assert_array_equal(index_map, indexed_data)
+
+    def test_indexed_png_palette_match_preserves_index_map(self, tmp_path) -> None:
+        """Indexed PNG preserves index map when palette matches sheet palette."""
+        from core.services.rgb_to_indexed import load_image_preserving_indices
+
+        indexed_data = np.array([[0, 1], [2, 3]], dtype=np.uint8)
+        colors = [
+            (0, 0, 0),
+            (10, 20, 30),
+            (40, 50, 60),
+            (70, 80, 90),
+            *[(0, 0, 0)] * 12,
+        ]
+
+        palette_flat: list[int] = []
+        for r, g, b in colors:
+            palette_flat.extend([r, g, b])
+        palette_flat.extend([0] * (768 - len(palette_flat)))
+
+        img = Image.fromarray(indexed_data, mode="P")
+        img.putpalette(palette_flat)
+
+        path = tmp_path / "match.png"
+        img.save(path)
+
+        palette = MockSheetPalette(colors=colors)
+        index_map, _ = load_image_preserving_indices(path, sheet_palette=palette)
+
+        assert index_map is not None
+        np.testing.assert_array_equal(index_map, indexed_data)
+
+    def test_indexed_png_palette_mismatch_drops_index_map(self, tmp_path) -> None:
+        """Indexed PNG returns None index map when palette mismatches sheet palette."""
+        from core.services.rgb_to_indexed import load_image_preserving_indices
+
+        indexed_data = np.array([[0, 1], [2, 3]], dtype=np.uint8)
+        palette_flat = [
+            0,
+            0,
+            0,
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80,
+            90,
+        ]
+        palette_flat.extend([0] * (768 - len(palette_flat)))
+
+        img = Image.fromarray(indexed_data, mode="P")
+        img.putpalette(palette_flat)
+
+        path = tmp_path / "mismatch.png"
+        img.save(path)
+
+        # Mismatched palette (second color differs)
+        palette = MockSheetPalette(
+            colors=[
+                (0, 0, 0),
+                (11, 22, 33),
+                (40, 50, 60),
+                (70, 80, 90),
+                *[(0, 0, 0)] * 12,
+            ]
+        )
+
+        index_map, _ = load_image_preserving_indices(path, sheet_palette=palette)
+        assert index_map is None

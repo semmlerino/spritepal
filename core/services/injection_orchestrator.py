@@ -552,7 +552,10 @@ class InjectionOrchestrator:
         indexed PNG, enabling index-preserving injection that avoids re-quantization.
         """
         # Load AI image, preserving palette indices if indexed PNG
-        ai_index_map, ai_img = load_image_preserving_indices(ai_frame.path)
+        ai_index_map, ai_img = load_image_preserving_indices(
+            ai_frame.path,
+            sheet_palette=sheet_palette,
+        )
         if ai_index_map is not None:
             logger.debug(
                 "Loaded indexed PNG with preserved indices: %s (shape: %s)",

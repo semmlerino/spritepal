@@ -291,7 +291,11 @@ def analyze_color_usage(
     }
 
 
-def load_image_preserving_indices(path: Path) -> tuple[np.ndarray | None, Image.Image]:
+def load_image_preserving_indices(
+    path: Path,
+    *,
+    sheet_palette: "SheetPalette | None" = None,
+) -> tuple[np.ndarray | None, Image.Image]:
     """Load image, extracting palette indices if it's an indexed PNG.
 
     BUG-1 FIX: When loading AI frames that were edited in the palette editor,
@@ -299,8 +303,13 @@ def load_image_preserving_indices(path: Path) -> tuple[np.ndarray | None, Image.
     injection. This ensures that edited pixels maintain their exact palette
     index assignment even when palette colors are duplicated.
 
+    If a sheet palette is provided, the embedded palette must match the
+    sheet palette colors to preserve indices. This avoids misaligned indices
+    when an indexed PNG was created with a different palette.
+
     Args:
         path: Path to the image file
+        sheet_palette: Optional sheet palette used to validate palette matches
 
     Returns:
         Tuple of (index_map, rgba_image):
@@ -312,6 +321,22 @@ def load_image_preserving_indices(path: Path) -> tuple[np.ndarray | None, Image.
         if img.mode == "P":
             # Indexed PNG - extract indices BEFORE converting
             index_map = np.array(img, dtype=np.uint8)
+
+            if sheet_palette is not None:
+                palette_data = img.getpalette() or []
+                expected_colors = sheet_palette.colors
+                needed = len(expected_colors) * 3
+                if len(palette_data) < needed:
+                    return None, img.convert("RGBA")
+
+                palette_colors = [
+                    (palette_data[i], palette_data[i + 1], palette_data[i + 2])
+                    for i in range(0, needed, 3)
+                ]
+
+                if palette_colors != expected_colors:
+                    return None, img.convert("RGBA")
+
             return index_map, img.convert("RGBA")
         # Non-indexed image - no indices to preserve
         return None, img.convert("RGBA")

@@ -1103,7 +1103,10 @@ class WorkbenchCanvas(QWidget):
             else:
                 # Cache miss - load and cache
                 try:
-                    self._ai_index_map, self._ai_image = load_image_preserving_indices(frame.path)
+                    self._ai_index_map, self._ai_image = load_image_preserving_indices(
+                        frame.path,
+                        sheet_palette=self._sheet_palette,
+                    )
                     if self._ai_index_map is not None:
                         logger.debug(
                             "Loaded AI frame %s with preserved index map (shape: %s)",
