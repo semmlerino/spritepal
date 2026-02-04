@@ -151,7 +151,7 @@ class SpriteCompositor:
 
         # Generate index map from color_mappings on ORIGINAL image (before transforms)
         # This implements "quantize full-res, scale indexed" for Live Preview parity
-        if ai_index_map is None and sheet_palette is not None and sheet_palette.color_mappings:
+        if ai_index_map is None and sheet_palette is not None:
             palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
             ai_index_map = quantize_to_index_map(
                 ai_image,  # ORIGINAL, before transforms
@@ -331,23 +331,14 @@ class SpriteCompositor:
         alpha_threshold = getattr(sheet_palette, "alpha_threshold", QUANTIZATION_TRANSPARENCY_THRESHOLD)
         dither_mode = getattr(sheet_palette, "dither_mode", "none")
         dither_strength = getattr(sheet_palette, "dither_strength", 0.0)
-        if sheet_palette.color_mappings:
-            indexed = quantize_with_mappings(
-                image,
-                palette_rgb,
-                sheet_palette.color_mappings,
-                transparency_threshold=alpha_threshold,
-                dither_mode=dither_mode,
-                dither_strength=dither_strength,
-            )
-        else:
-            indexed = quantize_to_palette(
-                image,
-                palette_rgb,
-                transparency_threshold=alpha_threshold,
-                dither_mode=dither_mode,
-                dither_strength=dither_strength,
-            )
+        indexed = quantize_with_mappings(
+            image,
+            palette_rgb,
+            sheet_palette.color_mappings or {},  # Empty dict = perceptual fallback
+            transparency_threshold=alpha_threshold,
+            dither_mode=dither_mode,
+            dither_strength=dither_strength,
+        )
 
         # 2. Overlay indices from the map where available (255 = no index)
         # With "quantize full-res, scale indexed", index_map is either:
@@ -509,25 +500,14 @@ class SpriteCompositor:
             alpha_threshold = getattr(sheet_palette, "alpha_threshold", QUANTIZATION_TRANSPARENCY_THRESHOLD)
             dither_mode = getattr(sheet_palette, "dither_mode", "none")
             dither_strength = getattr(sheet_palette, "dither_strength", 0.0)
-            if sheet_palette.color_mappings:
-                # Use explicit color mappings
-                indexed = quantize_with_mappings(
-                    image,
-                    palette_rgb,
-                    sheet_palette.color_mappings,
-                    transparency_threshold=alpha_threshold,
-                    dither_mode=dither_mode,
-                    dither_strength=dither_strength,
-                )
-            else:
-                # Sheet palette without explicit mappings -> nearest color
-                indexed = quantize_to_palette(
-                    image,
-                    palette_rgb,
-                    transparency_threshold=alpha_threshold,
-                    dither_mode=dither_mode,
-                    dither_strength=dither_strength,
-                )
+            indexed = quantize_with_mappings(
+                image,
+                palette_rgb,
+                sheet_palette.color_mappings or {},  # Empty dict = perceptual fallback
+                transparency_threshold=alpha_threshold,
+                dither_mode=dither_mode,
+                dither_strength=dither_strength,
+            )
         else:
             # Fallback: capture palette (existing behavior)
             if not capture_result.entries or not capture_result.palettes:

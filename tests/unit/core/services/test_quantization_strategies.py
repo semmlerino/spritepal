@@ -108,20 +108,22 @@ class TestPaletteMappingStrategy:
 
         assert result.mode == "P"
 
-    def test_raises_without_color_mappings(self) -> None:
+    def test_handles_empty_color_mappings(self) -> None:
+        """Should handle empty color_mappings by falling back to perceptual matching."""
         strategy = PaletteMappingStrategy()
         colors = [(248, 0, 0)]
         colors.extend([(0, 0, 0)] * 15)
-        palette = MockSheetPalette(colors=colors, color_mappings=None)
+        palette = MockSheetPalette(colors=colors, color_mappings={})  # Empty dict
 
-        with pytest.raises(ValueError, match="requires sheet palette with color_mappings"):
-            strategy.quantize(
-                chunk_image=Image.new("RGBA", (8, 8)),
-                chunk_index_map=None,
-                sheet_palette=palette,
-                capture_palette_rgb=None,
-                rom_offset=0x100,
-            )
+        result = strategy.quantize(
+            chunk_image=Image.new("RGBA", (8, 8), (255, 0, 0, 255)),
+            chunk_index_map=None,
+            sheet_palette=palette,
+            capture_palette_rgb=None,
+            rom_offset=0x100,
+        )
+
+        assert result.mode == "P"  # Should succeed, not raise
 
 
 class TestStandardQuantizationStrategy:
