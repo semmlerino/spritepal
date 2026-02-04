@@ -349,14 +349,14 @@ class SpriteCompositor:
                 dither_strength=dither_strength,
             )
 
-        # 2. Overlay indices from the map where available
-        # SKIP overlay when color_mappings exist: the mappings represent user's explicit
-        # decisions about color→index and should take precedence over embedded PNG indices.
-        # This makes workbench preview match the palette editor's Live Preview.
+        # 2. Overlay indices from the map where available (255 = no index)
+        # With "quantize full-res, scale indexed", index_map is either:
+        # - From indexed PNG (BUG-1 fix) when no color_mappings
+        # - Generated from color_mappings on ORIGINAL image before transforms
+        # In both cases, trust index_map over re-quantizing scaled pixels.
         pixels = np.array(indexed)
-        if not sheet_palette.color_mappings:
-            mask = index_map != 255
-            pixels[mask] = index_map[mask]
+        mask = index_map != 255
+        pixels[mask] = index_map[mask]
 
         # 3. Create final indexed image
         final_indexed = Image.fromarray(pixels, mode="P")
