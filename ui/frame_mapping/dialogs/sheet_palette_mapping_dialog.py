@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 from typing import override
 
+import numpy as np
 from PIL import Image
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
@@ -33,6 +34,7 @@ from core.palette_utils import (
     find_nearest_palette_index,
     quantize_colors_to_palette,
     quantize_with_mappings,
+    snap_to_snes_color,
 )
 from ui.components.base.dialog_base import DialogBase
 from ui.frame_mapping.services.palette_service import GamePaletteInfo
@@ -1037,17 +1039,23 @@ class SheetPaletteMappingDialog(DialogBase):
         self._refresh_preview_labels()
 
     def _update_preview(self) -> None:
-        """Update the quantized preview image."""
+        """Update the quantized preview image.
+
+        Matches injection pipeline: SNES color snapping + binary alpha.
+        """
         if self._sample_image is None:
             return
 
         if not hasattr(self, "_quantized_preview_label"):
             return
 
+        # Snap palette colors to SNES precision (BGR555) to match injection
+        palette_rgb = [snap_to_snes_color(c) for c in self._palette_colors]
+
         # Quantize with current mappings
         quantized_indexed = quantize_with_mappings(
             self._sample_image,
-            self._palette_colors,
+            palette_rgb,
             self._color_mappings,
             transparency_threshold=self._alpha_threshold,
             dither_mode=self._dither_mode,
@@ -1057,14 +1065,11 @@ class SheetPaletteMappingDialog(DialogBase):
         # Convert indexed image back to RGBA for display
         quantized_rgba = quantized_indexed.convert("RGBA")
 
-        # Apply background removal (make background transparent) for preview
-        if self._background_color is not None:
-            # Get the palette index that background should map to (usually 0)
-            bg_idx = self._color_mappings.get(self._background_color, 0)
-            if bg_idx == 0:
-                # Set pixels with index 0 to transparent in the RGBA version
-                # This is already handled by quantize_with_mappings for transparent pixels
-                pass
+        # Enforce binary alpha to match SNES hardware (no semi-transparency)
+        # Index 0 = fully transparent, indices 1-15 = fully opaque
+        idx_array = np.array(quantized_indexed)
+        binary_alpha = np.where(idx_array == 0, 0, 255).astype(np.uint8)
+        quantized_rgba.putalpha(Image.fromarray(binary_alpha, mode="L"))
 
         qimage = QImage(
             quantized_rgba.tobytes("raw", "RGBA"),
