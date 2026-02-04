@@ -692,12 +692,9 @@ class MappingPanel(QWidget):
         Args:
             palette: SheetPalette to use, or None to show original colors
         """
-        # Skip if palette is unchanged (same object or both None)
-        if palette is self._sheet_palette:
-            logger.debug("set_sheet_palette: SKIPPED (same object)")
-            return
-
-        logger.debug("set_sheet_palette: palette CHANGED, refreshing thumbnails only")
+        # Always update and refresh (identity check removed for robustness -
+        # the same palette object may have been mutated in-place)
+        logger.debug("set_sheet_palette: refreshing thumbnails")
         self._sheet_palette = palette
         # Clear quantized icon cache since palette changed
         self._quantized_icon_cache.clear()

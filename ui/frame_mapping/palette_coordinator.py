@@ -240,6 +240,13 @@ class PaletteCoordinator:
                 if data is not None:
                     editor._canvas.set_image(data, palette)
 
+        # Request regeneration of game frame previews
+        project = self._controller.project
+        if project is not None:
+            frame_ids = [gf.id for gf in project.game_frames]
+            if frame_ids:
+                self._controller.request_game_frame_previews_async(frame_ids)
+
     # -------------------------------------------------------------------------
     # Bidirectional Palette Highlighting
     # -------------------------------------------------------------------------
