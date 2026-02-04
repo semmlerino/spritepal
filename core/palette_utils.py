@@ -410,6 +410,78 @@ def quantize_with_mappings(
     return indexed_img
 
 
+def quantize_to_index_map(
+    img: Image.Image,
+    palette_rgb: list[tuple[int, int, int]],
+    color_mappings: dict[tuple[int, int, int], int],
+    transparency_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD,
+) -> np.ndarray:
+    """Generate palette index map from RGBA image using color mappings.
+
+    Returns numpy array (H, W) of uint8 indices instead of PIL Image.
+    Used for "quantize full-res, scale indexed" approach.
+
+    Args:
+        img: PIL Image in RGBA mode
+        palette_rgb: List of 16 RGB tuples defining the target palette
+        color_mappings: Dict mapping RGB tuples to palette indices
+        transparency_threshold: Alpha values below this map to index 0
+
+    Returns:
+        numpy array of shape (H, W) with uint8 palette indices.
+        Index 0 = transparent, indices 1-15 = opaque colors.
+    """
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+
+    # Convert image to numpy array
+    pixels = np.array(img, dtype=np.uint8)
+
+    # Extract RGBA channels
+    r = pixels[:, :, 0].astype(np.int32)
+    g = pixels[:, :, 1].astype(np.int32)
+    b = pixels[:, :, 2].astype(np.int32)
+    alpha = pixels[:, :, 3]
+
+    # Create transparency mask
+    transparent_mask = alpha < transparency_threshold
+
+    # Build pixel RGB array and convert to LAB for perceptual distance
+    pixel_rgb = np.stack([r, g, b], axis=-1)  # Shape: (H, W, 3)
+    pixel_lab = _rgb_array_to_lab(pixel_rgb)  # Shape: (H, W, 3)
+
+    # Convert palette to LAB (cached for performance - same palette reused across updates)
+    palette_lab = _get_cached_palette_lab(palette_rgb)  # Shape: (16, 3)
+
+    # Calculate squared distances in LAB space for nearest-color fallback
+    pixel_lab_broadcast = pixel_lab[:, :, np.newaxis, :]  # Shape: (H, W, 1, 3)
+    palette_lab_broadcast = palette_lab[np.newaxis, np.newaxis, :, :]  # Shape: (1, 1, 16, 3)
+
+    # Squared perceptual distance (Delta E squared)
+    distances = np.sum((pixel_lab_broadcast - palette_lab_broadcast) ** 2, axis=-1)  # Shape: (H, W, 16)
+
+    # For opaque pixels: exclude index 0 from consideration in fallback
+    # Index 0 is reserved for transparency in SNES sprites
+    opaque_mask = ~transparent_mask
+    distances[opaque_mask, 0] = np.inf
+
+    # Find nearest color for each pixel (fallback) using stable tie-breaking
+    # This ensures symmetric pixels with near-identical colors map consistently
+    indices = _stable_argmin(distances)  # Shape: (H, W)
+
+    # Apply explicit color mappings (override nearest-color for mapped colors)
+    for rgb_color, palette_idx in color_mappings.items():
+        # Find pixels matching this exact RGB color
+        mask = (r == rgb_color[0]) & (g == rgb_color[1]) & (b == rgb_color[2])
+        if np.any(mask):
+            indices[mask] = palette_idx
+
+    # Override transparent pixels to index 0
+    indices[transparent_mask] = 0
+
+    return indices.astype(np.uint8)
+
+
 # === Helper Functions for Palette Operations ===
 # Moved from ui/dialogs/color_mapping_dialog.py to centralize core logic.
 
