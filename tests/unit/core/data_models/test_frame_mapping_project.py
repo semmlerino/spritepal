@@ -952,6 +952,27 @@ class TestFacadeMethods:
 
         assert project.ai_frames_dir == Path("/existing")
 
+    def test_replace_ai_frames_filters_duplicates(self) -> None:
+        """replace_ai_frames removes duplicate frames with same ID (same filename)."""
+        project = FrameMappingProject(name="test")
+        # Create two frames with same filename (same ID) but different paths
+        frames = [
+            AIFrame(path=Path("/dir1/frame.png"), index=0, width=100, height=100),
+            AIFrame(path=Path("/dir2/frame.png"), index=1, width=200, height=200),  # Duplicate ID
+            AIFrame(path=Path("/dir3/other.png"), index=2, width=300, height=300),
+        ]
+
+        project.replace_ai_frames(frames)
+
+        # Should keep only first occurrence of "frame.png" and "other.png"
+        assert len(project.ai_frames) == 2
+        assert project.get_ai_frame_by_id("frame.png") is not None
+        assert project.get_ai_frame_by_id("other.png") is not None
+        # First occurrence should be kept
+        frame = project.get_ai_frame_by_id("frame.png")
+        assert frame is not None
+        assert frame.width == 100
+
     def test_add_game_frame_appends_to_list(self) -> None:
         """add_game_frame adds a frame to game_frames list."""
         project = FrameMappingProject(name="test")

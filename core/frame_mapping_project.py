@@ -13,7 +13,7 @@ from enum import Enum
 from pathlib import Path
 from typing import cast
 
-from core.palette_utils import SNES_PALETTE_SIZE
+from core.palette_utils import QUANTIZATION_TRANSPARENCY_THRESHOLD, SNES_PALETTE_SIZE
 from core.types import CompressionType
 
 
@@ -43,6 +43,9 @@ class SheetPalette:
     Attributes:
         colors: List of 16 RGB tuples (index 0 = transparent)
         color_mappings: Dict mapping AI frame RGB colors to palette indices
+        alpha_threshold: Alpha cutoff for transparency (0-255)
+        dither_mode: "none" or "bayer" ordered dithering
+        dither_strength: Dither strength (0.0-1.0)
     """
 
     colors: list[tuple[int, int, int]]  # 16 RGB colors (index 0 = transparent)
@@ -50,6 +53,10 @@ class SheetPalette:
     # Background removal settings (chroma key)
     background_color: tuple[int, int, int] | None = None  # RGB or None=disabled
     background_tolerance: int = 30  # RGB distance threshold (Euclidean)
+    # Quantization detail controls (preview + injection)
+    alpha_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD  # 0-255
+    dither_mode: str = "none"  # "none" or "bayer"
+    dither_strength: float = 0.0  # 0.0-1.0
 
     @property
     def version_hash(self) -> int:
@@ -69,6 +76,9 @@ class SheetPalette:
                 mappings_tuple,
                 self.background_color,  # NEW - None-safe
                 self.background_tolerance,  # NEW
+                self.alpha_threshold,
+                self.dither_mode,
+                self.dither_strength,
             )
         )
         return full_hash & 0x7FFFFFFF
@@ -86,6 +96,13 @@ class SheetPalette:
             result["background_color"] = list(self.background_color)
         if self.background_tolerance != 30:  # Only if non-default
             result["background_tolerance"] = self.background_tolerance
+        # Quantization detail controls (only serialize if non-default)
+        if self.alpha_threshold != QUANTIZATION_TRANSPARENCY_THRESHOLD:
+            result["alpha_threshold"] = self.alpha_threshold
+        if self.dither_mode != "none":
+            result["dither_mode"] = self.dither_mode
+        if abs(self.dither_strength) > 1e-6:
+            result["dither_strength"] = self.dither_strength
         return result
 
     @classmethod
@@ -161,11 +178,38 @@ class SheetPalette:
         background_color = tuple(bg_raw) if bg_raw else None  # type: ignore[arg-type]
         background_tolerance = cast(int, data.get("background_tolerance", 30))
 
+        # Parse quantization settings (with defaults for backward compatibility)
+        alpha_threshold_raw = cast(int, data.get("alpha_threshold", QUANTIZATION_TRANSPARENCY_THRESHOLD))
+        alpha_threshold = max(0, min(255, alpha_threshold_raw))
+        if alpha_threshold != alpha_threshold_raw:
+            logger.warning(
+                "alpha_threshold clamped: %d -> %d",
+                alpha_threshold_raw,
+                alpha_threshold,
+            )
+
+        dither_mode_raw = cast(str, data.get("dither_mode", "none"))
+        dither_mode = dither_mode_raw if dither_mode_raw in {"none", "bayer"} else "none"
+        if dither_mode != dither_mode_raw:
+            logger.warning("Invalid dither_mode '%s', defaulting to 'none'", dither_mode_raw)
+
+        dither_strength_raw = cast(float, data.get("dither_strength", 0.0))
+        dither_strength = max(0.0, min(1.0, float(dither_strength_raw)))
+        if dither_strength != dither_strength_raw:
+            logger.warning(
+                "dither_strength clamped: %.3f -> %.3f",
+                dither_strength_raw,
+                dither_strength,
+            )
+
         return cls(
             colors=colors,
             color_mappings=color_mappings,
             background_color=background_color,
             background_tolerance=background_tolerance,
+            alpha_threshold=alpha_threshold,
+            dither_mode=dither_mode,
+            dither_strength=dither_strength,
         )
 
 
@@ -521,7 +565,17 @@ class FrameMappingProject:
             frames: New list of AI frames
             ai_frames_dir: Optional directory path where frames are located
         """
-        self.ai_frames = frames
+        # Filter out duplicates (same ID) - keep first occurrence
+        seen_ids: set[str] = set()
+        unique_frames: list[AIFrame] = []
+        for frame in frames:
+            if frame.id not in seen_ids:
+                seen_ids.add(frame.id)
+                unique_frames.append(frame)
+            else:
+                logger.warning("Filtered duplicate AI frame during replace: %s", frame.id)
+
+        self.ai_frames = unique_frames
         if ai_frames_dir is not None:
             self.ai_frames_dir = ai_frames_dir
         self._invalidate_ai_frame_index()
