@@ -781,7 +781,7 @@ class WorkbenchCanvas(QWidget):
         # Tile overlay toggle
         self._tile_overlay_checkbox = QCheckBox("Tile Overlay")
         self._tile_overlay_checkbox.setStyleSheet("font-size: 11px;")
-        self._tile_overlay_checkbox.setChecked(True)
+        self._tile_overlay_checkbox.setChecked(False)
         controls2.addWidget(self._tile_overlay_checkbox)
 
         # Tile addresses toggle

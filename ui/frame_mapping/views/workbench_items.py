@@ -329,25 +329,8 @@ class AIFrameItem(QGraphicsObject):
         target_rect = self.boundingRect()
 
         if self._ghost_mode:
-            # Ghost mode: dashed yellow outline with corner markers
-            painter.setOpacity(0.5)
-            pen = QPen(QColor(255, 255, 0, 200))
-            pen.setWidth(2)
-            pen.setStyle(Qt.PenStyle.DashLine)
-            painter.setPen(pen)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawRect(target_rect)
-            # Corner markers for grabbing
-            marker_size = 6
-            painter.setBrush(QColor(255, 255, 0, 200))
-            painter.setPen(Qt.PenStyle.NoPen)
-            for corner in [
-                target_rect.topLeft(),
-                target_rect.topRight(),
-                target_rect.bottomLeft(),
-                target_rect.bottomRight(),
-            ]:
-                painter.drawEllipse(corner, marker_size, marker_size)
+            # Ghost mode: no visible rendering (preview mode)
+            pass
         else:
             # Normal rendering
             painter.setOpacity(self._opacity)

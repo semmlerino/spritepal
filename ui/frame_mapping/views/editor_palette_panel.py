@@ -396,9 +396,9 @@ class EditorPalettePanel(QWidget):
         """Set the currently active (selected) palette index.
 
         Args:
-            index: Palette index (0-15)
+            index: Palette index (0-15), or -1 to deselect
         """
-        if not 0 <= index <= 15:
+        if not (-1 <= index <= 15):
             return
 
         # Update selection state
@@ -406,7 +406,10 @@ class EditorPalettePanel(QWidget):
             swatch.set_selected(i == index)
 
         self._active_index = index
-        self._active_label.setText(f"Active: {index}")
+        if index == -1:
+            self._active_label.setText("Active: None")
+        else:
+            self._active_label.setText(f"Active: {index}")
 
     def get_active_index(self) -> int:
         """Get the currently active palette index."""
@@ -425,8 +428,14 @@ class EditorPalettePanel(QWidget):
         """Handle swatch click."""
         # Clear any merge target on regular click
         self.clear_merge_target()
-        self.set_active_index(index)
-        self.index_selected.emit(index)
+
+        # Toggle selection if clicking on already-selected index
+        if self._active_index == index:
+            self.set_active_index(-1)
+            self.index_selected.emit(-1)
+        else:
+            self.set_active_index(index)
+            self.index_selected.emit(index)
 
     def _on_swatch_ctrl_clicked(self, index: int) -> None:
         """Handle Ctrl+click for merge target selection.

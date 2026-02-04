@@ -246,8 +246,8 @@ class PaletteEditorController(QObject):
         self._current_tool = tool
 
     def set_active_index(self, index: int) -> None:
-        """Set the active palette index."""
-        if 0 <= index <= 15 and index != self._active_index:
+        """Set the active palette index (-1 for no selection, 0-15 for palette index)."""
+        if -1 <= index <= 15 and index != self._active_index:
             self._active_index = index
             self.active_index_changed.emit(index)
 

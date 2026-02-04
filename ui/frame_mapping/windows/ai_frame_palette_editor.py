@@ -642,7 +642,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
         """Handle active index change from controller (e.g., right-click pick)."""
         self._palette_panel.set_active_index(index)
         # Update canvas highlight to show all pixels using this index
-        self._canvas.set_highlight_index(index)
+        # Pass None to clear highlight when index is -1 (deselected)
+        self._canvas.set_highlight_index(None if index == -1 else index)
 
     def _on_color_mapping_report(self, report: dict[str, object]) -> None:
         """Handle color mapping analysis report after image load.
@@ -829,7 +830,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
         """Handle palette panel selection."""
         self._controller.set_active_index(index)
         # Highlight all pixels using this index
-        self._canvas.set_highlight_index(index)
+        # Pass None to clear highlight when index is -1 (deselected)
+        self._canvas.set_highlight_index(None if index == -1 else index)
 
     def _on_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle palette color change from right-click."""
