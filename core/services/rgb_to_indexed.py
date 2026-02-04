@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PIL import Image
 
+from core.palette_utils import snap_to_snes_color
 from utils.color_distance import perceptual_distance, perceptual_distance_sq
 
 if TYPE_CHECKING:
@@ -109,6 +110,9 @@ def convert_indexed_to_rgb(
 ) -> Image.Image:
     """Convert indexed palette data back to an RGBA image.
 
+    Applies SNES color snapping for WYSIWYG fidelity - the colors shown
+    match what will be injected into the ROM (5-bit BGR555 precision).
+
     Args:
         indexed: 2D numpy array (H, W) of palette indices (0-15)
         palette: SheetPalette with colors
@@ -119,6 +123,9 @@ def convert_indexed_to_rgb(
     """
     height, width = indexed.shape
 
+    # Pre-compute SNES-snapped palette colors for WYSIWYG fidelity
+    snapped_colors = [snap_to_snes_color(c) for c in palette.colors]
+
     # Create output RGBA array
     rgba = np.zeros((height, width, 4), dtype=np.uint8)
 
@@ -127,8 +134,8 @@ def convert_indexed_to_rgb(
             idx = indexed[y, x]
             if idx == 0:
                 rgba[y, x] = transparent_color
-            elif 0 < idx < len(palette.colors):
-                r, g, b = palette.colors[idx]
+            elif 0 < idx < len(snapped_colors):
+                r, g, b = snapped_colors[idx]
                 rgba[y, x] = (r, g, b, 255)
             else:
                 # Out of range - use transparent
