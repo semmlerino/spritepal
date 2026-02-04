@@ -1211,6 +1211,9 @@ class AIFramesPane(QWidget):
         # Update count label
         self._update_count_label()
 
+        # Enable palette buttons (we now have at least one frame)
+        self._palette_widget.set_buttons_enabled(True)
+
     def _update_count_label(self) -> None:
         """Update the count label based on current filter state."""
         total_count = len(self._ai_frames)
