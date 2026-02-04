@@ -229,8 +229,8 @@ class TestSelectQuantizationStrategy:
 
         strategy = select_quantization_strategy(index_map, palette, None)
 
-        # Should fall through to standard since no color_mappings
-        assert isinstance(strategy, StandardQuantizationStrategy)
+        # Should fall through to palette mapping (handles empty mappings via perceptual fallback)
+        assert isinstance(strategy, PaletteMappingStrategy)
 
     def test_skips_passthrough_when_indices_exceed_4bpp(self) -> None:
         """Should not use passthrough when indices exceed 4bpp limit (>15)."""
@@ -243,8 +243,8 @@ class TestSelectQuantizationStrategy:
 
         strategy = select_quantization_strategy(index_map, palette, None)
 
-        # Should fall through to standard since indices too high for 4bpp
-        assert isinstance(strategy, StandardQuantizationStrategy)
+        # Should fall through to palette mapping (handles empty mappings via perceptual fallback)
+        assert isinstance(strategy, PaletteMappingStrategy)
 
     def test_selects_palette_mapping_when_has_mappings(self) -> None:
         """Should select palette mapping when color_mappings exists."""
@@ -258,15 +258,16 @@ class TestSelectQuantizationStrategy:
 
         assert isinstance(strategy, PaletteMappingStrategy)
 
-    def test_selects_standard_when_sheet_palette_only(self) -> None:
-        """Should select standard quantization with just sheet palette."""
+    def test_selects_palette_mapping_when_sheet_palette_only(self) -> None:
+        """Should select palette mapping with just sheet palette (perceptual fallback)."""
         colors = [(248, 0, 0)]
         colors.extend([(0, 0, 0)] * 15)
         palette = MockSheetPalette(colors=colors)
 
         strategy = select_quantization_strategy(None, palette, None)
 
-        assert isinstance(strategy, StandardQuantizationStrategy)
+        # PaletteMappingStrategy handles empty mappings via perceptual fallback
+        assert isinstance(strategy, PaletteMappingStrategy)
 
     def test_selects_capture_fallback_when_no_sheet_palette(self) -> None:
         """Should select capture fallback when no sheet palette."""
@@ -277,9 +278,9 @@ class TestSelectQuantizationStrategy:
 
         assert isinstance(strategy, CapturePaletteFallbackStrategy)
 
-    def test_priority_mapping_over_passthrough(self) -> None:
-        """Palette mapping takes priority over index passthrough when mappings exist."""
-        index_map = np.zeros((8, 8), dtype=np.uint8)  # Valid
+    def test_priority_passthrough_over_mapping(self) -> None:
+        """Index passthrough takes priority when index map is valid 4bpp."""
+        index_map = np.zeros((8, 8), dtype=np.uint8)  # Valid 4bpp indices
 
         colors = [(248, 0, 0)]
         colors.extend([(0, 0, 0)] * 15)
@@ -287,5 +288,5 @@ class TestSelectQuantizationStrategy:
 
         strategy = select_quantization_strategy(index_map, palette, None)
 
-        # Mappings win even though index map is valid
-        assert isinstance(strategy, PaletteMappingStrategy)
+        # Valid index map wins - preserves exact indices from indexed PNG
+        assert isinstance(strategy, IndexPassthroughStrategy)

@@ -209,6 +209,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
             (EditorTool.BRUSH, "Brush", "B", "Draw with selected color (B)"),
             (EditorTool.ERASER, "Eraser", "E", "Erase to transparent (E)"),
             (EditorTool.FILL, "Fill", "F", "Flood fill area (F)"),
+            (EditorTool.PICKER, "Picker", "I", "Pick color from image (I)"),
             (
                 EditorTool.CONTIGUOUS_SELECT,
                 "Select",
@@ -440,6 +441,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
             ("B", EditorTool.BRUSH),
             ("E", EditorTool.ERASER),
             ("F", EditorTool.FILL),
+            ("I", EditorTool.PICKER),
             ("W", EditorTool.CONTIGUOUS_SELECT),
             ("G", EditorTool.GLOBAL_SELECT),
         ]
@@ -484,6 +486,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._controller.pixel_info.connect(self._on_pixel_info)
         self._controller.dirty_changed.connect(self._on_dirty_changed)
         self._controller.active_index_changed.connect(self._on_active_index_changed)
+        self._controller.tool_changed.connect(self._on_tool_changed)
         self._controller.color_mapping_report.connect(self._on_color_mapping_report)
 
         # Canvas signals
@@ -540,8 +543,11 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._select_tool(tool)
 
     def _select_tool(self, tool: EditorTool) -> None:
-        """Select a tool."""
+        """Select a tool via controller."""
         self._controller.set_tool(tool)
+
+    def _on_tool_changed(self, tool: EditorTool) -> None:
+        """Handle tool change from controller (e.g., auto-switch after pick)."""
         self._tool_buttons[tool].setChecked(True)
         self._tool_label.setText(f"Tool: {tool.name.replace('_', ' ').title()}")
 

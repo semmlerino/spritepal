@@ -14,7 +14,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 from PIL import Image
 
-from core.palette_utils import snap_to_snes_color
+from core.palette_utils import (
+    QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    quantize_to_index_map,
+    snap_to_snes_color,
+)
 from utils.color_distance import perceptual_distance, perceptual_distance_sq
 
 if TYPE_CHECKING:
@@ -345,5 +349,30 @@ def load_image_preserving_indices(
                     return None, img.convert("RGBA")
 
             return index_map, img.convert("RGBA")
-        # Non-indexed image - no indices to preserve
-        return None, img.convert("RGBA")
+
+        # Non-indexed image - optionally generate index map from sheet palette
+        rgba_img = img.convert("RGBA")
+        if sheet_palette is None:
+            return None, rgba_img
+
+        # Match Live Preview quantization: background removal + SNES snapping + palette mappings
+        image_for_index = rgba_img
+        background_color = getattr(sheet_palette, "background_color", None)
+        if background_color is not None:
+            from core.services.content_bounds_analyzer import remove_background
+
+            background_tolerance = getattr(sheet_palette, "background_tolerance", 30)
+            image_for_index = remove_background(rgba_img, background_color, background_tolerance)
+
+        palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
+        alpha_threshold = getattr(sheet_palette, "alpha_threshold", QUANTIZATION_TRANSPARENCY_THRESHOLD)
+        color_mappings = getattr(sheet_palette, "color_mappings", {}) or {}
+
+        index_map = quantize_to_index_map(
+            image_for_index,
+            palette_rgb,
+            color_mappings,
+            transparency_threshold=alpha_threshold,
+        )
+
+        return index_map, rgba_img

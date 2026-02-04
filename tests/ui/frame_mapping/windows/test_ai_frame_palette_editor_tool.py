@@ -102,3 +102,61 @@ class TestToolSelection:
         """EditorTool enum should have BRUSH and not PENCIL."""
         assert hasattr(EditorTool, "BRUSH")
         assert not hasattr(EditorTool, "PENCIL")
+
+    def test_picker_tool_shortcut(
+        self,
+        qtbot,
+        test_ai_frame: AIFrame,
+        test_palette: SheetPalette,
+    ) -> None:
+        """Pressing 'I' should select Picker tool."""
+        window = AIFramePaletteEditorWindow(test_ai_frame, test_palette)
+        qtbot.addWidget(window)
+        window.show()
+
+        # Switch to Brush first (default)
+        assert window._controller.current_tool == EditorTool.BRUSH
+
+        # Verify shortcut setup for 'I'
+        picker_shortcut = None
+        for child in window.children():
+            if isinstance(child, QShortcut):
+                if child.key().toString() == "I":
+                    picker_shortcut = child
+                    break
+        
+        assert picker_shortcut is not None
+        
+        # Manually activate to verify the callback
+        picker_shortcut.activated.emit()
+        
+        assert window._controller.current_tool == EditorTool.PICKER
+        assert window._tool_buttons[EditorTool.PICKER].isChecked()
+        assert window._tool_label.text() == "Tool: Picker"
+
+    def test_picker_switches_back_to_brush(
+        self,
+        qtbot,
+        test_ai_frame: AIFrame,
+        test_palette: SheetPalette,
+    ) -> None:
+        """Using Picker should switch back to Brush."""
+        window = AIFramePaletteEditorWindow(test_ai_frame, test_palette)
+        qtbot.addWidget(window)
+        window.show()
+
+        # Load indexed data manually since we want to pick a specific color
+        import numpy as np
+        data = np.zeros((16, 16), dtype=np.uint8)
+        data[5, 5] = 7
+        window._controller.load_indexed_data(data, test_palette)
+
+        window._select_tool(EditorTool.PICKER)
+        assert window._controller.current_tool == EditorTool.PICKER
+
+        # Click at (5, 5) to pick index 7
+        window._on_canvas_clicked(5, 5, 0) # button 0 is left click
+
+        assert window._controller.active_index == 7
+        assert window._controller.current_tool == EditorTool.BRUSH
+        assert window._tool_buttons[EditorTool.BRUSH].isChecked()

@@ -207,22 +207,6 @@ class ColorSwatch(QFrame):
         if self._is_locked:
             return
 
-        # Show confirmation dialog - this change affects ALL frames
-        result = QMessageBox.question(
-            self,
-            "Edit Global Palette Color?",
-            f"Changing color at index {self._index} will affect ALL frames "
-            "in this project.\n\n"
-            "To change colors for just this frame, use the painting tools "
-            "to assign pixels to a different palette index instead.\n\n"
-            "Edit global palette color?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,  # Default to No (safe choice)
-        )
-
-        if result != QMessageBox.StandardButton.Yes:
-            return
-
         r, g, b = self._color
         initial_color = QColor(r, g, b)
 

@@ -129,22 +129,14 @@ def main() -> None:
     resampling = mapping.get("resampling", "lanczos")
     print(f"Transform: scale={scale:.3f}, flip_h={flip_h}, flip_v={flip_v}")
 
-    # Apply transforms
+    # Apply flips (no interpolation, preserves exact colors)
     transformed = ai_image.copy()
     if flip_h:
         transformed = transformed.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
     if flip_v:
         transformed = transformed.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
-    resample_mode = Image.Resampling.LANCZOS if resampling == "lanczos" else Image.Resampling.NEAREST
-    if scale != 1.0:
-        new_w = int(transformed.width * scale)
-        new_h = int(transformed.height * scale)
-        transformed = transformed.resize((new_w, new_h), resample_mode)
-
-    print(f"Transformed size: {transformed.size}")
-
-    # Apply background removal if configured (matches injection pipeline)
+    # Apply background removal if configured (before quantization)
     image_to_quantize = transformed
     if background_color is not None:
         from core.services.content_bounds_analyzer import remove_background
@@ -158,7 +150,8 @@ def main() -> None:
     # Snap palette to SNES precision (matches injection pipeline)
     palette_rgb = [snap_to_snes_color(c) for c in palette_colors]
 
-    # Quantize with mappings (matches Sheet Palette Editor and injection pipeline)
+    # Quantize at FULL RESOLUTION first (respects explicit color mappings)
+    # This matches the Sheet Palette Editor's Live Preview
     quantized_indexed = quantize_with_mappings(
         image_to_quantize,
         palette_rgb,
@@ -173,6 +166,13 @@ def main() -> None:
     idx_array = np.array(quantized_indexed)
     binary_alpha = np.where(idx_array == 0, 0, 255).astype(np.uint8)
     quantized.putalpha(Image.fromarray(binary_alpha, mode="L"))
+
+    # NOW apply scale to the quantized result (NEAREST preserves palette indices)
+    if scale != 1.0:
+        new_w = int(quantized.width * scale)
+        new_h = int(quantized.height * scale)
+        quantized = quantized.resize((new_w, new_h), Image.Resampling.NEAREST)
+        print(f"Scaled to: {quantized.size}")
 
     # Scale up for display
     display_scale = args.display_scale

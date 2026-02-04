@@ -272,26 +272,40 @@ class InjectionOrchestrator:
             height=snapshot.game_frame.height,
         )
 
-        # Create palette wrapper for internal methods
-        class _Palette:
-            """Minimal palette holder mimicking SheetPalette interface."""
-
-            def __init__(
-                self,
-                colors: list[tuple[int, int, int]],
-                color_mappings: dict[tuple[int, int, int], int],
-            ) -> None:
-                self.colors = colors
-                self.color_mappings = color_mappings
-
         class _PaletteHolder:
             """Wrapper mimicking project's sheet_palette attribute."""
 
             def __init__(self, palette_snapshot: PaletteSnapshot | None) -> None:
                 if palette_snapshot is not None:
+                    class _Palette:
+                        """Minimal palette holder mimicking SheetPalette interface."""
+
+                        def __init__(
+                            self,
+                            colors: list[tuple[int, int, int]],
+                            color_mappings: dict[tuple[int, int, int], int],
+                            background_color: tuple[int, int, int] | None,
+                            background_tolerance: int,
+                            alpha_threshold: int,
+                            dither_mode: str,
+                            dither_strength: float,
+                        ) -> None:
+                            self.colors = colors
+                            self.color_mappings = color_mappings
+                            self.background_color = background_color
+                            self.background_tolerance = background_tolerance
+                            self.alpha_threshold = alpha_threshold
+                            self.dither_mode = dither_mode
+                            self.dither_strength = dither_strength
+
                     self.sheet_palette: _Palette | None = _Palette(
                         colors=list(palette_snapshot.colors),
                         color_mappings=dict(palette_snapshot.color_mappings),
+                        background_color=palette_snapshot.background_color,
+                        background_tolerance=palette_snapshot.background_tolerance,
+                        alpha_threshold=palette_snapshot.alpha_threshold,
+                        dither_mode=palette_snapshot.dither_mode,
+                        dither_strength=palette_snapshot.dither_strength,
                     )
                 else:
                     self.sheet_palette = None
@@ -347,6 +361,7 @@ class InjectionOrchestrator:
                 mapping,
                 request,
                 debug,
+                sheet_palette=palette_holder.sheet_palette,  # type: ignore[arg-type]
             )
             if isinstance(composite_data, InjectionResult):
                 return composite_data
@@ -571,6 +586,39 @@ class InjectionOrchestrator:
                 ai_img,
                 sheet_palette.background_color,
                 sheet_palette.background_tolerance,
+            )
+
+        # Pre-quantize RGBA images at full resolution to preserve color mappings
+        # This fixes the "muddy colors" issue caused by LANCZOS scaling before quantization
+        # The compositor will then scale the index map with NEAREST, preserving exact indices
+        if ai_index_map is None and sheet_palette is not None:
+            from core.palette_utils import quantize_with_mappings, snap_to_snes_color
+
+            # Get alpha threshold and dither settings from sheet_palette
+            alpha_threshold = getattr(sheet_palette, "alpha_threshold", 128)
+            dither_mode = getattr(sheet_palette, "dither_mode", "none")
+            dither_strength = float(getattr(sheet_palette, "dither_strength", 0.0))
+
+            # Snap palette to SNES precision
+            palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
+
+            # Quantize at full resolution
+            quantized_indexed = quantize_with_mappings(
+                ai_img,
+                palette_rgb,
+                sheet_palette.color_mappings or {},
+                transparency_threshold=alpha_threshold,
+                dither_mode=dither_mode,
+                dither_strength=dither_strength,
+            )
+
+            # Extract index map from quantized image
+            import numpy as np
+            ai_index_map = np.array(quantized_indexed, dtype=np.uint8)
+            logger.debug(
+                "Pre-quantized RGBA image at full resolution: %s (shape: %s)",
+                ai_frame.path.name,
+                ai_index_map.shape,
             )
 
         # Parse capture for tile layout

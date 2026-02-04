@@ -60,6 +60,11 @@ class PaletteSnapshot:
 
     colors: tuple[tuple[int, int, int], ...]
     color_mappings: tuple[tuple[tuple[int, int, int], int], ...]  # Frozen dict as tuple of pairs
+    background_color: tuple[int, int, int] | None
+    background_tolerance: int
+    alpha_threshold: int
+    dither_mode: str
+    dither_strength: float
 
 
 @dataclass(frozen=True)
@@ -142,6 +147,11 @@ class InjectionSnapshot:
             palette_snapshot = PaletteSnapshot(
                 colors=tuple((c[0], c[1], c[2]) for c in project.sheet_palette.colors),
                 color_mappings=tuple(project.sheet_palette.color_mappings.items()),
+                background_color=project.sheet_palette.background_color,
+                background_tolerance=project.sheet_palette.background_tolerance,
+                alpha_threshold=project.sheet_palette.alpha_threshold,
+                dither_mode=project.sheet_palette.dither_mode,
+                dither_strength=project.sheet_palette.dither_strength,
             )
 
         return cls(

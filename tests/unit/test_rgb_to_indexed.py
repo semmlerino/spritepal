@@ -479,6 +479,38 @@ class TestLoadImagePreservingIndices:
         assert index_map is None
         assert rgba_img.mode == "RGBA"
 
+    def test_non_indexed_png_with_sheet_palette_generates_index_map(self, tmp_path) -> None:
+        """Non-indexed PNG returns index map when sheet palette is provided."""
+        from core.services.rgb_to_indexed import load_image_preserving_indices
+
+        img = Image.new("RGBA", (2, 2))
+        img.putdata(
+            [
+                (255, 0, 0, 255),  # red -> index 1
+                (0, 255, 0, 255),  # green -> index 2 (explicit mapping)
+                (0, 0, 0, 0),  # transparent -> index 0
+                (255, 0, 0, 255),  # red -> index 1
+            ]
+        )
+        path = tmp_path / "rgba.png"
+        img.save(path)
+
+        palette = MockSheetPalette(
+            colors=[
+                (0, 0, 0),
+                (255, 0, 0),
+                (0, 255, 0),
+                *[(0, 0, 0)] * 13,
+            ],
+            color_mappings={(0, 255, 0): 2},
+        )
+
+        index_map, _ = load_image_preserving_indices(path, sheet_palette=palette)
+
+        assert index_map is not None
+        expected = np.array([[1, 2], [0, 1]], dtype=np.uint8)
+        np.testing.assert_array_equal(index_map, expected)
+
     def test_preserved_indices_match_original(self, tmp_path) -> None:
         """Preserved indices exactly match original indexed PNG."""
         from core.services.rgb_to_indexed import load_image_preserving_indices

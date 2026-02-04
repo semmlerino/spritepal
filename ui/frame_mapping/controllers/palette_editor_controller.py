@@ -44,6 +44,7 @@ class EditorTool(Enum):
     BRUSH = auto()
     ERASER = auto()
     FILL = auto()
+    PICKER = auto()
     CONTIGUOUS_SELECT = auto()
     GLOBAL_SELECT = auto()
 
@@ -73,6 +74,7 @@ class PaletteEditorController(QObject):
         pixel_info: (x, y, index) - Pixel info for status bar
         preview_requested: Debounced request to update workspace preview
         dirty_changed: (is_dirty) - Modification state changed
+        tool_changed: (tool) - Active tool changed
     """
 
     image_changed = Signal()
@@ -82,6 +84,7 @@ class PaletteEditorController(QObject):
     preview_requested = Signal(np.ndarray)  # indexed data for preview
     dirty_changed = Signal(bool)  # is_dirty
     active_index_changed = Signal(int)  # new active palette index
+    tool_changed = Signal(EditorTool)  # active tool changed
     color_mapping_report = Signal(dict)  # RGB→indexed conversion analysis
 
     PREVIEW_DEBOUNCE_MS = 100
@@ -243,7 +246,9 @@ class PaletteEditorController(QObject):
 
     def set_tool(self, tool: EditorTool) -> None:
         """Set the active tool."""
-        self._current_tool = tool
+        if self._current_tool != tool:
+            self._current_tool = tool
+            self.tool_changed.emit(tool)
 
     def set_active_index(self, index: int) -> None:
         """Set the active palette index (-1 for no selection, 0-15 for palette index)."""
@@ -428,6 +433,10 @@ class PaletteEditorController(QObject):
             self._handle_eraser(x, y)
         elif self._current_tool == EditorTool.FILL:
             self._handle_fill(x, y)
+        elif self._current_tool == EditorTool.PICKER:
+            picked_index = self._image_model.get_pixel(x, y)
+            self.set_active_index(picked_index)
+            self.set_tool(EditorTool.BRUSH)
         elif self._current_tool == EditorTool.CONTIGUOUS_SELECT:
             self._handle_contiguous_select(x, y, sel_mode)
         elif self._current_tool == EditorTool.GLOBAL_SELECT:
@@ -443,11 +452,15 @@ class PaletteEditorController(QObject):
         if self._image_model is None:
             return
 
-        # Only brush and eraser work with drag
+        # Only brush, eraser, and picker work with drag
         if self._current_tool == EditorTool.BRUSH:
             self._handle_brush(x, y)
         elif self._current_tool == EditorTool.ERASER:
             self._handle_eraser(x, y)
+        elif self._current_tool == EditorTool.PICKER:
+            picked_index = self._image_model.get_pixel(x, y)
+            self.set_active_index(picked_index)
+            self.set_tool(EditorTool.BRUSH)
 
     def handle_pixel_hover(self, x: int, y: int) -> None:
         """Handle pixel hover for status updates.
