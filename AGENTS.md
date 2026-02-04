@@ -1,5 +1,5 @@
 # Repository Guidelines
-**IMPORTANT**: If proceeding with TDD, ensure FIRST that the test that should fail ACTUALLY FAILS, before attempting to fix.
+
 
 Always activate the Serena MCP at the start.
 
@@ -27,7 +27,7 @@ Run from `spritepal/`:
 - **Law of Demeter (LoD)**: Strictly follow the Law of Demeter. Use facade methods on parent components rather than reaching through to children. Never access `parent.child.grandchild`.
 
 ## Testing Guidelines
-- **Bug-First TDD (Mandatory)**: Always write a failing reproduction test before fixing a bug.
+- **Bug-First TDD (For Bugs)**: When fixing a bug, write a failing reproduction test before the fix. This is not required for improvements, refactors, or planning/implementation work.
 - Frameworks: `pytest`, `pytest-qt`, `pytest-xdist`.
 - Use `app_context` fixture unless `session_app_context` is required with `@pytest.mark.shared_state_safe`.
 - Avoid `time.sleep()`; use `qtbot.wait()`/`waitSignal()` context managers.
