@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import override
 
@@ -26,6 +27,8 @@ from PySide6.QtWidgets import (
 
 from core.frame_mapping_project import SheetPalette
 from core.palette_utils import (
+    PALETTE_CLUSTER_THRESHOLD_SQ,
+    PALETTE_DIVERSITY_MIN_DISTANCE,
     QUANTIZATION_TRANSPARENCY_THRESHOLD,
     find_nearest_palette_index,
     quantize_colors_to_palette,
@@ -319,6 +322,15 @@ class SheetPaletteMappingDialog(DialogBase):
             self._dither_mode = "none"
             self._dither_strength = 0.0
 
+        # Extraction tuning defaults
+        self._cluster_threshold = math.sqrt(PALETTE_CLUSTER_THRESHOLD_SQ)
+        self._diversity_min_distance = PALETTE_DIVERSITY_MIN_DISTANCE
+
+        # Preview zoom + base pixmaps
+        self._preview_zoom_percent = 200
+        self._original_preview_pixmap: QPixmap | None = None
+        self._quantized_preview_pixmap: QPixmap | None = None
+
         # Detect rare important colors (e.g., eye whites, small highlights)
         self._rare_important_colors = detect_rare_important_colors(
             sheet_colors,
@@ -345,7 +357,7 @@ class SheetPaletteMappingDialog(DialogBase):
         super().__init__(
             parent,
             title="Edit Sheet Palette",
-            min_size=(700, 600) if self._sample_image else (650, 550),
+            min_size=(900, 700) if self._sample_image else (650, 550),
             with_button_box=True,
         )
 
@@ -354,6 +366,11 @@ class SheetPaletteMappingDialog(DialogBase):
         self._preview_timer.setSingleShot(True)
         self._preview_timer.setInterval(100)
         self._preview_timer.timeout.connect(self._update_preview)
+
+        self._extract_timer = QTimer(self)
+        self._extract_timer.setSingleShot(True)
+        self._extract_timer.setInterval(150)
+        self._extract_timer.timeout.connect(self._apply_extraction_settings)
 
         # Initial preview
         if self._sample_image:
@@ -482,6 +499,49 @@ class SheetPaletteMappingDialog(DialogBase):
         actions_layout.addStretch()
         content_layout.addLayout(actions_layout)
 
+        # Extraction tuning controls
+        tuning_group = QGroupBox("Extraction Tuning")
+        tuning_layout = QHBoxLayout(tuning_group)
+        tuning_layout.setSpacing(8)
+
+        cluster_label = QLabel("Group Similar (ΔE):")
+        tuning_layout.addWidget(cluster_label)
+
+        self._cluster_threshold_slider = QSlider(Qt.Orientation.Horizontal)
+        self._cluster_threshold_slider.setRange(0, 250)
+        self._cluster_threshold_slider.setValue(int(round(self._cluster_threshold * 10)))
+        self._cluster_threshold_slider.setToolTip(
+            "Merge nearby colors before quantization. Higher values group more similar colors."
+        )
+        tuning_layout.addWidget(self._cluster_threshold_slider, 1)
+
+        self._cluster_threshold_value = QLabel(f"{self._cluster_threshold:.1f}")
+        self._cluster_threshold_value.setMinimumWidth(36)
+        self._cluster_threshold_value.setStyleSheet("font-size: 11px;")
+        tuning_layout.addWidget(self._cluster_threshold_value)
+
+        diversity_label = QLabel("Min Palette ΔE:")
+        tuning_layout.addWidget(diversity_label)
+
+        self._diversity_distance_slider = QSlider(Qt.Orientation.Horizontal)
+        self._diversity_distance_slider.setRange(0, 300)
+        self._diversity_distance_slider.setValue(int(round(self._diversity_min_distance * 10)))
+        self._diversity_distance_slider.setToolTip(
+            "Minimum perceptual distance between palette colors. Higher values enforce distinct hues."
+        )
+        tuning_layout.addWidget(self._diversity_distance_slider, 1)
+
+        self._diversity_distance_value = QLabel(f"{self._diversity_min_distance:.1f}")
+        self._diversity_distance_value.setMinimumWidth(36)
+        self._diversity_distance_value.setStyleSheet("font-size: 11px;")
+        tuning_layout.addWidget(self._diversity_distance_value)
+
+        tuning_layout.addStretch()
+        content_layout.addWidget(tuning_group)
+
+        self._cluster_threshold_slider.valueChanged.connect(self._on_extraction_settings_changed)
+        self._diversity_distance_slider.valueChanged.connect(self._on_extraction_settings_changed)
+
         # Background removal section
         bg_group = QGroupBox("Background Removal")
         bg_layout = QHBoxLayout(bg_group)
@@ -589,8 +649,27 @@ class SheetPaletteMappingDialog(DialogBase):
         # Live preview section (only if sample image provided)
         if self._sample_image is not None:
             preview_group = QGroupBox("Live Preview")
-            preview_layout = QHBoxLayout(preview_group)
-            preview_layout.setSpacing(16)
+            preview_group_layout = QVBoxLayout(preview_group)
+            preview_group_layout.setSpacing(8)
+
+            zoom_layout = QHBoxLayout()
+            zoom_label = QLabel("Zoom:")
+            zoom_layout.addWidget(zoom_label)
+
+            self._preview_zoom_slider = QSlider(Qt.Orientation.Horizontal)
+            self._preview_zoom_slider.setRange(50, 800)
+            self._preview_zoom_slider.setValue(self._preview_zoom_percent)
+            self._preview_zoom_slider.setToolTip("Zoom both previews")
+            zoom_layout.addWidget(self._preview_zoom_slider, 1)
+
+            self._preview_zoom_value = QLabel(f"{self._preview_zoom_percent}%")
+            self._preview_zoom_value.setMinimumWidth(48)
+            self._preview_zoom_value.setStyleSheet("font-size: 11px;")
+            zoom_layout.addWidget(self._preview_zoom_value)
+            preview_group_layout.addLayout(zoom_layout)
+
+            previews_layout = QHBoxLayout()
+            previews_layout.setSpacing(16)
 
             # Original preview
             original_frame = QVBoxLayout()
@@ -600,19 +679,17 @@ class SheetPaletteMappingDialog(DialogBase):
             original_frame.addWidget(original_label)
 
             self._original_preview_label = QLabel()
-            self._original_preview_label.setFixedSize(128, 128)
             self._original_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._original_preview_label.setStyleSheet("background-color: #ccc; border: 1px solid #888;")
-            # Set original image
-            self._set_original_preview()
-            original_frame.addWidget(self._original_preview_label)
-            preview_layout.addLayout(original_frame)
+            self._original_preview_label.setStyleSheet("background-color: #2a2a2a;")
 
-            # Arrow
-            arrow_label = QLabel("→")
-            arrow_label.setStyleSheet("font-size: 24px; font-weight: bold;")
-            arrow_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            preview_layout.addWidget(arrow_label)
+            original_scroll = QScrollArea()
+            original_scroll.setWidget(self._original_preview_label)
+            original_scroll.setWidgetResizable(False)
+            original_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            original_scroll.setMinimumSize(260, 260)
+            original_scroll.setStyleSheet("background-color: #1e1e1e; border: 1px solid #888;")
+            original_frame.addWidget(original_scroll, 1)
+            previews_layout.addLayout(original_frame, 1)
 
             # Quantized preview
             quantized_frame = QVBoxLayout()
@@ -622,14 +699,23 @@ class SheetPaletteMappingDialog(DialogBase):
             quantized_frame.addWidget(quantized_label)
 
             self._quantized_preview_label = QLabel()
-            self._quantized_preview_label.setFixedSize(128, 128)
             self._quantized_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._quantized_preview_label.setStyleSheet("background-color: #ccc; border: 1px solid #888;")
-            quantized_frame.addWidget(self._quantized_preview_label)
-            preview_layout.addLayout(quantized_frame)
+            self._quantized_preview_label.setStyleSheet("background-color: #2a2a2a;")
 
-            preview_layout.addStretch()
+            quantized_scroll = QScrollArea()
+            quantized_scroll.setWidget(self._quantized_preview_label)
+            quantized_scroll.setWidgetResizable(False)
+            quantized_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            quantized_scroll.setMinimumSize(260, 260)
+            quantized_scroll.setStyleSheet("background-color: #1e1e1e; border: 1px solid #888;")
+            quantized_frame.addWidget(quantized_scroll, 1)
+            previews_layout.addLayout(quantized_frame, 1)
+
+            preview_group_layout.addLayout(previews_layout)
             content_layout.addWidget(preview_group)
+
+            self._preview_zoom_slider.valueChanged.connect(self._on_preview_zoom_changed)
+            self._set_original_preview()
 
         # Color mappings section
         mappings_header_layout = QHBoxLayout()
@@ -714,16 +800,24 @@ class SheetPaletteMappingDialog(DialogBase):
 
     def _on_extract_palette(self) -> None:
         """Extract 16-color palette from AI sheet colors."""
-        # Use the quantization utility with background filtering
+        self._extract_palette(log=True)
+
+    def _apply_extraction_settings(self) -> None:
+        """Apply extraction tuning (debounced)."""
+        self._extract_palette(log=False)
+
+    def _extract_palette(self, *, log: bool) -> None:
+        """Extract a 16-color palette using current tuning options."""
         extracted = quantize_colors_to_palette(
             self._sheet_colors,
             max_colors=16,
             snap_to_snes=True,
             background_color=self._background_color,
             background_tolerance=self._background_tolerance,
+            cluster_threshold=self._cluster_threshold,
+            diversity_min_distance=self._diversity_min_distance,
         )
 
-        # Update palette slots
         self._palette_colors = extracted
         for i, slot in enumerate(self._palette_slots):
             slot.set_color(extracted[i])
@@ -731,7 +825,22 @@ class SheetPaletteMappingDialog(DialogBase):
         # Re-map all colors to new palette
         self._on_auto_map()
 
-        logger.info("Extracted 16-color palette from %d sheet colors", len(self._sheet_colors))
+        if log:
+            logger.info("Extracted 16-color palette from %d sheet colors", len(self._sheet_colors))
+
+    def _on_extraction_settings_changed(self, _value: float) -> None:
+        """Handle extraction tuning changes."""
+        self._cluster_threshold = self._cluster_threshold_slider.value() / 10.0
+        self._diversity_min_distance = self._diversity_distance_slider.value() / 10.0
+        if hasattr(self, "_cluster_threshold_value"):
+            self._cluster_threshold_value.setText(f"{self._cluster_threshold:.1f}")
+        if hasattr(self, "_diversity_distance_value"):
+            self._diversity_distance_value.setText(f"{self._diversity_min_distance:.1f}")
+        self._request_extract_update()
+
+    def _request_extract_update(self) -> None:
+        """Request a debounced palette extraction update."""
+        self._extract_timer.start()
 
     def _on_protect_toggle(self, state: int) -> None:
         """Handle protect checkbox toggle."""
@@ -904,16 +1013,19 @@ class SheetPaletteMappingDialog(DialogBase):
         if self._sample_image is not None:
             self._preview_timer.start()
 
+    def _on_preview_zoom_changed(self, value: int) -> None:
+        """Handle zoom slider changes."""
+        self._preview_zoom_percent = max(10, value)
+        if hasattr(self, "_preview_zoom_value"):
+            self._preview_zoom_value.setText(f"{self._preview_zoom_percent}%")
+        self._refresh_preview_labels()
+
     def _set_original_preview(self) -> None:
         """Set the original preview image."""
         if self._sample_image is None:
             return
 
-        # Scale to fit 128x128 while maintaining aspect ratio
         img = self._sample_image.copy()
-        img.thumbnail((128, 128), Image.Resampling.NEAREST)
-
-        # Convert to QPixmap
         qimage = QImage(
             img.tobytes("raw", "RGBA"),
             img.width,
@@ -921,7 +1033,8 @@ class SheetPaletteMappingDialog(DialogBase):
             img.width * 4,
             QImage.Format.Format_RGBA8888,
         )
-        self._original_preview_label.setPixmap(QPixmap.fromImage(qimage))
+        self._original_preview_pixmap = QPixmap.fromImage(qimage)
+        self._refresh_preview_labels()
 
     def _update_preview(self) -> None:
         """Update the quantized preview image."""
@@ -953,10 +1066,6 @@ class SheetPaletteMappingDialog(DialogBase):
                 # This is already handled by quantize_with_mappings for transparent pixels
                 pass
 
-        # Scale to fit 128x128
-        quantized_rgba.thumbnail((128, 128), Image.Resampling.NEAREST)
-
-        # Convert to QPixmap
         qimage = QImage(
             quantized_rgba.tobytes("raw", "RGBA"),
             quantized_rgba.width,
@@ -964,4 +1073,34 @@ class SheetPaletteMappingDialog(DialogBase):
             quantized_rgba.width * 4,
             QImage.Format.Format_RGBA8888,
         )
-        self._quantized_preview_label.setPixmap(QPixmap.fromImage(qimage))
+        self._quantized_preview_pixmap = QPixmap.fromImage(qimage)
+        self._refresh_preview_labels()
+
+    def _refresh_preview_labels(self) -> None:
+        """Apply current zoom to preview pixmaps."""
+        if self._sample_image is None:
+            return
+
+        zoom = max(0.1, self._preview_zoom_percent / 100.0)
+
+        if hasattr(self, "_original_preview_label") and self._original_preview_pixmap is not None:
+            scaled = self._scale_preview_pixmap(self._original_preview_pixmap, zoom)
+            self._original_preview_label.setPixmap(scaled)
+            self._original_preview_label.resize(scaled.size())
+
+        if hasattr(self, "_quantized_preview_label") and self._quantized_preview_pixmap is not None:
+            scaled = self._scale_preview_pixmap(self._quantized_preview_pixmap, zoom)
+            self._quantized_preview_label.setPixmap(scaled)
+            self._quantized_preview_label.resize(scaled.size())
+
+    @staticmethod
+    def _scale_preview_pixmap(pixmap: QPixmap, zoom: float) -> QPixmap:
+        """Scale a pixmap using nearest-neighbor for crisp pixel art."""
+        width = max(1, int(pixmap.width() * zoom))
+        height = max(1, int(pixmap.height() * zoom))
+        return pixmap.scaled(
+            width,
+            height,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation,
+        )
