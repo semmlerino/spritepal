@@ -315,24 +315,35 @@ class SpriteCompositor:
         # (This handles original sprite pixels if uncovered_policy="original")
         # Snap palette colors to SNES precision for WYSIWYG fidelity
         palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
+        alpha_threshold = getattr(sheet_palette, "alpha_threshold", QUANTIZATION_TRANSPARENCY_THRESHOLD)
+        dither_mode = getattr(sheet_palette, "dither_mode", "none")
+        dither_strength = getattr(sheet_palette, "dither_strength", 0.0)
         if sheet_palette.color_mappings:
             indexed = quantize_with_mappings(
                 image,
                 palette_rgb,
                 sheet_palette.color_mappings,
-                transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+                transparency_threshold=alpha_threshold,
+                dither_mode=dither_mode,
+                dither_strength=dither_strength,
             )
         else:
             indexed = quantize_to_palette(
                 image,
                 palette_rgb,
-                transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+                transparency_threshold=alpha_threshold,
+                dither_mode=dither_mode,
+                dither_strength=dither_strength,
             )
 
         # 2. Overlay indices from the map where available
+        # SKIP overlay when color_mappings exist: the mappings represent user's explicit
+        # decisions about color→index and should take precedence over embedded PNG indices.
+        # This makes workbench preview match the palette editor's Live Preview.
         pixels = np.array(indexed)
-        mask = index_map != 255
-        pixels[mask] = index_map[mask]
+        if not sheet_palette.color_mappings:
+            mask = index_map != 255
+            pixels[mask] = index_map[mask]
 
         # 3. Create final indexed image
         final_indexed = Image.fromarray(pixels, mode="P")
@@ -482,20 +493,27 @@ class SpriteCompositor:
             # Use sheet palette (user-defined for consistent AI frame rendering)
             # Snap palette colors to SNES precision for WYSIWYG fidelity
             palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
+            alpha_threshold = getattr(sheet_palette, "alpha_threshold", QUANTIZATION_TRANSPARENCY_THRESHOLD)
+            dither_mode = getattr(sheet_palette, "dither_mode", "none")
+            dither_strength = getattr(sheet_palette, "dither_strength", 0.0)
             if sheet_palette.color_mappings:
                 # Use explicit color mappings
                 indexed = quantize_with_mappings(
                     image,
                     palette_rgb,
                     sheet_palette.color_mappings,
-                    transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+                    transparency_threshold=alpha_threshold,
+                    dither_mode=dither_mode,
+                    dither_strength=dither_strength,
                 )
             else:
                 # Sheet palette without explicit mappings -> nearest color
                 indexed = quantize_to_palette(
                     image,
                     palette_rgb,
-                    transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+                    transparency_threshold=alpha_threshold,
+                    dither_mode=dither_mode,
+                    dither_strength=dither_strength,
                 )
         else:
             # Fallback: capture palette (existing behavior)
