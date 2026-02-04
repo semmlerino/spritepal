@@ -286,6 +286,20 @@ uv run python scripts/capture_quantized_preview.py -m 2 --display-scale 8
 
 Uses `sheet_palette` from the project (falls back to capture palette if not set).
 
+### Sheet Palette Editor Preview
+
+Render just the quantized preview image as it appears in the Sheet Palette Editor's Live Preview panel:
+
+```bash
+# Default: mapping.spritepal-mapping.json, first mapping → /tmp/sheet_palette_quantized.png
+uv run python scripts/capture_sheet_palette_preview.py
+
+# Specify output and scale
+uv run python scripts/capture_sheet_palette_preview.py -o preview.png --display-scale 8
+```
+
+Applies all Sheet Palette Editor settings: background removal, SNES color snapping, color mappings, dithering.
+
 ### Workbench Alignment Preview
 
 Render the alignment overlay (AI frame over game frame):
