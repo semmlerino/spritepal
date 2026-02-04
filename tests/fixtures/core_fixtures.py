@@ -119,10 +119,10 @@ def reset_all_singletons() -> None:
 
     # Cleanup all workers and clear registry (waits for thread termination)
     def cleanup_worker_registry() -> None:
-        from core.services.worker_lifecycle import WorkerManager
-
         # Silence logging during session teardown to avoid closed-stream errors.
         import logging
+
+        from core.services.worker_lifecycle import WorkerManager
 
         logging.disable(logging.CRITICAL)
         try:

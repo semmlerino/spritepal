@@ -294,7 +294,7 @@ def analyze_color_usage(
 def load_image_preserving_indices(
     path: Path,
     *,
-    sheet_palette: "SheetPalette | None" = None,
+    sheet_palette: SheetPalette | None = None,
 ) -> tuple[np.ndarray | None, Image.Image]:
     """Load image, extracting palette indices if it's an indexed PNG.
 

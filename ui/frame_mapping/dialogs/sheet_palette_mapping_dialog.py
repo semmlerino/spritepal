@@ -511,7 +511,7 @@ class SheetPaletteMappingDialog(DialogBase):
 
         self._cluster_threshold_slider = QSlider(Qt.Orientation.Horizontal)
         self._cluster_threshold_slider.setRange(0, 250)
-        self._cluster_threshold_slider.setValue(int(round(self._cluster_threshold * 10)))
+        self._cluster_threshold_slider.setValue(round(self._cluster_threshold * 10))
         self._cluster_threshold_slider.setToolTip(
             "Merge nearby colors before quantization. Higher values group more similar colors."
         )
@@ -527,7 +527,7 @@ class SheetPaletteMappingDialog(DialogBase):
 
         self._diversity_distance_slider = QSlider(Qt.Orientation.Horizontal)
         self._diversity_distance_slider.setRange(0, 300)
-        self._diversity_distance_slider.setValue(int(round(self._diversity_min_distance * 10)))
+        self._diversity_distance_slider.setValue(round(self._diversity_min_distance * 10))
         self._diversity_distance_slider.setToolTip(
             "Minimum perceptual distance between palette colors. Higher values enforce distinct hues."
         )
