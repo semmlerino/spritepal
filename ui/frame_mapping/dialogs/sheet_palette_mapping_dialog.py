@@ -18,13 +18,19 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QSlider,
     QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
 from core.frame_mapping_project import SheetPalette
-from core.palette_utils import find_nearest_palette_index, quantize_colors_to_palette, quantize_with_mappings
+from core.palette_utils import (
+    QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    find_nearest_palette_index,
+    quantize_colors_to_palette,
+    quantize_with_mappings,
+)
 from ui.components.base.dialog_base import DialogBase
 from ui.frame_mapping.services.palette_service import GamePaletteInfo
 from utils.color_distance import detect_rare_important_colors, perceptual_distance
@@ -303,9 +309,15 @@ class SheetPaletteMappingDialog(DialogBase):
         if current_palette is not None:
             self._background_color = current_palette.background_color
             self._background_tolerance = current_palette.background_tolerance
+            self._alpha_threshold = getattr(current_palette, "alpha_threshold", QUANTIZATION_TRANSPARENCY_THRESHOLD)
+            self._dither_mode = getattr(current_palette, "dither_mode", "none")
+            self._dither_strength = float(getattr(current_palette, "dither_strength", 0.0))
         else:
             self._background_color: tuple[int, int, int] | None = None
             self._background_tolerance = 30
+            self._alpha_threshold = QUANTIZATION_TRANSPARENCY_THRESHOLD
+            self._dither_mode = "none"
+            self._dither_strength = 0.0
 
         # Detect rare important colors (e.g., eye whites, small highlights)
         self._rare_important_colors = detect_rare_important_colors(
@@ -360,6 +372,9 @@ class SheetPaletteMappingDialog(DialogBase):
             color_mappings=dict(self._color_mappings),
             background_color=self._background_color,
             background_tolerance=self._background_tolerance,
+            alpha_threshold=self._alpha_threshold,
+            dither_mode=self._dither_mode,
+            dither_strength=self._dither_strength,
         )
 
     @override
@@ -514,6 +529,63 @@ class SheetPaletteMappingDialog(DialogBase):
         bg_layout.addStretch()
         content_layout.addWidget(bg_group)
 
+        # Quantization detail controls
+        quant_group = QGroupBox("Quantization")
+        quant_layout = QHBoxLayout(quant_group)
+        quant_layout.setSpacing(8)
+
+        dither_label = QLabel("Dither:")
+        quant_layout.addWidget(dither_label)
+
+        self._dither_combo = QComboBox()
+        self._dither_combo.addItem("Off", "none")
+        self._dither_combo.addItem("Ordered (Bayer)", "bayer")
+        self._dither_combo.setToolTip("Ordered dithering can preserve fine detail but adds texture")
+        if self._dither_mode == "bayer":
+            self._dither_combo.setCurrentIndex(1)
+        else:
+            self._dither_combo.setCurrentIndex(0)
+        self._dither_combo.currentIndexChanged.connect(self._on_dither_mode_changed)
+        quant_layout.addWidget(self._dither_combo)
+
+        strength_label = QLabel("Strength:")
+        quant_layout.addWidget(strength_label)
+
+        self._dither_strength_slider = QSlider(Qt.Orientation.Horizontal)
+        self._dither_strength_slider.setRange(0, 100)
+        self._dither_strength_slider.setValue(int(self._dither_strength * 100))
+        self._dither_strength_slider.setMaximumWidth(80)
+        self._dither_strength_slider.setToolTip("Ordered dither strength (0-100%)")
+        self._dither_strength_slider.valueChanged.connect(self._on_dither_strength_changed)
+        quant_layout.addWidget(self._dither_strength_slider)
+
+        self._dither_strength_value = QLabel(f"{int(self._dither_strength * 100)}%")
+        self._dither_strength_value.setStyleSheet("font-size: 11px;")
+        self._dither_strength_value.setMinimumWidth(40)
+        quant_layout.addWidget(self._dither_strength_value)
+
+        dither_enabled = self._dither_mode == "bayer"
+        self._dither_strength_slider.setEnabled(dither_enabled)
+        self._dither_strength_value.setEnabled(dither_enabled)
+
+        quant_sep = QFrame()
+        quant_sep.setFrameShape(QFrame.Shape.VLine)
+        quant_sep.setFrameShadow(QFrame.Shadow.Sunken)
+        quant_layout.addWidget(quant_sep)
+
+        alpha_label = QLabel("Alpha threshold:")
+        quant_layout.addWidget(alpha_label)
+
+        self._alpha_threshold_spin = QSpinBox()
+        self._alpha_threshold_spin.setRange(0, 255)
+        self._alpha_threshold_spin.setValue(self._alpha_threshold)
+        self._alpha_threshold_spin.setToolTip("Pixels with alpha below this are transparent")
+        self._alpha_threshold_spin.valueChanged.connect(self._on_alpha_threshold_changed)
+        quant_layout.addWidget(self._alpha_threshold_spin)
+
+        quant_layout.addStretch()
+        content_layout.addWidget(quant_group)
+
         # Live preview section (only if sample image provided)
         if self._sample_image is not None:
             preview_group = QGroupBox("Live Preview")
@@ -642,8 +714,14 @@ class SheetPaletteMappingDialog(DialogBase):
 
     def _on_extract_palette(self) -> None:
         """Extract 16-color palette from AI sheet colors."""
-        # Use the quantization utility
-        extracted = quantize_colors_to_palette(self._sheet_colors, max_colors=16, snap_to_snes=True)
+        # Use the quantization utility with background filtering
+        extracted = quantize_colors_to_palette(
+            self._sheet_colors,
+            max_colors=16,
+            snap_to_snes=True,
+            background_color=self._background_color,
+            background_tolerance=self._background_tolerance,
+        )
 
         # Update palette slots
         self._palette_colors = extracted
@@ -788,6 +866,30 @@ class SheetPaletteMappingDialog(DialogBase):
         self._background_tolerance = value
         self._request_preview_update()
 
+    def _on_dither_mode_changed(self, _index: int) -> None:
+        """Handle dither mode change."""
+        if not hasattr(self, "_dither_combo"):
+            return
+        self._dither_mode = self._dither_combo.currentData() or "none"
+        dither_enabled = self._dither_mode == "bayer"
+        if hasattr(self, "_dither_strength_slider"):
+            self._dither_strength_slider.setEnabled(dither_enabled)
+        if hasattr(self, "_dither_strength_value"):
+            self._dither_strength_value.setEnabled(dither_enabled)
+        self._request_preview_update()
+
+    def _on_dither_strength_changed(self, value: int) -> None:
+        """Handle dither strength change."""
+        self._dither_strength = max(0.0, min(1.0, value / 100.0))
+        if hasattr(self, "_dither_strength_value"):
+            self._dither_strength_value.setText(f"{int(self._dither_strength * 100)}%")
+        self._request_preview_update()
+
+    def _on_alpha_threshold_changed(self, value: int) -> None:
+        """Handle alpha threshold change."""
+        self._alpha_threshold = max(0, min(255, value))
+        self._request_preview_update()
+
     def _on_clear_background(self) -> None:
         """Clear background color (disable removal)."""
         self._background_color = None
@@ -834,6 +936,9 @@ class SheetPaletteMappingDialog(DialogBase):
             self._sample_image,
             self._palette_colors,
             self._color_mappings,
+            transparency_threshold=self._alpha_threshold,
+            dither_mode=self._dither_mode,
+            dither_strength=self._dither_strength,
         )
 
         # Convert indexed image back to RGBA for display
