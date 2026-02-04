@@ -1092,82 +1092,15 @@ class TestPaletteInvariantAssertions:
 
 
 class TestQuantizeFullResScaleIndexed:
-    """Test the "quantize full-res, scale indexed" fix for color_mappings.
+    """Test index map passthrough for indexed PNGs.
 
-    Bug: When color_mappings existed, index_map was ignored, causing scaled pixels
-    to be re-quantized with perceptual matching instead of preserving exact indices.
+    When an explicit ai_index_map is passed (from indexed PNG), the compositor
+    transforms and uses it to preserve exact palette indices. This avoids
+    re-quantizing with perceptual matching.
 
-    Fix: When color_mappings exist, generate index_map from ORIGINAL image before
-    transforms, then use that index_map for quantization after transforms.
+    Note: Auto-generation of index maps from RGBA images was removed to align
+    Workbench preview with Live Preview (both now use direct quantization).
     """
-
-    def test_color_mappings_generates_index_map_before_transforms(self) -> None:
-        """color_mappings should generate an index_map from original image before transforms."""
-        import numpy as np
-
-        from core.frame_mapping_project import SheetPalette
-
-        compositor = SpriteCompositor(uncovered_policy="transparent")
-
-        # Create an 8x8 AI image with 3 distinct colors
-        ai_image = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
-        # Top-left quadrant: red
-        for x in range(4):
-            for y in range(4):
-                ai_image.putpixel((x, y), (255, 0, 0, 255))
-        # Top-right quadrant: green
-        for x in range(4, 8):
-            for y in range(4):
-                ai_image.putpixel((x, y), (0, 255, 0, 255))
-        # Bottom-left quadrant: blue
-        for x in range(4):
-            for y in range(4, 8):
-                ai_image.putpixel((x, y), (0, 0, 255, 255))
-        # Bottom-right remains transparent
-
-        # Sheet palette with color_mappings for each color
-        sheet_palette = SheetPalette(
-            colors=[
-                (0, 0, 0),  # 0: transparent
-                (255, 0, 0),  # 1: red
-                (0, 255, 0),  # 2: green
-                (0, 0, 255),  # 3: blue
-            ]
-            + [(100, 100, 100)] * 12,  # pad to 16
-            color_mappings={
-                (255, 0, 0): 1,
-                (0, 255, 0): 2,
-                (0, 0, 255): 3,
-            },
-        )
-
-        # Create transform that shrinks to 4x4
-        transform = TransformParams(scale=0.5)
-
-        # Mock capture with 8x8 bounding box
-        entry = MockEntry(id=0, x=0, y=0, width=8, height=8)
-        capture = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16}, width=8, height=8)
-
-        # Call composite_frame with ai_index_map=None (should generate internally)
-        result = compositor.composite_frame(
-            ai_image=ai_image,
-            capture_result=capture,  # type: ignore[arg-type]
-            transform=transform,
-            quantize=True,
-            sheet_palette=sheet_palette,
-            ai_index_map=None,  # Force generation from color_mappings
-        )
-
-        # Verify index_map was generated and returned
-        assert result.index_map is not None, "index_map should be generated from color_mappings"
-
-        # After scaling from 8x8 to 4x4, result.index_map should match transformed size
-        # But wait - we need to check the canvas size. The transform is applied to the AI image,
-        # then pasted onto a canvas. The canvas size is 8x8 (from bounding box).
-        # The transformed AI will be 4x4, pasted at offset (0,0) into 8x8 canvas.
-        assert result.index_map.shape == (8, 8), (
-            f"index_map shape should match canvas size (8x8), got {result.index_map.shape}"
-        )
 
     def test_index_map_preserves_exact_indices_through_scale(self) -> None:
         """Scaling with color_mappings should preserve exact palette indices, not use perceptual matching."""
