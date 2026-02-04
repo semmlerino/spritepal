@@ -10,9 +10,9 @@ import hashlib
 import io
 import os
 import time
-from tempfile import gettempdir
 from functools import lru_cache
 from pathlib import Path
+from tempfile import gettempdir
 from typing import TYPE_CHECKING
 
 from PIL import Image
@@ -42,6 +42,9 @@ def _compute_cache_key(
     palette_mappings: dict[tuple[int, int, int], int] | None,
     background_color: tuple[int, int, int] | None,
     background_tolerance: int,
+    alpha_threshold: int,
+    dither_mode: str,
+    dither_strength: float,
     size: int,
 ) -> str:
     """Compute stable SHA-256 cache key for thumbnail parameters.
@@ -60,6 +63,9 @@ def _compute_cache_key(
         str(sorted(palette_mappings.items()) if palette_mappings else None),
         str(background_color),
         str(background_tolerance),
+        str(alpha_threshold),
+        str(dither_mode),
+        f"{dither_strength:.4f}",
         str(size),
     ]
     key_string = "|".join(key_parts)
@@ -76,6 +82,7 @@ def get_disk_cache() -> ThumbnailDiskCache:
     global _disk_cache
     if _disk_cache is None:
         from core.app_context import get_app_context
+
         try:
             config = get_app_context().configuration_service
             cache_dir = config.cache_directory / "thumbnails" / "v1" / "quantized"
@@ -177,6 +184,9 @@ def _cached_quantized_thumbnail_bytes(
     palette_mappings: tuple[tuple[tuple[int, int, int], int], ...] | None,
     background_color: tuple[int, int, int] | None,
     background_tolerance: int,
+    alpha_threshold: int,
+    dither_mode: str,
+    dither_strength: float,
     size: int,
 ) -> bytes | None:
     """Generate and cache a quantized thumbnail as PNG bytes.
@@ -207,6 +217,9 @@ def _cached_quantized_thumbnail_bytes(
         palette_mappings_dict,
         background_color,
         background_tolerance,
+        alpha_threshold,
+        dither_mode,
+        dither_strength,
         size,
     )
     cached_bytes = disk_cache.get(cache_key)
@@ -245,13 +258,17 @@ def _cached_quantized_thumbnail_bytes(
                 pil_image,
                 palette_list,
                 mappings_dict,
-                transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+                transparency_threshold=alpha_threshold,
+                dither_mode=dither_mode,
+                dither_strength=dither_strength,
             )
         else:
             indexed = quantize_to_palette(
                 pil_image,
                 palette_list,
-                transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+                transparency_threshold=alpha_threshold,
+                dither_mode=dither_mode,
+                dither_strength=dither_strength,
             )
         # Convert indexed back to RGBA for display
         pil_image = indexed.convert("RGBA")
@@ -287,14 +304,8 @@ def _compute_palette_hash(sheet_palette: SheetPalette | None) -> int:
     """
     if sheet_palette is None:
         return 0
-    colors_hash = hash(tuple(sheet_palette.colors))
-    if sheet_palette.color_mappings:
-        mappings_hash = hash(tuple(sorted(sheet_palette.color_mappings.items())))
-        full_hash = hash((colors_hash, mappings_hash))
-    else:
-        full_hash = colors_hash
-    # Constrain to 32-bit signed int range for Qt signal compatibility
-    return full_hash & 0x7FFFFFFF
+    # Use SheetPalette's built-in version hash (includes quantization settings)
+    return sheet_palette.version_hash
 
 
 def create_quantized_thumbnail(
@@ -355,9 +366,25 @@ def create_quantized_thumbnail(
         background_tolerance = (
             sheet_palette.background_tolerance if hasattr(sheet_palette, "background_tolerance") else 0
         )
+        alpha_threshold = (
+            sheet_palette.alpha_threshold
+            if hasattr(sheet_palette, "alpha_threshold")
+            else QUANTIZATION_TRANSPARENCY_THRESHOLD
+        )
+        dither_mode = sheet_palette.dither_mode if hasattr(sheet_palette, "dither_mode") else "none"
+        dither_strength = sheet_palette.dither_strength if hasattr(sheet_palette, "dither_strength") else 0.0
 
         png_bytes = _cached_quantized_thumbnail_bytes(
-            path_str, mtime, palette_colors, palette_mappings, background_color, background_tolerance, size
+            path_str,
+            mtime,
+            palette_colors,
+            palette_mappings,
+            background_color,
+            background_tolerance,
+            alpha_threshold,
+            dither_mode,
+            dither_strength,
+            size,
         )
     else:
         # No palette - use simpler cache
@@ -399,19 +426,31 @@ def quantize_pil_image(
     if pil_image.mode != "RGBA":
         pil_image = pil_image.convert("RGBA")
 
+    alpha_threshold = (
+        sheet_palette.alpha_threshold
+        if hasattr(sheet_palette, "alpha_threshold")
+        else QUANTIZATION_TRANSPARENCY_THRESHOLD
+    )
+    dither_mode = sheet_palette.dither_mode if hasattr(sheet_palette, "dither_mode") else "none"
+    dither_strength = sheet_palette.dither_strength if hasattr(sheet_palette, "dither_strength") else 0.0
+
     # Use color_mappings if defined, otherwise simple quantization
     if sheet_palette.color_mappings:
         indexed = quantize_with_mappings(
             pil_image,
             sheet_palette.colors,
             sheet_palette.color_mappings,
-            transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+            transparency_threshold=alpha_threshold,
+            dither_mode=dither_mode,
+            dither_strength=dither_strength,
         )
     else:
         indexed = quantize_to_palette(
             pil_image,
             sheet_palette.colors,
-            transparency_threshold=QUANTIZATION_TRANSPARENCY_THRESHOLD,
+            transparency_threshold=alpha_threshold,
+            dither_mode=dither_mode,
+            dither_strength=dither_strength,
         )
 
     # Convert indexed back to RGBA for display (preserves palette colors)
@@ -771,11 +810,21 @@ class _ThumbnailWorker(QObject):
             if not (isinstance(background_color, (tuple, list)) and len(background_color) == 3):
                 background_color = None
             background_tolerance = self._sheet_palette.background_tolerance
+            alpha_threshold = (
+                self._sheet_palette.alpha_threshold if hasattr(self._sheet_palette, "alpha_threshold") else 128
+            )
+            dither_mode = self._sheet_palette.dither_mode if hasattr(self._sheet_palette, "dither_mode") else "none"
+            dither_strength = (
+                self._sheet_palette.dither_strength if hasattr(self._sheet_palette, "dither_strength") else 0.0
+            )
         else:
             palette_colors = ()
             palette_mappings = None
             background_color = None
             background_tolerance = 0
+            alpha_threshold = 128
+            dither_mode = "none"
+            dither_strength = 0.0
 
         # Check disk cache first
         disk_cache = get_disk_cache()
@@ -786,6 +835,9 @@ class _ThumbnailWorker(QObject):
             palette_mappings,
             background_color,
             background_tolerance,
+            alpha_threshold,
+            dither_mode,
+            dither_strength,
             self._size,
         )
         cached_bytes = disk_cache.get(cache_key)

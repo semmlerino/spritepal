@@ -33,6 +33,9 @@ def create_test_palette() -> MagicMock:
         (0, 255, 0),  # Green
         (0, 0, 255),  # Blue
     ]
+    palette.alpha_threshold = 128
+    palette.dither_mode = "none"
+    palette.dither_strength = 0.0
     return palette
 
 
