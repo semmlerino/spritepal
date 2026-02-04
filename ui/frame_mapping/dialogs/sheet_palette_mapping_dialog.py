@@ -1041,7 +1041,7 @@ class SheetPaletteMappingDialog(DialogBase):
     def _update_preview(self) -> None:
         """Update the quantized preview image.
 
-        Matches injection pipeline: SNES color snapping + binary alpha.
+        Matches injection pipeline: background removal + SNES color snapping + binary alpha.
         """
         if self._sample_image is None:
             return
@@ -1049,12 +1049,23 @@ class SheetPaletteMappingDialog(DialogBase):
         if not hasattr(self, "_quantized_preview_label"):
             return
 
+        # Apply background removal if configured (matches compositor pipeline)
+        image_to_quantize = self._sample_image
+        if self._background_color is not None:
+            from core.services.content_bounds_analyzer import remove_background
+
+            image_to_quantize = remove_background(
+                self._sample_image,
+                self._background_color,
+                self._background_tolerance,
+            )
+
         # Snap palette colors to SNES precision (BGR555) to match injection
         palette_rgb = [snap_to_snes_color(c) for c in self._palette_colors]
 
         # Quantize with current mappings
         quantized_indexed = quantize_with_mappings(
-            self._sample_image,
+            image_to_quantize,
             palette_rgb,
             self._color_mappings,
             transparency_threshold=self._alpha_threshold,
