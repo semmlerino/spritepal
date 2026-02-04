@@ -564,6 +564,9 @@ class WorkbenchCanvas(QWidget):
         self._setup_ui()
         self._connect_signals()
 
+        # Initialize tile overlay visibility to match checkbox state
+        self._tile_overlay_item.set_overlay_visible(self._tile_overlay_checkbox.isChecked())
+
     def _shutdown_async_services(self) -> None:
         """Shut down background services to avoid QThread leaks."""
         if self._async_services_shutdown:
