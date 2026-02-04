@@ -8,6 +8,8 @@ Provides functions to:
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
@@ -702,7 +704,7 @@ def _ensure_palette_diversity(
             kept.append(best_color)
             candidates.remove(best_color)
 
-    diversified = [transparency] + kept
+    diversified = [transparency, *kept]
     while len(diversified) < max_colors:
         diversified.append((0, 0, 0))
 
@@ -718,6 +720,11 @@ def quantize_colors_to_palette(
     dither_strength: float = 0.0,
     background_color: tuple[int, int, int] | None = None,
     background_tolerance: int = 30,
+    cluster_threshold: float | None = None,
+    diversity_min_distance: float = PALETTE_DIVERSITY_MIN_DISTANCE,
+    rare_rarity_threshold: float = 0.01,
+    rare_distinctness_threshold: float = 12.0,
+    rare_max_candidates: int = 5,
 ) -> list[tuple[int, int, int]]:
     """Quantize colors to a limited palette.
 
@@ -732,10 +739,17 @@ def quantize_colors_to_palette(
         dither_strength: Dithering strength 0.0-1.0 (default 0.0, disabled)
         background_color: If provided, colors within tolerance are filtered out
         background_tolerance: Max RGB component difference to match background (default 30)
+        cluster_threshold: LAB delta for grouping similar colors before quantization
+        diversity_min_distance: Minimum LAB delta between palette colors
+        rare_rarity_threshold: Pixel fraction threshold for rare color detection (0.0-1.0)
+        rare_distinctness_threshold: LAB delta for rare color distinctness
+        rare_max_candidates: Max rare colors to reserve before quantization
 
     Returns:
         List of RGB tuples (max_colors entries, index 0 = transparency)
     """
+    if cluster_threshold is None:
+        cluster_threshold = math.sqrt(PALETTE_CLUSTER_THRESHOLD_SQ)
     if not color_counts:
         # Return empty palette with black at index 0
         return [(0, 0, 0)] * max_colors
@@ -755,14 +769,20 @@ def quantize_colors_to_palette(
         if not color_counts:
             return [(0, 0, 0)] * max_colors
 
+    cluster_threshold = max(0.0, cluster_threshold)
+    diversity_min_distance = max(0.0, diversity_min_distance)
+    rare_rarity_threshold = max(0.0, min(1.0, rare_rarity_threshold))
+    rare_distinctness_threshold = max(0.0, rare_distinctness_threshold)
+    rare_max_candidates = max(0, rare_max_candidates)
+
     original_counts = dict(color_counts)
 
     max_reserved = max(0, max_colors - 1)
     rare_colors = detect_rare_important_colors(
         original_counts,
-        rarity_threshold=0.01,
-        distinctness_threshold=12.0,
-        max_candidates=min(5, max_reserved),
+        rarity_threshold=rare_rarity_threshold,
+        distinctness_threshold=rare_distinctness_threshold,
+        max_candidates=min(rare_max_candidates, max_reserved),
     )
     reserved_colors = _dedupe_preserve_order(
         [rc[0] for rc in rare_colors if rc[0] != (0, 0, 0)]
@@ -787,7 +807,7 @@ def quantize_colors_to_palette(
     # Cluster similar colors to group near-duplicates
     color_counts = _cluster_similar_colors(
         color_counts,
-        threshold_sq=PALETTE_CLUSTER_THRESHOLD_SQ,
+        threshold_sq=cluster_threshold * cluster_threshold,
     )
 
     # Sort colors by frequency
@@ -862,5 +882,5 @@ def quantize_colors_to_palette(
         original_counts_snapped,
         max_colors=max_colors,
         protected_colors=reserved_set,
-        min_distance=PALETTE_DIVERSITY_MIN_DISTANCE,
+        min_distance=diversity_min_distance,
     )
