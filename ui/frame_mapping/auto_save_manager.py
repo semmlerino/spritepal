@@ -37,8 +37,11 @@ class _SaveWorker(QRunnable):
     def run(self) -> None:
         """Run the save operation in background thread."""
         try:
-            self._save_project(self._project_path)
-            self.signals.finished.emit(True, "")
+            success = self._save_project(self._project_path)
+            if success:
+                self.signals.finished.emit(True, "")
+            else:
+                self.signals.finished.emit(False, "Save operation returned failure")
         except Exception as e:
             self.signals.finished.emit(False, str(e))
 
