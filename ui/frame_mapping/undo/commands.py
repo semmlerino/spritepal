@@ -153,6 +153,70 @@ class UpdateAlignmentCommand:
         self.ctx.signal_emitter.emit_alignment_updated(self.ai_frame_id)
 
 
+@dataclass
+class ApplyTransformsToAllCommand:
+    """Command to apply alignment transforms to all mappings.
+
+    Captures prior alignment state for each affected mapping so the
+    entire batch operation can be undone in one step.
+    """
+
+    ctx: CommandContext
+    offset_x: int
+    offset_y: int
+    scale: float
+    exclude_ai_frame_id: str | None = None
+    # Captured prior state: ai_frame_id -> (AlignmentState, status)
+    prev_states: dict[str, tuple[AlignmentState, str]] | None = None
+
+    @property
+    def description(self) -> str:
+        return "Apply alignment to all mappings"
+
+    def _capture_states(self) -> dict[str, tuple[AlignmentState, str]]:
+        """Capture current alignment states for all affected mappings."""
+        states: dict[str, tuple[AlignmentState, str]] = {}
+        for mapping in self.ctx.project.mappings:
+            if mapping.ai_frame_id == self.exclude_ai_frame_id:
+                continue
+            states[mapping.ai_frame_id] = (
+                AlignmentState(
+                    offset_x=mapping.offset_x,
+                    offset_y=mapping.offset_y,
+                    flip_h=mapping.flip_h,
+                    flip_v=mapping.flip_v,
+                    scale=mapping.scale,
+                    sharpen=mapping.sharpen,
+                    resampling=mapping.resampling,
+                ),
+                mapping.status,
+            )
+        return states
+
+    def execute(self) -> None:
+        # Capture states before mutation (only on first execute)
+        if self.prev_states is None:
+            self.prev_states = self._capture_states()
+        self.ctx.alignment_service.apply_transforms_to_all(
+            self.ctx.project, self.offset_x, self.offset_y, self.scale, self.exclude_ai_frame_id
+        )
+
+    def undo(self) -> None:
+        if self.prev_states is None:
+            return
+        for ai_frame_id, (alignment, status) in self.prev_states.items():
+            mapping = self.ctx.project.get_mapping_for_ai_frame(ai_frame_id)
+            if mapping is not None:
+                mapping.offset_x = alignment.offset_x
+                mapping.offset_y = alignment.offset_y
+                mapping.flip_h = alignment.flip_h
+                mapping.flip_v = alignment.flip_v
+                mapping.scale = alignment.scale
+                mapping.sharpen = alignment.sharpen
+                mapping.resampling = alignment.resampling
+                mapping.status = status
+
+
 # =============================================================================
 # Tier 2: Organization Commands
 # =============================================================================

@@ -46,6 +46,7 @@ from ui.frame_mapping.services.palette_service import GamePaletteInfo, PaletteSe
 from ui.frame_mapping.services.preview_service import PreviewService
 from ui.frame_mapping.services.stale_entry_detector import AsyncStaleEntryDetector
 from ui.frame_mapping.undo import (
+    ApplyTransformsToAllCommand,
     CommandContext,
     CreateMappingCommand,
     RemoveMappingCommand,
@@ -1278,15 +1279,24 @@ class FrameMappingController(QObject):
         if project is None:
             return 0
 
-        updated_count = self._alignment_service.apply_transforms_to_all(
-            project, offset_x, offset_y, scale, exclude_ai_frame_id
+        # Count affected mappings for return value
+        affected = sum(1 for m in project.mappings if m.ai_frame_id != exclude_ai_frame_id)
+        if affected == 0:
+            return 0
+
+        command = ApplyTransformsToAllCommand(
+            ctx=self._get_command_context(),
+            offset_x=offset_x,
+            offset_y=offset_y,
+            scale=scale,
+            exclude_ai_frame_id=exclude_ai_frame_id,
         )
+        self._undo_stack.push(command)
 
-        if updated_count > 0:
-            self.project_changed.emit()
-            self.save_requested.emit()
+        self.project_changed.emit()
+        self.save_requested.emit()
 
-        return updated_count
+        return affected
 
     def get_cached_game_frame_preview(self, frame_id: str) -> QPixmap | None:
         """Get cached preview without triggering regeneration.

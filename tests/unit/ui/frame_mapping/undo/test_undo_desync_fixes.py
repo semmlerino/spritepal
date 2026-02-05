@@ -216,3 +216,131 @@ class TestBug4GhostSelectionOnProjectLoad:
         assert state.selected_ai_frame_id is None
         assert state.selected_game_id is None
         assert state.current_canvas_game_id is None
+
+
+class TestBug1ApplyTransformsToAllUndoable:
+    """BUG-1: apply_transforms_to_all should be undoable."""
+
+    def test_apply_transforms_to_all_creates_undo_command(self, populated_controller: FrameMappingController) -> None:
+        """Apply-to-all should push an undo command."""
+        project = populated_controller.project
+        assert project is not None
+
+        # Create two mappings
+        populated_controller.create_mapping("sprite_01.png", "capture_A")
+        populated_controller.create_mapping("sprite_02.png", "capture_B")
+
+        # Apply transforms to all
+        updated = populated_controller.apply_transforms_to_all_mappings(10, 20, 0.5)
+        assert updated == 2
+
+        # Should be undoable (3 commands: 2 creates + 1 apply-to-all)
+        assert populated_controller.can_undo()
+
+    def test_apply_transforms_to_all_undo_restores_prior_alignments(
+        self, populated_controller: FrameMappingController
+    ) -> None:
+        """Undo apply-to-all should restore all prior alignment states."""
+        project = populated_controller.project
+        assert project is not None
+
+        # Create mappings with different alignments
+        populated_controller.create_mapping("sprite_01.png", "capture_A")
+        populated_controller.update_mapping_alignment("sprite_01.png", 5, 10, False, False, 0.8)
+
+        populated_controller.create_mapping("sprite_02.png", "capture_B")
+        populated_controller.update_mapping_alignment("sprite_02.png", -3, 7, True, False, 0.6)
+
+        # Record pre-apply states
+        m1 = project.get_mapping_for_ai_frame("sprite_01.png")
+        m2 = project.get_mapping_for_ai_frame("sprite_02.png")
+        assert m1 is not None and m2 is not None
+        pre_m1 = (m1.offset_x, m1.offset_y, m1.scale, m1.status)
+        pre_m2 = (m2.offset_x, m2.offset_y, m2.scale, m2.status)
+
+        # Apply transforms to all
+        populated_controller.apply_transforms_to_all_mappings(99, 88, 0.3)
+
+        # Verify transforms were applied
+        m1 = project.get_mapping_for_ai_frame("sprite_01.png")
+        m2 = project.get_mapping_for_ai_frame("sprite_02.png")
+        assert m1 is not None and m2 is not None
+        assert m1.offset_x == 99 and m1.offset_y == 88
+        assert m2.offset_x == 99 and m2.offset_y == 88
+
+        # Undo
+        populated_controller.undo()
+
+        # Verify prior states restored
+        m1 = project.get_mapping_for_ai_frame("sprite_01.png")
+        m2 = project.get_mapping_for_ai_frame("sprite_02.png")
+        assert m1 is not None and m2 is not None
+        assert (m1.offset_x, m1.offset_y, m1.scale, m1.status) == pre_m1
+        assert (m2.offset_x, m2.offset_y, m2.scale, m2.status) == pre_m2
+
+    def test_apply_transforms_to_all_redo_reapplies(self, populated_controller: FrameMappingController) -> None:
+        """Redo apply-to-all should re-apply the transforms."""
+        project = populated_controller.project
+        assert project is not None
+
+        populated_controller.create_mapping("sprite_01.png", "capture_A")
+        populated_controller.create_mapping("sprite_02.png", "capture_B")
+
+        populated_controller.apply_transforms_to_all_mappings(50, 60, 0.4)
+
+        # Undo
+        populated_controller.undo()
+        m1 = project.get_mapping_for_ai_frame("sprite_01.png")
+        assert m1 is not None
+        assert m1.offset_x != 50  # Should be restored to previous
+
+        # Redo
+        populated_controller.redo()
+        m1 = project.get_mapping_for_ai_frame("sprite_01.png")
+        assert m1 is not None
+        assert m1.offset_x == 50
+        assert m1.offset_y == 60
+
+    def test_apply_transforms_to_all_excludes_specified_frame(
+        self, populated_controller: FrameMappingController
+    ) -> None:
+        """Apply-to-all respects exclude_ai_frame_id."""
+        project = populated_controller.project
+        assert project is not None
+
+        populated_controller.create_mapping("sprite_01.png", "capture_A")
+        populated_controller.create_mapping("sprite_02.png", "capture_B")
+        populated_controller.update_mapping_alignment("sprite_01.png", 5, 5, False, False, 1.0)
+
+        updated = populated_controller.apply_transforms_to_all_mappings(
+            99, 99, 0.5, exclude_ai_frame_id="sprite_01.png"
+        )
+        assert updated == 1  # Only sprite_02 updated
+
+        m1 = project.get_mapping_for_ai_frame("sprite_01.png")
+        assert m1 is not None
+        assert m1.offset_x == 5  # Unchanged
+
+    def test_apply_transforms_to_all_undo_restores_injected_status(
+        self, populated_controller: FrameMappingController
+    ) -> None:
+        """Undo apply-to-all should restore 'injected' status."""
+        project = populated_controller.project
+        assert project is not None
+
+        populated_controller.create_mapping("sprite_01.png", "capture_A")
+        mapping = project.get_mapping_for_ai_frame("sprite_01.png")
+        assert mapping is not None
+        mapping.status = "injected"
+
+        populated_controller.apply_transforms_to_all_mappings(10, 10, 0.5)
+        # Status should be "edited" after apply
+        mapping = project.get_mapping_for_ai_frame("sprite_01.png")
+        assert mapping is not None
+        assert mapping.status == "edited"
+
+        # Undo should restore "injected"
+        populated_controller.undo()
+        mapping = project.get_mapping_for_ai_frame("sprite_01.png")
+        assert mapping is not None
+        assert mapping.status == "injected"
