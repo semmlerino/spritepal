@@ -86,6 +86,7 @@ class PaletteEditorController(QObject):
     active_index_changed = Signal(int)  # new active palette index
     tool_changed = Signal(EditorTool)  # active tool changed
     color_mapping_report = Signal(dict)  # RGB→indexed conversion analysis
+    constrain_to_index_changed = Signal(bool)
 
     PREVIEW_DEBOUNCE_MS = 100
 
@@ -102,6 +103,7 @@ class PaletteEditorController(QObject):
         self._current_tool = EditorTool.BRUSH
         self._active_index = 1  # Default to index 1 (not transparent)
         self._brush_size = 1
+        self._constrain_to_index = False
 
         # Stroke tracking for batched undo
         self._current_stroke: BatchCommand | None = None
@@ -231,6 +233,15 @@ class PaletteEditorController(QObject):
     def brush_size(self) -> int:
         """Get the current brush size."""
         return self._brush_size
+
+    @property
+    def constrain_to_index(self) -> bool:
+        return self._constrain_to_index
+
+    def set_constrain_to_index(self, enabled: bool) -> None:
+        if self._constrain_to_index != enabled:
+            self._constrain_to_index = enabled
+            self.constrain_to_index_changed.emit(enabled)
 
     @property
     def is_dirty(self) -> bool:
@@ -495,6 +506,11 @@ class PaletteEditorController(QObject):
             if (px, py) in self._stroke_pixels_painted:
                 continue
 
+            if self._constrain_to_index:
+                current = self._image_model.get_pixel(px, py)
+                if current != self._active_index:
+                    continue
+
             old_color = self._image_model.get_pixel(px, py)
             if old_color != self._active_index:
                 cmd = DrawPixelCommand(
@@ -530,6 +546,11 @@ class PaletteEditorController(QObject):
             if (px, py) in self._stroke_pixels_painted:
                 continue
 
+            if self._constrain_to_index:
+                current = self._image_model.get_pixel(px, py)
+                if current != self._active_index:
+                    continue
+
             old_color = self._image_model.get_pixel(px, py)
             if old_color != 0:
                 cmd = DrawPixelCommand(x=px, y=py, old_color=old_color, new_color=0)
@@ -563,6 +584,10 @@ class PaletteEditorController(QObject):
             return
 
         old_color = self._image_model.get_pixel(x, y)
+
+        if self._constrain_to_index and old_color != self._active_index:
+            return
+
         if old_color == self._active_index:
             return
 

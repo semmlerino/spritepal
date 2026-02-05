@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSignalBlocker, Qt, Signal
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -278,6 +278,15 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._brush_size_spinbox.valueChanged.connect(self._on_brush_spinbox_changed)
         layout.addWidget(self._brush_size_spinbox)
 
+        # Constrain to index toggle
+        self._constrain_checkbox = QCheckBox("Constrain [C]")
+        self._constrain_checkbox.setToolTip(
+            "Only affect pixels matching the active palette index.\nUseful with Eraser to erase only a specific index."
+        )
+        self._constrain_checkbox.setFixedHeight(28)
+        self._constrain_checkbox.toggled.connect(self._main_controller.set_constrain_to_index)
+        layout.addWidget(self._constrain_checkbox)
+
         layout.addSpacing(16)
 
         # Selection actions header
@@ -506,6 +515,13 @@ class AIFramePaletteEditorWindow(QMainWindow):
         QShortcut(QKeySequence("="), self).activated.connect(self._main_canvas.zoom_in)
         QShortcut(QKeySequence("-"), self).activated.connect(self._main_canvas.zoom_out)
 
+        # Constrain toggle
+        QShortcut(QKeySequence("C"), self).activated.connect(self._toggle_constrain)
+
+    def _toggle_constrain(self) -> None:
+        """Toggle constrain-to-index mode."""
+        self._constrain_checkbox.setChecked(not self._constrain_checkbox.isChecked())
+
     def _connect_signals(self) -> None:
         """Connect controller and widget signals."""
         # Main controller signals
@@ -530,6 +546,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._palette_panel.index_selected.connect(self._on_palette_index_selected)
         self._palette_panel.color_changed.connect(self._on_palette_color_changed)
         self._palette_panel.merge_requested.connect(self._on_palette_merge_requested)
+
+        self._main_controller.constrain_to_index_changed.connect(self._on_constrain_changed)
 
     def _load_image(self) -> None:
         """Load the AI frame image."""
@@ -600,7 +618,19 @@ class AIFramePaletteEditorWindow(QMainWindow):
     def _on_tool_changed(self, tool: EditorTool) -> None:
         """Handle tool change from controller (e.g., auto-switch after pick)."""
         self._tool_buttons[tool].setChecked(True)
-        self._tool_label.setText(f"Tool: {tool.name.replace('_', ' ').title()}")
+        suffix = " [Constrained]" if self._main_controller.constrain_to_index else ""
+        self._tool_label.setText(f"Tool: {tool.name.replace('_', ' ').title()}{suffix}")
+
+    def _on_constrain_changed(self, enabled: bool) -> None:
+        """Handle constrain-to-index state change."""
+        with QSignalBlocker(self._constrain_checkbox):
+            self._constrain_checkbox.setChecked(enabled)
+        if self._ingame_controller is not None:
+            self._ingame_controller.set_constrain_to_index(enabled)
+        # Refresh tool label to show constraint status
+        tool = self._main_controller.current_tool
+        suffix = " [Constrained]" if enabled else ""
+        self._tool_label.setText(f"Tool: {tool.name.replace('_', ' ').title()}{suffix}")
 
     def _select_index(self, index: int) -> None:
         """Select a palette index."""
@@ -950,6 +980,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._ingame_controller.set_tool(self._main_controller.current_tool)
         self._ingame_controller.set_active_index(self._main_controller.active_index)
         self._ingame_controller.set_brush_size(self._main_controller.brush_size)
+        self._ingame_controller.set_constrain_to_index(self._main_controller.constrain_to_index)
         if self._ingame_canvas is not None:
             self._ingame_canvas.set_brush_size(self._main_controller.brush_size)
 
