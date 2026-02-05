@@ -1061,6 +1061,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
         if data is not None:
             self._main_canvas.set_image(data, self._palette)
 
+        # Refresh the in-game canvas (shares the same palette)
+        if self._ingame_controller is not None and self._ingame_canvas is not None:
+            ingame_data = self._ingame_controller.get_indexed_data()
+            if ingame_data is not None:
+                self._ingame_canvas.set_image(ingame_data, self._palette)
+
         # Also sync the palette panel's swatch (in case signal didn't update it)
         self._palette_panel.sync_palette(self._palette)
 
