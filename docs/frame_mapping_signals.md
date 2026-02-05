@@ -1,6 +1,6 @@
 # Frame Mapping Signal Flow Documentation
 
-**Last Updated:** January 24, 2026
+**Last Updated:** 2026-02-05
 
 This document describes all signal chains in the Frame Mapping subsystem with flow diagrams showing how signals propagate through the system during key operations.
 
@@ -25,6 +25,7 @@ This document describes all signal chains in the Frame Mapping subsystem with fl
 | `game_frame_added` | FrameMappingController:67 | Emitted when a game frame is added | Workspace: `_on_game_frame_added()` - shows status message |
 | `game_frame_removed` | FrameMappingController:68 | Emitted when a game frame is removed | (No direct handler - handled via `project_changed`) |
 | `mapping_created` | FrameMappingController:69 | Emitted when a mapping is created | (Tracked internally, triggers `project_changed`) |
+| `mapping_displaced` | FrameMappingController:152 | Emitted when a mapping creation displaces existing mappings (1:1 enforcement) | Workspace: `_on_mapping_displaced()` - updates displaced frames |
 | `mapping_removed` | FrameMappingController:70 | Emitted when a mapping is removed | (Tracked internally, triggers `project_changed`) |
 | `mapping_injected` | FrameMappingController:71 | Emitted when injection succeeds | Workspace: `_on_mapping_injected()` - shows success dialog |
 | `error_occurred` | FrameMappingController:72 | Emitted on errors | Workspace: `_on_error()` - displays error dialog |
