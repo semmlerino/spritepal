@@ -65,7 +65,7 @@ from core.services.content_bounds_analyzer import (
     get_content_bbox,
 )
 from core.services.image_utils import pil_to_qimage
-from core.services.rgb_to_indexed import load_image_preserving_indices
+from core.services.rgb_to_indexed import convert_indexed_to_rgb, load_image_preserving_indices
 from core.services.sprite_compositor import TransformParams
 from core.services.tile_sampling_service import TileSamplingService
 from core.types import CompressionType
@@ -473,6 +473,7 @@ class WorkbenchCanvas(QWidget):
         self._ai_pixmap: QPixmap | None = None
         self._ai_image: Image.Image | None = None  # PIL image for auto-alignment
         self._ai_index_map: np.ndarray | None = None  # Original palette indices for indexed PNGs
+        self._ingame_edited_path: str | None = None  # Saved in-game edit overrides compositor
         self._has_mapping = False
         self._updating_from_external = False
 
@@ -1082,6 +1083,7 @@ class WorkbenchCanvas(QWidget):
             self._ai_pixmap = None
             self._ai_image = None
             self._ai_index_map = None
+            self._ingame_edited_path = None
             self._cached_content_bbox = None
             self._ai_frame_item.set_pixmap(None)
             self._update_auto_align_button_state()
@@ -1158,6 +1160,16 @@ class WorkbenchCanvas(QWidget):
         self._update_auto_align_button_state()
         # Update preview if enabled
         self._schedule_preview_update()
+
+    def set_ingame_edited_path(self, path: str | None) -> None:
+        """Set the saved in-game edit path, bypassing compositor for preview.
+
+        When set, the preview shows the saved in-game edit directly instead of
+        running the compositor. This matches injection behavior.
+        """
+        if self._ingame_edited_path != path:
+            self._ingame_edited_path = path
+            self._schedule_preview_update()
 
     def _get_ai_frame_from_cache(self, path: Path) -> _AIFrameCacheEntry | None:
         """Get AI frame from cache if valid (exists and mtime matches).
@@ -1871,6 +1883,25 @@ class WorkbenchCanvas(QWidget):
         if self._ai_image is None or self._capture_result is None or self._game_pixmap is None:
             self._preview_item.setVisible(False)
             return
+
+        # If a saved in-game edit exists, show it directly (matches injection behavior)
+        if self._ingame_edited_path and self._sheet_palette is not None:
+            ingame_path = Path(self._ingame_edited_path)
+            if ingame_path.exists():
+                try:
+                    index_map, _ = load_image_preserving_indices(ingame_path, sheet_palette=self._sheet_palette)
+                    if index_map is not None:
+                        rgba_image = convert_indexed_to_rgb(index_map, self._sheet_palette)
+                        qimage = pil_to_qimage(rgba_image, with_alpha=True)
+                        scaled = qimage.scaled(
+                            rgba_image.width * self._display_scale,
+                            rgba_image.height * self._display_scale,
+                        )
+                        self._preview_item.setPixmap(QPixmap.fromImage(scaled))
+                        self._preview_item.setVisible(True)
+                        return
+                except Exception as e:
+                    logger.warning("Failed to load in-game edit %s: %s", ingame_path, e)
 
         # Use snapshot if available, otherwise use current values
         if self._preview_snapshot is not None:
