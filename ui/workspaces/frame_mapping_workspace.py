@@ -682,6 +682,9 @@ class FrameMappingWorkspace(QWidget):
         # Only clear canvas on actual project change, not content updates
         if project_identity_changed:
             logger.debug("_on_project_changed: identity changed - will call set_project()")
+            self._state.selected_ai_frame_id = None
+            self._state.selected_game_id = None
+            self._state.current_canvas_game_id = None
             self._alignment_canvas.clear()
 
         if project is None:

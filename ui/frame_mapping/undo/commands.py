@@ -43,6 +43,8 @@ class CreateMappingCommand:
     prev_game_mapping_ai_id: str | None = None  # AI frame previously linked to this game frame
     prev_ai_mapping_alignment: AlignmentState | None = None
     prev_game_mapping_alignment: AlignmentState | None = None
+    prev_ai_mapping_status: str | None = None
+    prev_game_mapping_status: str | None = None
 
     @property
     def description(self) -> str:
@@ -62,6 +64,11 @@ class CreateMappingCommand:
                 self.ctx.alignment_service.apply_alignment_to_project(
                     self.ctx.project, self.ai_frame_id, self.prev_ai_mapping_alignment
                 )
+            # Restore status
+            if self.prev_ai_mapping_status is not None:
+                mapping = self.ctx.project.get_mapping_for_ai_frame(self.ai_frame_id)
+                if mapping is not None:
+                    mapping.status = self.prev_ai_mapping_status
             # Emit signal for restored AI frame mapping
             self.ctx.signal_emitter.emit_mapping_created(self.ai_frame_id, self.prev_ai_mapping_game_id)
 
@@ -72,6 +79,11 @@ class CreateMappingCommand:
                 self.ctx.alignment_service.apply_alignment_to_project(
                     self.ctx.project, self.prev_game_mapping_ai_id, self.prev_game_mapping_alignment
                 )
+            # Restore status
+            if self.prev_game_mapping_status is not None:
+                mapping = self.ctx.project.get_mapping_for_ai_frame(self.prev_game_mapping_ai_id)
+                if mapping is not None:
+                    mapping.status = self.prev_game_mapping_status
             # Emit signal for restored game frame mapping
             self.ctx.signal_emitter.emit_mapping_created(self.prev_game_mapping_ai_id, self.game_frame_id)
 

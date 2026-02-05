@@ -10,6 +10,10 @@ from typing import Protocol
 
 from PySide6.QtCore import QObject, Signal
 
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class FrameMappingCommand(Protocol):
     """Protocol for undoable frame mapping commands.
@@ -86,7 +90,12 @@ class UndoRedoStack(QObject):
             return None
 
         command = self._undo_stack.pop()
-        command.undo()
+        try:
+            command.undo()
+        except Exception:
+            logger.warning("Undo failed for '%s', discarding command", command.description, exc_info=True)
+            self.can_undo_changed.emit(len(self._undo_stack) > 0)
+            return command.description
         self._redo_stack.append(command)
 
         # Emit signals
@@ -105,7 +114,12 @@ class UndoRedoStack(QObject):
             return None
 
         command = self._redo_stack.pop()
-        command.execute()
+        try:
+            command.execute()
+        except Exception:
+            logger.warning("Redo failed for '%s', discarding command", command.description, exc_info=True)
+            self.can_redo_changed.emit(len(self._redo_stack) > 0)
+            return command.description
         self._undo_stack.append(command)
 
         # Emit signals

@@ -95,8 +95,8 @@ class TestUndoWhenFrameWasDeleted:
     def test_undo_create_mapping_when_ai_frame_deleted(self, populated_controller: FrameMappingController) -> None:
         """Undo create mapping gracefully handles deleted AI frame.
 
-        When an AI frame is deleted after a mapping was created, undoing
-        should not crash (the remove operation will be a no-op).
+        When an AI frame is deleted after a mapping was created, the undo
+        stack is cleared to prevent stale references (BUG-2 fix).
         """
         project = populated_controller.project
         assert project is not None
@@ -105,16 +105,20 @@ class TestUndoWhenFrameWasDeleted:
         populated_controller.create_mapping("sprite_01.png", "capture_A")
         assert populated_controller.can_undo()
 
-        # Delete the AI frame
+        # Delete the AI frame - this now clears the undo stack
         populated_controller.remove_ai_frame("sprite_01.png")
 
-        # Undo should not raise, even though the frame is gone
+        # Undo stack should be cleared
+        assert not populated_controller.can_undo()
         result = populated_controller.undo()
-        # The undo stack still returns the description
-        assert result is not None
+        assert result is None
 
     def test_undo_create_mapping_when_game_frame_deleted(self, populated_controller: FrameMappingController) -> None:
-        """Undo create mapping gracefully handles deleted game frame."""
+        """Undo create mapping gracefully handles deleted game frame.
+
+        When a game frame is deleted after a mapping was created, the undo
+        stack is cleared to prevent stale references (BUG-2 fix).
+        """
         project = populated_controller.project
         assert project is not None
 
@@ -122,12 +126,13 @@ class TestUndoWhenFrameWasDeleted:
         populated_controller.create_mapping("sprite_01.png", "capture_A")
         assert populated_controller.can_undo()
 
-        # Delete the game frame
+        # Delete the game frame - this now clears the undo stack
         populated_controller.remove_game_frame("capture_A")
 
-        # Undo should not crash
+        # Undo stack should be cleared
+        assert not populated_controller.can_undo()
         result = populated_controller.undo()
-        assert result is not None
+        assert result is None
 
     def test_undo_alignment_when_mapping_deleted(self, populated_controller: FrameMappingController) -> None:
         """Undo alignment update gracefully handles deleted mapping."""

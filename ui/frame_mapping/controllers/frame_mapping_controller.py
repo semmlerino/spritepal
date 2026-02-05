@@ -1077,6 +1077,16 @@ class FrameMappingController(QObject):
             prev_game_alignment,
         ) = self._mapping_service.capture_create_mapping_undo_state(project, ai_frame_id, game_frame_id)
 
+        # Capture status for undo restoration
+        prev_ai_status = (
+            prev_ai_mapping.status if (prev_ai_mapping := project.get_mapping_for_ai_frame(ai_frame_id)) else None
+        )
+        prev_game_status = (
+            prev_game_mapping.status
+            if (prev_game_mapping := project.get_mapping_for_game_frame(game_frame_id))
+            else None
+        )
+
         # Create and execute command via undo stack
         command = CreateMappingCommand(
             ctx=self._get_command_context(),
@@ -1086,6 +1096,8 @@ class FrameMappingController(QObject):
             prev_game_mapping_ai_id=prev_game_ai_id,
             prev_ai_mapping_alignment=prev_ai_alignment,
             prev_game_mapping_alignment=prev_game_alignment,
+            prev_ai_mapping_status=prev_ai_status,
+            prev_game_mapping_status=prev_game_status,
         )
         self._undo_stack.push(command)
 
