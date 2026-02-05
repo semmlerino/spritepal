@@ -104,17 +104,6 @@ class TestROMStateManagement:
         manager.last_injected_rom = injected_path
         assert manager.last_injected_rom == injected_path
 
-    def test_clear_rom_state(self, tmp_path: Path) -> None:
-        """Should clear all ROM state."""
-        manager = WorkspaceStateManager()
-        manager.rom_path = tmp_path / "game.sfc"
-        manager.last_injected_rom = tmp_path / "game_inj.sfc"
-
-        manager.clear_rom_state()
-
-        assert manager.rom_path is None
-        assert manager.last_injected_rom is None
-
     def test_is_rom_valid_when_path_exists(self, tmp_path: Path) -> None:
         """Should return True when ROM path exists."""
         manager = WorkspaceStateManager()

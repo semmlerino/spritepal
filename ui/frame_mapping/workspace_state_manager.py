@@ -9,10 +9,10 @@ Manages UI state for the Frame Mapping workspace, including:
 
 This is a pure state container with no Qt dependencies or signals.
 
-NOTE: Selection state properties are CACHED for performance. The panes
-(AIFramesPane, CapturesLibraryPane) are the source of truth. Workspace
-provides helper methods (_get_selected_ai_frame_id, _get_selected_game_id)
-that query panes first, falling back to cached state when pane unavailable.
+Note: Selection state is cached locally. The workspace panes
+(AIFramesPane, CapturesLibraryPane) manage their own selection state.
+This manager provides helper properties for convenient access to cached
+selection state without requiring pane references.
 """
 
 from __future__ import annotations
@@ -152,11 +152,6 @@ class WorkspaceStateManager:
     def last_injected_rom(self, path: Path | None) -> None:
         """Set the last injected ROM path."""
         self._last_injected_rom = path
-
-    def clear_rom_state(self) -> None:
-        """Clear all ROM path state."""
-        self._rom_path = None
-        self._last_injected_rom = None
 
     def is_rom_valid(self) -> bool:
         """Check if the current ROM path is valid and exists.

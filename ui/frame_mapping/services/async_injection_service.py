@@ -25,7 +25,7 @@ else:
         return f
 
 
-from core.services.injection_debug_context import InjectionDebugContext
+from core.services.injection_debug_utils import managed_debug_context
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest, InjectionResult
 from core.services.injection_snapshot import InjectionSnapshot
@@ -133,26 +133,13 @@ class _InjectionWorker(QObject):
 
         try:
             # Execute injection using snapshot (thread-safe, no mutable project access)
-            with InjectionDebugContext.from_env() as debug_ctx:
-                if request.debug and not debug_ctx.enabled:
-                    debug_ctx = InjectionDebugContext(enabled=True)
-                    debug_ctx.__enter__()
-                    try:
-                        result = self._orchestrator.execute_from_snapshot(
-                            request=request.injection_request,
-                            snapshot=request.snapshot,
-                            debug_context=debug_ctx,
-                            on_progress=emit_progress,
-                        )
-                    finally:
-                        debug_ctx.__exit__(None, None, None)
-                else:
-                    result = self._orchestrator.execute_from_snapshot(
-                        request=request.injection_request,
-                        snapshot=request.snapshot,
-                        debug_context=debug_ctx,
-                        on_progress=emit_progress,
-                    )
+            with managed_debug_context(explicit_debug=request.debug) as debug_ctx:
+                result = self._orchestrator.execute_from_snapshot(
+                    request=request.injection_request,
+                    snapshot=request.snapshot,
+                    debug_context=debug_ctx,
+                    on_progress=emit_progress,
+                )
 
             if not self._is_stop_requested():
                 self.injection_finished.emit(request_id, ai_frame_id, result)

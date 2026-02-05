@@ -9,7 +9,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from core.services.injection_debug_context import InjectionDebugContext
+from core.services.injection_debug_utils import managed_debug_context
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest
 from ui.frame_mapping.services.async_injection_service import AsyncInjectionService
@@ -148,27 +148,13 @@ class InjectionFacade:
             self._signals.emit_status_update(msg)
 
         # Execute via orchestrator with debug context
-        with InjectionDebugContext.from_env() as debug_ctx:
-            # Override with explicit debug flag if passed
-            if debug and not debug_ctx.enabled:
-                debug_ctx = InjectionDebugContext(enabled=True)
-                debug_ctx.__enter__()
-                try:
-                    result = self._injection_orchestrator.execute(
-                        request=request,
-                        project=project,
-                        debug_context=debug_ctx,
-                        on_progress=emit_progress,
-                    )
-                finally:
-                    debug_ctx.__exit__(None, None, None)
-            else:
-                result = self._injection_orchestrator.execute(
-                    request=request,
-                    project=project,
-                    debug_context=debug_ctx,
-                    on_progress=emit_progress,
-                )
+        with managed_debug_context(explicit_debug=debug) as debug_ctx:
+            result = self._injection_orchestrator.execute(
+                request=request,
+                project=project,
+                debug_context=debug_ctx,
+                on_progress=emit_progress,
+            )
 
         # Handle stale entries warning
         if result.needs_fallback_confirmation and result.stale_frame_id:

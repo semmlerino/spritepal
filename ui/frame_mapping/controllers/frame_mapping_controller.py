@@ -290,7 +290,7 @@ class FrameMappingController(QObject):
         ai_frame_id: ID of the AI frame whose alignment changed
 
     Emitted by:
-        - MappingsFacade.update_alignment()
+        - AIFramesFacade.update_alignment()
         - UpdateAlignmentCommand.redo()
 
     Triggers:
@@ -1649,6 +1649,7 @@ class FrameMappingController(QObject):
                     mapping.status = result.new_mapping_status
 
                 self.mapping_injected.emit(ai_frame_id, "\n".join(result.messages))
+                self.emit_project_changed()
                 self.save_requested.emit()
             elif result.error:
                 self.error_occurred.emit(result.error)
