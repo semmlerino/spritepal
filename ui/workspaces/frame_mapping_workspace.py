@@ -1398,7 +1398,7 @@ class FrameMappingWorkspace(QWidget):
             self._controller.project.replace_ai_frames([], None)
             self._controller.project.filter_mappings_by_valid_ai_ids(set())
             self._controller.clear_undo_history()  # Clear undo: old commands reference deleted frames
-            self._controller.project_changed.emit()
+            self._controller.emit_project_changed()
 
     @signal_error_boundary()
     def _on_frame_rename_requested(self, frame_id: str, display_name: str) -> None:

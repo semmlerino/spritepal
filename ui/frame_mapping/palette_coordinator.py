@@ -407,7 +407,7 @@ class PaletteCoordinator:
                 self._state.selected_ai_frame_id = new_id
 
         # Mark project as modified (will auto-save on next operation)
-        self._controller.project_changed.emit()
+        self._controller.emit_project_changed()
 
         # Refresh the AI frames pane to show updated preview
         if self._ai_frames_pane:
