@@ -1,263 +1,32 @@
 """Tests for frame mapping workflow fixes.
 
 Covers:
-- Step 1: Double refresh prevention
-- Step 2: Batch injection signal coalescing
-- Step 3: Auto-save after structural changes
 - Step 4: Controller-routed compression updates
 - Step 5: Canvas state preservation
+- Step 6: Split brain fixes (compression/alignment apply to correct frame)
+
+Note: Steps 1-3 are covered by other test files:
+- Step 1 (double refresh): tests/ui/frame_mapping/views/test_mapping_panel_refresh_selection.py
+- Step 2 (batch injection): tests/ui/integration/test_frame_mapping_batch_operations.py
+- Step 3 (auto-save): tests/unit/ui/frame_mapping/test_auto_save_manager.py + tests/ui/frame_mapping/test_auto_save_manager.py
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from core.frame_mapping_project import AIFrame, FrameMappingProject, GameFrame
+from core.frame_mapping_project import GameFrame
 from core.types import CompressionType
 from tests.fixtures.frame_mapping_helpers import create_test_project
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
-from ui.frame_mapping.views.mapping_panel import MappingPanel
 from ui.frame_mapping.views.workbench_types import AlignmentState
 
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
-
-
-class TestDoubleRefreshPrevention:
-    """Step 1: Verify set_project doesn't auto-refresh."""
-
-    def test_set_project_does_not_call_refresh(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """MappingPanel.set_project() should NOT call refresh() internally.
-
-        The caller controls refresh timing to prevent double refresh when
-        project_changed signal triggers both set_project and update_previews.
-        """
-        panel = MappingPanel()
-        qtbot.addWidget(panel)
-
-        project = create_test_project(tmp_path, num_frames=3)
-
-        # Track refresh calls
-        refresh_call_count = 0
-        original_refresh = panel.refresh
-
-        def counting_refresh() -> None:
-            nonlocal refresh_call_count
-            refresh_call_count += 1
-            original_refresh()
-
-        panel.refresh = counting_refresh  # type: ignore[method-assign]
-
-        # Call set_project - should NOT trigger refresh
-        panel.set_project(project)
-
-        assert refresh_call_count == 0, (
-            f"set_project() called refresh() {refresh_call_count} times, expected 0. "
-            "Caller should control refresh timing."
-        )
-
-    def test_project_changed_causes_single_rebuild(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """When project_changed fires, mapping panel rebuilds exactly once.
-
-        This tests the full flow where workspace._on_project_changed calls
-        set_project then _update_mapping_panel_previews.
-        """
-        panel = MappingPanel()
-        qtbot.addWidget(panel)
-
-        project = create_test_project(tmp_path, num_frames=5)
-
-        # First set up the panel
-        panel.set_project(project)
-        panel.refresh()
-
-        # Track refresh calls
-        refresh_call_count = 0
-        original_refresh = panel.refresh
-
-        def counting_refresh() -> None:
-            nonlocal refresh_call_count
-            refresh_call_count += 1
-            original_refresh()
-
-        panel.refresh = counting_refresh  # type: ignore[method-assign]
-
-        # Simulate workspace._on_project_changed behavior:
-        # 1. set_project (should NOT refresh)
-        panel.set_project(project)
-        # 2. _update_mapping_panel_previews calls refresh
-        panel.refresh()
-
-        # Should be exactly 1 refresh (from explicit call, not from set_project)
-        assert refresh_call_count == 1, (
-            f"Expected exactly 1 refresh, got {refresh_call_count}. set_project should not call refresh internally."
-        )
-
-
-class TestBatchInjectionSignalCoalescing:
-    """Step 2: Verify batch injection emits project_changed once."""
-
-    def test_inject_mapping_with_emit_false_does_not_emit_project_changed(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """inject_mapping(emit_project_changed=False) should not emit signal.
-
-        This enables batch injection to emit once at the end instead of per-frame.
-        """
-        from core.services.injection_results import InjectionResult
-
-        controller = FrameMappingController()
-
-        # Track project_changed emissions
-        emissions: list[None] = []
-        controller.project_changed.connect(lambda: emissions.append(None))
-
-        # Create project with AI frame and game frame
-        project = create_test_project(tmp_path, num_frames=1)
-        ai_frame_id = project.ai_frames[0].id  # Use actual ID from project
-
-        # Create game frame with ROM offset
-        game_frame = GameFrame(
-            id="test_game",
-            rom_offsets=[0x1000],
-            capture_path=tmp_path / "dummy.json",  # Non-None path
-            palette_index=0,
-            width=8,
-            height=8,
-            selected_entry_ids=[],
-            compression_types={0x1000: CompressionType.RAW},
-        )
-        project.add_game_frame(game_frame)
-        project.create_mapping(ai_frame_id, game_frame.id)
-        controller._project = project
-        emissions.clear()  # Clear any emissions from setup
-
-        # Mock orchestrator to return success - we're testing the flag, not injection itself
-        mock_result = InjectionResult(success=True, new_mapping_status="injected", messages=())
-        with patch.object(controller._injection_orchestrator, "execute", return_value=mock_result):
-            controller.inject_mapping(
-                ai_frame_id=ai_frame_id,
-                rom_path=tmp_path / "dummy.sfc",
-                emit_project_changed=False,
-            )
-
-        # With emit_project_changed=False, no project_changed emission should occur
-        assert len(emissions) == 0, f"Expected 0 emissions with emit_project_changed=False, got {len(emissions)}"
-
-    def test_inject_mapping_with_emit_true_does_emit_project_changed(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """inject_mapping(emit_project_changed=True) should emit signal.
-
-        This is the default behavior for single-frame injection.
-        """
-        from core.services.injection_results import InjectionResult
-
-        controller = FrameMappingController()
-
-        # Track project_changed emissions
-        emissions: list[None] = []
-        controller.project_changed.connect(lambda: emissions.append(None))
-
-        # Create project with AI frame and game frame
-        project = create_test_project(tmp_path, num_frames=1)
-        ai_frame_id = project.ai_frames[0].id
-
-        game_frame = GameFrame(
-            id="test_game",
-            rom_offsets=[0x1000],
-            capture_path=tmp_path / "dummy.json",
-            palette_index=0,
-            width=8,
-            height=8,
-            selected_entry_ids=[],
-            compression_types={0x1000: CompressionType.RAW},
-        )
-        project.add_game_frame(game_frame)
-        project.create_mapping(ai_frame_id, game_frame.id)
-        controller._project = project
-        emissions.clear()
-
-        # Mock orchestrator to return success
-        mock_result = InjectionResult(success=True, new_mapping_status="injected", messages=())
-        with patch.object(controller._injection_orchestrator, "execute", return_value=mock_result):
-            controller.inject_mapping(
-                ai_frame_id=ai_frame_id,
-                rom_path=tmp_path / "dummy.sfc",
-                emit_project_changed=True,  # Explicitly True (also the default)
-            )
-
-        # With emit_project_changed=True, exactly 1 project_changed emission expected
-        assert len(emissions) == 1, f"Expected 1 emission with emit_project_changed=True, got {len(emissions)}"
-
-
-class TestAutoSaveAfterStructuralChanges:
-    """Step 3: Verify save_requested is emitted after structural changes."""
-
-    def test_create_mapping_emits_save_requested(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """create_mapping() should emit save_requested after success."""
-        controller = FrameMappingController()
-        # Note: FrameMappingController is QObject, not QWidget
-
-        # Create project
-        project = create_test_project(tmp_path, num_frames=1)
-        game_frame = GameFrame(
-            id="test_game",
-            rom_offsets=[0x1000],
-            capture_path=None,
-            palette_index=0,
-            width=8,
-            height=8,
-            selected_entry_ids=[],
-            compression_types={},
-        )
-        project.add_game_frame(game_frame)
-        controller._project = project
-
-        # Track save_requested emissions
-        save_emissions: list[None] = []
-        controller.save_requested.connect(lambda: save_emissions.append(None))
-
-        # Create mapping - use AI frame ID
-        ai_frame_id = project.ai_frames[0].id
-        controller.create_mapping(ai_frame_id, "test_game")
-
-        assert len(save_emissions) == 1, (
-            f"Expected 1 save_requested emission after create_mapping, got {len(save_emissions)}"
-        )
-
-    def test_remove_mapping_emits_save_requested(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """remove_mapping() should emit save_requested after success."""
-        controller = FrameMappingController()
-        # Note: FrameMappingController is QObject, not QWidget
-
-        # Create project with mapping
-        project = create_test_project(tmp_path, num_frames=1)
-        game_frame = GameFrame(
-            id="test_game",
-            rom_offsets=[0x1000],
-            capture_path=None,
-            palette_index=0,
-            width=8,
-            height=8,
-            selected_entry_ids=[],
-            compression_types={},
-        )
-        project.add_game_frame(game_frame)
-        project.create_mapping(project.ai_frames[0].id, "test_game")
-        controller._project = project
-
-        # Track save_requested emissions
-        save_emissions: list[None] = []
-        controller.save_requested.connect(lambda: save_emissions.append(None))
-
-        # Remove mapping - use AI frame ID
-        ai_frame_id = project.ai_frames[0].id
-        controller.remove_mapping(ai_frame_id)
-
-        assert len(save_emissions) == 1, (
-            f"Expected 1 save_requested emission after remove_mapping, got {len(save_emissions)}"
-        )
 
 
 class TestControllerRoutedCompressionUpdates:
@@ -281,7 +50,8 @@ class TestControllerRoutedCompressionUpdates:
             compression_types={0x1000: CompressionType.RAW, 0x2000: CompressionType.RAW, 0x3000: CompressionType.RAW},
         )
         project.add_game_frame(game_frame)
-        controller._project = project
+        # Standard test setup pattern: use controller.project setter for test setup
+        controller.project = project
 
         # Update compression type
         result = controller.update_game_frame_compression("test_game", CompressionType.HAL)
@@ -309,7 +79,8 @@ class TestControllerRoutedCompressionUpdates:
             compression_types={0x1000: CompressionType.RAW},
         )
         project.add_game_frame(game_frame)
-        controller._project = project
+        # Standard test setup pattern: use controller.project setter for test setup
+        controller.project = project
 
         # Track emissions
         project_changed_emissions: list[None] = []
@@ -329,7 +100,8 @@ class TestControllerRoutedCompressionUpdates:
         # Note: FrameMappingController is QObject, not QWidget
 
         project = create_test_project(tmp_path, num_frames=1)
-        controller._project = project
+        # Standard test setup pattern: use controller.project setter for test setup
+        controller.project = project
 
         result = controller.update_game_frame_compression("nonexistent", CompressionType.HAL)
 
@@ -345,9 +117,10 @@ class TestCanvasStatePreservation:
         """Canvas should not clear when project content changes (same project).
 
         Only clear on new/load project (identity change).
+
+        Note: This test verifies the fix was applied by checking that the state
+        manager tracks previous_project_id for canvas state preservation.
         """
-        # This test needs the full workspace, but we can test the concept
-        # by checking that _previous_project_id tracking works
         from ui.workspaces.frame_mapping_workspace import FrameMappingWorkspace
 
         workspace = FrameMappingWorkspace()
@@ -364,8 +137,8 @@ class TestSplitBrainFixes:
     """Step 6: Verify canvas/selection split brain fixes.
 
     The workspace tracks two distinct IDs:
-    - _selected_game_id: What user last clicked in the captures library
-    - _current_canvas_game_id: What the canvas is actually displaying
+    - selected_game_id: What user last clicked in the captures library
+    - current_canvas_game_id: What the canvas is actually displaying
 
     These can differ when previewing captures. The fixes ensure:
     1. Compression changes apply to the displayed frame (canvas), not selected
@@ -416,25 +189,33 @@ class TestSplitBrainFixes:
         )
         project.add_game_frame(capture_a)
         project.add_game_frame(capture_b)
-        workspace._controller._project = project
+        # Standard test setup pattern: use controller.project setter for test setup
+        workspace.controller.project = project
 
-        # Simulate: AI frame mapped to capture_a, but canvas shows capture_b
+        # Create mapping: AI frame -> capture_a
         ai_frame_id = project.ai_frames[0].id
         project.create_mapping(ai_frame_id, "capture_a")
-        workspace._state.selected_ai_frame_id = ai_frame_id
-        workspace._state.selected_game_id = "capture_a"  # What was linked
-        workspace._state.current_canvas_game_id = "capture_b"  # What canvas displays (user previewing)
+
+        # Simulate user workflow:
+        # 1. Select AI frame (loads mapping with capture_a)
+        workspace._on_ai_frame_selected(ai_frame_id)
+        # 2. Click capture_b to preview (canvas now shows capture_b)
+        workspace._on_game_frame_selected("capture_b")
+
+        # Verify state is set up correctly (canvas shows capture_b, not capture_a)
+        assert workspace._state.selected_game_id == "capture_b"
+        assert workspace._state.current_canvas_game_id == "capture_b"
 
         # User changes compression type via canvas
         workspace._on_compression_type_changed(CompressionType.HAL)
 
         # Compression should be applied to capture_b (what canvas shows),
-        # NOT capture_a (what was selected for linking)
+        # NOT capture_a (what the mapping points to)
         assert capture_b.compression_types[0x2000] == CompressionType.HAL, (
-            "Compression should apply to canvas frame (capture_b), not selected frame (capture_a)"
+            "Compression should apply to canvas frame (capture_b), not mapped frame (capture_a)"
         )
         assert capture_a.compression_types[0x1000] == CompressionType.RAW, (
-            "Selected frame (capture_a) should remain unchanged"
+            "Mapped frame (capture_a) should remain unchanged"
         )
 
     def test_alignment_blocked_shows_user_feedback(self, qtbot: QtBot, tmp_path: Path, app_context: object) -> None:
@@ -483,14 +264,24 @@ class TestSplitBrainFixes:
         )
         project.add_game_frame(capture_a)
         project.add_game_frame(capture_b)
-        workspace._controller._project = project
+        # Standard test setup pattern: use controller.project setter for test setup
+        workspace.controller.project = project
 
-        # Create mapping AI frame -> capture_a
+        # Create mapping: AI frame -> capture_a
         ai_frame_id = project.ai_frames[0].id
         project.create_mapping(ai_frame_id, "capture_a")
-        workspace._state.selected_ai_frame_id = ai_frame_id
-        workspace._state.selected_game_id = "capture_a"
-        workspace._state.current_canvas_game_id = "capture_b"  # Canvas shows different frame
+
+        # Simulate user workflow:
+        # 1. Select AI frame (loads mapping with capture_a)
+        workspace._on_ai_frame_selected(ai_frame_id)
+        # 2. Click capture_b to preview (canvas now shows capture_b)
+        workspace._on_game_frame_selected("capture_b")
+
+        # Verify state (canvas shows different frame than mapping)
+        assert workspace._state.current_canvas_game_id == "capture_b"
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
+        assert mapping is not None
+        assert mapping.game_frame_id == "capture_a"
 
         # User tries to adjust alignment
         state = AlignmentState(
