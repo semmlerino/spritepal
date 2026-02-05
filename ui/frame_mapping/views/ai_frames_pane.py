@@ -1156,8 +1156,10 @@ class AIFramesPane(QWidget):
         Args:
             frame: The AIFrame to add
         """
-        # Add to our internal list
-        self._ai_frames.append(frame)
+        # NOTE: Do NOT append to self._ai_frames here.
+        # self._ai_frames is a shared reference to project.ai_frames,
+        # and the frame was already added by project.add_ai_frame().
+        # Appending again would create a duplicate.
 
         # Check filters - skip if filtered out
         status = self._mapping_status.get(frame.id, "unmapped")
