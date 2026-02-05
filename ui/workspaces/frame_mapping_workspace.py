@@ -461,6 +461,7 @@ class FrameMappingWorkspace(QWidget):
         self._controller.ai_frames_loaded.connect(self._on_ai_frames_loaded)
         self._controller.game_frame_added.connect(self._on_game_frame_added)
         self._controller.mapping_created.connect(self._on_mapping_created)
+        self._controller.mapping_displaced.connect(self._on_mapping_displaced)
         self._controller.mapping_removed.connect(self._on_mapping_removed)
         self._controller.mapping_injected.connect(self._on_mapping_injected)
         self._controller.error_occurred.connect(self._on_error)
@@ -566,6 +567,7 @@ class FrameMappingWorkspace(QWidget):
         safe_disconnect(self._controller.ai_frames_loaded, self._on_ai_frames_loaded)
         safe_disconnect(self._controller.game_frame_added, self._on_game_frame_added)
         safe_disconnect(self._controller.mapping_created, self._on_mapping_created)
+        safe_disconnect(self._controller.mapping_displaced, self._on_mapping_displaced)
         safe_disconnect(self._controller.mapping_removed, self._on_mapping_removed)
         safe_disconnect(self._controller.mapping_injected, self._on_mapping_injected)
         safe_disconnect(self._controller.error_occurred, self._on_error)
@@ -799,6 +801,15 @@ class FrameMappingWorkspace(QWidget):
         self._update_single_ai_frame_status(ai_frame_id)
         self._update_single_game_frame_link_status(game_frame_id)
         self._update_single_mapping_panel_row(ai_frame_id)
+
+    @signal_error_boundary()
+    def _on_mapping_displaced(self, displaced_ai_id: str, displaced_game_id: str) -> None:
+        """Handle displaced mapping — update UI for frames that lost their mapping."""
+        if displaced_ai_id:
+            self._update_single_ai_frame_status(displaced_ai_id)
+            self._update_single_mapping_panel_row(displaced_ai_id)
+        if displaced_game_id:
+            self._update_single_game_frame_link_status(displaced_game_id)
 
     @signal_error_boundary()
     def _on_mapping_removed(self, ai_frame_id: str, game_frame_id: str) -> None:

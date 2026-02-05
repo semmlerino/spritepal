@@ -149,6 +149,20 @@ class FrameMappingController(QObject):
         - FrameMappingWorkspace._on_mapping_created() → highlights mapping
     """
 
+    mapping_displaced = Signal(str, str)
+    """Emitted when a mapping creation displaces existing mappings.
+
+    Args:
+        displaced_ai_id: AI frame ID that lost its mapping (empty string if none)
+        displaced_game_id: Game frame ID that lost its mapping (empty string if none)
+
+    Emitted by:
+        - FrameMappingController.create_mapping() → after mapping_created
+
+    Triggers:
+        - FrameMappingWorkspace._on_mapping_displaced() → updates displaced frames
+    """
+
     mapping_removed = Signal(str, str)
     """Emitted when a mapping is removed or an AI frame is unlinked.
 
@@ -1103,6 +1117,13 @@ class FrameMappingController(QObject):
         self._undo_stack.push(command)
 
         self.mapping_created.emit(ai_frame_id, game_frame_id)
+
+        # Signal displaced frames (lost their mapping due to 1:1 enforcement)
+        displaced_ai = prev_game_ai_id if prev_game_ai_id and prev_game_ai_id != ai_frame_id else ""
+        displaced_game = prev_ai_game_id if prev_ai_game_id and prev_ai_game_id != game_frame_id else ""
+        if displaced_ai or displaced_game:
+            self.mapping_displaced.emit(displaced_ai, displaced_game)
+
         self.save_requested.emit()
         logger.info("Created mapping: AI frame %s -> Game frame %s", ai_frame_id, game_frame_id)
         return True
