@@ -359,6 +359,9 @@ class WorkspaceLogicHelper:
         # Update status column
         self._mapping_panel.update_row_status(ai_frame_id, mapping.status)
 
+        # Update game frame text (column 3) — handles relink case
+        self._mapping_panel.update_row_game_frame_text(ai_frame_id, mapping.game_frame_id)
+
         # Update game frame preview if applicable
         if mapping.game_frame_id:
             preview = self._controller.get_cached_game_frame_preview(mapping.game_frame_id)
@@ -451,6 +454,16 @@ class WorkspaceLogicHelper:
             self._state.current_canvas_game_id = mapping.game_frame_id
             # Clear browsing mode - canvas now shows the mapped capture
             self._alignment_canvas.set_browsing_mode(False)
+            # Update capture palette info for sheet palette widget
+            if capture_result is not None and capture_result.entries:
+                palette_indices = {entry.palette for entry in capture_result.entries}
+                self._ai_frames_pane.set_capture_palette_info(palette_indices)
+            else:
+                self._ai_frames_pane.set_capture_palette_info(None)
+            if game_frame is not None:
+                self._ai_frames_pane.set_current_frame_palette_index(game_frame.palette_index)
+            else:
+                self._ai_frames_pane.set_current_frame_palette_index(None)
         else:
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
@@ -459,6 +472,8 @@ class WorkspaceLogicHelper:
             self._state.current_canvas_game_id = None
             # Clear browsing mode - no mapping exists
             self._alignment_canvas.set_browsing_mode(False)
+            self._ai_frames_pane.set_capture_palette_info(None)
+            self._ai_frames_pane.set_current_frame_palette_index(None)
 
         self.update_map_button_state()
 
@@ -507,6 +522,15 @@ class WorkspaceLogicHelper:
             mapping = project.get_mapping_for_ai_frame(self._state.selected_ai_frame_id)
             is_browsing = mapping is not None and frame_id != mapping.game_frame_id
             self._alignment_canvas.set_browsing_mode(is_browsing)
+            # Update capture palette info for the selected game frame
+            if self._ai_frames_pane is not None:
+                if capture_result is not None and capture_result.entries:
+                    palette_indices = {entry.palette for entry in capture_result.entries}
+                    self._ai_frames_pane.set_capture_palette_info(palette_indices)
+                else:
+                    self._ai_frames_pane.set_capture_palette_info(None)
+                if game_frame is not None:
+                    self._ai_frames_pane.set_current_frame_palette_index(game_frame.palette_index)
 
         # Debug: Validate selection sync (only when SPRITEPAL_DEBUG_STATE=1)
         self.validate_selection_state()

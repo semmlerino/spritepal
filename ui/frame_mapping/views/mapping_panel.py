@@ -950,6 +950,16 @@ class MappingPanel(QWidget):
                     status_item.setForeground(QBrush(color))
                 break
 
+    def update_row_game_frame_text(self, ai_frame_id: str, game_frame_id: str) -> None:
+        """Update only the game frame text (column 3) for a specific row."""
+        for row in range(self._table.rowCount()):
+            checkbox_item = self._table.item(row, 0)
+            if checkbox_item is not None and checkbox_item.data(Qt.ItemDataRole.UserRole + 1) == ai_frame_id:
+                game_item = self._table.item(row, 3)
+                if game_item is not None:
+                    game_item.setText(game_frame_id)
+                break
+
     def clear_row_mapping(self, ai_frame_id: str) -> None:
         """Clear mapping data from a row without full refresh.
 
