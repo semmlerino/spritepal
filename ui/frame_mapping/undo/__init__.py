@@ -6,6 +6,7 @@ FrameMappingController, supporting all mapping and alignment operations.
 
 from ui.frame_mapping.undo.command_context import CommandContext, CommandSignalEmitter
 from ui.frame_mapping.undo.commands import (
+    ApplyTransformsToAllCommand,
     CreateMappingCommand,
     RemoveMappingCommand,
     RenameAIFrameCommand,
@@ -17,6 +18,7 @@ from ui.frame_mapping.undo.commands import (
 from ui.frame_mapping.undo.undo_stack import FrameMappingCommand, UndoRedoStack
 
 __all__ = [
+    "ApplyTransformsToAllCommand",
     "CommandContext",
     "CommandSignalEmitter",
     "CreateMappingCommand",
