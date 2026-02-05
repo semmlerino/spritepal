@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QColorDialog,
     QComboBox,
+    QFileDialog,
     QFrame,
     QGraphicsPathItem,
     QGraphicsPixmapItem,
@@ -62,6 +63,8 @@ from utils.color_distance import detect_rare_important_colors, perceptual_distan
 from utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+_PREVIEW_TARGET_HEIGHT = 48
 
 
 class PaletteSlotWidget(QWidget):
@@ -462,6 +465,10 @@ class SheetPaletteMappingDialog(DialogBase):
         self._quantized_preview_pixmap_item: QGraphicsPixmapItem | None = None
         self._original_highlight_item: QGraphicsPathItem | None = None
         self._quantized_highlight_item: QGraphicsPathItem | None = None
+        self._scaled_preview_pixmap: QPixmap | None = None
+        self._scaled_preview_scene: QGraphicsScene | None = None
+        self._scaled_preview_view: QGraphicsView | None = None
+        self._scaled_preview_pixmap_item: QGraphicsPixmapItem | None = None
 
         # Detect rare important colors (e.g., eye whites, small highlights)
         self._rare_important_colors = detect_rare_important_colors(
@@ -926,6 +933,12 @@ class SheetPaletteMappingDialog(DialogBase):
             self._preview_zoom_value.setMinimumWidth(48)
             self._preview_zoom_value.setStyleSheet("font-size: 11px;")
             zoom_layout.addWidget(self._preview_zoom_value)
+
+            save_btn = QPushButton("Save...")
+            save_btn.setToolTip("Save quantized preview as PNG")
+            save_btn.clicked.connect(self._on_save_quantized_preview)
+            zoom_layout.addWidget(save_btn)
+
             preview_group_layout.addLayout(zoom_layout)
 
             previews_layout = QHBoxLayout()
@@ -990,6 +1003,29 @@ class SheetPaletteMappingDialog(DialogBase):
 
             quantized_frame.addWidget(self._quantized_preview_view, 1)
             previews_layout.addLayout(quantized_frame, 1)
+
+            # Scaled preview (in-game size approximation)
+            scaled_frame = QVBoxLayout()
+            scaled_label = QLabel("Preview")
+            scaled_label.setStyleSheet("font-size: 10px; color: #666;")
+            scaled_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            scaled_frame.addWidget(scaled_label)
+
+            self._scaled_preview_scene = QGraphicsScene(self)
+            self._scaled_preview_view = QGraphicsView(self._scaled_preview_scene)
+            self._scaled_preview_view.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+            self._scaled_preview_view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
+            self._scaled_preview_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self._scaled_preview_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self._scaled_preview_view.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            self._scaled_preview_view.setStyleSheet("background-color: #1e1e1e; border: 1px solid #888;")
+            self._scaled_preview_view.setMinimumSize(260, 260)
+
+            self._scaled_preview_pixmap_item = QGraphicsPixmapItem()
+            self._scaled_preview_scene.addItem(self._scaled_preview_pixmap_item)
+
+            scaled_frame.addWidget(self._scaled_preview_view, 1)
+            previews_layout.addLayout(scaled_frame, 1)
 
             preview_group_layout.addLayout(previews_layout)
 
@@ -1549,6 +1585,15 @@ class SheetPaletteMappingDialog(DialogBase):
             self._preview_zoom_value.setText(f"{self._preview_zoom_percent}%")
         self._refresh_preview_labels()
 
+    def _on_save_quantized_preview(self) -> None:
+        """Save the quantized preview image as PNG."""
+        if self._quantized_preview_pixmap is None:
+            return
+
+        path, _ = QFileDialog.getSaveFileName(self, "Save Quantized Preview", "", "PNG Images (*.png)")
+        if path:
+            self._quantized_preview_pixmap.save(path)
+
     def _set_original_preview(self) -> None:
         """Set the original preview image."""
         if self._sample_image is None:
@@ -1619,6 +1664,24 @@ class SheetPaletteMappingDialog(DialogBase):
             QImage.Format.Format_RGBA8888,
         )
         self._quantized_preview_pixmap = QPixmap.fromImage(qimage)
+
+        # Generate scaled preview (in-game size approximation)
+        orig_w, orig_h = quantized_rgba.width, quantized_rgba.height
+        if orig_h > 0:
+            new_h = _PREVIEW_TARGET_HEIGHT
+            new_w = max(1, round(orig_w * new_h / orig_h))
+            scaled_rgba = quantized_rgba.resize((new_w, new_h), Image.Resampling.NEAREST)
+            scaled_qimage = QImage(
+                scaled_rgba.tobytes("raw", "RGBA"),
+                scaled_rgba.width,
+                scaled_rgba.height,
+                scaled_rgba.width * 4,
+                QImage.Format.Format_RGBA8888,
+            )
+            self._scaled_preview_pixmap = QPixmap.fromImage(scaled_qimage)
+        else:
+            self._scaled_preview_pixmap = None
+
         self._refresh_preview_labels()
 
     def _refresh_preview_labels(self) -> None:
@@ -1643,5 +1706,23 @@ class SheetPaletteMappingDialog(DialogBase):
         if self._quantized_preview_view is not None:
             self._quantized_preview_view.resetTransform()
             self._quantized_preview_view.scale(zoom, zoom)
+
+        if self._scaled_preview_pixmap_item is not None and self._scaled_preview_pixmap is not None:
+            self._scaled_preview_pixmap_item.setPixmap(self._scaled_preview_pixmap)
+            if self._scaled_preview_scene is not None:
+                self._scaled_preview_scene.setSceneRect(self._scaled_preview_pixmap.rect())
+        if self._scaled_preview_view is not None:
+            self._scaled_preview_view.resetTransform()
+            # Scale the tiny preview up so it appears at comparable visual size
+            if self._original_preview_pixmap is not None and self._scaled_preview_pixmap is not None:
+                orig_h = self._original_preview_pixmap.height()
+                scaled_h = self._scaled_preview_pixmap.height()
+                if scaled_h > 0:
+                    scale_ratio = orig_h / scaled_h
+                    self._scaled_preview_view.scale(zoom * scale_ratio, zoom * scale_ratio)
+                else:
+                    self._scaled_preview_view.scale(zoom, zoom)
+            else:
+                self._scaled_preview_view.scale(zoom, zoom)
 
         self._update_preview_highlight_items()
