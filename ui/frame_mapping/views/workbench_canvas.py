@@ -1893,6 +1893,15 @@ class WorkbenchCanvas(QWidget):
                     if index_map is not None:
                         rgba_image = convert_indexed_to_rgb(index_map, self._sheet_palette)
                         qimage = pil_to_qimage(rgba_image, with_alpha=True)
+                        # Apply current flip state to the saved image
+                        if self._preview_snapshot is not None:
+                            flip_h = self._preview_snapshot.flip_h
+                            flip_v = self._preview_snapshot.flip_v
+                        else:
+                            flip_h = self._flip_h_checkbox.isChecked()
+                            flip_v = self._flip_v_checkbox.isChecked()
+                        if flip_h or flip_v:
+                            qimage = qimage.mirrored(flip_h, flip_v)
                         scaled = qimage.scaled(
                             rgba_image.width * self._display_scale,
                             rgba_image.height * self._display_scale,
