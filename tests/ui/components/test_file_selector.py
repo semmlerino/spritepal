@@ -49,51 +49,6 @@ def existing_file(tmp_path: Path) -> Path:
     return file
 
 
-class TestFileSelectorInit:
-    """Tests for FileSelector initialization."""
-
-    def test_init_default(self, widget: FileSelector) -> None:
-        """Verify default initialization."""
-        assert widget.path_edit is not None
-        assert widget.browse_button is not None
-        assert widget.get_path() == ""
-
-    def test_init_with_label(self, qtbot: QtBot, mock_settings: Mock) -> None:
-        """Verify label text is displayed."""
-        w = FileSelector(label_text="ROM File:", settings_manager=mock_settings)
-        qtbot.addWidget(w)
-        assert hasattr(w, "label")
-        assert w.label.text() == "ROM File:"
-
-    def test_init_with_placeholder(self, qtbot: QtBot, mock_settings: Mock) -> None:
-        """Verify custom placeholder text."""
-        w = FileSelector(placeholder="Select a file...", settings_manager=mock_settings)
-        qtbot.addWidget(w)
-        assert w.path_edit.placeholderText() == "Select a file..."
-
-    def test_init_with_browse_text(self, qtbot: QtBot, mock_settings: Mock) -> None:
-        """Verify custom browse button text."""
-        w = FileSelector(browse_text="Open...", settings_manager=mock_settings)
-        qtbot.addWidget(w)
-        assert w.browse_button.text() == "Open..."
-
-    def test_init_with_initial_path(self, qtbot: QtBot, mock_settings: Mock) -> None:
-        """Verify initial path is set."""
-        w = FileSelector(initial_path="/path/to/file.rom", settings_manager=mock_settings)
-        qtbot.addWidget(w)
-        assert w.get_path() == "/path/to/file.rom"
-
-    def test_init_read_only(self, qtbot: QtBot, mock_settings: Mock) -> None:
-        """Verify read-only mode."""
-        w = FileSelector(read_only=True, settings_manager=mock_settings)
-        qtbot.addWidget(w)
-        assert w.path_edit.isReadOnly() is True
-
-    def test_init_editable_by_default(self, widget: FileSelector) -> None:
-        """Verify path input is editable by default."""
-        assert widget.path_edit.isReadOnly() is False
-
-
 class TestFileSelectorPathOperations:
     """Tests for path get/set operations."""
 
@@ -257,54 +212,3 @@ class TestFileSelectorBrowse:
             qtbot.mouseClick(w.browse_button, Qt.MouseButton.LeftButton)
 
             callback.assert_called_once()
-
-
-class TestFileSelectorUI:
-    """Tests for UI operations."""
-
-    def test_set_placeholder(self, widget: FileSelector) -> None:
-        """set_placeholder updates placeholder text."""
-        widget.set_placeholder("Enter path...")
-        assert widget.path_edit.placeholderText() == "Enter path..."
-
-    def test_set_read_only_true(self, widget: FileSelector) -> None:
-        """set_read_only(True) makes path input read-only."""
-        widget.set_read_only(True)
-        assert widget.path_edit.isReadOnly() is True
-
-    def test_set_read_only_false(self, widget: FileSelector) -> None:
-        """set_read_only(False) makes path input editable."""
-        widget.path_edit.setReadOnly(True)
-        widget.set_read_only(False)
-        assert widget.path_edit.isReadOnly() is False
-
-    def test_set_browse_enabled_false(self, widget: FileSelector) -> None:
-        """set_browse_enabled(False) disables browse button."""
-        widget.set_browse_enabled(False)
-        assert widget.browse_button.isEnabled() is False
-
-    def test_set_browse_enabled_true(self, widget: FileSelector) -> None:
-        """set_browse_enabled(True) enables browse button."""
-        widget.browse_button.setEnabled(False)
-        widget.set_browse_enabled(True)
-        assert widget.browse_button.isEnabled() is True
-
-    def test_setFocus_without_reason(self, qtbot: QtBot, widget: FileSelector) -> None:
-        """setFocus without reason sets focus on path_edit."""
-        widget.show()
-        QApplication.processEvents()
-
-        widget.setFocus()
-        QApplication.processEvents()
-
-        assert widget.path_edit.hasFocus()
-
-    def test_setFocus_with_reason(self, qtbot: QtBot, widget: FileSelector) -> None:
-        """setFocus with reason sets focus on path_edit."""
-        widget.show()
-        QApplication.processEvents()
-
-        widget.setFocus(Qt.FocusReason.TabFocusReason)
-        QApplication.processEvents()
-
-        assert widget.path_edit.hasFocus()

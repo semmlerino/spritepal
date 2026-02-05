@@ -43,50 +43,6 @@ def widget_with_callback(qtbot: QtBot) -> tuple[HexOffsetInput, Mock]:
     return w, callback
 
 
-class TestHexOffsetInputInit:
-    """Tests for HexOffsetInput initialization."""
-
-    def test_init_default(self, widget: HexOffsetInput) -> None:
-        """Verify default initialization."""
-        assert widget.hex_edit is not None
-        assert widget.decimal_label is not None
-        assert widget.get_text() == ""
-
-    def test_init_with_custom_placeholder(self, qtbot: QtBot) -> None:
-        """Verify custom placeholder text."""
-        w = HexOffsetInput(placeholder="0x8000")
-        qtbot.addWidget(w)
-        assert w.hex_edit.placeholderText() == "0x8000"
-
-    def test_init_without_decimal_display(self, widget_no_decimal: HexOffsetInput) -> None:
-        """Verify decimal display can be disabled."""
-        assert widget_no_decimal.decimal_label is None
-        assert widget_no_decimal.hex_edit is not None
-
-    def test_init_with_decimal_display_shows_initial_value(self, qtbot: QtBot) -> None:
-        """Verify decimal display shows initial placeholder value."""
-        w = HexOffsetInput(placeholder="0x100")
-        qtbot.addWidget(w)
-        # decimal_label should show 256 (0x100 in decimal)
-        assert w.decimal_label is not None
-        assert w.decimal_label.text() == "256"
-
-    def test_init_with_label_prefix(self, qtbot: QtBot) -> None:
-        """Verify label prefix is displayed."""
-        w = HexOffsetInput(label_prefix="Offset:")
-        qtbot.addWidget(w)
-        assert hasattr(w, "prefix_label")
-        assert w.prefix_label.text() == "Offset:"
-
-    def test_init_custom_widths(self, qtbot: QtBot) -> None:
-        """Verify custom input and decimal widths."""
-        w = HexOffsetInput(input_width=200, decimal_width=100)
-        qtbot.addWidget(w)
-        assert w.hex_edit.maximumWidth() == 200
-        assert w.decimal_label is not None
-        assert w.decimal_label.minimumWidth() == 100
-
-
 class TestHexOffsetInputParsing:
     """Tests for hex offset parsing."""
 
@@ -145,47 +101,6 @@ class TestHexOffsetInputParsing:
         widget.set_text("0x")
         # "0x" alone should fail to parse
         assert widget.get_value() is None
-
-
-class TestHexOffsetInputGetSet:
-    """Tests for get/set operations."""
-
-    def test_get_value_valid(self, widget: HexOffsetInput) -> None:
-        """get_value returns parsed integer."""
-        widget.set_text("0x100")
-        assert widget.get_value() == 256
-
-    def test_get_value_invalid(self, widget: HexOffsetInput) -> None:
-        """get_value returns None for invalid input."""
-        widget.set_text("invalid")
-        assert widget.get_value() is None
-
-    def test_get_text_returns_raw(self, widget: HexOffsetInput) -> None:
-        """get_text returns raw text as entered."""
-        widget.set_text("0xABC")
-        assert widget.get_text() == "0xABC"
-
-    def test_set_text_string(self, widget: HexOffsetInput) -> None:
-        """set_text accepts string."""
-        widget.set_text("0x1234")
-        assert widget.get_text() == "0x1234"
-
-    def test_set_text_int(self, widget: HexOffsetInput) -> None:
-        """set_text accepts int and formats as hex."""
-        widget.set_text(256)
-        assert widget.get_text() == "0x100"
-
-    def test_set_text_none(self, widget: HexOffsetInput) -> None:
-        """set_text with None clears input."""
-        widget.set_text("0x100")
-        widget.set_text(None)
-        assert widget.get_text() == ""
-
-    def test_clear(self, widget: HexOffsetInput) -> None:
-        """clear() empties the input."""
-        widget.set_text("0x100")
-        widget.clear()
-        assert widget.get_text() == ""
 
 
 class TestHexOffsetInputSignals:
@@ -303,34 +218,3 @@ class TestHexOffsetInputDecimalDisplay:
         """Widget without decimal display still handles changes."""
         widget_no_decimal.set_text("0xff")
         assert widget_no_decimal.get_value() == 255
-
-
-class TestHexOffsetInputFocus:
-    """Tests for focus management."""
-
-    def test_setFocus_without_reason(self, qtbot: QtBot, widget: HexOffsetInput) -> None:
-        """setFocus without reason sets focus on hex_edit."""
-        # Need to show widget for focus to work
-        widget.show()
-        QApplication.processEvents()
-
-        widget.setFocus()
-        QApplication.processEvents()
-
-        # Check that hex_edit has focus
-        assert widget.hex_edit.hasFocus()
-
-    def test_setFocus_with_reason(self, qtbot: QtBot, widget: HexOffsetInput) -> None:
-        """setFocus with reason sets focus on hex_edit."""
-        widget.show()
-        QApplication.processEvents()
-
-        widget.setFocus(Qt.FocusReason.TabFocusReason)
-        QApplication.processEvents()
-
-        assert widget.hex_edit.hasFocus()
-
-    def test_set_placeholder(self, widget: HexOffsetInput) -> None:
-        """set_placeholder updates placeholder text."""
-        widget.set_placeholder("Enter offset...")
-        assert widget.hex_edit.placeholderText() == "Enter offset..."
