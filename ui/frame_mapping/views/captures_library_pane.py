@@ -251,10 +251,17 @@ class CapturesLibraryPane(QWidget):
             game_frame_id: The game frame ID to update
             linked_ai_id: The linked AI frame ID, or None if unlinked
         """
-        # Update internal link status
+        # Capture old link status before updating
+        old_linked = self._link_status.get(game_frame_id)
         self._link_status[game_frame_id] = linked_ai_id
 
-        # Find and update the list item
+        # If "show unlinked only" is active and linked status crossed the boundary,
+        # an item needs to appear or disappear → full refilter
+        if self._show_unlinked_only and (old_linked is None) != (linked_ai_id is None):
+            self._refresh_list()
+            return
+
+        # No filter boundary crossed — update in-place (existing logic unchanged)
         for row in range(self._list.count()):
             item = self._list.item(row)
             if item is not None and item.data(Qt.ItemDataRole.UserRole) == game_frame_id:  # type: ignore[reportUnnecessaryComparison]

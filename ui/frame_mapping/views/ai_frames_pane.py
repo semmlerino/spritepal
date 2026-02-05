@@ -536,9 +536,17 @@ class AIFramesPane(QWidget):
             ai_frame_id: The AI frame ID (filename) to update
             status: New status string ("unmapped", "mapped", "edited", "injected")
         """
-        # Update internal status map
+        # Capture old status before updating (default to unmapped if not present)
+        old_status = self._mapping_status.get(ai_frame_id, "unmapped")
         self._mapping_status[ai_frame_id] = status
 
+        # If "show unmapped only" is active and status crossed the unmapped boundary,
+        # an item needs to appear or disappear → full refilter
+        if self._show_unmapped_only and (old_status == "unmapped") != (status == "unmapped"):
+            self._refresh_list()
+            return
+
+        # No filter boundary crossed — update in-place (existing logic unchanged)
         # Find the list item using O(1) lookup
         row = self._id_to_row.get(ai_frame_id)
         if row is None:
