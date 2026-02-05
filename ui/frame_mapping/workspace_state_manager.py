@@ -62,8 +62,8 @@ class WorkspaceStateManager:
         # Auto-advance toggle state (default: OFF per UX spec)
         self._auto_advance_enabled = False
 
-        # Track stale entry warnings during injection
-        self._stale_entry_frame_id: str | None = None
+        # Track stale entry warnings during injection (stores game frame ID)
+        self._stale_entry_game_frame_id: str | None = None
 
         # Track project identity for canvas state preservation
         self._previous_project_id: int | None = None
@@ -230,14 +230,14 @@ class WorkspaceStateManager:
     # -------------------------------------------------------------------------
 
     @property
-    def stale_entry_frame_id(self) -> str | None:
-        """Get the frame ID with stale entry warning."""
-        return self._stale_entry_frame_id
+    def stale_entry_game_frame_id(self) -> str | None:
+        """Get the game frame ID with stale entry warning."""
+        return self._stale_entry_game_frame_id
 
-    @stale_entry_frame_id.setter
-    def stale_entry_frame_id(self, frame_id: str | None) -> None:
-        """Set the frame ID with stale entry warning."""
-        self._stale_entry_frame_id = frame_id
+    @stale_entry_game_frame_id.setter
+    def stale_entry_game_frame_id(self, frame_id: str | None) -> None:
+        """Set the game frame ID with stale entry warning."""
+        self._stale_entry_game_frame_id = frame_id
 
     # -------------------------------------------------------------------------
     # Project Identity Properties

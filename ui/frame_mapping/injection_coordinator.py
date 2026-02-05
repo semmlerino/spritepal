@@ -155,7 +155,7 @@ class InjectionCoordinator:
         rom_path = cast(Path, self._state.rom_path)
 
         # Clear stale entry tracking before injection
-        self._state.stale_entry_frame_id = None
+        self._state.stale_entry_game_frame_id = None
 
         # Prepare injection target ROM
         target_rom = self._prepare_injection_target(f"AI Frame '{ai_frame_id}'", rom_path, "Inject Frame")
@@ -359,7 +359,7 @@ class InjectionCoordinator:
             return
 
         logger.info("Stale entries detected for frame '%s'", frame_id)
-        self._state.stale_entry_frame_id = frame_id
+        self._state.stale_entry_game_frame_id = frame_id
 
         # Update canvas warning label if this is the currently selected game frame
         if self._state.selected_game_id == frame_id and self._alignment_canvas:
@@ -423,11 +423,20 @@ class InjectionCoordinator:
             success: Whether the injection succeeded
             message: Result message
         """
-        if self._state is None:
+        if self._state is None or self._controller is None:
             return
 
         # Track stale entry failures for batch reporting
-        stale_entries = self._state.stale_entry_frame_id == ai_frame_id
+        # Note: stale_entry_game_frame_id stores a GAME frame ID, but ai_frame_id is an AI frame ID.
+        # We need to look up the game frame ID for this AI frame to compare correctly.
+        stale_entries = False
+        if self._state.stale_entry_game_frame_id is not None:
+            project = self._controller.project
+            if project is not None:
+                mapping = project.get_mapping_for_ai_frame(ai_frame_id)
+                if mapping is not None:
+                    stale_entries = mapping.game_frame_id == self._state.stale_entry_game_frame_id
+
         self._state.record_batch_injection_result(ai_frame_id, success, stale_entries)
 
         # Check if batch is complete
