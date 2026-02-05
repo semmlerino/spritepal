@@ -26,6 +26,12 @@ git add <files> && git commit -m "fix: description"
 
 ---
 
+## Requirement Confirmation
+
+Before writing any code, restate what you understand the requirement to be in 2-3 sentences and ask me to confirm. Specifically clarify: (1) is this a simple or complex operation, (2) what existing code path should this match or differ from, and (3) what does "done" look like.
+
+---
+
 ## Development Workflow
 
 ```bash
@@ -177,6 +183,18 @@ Agents auto-fix lint/type issues via hook, but the orchestrator is responsible f
 
 ---
 
+## UI Implementation Guidelines
+
+When implementing UI features (previews, dialogs, panels), ask for clarification on whether the feature is a simple transformation (e.g., scale-down) or requires complex compositing/mapping BEFORE exploring code. Do not assume complex approaches.
+
+---
+
+## Debugging
+
+When debugging visual/rendering discrepancies, identify and compare the exact pipeline steps (strategy, order of operations like scale-vs-quantize) between the working and broken paths FIRST, before attempting fixes.
+
+---
+
 ## Gotchas
 
 Qt/PySide6 pitfalls from real bugs:
@@ -244,6 +262,18 @@ The log includes timestamps, log levels, and module names for tracing signal/eve
 - Use `| None` not `Optional`
 - Qt signals need annotations: `finished = Signal(str, int)`
 - Use `Mapping[str, object]` for read-only dict params
+
+---
+
+## Architectural Context
+
+Path-scoped rules auto-load when working with matching files:
+- `.claude/rules/compositor.md` — rendering pipeline, two paths, transform order
+- `.claude/rules/palette.md` — PaletteManager vs SheetPalette, quantization
+- `.claude/rules/injection.md` — ROM/VRAM injection flow, HAL compression
+- `.claude/rules/frame-mapping.md` — controller/facade/service architecture
+
+For session-start context: `/ctx [subsystem]`. For visual bugs: `/debug-visual`. For signal tracing: `/trace-signal [name]`.
 
 ---
 
