@@ -17,7 +17,7 @@ from PySide6.QtTest import QTest
 
 from core.app_context import get_app_context
 from core.services.signal_payloads import PreviewData
-from tests.fixtures.timeouts import signal_timeout
+from tests.fixtures.timeouts import LONG, signal_timeout, worker_timeout
 from ui.dialogs.manual_offset_dialog import UnifiedManualOffsetDialog
 from utils.logging_config import get_logger
 
@@ -233,7 +233,7 @@ class TestManualOffsetDialog:
 
         # Wait for preview (with timeout)
         # This implicitly verifies the preview generation chain works
-        wait_for(preview_has_content, timeout=3000, message="Preview not generated")
+        wait_for(preview_has_content, timeout=worker_timeout(LONG), message="Preview not generated")
 
         assert preview_has_content()
 

@@ -4,22 +4,16 @@
   "ai_frames_dir": "M\\dedede_project\\framesV2\\v3\\sprites",
   "ai_frames": [
     {
-      "path": "m_reduc.png",
+      "path": "M\\v\\oMax (3).png",
       "index": 0,
-      "width": 33,
-      "height": 48
+      "width": 89,
+      "height": 129
     },
     {
-      "path": "m_reduc_edited.png",
-      "index": 1,
-      "width": 33,
-      "height": 48
-    },
-    {
-      "path": "M\\v\\maxnew (4)_edited.png",
-      "index": 2,
-      "width": 60,
-      "height": 85
+      "path": "M\\v\\oMax (3).png",
+      "index": 0,
+      "width": 89,
+      "height": 129
     }
   ],
   "game_frames": [
@@ -252,26 +246,14 @@
   ],
   "mappings": [
     {
-      "ai_frame_id": "m_reduc_edited.png",
+      "ai_frame_id": "oMax (3).png",
       "game_frame_id": "capture_1769721724",
-      "status": "injected",
+      "status": "edited",
       "offset_x": 0,
-      "offset_y": 0,
+      "offset_y": 1,
       "flip_h": false,
       "flip_v": false,
-      "scale": 1.0,
-      "sharpen": 0.0,
-      "resampling": "lanczos"
-    },
-    {
-      "ai_frame_id": "m_reduc.png",
-      "game_frame_id": "capture_1769721778",
-      "status": "injected",
-      "offset_x": 0,
-      "offset_y": 0,
-      "flip_h": false,
-      "flip_v": false,
-      "scale": 1.0,
+      "scale": 0.37015688004032254,
       "sharpen": 0.0,
       "resampling": "lanczos"
     }

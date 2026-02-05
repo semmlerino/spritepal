@@ -1637,7 +1637,6 @@ class FrameMappingController(QObject):
         """
         return self._ai_frames.rename_frame(frame_id, display_name)
 
-
     def toggle_frame_tag(self, frame_id: str, tag: str) -> bool:
         """Toggle a tag on an AI frame.
 

@@ -51,6 +51,23 @@ _palette_lab_cache: dict[tuple[tuple[int, int, int], ...], NDArray[np.float64]] 
 _PALETTE_CACHE_MAX_SIZE = 32
 
 
+# Standard 4x4 Bayer Dithering Matrix
+# Values 0-15 representing threshold biases
+_BAYER_MATRIX_4x4 = (
+    np.array(
+        [
+            [0, 8, 2, 10],
+            [12, 4, 14, 6],
+            [3, 11, 1, 9],
+            [15, 7, 13, 5],
+        ],
+        dtype=np.float32,
+    )
+    / 16.0
+    - 0.5
+)  # Normalize to -0.5 to +0.4375
+
+
 def _get_cached_palette_lab(
     palette_rgb: list[tuple[int, int, int]],
 ) -> NDArray[np.float64]:
@@ -163,6 +180,128 @@ def _stable_argmin(
     return np.argmin(candidate_indices, axis=-1).astype(np.uint8)
 
 
+def _apply_bayer_dither(
+    pixel_lab: NDArray[np.float64],
+    strength: float,
+) -> NDArray[np.float64]:
+    """Apply ordered Bayer dithering to LAB Lightness channel.
+
+    Args:
+        pixel_lab: Array of shape (H, W, 3) in LAB color space.
+        strength: Dithering strength (0.0 to 1.0).
+
+    Returns:
+        Modified LAB array with dithering applied to L channel.
+    """
+    height, width = pixel_lab.shape[:2]
+
+    # Tile the Bayer matrix to cover the image
+    bayer_h, bayer_w = _BAYER_MATRIX_4x4.shape
+    tiled_bayer = np.tile(
+        _BAYER_MATRIX_4x4,
+        (math.ceil(height / bayer_h), math.ceil(width / bayer_w)),
+    )[:height, :width]
+
+    # Apply dither to Lightness (L) channel (index 0)
+    # Scale strength: at 1.0, range is roughly -8 to +7 L units (significant)
+    # L ranges 0-100, so this is ~±8% lightness variation
+    dither_amount = 16.0 * strength
+    pixel_lab_dithered = pixel_lab.copy()
+    pixel_lab_dithered[:, :, 0] += tiled_bayer * dither_amount
+
+    return pixel_lab_dithered
+
+
+def _quantize_impl(
+    img: Image.Image,
+    palette_rgb: list[tuple[int, int, int]],
+    color_mappings: dict[tuple[int, int, int], int],
+    transparency_threshold: int,
+    dither_mode: str,
+    dither_strength: float,
+) -> NDArray[np.uint8]:
+    """Common implementation for quantization with optional dithering.
+
+    Args:
+        img: RGBA Image.
+        palette_rgb: List of palette colors.
+        color_mappings: Explicit color mappings.
+        transparency_threshold: Alpha threshold.
+        dither_mode: "none" or "bayer".
+        dither_strength: 0.0-1.0.
+
+    Returns:
+        numpy array (H, W) of uint8 palette indices.
+    """
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+
+    # Convert image to numpy array
+    pixels = np.array(img, dtype=np.uint8)
+    height, width = pixels.shape[:2]
+
+    # Extract RGBA channels
+    r = pixels[:, :, 0].astype(np.int32)
+    g = pixels[:, :, 1].astype(np.int32)
+    b = pixels[:, :, 2].astype(np.int32)
+    alpha = pixels[:, :, 3]
+
+    # Create transparency mask
+    transparent_mask = alpha < transparency_threshold
+
+    # Build pixel RGB array and convert to LAB for perceptual distance
+    pixel_rgb = np.stack([r, g, b], axis=-1)  # Shape: (H, W, 3)
+    pixel_lab = _rgb_array_to_lab(pixel_rgb)  # Shape: (H, W, 3)
+
+    # Apply Dithering (only if mode is bayer and strength > 0)
+    if dither_mode == "bayer" and dither_strength > 0.0:
+        pixel_lab = _apply_bayer_dither(pixel_lab, dither_strength)
+
+    # Convert palette to LAB (cached for performance - same palette reused across updates)
+    palette_lab = _get_cached_palette_lab(palette_rgb)  # Shape: (16, 3)
+
+    # Calculate squared distances in LAB space for nearest-color fallback
+    pixel_lab_broadcast = pixel_lab[:, :, np.newaxis, :]  # Shape: (H, W, 1, 3)
+    palette_lab_broadcast = palette_lab[np.newaxis, np.newaxis, :, :]  # Shape: (1, 1, 16, 3)
+
+    # Squared perceptual distance (Delta E squared)
+    distances = np.sum((pixel_lab_broadcast - palette_lab_broadcast) ** 2, axis=-1)  # Shape: (H, W, 16)
+
+    # For opaque pixels: exclude index 0 from consideration in fallback
+    # Index 0 is reserved for transparency in SNES sprites
+    opaque_mask = ~transparent_mask
+    distances[opaque_mask, 0] = np.inf
+
+    # Find nearest color for each pixel (fallback) using stable tie-breaking
+    # This ensures symmetric pixels with near-identical colors map consistently
+    indices = _stable_argmin(distances)  # Shape: (H, W)
+
+    # Apply explicit color mappings (override nearest-color for mapped colors)
+    # Note: Dithering affects nearest-color fallback, but explicit mappings override it.
+    mapped_count = 0
+    for rgb_color, palette_idx in color_mappings.items():
+        # Find pixels matching this exact RGB color
+        mask = (r == rgb_color[0]) & (g == rgb_color[1]) & (b == rgb_color[2])
+        if np.any(mask):
+            indices[mask] = palette_idx
+            mapped_count += int(np.sum(mask))
+
+    # Override transparent pixels to index 0
+    indices[transparent_mask] = 0
+
+    if dither_mode == "bayer" and dither_strength > 0.0:
+        logger.debug(
+            "Quantized %dx%d with bayer dither (%.2f): %d mappings, %d pixels mapped",
+            width,
+            height,
+            dither_strength,
+            len(color_mappings),
+            mapped_count,
+        )
+
+    return indices
+
+
 def bgr555_to_rgb(bgr555: int) -> tuple[int, int, int]:
     """Convert single SNES BGR555 color to RGB888 with full 8-bit scaling.
 
@@ -243,49 +382,15 @@ def quantize_to_palette(
     Returns:
         PIL Image in mode "P" (indexed) with the specified palette
     """
-    if img.mode != "RGBA":
-        img = img.convert("RGBA")
-
-    # Convert image to numpy array
-    pixels = np.array(img, dtype=np.uint8)
-    height, width = pixels.shape[:2]
-
-    # Extract RGBA channels
-    r = pixels[:, :, 0].astype(np.int32)
-    g = pixels[:, :, 1].astype(np.int32)
-    b = pixels[:, :, 2].astype(np.int32)
-    alpha = pixels[:, :, 3]
-
-    # Create transparency mask
-    transparent_mask = alpha < transparency_threshold
-
-    # Build pixel RGB array and convert to LAB for perceptual distance
-    pixel_rgb = np.stack([r, g, b], axis=-1)  # Shape: (H, W, 3)
-    pixel_lab = _rgb_array_to_lab(pixel_rgb)  # Shape: (H, W, 3)
-
-    # Convert palette to LAB (cached for performance - same palette reused across updates)
-    palette_lab = _get_cached_palette_lab(palette_rgb)  # Shape: (16, 3)
-
-    # Calculate squared distances in LAB space (perceptual distance)
-    # Reshape for broadcasting: pixels (H, W, 1, 3) vs palette (1, 1, 16, 3)
-    pixel_lab_broadcast = pixel_lab[:, :, np.newaxis, :]  # Shape: (H, W, 1, 3)
-    palette_lab_broadcast = palette_lab[np.newaxis, np.newaxis, :, :]  # Shape: (1, 1, 16, 3)
-
-    # Squared perceptual distance (Delta E squared)
-    distances = np.sum((pixel_lab_broadcast - palette_lab_broadcast) ** 2, axis=-1)  # Shape: (H, W, 16)
-
-    # For opaque pixels: exclude index 0 from consideration
-    # Index 0 is reserved for transparency in SNES sprites
-    # Set distance to index 0 to infinity for opaque pixels so argmin picks index 1+
-    opaque_mask = ~transparent_mask
-    distances[opaque_mask, 0] = np.inf
-
-    # Find nearest color for each pixel using stable tie-breaking
-    # This ensures symmetric pixels with near-identical colors map consistently
-    indices = _stable_argmin(distances)  # Shape: (H, W)
-
-    # Override transparent pixels to index 0
-    indices[transparent_mask] = 0
+    # Use shared implementation
+    indices = _quantize_impl(
+        img,
+        palette_rgb,
+        {},  # No explicit mappings
+        transparency_threshold,
+        dither_mode,
+        dither_strength,
+    )
 
     # Create indexed PIL image
     indexed_img = Image.fromarray(indices, mode="P")
@@ -299,13 +404,18 @@ def quantize_to_palette(
 
     indexed_img.putpalette(flat_palette)
 
-    logger.debug(
-        "Quantized %dx%d image to %d-color palette (perceptual LAB distance, transparent pixels: %d)",
-        width,
-        height,
-        len(palette_rgb),
-        int(np.sum(transparent_mask)),
-    )
+    if dither_mode == "none":
+        # Only log here if dither is off (impl logs if on)
+        height, width = indices.shape
+        # Count transparent pixels (index 0)
+        transparent_count = int(np.sum(indices == 0))
+        logger.debug(
+            "Quantized %dx%d image to %d-color palette (perceptual LAB distance, transparent pixels: %d)",
+            width,
+            height,
+            len(palette_rgb),
+            transparent_count,
+        )
 
     return indexed_img
 
@@ -336,56 +446,15 @@ def quantize_with_mappings(
     Returns:
         PIL Image in mode "P" (indexed) with the specified palette
     """
-    if img.mode != "RGBA":
-        img = img.convert("RGBA")
-
-    # Convert image to numpy array
-    pixels = np.array(img, dtype=np.uint8)
-    height, width = pixels.shape[:2]
-
-    # Extract RGBA channels
-    r = pixels[:, :, 0].astype(np.int32)
-    g = pixels[:, :, 1].astype(np.int32)
-    b = pixels[:, :, 2].astype(np.int32)
-    alpha = pixels[:, :, 3]
-
-    # Create transparency mask
-    transparent_mask = alpha < transparency_threshold
-
-    # Build pixel RGB array and convert to LAB for perceptual distance
-    pixel_rgb = np.stack([r, g, b], axis=-1)  # Shape: (H, W, 3)
-    pixel_lab = _rgb_array_to_lab(pixel_rgb)  # Shape: (H, W, 3)
-
-    # Convert palette to LAB (cached for performance - same palette reused across updates)
-    palette_lab = _get_cached_palette_lab(palette_rgb)  # Shape: (16, 3)
-
-    # Calculate squared distances in LAB space for nearest-color fallback
-    pixel_lab_broadcast = pixel_lab[:, :, np.newaxis, :]  # Shape: (H, W, 1, 3)
-    palette_lab_broadcast = palette_lab[np.newaxis, np.newaxis, :, :]  # Shape: (1, 1, 16, 3)
-
-    # Squared perceptual distance (Delta E squared)
-    distances = np.sum((pixel_lab_broadcast - palette_lab_broadcast) ** 2, axis=-1)  # Shape: (H, W, 16)
-
-    # For opaque pixels: exclude index 0 from consideration in fallback
-    # Index 0 is reserved for transparency in SNES sprites
-    opaque_mask = ~transparent_mask
-    distances[opaque_mask, 0] = np.inf
-
-    # Find nearest color for each pixel (fallback) using stable tie-breaking
-    # This ensures symmetric pixels with near-identical colors map consistently
-    indices = _stable_argmin(distances)  # Shape: (H, W)
-
-    # Apply explicit color mappings (override nearest-color for mapped colors)
-    mapped_count = 0
-    for rgb_color, palette_idx in color_mappings.items():
-        # Find pixels matching this exact RGB color
-        mask = (r == rgb_color[0]) & (g == rgb_color[1]) & (b == rgb_color[2])
-        if np.any(mask):
-            indices[mask] = palette_idx
-            mapped_count += int(np.sum(mask))
-
-    # Override transparent pixels to index 0
-    indices[transparent_mask] = 0
+    # Use shared implementation
+    indices = _quantize_impl(
+        img,
+        palette_rgb,
+        color_mappings,
+        transparency_threshold,
+        dither_mode,
+        dither_strength,
+    )
 
     # Create indexed PIL image
     indexed_img = Image.fromarray(indices, mode="P")
@@ -399,13 +468,14 @@ def quantize_with_mappings(
 
     indexed_img.putpalette(flat_palette)
 
-    logger.debug(
-        "Quantized %dx%d with mappings (perceptual LAB): %d explicit mappings, %d pixels mapped",
-        width,
-        height,
-        len(color_mappings),
-        mapped_count,
-    )
+    if dither_mode == "none":
+        height, width = indices.shape
+        logger.debug(
+            "Quantized %dx%d with mappings (perceptual LAB): %d explicit mappings",
+            width,
+            height,
+            len(color_mappings),
+        )
 
     return indexed_img
 
@@ -415,6 +485,8 @@ def quantize_to_index_map(
     palette_rgb: list[tuple[int, int, int]],
     color_mappings: dict[tuple[int, int, int], int],
     transparency_threshold: int = QUANTIZATION_TRANSPARENCY_THRESHOLD,
+    dither_mode: str = "none",
+    dither_strength: float = 0.0,
 ) -> np.ndarray:
     """Generate palette index map from RGBA image using color mappings.
 
@@ -426,60 +498,21 @@ def quantize_to_index_map(
         palette_rgb: List of 16 RGB tuples defining the target palette
         color_mappings: Dict mapping RGB tuples to palette indices
         transparency_threshold: Alpha values below this map to index 0
+        dither_mode: Dithering mode ("none" or "bayer", default "none")
+        dither_strength: Dithering strength 0.0-1.0 (default 0.0, disabled)
 
     Returns:
         numpy array of shape (H, W) with uint8 palette indices.
         Index 0 = transparent, indices 1-15 = opaque colors.
     """
-    if img.mode != "RGBA":
-        img = img.convert("RGBA")
-
-    # Convert image to numpy array
-    pixels = np.array(img, dtype=np.uint8)
-
-    # Extract RGBA channels
-    r = pixels[:, :, 0].astype(np.int32)
-    g = pixels[:, :, 1].astype(np.int32)
-    b = pixels[:, :, 2].astype(np.int32)
-    alpha = pixels[:, :, 3]
-
-    # Create transparency mask
-    transparent_mask = alpha < transparency_threshold
-
-    # Build pixel RGB array and convert to LAB for perceptual distance
-    pixel_rgb = np.stack([r, g, b], axis=-1)  # Shape: (H, W, 3)
-    pixel_lab = _rgb_array_to_lab(pixel_rgb)  # Shape: (H, W, 3)
-
-    # Convert palette to LAB (cached for performance - same palette reused across updates)
-    palette_lab = _get_cached_palette_lab(palette_rgb)  # Shape: (16, 3)
-
-    # Calculate squared distances in LAB space for nearest-color fallback
-    pixel_lab_broadcast = pixel_lab[:, :, np.newaxis, :]  # Shape: (H, W, 1, 3)
-    palette_lab_broadcast = palette_lab[np.newaxis, np.newaxis, :, :]  # Shape: (1, 1, 16, 3)
-
-    # Squared perceptual distance (Delta E squared)
-    distances = np.sum((pixel_lab_broadcast - palette_lab_broadcast) ** 2, axis=-1)  # Shape: (H, W, 16)
-
-    # For opaque pixels: exclude index 0 from consideration in fallback
-    # Index 0 is reserved for transparency in SNES sprites
-    opaque_mask = ~transparent_mask
-    distances[opaque_mask, 0] = np.inf
-
-    # Find nearest color for each pixel (fallback) using stable tie-breaking
-    # This ensures symmetric pixels with near-identical colors map consistently
-    indices = _stable_argmin(distances)  # Shape: (H, W)
-
-    # Apply explicit color mappings (override nearest-color for mapped colors)
-    for rgb_color, palette_idx in color_mappings.items():
-        # Find pixels matching this exact RGB color
-        mask = (r == rgb_color[0]) & (g == rgb_color[1]) & (b == rgb_color[2])
-        if np.any(mask):
-            indices[mask] = palette_idx
-
-    # Override transparent pixels to index 0
-    indices[transparent_mask] = 0
-
-    return indices.astype(np.uint8)
+    return _quantize_impl(
+        img,
+        palette_rgb,
+        color_mappings,
+        transparency_threshold,
+        dither_mode,
+        dither_strength,
+    )
 
 
 # === Helper Functions for Palette Operations ===
@@ -706,9 +739,7 @@ def _ensure_palette_diversity(
         return [(0, 0, 0)] * max_colors
 
     transparency = palette[0]
-    palette_colors = [
-        color for color in _dedupe_preserve_order(palette[1:]) if color != transparency
-    ]
+    palette_colors = [color for color in _dedupe_preserve_order(palette[1:]) if color != transparency]
 
     protected_list = [color for color in palette_colors if color in protected_colors]
     non_protected = [color for color in palette_colors if color not in protected_colors]
@@ -735,11 +766,7 @@ def _ensure_palette_diversity(
             kept.append(color)
 
     if len(kept) < target_count:
-        candidates = [
-            color
-            for color in color_counts
-            if color != transparency and color not in kept
-        ]
+        candidates = [color for color in color_counts if color != transparency and color not in kept]
         candidates.sort(key=lambda color: (-color_counts.get(color, 0), color))
 
         while len(kept) < target_count and candidates:
@@ -749,22 +776,14 @@ def _ensure_palette_diversity(
 
             for candidate in candidates:
                 if kept:
-                    min_distance_candidate = min(
-                        perceptual_distance_sq(candidate, kept_color) for kept_color in kept
-                    )
+                    min_distance_candidate = min(perceptual_distance_sq(candidate, kept_color) for kept_color in kept)
                 else:
                     min_distance_candidate = float("inf")
 
                 count = color_counts.get(candidate, 0)
-                if (
-                    min_distance_candidate > best_min_distance
-                    or (
-                        min_distance_candidate == best_min_distance
-                        and (
-                            count > best_count
-                            or (count == best_count and (best_color is None or candidate < best_color))
-                        )
-                    )
+                if min_distance_candidate > best_min_distance or (
+                    min_distance_candidate == best_min_distance
+                    and (count > best_count or (count == best_count and (best_color is None or candidate < best_color)))
                 ):
                     best_color = candidate
                     best_min_distance = min_distance_candidate
@@ -856,9 +875,7 @@ def quantize_colors_to_palette(
         distinctness_threshold=rare_distinctness_threshold,
         max_candidates=min(rare_max_candidates, max_reserved),
     )
-    reserved_colors = _dedupe_preserve_order(
-        [rc[0] for rc in rare_colors if rc[0] != (0, 0, 0)]
-    )
+    reserved_colors = _dedupe_preserve_order([rc[0] for rc in rare_colors if rc[0] != (0, 0, 0)])
 
     if snap_to_snes:
         reserved_colors = _dedupe_preserve_order(

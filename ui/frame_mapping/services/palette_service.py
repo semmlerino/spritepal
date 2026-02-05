@@ -21,6 +21,8 @@ class GamePaletteInfo:
 
     colors: list[tuple[int, int, int]]
     display_name: str  # GameFrame.name property (display_name or ID fallback)
+
+
 from core.palette_utils import (
     extract_unique_colors,
     find_nearest_palette_index,

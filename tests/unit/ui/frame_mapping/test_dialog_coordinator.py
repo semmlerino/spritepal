@@ -118,8 +118,6 @@ def test_show_sprite_selection_rejected(coordinator, mock_capture_result):
         mock_dialog.exec.assert_called_once()
 
 
-
-
 def test_process_empty_queue(qtbot, coordinator, mock_controller):
     """Test processing empty queue emits finished signal immediately."""
     with qtbot.waitSignal(coordinator.queue_processing_finished, timeout=1000) as blocker:

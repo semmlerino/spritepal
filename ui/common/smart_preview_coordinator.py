@@ -339,7 +339,8 @@ class SmartPreviewCoordinator(QObject):
                     with QMutexLocker(self._mutex):
                         force_compression_type = self._force_compression_type
                     cache_key = self._make_cache_key(rom_path, offset, force_compression_type, False)
-                    if self._cache.get(cache_key):
+                    cached_data = self._cache.get(cache_key)
+                    if cached_data and cached_data[0]:  # Check tile_data is not empty
                         logger.debug(f"[PRELOAD] Already cached: 0x{offset:06X}")
                         return
             except Exception:

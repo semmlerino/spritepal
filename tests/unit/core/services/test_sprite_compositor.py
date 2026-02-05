@@ -1277,7 +1277,7 @@ class TestIndexFirstRendering:
         # Sheet palette with red at index 1, blue at index 2
         sheet_palette = SheetPalette(
             colors=[
-                (0, 0, 0),    # 0: transparent
+                (0, 0, 0),  # 0: transparent
                 (255, 0, 0),  # 1: red
                 (0, 0, 255),  # 2: blue
             ]
@@ -1327,18 +1327,16 @@ class TestIndexFirstRendering:
 
         # Create 4x4 index map with specific test values
         index_map = np.full((4, 4), 3, dtype=np.uint8)
-        index_map[0, 0] = 0    # transparent index
-        index_map[0, 1] = 5    # opaque
+        index_map[0, 0] = 0  # transparent index
+        index_map[0, 1] = 5  # opaque
         index_map[1, 0] = 255  # no-data marker
-        index_map[1, 1] = 1    # opaque
+        index_map[1, 1] = 1  # opaque
 
         # Create matching 4x4 AI image (colors don't matter, indices drive rendering)
         ai_image = Image.new("RGBA", (4, 4), (100, 100, 100, 255))
 
         # Sheet palette with 16 colors
-        sheet_palette = SheetPalette(
-            colors=[(i * 16, i * 16, i * 16) for i in range(16)]
-        )
+        sheet_palette = SheetPalette(colors=[(i * 16, i * 16, i * 16) for i in range(16)])
 
         transform = TransformParams(scale=1.0)
 
@@ -1486,7 +1484,7 @@ class TestIndexFirstRendering:
         # Sheet palette with red at index 5
         sheet_palette = SheetPalette(
             colors=[
-                (0, 0, 0),    # 0: transparent
+                (0, 0, 0),  # 0: transparent
                 (99, 99, 99),
                 (99, 99, 99),
                 (99, 99, 99),
@@ -1661,7 +1659,7 @@ class TestIndexFirstRendering:
         # Sheet palette with red at index 1
         sheet_palette = SheetPalette(
             colors=[
-                (0, 0, 0),    # 0: transparent
+                (0, 0, 0),  # 0: transparent
                 (255, 0, 0),  # 1: red
             ]
             + [(99, 99, 99)] * 14,

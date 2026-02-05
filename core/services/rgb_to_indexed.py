@@ -341,8 +341,7 @@ def load_image_preserving_indices(
                     return None, img.convert("RGBA")
 
                 palette_colors = [
-                    (palette_data[i], palette_data[i + 1], palette_data[i + 2])
-                    for i in range(0, needed, 3)
+                    (palette_data[i], palette_data[i + 1], palette_data[i + 2]) for i in range(0, needed, 3)
                 ]
 
                 if palette_colors != expected_colors:
@@ -366,6 +365,8 @@ def load_image_preserving_indices(
 
         palette_rgb = [snap_to_snes_color(c) for c in sheet_palette.colors]
         alpha_threshold = getattr(sheet_palette, "alpha_threshold", QUANTIZATION_TRANSPARENCY_THRESHOLD)
+        dither_mode = getattr(sheet_palette, "dither_mode", "none")
+        dither_strength = getattr(sheet_palette, "dither_strength", 0.0)
         color_mappings = getattr(sheet_palette, "color_mappings", {}) or {}
 
         index_map = quantize_to_index_map(
@@ -373,6 +374,8 @@ def load_image_preserving_indices(
             palette_rgb,
             color_mappings,
             transparency_threshold=alpha_threshold,
+            dither_mode=dither_mode,
+            dither_strength=dither_strength,
         )
 
         return index_map, rgba_img

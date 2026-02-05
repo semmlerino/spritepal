@@ -277,6 +277,7 @@ class InjectionOrchestrator:
 
             def __init__(self, palette_snapshot: PaletteSnapshot | None) -> None:
                 if palette_snapshot is not None:
+
                     class _Palette:
                         """Minimal palette holder mimicking SheetPalette interface."""
 
@@ -614,6 +615,7 @@ class InjectionOrchestrator:
 
             # Extract index map from quantized image
             import numpy as np
+
             ai_index_map = np.array(quantized_indexed, dtype=np.uint8)
             logger.debug(
                 "Pre-quantized RGBA image at full resolution: %s (shape: %s)",

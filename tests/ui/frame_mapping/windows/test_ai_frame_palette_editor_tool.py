@@ -80,7 +80,7 @@ class TestToolSelection:
         # Simulate 'B' key press
         # Note: QShortcut activation is hard to simulate directly via keyClick in some envs,
         # but we can verify the shortcut exists and calls the method.
-        
+
         # Verify shortcut setup
         brush_shortcut = None
         for child in window.children():
@@ -88,12 +88,12 @@ class TestToolSelection:
                 if child.key().toString() == "B":
                     brush_shortcut = child
                     break
-        
+
         assert brush_shortcut is not None
-        
+
         # Manually activate to verify the callback
         brush_shortcut.activated.emit()
-        
+
         assert window._controller.current_tool == EditorTool.BRUSH
         assert window._tool_buttons[EditorTool.BRUSH].isChecked()
         assert window._tool_label.text() == "Tool: Brush"
@@ -124,12 +124,12 @@ class TestToolSelection:
                 if child.key().toString() == "I":
                     picker_shortcut = child
                     break
-        
+
         assert picker_shortcut is not None
-        
+
         # Manually activate to verify the callback
         picker_shortcut.activated.emit()
-        
+
         assert window._controller.current_tool == EditorTool.PICKER
         assert window._tool_buttons[EditorTool.PICKER].isChecked()
         assert window._tool_label.text() == "Tool: Picker"
@@ -147,6 +147,7 @@ class TestToolSelection:
 
         # Load indexed data manually since we want to pick a specific color
         import numpy as np
+
         data = np.zeros((16, 16), dtype=np.uint8)
         data[5, 5] = 7
         window._controller.load_indexed_data(data, test_palette)
@@ -155,7 +156,7 @@ class TestToolSelection:
         assert window._controller.current_tool == EditorTool.PICKER
 
         # Click at (5, 5) to pick index 7
-        window._on_canvas_clicked(5, 5, 0) # button 0 is left click
+        window._on_canvas_clicked(5, 5, 0)  # button 0 is left click
 
         assert window._controller.active_index == 7
         assert window._controller.current_tool == EditorTool.BRUSH
