@@ -73,11 +73,13 @@ class AIFramePaletteEditorWindow(QMainWindow):
         save_requested: (ai_frame_id, indexed_data, output_path) - Request to save
         closed: (ai_frame_id) - Editor window was closed
         palette_color_changed: (index, rgb) - Palette color was edited via right-click
+        ingame_saved: (ai_frame_id, ingame_edited_path) - In-game edit was saved
     """
 
     save_requested = Signal(str, object, str)  # ai_frame_id, np.ndarray, output_path
     closed = Signal(str)  # ai_frame_id (current, may have changed after save)
     palette_color_changed = Signal(int, tuple)  # index, (r, g, b)
+    ingame_saved = Signal(str, str)  # ai_frame_id, ingame_edited_path
 
     def __init__(
         self,
@@ -970,6 +972,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
                     if mapping is not None:
                         mapping.ingame_edited_path = str(output_path)
                         self._frame_controller.save_requested.emit()
+            self.ingame_saved.emit(self._ai_frame.id, str(output_path))
             logger.info("Saved in-game edits: %s", output_path)
             self._status_bar.showMessage(f"Saved: {output_path.name}", 3000)
         else:

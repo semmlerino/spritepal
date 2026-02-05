@@ -161,17 +161,17 @@ class TestEditorPaletteSyncOnPaletteChange:
         mock_editor1._palette = palette
         mock_editor1._palette_panel = MagicMock()
         mock_editor1._update_duplicate_warning = MagicMock()
-        mock_editor1._controller = MagicMock()
-        mock_editor1._controller.get_indexed_data.return_value = MagicMock()  # Simulate having data
-        mock_editor1._canvas = MagicMock()
+        mock_editor1._main_controller = MagicMock()
+        mock_editor1._main_controller.get_indexed_data.return_value = MagicMock()  # Simulate having data
+        mock_editor1._main_canvas = MagicMock()
 
         mock_editor2 = MagicMock()
         mock_editor2._palette = palette
         mock_editor2._palette_panel = MagicMock()
         mock_editor2._update_duplicate_warning = MagicMock()
-        mock_editor2._controller = MagicMock()
-        mock_editor2._controller.get_indexed_data.return_value = MagicMock()
-        mock_editor2._canvas = MagicMock()
+        mock_editor2._main_controller = MagicMock()
+        mock_editor2._main_controller.get_indexed_data.return_value = MagicMock()
+        mock_editor2._main_canvas = MagicMock()
 
         # Register mock editors
         workspace._palette.palette_editors["frame1.png"] = mock_editor1
@@ -183,11 +183,11 @@ class TestEditorPaletteSyncOnPaletteChange:
         # Verify both editors were synced
         mock_editor1._palette_panel.set_palette.assert_called()
         mock_editor1._update_duplicate_warning.assert_called()
-        mock_editor1._canvas.set_image.assert_called()
+        mock_editor1._main_canvas.set_image.assert_called()
 
         mock_editor2._palette_panel.set_palette.assert_called()
         mock_editor2._update_duplicate_warning.assert_called()
-        mock_editor2._canvas.set_image.assert_called()
+        mock_editor2._main_canvas.set_image.assert_called()
 
     def test_no_crash_when_no_editors_open(self, app_context, qtbot) -> None:
         """Palette change doesn't crash when no editors are open."""

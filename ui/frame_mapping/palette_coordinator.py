@@ -363,6 +363,7 @@ class PaletteCoordinator:
         editor.save_requested.connect(self._handle_palette_editor_save)
         editor.closed.connect(self._handle_palette_editor_closed)
         editor.palette_color_changed.connect(self._handle_editor_palette_color_changed)
+        editor.ingame_saved.connect(self._handle_ingame_saved)
 
         # Show the editor
         editor.show()
@@ -452,6 +453,14 @@ class PaletteCoordinator:
         """
         if self._controller:
             self._controller.set_sheet_palette_color(index, color)
+
+    def _handle_ingame_saved(self, ai_frame_id: str, ingame_edited_path: str) -> None:
+        """Handle in-game edit saved from palette editor.
+
+        Updates the workbench preview to show the saved in-game edit.
+        """
+        if self._alignment_canvas is not None:
+            self._alignment_canvas.set_ingame_edited_path(ingame_edited_path)
 
     # -------------------------------------------------------------------------
     # Helper Methods
