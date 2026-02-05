@@ -8,13 +8,17 @@ from typing import override
 
 import numpy as np
 from PIL import Image
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPixmap
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QColorDialog,
     QComboBox,
     QFrame,
+    QGraphicsPathItem,
+    QGraphicsPixmapItem,
+    QGraphicsScene,
+    QGraphicsView,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -51,6 +55,8 @@ class PaletteSlotWidget(QWidget):
     """Clickable palette slot showing color and index."""
 
     clicked = Signal(int)  # Emits slot index when clicked
+    hovered = Signal(int)
+    hover_left = Signal()
 
     def __init__(
         self,
@@ -63,6 +69,7 @@ class PaletteSlotWidget(QWidget):
         self._index = index
         self._color = color
         self._selected = False
+        self._highlighted = False
         self.setFixedSize(size, size)
         self._update_tooltip()
 
@@ -86,6 +93,11 @@ class PaletteSlotWidget(QWidget):
         self._selected = selected
         self.update()
 
+    def set_highlighted(self, highlighted: bool) -> None:
+        """Set hover-highlight state."""
+        self._highlighted = highlighted
+        self.update()
+
     @override
     def paintEvent(self, event: object) -> None:
         """Draw the color slot."""
@@ -97,6 +109,9 @@ class PaletteSlotWidget(QWidget):
             painter.setPen(Qt.GlobalColor.blue)
             painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
             painter.drawRect(1, 1, self.width() - 3, self.height() - 3)
+        elif self._highlighted:
+            painter.setPen(QColor(0, 200, 255))
+            painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
         else:
             painter.setPen(Qt.GlobalColor.darkGray)
             painter.drawRect(0, 0, self.width() - 1, self.height() - 1)
@@ -117,11 +132,26 @@ class PaletteSlotWidget(QWidget):
         """Handle click."""
         self.clicked.emit(self._index)
 
+    @override
+    def enterEvent(self, event: object) -> None:
+        """Handle hover enter."""
+        self.hovered.emit(self._index)
+        super().enterEvent(event)
+
+    @override
+    def leaveEvent(self, event: object) -> None:
+        """Handle hover leave."""
+        self.hover_left.emit()
+        super().leaveEvent(event)
+
 
 class ColorMappingRowWidget(QWidget):
     """A row showing: AI color swatch -> palette index dropdown."""
 
     mapping_changed = Signal(tuple, int)  # (rgb_color, new_palette_index)
+    hovered = Signal()
+    hover_left = Signal()
+    clicked = Signal()
 
     def __init__(
         self,
@@ -139,6 +169,8 @@ class ColorMappingRowWidget(QWidget):
         self._is_rare_important = is_rare_important
         self._distinctness = distinctness
         self._protected = False
+        self._selected = False
+        self._highlighted = False
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 2, 4, 2)
@@ -191,6 +223,7 @@ class ColorMappingRowWidget(QWidget):
         # Show initial protection status if rare
         if is_rare_important:
             self._update_protection_indicator()
+        self._update_row_style()
 
     def _populate_combo(self, selected_index: int) -> None:
         """Populate the palette dropdown."""
@@ -242,6 +275,29 @@ class ColorMappingRowWidget(QWidget):
             self._protect_label.setText("⚠")
             self._protected = False
 
+    def _update_row_style(self) -> None:
+        """Update row background for selection/highlight."""
+        if self._selected:
+            background = "#23324a"
+            border = "#4da3ff"
+        elif self._highlighted:
+            background = "#1f2a38"
+            border = "#3aa0ff"
+        else:
+            background = "transparent"
+            border = "transparent"
+        self.setStyleSheet(f"background-color: {background}; border: 1px solid {border}; border-radius: 4px;")
+
+    def set_selected(self, selected: bool) -> None:
+        """Set selection state."""
+        self._selected = selected
+        self._update_row_style()
+
+    def set_highlighted(self, highlighted: bool) -> None:
+        """Set hover highlight state."""
+        self._highlighted = highlighted
+        self._update_row_style()
+
     def set_protected(self, protected: bool) -> None:
         """Manually set protection status."""
         self._protected = protected
@@ -264,6 +320,28 @@ class ColorMappingRowWidget(QWidget):
     def get_mapping(self) -> tuple[tuple[int, int, int], int]:
         """Get current mapping."""
         return (self._rgb_color, self._combo.currentIndex())
+
+    def get_target_index(self) -> int:
+        """Get the current target palette index."""
+        return self._combo.currentIndex()
+
+    @override
+    def mousePressEvent(self, event: object) -> None:
+        """Handle click."""
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
+    @override
+    def enterEvent(self, event: object) -> None:
+        """Handle hover enter."""
+        self.hovered.emit()
+        super().enterEvent(event)
+
+    @override
+    def leaveEvent(self, event: object) -> None:
+        """Handle hover leave."""
+        self.hover_left.emit()
+        super().leaveEvent(event)
 
 
 class SheetPaletteMappingDialog(DialogBase):
@@ -335,6 +413,14 @@ class SheetPaletteMappingDialog(DialogBase):
         self._preview_zoom_percent = 200
         self._original_preview_pixmap: QPixmap | None = None
         self._quantized_preview_pixmap: QPixmap | None = None
+        self._original_preview_scene: QGraphicsScene | None = None
+        self._quantized_preview_scene: QGraphicsScene | None = None
+        self._original_preview_view: QGraphicsView | None = None
+        self._quantized_preview_view: QGraphicsView | None = None
+        self._original_preview_pixmap_item: QGraphicsPixmapItem | None = None
+        self._quantized_preview_pixmap_item: QGraphicsPixmapItem | None = None
+        self._original_highlight_item: QGraphicsPathItem | None = None
+        self._quantized_highlight_item: QGraphicsPathItem | None = None
 
         # Detect rare important colors (e.g., eye whites, small highlights)
         self._rare_important_colors = detect_rare_important_colors(
@@ -357,7 +443,16 @@ class SheetPaletteMappingDialog(DialogBase):
         self._palette_slots: list[PaletteSlotWidget] = []
         self._mapping_rows: list[ColorMappingRowWidget] = []
         self._selected_slot_index: int | None = None
+        self._selected_mapping_row: ColorMappingRowWidget | None = None
+        self._hover_palette_index: int | None = None
+        self._rows_by_index: dict[int, list[ColorMappingRowWidget]] = {i: [] for i in range(16)}
+        self._row_by_color: dict[tuple[int, int, int], ColorMappingRowWidget] = {}
+        self._highlighted_rows: set[ColorMappingRowWidget] = set()
         self._protect_rare_enabled = True  # Default: protect rare colors
+        self._preview_index_map: np.ndarray | None = None
+        self._preview_highlight_index: int | None = None
+        self._preview_highlight_paths: dict[int, QPainterPath] = {}
+        self._preview_dash_offset = 0.0
 
         super().__init__(
             parent,
@@ -376,6 +471,10 @@ class SheetPaletteMappingDialog(DialogBase):
         self._extract_timer.setSingleShot(True)
         self._extract_timer.setInterval(150)
         self._extract_timer.timeout.connect(self._apply_extraction_settings)
+
+        self._preview_march_timer = QTimer(self)
+        self._preview_march_timer.setInterval(100)
+        self._preview_march_timer.timeout.connect(self._on_preview_march_tick)
 
         # Initial preview
         if self._sample_image:
@@ -464,6 +563,8 @@ class SheetPaletteMappingDialog(DialogBase):
         for i in range(16):
             slot = PaletteSlotWidget(i, self._palette_colors[i])
             slot.clicked.connect(self._on_slot_clicked)
+            slot.hovered.connect(self._on_slot_hovered)
+            slot.hover_left.connect(self._on_slot_hover_left)
             self._palette_slots.append(slot)
             slots_layout.addWidget(slot)
         slots_layout.addStretch()
@@ -726,7 +827,12 @@ class SheetPaletteMappingDialog(DialogBase):
                 distinctness=distinctness,
             )
             row.mapping_changed.connect(self._on_mapping_changed)
+            row.hovered.connect(lambda row=row: self._on_mapping_row_hovered(row))
+            row.hover_left.connect(lambda row=row: self._on_mapping_row_hover_left(row))
+            row.clicked.connect(lambda row=row: self._on_mapping_row_clicked(row))
             self._mapping_rows.append(row)
+            self._row_by_color[color] = row
+            self._rows_by_index[row.get_target_index()].append(row)
             scroll_layout.addWidget(row)
 
         scroll_layout.addStretch()
@@ -779,17 +885,26 @@ class SheetPaletteMappingDialog(DialogBase):
             original_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             original_frame.addWidget(original_label)
 
-            self._original_preview_label = QLabel()
-            self._original_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._original_preview_label.setStyleSheet("background-color: #2a2a2a;")
+            self._original_preview_scene = QGraphicsScene(self)
+            self._original_preview_view = QGraphicsView(self._original_preview_scene)
+            self._original_preview_view.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+            self._original_preview_view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
+            self._original_preview_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self._original_preview_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self._original_preview_view.setStyleSheet("background-color: #1e1e1e; border: 1px solid #888;")
+            self._original_preview_view.setMinimumSize(260, 260)
+            self._original_preview_view.setMouseTracking(True)
+            self._original_preview_view.viewport().setMouseTracking(True)
+            self._original_preview_view.viewport().installEventFilter(self)
 
-            original_scroll = QScrollArea()
-            original_scroll.setWidget(self._original_preview_label)
-            original_scroll.setWidgetResizable(False)
-            original_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            original_scroll.setMinimumSize(260, 260)
-            original_scroll.setStyleSheet("background-color: #1e1e1e; border: 1px solid #888;")
-            original_frame.addWidget(original_scroll, 1)
+            self._original_preview_pixmap_item = QGraphicsPixmapItem()
+            self._original_preview_scene.addItem(self._original_preview_pixmap_item)
+
+            self._original_highlight_item = QGraphicsPathItem()
+            self._original_highlight_item.setZValue(10)
+            self._original_preview_scene.addItem(self._original_highlight_item)
+
+            original_frame.addWidget(self._original_preview_view, 1)
             previews_layout.addLayout(original_frame, 1)
 
             # Quantized preview
@@ -799,17 +914,26 @@ class SheetPaletteMappingDialog(DialogBase):
             quantized_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             quantized_frame.addWidget(quantized_label)
 
-            self._quantized_preview_label = QLabel()
-            self._quantized_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._quantized_preview_label.setStyleSheet("background-color: #2a2a2a;")
+            self._quantized_preview_scene = QGraphicsScene(self)
+            self._quantized_preview_view = QGraphicsView(self._quantized_preview_scene)
+            self._quantized_preview_view.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+            self._quantized_preview_view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
+            self._quantized_preview_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self._quantized_preview_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self._quantized_preview_view.setStyleSheet("background-color: #1e1e1e; border: 1px solid #888;")
+            self._quantized_preview_view.setMinimumSize(260, 260)
+            self._quantized_preview_view.setMouseTracking(True)
+            self._quantized_preview_view.viewport().setMouseTracking(True)
+            self._quantized_preview_view.viewport().installEventFilter(self)
 
-            quantized_scroll = QScrollArea()
-            quantized_scroll.setWidget(self._quantized_preview_label)
-            quantized_scroll.setWidgetResizable(False)
-            quantized_scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            quantized_scroll.setMinimumSize(260, 260)
-            quantized_scroll.setStyleSheet("background-color: #1e1e1e; border: 1px solid #888;")
-            quantized_frame.addWidget(quantized_scroll, 1)
+            self._quantized_preview_pixmap_item = QGraphicsPixmapItem()
+            self._quantized_preview_scene.addItem(self._quantized_preview_pixmap_item)
+
+            self._quantized_highlight_item = QGraphicsPathItem()
+            self._quantized_highlight_item.setZValue(10)
+            self._quantized_preview_scene.addItem(self._quantized_highlight_item)
+
+            quantized_frame.addWidget(self._quantized_preview_view, 1)
             previews_layout.addLayout(quantized_frame, 1)
 
             preview_group_layout.addLayout(previews_layout)
@@ -834,18 +958,245 @@ class SheetPaletteMappingDialog(DialogBase):
         content_layout.addWidget(main_splitter, 1)
         self.set_content_layout(content_layout)
 
+    def _set_selected_palette_index(self, index: int | None, *, selected_row: ColorMappingRowWidget | None = None) -> None:
+        """Set the persistent (clicked) palette index selection."""
+        if self._selected_slot_index is not None and self._selected_slot_index != index:
+            self._palette_slots[self._selected_slot_index].set_selected(False)
+        if index is not None:
+            self._palette_slots[index].set_selected(True)
+        self._selected_slot_index = index
+
+        if self._selected_mapping_row is not None and self._selected_mapping_row is not selected_row:
+            self._selected_mapping_row.set_selected(False)
+        self._selected_mapping_row = selected_row
+        if selected_row is not None:
+            selected_row.set_selected(True)
+        self._rebuild_rows_by_index()
+        self._apply_highlight_state()
+
+    def _set_hover_palette_index(self, index: int | None) -> None:
+        """Set the hover palette index (transient)."""
+        if self._hover_palette_index == index:
+            return
+        self._hover_palette_index = index
+        self._apply_highlight_state()
+
+    def _apply_highlight_state(self) -> None:
+        """Apply hover/selection state across slots, rows, and preview."""
+        hover_index = self._hover_palette_index
+        selected_index = self._selected_slot_index
+        highlight_index = hover_index if hover_index is not None else selected_index
+
+        for i, slot in enumerate(self._palette_slots):
+            slot.set_highlighted(hover_index is not None and i == hover_index)
+
+        self._update_highlighted_rows(highlight_index)
+
+        self._set_preview_highlight_index(highlight_index)
+
+    def _update_highlighted_rows(self, highlight_index: int | None) -> None:
+        """Update which mapping rows are highlighted for the given index."""
+        if highlight_index is None:
+            new_rows: set[ColorMappingRowWidget] = set()
+        else:
+            new_rows = set(self._rows_by_index.get(highlight_index, []))
+
+        for row in self._highlighted_rows - new_rows:
+            row.set_highlighted(False)
+        for row in new_rows - self._highlighted_rows:
+            row.set_highlighted(True)
+
+        self._highlighted_rows = new_rows
+
+    def _rebuild_rows_by_index(self) -> None:
+        """Rebuild row index mapping after bulk changes."""
+        self._rows_by_index = {i: [] for i in range(16)}
+        for row in self._mapping_rows:
+            self._rows_by_index[row.get_target_index()].append(row)
+        self._update_highlighted_rows(self._preview_highlight_index)
+
     def _on_slot_clicked(self, index: int) -> None:
         """Handle palette slot click."""
-        # Deselect previous
-        if self._selected_slot_index is not None:
-            self._palette_slots[self._selected_slot_index].set_selected(False)
-
-        # Select new (or deselect if same)
         if self._selected_slot_index == index:
-            self._selected_slot_index = None
+            self._set_selected_palette_index(None)
         else:
-            self._selected_slot_index = index
-            self._palette_slots[index].set_selected(True)
+            self._set_selected_palette_index(index)
+
+    def _on_slot_hovered(self, index: int) -> None:
+        """Handle palette slot hover."""
+        self._set_hover_palette_index(index)
+
+    def _on_slot_hover_left(self) -> None:
+        """Handle palette slot hover leave."""
+        self._set_hover_palette_index(None)
+
+    def _on_mapping_row_hovered(self, row: ColorMappingRowWidget) -> None:
+        """Handle mapping row hover."""
+        self._set_hover_palette_index(row.get_target_index())
+
+    def _on_mapping_row_hover_left(self, _row: ColorMappingRowWidget) -> None:
+        """Handle mapping row hover leave."""
+        self._set_hover_palette_index(None)
+
+    def _on_mapping_row_clicked(self, row: ColorMappingRowWidget) -> None:
+        """Handle mapping row click."""
+        if self._selected_mapping_row is row:
+            self._set_selected_palette_index(None)
+        else:
+            self._set_selected_palette_index(row.get_target_index(), selected_row=row)
+
+    @override
+    def eventFilter(self, watched: object, event: QEvent) -> bool:
+        """Handle preview hover picking."""
+        if self._original_preview_view and watched is self._original_preview_view.viewport():
+            if event.type() == QEvent.Type.MouseMove:
+                self._handle_preview_hover(self._original_preview_view, event)
+            elif event.type() == QEvent.Type.Leave:
+                self._set_hover_palette_index(None)
+        elif self._quantized_preview_view and watched is self._quantized_preview_view.viewport():
+            if event.type() == QEvent.Type.MouseMove:
+                self._handle_preview_hover(self._quantized_preview_view, event)
+            elif event.type() == QEvent.Type.Leave:
+                self._set_hover_palette_index(None)
+        return super().eventFilter(watched, event)
+
+    def _handle_preview_hover(self, view: QGraphicsView, event: QEvent) -> None:
+        """Handle hover over preview to pick palette index."""
+        if self._preview_index_map is None:
+            return
+        if hasattr(event, "position"):
+            pos = event.position().toPoint()
+        else:
+            pos = event.pos()
+
+        scene_pos = view.mapToScene(pos)
+        x_f = scene_pos.x()
+        y_f = scene_pos.y()
+        if y_f < 0 or x_f < 0:
+            self._set_hover_palette_index(None)
+            return
+        x = int(x_f)
+        y = int(y_f)
+        if y >= self._preview_index_map.shape[0] or x >= self._preview_index_map.shape[1]:
+            self._set_hover_palette_index(None)
+            return
+
+        index = int(self._preview_index_map[y, x])
+        self._set_hover_palette_index(index)
+
+    def _set_preview_highlight_index(self, index: int | None) -> None:
+        """Set highlight index for preview overlays."""
+        if self._sample_image is None:
+            return
+        if self._preview_highlight_index == index:
+            return
+        self._preview_highlight_index = index
+        if index is None:
+            self._preview_march_timer.stop()
+            self._preview_dash_offset = 0.0
+        elif not self._preview_march_timer.isActive():
+            self._preview_march_timer.start()
+        self._update_preview_highlight_items()
+
+    def _compute_boundary_edges(self, mask: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Compute edge segments for pixels matching the highlight mask."""
+        padded = np.pad(mask, 1, mode="constant", constant_values=False)
+        top_edges = mask & ~padded[:-2, 1:-1]
+        bottom_edges = mask & ~padded[2:, 1:-1]
+        left_edges = mask & ~padded[1:-1, :-2]
+        right_edges = mask & ~padded[1:-1, 2:]
+        return top_edges, bottom_edges, left_edges, right_edges
+
+    def _create_boundary_path(self, mask: np.ndarray) -> QPainterPath:
+        """Create a QPainterPath for the boundaries of a boolean mask."""
+        height, width = mask.shape
+        top_edges, bottom_edges, left_edges, right_edges = self._compute_boundary_edges(mask)
+        path = QPainterPath()
+
+        for edge_mask, y_offset in [(top_edges, 0), (bottom_edges, 1)]:
+            for y in range(height):
+                row = edge_mask[y]
+                if not np.any(row):
+                    continue
+                padded_row = np.concatenate(([False], row, [False]))
+                diff = np.diff(padded_row.astype(int))
+                starts = np.where(diff == 1)[0]
+                ends = np.where(diff == -1)[0]
+                y_coord = y + y_offset
+                for start, end in zip(starts, ends, strict=True):
+                    path.moveTo(start, y_coord)
+                    path.lineTo(end, y_coord)
+
+        for edge_mask, x_offset in [(left_edges, 0), (right_edges, 1)]:
+            for x in range(width):
+                col = edge_mask[:, x]
+                if not np.any(col):
+                    continue
+                padded_col = np.concatenate(([False], col, [False]))
+                diff = np.diff(padded_col.astype(int))
+                starts = np.where(diff == 1)[0]
+                ends = np.where(diff == -1)[0]
+                x_coord = x + x_offset
+                for start, end in zip(starts, ends, strict=True):
+                    path.moveTo(x_coord, start)
+                    path.lineTo(x_coord, end)
+
+        return path
+
+    def _get_preview_highlight_path(self, index: int) -> QPainterPath | None:
+        """Get a cached highlight path for the given palette index."""
+        if self._preview_index_map is None:
+            return None
+        if index in self._preview_highlight_paths:
+            return self._preview_highlight_paths[index]
+
+        mask = self._preview_index_map == index
+        if not np.any(mask):
+            return None
+        path = self._create_boundary_path(mask)
+        self._preview_highlight_paths[index] = path
+        return path
+
+    def _apply_preview_highlight_pen(self) -> None:
+        """Apply marching ants pen to highlight items."""
+        pen = QPen(QColor(255, 255, 255, 255))
+        pen.setWidthF(1.5)
+        pen.setCosmetic(True)
+        pen.setStyle(Qt.PenStyle.DashLine)
+        pen.setDashOffset(self._preview_dash_offset)
+        for item in (self._original_highlight_item, self._quantized_highlight_item):
+            if item is not None:
+                item.setPen(pen)
+
+    def _update_preview_highlight_items(self) -> None:
+        """Update highlight path items for the current index."""
+        if self._preview_highlight_index is None:
+            empty = QPainterPath()
+            for item in (self._original_highlight_item, self._quantized_highlight_item):
+                if item is not None:
+                    item.setPath(empty)
+            return
+
+        path = self._get_preview_highlight_path(self._preview_highlight_index)
+        if path is None:
+            empty = QPainterPath()
+            for item in (self._original_highlight_item, self._quantized_highlight_item):
+                if item is not None:
+                    item.setPath(empty)
+            return
+
+        for item in (self._original_highlight_item, self._quantized_highlight_item):
+            if item is not None:
+                item.setPath(path)
+        self._apply_preview_highlight_pen()
+
+    def _on_preview_march_tick(self) -> None:
+        """Advance marching ants animation by one frame."""
+        self._preview_dash_offset += 1.0
+        if self._preview_dash_offset >= 8.0:
+            self._preview_dash_offset = 0.0
+        if self._preview_highlight_index is not None:
+            self._apply_preview_highlight_pen()
 
     def _on_extract_palette(self) -> None:
         """Extract 16-color palette from AI sheet colors."""
@@ -940,6 +1291,7 @@ class SheetPaletteMappingDialog(DialogBase):
         else:
             logger.info("Auto-mapped %d colors to nearest palette colors (perceptual LAB)", len(self._sheet_colors))
 
+        self._apply_highlight_state()
         # Update preview
         self._request_preview_update()
 
@@ -971,7 +1323,20 @@ class SheetPaletteMappingDialog(DialogBase):
 
     def _on_mapping_changed(self, rgb_color: tuple[int, int, int], palette_index: int) -> None:
         """Handle mapping change from a row."""
+        old_index = self._color_mappings.get(rgb_color, palette_index)
         self._color_mappings[rgb_color] = palette_index
+
+        row = self._row_by_color.get(rgb_color)
+        if row is not None and old_index != palette_index:
+            if old_index in self._rows_by_index and row in self._rows_by_index[old_index]:
+                self._rows_by_index[old_index].remove(row)
+            self._rows_by_index[palette_index].append(row)
+
+            if self._selected_mapping_row is row:
+                self._set_selected_palette_index(palette_index, selected_row=row)
+            elif self._preview_highlight_index in (old_index, palette_index):
+                self._update_highlighted_rows(self._preview_highlight_index)
+
         self._request_preview_update()
 
     def _update_bg_swatch(self) -> None:
@@ -1093,7 +1458,7 @@ class SheetPaletteMappingDialog(DialogBase):
         if self._sample_image is None:
             return
 
-        if not hasattr(self, "_quantized_preview_label"):
+        if self._quantized_preview_pixmap_item is None:
             return
 
         # Apply background removal if configured (matches compositor pipeline)
@@ -1126,6 +1491,8 @@ class SheetPaletteMappingDialog(DialogBase):
         # Enforce binary alpha to match SNES hardware (no semi-transparency)
         # Index 0 = fully transparent, indices 1-15 = fully opaque
         idx_array = np.array(quantized_indexed)
+        self._preview_index_map = idx_array
+        self._preview_highlight_paths.clear()
         binary_alpha = np.where(idx_array == 0, 0, 255).astype(np.uint8)
         quantized_rgba.putalpha(Image.fromarray(binary_alpha, mode="L"))
 
@@ -1146,24 +1513,20 @@ class SheetPaletteMappingDialog(DialogBase):
 
         zoom = max(0.1, self._preview_zoom_percent / 100.0)
 
-        if hasattr(self, "_original_preview_label") and self._original_preview_pixmap is not None:
-            scaled = self._scale_preview_pixmap(self._original_preview_pixmap, zoom)
-            self._original_preview_label.setPixmap(scaled)
-            self._original_preview_label.resize(scaled.size())
+        if self._original_preview_pixmap_item is not None and self._original_preview_pixmap is not None:
+            self._original_preview_pixmap_item.setPixmap(self._original_preview_pixmap)
+            if self._original_preview_scene is not None:
+                self._original_preview_scene.setSceneRect(self._original_preview_pixmap.rect())
+        if self._original_preview_view is not None:
+            self._original_preview_view.resetTransform()
+            self._original_preview_view.scale(zoom, zoom)
 
-        if hasattr(self, "_quantized_preview_label") and self._quantized_preview_pixmap is not None:
-            scaled = self._scale_preview_pixmap(self._quantized_preview_pixmap, zoom)
-            self._quantized_preview_label.setPixmap(scaled)
-            self._quantized_preview_label.resize(scaled.size())
+        if self._quantized_preview_pixmap_item is not None and self._quantized_preview_pixmap is not None:
+            self._quantized_preview_pixmap_item.setPixmap(self._quantized_preview_pixmap)
+            if self._quantized_preview_scene is not None:
+                self._quantized_preview_scene.setSceneRect(self._quantized_preview_pixmap.rect())
+        if self._quantized_preview_view is not None:
+            self._quantized_preview_view.resetTransform()
+            self._quantized_preview_view.scale(zoom, zoom)
 
-    @staticmethod
-    def _scale_preview_pixmap(pixmap: QPixmap, zoom: float) -> QPixmap:
-        """Scale a pixmap using nearest-neighbor for crisp pixel art."""
-        width = max(1, int(pixmap.width() * zoom))
-        height = max(1, int(pixmap.height() * zoom))
-        return pixmap.scaled(
-            width,
-            height,
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.FastTransformation,
-        )
+        self._update_preview_highlight_items()
