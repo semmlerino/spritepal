@@ -9,7 +9,7 @@ from typing import override
 import numpy as np
 from PIL import Image
 from PySide6.QtCore import QEvent, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import QColor, QCursor, QImage, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QColorDialog,
@@ -170,7 +170,8 @@ class ColorMappingRowWidget(QWidget):
         self._distinctness = distinctness
         self._protected = False
         self._selected = False
-        self._highlighted = False
+        self._source_hovered = False
+        self._target_highlighted = False
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(4, 2, 4, 2)
@@ -224,6 +225,11 @@ class ColorMappingRowWidget(QWidget):
         if is_rare_important:
             self._update_protection_indicator()
         self._update_row_style()
+
+        self.setMouseTracking(True)
+        for child in self.findChildren(QWidget):
+            child.setMouseTracking(True)
+            child.installEventFilter(self)
 
     def _populate_combo(self, selected_index: int) -> None:
         """Populate the palette dropdown."""
@@ -280,9 +286,12 @@ class ColorMappingRowWidget(QWidget):
         if self._selected:
             background = "#23324a"
             border = "#4da3ff"
-        elif self._highlighted:
+        elif self._source_hovered:
             background = "#1f2a38"
             border = "#3aa0ff"
+        elif self._target_highlighted:
+            background = "#1a2432"
+            border = "#2e6fa3"
         else:
             background = "transparent"
             border = "transparent"
@@ -293,9 +302,14 @@ class ColorMappingRowWidget(QWidget):
         self._selected = selected
         self._update_row_style()
 
-    def set_highlighted(self, highlighted: bool) -> None:
-        """Set hover highlight state."""
-        self._highlighted = highlighted
+    def set_source_hovered(self, hovered: bool) -> None:
+        """Set source hover state."""
+        self._source_hovered = hovered
+        self._update_row_style()
+
+    def set_target_highlighted(self, highlighted: bool) -> None:
+        """Set target highlight state."""
+        self._target_highlighted = highlighted
         self._update_row_style()
 
     def set_protected(self, protected: bool) -> None:
@@ -342,6 +356,16 @@ class ColorMappingRowWidget(QWidget):
         """Handle hover leave."""
         self.hover_left.emit()
         super().leaveEvent(event)
+
+    @override
+    def eventFilter(self, watched: object, event: QEvent) -> bool:
+        """Handle hover for child widgets in this row."""
+        if event.type() == QEvent.Type.Enter:
+            self.hovered.emit()
+        elif event.type() == QEvent.Type.Leave:
+            if not self.rect().contains(self.mapFromGlobal(QCursor.pos())):
+                self.hover_left.emit()
+        return super().eventFilter(watched, event)
 
 
 class SheetPaletteMappingDialog(DialogBase):
@@ -444,6 +468,7 @@ class SheetPaletteMappingDialog(DialogBase):
         self._mapping_rows: list[ColorMappingRowWidget] = []
         self._selected_slot_index: int | None = None
         self._selected_mapping_row: ColorMappingRowWidget | None = None
+        self._hover_mapping_row: ColorMappingRowWidget | None = None
         self._hover_palette_index: int | None = None
         self._rows_by_index: dict[int, list[ColorMappingRowWidget]] = {i: [] for i in range(16)}
         self._row_by_color: dict[tuple[int, int, int], ColorMappingRowWidget] = {}
@@ -891,6 +916,7 @@ class SheetPaletteMappingDialog(DialogBase):
             self._original_preview_view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
             self._original_preview_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             self._original_preview_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self._original_preview_view.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             self._original_preview_view.setStyleSheet("background-color: #1e1e1e; border: 1px solid #888;")
             self._original_preview_view.setMinimumSize(260, 260)
             self._original_preview_view.setMouseTracking(True)
@@ -920,6 +946,7 @@ class SheetPaletteMappingDialog(DialogBase):
             self._quantized_preview_view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
             self._quantized_preview_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             self._quantized_preview_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self._quantized_preview_view.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             self._quantized_preview_view.setStyleSheet("background-color: #1e1e1e; border: 1px solid #888;")
             self._quantized_preview_view.setMinimumSize(260, 260)
             self._quantized_preview_view.setMouseTracking(True)
@@ -958,26 +985,39 @@ class SheetPaletteMappingDialog(DialogBase):
         content_layout.addWidget(main_splitter, 1)
         self.set_content_layout(content_layout)
 
-    def _set_selected_palette_index(self, index: int | None, *, selected_row: ColorMappingRowWidget | None = None) -> None:
+    def _set_selected_palette_index(self, index: int | None) -> None:
         """Set the persistent (clicked) palette index selection."""
         if self._selected_slot_index is not None and self._selected_slot_index != index:
             self._palette_slots[self._selected_slot_index].set_selected(False)
         if index is not None:
             self._palette_slots[index].set_selected(True)
         self._selected_slot_index = index
-
-        if self._selected_mapping_row is not None and self._selected_mapping_row is not selected_row:
-            self._selected_mapping_row.set_selected(False)
-        self._selected_mapping_row = selected_row
-        if selected_row is not None:
-            selected_row.set_selected(True)
-        self._rebuild_rows_by_index()
         self._apply_highlight_state()
+
+    def _set_selected_mapping_row(self, row: ColorMappingRowWidget | None) -> None:
+        """Set the persistent (clicked) mapping row selection."""
+        if self._selected_mapping_row is not None and self._selected_mapping_row is not row:
+            self._selected_mapping_row.set_selected(False)
+        self._selected_mapping_row = row
+        if row is not None:
+            row.set_selected(True)
+
+    def _set_hover_mapping_row(self, row: ColorMappingRowWidget | None) -> None:
+        """Set the hover mapping row (source)."""
+        if row is not None:
+            self._set_hover_palette_index(None)
+        if self._hover_mapping_row is not None and self._hover_mapping_row is not row:
+            self._hover_mapping_row.set_source_hovered(False)
+        self._hover_mapping_row = row
+        if row is not None:
+            row.set_source_hovered(True)
 
     def _set_hover_palette_index(self, index: int | None) -> None:
         """Set the hover palette index (transient)."""
         if self._hover_palette_index == index:
             return
+        if index is not None:
+            self._set_hover_mapping_row(None)
         self._hover_palette_index = index
         self._apply_highlight_state()
 
@@ -995,16 +1035,16 @@ class SheetPaletteMappingDialog(DialogBase):
         self._set_preview_highlight_index(highlight_index)
 
     def _update_highlighted_rows(self, highlight_index: int | None) -> None:
-        """Update which mapping rows are highlighted for the given index."""
+        """Update which mapping rows are target-highlighted for the given index."""
         if highlight_index is None:
             new_rows: set[ColorMappingRowWidget] = set()
         else:
             new_rows = set(self._rows_by_index.get(highlight_index, []))
 
         for row in self._highlighted_rows - new_rows:
-            row.set_highlighted(False)
+            row.set_target_highlighted(False)
         for row in new_rows - self._highlighted_rows:
-            row.set_highlighted(True)
+            row.set_target_highlighted(True)
 
         self._highlighted_rows = new_rows
 
@@ -1031,19 +1071,21 @@ class SheetPaletteMappingDialog(DialogBase):
         self._set_hover_palette_index(None)
 
     def _on_mapping_row_hovered(self, row: ColorMappingRowWidget) -> None:
-        """Handle mapping row hover."""
-        self._set_hover_palette_index(row.get_target_index())
+        """Handle mapping row hover (source)."""
+        self._set_hover_mapping_row(row)
 
-    def _on_mapping_row_hover_left(self, _row: ColorMappingRowWidget) -> None:
+    def _on_mapping_row_hover_left(self, row: ColorMappingRowWidget) -> None:
         """Handle mapping row hover leave."""
-        self._set_hover_palette_index(None)
+        if self._hover_mapping_row is row:
+            self._set_hover_mapping_row(None)
 
     def _on_mapping_row_clicked(self, row: ColorMappingRowWidget) -> None:
-        """Handle mapping row click."""
+        """Handle mapping row click (source)."""
+        self._set_hover_palette_index(None)
         if self._selected_mapping_row is row:
-            self._set_selected_palette_index(None)
+            self._set_selected_mapping_row(None)
         else:
-            self._set_selected_palette_index(row.get_target_index(), selected_row=row)
+            self._set_selected_mapping_row(row)
 
     @override
     def eventFilter(self, watched: object, event: QEvent) -> bool:
@@ -1069,12 +1111,24 @@ class SheetPaletteMappingDialog(DialogBase):
         else:
             pos = event.pos()
 
-        scene_pos = view.mapToScene(pos)
-        x_f = scene_pos.x()
-        y_f = scene_pos.y()
-        if y_f < 0 or x_f < 0:
+        pixmap_item = None
+        if view is self._original_preview_view:
+            pixmap_item = self._original_preview_pixmap_item
+        elif view is self._quantized_preview_view:
+            pixmap_item = self._quantized_preview_pixmap_item
+
+        if pixmap_item is None or pixmap_item.pixmap().isNull():
             self._set_hover_palette_index(None)
             return
+
+        scene_pos = view.mapToScene(pos)
+        local_pos = pixmap_item.mapFromScene(scene_pos)
+        x_f = local_pos.x()
+        y_f = local_pos.y()
+        if x_f < 0 or y_f < 0:
+            self._set_hover_palette_index(None)
+            return
+
         x = int(x_f)
         y = int(y_f)
         if y >= self._preview_index_map.shape[0] or x >= self._preview_index_map.shape[1]:
@@ -1332,9 +1386,7 @@ class SheetPaletteMappingDialog(DialogBase):
                 self._rows_by_index[old_index].remove(row)
             self._rows_by_index[palette_index].append(row)
 
-            if self._selected_mapping_row is row:
-                self._set_selected_palette_index(palette_index, selected_row=row)
-            elif self._preview_highlight_index in (old_index, palette_index):
+            if self._preview_highlight_index in (old_index, palette_index):
                 self._update_highlighted_rows(self._preview_highlight_index)
 
         self._request_preview_update()
