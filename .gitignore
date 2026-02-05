@@ -79,6 +79,14 @@ config/test_profiles/
 *.sfc
 *.smc
 
+# Image files (development artifacts)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+
 # Generated analysis reports
 typecheck_report_*.json
 import_analysis_report.json
