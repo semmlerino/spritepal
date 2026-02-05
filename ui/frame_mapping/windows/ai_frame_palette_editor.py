@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
-from PySide6.QtCore import QSignalBlocker, Qt, Signal
+from PySide6.QtCore import QSignalBlocker, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -97,6 +97,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._ingame_controller: PaletteEditorController | None = None
         self._ingame_canvas: IndexedCanvas | None = None
         self._active_canvas: str = "main"  # "main" or "ingame"
+        self._ingame_refresh_timer: QTimer | None = None
 
         self._setup_ui()
         self._setup_menu()
@@ -676,6 +677,46 @@ class AIFramePaletteEditorWindow(QMainWindow):
             self._main_canvas.set_image(data, self._palette)
             # Refresh highlight overlay with new data
             self._main_canvas.set_highlight_index(self._main_controller.active_index)
+        self._schedule_ingame_refresh()
+
+    def _schedule_ingame_refresh(self) -> None:
+        """Schedule debounced auto-refresh of in-game canvas."""
+        if not self._preview_enabled:
+            return
+        if self._ingame_controller is None:
+            return
+        if self._ingame_controller.is_dirty:
+            return  # Preserve manual in-game edits
+        if self._frame_controller is None:
+            return
+        project = self._frame_controller.project
+        if project is None:
+            return
+        mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
+        if mapping is None:
+            return
+
+        if self._ingame_refresh_timer is None:
+            self._ingame_refresh_timer = QTimer(self)
+            self._ingame_refresh_timer.setSingleShot(True)
+            self._ingame_refresh_timer.timeout.connect(self._do_auto_refresh_ingame)
+
+        self._ingame_refresh_timer.start(200)
+
+    def _do_auto_refresh_ingame(self) -> None:
+        """Execute auto-refresh when debounce timer fires."""
+        # Re-check dirty (could have changed during delay)
+        if self._ingame_controller is not None and self._ingame_controller.is_dirty:
+            return
+        if self._frame_controller is None:
+            return
+        project = self._frame_controller.project
+        if project is None:
+            return
+        mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
+        if mapping is None:
+            return
+        self._generate_ingame_canvas(mapping)
 
     def _on_ingame_image_changed(self) -> None:
         """Handle in-game image data change."""
@@ -1223,6 +1264,9 @@ class AIFramePaletteEditorWindow(QMainWindow):
             elif result == QMessageBox.StandardButton.Cancel:
                 event.ignore()
                 return
+
+        if self._ingame_refresh_timer is not None:
+            self._ingame_refresh_timer.stop()
 
         self.closed.emit(self._ai_frame.id)
         event.accept()
