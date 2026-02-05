@@ -108,9 +108,9 @@ class IndexedCanvasView(QGraphicsView):
         """Set the brush size and update cursor.
 
         Args:
-            size: Brush size (1-5)
+            size: Brush size (1-16)
         """
-        self._brush_size = max(1, min(5, size))
+        self._brush_size = max(1, min(16, size))
         self._update_brush_cursor()
 
     def _update_brush_cursor(self) -> None:
@@ -275,7 +275,7 @@ class IndexedCanvasView(QGraphicsView):
             delta_x = event.position().x() - self._resize_start_x
             # 20 pixels of movement = 1 size change
             size_delta = int(delta_x / 20)
-            new_size = max(1, min(5, self._resize_start_size + size_delta))
+            new_size = max(1, min(16, self._resize_start_size + size_delta))
             if new_size != self._brush_size:
                 self._brush_size = new_size
                 self._update_brush_cursor()
@@ -659,7 +659,7 @@ class IndexedCanvas(QWidget):
         """Set the brush size cursor.
 
         Args:
-            size: Brush size (1-5)
+            size: Brush size (1-16)
         """
         self._view.set_brush_size(size)
 

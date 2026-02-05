@@ -262,6 +262,22 @@ class AIFramePaletteEditorWindow(QMainWindow):
         # Select brush by default
         self._tool_buttons[EditorTool.BRUSH].setChecked(True)
 
+        layout.addSpacing(8)
+
+        # Brush size
+        brush_size_label = QLabel("Brush Size")
+        brush_size_label.setStyleSheet("font-weight: bold; color: #AAA;")
+        layout.addWidget(brush_size_label)
+
+        self._brush_size_spinbox = QSpinBox()
+        self._brush_size_spinbox.setRange(1, 16)
+        self._brush_size_spinbox.setValue(1)
+        self._brush_size_spinbox.setSuffix(" px")
+        self._brush_size_spinbox.setToolTip("Brush size in pixels (Ctrl+/- to adjust)")
+        self._brush_size_spinbox.setFixedHeight(28)
+        self._brush_size_spinbox.valueChanged.connect(self._on_brush_spinbox_changed)
+        layout.addWidget(self._brush_size_spinbox)
+
         layout.addSpacing(16)
 
         # Selection actions header
@@ -558,19 +574,23 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _decrease_brush(self) -> None:
         """Decrease brush size."""
-        new_size = max(1, self._controller.brush_size - 1)
-        self._controller.set_brush_size(new_size)
-        self._canvas.set_brush_size(new_size)
+        self._brush_size_spinbox.setValue(self._brush_size_spinbox.value() - 1)
 
     def _increase_brush(self) -> None:
         """Increase brush size."""
-        new_size = min(5, self._controller.brush_size + 1)
-        self._controller.set_brush_size(new_size)
-        self._canvas.set_brush_size(new_size)
+        self._brush_size_spinbox.setValue(self._brush_size_spinbox.value() + 1)
+
+    def _on_brush_spinbox_changed(self, size: int) -> None:
+        """Handle brush size spinbox value change."""
+        self._controller.set_brush_size(size)
+        self._canvas.set_brush_size(size)
 
     def _on_brush_size_changed(self, size: int) -> None:
         """Handle brush size change from Ctrl+RMB drag on canvas."""
         self._controller.set_brush_size(size)
+        self._brush_size_spinbox.blockSignals(True)
+        self._brush_size_spinbox.setValue(size)
+        self._brush_size_spinbox.blockSignals(False)
 
     def _on_grid_toggled(self, checked: bool) -> None:
         """Handle grid toggle."""

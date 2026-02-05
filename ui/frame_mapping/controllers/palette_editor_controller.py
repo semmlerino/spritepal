@@ -257,8 +257,8 @@ class PaletteEditorController(QObject):
             self.active_index_changed.emit(index)
 
     def set_brush_size(self, size: int) -> None:
-        """Set the brush size (1-5)."""
-        self._brush_size = max(1, min(5, size))
+        """Set the brush size (1-16)."""
+        self._brush_size = max(1, min(16, size))
 
     def set_palette_color(self, index: int, color: tuple[int, int, int]) -> None:
         """Change a palette color.
