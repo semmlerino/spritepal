@@ -1613,7 +1613,10 @@ class FrameMappingController(QObject):
             create_backup: Whether to create a backup before injection.
             debug: Enable debug mode.
             force_raw: Force RAW (uncompressed) injection for all tiles.
-            allow_fallback: Allow fallback to rom_offset filtering.
+            allow_fallback: [NON-UI API] Allow fallback to rom_offset filtering
+                when VRAM entry ID is stale. Not used by UI injection flows.
+                Intended for script-based injection where user confirmation
+                is not available.
             preserve_sprite: If True, original sprite remains visible.
         """
         self._injection.inject_mapping_async(

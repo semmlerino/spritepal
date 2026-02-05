@@ -1,7 +1,7 @@
 """Utilities for injection debug context management."""
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 from core.services.injection_debug_context import InjectionDebugContext
 

@@ -105,7 +105,9 @@ class InjectionFacade:
             create_backup: Whether to create a backup before injection.
             debug: Enable debug mode (saves intermediate images to /tmp/inject_debug/).
             force_raw: Force RAW (uncompressed) injection for all tiles.
-            allow_fallback: If True, allow fallback to rom_offset filtering.
+            allow_fallback: [NON-UI API] If True, allow fallback to rom_offset filtering
+                when VRAM entry ID is stale. Not used by UI injection flows. Intended for
+                script-based injection where user confirmation is not available.
             emit_project_changed: If True, emit project_changed after success.
             preserve_sprite: If True, original sprite remains visible where AI doesn't cover.
 
