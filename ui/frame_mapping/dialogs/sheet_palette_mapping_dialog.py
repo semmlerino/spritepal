@@ -8,9 +8,22 @@ from typing import override
 
 import numpy as np
 from PIL import Image
-from PySide6.QtCore import QEvent, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QCursor, QImage, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
+from PySide6.QtGui import (
+    QColor,
+    QCursor,
+    QEnterEvent,
+    QHoverEvent,
+    QImage,
+    QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPaintEvent,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QColorDialog,
     QComboBox,
@@ -25,9 +38,9 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
-    QSplitter,
     QSlider,
     QSpinBox,
+    QSplitter,
     QToolBox,
     QVBoxLayout,
     QWidget,
@@ -99,7 +112,7 @@ class PaletteSlotWidget(QWidget):
         self.update()
 
     @override
-    def paintEvent(self, event: object) -> None:
+    def paintEvent(self, event: QPaintEvent) -> None:
         """Draw the color slot."""
         painter = QPainter(self)
         painter.fillRect(self.rect(), QColor(*self._color))
@@ -128,18 +141,18 @@ class PaletteSlotWidget(QWidget):
         painter.end()
 
     @override
-    def mousePressEvent(self, event: object) -> None:
+    def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle click."""
         self.clicked.emit(self._index)
 
     @override
-    def enterEvent(self, event: object) -> None:
+    def enterEvent(self, event: QEnterEvent) -> None:
         """Handle hover enter."""
         self.hovered.emit(self._index)
         super().enterEvent(event)
 
     @override
-    def leaveEvent(self, event: object) -> None:
+    def leaveEvent(self, event: QEvent) -> None:
         """Handle hover leave."""
         self.hover_left.emit()
         super().leaveEvent(event)
@@ -164,6 +177,8 @@ class ColorMappingRowWidget(QWidget):
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAutoFillBackground(True)
         self._rgb_color = rgb_color
         self._palette = palette
         self._is_rare_important = is_rare_important
@@ -340,25 +355,25 @@ class ColorMappingRowWidget(QWidget):
         return self._combo.currentIndex()
 
     @override
-    def mousePressEvent(self, event: object) -> None:
+    def mousePressEvent(self, event: QMouseEvent) -> None:
         """Handle click."""
         self.clicked.emit()
         super().mousePressEvent(event)
 
     @override
-    def enterEvent(self, event: object) -> None:
+    def enterEvent(self, event: QEnterEvent) -> None:
         """Handle hover enter."""
         self.hovered.emit()
         super().enterEvent(event)
 
     @override
-    def leaveEvent(self, event: object) -> None:
+    def leaveEvent(self, event: QEvent) -> None:
         """Handle hover leave."""
         self.hover_left.emit()
         super().leaveEvent(event)
 
     @override
-    def eventFilter(self, watched: object, event: QEvent) -> bool:
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
         """Handle hover for child widgets in this row."""
         if event.type() == QEvent.Type.Enter:
             self.hovered.emit()
@@ -437,6 +452,8 @@ class SheetPaletteMappingDialog(DialogBase):
         self._preview_zoom_percent = 200
         self._original_preview_pixmap: QPixmap | None = None
         self._quantized_preview_pixmap: QPixmap | None = None
+        self._mapping_scroll_viewport: QWidget | None = None
+        self._mapping_scroll_content: QWidget | None = None
         self._original_preview_scene: QGraphicsScene | None = None
         self._quantized_preview_scene: QGraphicsScene | None = None
         self._original_preview_view: QGraphicsView | None = None
@@ -478,6 +495,7 @@ class SheetPaletteMappingDialog(DialogBase):
         self._preview_highlight_index: int | None = None
         self._preview_highlight_paths: dict[int, QPainterPath] = {}
         self._preview_dash_offset = 0.0
+        self._mapping_hover_debug_label: QLabel | None = None
 
         super().__init__(
             parent,
@@ -816,6 +834,11 @@ class SheetPaletteMappingDialog(DialogBase):
         legend_label = QLabel("★ = protected  ⚠ = needs review")
         legend_label.setStyleSheet("font-size: 10px; color: #808080;")
         mappings_header_layout.addWidget(legend_label)
+
+        self._mapping_hover_debug_label = QLabel("")
+        self._mapping_hover_debug_label.setStyleSheet("font-size: 10px; color: #6080a0;")
+        self._mapping_hover_debug_label.setMinimumWidth(220)
+        mappings_header_layout.addWidget(self._mapping_hover_debug_label)
         mappings_header_layout.addStretch()
         mappings_layout.addLayout(mappings_header_layout)
 
@@ -827,6 +850,7 @@ class SheetPaletteMappingDialog(DialogBase):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setSpacing(2)
+        self._mapping_scroll_content = scroll_content
 
         # Sort colors: rare important colors first, then by pixel count
         sorted_colors = sorted(
@@ -863,6 +887,10 @@ class SheetPaletteMappingDialog(DialogBase):
         scroll_layout.addStretch()
         scroll.setWidget(scroll_content)
         mappings_layout.addWidget(scroll, 1)
+        self._mapping_scroll_viewport = scroll.viewport()
+        self._mapping_scroll_viewport.setMouseTracking(True)
+        self._mapping_scroll_viewport.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self._mapping_scroll_viewport.installEventFilter(self)
 
         # Summary
         total_colors = len(self._sheet_colors)
@@ -1011,6 +1039,10 @@ class SheetPaletteMappingDialog(DialogBase):
         self._hover_mapping_row = row
         if row is not None:
             row.set_source_hovered(True)
+            self._set_preview_highlight_index(row.get_target_index())
+        else:
+            # Restore preview highlight to ambient selection state
+            self._apply_highlight_state()
 
     def _set_hover_palette_index(self, index: int | None) -> None:
         """Set the hover palette index (transient)."""
@@ -1047,6 +1079,13 @@ class SheetPaletteMappingDialog(DialogBase):
             row.set_target_highlighted(True)
 
         self._highlighted_rows = new_rows
+
+    def _find_mapping_row(self, widget: QWidget | None) -> ColorMappingRowWidget | None:
+        """Find the mapping row for a child widget."""
+        current = widget
+        while current is not None and not isinstance(current, ColorMappingRowWidget):
+            current = current.parentWidget()
+        return current
 
     def _rebuild_rows_by_index(self) -> None:
         """Rebuild row index mapping after bulk changes."""
@@ -1088,28 +1127,52 @@ class SheetPaletteMappingDialog(DialogBase):
             self._set_selected_mapping_row(row)
 
     @override
-    def eventFilter(self, watched: object, event: QEvent) -> bool:
-        """Handle preview hover picking."""
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        """Handle preview and mapping hover picking."""
+        if self._mapping_scroll_viewport is not None and watched is self._mapping_scroll_viewport:
+            if event.type() in (QEvent.Type.MouseMove, QEvent.Type.HoverMove):
+                if isinstance(event, (QMouseEvent, QHoverEvent)):
+                    pos = event.position().toPoint()
+                else:
+                    return super().eventFilter(watched, event)
+
+                if self._mapping_scroll_content is not None:
+                    content_pos = self._mapping_scroll_content.mapFrom(self._mapping_scroll_viewport, pos)
+                    widget = self._mapping_scroll_content.childAt(content_pos)
+                else:
+                    widget = QApplication.widgetAt(QCursor.pos())
+                row = self._find_mapping_row(widget)
+                widget_name = type(widget).__name__ if widget is not None else "None"
+                row_name = type(row).__name__ if row is not None else "None"
+                if self._mapping_hover_debug_label is not None:
+                    self._mapping_hover_debug_label.setText(f"hover: {widget_name} -> {row_name}")
+                logger.debug("Mapping hover: widget=%s row=%s", widget_name, row_name)
+                self._set_hover_mapping_row(row)
+            elif event.type() == QEvent.Type.Leave:
+                if self._mapping_hover_debug_label is not None:
+                    self._mapping_hover_debug_label.setText("hover: None")
+                logger.debug("Mapping hover: None")
+                self._set_hover_mapping_row(None)
+            return super().eventFilter(watched, event)
+
         if self._original_preview_view and watched is self._original_preview_view.viewport():
-            if event.type() == QEvent.Type.MouseMove:
+            if event.type() == QEvent.Type.MouseMove and isinstance(event, QMouseEvent):
                 self._handle_preview_hover(self._original_preview_view, event)
             elif event.type() == QEvent.Type.Leave:
                 self._set_hover_palette_index(None)
         elif self._quantized_preview_view and watched is self._quantized_preview_view.viewport():
-            if event.type() == QEvent.Type.MouseMove:
+            if event.type() == QEvent.Type.MouseMove and isinstance(event, QMouseEvent):
                 self._handle_preview_hover(self._quantized_preview_view, event)
             elif event.type() == QEvent.Type.Leave:
                 self._set_hover_palette_index(None)
         return super().eventFilter(watched, event)
 
-    def _handle_preview_hover(self, view: QGraphicsView, event: QEvent) -> None:
+    def _handle_preview_hover(self, view: QGraphicsView, event: QMouseEvent) -> None:
         """Handle hover over preview to pick palette index."""
         if self._preview_index_map is None:
             return
-        if hasattr(event, "position"):
-            pos = event.position().toPoint()
-        else:
-            pos = event.pos()
+
+        pos = event.position().toPoint()
 
         pixmap_item = None
         if view is self._original_preview_view:
