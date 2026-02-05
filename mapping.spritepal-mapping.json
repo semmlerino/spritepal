@@ -4,14 +4,14 @@
   "ai_frames_dir": "M\\dedede_project\\framesV2\\v3\\sprites",
   "ai_frames": [
     {
-      "path": "M\\v\\oMax (3).png",
+      "path": "C:\\Users\\gabri\\OneDrive\\Bilder\\max\\character_2_edited.png",
       "index": 0,
-      "width": 89,
-      "height": 129
+      "width": 128,
+      "height": 187
     },
     {
-      "path": "M\\v\\oMax (3).png",
-      "index": 0,
+      "path": "M\\v\\oMax (2)_edited.png",
+      "index": 1,
       "width": 89,
       "height": 129
     }
@@ -246,16 +246,30 @@
   ],
   "mappings": [
     {
-      "ai_frame_id": "oMax (3).png",
+      "ai_frame_id": "character_2_edited.png",
       "game_frame_id": "capture_1769721724",
       "status": "edited",
       "offset_x": 0,
-      "offset_y": 1,
-      "flip_h": false,
+      "offset_y": 0,
+      "flip_h": true,
       "flip_v": false,
-      "scale": 0.37015688004032254,
+      "scale": 0.2574103860294118,
       "sharpen": 0.0,
-      "resampling": "lanczos"
+      "resampling": "lanczos",
+      "ingame_edited_path": "C:\\Users\\gabri\\OneDrive\\Bilder\\max\\character_2_edited_ingame.png"
+    },
+    {
+      "ai_frame_id": "oMax (2)_edited.png",
+      "game_frame_id": "capture_1769721778",
+      "status": "edited",
+      "offset_x": 0,
+      "offset_y": 0,
+      "flip_h": true,
+      "flip_v": false,
+      "scale": 0.3789950856854839,
+      "sharpen": 0.0,
+      "resampling": "lanczos",
+      "ingame_edited_path": null
     }
   ],
   "sheet_palette": {
