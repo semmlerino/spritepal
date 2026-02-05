@@ -11,17 +11,14 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, override
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QImage, QKeySequence, QPainter, QPixmap, QShortcut
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
-    QGraphicsPixmapItem,
-    QGraphicsScene,
-    QGraphicsView,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -29,6 +26,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSpinBox,
+    QSplitter,
     QStatusBar,
     QToolButton,
     QVBoxLayout,
@@ -43,9 +41,8 @@ from ui.frame_mapping.views.editor_palette_panel import EditorPalettePanel
 from ui.frame_mapping.views.indexed_canvas import IndexedCanvas
 
 if TYPE_CHECKING:
-    from core.frame_mapping_project import AIFrame, SheetPalette
+    from core.frame_mapping_project import AIFrame, FrameMapping, SheetPalette
     from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
-    from ui.frame_mapping.services.async_preview_service import AsyncPreviewService
 
 logger = logging.getLogger(__name__)
 
@@ -92,11 +89,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
         super().__init__(parent)
         self._ai_frame = ai_frame
         self._palette = palette
-        self._controller = PaletteEditorController(self)
+        self._main_controller = PaletteEditorController(self)
         self._frame_controller = controller
         self._preview_enabled = False
-        self._async_preview_service: AsyncPreviewService | None = None
-        self._debounce_timer: QTimer | None = None
+        self._ingame_controller: PaletteEditorController | None = None
+        self._ingame_canvas: IndexedCanvas | None = None
+        self._active_canvas: str = "main"  # "main" or "ingame"
 
         self._setup_ui()
         self._setup_menu()
@@ -109,19 +107,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self.resize(900, 700)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
-        # Initialize preview service if controller is available
-        if self._frame_controller is not None:
-            from ui.frame_mapping.services.async_preview_service import AsyncPreviewService
-
-            self._async_preview_service = AsyncPreviewService(self)
-            self._async_preview_service.preview_ready.connect(self._on_preview_ready)
-            self._async_preview_service.preview_failed.connect(self._on_preview_failed)
-
-            self._debounce_timer = QTimer()
-            self._debounce_timer.setSingleShot(True)
-            self._debounce_timer.setInterval(300)
-            self._debounce_timer.timeout.connect(self._generate_preview)
-
     def _setup_ui(self) -> None:
         """Set up the main UI layout."""
         central = QWidget()
@@ -132,21 +117,22 @@ class AIFramePaletteEditorWindow(QMainWindow):
         main_layout.setSpacing(4)
 
         # Center: Canvas (created first - tool panel references it)
-        self._canvas = IndexedCanvas()
-        self._canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._main_canvas = IndexedCanvas()
+        self._main_canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         # Left: Tool panel
         self._tool_panel = self._create_tool_panel()
         main_layout.addWidget(self._tool_panel)
 
         # Center section: Warning banner + Canvas
-        center_layout = QVBoxLayout()
+        center_widget = QWidget()
+        center_layout = QVBoxLayout(center_widget)
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(4)
 
         # Duplicate color warning banner
         self._duplicate_warning_label = QLabel(
-            "⚠ Duplicate colors detected in palette. During injection, pixels with the same "
+            "\u26a0 Duplicate colors detected in palette. During injection, pixels with the same "
             "color will be mapped to the same index, regardless of their original index."
         )
         self._duplicate_warning_label.setStyleSheet(
@@ -157,19 +143,31 @@ class AIFramePaletteEditorWindow(QMainWindow):
         center_layout.addWidget(self._duplicate_warning_label)
 
         # Add canvas to center layout
-        center_layout.addWidget(self._canvas, 1)
-        main_layout.addLayout(center_layout, 1)
+        center_layout.addWidget(self._main_canvas, 1)
 
-        # Right: Palette panel
+        # Right side: Palette panel + In-game preview panel (stacked)
+        right_side = QWidget()
+        right_layout = QVBoxLayout(right_side)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(4)
+
         self._palette_panel = EditorPalettePanel()
         self._palette_panel.set_palette(self._palette)
         self._palette_panel.set_active_index(1)
-        main_layout.addWidget(self._palette_panel)
+        right_layout.addWidget(self._palette_panel)
 
-        # Far right: Preview panel (collapsible)
+        # In-game preview panel (collapsible)
         self._preview_panel = self._create_preview_panel()
         self._preview_panel.setVisible(False)  # Hidden by default
-        main_layout.addWidget(self._preview_panel)
+        right_layout.addWidget(self._preview_panel, 1)
+
+        # Use QSplitter so user can resize center vs right
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(center_widget)
+        splitter.addWidget(right_side)
+        splitter.setStretchFactor(0, 3)  # Center gets more space
+        splitter.setStretchFactor(1, 1)
+        main_layout.addWidget(splitter, 1)
 
         # Status bar
         self._status_bar = QStatusBar()
@@ -289,7 +287,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._fill_selection_btn = QPushButton("Fill Sel [Shift+F]")
         self._fill_selection_btn.setToolTip("Fill selected pixels with active color (Shift+F)")
         self._fill_selection_btn.setFixedHeight(28)
-        self._fill_selection_btn.clicked.connect(self._controller.paint_selection)
+        self._fill_selection_btn.clicked.connect(self._main_controller.paint_selection)
         layout.addWidget(self._fill_selection_btn)
 
         layout.addSpacing(8)
@@ -328,57 +326,70 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         zoom_in = QPushButton("+")
         zoom_in.setToolTip("Zoom in (+)")
-        zoom_in.clicked.connect(self._canvas.zoom_in)
+        zoom_in.clicked.connect(self._main_canvas.zoom_in)
         layout.addWidget(zoom_in)
 
         zoom_out = QPushButton("-")
         zoom_out.setToolTip("Zoom out (-)")
-        zoom_out.clicked.connect(self._canvas.zoom_out)
+        zoom_out.clicked.connect(self._main_canvas.zoom_out)
         layout.addWidget(zoom_out)
 
         zoom_fit = QPushButton("Fit")
         zoom_fit.setToolTip("Fit in view")
-        zoom_fit.clicked.connect(self._canvas.zoom_fit)
+        zoom_fit.clicked.connect(self._main_canvas.zoom_fit)
         layout.addWidget(zoom_fit)
 
         zoom_100 = QPushButton("1:1")
         zoom_100.setToolTip("100% zoom")
-        zoom_100.clicked.connect(self._canvas.zoom_100)
+        zoom_100.clicked.connect(self._main_canvas.zoom_100)
         layout.addWidget(zoom_100)
 
         return panel
 
     def _create_preview_panel(self) -> QWidget:
-        """Create the collapsible preview panel."""
+        """Create the in-game preview/edit panel."""
         panel = QWidget()
-        panel.setFixedWidth(200)
+        panel.setMinimumWidth(200)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
 
         # Header
-        header = QLabel("Preview")
+        header = QLabel("In-Game Canvas")
         header.setStyleSheet("font-weight: bold; color: #AAA;")
         layout.addWidget(header)
 
-        # Preview display area with graphics view
-        self._preview_scene = QGraphicsScene(self)
-        self._preview_view = QGraphicsView(self._preview_scene)
-        self._preview_view.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-        self._preview_view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
-        self._preview_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self._preview_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self._preview_view.setStyleSheet("background-color: #2A2A2A; border: 1px solid #444;")
-        self._preview_view.setMinimumHeight(150)
+        # In-game canvas (editable)
+        self._ingame_canvas = IndexedCanvas()
+        self._ingame_canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self._ingame_canvas.setStyleSheet("border: 1px solid #444;")
+        layout.addWidget(self._ingame_canvas, 1)
 
-        # Pixmap item for preview
-        self._preview_pixmap_item = QGraphicsPixmapItem()
-        self._preview_scene.addItem(self._preview_pixmap_item)
+        # Connect in-game canvas signals
+        self._ingame_canvas.pixel_clicked.connect(self._on_ingame_canvas_clicked)
+        self._ingame_canvas.pixel_dragged.connect(self._on_ingame_canvas_dragged)
+        self._ingame_canvas.pixel_hovered.connect(self._on_ingame_canvas_hovered)
+        self._ingame_canvas.mouse_left.connect(self._on_canvas_left)
 
-        layout.addWidget(self._preview_view, 1)
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(4)
+
+        self._refresh_ingame_btn = QPushButton("Refresh")
+        self._refresh_ingame_btn.setToolTip("Re-generate from current AI frame edits")
+        self._refresh_ingame_btn.clicked.connect(self._on_refresh_ingame)
+        btn_layout.addWidget(self._refresh_ingame_btn)
+
+        self._save_ingame_btn = QPushButton("Save In-Game")
+        self._save_ingame_btn.setToolTip("Save in-game edits as separate indexed PNG")
+        self._save_ingame_btn.setEnabled(False)
+        self._save_ingame_btn.clicked.connect(self._on_save_ingame)
+        btn_layout.addWidget(self._save_ingame_btn)
+
+        layout.addLayout(btn_layout)
 
         # Info label
-        self._preview_info_label = QLabel("Shows quantized result\nas it appears in-game")
+        self._preview_info_label = QLabel("Edit the composited in-game result directly")
         self._preview_info_label.setStyleSheet("color: #666; font-size: 10px;")
         self._preview_info_label.setWordWrap(True)
         layout.addWidget(self._preview_info_label)
@@ -409,13 +420,13 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         self._undo_action = QAction("&Undo", self)
         self._undo_action.setShortcut(QKeySequence.StandardKey.Undo)
-        self._undo_action.triggered.connect(self._controller.undo)
+        self._undo_action.triggered.connect(lambda: self._get_active_controller().undo())
         self._undo_action.setEnabled(False)
         edit_menu.addAction(self._undo_action)
 
         self._redo_action = QAction("&Redo", self)
         self._redo_action.setShortcut(QKeySequence.StandardKey.Redo)
-        self._redo_action.triggered.connect(self._controller.redo)
+        self._redo_action.triggered.connect(lambda: self._get_active_controller().redo())
         self._redo_action.setEnabled(False)
         edit_menu.addAction(self._redo_action)
 
@@ -423,24 +434,24 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         select_all = QAction("Select &All", self)
         select_all.setShortcut(QKeySequence.StandardKey.SelectAll)
-        select_all.triggered.connect(self._controller.select_all)
+        select_all.triggered.connect(self._main_controller.select_all)
         edit_menu.addAction(select_all)
 
         deselect = QAction("&Deselect", self)
         deselect.setShortcut("Ctrl+D")
-        deselect.triggered.connect(self._controller.deselect_all)
+        deselect.triggered.connect(self._main_controller.deselect_all)
         edit_menu.addAction(deselect)
 
         invert_sel = QAction("&Invert Selection", self)
         invert_sel.setShortcut("Ctrl+I")
-        invert_sel.triggered.connect(self._controller.invert_selection)
+        invert_sel.triggered.connect(self._main_controller.invert_selection)
         edit_menu.addAction(invert_sel)
 
         edit_menu.addSeparator()
 
         erase_sel = QAction("&Erase Selection", self)
         erase_sel.setShortcut("Delete")
-        erase_sel.triggered.connect(self._controller.erase_selection)
+        erase_sel.triggered.connect(self._main_controller.erase_selection)
         edit_menu.addAction(erase_sel)
 
         edit_menu.addSeparator()
@@ -481,7 +492,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
             shortcut.activated.connect(lambda index=idx: self._select_index(index))
 
         # Selection action shortcuts
-        QShortcut(QKeySequence("Shift+F"), self).activated.connect(self._controller.paint_selection)
+        QShortcut(QKeySequence("Shift+F"), self).activated.connect(self._main_controller.paint_selection)
 
         # Brush size shortcuts (Ctrl+Plus/Minus)
         QShortcut(QKeySequence("Ctrl+-"), self).activated.connect(self._decrease_brush)
@@ -489,29 +500,29 @@ class AIFramePaletteEditorWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl++"), self).activated.connect(self._increase_brush)
 
         # Zoom shortcuts (without Ctrl)
-        QShortcut(QKeySequence("+"), self).activated.connect(self._canvas.zoom_in)
-        QShortcut(QKeySequence("="), self).activated.connect(self._canvas.zoom_in)
-        QShortcut(QKeySequence("-"), self).activated.connect(self._canvas.zoom_out)
+        QShortcut(QKeySequence("+"), self).activated.connect(self._main_canvas.zoom_in)
+        QShortcut(QKeySequence("="), self).activated.connect(self._main_canvas.zoom_in)
+        QShortcut(QKeySequence("-"), self).activated.connect(self._main_canvas.zoom_out)
 
     def _connect_signals(self) -> None:
         """Connect controller and widget signals."""
-        # Controller signals
-        self._controller.image_changed.connect(self._on_image_changed)
-        self._controller.selection_changed.connect(self._on_selection_changed)
-        self._controller.undo_state_changed.connect(self._on_undo_state_changed)
-        self._controller.pixel_info.connect(self._on_pixel_info)
-        self._controller.dirty_changed.connect(self._on_dirty_changed)
-        self._controller.active_index_changed.connect(self._on_active_index_changed)
-        self._controller.tool_changed.connect(self._on_tool_changed)
-        self._controller.color_mapping_report.connect(self._on_color_mapping_report)
+        # Main controller signals
+        self._main_controller.image_changed.connect(self._on_main_image_changed)
+        self._main_controller.selection_changed.connect(self._on_selection_changed)
+        self._main_controller.undo_state_changed.connect(self._on_undo_state_changed)
+        self._main_controller.pixel_info.connect(self._on_pixel_info)
+        self._main_controller.dirty_changed.connect(self._on_dirty_changed)
+        self._main_controller.active_index_changed.connect(self._on_active_index_changed)
+        self._main_controller.tool_changed.connect(self._on_tool_changed)
+        self._main_controller.color_mapping_report.connect(self._on_color_mapping_report)
 
-        # Canvas signals
-        self._canvas.pixel_clicked.connect(self._on_canvas_clicked)
-        self._canvas.pixel_dragged.connect(self._on_canvas_dragged)
-        self._canvas.pixel_hovered.connect(self._on_canvas_hovered)
-        self._canvas.mouse_left.connect(self._on_canvas_left)
-        self._canvas.drag_ended.connect(self._controller.finish_stroke)
-        self._canvas.brush_size_changed.connect(self._on_brush_size_changed)
+        # Main canvas signals
+        self._main_canvas.pixel_clicked.connect(self._on_main_canvas_clicked)
+        self._main_canvas.pixel_dragged.connect(self._on_main_canvas_dragged)
+        self._main_canvas.pixel_hovered.connect(self._on_main_canvas_hovered)
+        self._main_canvas.mouse_left.connect(self._on_canvas_left)
+        self._main_canvas.drag_ended.connect(self._main_controller.finish_stroke)
+        self._main_canvas.brush_size_changed.connect(self._on_brush_size_changed)
 
         # Palette panel signals
         self._palette_panel.index_selected.connect(self._on_palette_index_selected)
@@ -521,13 +532,13 @@ class AIFramePaletteEditorWindow(QMainWindow):
     def _load_image(self) -> None:
         """Load the AI frame image."""
         path = Path(self._ai_frame.path)
-        if self._controller.load_image(path, self._palette):
+        if self._main_controller.load_image(path, self._palette):
             # Update canvas
-            data = self._controller.get_indexed_data()
+            data = self._main_controller.get_indexed_data()
             if data is not None:
-                self._canvas.set_image(data, self._palette)
+                self._main_canvas.set_image(data, self._palette)
                 # Initialize brush cursor
-                self._canvas.set_brush_size(self._controller.brush_size)
+                self._main_canvas.set_brush_size(self._main_controller.brush_size)
 
             # Check for duplicate colors in palette and show warning if found
             self._update_duplicate_warning()
@@ -552,6 +563,26 @@ class AIFramePaletteEditorWindow(QMainWindow):
         """
         return self._duplicate_warning_label.isVisible()
 
+    # --- Active Canvas Tracking ---
+
+    def _set_active_canvas(self, which: str) -> None:
+        """Set which canvas is active and apply visual highlight."""
+        self._active_canvas = which
+        if which == "main":
+            self._main_canvas.setStyleSheet("border: 2px solid #4A90D9;")
+            if self._ingame_canvas is not None:
+                self._ingame_canvas.setStyleSheet("border: 1px solid #444;")
+        else:
+            self._main_canvas.setStyleSheet("border: 1px solid #444;")
+            if self._ingame_canvas is not None:
+                self._ingame_canvas.setStyleSheet("border: 2px solid #4A90D9;")
+
+    def _get_active_controller(self) -> PaletteEditorController:
+        """Return the controller for the currently active canvas."""
+        if self._active_canvas == "ingame" and self._ingame_controller is not None:
+            return self._ingame_controller
+        return self._main_controller
+
     # --- Event Handlers ---
 
     def _on_tool_button_clicked(self, tool: EditorTool) -> None:
@@ -560,7 +591,9 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _select_tool(self, tool: EditorTool) -> None:
         """Select a tool via controller."""
-        self._controller.set_tool(tool)
+        self._main_controller.set_tool(tool)
+        if self._ingame_controller is not None:
+            self._ingame_controller.set_tool(tool)
 
     def _on_tool_changed(self, tool: EditorTool) -> None:
         """Handle tool change from controller (e.g., auto-switch after pick)."""
@@ -569,7 +602,9 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _select_index(self, index: int) -> None:
         """Select a palette index."""
-        self._controller.set_active_index(index)
+        self._main_controller.set_active_index(index)
+        if self._ingame_controller is not None:
+            self._ingame_controller.set_active_index(index)
         self._palette_panel.set_active_index(index)
 
     def _decrease_brush(self) -> None:
@@ -582,45 +617,51 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _on_brush_spinbox_changed(self, size: int) -> None:
         """Handle brush size spinbox value change."""
-        self._controller.set_brush_size(size)
-        self._canvas.set_brush_size(size)
+        self._main_controller.set_brush_size(size)
+        self._main_canvas.set_brush_size(size)
+        if self._ingame_controller is not None:
+            self._ingame_controller.set_brush_size(size)
+        if self._ingame_canvas is not None:
+            self._ingame_canvas.set_brush_size(size)
 
     def _on_brush_size_changed(self, size: int) -> None:
         """Handle brush size change from Ctrl+RMB drag on canvas."""
-        self._controller.set_brush_size(size)
+        self._main_controller.set_brush_size(size)
+        if self._ingame_controller is not None:
+            self._ingame_controller.set_brush_size(size)
         self._brush_size_spinbox.blockSignals(True)
         self._brush_size_spinbox.setValue(size)
         self._brush_size_spinbox.blockSignals(False)
 
     def _on_grid_toggled(self, checked: bool) -> None:
         """Handle grid toggle."""
-        self._canvas.set_show_grid(checked)
+        self._main_canvas.set_show_grid(checked)
 
-    def _on_image_changed(self) -> None:
-        """Handle image data change."""
-        data = self._controller.get_indexed_data()
+    def _on_main_image_changed(self) -> None:
+        """Handle main image data change."""
+        data = self._main_controller.get_indexed_data()
         if data is not None:
-            self._canvas.set_image(data, self._palette)
+            self._main_canvas.set_image(data, self._palette)
             # Refresh highlight overlay with new data
-            self._canvas.set_highlight_index(self._controller.active_index)
+            self._main_canvas.set_highlight_index(self._main_controller.active_index)
 
-        # Schedule preview update if enabled
-        if self._preview_enabled:
-            if self._frame_controller is not None:
-                project = self._frame_controller.project
-                if project is not None:
-                    mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
-                    if mapping is not None and self._debounce_timer is not None:
-                        # Debounced composite preview
-                        self._debounce_timer.start()
-                    else:
-                        # Immediate standalone preview (no async needed)
-                        self._generate_standalone_preview()
+    def _on_ingame_image_changed(self) -> None:
+        """Handle in-game image data change."""
+        if self._ingame_controller is None or self._ingame_canvas is None:
+            return
+        data = self._ingame_controller.get_indexed_data()
+        if data is not None:
+            self._ingame_canvas.set_image(data, self._palette)
+            self._ingame_canvas.set_highlight_index(self._ingame_controller.active_index)
+
+    def _on_ingame_dirty_changed(self, dirty: bool) -> None:
+        """Handle in-game dirty state change."""
+        self._save_ingame_btn.setEnabled(dirty)
 
     def _on_selection_changed(self) -> None:
         """Handle selection change."""
-        mask = self._controller.selection_mask
-        self._canvas.set_selection_mask(mask)
+        mask = self._main_controller.selection_mask
+        self._main_canvas.set_selection_mask(mask)
         # Update selection count in status bar
         count = mask.get_selection_count() if mask is not None else 0
         self._selection_count_label.setText(f"Selected: {count}")
@@ -667,15 +708,18 @@ class AIFramePaletteEditorWindow(QMainWindow):
     def _on_active_index_changed(self, index: int) -> None:
         """Handle active index change from controller (e.g., right-click pick)."""
         self._palette_panel.set_active_index(index)
-        # Update canvas highlight to show all pixels using this index
-        # Pass None to clear highlight when index is -1 (deselected)
-        self._canvas.set_highlight_index(None if index == -1 else index)
+        if self._ingame_controller is not None:
+            self._ingame_controller.set_active_index(index)
+        highlight = None if index == -1 else index
+        self._main_canvas.set_highlight_index(highlight)
+        if self._ingame_canvas is not None:
+            self._ingame_canvas.set_highlight_index(highlight)
 
     def _on_color_mapping_report(self, report: dict[str, object]) -> None:
         """Handle color mapping analysis report after image load.
 
         Shows an informational dialog if there were colors requiring
-        nearest-neighbor fallback during RGB→indexed conversion.
+        nearest-neighbor fallback during RGB->indexed conversion.
         """
         unmapped_count = report.get("unmapped_count", 0)
         exact_count = report.get("exact_count", 0)
@@ -702,26 +746,55 @@ class AIFramePaletteEditorWindow(QMainWindow):
                 max_dist,
             )
 
-    def _on_canvas_clicked(self, x: int, y: int, button: int) -> None:
-        """Handle canvas click."""
+    # --- Canvas Click/Drag/Hover Handlers ---
+
+    def _on_main_canvas_clicked(self, x: int, y: int, button: int) -> None:
+        """Handle main canvas click."""
+        from PySide6.QtWidgets import QApplication
+
+        self._set_active_canvas("main")
+        modifiers = QApplication.keyboardModifiers().value
+        self._update_selection_mode_display(modifiers)
+        self._main_controller.handle_pixel_click(x, y, button, modifiers)
+
+    def _on_main_canvas_dragged(self, x: int, y: int) -> None:
+        """Handle main canvas drag."""
+        self._main_controller.handle_pixel_drag(x, y)
+
+    def _on_main_canvas_hovered(self, x: int, y: int) -> None:
+        """Handle main canvas hover."""
         from PySide6.QtWidgets import QApplication
 
         modifiers = QApplication.keyboardModifiers().value
         self._update_selection_mode_display(modifiers)
-        self._controller.handle_pixel_click(x, y, button, modifiers)
+        self._main_controller.handle_pixel_hover(x, y)
 
-    def _on_canvas_dragged(self, x: int, y: int) -> None:
-        """Handle canvas drag."""
-        self._controller.handle_pixel_drag(x, y)
-
-    def _on_canvas_hovered(self, x: int, y: int) -> None:
-        """Handle canvas hover."""
+    def _on_ingame_canvas_clicked(self, x: int, y: int, button: int) -> None:
+        """Handle in-game canvas click."""
+        if self._ingame_controller is None:
+            return
         from PySide6.QtWidgets import QApplication
 
-        # Update selection mode display based on current modifiers
+        self._set_active_canvas("ingame")
         modifiers = QApplication.keyboardModifiers().value
         self._update_selection_mode_display(modifiers)
-        self._controller.handle_pixel_hover(x, y)
+        self._ingame_controller.handle_pixel_click(x, y, button, modifiers)
+
+    def _on_ingame_canvas_dragged(self, x: int, y: int) -> None:
+        """Handle in-game canvas drag."""
+        if self._ingame_controller is None:
+            return
+        self._ingame_controller.handle_pixel_drag(x, y)
+
+    def _on_ingame_canvas_hovered(self, x: int, y: int) -> None:
+        """Handle in-game canvas hover."""
+        if self._ingame_controller is None:
+            return
+        from PySide6.QtWidgets import QApplication
+
+        modifiers = QApplication.keyboardModifiers().value
+        self._update_selection_mode_display(modifiers)
+        self._ingame_controller.handle_pixel_hover(x, y)
 
     def _on_canvas_left(self) -> None:
         """Handle mouse leaving canvas."""
@@ -729,6 +802,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._index_label.setText("Index: -")
         # Clear palette highlight
         self._palette_panel.highlight_index(None)
+
+    # --- Preview / In-Game Canvas ---
 
     def _on_preview_toggled(self, checked: bool) -> None:
         """Handle preview toggle."""
@@ -745,35 +820,49 @@ class AIFramePaletteEditorWindow(QMainWindow):
                 self._preview_checkbox.setChecked(False)
                 return
 
-            # Check if we have a mapping (for full composite preview)
             mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
 
             # Show preview panel
             self._preview_panel.setVisible(True)
 
-            if mapping is not None:
-                # Full composite preview with game sprite
-                self._preview_info_label.setText("In-game composite preview")
-                self._generate_preview()
-            else:
-                # Standalone quantized preview (no mapping required)
-                self._preview_info_label.setText("Quantized preview\n(no mapping - no game sprite)")
-                self._generate_standalone_preview()
+            if mapping is None:
+                self._preview_info_label.setText("No mapping - in-game canvas unavailable")
+                if self._ingame_canvas is not None:
+                    self._ingame_canvas.setEnabled(False)
+                self._refresh_ingame_btn.setEnabled(False)
+                self._save_ingame_btn.setEnabled(False)
+                return
+
+            # Check for saved in-game edits
+            if mapping.ingame_edited_path:
+                ingame_path = Path(mapping.ingame_edited_path)
+                if ingame_path.exists():
+                    self._load_ingame_from_file(ingame_path)
+                    self._preview_info_label.setText("Loaded saved in-game edits")
+                    return
+
+            # Generate from compositor
+            self._generate_ingame_canvas(mapping)
+            self._preview_info_label.setText("Edit the composited in-game result")
         else:
+            # Check for unsaved in-game edits
+            if self._ingame_controller is not None and self._ingame_controller.is_dirty:
+                result = QMessageBox.question(
+                    self,
+                    "Unsaved In-Game Edits",
+                    "You have unsaved in-game edits. Discard?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if result == QMessageBox.StandardButton.No:
+                    self._preview_checkbox.setChecked(True)
+                    return
+
             # Hide preview panel
             self._preview_panel.setVisible(False)
 
-    def _generate_preview(self) -> None:
-        """Generate in-game preview asynchronously."""
-        if not self._preview_enabled or self._frame_controller is None or self._async_preview_service is None:
-            return
-
-        project = self._frame_controller.project
-        if project is None:
-            return
-
-        mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
-        if mapping is None:
+    def _generate_ingame_canvas(self, mapping: FrameMapping) -> None:
+        """Generate in-game canvas from current AI frame via compositor."""
+        if self._frame_controller is None:
             return
 
         capture_result, _ = self._frame_controller.get_capture_result_for_game_frame(mapping.game_frame_id)
@@ -781,16 +870,14 @@ class AIFramePaletteEditorWindow(QMainWindow):
             self._status_bar.showMessage("Capture data not found", 3000)
             return
 
-        indexed_data = self._controller.get_indexed_data()
+        indexed_data = self._main_controller.get_indexed_data()
         if indexed_data is None:
             return
 
-        # Convert indexed to RGBA PIL Image
         from core.services.rgb_to_indexed import convert_indexed_to_rgb
+        from core.services.sprite_compositor import SpriteCompositor, TransformParams
 
         ai_image = convert_indexed_to_rgb(indexed_data, self._palette)
-
-        from core.services.sprite_compositor import TransformParams
 
         transform = TransformParams(
             offset_x=mapping.offset_x,
@@ -802,62 +889,129 @@ class AIFramePaletteEditorWindow(QMainWindow):
             resampling=mapping.resampling,
         )
 
-        self._async_preview_service.request_preview(
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+        composite_result = compositor.composite_frame(
             ai_image=ai_image,
             capture_result=capture_result,
             transform=transform,
-            uncovered_policy="transparent",
+            quantize=False,
             sheet_palette=self._palette,
             ai_index_map=indexed_data,
-            display_scale=1,
         )
 
-    def _generate_standalone_preview(self) -> None:
-        """Generate standalone quantized preview (no game sprite background)."""
-        indexed_data = self._controller.get_indexed_data()
-        if indexed_data is None:
+        index_map = composite_result.index_map
+        if index_map is None:
+            self._status_bar.showMessage("Failed to generate in-game index map", 3000)
             return
 
-        from core.services.rgb_to_indexed import convert_indexed_to_rgb
+        self._setup_ingame_canvas(index_map)
 
-        # Convert indexed data to RGBA using sheet palette
-        ai_image = convert_indexed_to_rgb(indexed_data, self._palette)
+    def _load_ingame_from_file(self, path: Path) -> None:
+        """Load in-game canvas from a saved indexed PNG."""
+        from core.services.rgb_to_indexed import load_image_preserving_indices
 
-        # Convert PIL Image to QImage and display
-        from PySide6.QtGui import QImage
-
-        # ai_image is a PIL Image in RGBA mode
-        data = ai_image.tobytes("raw", "RGBA")
-        qimage = QImage(data, ai_image.width, ai_image.height, QImage.Format.Format_RGBA8888)
-
-        pixmap = QPixmap.fromImage(qimage)
-        self._preview_pixmap_item.setPixmap(pixmap)
-        self._preview_scene.setSceneRect(0, 0, pixmap.width(), pixmap.height())
-        self._preview_view.fitInView(self._preview_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
-
-    def _on_preview_ready(self, qimage: QImage, width: int, height: int) -> None:
-        """Handle async preview completion."""
-        if not self._preview_enabled:
+        index_map, _ = load_image_preserving_indices(path, sheet_palette=self._palette)
+        if index_map is None:
+            self._status_bar.showMessage("Failed to load in-game edits (not indexed)", 3000)
             return
 
-        pixmap = QPixmap.fromImage(qimage)
-        self._preview_pixmap_item.setPixmap(pixmap)
-        self._preview_scene.setSceneRect(0, 0, pixmap.width(), pixmap.height())
-        self._preview_view.fitInView(self._preview_pixmap_item, Qt.AspectRatioMode.KeepAspectRatio)
+        self._setup_ingame_canvas(index_map)
 
-    def _on_preview_failed(self, error_message: str) -> None:
-        """Handle async preview failure."""
-        logger.warning("Preview generation failed: %s", error_message)
-        self._status_bar.showMessage(f"Preview failed: {error_message}", 5000)
-        # Clear the preview display
-        self._preview_pixmap_item.setPixmap(QPixmap())
+    def _setup_ingame_canvas(self, index_map: object) -> None:
+        """Initialize or update the in-game canvas with an index map.
+
+        Args:
+            index_map: numpy ndarray of palette indices (H, W), uint8
+        """
+        import numpy as np
+
+        if not isinstance(index_map, np.ndarray):
+            return
+
+        if self._ingame_controller is None:
+            self._ingame_controller = PaletteEditorController(self)
+            self._ingame_controller.image_changed.connect(self._on_ingame_image_changed)
+            self._ingame_controller.dirty_changed.connect(self._on_ingame_dirty_changed)
+            self._ingame_controller.pixel_info.connect(self._on_pixel_info)
+            self._ingame_controller.active_index_changed.connect(self._on_active_index_changed)
+            if self._ingame_canvas is not None:
+                self._ingame_canvas.drag_ended.connect(self._ingame_controller.finish_stroke)
+
+        self._ingame_controller.load_indexed_data(index_map, self._palette)
+
+        if self._ingame_canvas is not None:
+            self._ingame_canvas.set_image(index_map, self._palette)
+            self._ingame_canvas.setEnabled(True)
+            self._ingame_canvas.set_highlight_index(self._main_controller.active_index)
+
+        # Sync tool/brush state from main controller
+        self._ingame_controller.set_tool(self._main_controller.current_tool)
+        self._ingame_controller.set_active_index(self._main_controller.active_index)
+        self._ingame_controller.set_brush_size(self._main_controller.brush_size)
+        if self._ingame_canvas is not None:
+            self._ingame_canvas.set_brush_size(self._main_controller.brush_size)
+
+        self._refresh_ingame_btn.setEnabled(True)
+        self._save_ingame_btn.setEnabled(False)  # Not dirty yet
+
+    def _on_save_ingame(self) -> None:
+        """Save in-game edits as a separate indexed PNG."""
+        if self._ingame_controller is None or not self._ingame_controller.is_dirty:
+            return
+
+        original = Path(self._ai_frame.path)
+        output_path = original.parent / f"{original.stem}_ingame.png"
+
+        if self._ingame_controller.save(output_path):
+            if self._frame_controller is not None:
+                project = self._frame_controller.project
+                if project is not None:
+                    mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
+                    if mapping is not None:
+                        mapping.ingame_edited_path = str(output_path)
+                        self._frame_controller.save_requested.emit()
+            logger.info("Saved in-game edits: %s", output_path)
+            self._status_bar.showMessage(f"Saved: {output_path.name}", 3000)
+        else:
+            QMessageBox.warning(self, "Save Error", f"Failed to save to: {output_path}")
+
+    def _on_refresh_ingame(self) -> None:
+        """Re-generate in-game canvas from current AI frame edits."""
+        if self._ingame_controller is not None and self._ingame_controller.is_dirty:
+            result = QMessageBox.question(
+                self,
+                "Discard In-Game Edits",
+                "Re-generating will discard your in-game edits. Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if result == QMessageBox.StandardButton.No:
+                return
+
+        if self._frame_controller is None:
+            return
+
+        project = self._frame_controller.project
+        if project is None:
+            return
+
+        mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
+        if mapping is None:
+            return
+
+        self._generate_ingame_canvas(mapping)
+        self._status_bar.showMessage("In-game canvas refreshed", 3000)
+
+    # --- Palette Panel Handlers ---
 
     def _on_palette_index_selected(self, index: int) -> None:
         """Handle palette panel selection."""
-        self._controller.set_active_index(index)
-        # Highlight all pixels using this index
-        # Pass None to clear highlight when index is -1 (deselected)
-        self._canvas.set_highlight_index(None if index == -1 else index)
+        self._main_controller.set_active_index(index)
+        if self._ingame_controller is not None:
+            self._ingame_controller.set_active_index(index)
+        highlight = None if index == -1 else index
+        self._main_canvas.set_highlight_index(highlight)
+        if self._ingame_canvas is not None:
+            self._ingame_canvas.set_highlight_index(highlight)
 
     def _on_palette_color_changed(self, index: int, color: tuple[int, int, int]) -> None:
         """Handle palette color change from right-click."""
@@ -866,12 +1020,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
             self._palette.colors[index] = color
 
         # Also update via controller for dirty state tracking
-        self._controller.set_palette_color(index, color)
+        self._main_controller.set_palette_color(index, color)
 
         # Refresh the canvas with the updated palette
-        data = self._controller.get_indexed_data()
+        data = self._main_controller.get_indexed_data()
         if data is not None:
-            self._canvas.set_image(data, self._palette)
+            self._main_canvas.set_image(data, self._palette)
 
         # Also sync the palette panel's swatch (in case signal didn't update it)
         self._palette_panel.sync_palette(self._palette)
@@ -885,7 +1039,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         Merges all pixels using merge_index into primary_index, freeing up
         the merge_index slot (shown as dark purple).
         """
-        if self._controller.merge_palette_indices(primary_index, merge_index):
+        if self._main_controller.merge_palette_indices(primary_index, merge_index):
             # Mark the merged slot as free in the palette panel
             self._palette_panel.mark_slot_free(merge_index)
             logger.info(f"Merged palette index {merge_index} into {primary_index}")
@@ -915,12 +1069,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
         from_spin = QSpinBox()
         from_spin.setRange(0, 15)
-        from_spin.setValue(self._controller.active_index)
+        from_spin.setValue(self._main_controller.active_index)
         form.addRow("Replace index:", from_spin)
 
         to_spin = QSpinBox()
         to_spin.setRange(0, 15)
-        to_spin.setValue(1 if self._controller.active_index == 0 else 0)
+        to_spin.setValue(1 if self._main_controller.active_index == 0 else 0)
         form.addRow("With index:", to_spin)
 
         layout.addLayout(form)
@@ -943,10 +1097,10 @@ class AIFramePaletteEditorWindow(QMainWindow):
                 )
                 return
 
-            result = self._controller.replace_index(from_index, to_index)
+            result = self._main_controller.replace_index(from_index, to_index)
             if result > 0:
                 self._status_bar.showMessage(
-                    f"Replaced {result} pixel(s): index {from_index} → {to_index}",
+                    f"Replaced {result} pixel(s): index {from_index} \u2192 {to_index}",
                     5000,
                 )
             elif result == 0:
@@ -956,9 +1110,11 @@ class AIFramePaletteEditorWindow(QMainWindow):
                     f"No pixels were using index {from_index}.",
                 )
 
+    # --- Save / Close ---
+
     def _on_save(self) -> None:
         """Handle save action."""
-        if not self._controller.is_dirty:
+        if not self._main_controller.is_dirty:
             return
 
         # Generate output path
@@ -969,8 +1125,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
         else:
             output_path = original.parent / f"{stem}_edited.png"
 
-        if self._controller.save(output_path):
-            data = self._controller.get_indexed_data()
+        if self._main_controller.save(output_path):
+            data = self._main_controller.get_indexed_data()
             self.save_requested.emit(self._ai_frame.id, data, str(output_path))
             logger.info("Saved edited image: %s", output_path)
         else:
@@ -988,11 +1144,12 @@ class AIFramePaletteEditorWindow(QMainWindow):
         if not isinstance(event, QCloseEvent):
             return
 
-        if self._controller.is_dirty:
+        # Check main controller dirty state
+        if self._main_controller.is_dirty:
             result = QMessageBox.question(
                 self,
                 "Unsaved Changes",
-                "You have unsaved changes. Save before closing?",
+                "You have unsaved changes to the AI frame. Save before closing?",
                 QMessageBox.StandardButton.Save
                 | QMessageBox.StandardButton.Discard
                 | QMessageBox.StandardButton.Cancel,
@@ -1000,17 +1157,32 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
             if result == QMessageBox.StandardButton.Save:
                 self._on_save()
-                if self._controller.is_dirty:  # Save failed
+                if self._main_controller.is_dirty:  # Save failed
                     event.ignore()
                     return
             elif result == QMessageBox.StandardButton.Cancel:
                 event.ignore()
                 return
 
-        if self._async_preview_service is not None:
-            self._async_preview_service.shutdown()
-        if self._debounce_timer is not None:
-            self._debounce_timer.stop()
+        # Check in-game controller dirty state
+        if self._ingame_controller is not None and self._ingame_controller.is_dirty:
+            result = QMessageBox.question(
+                self,
+                "Unsaved In-Game Edits",
+                "You have unsaved in-game edits. Save before closing?",
+                QMessageBox.StandardButton.Save
+                | QMessageBox.StandardButton.Discard
+                | QMessageBox.StandardButton.Cancel,
+            )
+
+            if result == QMessageBox.StandardButton.Save:
+                self._on_save_ingame()
+                if self._ingame_controller.is_dirty:  # Save failed
+                    event.ignore()
+                    return
+            elif result == QMessageBox.StandardButton.Cancel:
+                event.ignore()
+                return
 
         self.closed.emit(self._ai_frame.id)
         event.accept()

@@ -58,7 +58,7 @@ class TestToolSelection:
         qtbot.addWidget(window)
         window.show()
 
-        assert window._controller.current_tool == EditorTool.BRUSH
+        assert window._main_controller.current_tool == EditorTool.BRUSH
         assert window._tool_buttons[EditorTool.BRUSH].isChecked()
         assert window._tool_label.text() == "Tool: Brush"
 
@@ -75,7 +75,7 @@ class TestToolSelection:
 
         # Switch to another tool first
         window._select_tool(EditorTool.ERASER)
-        assert window._controller.current_tool == EditorTool.ERASER
+        assert window._main_controller.current_tool == EditorTool.ERASER
 
         # Simulate 'B' key press
         # Note: QShortcut activation is hard to simulate directly via keyClick in some envs,
@@ -94,7 +94,7 @@ class TestToolSelection:
         # Manually activate to verify the callback
         brush_shortcut.activated.emit()
 
-        assert window._controller.current_tool == EditorTool.BRUSH
+        assert window._main_controller.current_tool == EditorTool.BRUSH
         assert window._tool_buttons[EditorTool.BRUSH].isChecked()
         assert window._tool_label.text() == "Tool: Brush"
 
@@ -115,7 +115,7 @@ class TestToolSelection:
         window.show()
 
         # Switch to Brush first (default)
-        assert window._controller.current_tool == EditorTool.BRUSH
+        assert window._main_controller.current_tool == EditorTool.BRUSH
 
         # Verify shortcut setup for 'I'
         picker_shortcut = None
@@ -130,7 +130,7 @@ class TestToolSelection:
         # Manually activate to verify the callback
         picker_shortcut.activated.emit()
 
-        assert window._controller.current_tool == EditorTool.PICKER
+        assert window._main_controller.current_tool == EditorTool.PICKER
         assert window._tool_buttons[EditorTool.PICKER].isChecked()
         assert window._tool_label.text() == "Tool: Picker"
 
@@ -150,14 +150,14 @@ class TestToolSelection:
 
         data = np.zeros((16, 16), dtype=np.uint8)
         data[5, 5] = 7
-        window._controller.load_indexed_data(data, test_palette)
+        window._main_controller.load_indexed_data(data, test_palette)
 
         window._select_tool(EditorTool.PICKER)
-        assert window._controller.current_tool == EditorTool.PICKER
+        assert window._main_controller.current_tool == EditorTool.PICKER
 
         # Click at (5, 5) to pick index 7
-        window._on_canvas_clicked(5, 5, 0)  # button 0 is left click
+        window._on_main_canvas_clicked(5, 5, 0)  # button 0 is left click
 
-        assert window._controller.active_index == 7
-        assert window._controller.current_tool == EditorTool.BRUSH
+        assert window._main_controller.active_index == 7
+        assert window._main_controller.current_tool == EditorTool.BRUSH
         assert window._tool_buttons[EditorTool.BRUSH].isChecked()

@@ -71,13 +71,13 @@ class TestFillSelectionCommand:
         window.show()
 
         # Mock the controller method
-        window._controller.paint_selection = MagicMock()
+        window._main_controller.paint_selection = MagicMock()
 
         # Click the button
         window._fill_selection_btn.click()
 
         # Verify paint_selection was called
-        window._controller.paint_selection.assert_called_once()
+        window._main_controller.paint_selection.assert_called_once()
 
 
 class TestSelectionModeIndicator:

@@ -452,6 +452,9 @@ class FrameMapping:
     sharpen: float = 0.0  # Pre-sharpening before scale (0.0-4.0)
     resampling: str = "lanczos"  # "lanczos" or "nearest"
 
+    # Optional path to an edited in-game sprite
+    ingame_edited_path: str | None = None
+
     def to_dict(self) -> dict[str, object]:
         """Serialize to dictionary for JSON storage."""
         return {
@@ -465,6 +468,7 @@ class FrameMapping:
             "scale": self.scale,
             "sharpen": self.sharpen,
             "resampling": self.resampling,
+            "ingame_edited_path": self.ingame_edited_path,
         }
 
     @classmethod
@@ -489,6 +493,7 @@ class FrameMapping:
             scale=float(cast(int | float, data.get("scale", 1.0))),
             sharpen=float(cast(int | float, data.get("sharpen", 0.0))),
             resampling=cast(str, data.get("resampling", "lanczos")),
+            ingame_edited_path=cast(str | None, data.get("ingame_edited_path")),
         )
 
 

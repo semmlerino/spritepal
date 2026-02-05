@@ -236,9 +236,9 @@ class PaletteCoordinator:
                 editor._palette_panel.set_palette(palette)
                 editor._update_duplicate_warning()
                 # Refresh canvas with new palette colors
-                data = editor._controller.get_indexed_data()
+                data = editor._main_controller.get_indexed_data()
                 if data is not None:
-                    editor._canvas.set_image(data, palette)
+                    editor._main_canvas.set_image(data, palette)
 
         # Request regeneration of game frame previews
         project = self._controller.project
