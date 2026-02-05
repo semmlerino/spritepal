@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -1235,6 +1236,461 @@ class TestQuantizeFullResScaleIndexed:
             f"but got {center_pixel}. The provided index_map should take precedence "
             f"over color_mappings generation."
         )
+
+
+class TestIndexFirstRendering:
+    """Test index-first rendering path (BUG-3 fix).
+
+    When both ai_index_map and sheet_palette are provided, the compositor uses
+    an index-first path that:
+    1. Transforms the index map with NEAREST interpolation
+    2. Reconstructs RGBA from indices + SNES-snapped palette
+    3. Composites using the policy
+
+    This eliminates edge artifacts from Lanczos interpolation on RGBA.
+    """
+
+    def test_index_first_eliminates_edge_artifacts(self) -> None:
+        """Index-first path with NEAREST interpolation eliminates blended edge colors.
+
+        Creates a 4x4 image with two solid colors, scales 2x, and verifies NO
+        interpolated/blended colors appear (which would occur with Lanczos on RGBA).
+        """
+        from core.frame_mapping_project import SheetPalette
+        from core.palette_utils import snap_to_snes_color
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create 4x4 AI image: left half red, right half blue
+        ai_image = Image.new("RGBA", (4, 4), (0, 0, 0, 0))
+        for y in range(4):
+            for x in range(2):
+                ai_image.putpixel((x, y), (255, 0, 0, 255))  # left = red
+            for x in range(2, 4):
+                ai_image.putpixel((x, y), (0, 0, 255, 255))  # right = blue
+
+        # Create matching 4x4 index map: left = index 1, right = index 2
+        index_map = np.zeros((4, 4), dtype=np.uint8)
+        index_map[:, 0:2] = 1  # left half
+        index_map[:, 2:4] = 2  # right half
+
+        # Sheet palette with red at index 1, blue at index 2
+        sheet_palette = SheetPalette(
+            colors=[
+                (0, 0, 0),    # 0: transparent
+                (255, 0, 0),  # 1: red
+                (0, 0, 255),  # 2: blue
+            ]
+            + [(99, 99, 99)] * 13,  # pad to 16
+        )
+
+        # Scale 2x: 4x4 -> 8x8
+        transform = TransformParams(scale=2.0)
+
+        # Mock capture at 8x8 (the target size after scaling)
+        entry = MockEntry(width=8, height=8)
+        capture = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16}, width=8, height=8)
+
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=True,
+            sheet_palette=sheet_palette,
+            ai_index_map=index_map,
+        )
+
+        # Verify every opaque pixel is EXACTLY red or blue (no blended colors)
+        composited_array = np.array(result.composited_image)
+        opaque_mask = composited_array[:, :, 3] > 0
+
+        red_snapped = np.array(snap_to_snes_color((255, 0, 0)))
+        blue_snapped = np.array(snap_to_snes_color((0, 0, 255)))
+
+        for y in range(composited_array.shape[0]):
+            for x in range(composited_array.shape[1]):
+                if opaque_mask[y, x]:
+                    pixel_rgb = composited_array[y, x, :3]
+                    is_red = np.array_equal(pixel_rgb, red_snapped)
+                    is_blue = np.array_equal(pixel_rgb, blue_snapped)
+                    assert is_red or is_blue, (
+                        f"Pixel at ({x},{y}) has color {tuple(pixel_rgb)}, "
+                        f"expected exactly {tuple(red_snapped)} or {tuple(blue_snapped)}. "
+                        f"Blended colors indicate Lanczos was used instead of NEAREST on index map."
+                    )
+
+    def test_index_first_binary_alpha(self) -> None:
+        """Index-first path produces binary alpha: index 0 and 255 are transparent, others opaque."""
+        from core.frame_mapping_project import SheetPalette
+
+        compositor = SpriteCompositor(uncovered_policy="original")
+
+        # Create 4x4 index map with specific test values
+        index_map = np.full((4, 4), 3, dtype=np.uint8)
+        index_map[0, 0] = 0    # transparent index
+        index_map[0, 1] = 5    # opaque
+        index_map[1, 0] = 255  # no-data marker
+        index_map[1, 1] = 1    # opaque
+
+        # Create matching 4x4 AI image (colors don't matter, indices drive rendering)
+        ai_image = Image.new("RGBA", (4, 4), (100, 100, 100, 255))
+
+        # Sheet palette with 16 colors
+        sheet_palette = SheetPalette(
+            colors=[(i * 16, i * 16, i * 16) for i in range(16)]
+        )
+
+        transform = TransformParams(scale=1.0)
+
+        entry = MockEntry(width=4, height=4)
+        capture = MockCaptureResult(entries=[entry], palettes={0: [(0, 0, 0)] * 16}, width=4, height=4)
+
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=True,
+            sheet_palette=sheet_palette,
+            ai_index_map=index_map,
+        )
+
+        composited = result.composited_image
+
+        # Verify alpha values
+        assert composited.getpixel((0, 0))[3] == 0, "Index 0 should be transparent"
+        assert composited.getpixel((1, 0))[3] == 255, "Index 5 should be opaque"
+        assert composited.getpixel((0, 1))[3] == 0, "Index 255 should be transparent"
+        assert composited.getpixel((1, 1))[3] == 255, "Index 1 should be opaque"
+        # Remaining pixels have index 3, should be opaque
+        assert composited.getpixel((2, 2))[3] == 255, "Index 3 should be opaque"
+
+    def test_index_first_original_policy_composites_correctly(self) -> None:
+        """Index-first path with 'original' policy shows original sprite where indices are 0 or 255."""
+        from dataclasses import dataclass, field
+
+        from core.frame_mapping_project import SheetPalette
+
+        # Need full mock with actual tiles to render original sprite
+        @dataclass
+        class MockTileData:
+            tile_index: int
+            vram_addr: int
+            pos_x: int
+            pos_y: int
+            data_hex: str
+            rom_offset: int | None = None
+
+            @property
+            def data_bytes(self) -> bytes:
+                return bytes.fromhex(self.data_hex)
+
+        @dataclass
+        class MockOAMEntry:
+            id: int
+            x: int
+            y: int
+            width: int
+            height: int
+            palette: int
+            flip_h: bool = False
+            flip_v: bool = False
+            priority: int = 0
+            tile: int = 0
+            name_table: int = 0
+            size_large: bool = False
+            rom_offset: int = 0x10000
+            tiles: list = field(default_factory=list)
+
+            @property
+            def tiles_wide(self) -> int:
+                return self.width // 8
+
+            @property
+            def tiles_high(self) -> int:
+                return self.height // 8
+
+        @dataclass
+        class MockCaptureBoundingBox:
+            x: int
+            y: int
+            width: int
+            height: int
+
+        @dataclass
+        class MockCaptureResultFull:
+            frame: int
+            visible_count: int
+            obsel: int
+            entries: list
+            palettes: dict
+            timestamp: str = ""
+
+            @property
+            def bounding_box(self) -> MockCaptureBoundingBox:
+                if not self.entries:
+                    return MockCaptureBoundingBox(0, 0, 0, 0)
+                min_x = min(e.x for e in self.entries)
+                min_y = min(e.y for e in self.entries)
+                max_x = max(e.x + e.width for e in self.entries)
+                max_y = max(e.y + e.height for e in self.entries)
+                return MockCaptureBoundingBox(min_x, min_y, max_x - min_x, max_y - min_y)
+
+        compositor = SpriteCompositor(uncovered_policy="original")
+
+        # Create a 4x4 solid blue tile for original sprite
+        # 4bpp tile: 32 bytes, use index 15 (all bits set)
+        solid_tile_hex = "ff" * 32
+
+        # The mock renderer will render this as blue based on the palette
+        entry = MockOAMEntry(
+            id=0,
+            x=0,
+            y=0,
+            width=4,
+            height=4,
+            palette=0,
+            tiles=[
+                MockTileData(
+                    tile_index=0,
+                    vram_addr=0,
+                    pos_x=0,
+                    pos_y=0,
+                    data_hex=solid_tile_hex,
+                )
+            ],
+        )
+
+        # Capture palette: blue at index 15
+        capture_palettes = {0: [(0, 0, 255, 255)] * 16}
+
+        capture = MockCaptureResultFull(
+            frame=0,
+            visible_count=1,
+            obsel=0,
+            entries=[entry],
+            palettes=capture_palettes,
+        )
+
+        # Create 4x4 index map:
+        # top-left = index 5 (opaque AI)
+        # top-right = index 0 (transparent, original shows)
+        # bottom half = index 255 (no-data, original shows)
+        index_map = np.zeros((4, 4), dtype=np.uint8)
+        index_map[0, 0] = 5
+        index_map[0, 1] = 0
+        index_map[1:, :] = 255
+
+        # Create matching AI image (red)
+        ai_image = Image.new("RGBA", (4, 4), (255, 0, 0, 255))
+
+        # Sheet palette with red at index 5
+        sheet_palette = SheetPalette(
+            colors=[
+                (0, 0, 0),    # 0: transparent
+                (99, 99, 99),
+                (99, 99, 99),
+                (99, 99, 99),
+                (99, 99, 99),
+                (255, 0, 0),  # 5: red
+            ]
+            + [(99, 99, 99)] * 10,
+        )
+
+        transform = TransformParams(scale=1.0)
+
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=True,
+            sheet_palette=sheet_palette,
+            ai_index_map=index_map,
+        )
+
+        composited = result.composited_image
+
+        # Top-left (0,0): index 5 -> should be red from AI
+        pixel_tl = composited.getpixel((0, 0))
+        assert pixel_tl[:3] == (255, 0, 0), f"Expected red at (0,0), got {pixel_tl[:3]}"
+        assert pixel_tl[3] == 255, "Should be opaque"
+
+        # Top-right (1,0): index 0 -> transparent, original blue shows through via alpha_composite
+        # Bottom rows: index 255 -> transparent, original blue shows through
+        # With "original" policy, alpha_composite should blend original sprite content where AI is transparent
+        # Note: The exact behavior depends on whether the original sprite is opaque blue
+        # For now, just verify that these pixels are NOT pure red (they should differ from AI)
+        pixel_tr = composited.getpixel((1, 0))
+        pixel_bottom = composited.getpixel((0, 2))
+
+        # These pixels should NOT be pure red since index 0/255 are transparent in AI
+        assert pixel_tr[:3] != (255, 0, 0), (
+            "Pixel at (1,0) with index 0 should not be pure red; "
+            "original sprite should show through with 'original' policy"
+        )
+        assert pixel_bottom[:3] != (255, 0, 0), (
+            "Pixel at (0,2) with index 255 should not be pure red; "
+            "original sprite should show through with 'original' policy"
+        )
+
+    def test_index_first_transparent_policy_clips_to_tiles(self) -> None:
+        """Index-first path with 'transparent' policy still respects tile mask."""
+        from dataclasses import dataclass, field
+
+        from core.frame_mapping_project import SheetPalette
+
+        @dataclass
+        class MockTileData:
+            tile_index: int
+            vram_addr: int
+            pos_x: int
+            pos_y: int
+            data_hex: str
+            rom_offset: int | None = None
+
+            @property
+            def data_bytes(self) -> bytes:
+                return bytes.fromhex(self.data_hex)
+
+        @dataclass
+        class MockOAMEntry:
+            id: int
+            x: int
+            y: int
+            width: int
+            height: int
+            palette: int
+            flip_h: bool = False
+            flip_v: bool = False
+            priority: int = 0
+            tile: int = 0
+            name_table: int = 0
+            size_large: bool = False
+            rom_offset: int = 0x10000
+            tiles: list = field(default_factory=list)
+
+            @property
+            def tiles_wide(self) -> int:
+                return self.width // 8
+
+            @property
+            def tiles_high(self) -> int:
+                return self.height // 8
+
+        @dataclass
+        class MockCaptureBoundingBox:
+            x: int
+            y: int
+            width: int
+            height: int
+
+        @dataclass
+        class MockCaptureResultFull:
+            frame: int
+            visible_count: int
+            obsel: int
+            entries: list
+            palettes: dict
+            timestamp: str = ""
+
+            @property
+            def bounding_box(self) -> MockCaptureBoundingBox:
+                if not self.entries:
+                    return MockCaptureBoundingBox(0, 0, 0, 0)
+                min_x = min(e.x for e in self.entries)
+                min_y = min(e.y for e in self.entries)
+                max_x = max(e.x + e.width for e in self.entries)
+                max_y = max(e.y + e.height for e in self.entries)
+                return MockCaptureBoundingBox(min_x, min_y, max_x - min_x, max_y - min_y)
+
+        compositor = SpriteCompositor(uncovered_policy="transparent")
+
+        # Create two 8x8 tiles separated by an 8-pixel gap (total 24x8 bounding box)
+        solid_tile_hex = "ff" * 32
+
+        entry1 = MockOAMEntry(
+            id=0,
+            x=0,
+            y=0,
+            width=8,
+            height=8,
+            palette=0,
+            tiles=[
+                MockTileData(
+                    tile_index=0,
+                    vram_addr=0,
+                    pos_x=0,
+                    pos_y=0,
+                    data_hex=solid_tile_hex,
+                )
+            ],
+        )
+        entry2 = MockOAMEntry(
+            id=1,
+            x=16,  # 8-pixel gap from entry1
+            y=0,
+            width=8,
+            height=8,
+            palette=0,
+            tiles=[
+                MockTileData(
+                    tile_index=1,
+                    vram_addr=0,
+                    pos_x=0,
+                    pos_y=0,
+                    data_hex=solid_tile_hex,
+                )
+            ],
+        )
+
+        palettes = {0: [(255, 255, 255)] * 16}
+
+        capture = MockCaptureResultFull(
+            frame=0,
+            visible_count=2,
+            obsel=0,
+            entries=[entry1, entry2],
+            palettes=palettes,
+        )
+
+        # Create 24x8 index map filled with index 1 (opaque everywhere)
+        index_map = np.ones((8, 24), dtype=np.uint8)
+
+        # Create matching AI image (red)
+        ai_image = Image.new("RGBA", (24, 8), (255, 0, 0, 255))
+
+        # Sheet palette with red at index 1
+        sheet_palette = SheetPalette(
+            colors=[
+                (0, 0, 0),    # 0: transparent
+                (255, 0, 0),  # 1: red
+            ]
+            + [(99, 99, 99)] * 14,
+        )
+
+        transform = TransformParams(scale=1.0)
+
+        result = compositor.composite_frame(
+            ai_image=ai_image,
+            capture_result=capture,  # type: ignore[arg-type]
+            transform=transform,
+            quantize=True,
+            sheet_palette=sheet_palette,
+            ai_index_map=index_map,
+        )
+
+        composited = result.composited_image
+
+        # Verify tile regions (x=0-7, x=16-23) are opaque
+        assert composited.getpixel((4, 4))[3] > 0, "Left tile region should be opaque"
+        assert composited.getpixel((20, 4))[3] > 0, "Right tile region should be opaque"
+
+        # Verify gap region (x=8-15) is transparent (tile mask clips despite opaque index map)
+        for x in range(8, 16):
+            pixel = composited.getpixel((x, 4))
+            assert pixel[3] == 0, (
+                f"Pixel at ({x}, 4) should be transparent (alpha=0) due to tile mask, "
+                f"but got alpha={pixel[3]}. The tile mask should clip even in index-first path."
+            )
 
 
 class TestOriginalSpriteCache:

@@ -573,11 +573,11 @@ class TestInjectionOrchestratorColorFidelity:
             rom_injector=rom_injector,
         )
 
-        # Capture the palette passed to quantize_to_palette
+        # Capture the palette passed to quantize_with_mappings
         captured_palettes: list[list[tuple[int, int, int]]] = []
 
-        # Patch quantize_to_palette in quantization_strategies module (where it's called)
-        with patch("core.services.quantization_strategies.quantize_to_palette") as mock_quantize:
+        # Patch quantize_with_mappings in quantization_strategies module (where it's called)
+        with patch("core.services.quantization_strategies.quantize_with_mappings") as mock_quantize:
             # Return a valid indexed image
             indexed_img = Image.new("P", (8, 8))
             indexed_img.putpalette([0] * 768)
@@ -586,6 +586,7 @@ class TestInjectionOrchestratorColorFidelity:
             def capture_quantize(
                 img: Image.Image,
                 palette_rgb: list[tuple[int, int, int]],
+                color_mappings: object = None,
                 **kwargs: object,
             ) -> Image.Image:
                 captured_palettes.append(list(palette_rgb))
@@ -651,8 +652,8 @@ class TestInjectionOrchestratorColorFidelity:
                 debug=debug,
             )
 
-        # Verify quantize_to_palette was called
-        assert len(captured_palettes) == 1, "quantize_to_palette should be called once"
+        # Verify quantize_with_mappings was called
+        assert len(captured_palettes) == 1, "quantize_with_mappings should be called once"
 
         # Key assertion: the palette passed to quantization should be SNES-snapped
         actual_palette = captured_palettes[0]
