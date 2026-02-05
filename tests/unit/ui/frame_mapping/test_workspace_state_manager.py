@@ -32,7 +32,7 @@ class TestWorkspaceStateManagerInit:
         assert manager.auto_advance_enabled is False
 
         # Stale entry tracking should be None
-        assert manager.stale_entry_frame_id is None
+        assert manager.stale_entry_game_frame_id is None
 
         # Project identity tracking should be None
         assert manager.previous_project_id is None
@@ -184,21 +184,21 @@ class TestAutoAdvanceState:
 class TestStaleEntryTracking:
     """Test stale entry tracking."""
 
-    def test_set_and_get_stale_entry_frame_id(self) -> None:
+    def test_set_and_get_stale_entry_game_frame_id(self) -> None:
         """Should set and get stale entry frame ID."""
         manager = WorkspaceStateManager()
         frame_id = "capture_003"
 
-        manager.stale_entry_frame_id = frame_id
-        assert manager.stale_entry_frame_id == frame_id
+        manager.stale_entry_game_frame_id = frame_id
+        assert manager.stale_entry_game_frame_id == frame_id
 
-    def test_clear_stale_entry_frame_id(self) -> None:
+    def test_clear_stale_entry_game_frame_id(self) -> None:
         """Should allow clearing stale entry frame ID."""
         manager = WorkspaceStateManager()
-        manager.stale_entry_frame_id = "capture_003"
+        manager.stale_entry_game_frame_id = "capture_003"
 
-        manager.stale_entry_frame_id = None
-        assert manager.stale_entry_frame_id is None
+        manager.stale_entry_game_frame_id = None
+        assert manager.stale_entry_game_frame_id is None
 
 
 class TestProjectIdentityTracking:
