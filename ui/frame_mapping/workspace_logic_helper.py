@@ -733,11 +733,6 @@ class WorkspaceLogicHelper:
         # Auto-align with scale optimization (emits alignment_changed signal)
         self._alignment_canvas.auto_align(with_scale=True)
 
-        # Use targeted single-item updates instead of full list rebuilds
-        self.update_single_ai_frame_status(ai_frame_id)
-        self.update_single_game_frame_link_status(game_frame_id)
-        self.update_single_mapping_panel_row(ai_frame_id)
-
         # Update displaced frames if their links changed
         if existing_game_link is not None and existing_game_link != game_frame_id:
             # Old game frame is now unlinked

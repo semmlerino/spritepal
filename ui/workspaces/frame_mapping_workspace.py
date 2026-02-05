@@ -215,24 +215,26 @@ class FrameMappingWorkspace(QWidget):
                 self._rom_selector.set_path(str(rom_path) if rom_path else "")
 
     def _get_selected_ai_frame_id(self) -> str | None:
-        """Get the selected AI frame ID from the state manager.
+        """Get selected AI frame ID (TEST UTILITY - prefer direct pane access).
 
-        Returns the cached state value directly to preserve selection even
+        This method exists for test compatibility. Production code should
+        access selection state via signals or direct pane queries.
+
+        Returns the cached state value to preserve selection even
         when filters hide the selected item in the pane.
         """
-        if hasattr(self, "_logic"):
-            return self._logic.get_selected_ai_frame_id()
-        return self._state.selected_ai_frame_id if hasattr(self, "_state") else None
+        return self._logic.get_selected_ai_frame_id()
 
     def _get_selected_game_id(self) -> str | None:
-        """Get the selected game frame ID from the state manager.
+        """Get selected game frame ID (TEST UTILITY - prefer direct pane access).
 
-        Returns the cached state value directly to preserve selection even
+        This method exists for test compatibility. Production code should
+        access selection state via signals or direct pane queries.
+
+        Returns the cached state value to preserve selection even
         when filters hide the selected item in the pane.
         """
-        if hasattr(self, "_logic"):
-            return self._logic.get_selected_game_id()
-        return self._state.selected_game_id if hasattr(self, "_state") else None
+        return self._logic.get_selected_game_id()
 
     def _create_default_controller(self) -> FrameMappingController:
         """Create controller with workspace as parent for Qt ownership.
