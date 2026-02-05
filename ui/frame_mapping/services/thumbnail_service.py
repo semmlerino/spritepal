@@ -23,6 +23,7 @@ from core.palette_utils import (
     QUANTIZATION_TRANSPARENCY_THRESHOLD,
     quantize_to_palette,
     quantize_with_mappings,
+    snap_to_snes_color,
 )
 from core.services.image_utils import pil_to_qimage
 from ui.common import WorkerManager
@@ -434,11 +435,14 @@ def quantize_pil_image(
     dither_mode = sheet_palette.dither_mode if hasattr(sheet_palette, "dither_mode") else "none"
     dither_strength = sheet_palette.dither_strength if hasattr(sheet_palette, "dither_strength") else 0.0
 
+    # Snap palette colors to SNES-valid values for consistency with injection
+    snapped_colors = [snap_to_snes_color(c) for c in sheet_palette.colors]
+
     # Use color_mappings if defined, otherwise simple quantization
     if sheet_palette.color_mappings:
         indexed = quantize_with_mappings(
             pil_image,
-            sheet_palette.colors,
+            snapped_colors,
             sheet_palette.color_mappings,
             transparency_threshold=alpha_threshold,
             dither_mode=dither_mode,
@@ -447,7 +451,7 @@ def quantize_pil_image(
     else:
         indexed = quantize_to_palette(
             pil_image,
-            sheet_palette.colors,
+            snapped_colors,
             transparency_threshold=alpha_threshold,
             dither_mode=dither_mode,
             dither_strength=dither_strength,
