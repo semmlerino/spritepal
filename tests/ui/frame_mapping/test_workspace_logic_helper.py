@@ -293,6 +293,23 @@ class TestLinkingLogic:
         assert result is None
 
 
+class TestMappingPanelRowUpdate:
+    """Test Bug 2: Mapping panel row update when mapping is removed."""
+
+    def test_update_single_mapping_panel_row_clears_on_no_mapping(self, helper: WorkspaceLogicHelper) -> None:
+        """update_single_mapping_panel_row should clear row when mapping is None."""
+        # Setup: Project where get_mapping_for_ai_frame returns None
+        project = MagicMock()
+        project.get_mapping_for_ai_frame.return_value = None
+        helper._controller.project = project  # type: ignore[union-attr]
+
+        # Call the method
+        helper.update_single_mapping_panel_row("frame_A")
+
+        # Assert: Should clear the row when mapping is None
+        helper._mapping_panel.clear_row_mapping.assert_called_once_with("frame_A")  # type: ignore[union-attr]
+
+
 class TestAlignmentCoordination:
     """Test Phase 2e: Alignment coordination."""
 

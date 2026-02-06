@@ -23,6 +23,8 @@ from core.frame_mapping_project import GameFrame
 from core.types import CompressionType
 from tests.fixtures.frame_mapping_helpers import create_test_project
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
+from ui.frame_mapping.frame_operations_coordinator import FrameOperationsCoordinator
+from ui.frame_mapping.palette_coordinator import PaletteCoordinator
 from ui.frame_mapping.views.workbench_types import AlignmentState
 
 if TYPE_CHECKING:
@@ -301,3 +303,63 @@ class TestSplitBrainFixes:
         calls = mock_message_service.show_message.call_args_list
         warning_calls = [c for c in calls if "not saved" in c[0][0].lower() or "different" in c[0][0].lower()]
         assert len(warning_calls) >= 1, f"Expected a message explaining why alignment was blocked. Got calls: {calls}"
+
+
+class TestRemoveMappingCanvasGuard:
+    """Bug 3: Verify remove_mapping preserves canvas when removing non-selected frame."""
+
+    def test_remove_mapping_non_selected_preserves_canvas(self) -> None:
+        """Canvas should NOT be cleared when removing mapping for non-selected frame."""
+        # Create coordinator
+        coordinator = FrameOperationsCoordinator()
+
+        # Set up dependencies
+        mock_controller = MagicMock()
+        mock_controller.remove_mapping = MagicMock()
+        coordinator.set_controller(mock_controller)
+
+        mock_state = MagicMock()
+        mock_state.selected_ai_frame_id = "frame_A"
+        coordinator.set_state(mock_state)
+
+        mock_canvas = MagicMock()
+        mock_captures = MagicMock()
+        coordinator.set_panes(alignment_canvas=mock_canvas, captures_pane=mock_captures)
+
+        # Call remove_mapping for a DIFFERENT frame than selected
+        coordinator.handle_remove_mapping("frame_B")
+
+        # Assert: Canvas should NOT be cleared (frame_B != frame_A)
+        mock_canvas.clear_alignment.assert_not_called()
+
+        # Assert: Removal still happens
+        mock_controller.remove_mapping.assert_called_once_with("frame_B")
+
+
+class TestIngameSavedFrameGuard:
+    """Bug 6: Verify ingame_saved only updates canvas for selected frame."""
+
+    def test_ingame_saved_only_updates_selected_frame_canvas(self) -> None:
+        """Canvas should NOT be updated when ingame_saved for non-selected frame."""
+        # Create coordinator
+        coordinator = PaletteCoordinator()
+
+        # Set up dependencies
+        mock_state = MagicMock()
+        mock_state.selected_ai_frame_id = "frame_A"
+        coordinator.set_state(mock_state)
+
+        mock_ai_pane = MagicMock()
+        mock_mapping_panel = MagicMock()
+        mock_canvas = MagicMock()
+        coordinator.set_panes(
+            ai_frames_pane=mock_ai_pane,
+            mapping_panel=mock_mapping_panel,
+            alignment_canvas=mock_canvas,
+        )
+
+        # Call _handle_ingame_saved for a DIFFERENT frame than selected
+        coordinator._handle_ingame_saved("frame_B", "/some/path.png")
+
+        # Assert: Canvas should NOT be updated (frame_B != frame_A)
+        mock_canvas.set_ingame_edited_path.assert_not_called()

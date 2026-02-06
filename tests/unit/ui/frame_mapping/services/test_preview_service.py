@@ -302,15 +302,32 @@ class TestPreviewServiceStaleEntries:
                     cached_after_stale = preview_service.get_cached_preview("frame1", project)
                     assert cached_after_stale is None, "Stale preview should return None"
 
-                    # Verify stale flag was cleared
-                    assert "frame1" not in preview_service._stale_previews, (
-                        "Stale flag should be cleared after None return"
+                    # Verify stale flag still persists (not yet cleared)
+                    # Stale flag is only cleared when set_preview_cache is called (regeneration succeeds)
+                    assert "frame1" in preview_service._stale_previews, (
+                        "Stale flag should persist until set_preview_cache clears it"
                     )
 
-                    # Subsequent calls should return the old cached pixmap (not None again)
-                    # This prevents thrashing - caller should regenerate async
+                    # Subsequent calls should also return None while stale flag persists
+                    # This ensures caller knows to regenerate async
                     cached_second_call = preview_service.get_cached_preview("frame1", project)
-                    assert cached_second_call == preview1, "After stale cleared, should return old cache"
+                    assert cached_second_call is None, "Should return None while stale flag persists"
+
+                    # Only when set_preview_cache is called (regeneration succeeds) is stale flag cleared
+                    new_pixmap = QImage(100, 100, QImage.Format.Format_RGBA8888)
+                    new_qpixmap = QPixmap.fromImage(new_pixmap)
+                    # Use game_frame.cached_mtime to match the current state
+                    preview_service.set_preview_cache("frame1", new_qpixmap, game_frame.cached_mtime, (1, 2, 3))
+
+                    # After set_preview_cache, stale flag should be cleared
+                    assert "frame1" not in preview_service._stale_previews, (
+                        "Stale flag should be cleared after set_preview_cache"
+                    )
+
+                    # Now get_cached_preview should return the new pixmap
+                    cached_after_regen = preview_service.get_cached_preview("frame1", project)
+                    assert cached_after_regen is not None, "Should return pixmap after regen"
+                    assert cached_after_regen == new_qpixmap, "Should return regenerated pixmap"
 
     def test_force_regenerate_after_stale_returns_new_pixmap(
         self, preview_service, mock_project, mock_capture_result, qtbot
