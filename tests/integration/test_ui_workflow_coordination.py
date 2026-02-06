@@ -157,97 +157,33 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
 
         super().teardown_method()
 
+    @patch("ui.windows.detached_gallery_window.ThumbnailWorkerController")
     @patch("ui.windows.detached_gallery_window.SpriteScanWorker")
-    @patch("ui.workers.batch_thumbnail_worker.BatchThumbnailWorker")
     def test_complete_rom_to_fullscreen_workflow(
         self,
-        mock_thumbnail_worker_class,
         mock_scan_worker_class,
+        mock_thumbnail_controller_class,
         complete_test_rom,
         realistic_sprite_data,
         mock_settings_manager,
         mock_rom_cache,
     ):
-        # DI setup provided by session_app_context via pytestmark at module level
         """Test complete workflow: ROM load -> scan -> thumbnails -> fullscreen view."""
+        from tests.infrastructure.fake_sprite_scan_worker import FakeSpriteScanWorker
+        from tests.infrastructure.fake_thumbnail_controller import FakeThumbnailController
         from ui.windows.detached_gallery_window import DetachedGalleryWindow
 
-        # Setup mock extraction manager
         mock_manager = Mock()
         mock_manager.get_rom_extractor.return_value = Mock()
         mock_manager.get_known_sprite_locations.return_value = {}
 
-        # Mock scan worker with real signals
-        from PySide6.QtCore import QObject, Signal
+        # Use real fakes instead of inline mock classes
+        fake_scan_worker = FakeSpriteScanWorker()
+        fake_scan_worker.seed_sprites(realistic_sprite_data)
+        mock_scan_worker_class.return_value = fake_scan_worker
 
-        class MockScanWorker(QObject):
-            sprite_found = Signal(dict)
-            finished = Signal()
-            progress = Signal(int, str)
-            error = Signal(str)
-            cache_status = Signal(str)
-            operation_finished = Signal()
-
-            def __init__(self, *args, **kwargs):
-                super().__init__()
-                self.args = args
-                self.kwargs = kwargs
-
-            def start(self):
-                pass
-
-            def isRunning(self):
-                return False
-
-            def quit(self):
-                pass
-
-            def wait(self, ms=0):
-                return True
-
-            def requestInterruption(self):
-                pass
-
-            def isFinished(self):
-                return True
-
-            def deleteLater(self):
-                pass
-
-        mock_scan_worker = MockScanWorker()
-        mock_scan_worker_class.return_value = mock_scan_worker
-
-        # Mock thumbnail worker with Qt signals
-        mock_thumbnail_worker = Mock()
-
-        # Signals need to be usable
-        class MockThumbnailWorker(QObject):
-            thumbnail_ready = Signal(int, object)  # Accepts QImage
-            progress = Signal(int, str)
-            finished = Signal()
-            error = Signal(str)
-
-            def __init__(self):
-                super().__init__()
-                self.queue_thumbnail = Mock()
-                self.run = Mock()
-                self.cleanup = Mock()
-                self.deleteLater = Mock()
-                self.moveToThread = Mock()
-
-            def isRunning(self):
-                return False
-
-            def start(self):
-                pass
-
-            def stop(self):
-                pass  # Required for cleanup
-
-        mock_thumbnail_worker = MockThumbnailWorker()
-        mock_thumbnail_worker_class.return_value = mock_thumbnail_worker
-
-        workflow_steps = []
+        fake_thumbnail_controller = FakeThumbnailController()
+        mock_thumbnail_controller_class.return_value = fake_thumbnail_controller
 
         # Step 1: Create gallery window
         self.gallery_window = DetachedGalleryWindow(
@@ -255,61 +191,32 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
             settings_manager=mock_settings_manager,
             rom_cache=mock_rom_cache,
         )
-        workflow_steps.append("gallery_created")
-
         assert self.gallery_window.windowTitle() == "Sprite Gallery"
         assert not self.gallery_window.scanning
 
         # Step 2: Load ROM
         self.gallery_window.load_rom(complete_test_rom)
-        workflow_steps.append("rom_loaded")
-
         assert self.gallery_window.rom_path == complete_test_rom
         assert "complete_test" in self.gallery_window.windowTitle()
 
-        # Step 3: Start ROM scan
-        # Trigger via public action or method if available, or simulate UI interaction
-        # The scan worker is created in _start_scan. We mocked the worker class.
-        # We can trigger the scan via the public slot or action.
+        # Step 3: Start ROM scan via UI action
         scan_action = [a for a in self.gallery_window.findChildren(QAction) if "Scan ROM" in a.text()][0]
         scan_action.trigger()
 
-        workflow_steps.append("scan_started")
+        # FakeSpriteScanWorker emits all signals synchronously in start()
+        # So after trigger, scan is already complete
 
-        assert self.gallery_window.scanning
-        # mock_scan_worker is a QObject, not a Mock, so we can't assert_called_once on start()
-        # But we verified scanning state is True, which happens after start() is called.
-
-        # Step 4: Simulate sprites being found during scan
-        # Emit signal from the mock worker
-        for sprite in realistic_sprite_data:
-            mock_scan_worker.sprite_found.emit(sprite)
-        workflow_steps.append("sprites_found")
-
+        # Step 4+5: Verify sprites found and scan completed
         assert len(self.gallery_window.sprites_data) == len(realistic_sprite_data)
-
-        # Step 5: Complete scan (this automatically triggers thumbnail generation)
-        mock_scan_worker.finished.emit()
-        workflow_steps.append("scan_completed")
-        workflow_steps.append("thumbnails_started")  # Thumbnails start automatically
-
         assert not self.gallery_window.scanning
 
-        # Step 6: Verify thumbnail generation was triggered automatically
-        # Verify worker was created and thumbnails were queued
-        mock_thumbnail_worker_class.assert_called_once()  # Worker was created
-        # Note: We can't check call count easily on the MockWorker instance methods unless we mocked them specifically inside the class
-        # or we check the side effects. But the test flow continues so we assume it worked.
+        # Step 6: Verify thumbnails were queued (scan completion auto-triggers thumbnail generation)
+        queued_offsets = fake_thumbnail_controller.get_queued_offsets()
+        expected_offsets = [s["offset"] for s in realistic_sprite_data]
+        for offset in expected_offsets:
+            assert offset in queued_offsets
 
-        # Step 7: Simulate thumbnail completion
-        for sprite in realistic_sprite_data:
-            image = ThreadSafeTestImage(64, 64)
-            image.fill()
-            # Emit QImage, not QPixmap
-            mock_thumbnail_worker.thumbnail_ready.emit(sprite["offset"], image.toImage())
-        workflow_steps.append("thumbnails_completed")
-
-        # Step 8: Open fullscreen viewer
+        # Step 7: Open fullscreen viewer (boundary mock is fine for modal viewer)
         self.gallery_window.gallery_widget.get_selected_sprite_offset = Mock(
             return_value=realistic_sprite_data[0]["offset"]
         )
@@ -319,29 +226,12 @@ class TestCompleteUIWorkflowsIntegration(QtTestCase):
             mock_viewer.set_sprite_data.return_value = True
             mock_viewer_class.return_value = mock_viewer
 
-            # Trigger via menu action
             viewer_action = [a for a in self.gallery_window.findChildren(QAction) if "View Selected" in a.text()][0]
             viewer_action.trigger()
-
-            workflow_steps.append("fullscreen_opened")
 
             mock_viewer_class.assert_called_once()
             mock_viewer.set_sprite_data.assert_called_once()
             mock_viewer.show.assert_called_once()
-
-        # Verify complete workflow
-        expected_steps = [
-            "gallery_created",
-            "rom_loaded",
-            "scan_started",
-            "sprites_found",
-            "scan_completed",
-            "thumbnails_started",
-            "thumbnails_completed",
-            "fullscreen_opened",
-        ]
-
-        assert workflow_steps == expected_steps
 
     @patch("ui.windows.detached_gallery_window.SpriteScanWorker")
     @patch("ui.workers.batch_thumbnail_worker.BatchThumbnailWorker")
