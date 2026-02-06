@@ -433,18 +433,3 @@ class TestPreviewWithIngameEdit:
 
             # Async service SHOULD have been called (fell through to compositor)
             mock_request.assert_called_once()
-
-    def test_transform_change_clears_ingame_edit(self, qtbot: QtBot, tmp_path: Path) -> None:
-        """Changing transforms should clear in-game edit, falling back to compositor."""
-        canvas = WorkbenchCanvas()
-        qtbot.addWidget(canvas)
-
-        # Set in-game edited path
-        canvas.set_ingame_edited_path("/some/edited.png")
-        assert canvas._ingame_edited_path == "/some/edited.png"
-
-        # Simulate a user-initiated flip change (calls _emit_alignment_changed)
-        canvas._on_flip_changed()
-
-        # Path should be cleared
-        assert canvas._ingame_edited_path is None

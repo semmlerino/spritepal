@@ -617,6 +617,17 @@ class InjectionOrchestrator:
 
                     masked_canvas = convert_indexed_to_rgb(ingame_index_map, sheet_palette)
 
+                    # Apply current flip transforms
+                    if mapping.flip_h or mapping.flip_v:
+                        import numpy as np
+
+                        if mapping.flip_h:
+                            masked_canvas = masked_canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                            ingame_index_map = np.fliplr(ingame_index_map)
+                        if mapping.flip_v:
+                            masked_canvas = masked_canvas.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+                            ingame_index_map = np.flipud(ingame_index_map)
+
                     if debug.enabled and debug.debug_dir:
                         debug.save_debug_image("ingame_edited_canvas", masked_canvas)
 

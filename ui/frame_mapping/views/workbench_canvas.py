@@ -1167,12 +1167,24 @@ class WorkbenchCanvas(QWidget):
     def set_ingame_edited_path(self, path: str | None) -> None:
         """Set the saved in-game edit path, bypassing compositor for preview.
 
-        When set, the preview shows the saved in-game edit directly instead of
-        running the compositor. This matches injection behavior.
+        When set, transforms reset to neutral since the saved image becomes the
+        new reference. Flips, offset, and scale then apply relative to it.
         """
         if self._ingame_edited_path != path:
             self._ingame_edited_path = path
-            self._schedule_preview_update()
+            if path is not None:
+                # Reset transforms — the saved image is the new baseline
+                self.set_alignment(
+                    offset_x=0,
+                    offset_y=0,
+                    flip_h=False,
+                    flip_v=False,
+                    scale=1.0,
+                    sharpen=0.0,
+                    resampling="lanczos",
+                )
+            else:
+                self._schedule_preview_update()
 
     def _get_ai_frame_from_cache(self, path: Path) -> _AIFrameCacheEntry | None:
         """Get AI frame from cache if valid (exists and mtime matches).
@@ -1902,6 +1914,13 @@ class WorkbenchCanvas(QWidget):
                 ingame_index_map, _ = load_image_preserving_indices(ingame_path, sheet_palette=self._sheet_palette)
                 if ingame_index_map is not None:
                     rgba_image = convert_indexed_to_rgb(ingame_index_map, self._sheet_palette)
+                    # Apply current flip transforms
+                    flip_h = self._flip_h_checkbox.isChecked()
+                    flip_v = self._flip_v_checkbox.isChecked()
+                    if flip_h:
+                        rgba_image = rgba_image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+                    if flip_v:
+                        rgba_image = rgba_image.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
                     qimage = pil_to_qimage(rgba_image)
                     scaled = qimage.scaled(
                         qimage.width() * self._display_scale,
@@ -2427,8 +2446,6 @@ class WorkbenchCanvas(QWidget):
 
     def _emit_alignment_changed(self) -> None:
         """Emit alignment_changed signal with current values."""
-        # User changed transforms → in-game edit is stale, fall back to compositor
-        self._ingame_edited_path = None
         self.alignment_changed.emit(self.get_alignment())
 
     def _update_scene_for_alignment(self) -> None:
