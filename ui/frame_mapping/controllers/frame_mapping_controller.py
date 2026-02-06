@@ -1633,29 +1633,12 @@ class FrameMappingController(QObject):
     def _on_async_injection_finished(self, ai_frame_id: str, success: bool, message: str, result: object) -> None:
         """Handle async injection completion.
 
-        Updates mapping status and emits signals like the sync version.
+        Delegates result handling to injection facade, then emits async completion signal.
         """
         from core.services.injection_results import InjectionResult
 
-        if self._project is None:
-            return
-
         if isinstance(result, InjectionResult):
-            # Handle stale entries warning
-            if result.needs_fallback_confirmation and result.stale_frame_id:
-                self.stale_entries_warning.emit(result.stale_frame_id)
-
-            if success:
-                # Update mapping status
-                mapping = self._project.get_mapping_for_ai_frame(ai_frame_id)
-                if mapping is not None and result.new_mapping_status:
-                    mapping.status = result.new_mapping_status
-
-                self.mapping_injected.emit(ai_frame_id, "\n".join(result.messages))
-                self.emit_project_changed()
-                self.save_requested.emit()
-            elif result.error:
-                self.error_occurred.emit(result.error)
+            self._injection._handle_injection_result(result, ai_frame_id)
 
         # Emit the async_injection_finished signal
         self.async_injection_finished.emit(ai_frame_id, success, message)

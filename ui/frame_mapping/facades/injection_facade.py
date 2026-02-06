@@ -16,6 +16,7 @@ from ui.frame_mapping.services.async_injection_service import AsyncInjectionServ
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from core.services.injection_results import InjectionResult
     from core.services.palette_offset_calculator import PaletteOffsetCalculator
     from ui.frame_mapping.facades.controller_context import ControllerContext
 
@@ -158,30 +159,7 @@ class InjectionFacade:
                 on_progress=emit_progress,
             )
 
-        # Handle stale entries warning
-        if result.needs_fallback_confirmation and result.stale_frame_id:
-            self._signals.emit_stale_entries_warning(result.stale_frame_id)
-
-        # Handle result
-        if result.success:
-            # Update mapping status
-            mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-            if mapping is not None and result.new_mapping_status:
-                mapping.status = result.new_mapping_status
-
-            self._signals.emit_mapping_injected(ai_frame_id, "\n".join(result.messages))
-
-            # Emit project changed and save requested
-            if emit_project_changed:
-                self._signals.emit_project_changed()
-            self._signals.emit_save_requested()
-
-            return True
-        else:
-            # Emit error
-            if result.error:
-                self._signals.emit_error(result.error)
-            return False
+        return self._handle_injection_result(result, ai_frame_id, emit_project_changed)
 
     # ─── Async Injection ──────────────────────────────────────────────────────
 
@@ -256,6 +234,53 @@ class InjectionFacade:
         return self._async_injection_service.pending_count
 
     # ─── Helpers ──────────────────────────────────────────────────────────────
+
+    def _handle_injection_result(
+        self,
+        result: InjectionResult,
+        ai_frame_id: str,
+        emit_project_changed: bool = True,
+    ) -> bool:
+        """Handle injection result: update mapping status and emit signals.
+
+        Common logic for both sync and async injection paths.
+
+        Args:
+            result: The injection result from the orchestrator.
+            ai_frame_id: ID of the AI frame that was injected.
+            emit_project_changed: If True, emit project_changed after success.
+
+        Returns:
+            True if injection was successful.
+        """
+        project = self._context.project
+        if project is None:
+            return False
+
+        # Handle stale entries warning
+        if result.needs_fallback_confirmation and result.stale_frame_id:
+            self._signals.emit_stale_entries_warning(result.stale_frame_id)
+
+        # Handle result
+        if result.success:
+            # Update mapping status
+            mapping = project.get_mapping_for_ai_frame(ai_frame_id)
+            if mapping is not None and result.new_mapping_status:
+                mapping.status = result.new_mapping_status
+
+            self._signals.emit_mapping_injected(ai_frame_id, "\n".join(result.messages))
+
+            # Emit project changed and save requested
+            if emit_project_changed:
+                self._signals.emit_project_changed()
+            self._signals.emit_save_requested()
+
+            return True
+        else:
+            # Emit error
+            if result.error:
+                self._signals.emit_error(result.error)
+            return False
 
     def _calculate_palette_rom_offset(self, rom_path: Path, game_frame_id: str) -> int | None:
         """Calculate the palette ROM offset for injection.
