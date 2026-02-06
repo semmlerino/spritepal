@@ -617,16 +617,27 @@ class InjectionOrchestrator:
 
                     masked_canvas = convert_indexed_to_rgb(ingame_index_map, sheet_palette)
 
-                    # Apply current flip transforms
+                    # Apply flips in-place within the content region so the
+                    # sprite stays within tile bounds (flipping the whole canvas
+                    # would mirror content to the wrong side).
                     if mapping.flip_h or mapping.flip_v:
-                        import numpy as np
-
-                        if mapping.flip_h:
-                            masked_canvas = masked_canvas.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-                            ingame_index_map = np.fliplr(ingame_index_map)
-                        if mapping.flip_v:
-                            masked_canvas = masked_canvas.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-                            ingame_index_map = np.flipud(ingame_index_map)
+                        content_mask = ingame_index_map != 255
+                        rows = np.any(content_mask, axis=1)
+                        cols = np.any(content_mask, axis=0)
+                        if rows.any() and cols.any():
+                            r0 = int(np.argmax(rows))
+                            r1 = int(len(rows) - np.argmax(rows[::-1]))
+                            c0 = int(np.argmax(cols))
+                            c1 = int(len(cols) - np.argmax(cols[::-1]))
+                            region = ingame_index_map[r0:r1, c0:c1]
+                            if mapping.flip_h:
+                                region = np.fliplr(region)
+                            if mapping.flip_v:
+                                region = np.flipud(region)
+                            ingame_index_map = ingame_index_map.copy()
+                            ingame_index_map[r0:r1, c0:c1] = region
+                        # Rebuild RGBA from flipped index map
+                        masked_canvas = convert_indexed_to_rgb(ingame_index_map, sheet_palette)
 
                     if debug.enabled and debug.debug_dir:
                         debug.save_debug_image("ingame_edited_canvas", masked_canvas)
@@ -680,8 +691,6 @@ class InjectionOrchestrator:
             )
 
             # Extract index map from quantized image
-            import numpy as np
-
             ai_index_map = np.array(quantized_indexed, dtype=np.uint8)
             logger.debug(
                 "Pre-quantized RGBA image at full resolution: %s (shape: %s)",
