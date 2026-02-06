@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
 
 from tests.fixtures.timeouts import ui_timeout
 from ui.widgets.offset_browser_sidebar import (
@@ -251,7 +252,7 @@ class TestNearbyClickNavigation:
         sidebar.click_thumbnail(0)
 
         # Give a moment for any potential signal to emit
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         # Should not have emitted
         assert not signal_emitted
@@ -318,19 +319,19 @@ class TestNearbySizeControl:
     def test_size_change_updates_internal_state(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
         """Verify changing size updates the internal size variable."""
         sidebar.select_thumbnail_size("large")
-        qtbot.wait(50)
+        QApplication.processEvents()
         assert sidebar.get_thumbnail_size() == NEARBY_SIZES["large"]
 
     def test_size_change_unchecks_other_buttons(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
         """Verify changing size selects the correct size key."""
         sidebar.select_thumbnail_size("small")
-        qtbot.wait(50)
+        QApplication.processEvents()
         assert sidebar.get_selected_size_key() == "small"
 
     def test_size_change_resizes_labels(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
         """Verify changing size updates label dimensions."""
         sidebar.select_thumbnail_size("large")
-        qtbot.wait(50)
+        QApplication.processEvents()
         # Check all labels have new size
         sizes = sidebar.get_thumbnail_label_sizes()
         for width, height in sizes:
@@ -340,7 +341,7 @@ class TestNearbySizeControl:
     def test_size_change_to_small(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
         """Verify changing to small size works."""
         sidebar.select_thumbnail_size("small")
-        qtbot.wait(50)
+        QApplication.processEvents()
         assert sidebar.get_thumbnail_size() == NEARBY_SIZES["small"]
         sizes = sidebar.get_thumbnail_label_sizes()
         for width, _ in sizes:
@@ -363,32 +364,32 @@ class TestNearbyExpansion:
         """Verify expansion adds 6 more thumbnails (12 total)."""
         assert sidebar.get_thumbnail_count() == 6
         sidebar.toggle_expansion()
-        qtbot.wait(50)
+        QApplication.processEvents()
         assert sidebar.get_thumbnail_count() == 12
 
     def test_collapse_returns_to_six(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
         """Verify collapsing returns to 6 thumbnails."""
         sidebar.toggle_expansion()  # Expand
-        qtbot.wait(50)
+        QApplication.processEvents()
         assert sidebar.get_thumbnail_count() == 12
         sidebar.toggle_expansion()  # Collapse
-        qtbot.wait(50)
+        QApplication.processEvents()
         assert sidebar.get_thumbnail_count() == 6
 
     def test_expand_button_text_changes(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
         """Verify expand button text changes on toggle."""
         assert "Show More" in sidebar.get_expand_button_text()
         sidebar.toggle_expansion()
-        qtbot.wait(50)
+        QApplication.processEvents()
         assert "Show Less" in sidebar.get_expand_button_text()
         sidebar.toggle_expansion()
-        qtbot.wait(50)
+        QApplication.processEvents()
         assert "Show More" in sidebar.get_expand_button_text()
 
     def test_expanded_deltas_include_extended_range(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
         """Verify expanded mode includes ±256, ±512, ±1024."""
         sidebar.toggle_expansion()
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         # Get all deltas from labels
         deltas = sidebar.get_thumbnail_label_deltas()
@@ -437,11 +438,11 @@ class TestNearbySizeAndExpansionCombination:
     def test_size_change_while_expanded(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
         """Verify size change works correctly when expanded."""
         sidebar.toggle_expansion()  # Expand
-        qtbot.wait(50)
+        QApplication.processEvents()
         assert sidebar.get_thumbnail_count() == 12
 
         sidebar.select_thumbnail_size("large")
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         # Should still have 12 labels, all with large size
         assert sidebar.get_thumbnail_count() == 12
@@ -452,10 +453,10 @@ class TestNearbySizeAndExpansionCombination:
     def test_expand_preserves_size(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
         """Verify expansion preserves the current size setting."""
         sidebar.select_thumbnail_size("small")
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         sidebar.toggle_expansion()
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         # All 12 labels should have small size
         assert sidebar.get_thumbnail_count() == 12
@@ -468,7 +469,7 @@ class TestNearbySizeAndExpansionCombination:
         sidebar.select_thumbnail_size("large")
         sidebar.toggle_expansion()  # Expand
         sidebar.toggle_expansion()  # Collapse
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         # 6 labels should have large size
         assert sidebar.get_thumbnail_count() == 6
@@ -504,7 +505,7 @@ class TestNearbyTooltips:
     def test_expand_button_tooltip_updates_on_expand(self, qtbot: QtBot, sidebar: OffsetBrowserSidebar) -> None:
         """Verify tooltip changes when expanded."""
         sidebar.toggle_expansion()  # Expand
-        qtbot.wait(50)
+        QApplication.processEvents()
         tooltip = sidebar.get_expand_button_tooltip()
         assert "Hide" in tooltip
         assert "[E]" in tooltip
@@ -513,7 +514,7 @@ class TestNearbyTooltips:
         """Verify tooltip changes when collapsed again."""
         sidebar.toggle_expansion()  # Expand
         sidebar.toggle_expansion()  # Collapse
-        qtbot.wait(50)
+        QApplication.processEvents()
         tooltip = sidebar.get_expand_button_tooltip()
         assert "Show" in tooltip
         assert "±256" in tooltip
@@ -536,7 +537,7 @@ class TestNearbyKeyboardShortcuts:
         # Press key 1
         event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_1, Qt.KeyboardModifier.NoModifier)
         offset_browser.keyPressEvent(event)
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         assert sidebar.get_thumbnail_size() == NEARBY_SIZES["small"]
         assert sidebar.get_selected_size_key() == "small"
@@ -550,13 +551,13 @@ class TestNearbyKeyboardShortcuts:
 
         # First change to small
         sidebar.select_thumbnail_size("small")
-        qtbot.wait(50)
+        QApplication.processEvents()
         assert sidebar.get_thumbnail_size() == NEARBY_SIZES["small"]
 
         # Press key 2
         event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_2, Qt.KeyboardModifier.NoModifier)
         offset_browser.keyPressEvent(event)
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         assert sidebar.get_thumbnail_size() == NEARBY_SIZES["medium"]
         assert sidebar.get_selected_size_key() == "medium"
@@ -571,7 +572,7 @@ class TestNearbyKeyboardShortcuts:
         # Press key 3
         event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_3, Qt.KeyboardModifier.NoModifier)
         offset_browser.keyPressEvent(event)
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         assert sidebar.get_thumbnail_size() == NEARBY_SIZES["large"]
         assert sidebar.get_selected_size_key() == "large"
@@ -589,7 +590,7 @@ class TestNearbyKeyboardShortcuts:
         # Press key E to expand
         event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_E, Qt.KeyboardModifier.NoModifier)
         offset_browser.keyPressEvent(event)
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         assert sidebar.is_expanded()
         assert sidebar.get_thumbnail_count() == 12
@@ -597,7 +598,7 @@ class TestNearbyKeyboardShortcuts:
         # Press key E again to collapse
         event = QKeyEvent(QKeyEvent.Type.KeyPress, Qt.Key.Key_E, Qt.KeyboardModifier.NoModifier)
         offset_browser.keyPressEvent(event)
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         assert not sidebar.is_expanded()
         assert sidebar.get_thumbnail_count() == 6
@@ -619,7 +620,7 @@ class TestNearbyKeyboardShortcuts:
             Qt.KeyboardModifier.ControlModifier,
         )
         offset_browser.keyPressEvent(event)
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         # Size should remain medium (no change from modifier key)
         assert sidebar.get_thumbnail_size() == NEARBY_SIZES["medium"]
@@ -641,7 +642,7 @@ class TestNearbyKeyboardShortcuts:
             Qt.KeyboardModifier.ControlModifier,
         )
         offset_browser.keyPressEvent(event)
-        qtbot.wait(50)
+        QApplication.processEvents()
 
         # Should still be collapsed (no change from modifier key)
         assert not sidebar.is_expanded()
