@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from core.frame_mapping_project import FrameMapping, GameFrame
+from tests.infrastructure.fake_panes import FakeAIFramesPane
 from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 
 
@@ -31,14 +32,15 @@ class TestPaletteInfoOnSelection:
         helper._state.selected_game_id = None
         helper._state.current_canvas_game_id = None
 
-        # Mock panes
-        helper.set_panes(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+        # Mock panes (ai_pane is fake, others are mocks)
+        ai_pane = FakeAIFramesPane()
+        helper.set_panes(ai_pane, MagicMock(), MagicMock(), MagicMock())
 
-        return helper, project
+        return helper, project, ai_pane
 
     def test_palette_info_updated_on_ai_frame_selection_with_mapping(self, helper_with_mocks):
         """Selecting an AI frame with a mapping should update palette info."""
-        helper, project = helper_with_mocks
+        helper, project, ai_pane = helper_with_mocks
 
         # Set up mapping and game frame
         mapping = FrameMapping(
@@ -71,24 +73,24 @@ class TestPaletteInfoOnSelection:
         helper.handle_ai_frame_selected("ai_frame_001")
 
         # Verify palette info was set
-        helper._ai_frames_pane.set_capture_palette_info.assert_called_once_with({5, 7})
-        helper._ai_frames_pane.set_current_frame_palette_index.assert_called_once_with(5)
+        assert ai_pane.capture_palette_info == {5, 7}
+        assert ai_pane.current_frame_palette_index == 5
 
     def test_palette_info_cleared_when_no_mapping(self, helper_with_mocks):
         """Selecting an AI frame without mapping should clear palette info."""
-        helper, project = helper_with_mocks
+        helper, project, ai_pane = helper_with_mocks
 
         project.get_mapping_for_ai_frame.return_value = None
         project.get_ai_frame_by_id.return_value = MagicMock()
 
         helper.handle_ai_frame_selected("ai_frame_001")
 
-        helper._ai_frames_pane.set_capture_palette_info.assert_called_once_with(None)
-        helper._ai_frames_pane.set_current_frame_palette_index.assert_called_once_with(None)
+        assert ai_pane.capture_palette_info is None
+        assert ai_pane.current_frame_palette_index is None
 
     def test_palette_info_updated_on_game_frame_selection(self, helper_with_mocks):
         """Selecting a game frame should update palette info."""
-        helper, project = helper_with_mocks
+        helper, project, ai_pane = helper_with_mocks
         helper._state.selected_ai_frame_id = "some_ai_frame"
 
         game_frame = GameFrame(id="game_001", palette_index=3)
@@ -105,5 +107,5 @@ class TestPaletteInfoOnSelection:
 
         helper.handle_game_frame_selected("game_001")
 
-        helper._ai_frames_pane.set_capture_palette_info.assert_called_once_with({3})
-        helper._ai_frames_pane.set_current_frame_palette_index.assert_called_once_with(3)
+        assert ai_pane.capture_palette_info == {3}
+        assert ai_pane.current_frame_palette_index == 3

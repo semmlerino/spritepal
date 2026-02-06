@@ -25,23 +25,23 @@ def preview_service(qtbot):
 
 @pytest.fixture
 def mock_project(tmp_path):
-    """Create a mock project with game frames."""
-    project = Mock(spec=FrameMappingProject)
-
-    # Create a test capture file
+    """Create a real project with game frames."""
     capture_path = tmp_path / "test_capture.json"
     capture_path.write_text('{"frame": 100, "entries": []}')
-
-    # Mock game frame
-    game_frame = Mock(spec=GameFrame)
-    game_frame.id = "frame1"
-    game_frame.capture_path = capture_path
-    game_frame.selected_entry_ids = [1, 2, 3]
-    game_frame.rom_offsets = frozenset([0x12345, 0x67890])
-    game_frame.cached_mtime = 0.0  # Initialize cached_mtime for the new field
-
-    project.get_game_frame_by_id.return_value = game_frame
-
+    project = FrameMappingProject(
+        name="test",
+        ai_frames_dir=tmp_path,
+        ai_frames=[],
+        game_frames=[],
+        mappings=[],
+    )
+    game_frame = GameFrame(
+        id="frame1",
+        capture_path=capture_path,
+        selected_entry_ids=[1, 2, 3],
+        rom_offsets=[0x12345, 0x67890],
+    )
+    project.add_game_frame(game_frame)
     return project, game_frame
 
 

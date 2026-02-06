@@ -6,10 +6,16 @@ Tests the business logic extracted from FrameMappingWorkspace.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.infrastructure.fake_panes import (
+    FakeAIFramesPane,
+    FakeCapturesPane,
+    FakeMappingPanel,
+    FakeWorkbenchCanvas,
+)
 from ui.frame_mapping.views.workbench_types import AlignmentState
 from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 
@@ -33,10 +39,10 @@ def helper() -> WorkspaceLogicHelper:
     h.set_state(state)
 
     # Mock panes
-    ai_pane = MagicMock()
-    captures_pane = MagicMock()
-    mapping_panel = MagicMock()
-    canvas = MagicMock()
+    ai_pane = FakeAIFramesPane()
+    captures_pane = FakeCapturesPane()
+    mapping_panel = FakeMappingPanel()
+    canvas = FakeWorkbenchCanvas()
     h.set_panes(ai_pane, captures_pane, mapping_panel, canvas)
 
     # Mock message service
@@ -81,11 +87,11 @@ class TestSelectionHelpers:
         """update_map_button_state enables button when both frames selected and visible."""
         helper._state.selected_ai_frame_id = "frame.png"  # type: ignore[union-attr]
         helper._state.selected_game_id = "capture_1"  # type: ignore[union-attr]
-        helper._ai_frames_pane.has_visible_item.return_value = True  # type: ignore[union-attr]
+        helper._ai_frames_pane._visible_items.add("frame.png")
 
         helper.update_map_button_state()
 
-        helper._ai_frames_pane.set_map_button_enabled.assert_called_once_with(True)  # type: ignore[union-attr]
+        assert helper._ai_frames_pane.map_button_enabled is True
 
     def test_update_map_button_state_disables_when_ai_not_selected(self, helper: WorkspaceLogicHelper) -> None:
         """update_map_button_state disables button when AI frame not selected."""
@@ -94,29 +100,29 @@ class TestSelectionHelpers:
 
         helper.update_map_button_state()
 
-        helper._ai_frames_pane.set_map_button_enabled.assert_called_once_with(False)  # type: ignore[union-attr]
+        assert helper._ai_frames_pane.map_button_enabled is False
 
     def test_update_map_button_state_disables_when_ai_frame_filtered(self, helper: WorkspaceLogicHelper) -> None:
         """update_map_button_state disables button when selected AI frame is hidden by filter."""
         helper._state.selected_ai_frame_id = "frame.png"  # type: ignore[union-attr]
         helper._state.selected_game_id = "capture_1"  # type: ignore[union-attr]
         # Frame exists in state but is not visible (filtered out)
-        helper._ai_frames_pane.has_visible_item.return_value = False  # type: ignore[union-attr]
+        # Don't add to _visible_items, it's empty by default
 
         helper.update_map_button_state()
 
-        helper._ai_frames_pane.set_map_button_enabled.assert_called_once_with(False)  # type: ignore[union-attr]
+        assert helper._ai_frames_pane.map_button_enabled is False
 
     def test_update_map_button_state_enables_when_ai_frame_visible(self, helper: WorkspaceLogicHelper) -> None:
         """update_map_button_state enables button when selected AI frame is visible."""
         helper._state.selected_ai_frame_id = "frame.png"  # type: ignore[union-attr]
         helper._state.selected_game_id = "capture_1"  # type: ignore[union-attr]
         # Frame is visible (passes filters)
-        helper._ai_frames_pane.has_visible_item.return_value = True  # type: ignore[union-attr]
+        helper._ai_frames_pane._visible_items.add("frame.png")
 
         helper.update_map_button_state()
 
-        helper._ai_frames_pane.set_map_button_enabled.assert_called_once_with(True)  # type: ignore[union-attr]
+        assert helper._ai_frames_pane.map_button_enabled is True
 
 
 class TestRefreshHelpers:
@@ -136,9 +142,7 @@ class TestRefreshHelpers:
 
         helper.refresh_mapping_status()
 
-        helper._ai_frames_pane.set_mapping_status.assert_called_once_with(  # type: ignore[union-attr]
-            {"frame_001.png": "injected"}
-        )
+        assert helper._ai_frames_pane.mapping_status == {"frame_001.png": "injected"}
 
     def test_refresh_mapping_status_clears_when_no_project(self, helper: WorkspaceLogicHelper) -> None:
         """refresh_mapping_status clears status when no project."""
@@ -146,7 +150,7 @@ class TestRefreshHelpers:
 
         helper.refresh_mapping_status()
 
-        helper._ai_frames_pane.set_mapping_status.assert_called_once_with({})  # type: ignore[union-attr]
+        assert helper._ai_frames_pane.mapping_status == {}
 
     def test_refresh_game_frame_link_status_updates_pane(self, helper: WorkspaceLogicHelper) -> None:
         """refresh_game_frame_link_status updates captures pane."""
@@ -159,9 +163,7 @@ class TestRefreshHelpers:
 
         helper.refresh_game_frame_link_status()
 
-        helper._captures_pane.set_link_status.assert_called_once_with(  # type: ignore[union-attr]
-            {"capture_1": "frame_001.png"}
-        )
+        assert helper._captures_pane.link_status == {"capture_1": "frame_001.png"}
 
 
 class TestSelectionHandlers:
@@ -175,8 +177,8 @@ class TestSelectionHandlers:
         helper.handle_ai_frame_selected("")
 
         assert helper._state.selected_ai_frame_id is None  # type: ignore[union-attr]
-        helper._alignment_canvas.clear_alignment.assert_called_once()  # type: ignore[union-attr]
-        helper._mapping_panel.clear_selection.assert_called_once()  # type: ignore[union-attr]
+        assert helper._alignment_canvas.alignment_cleared is True
+        assert helper._mapping_panel.selection_cleared is True
 
     def test_handle_ai_frame_selected_updates_state(self, helper: WorkspaceLogicHelper) -> None:
         """handle_ai_frame_selected updates state and syncs panes."""
@@ -190,8 +192,8 @@ class TestSelectionHandlers:
         helper.handle_ai_frame_selected("frame_001.png")
 
         assert helper._state.selected_ai_frame_id == "frame_001.png"  # type: ignore[union-attr]
-        helper._mapping_panel.select_row_by_ai_id.assert_called_once_with("frame_001.png")  # type: ignore[union-attr]
-        helper._alignment_canvas.set_ai_frame.assert_called_once_with(frame)  # type: ignore[union-attr]
+        assert helper._mapping_panel.selected_ai_id == "frame_001.png"
+        assert helper._alignment_canvas.ai_frame is frame
 
     def test_handle_game_frame_selected_updates_state(self, helper: WorkspaceLogicHelper) -> None:
         """handle_game_frame_selected updates state."""
@@ -215,7 +217,7 @@ class TestSelectionHandlers:
         helper.handle_game_frame_selected("")
 
         assert helper._state.selected_game_id is None  # type: ignore[union-attr]
-        helper._alignment_canvas.clear_alignment.assert_called_once()  # type: ignore[union-attr]
+        assert helper._alignment_canvas.alignment_cleared is True
 
 
 class TestLinkingLogic:
@@ -244,8 +246,9 @@ class TestLinkingLogic:
             "frame_001.png", "capture_1"
         )
         # Verify canvas was set up with game frame and auto-align triggered
-        helper._alignment_canvas.set_game_frame.assert_called_once()  # type: ignore[union-attr]
-        helper._alignment_canvas.auto_align.assert_called_once_with(with_scale=True)  # type: ignore[union-attr]
+        assert helper._alignment_canvas.game_frame is not None
+        assert helper._alignment_canvas.auto_aligned is True
+        assert helper._alignment_canvas.auto_align_with_scale is True
 
     def test_attempt_link_same_pair_shows_message(self, helper: WorkspaceLogicHelper) -> None:
         """attempt_link shows message when linking same pair."""
@@ -307,7 +310,7 @@ class TestMappingPanelRowUpdate:
         helper.update_single_mapping_panel_row("frame_A")
 
         # Assert: Should clear the row when mapping is None
-        helper._mapping_panel.clear_row_mapping.assert_called_once_with("frame_A")  # type: ignore[union-attr]
+        assert "frame_A" in helper._mapping_panel.cleared_rows
 
 
 class TestAlignmentCoordination:
@@ -322,7 +325,7 @@ class TestAlignmentCoordination:
         helper._controller.project = project  # type: ignore[union-attr]
         helper._state.selected_ai_frame_id = "frame_001.png"  # type: ignore[union-attr]
         helper._state.current_canvas_game_id = "capture_1"  # type: ignore[union-attr]
-        helper._alignment_canvas.get_drag_start_alignment.return_value = None  # type: ignore[union-attr]
+        helper._alignment_canvas.drag_start_alignment = None
 
         state = AlignmentState(
             offset_x=10, offset_y=20, flip_h=False, flip_v=True, scale=1.0, sharpen=0.0, resampling="lanczos"
@@ -370,9 +373,8 @@ class TestAlignmentCoordination:
 
         helper.sync_canvas_alignment_from_model()
 
-        helper._alignment_canvas.set_alignment.assert_called_once_with(  # type: ignore[union-attr]
-            5, 10, True, False, 1.5, 0.0, "lanczos", has_mapping=True
-        )
+        assert helper._alignment_canvas.alignment == (5, 10, True, False, 1.5, 0.0, "lanczos")
+        assert helper._alignment_canvas.alignment_has_mapping is True
 
     def test_sync_canvas_alignment_from_model_clears_when_no_mapping(self, helper: WorkspaceLogicHelper) -> None:
         """sync_canvas_alignment_from_model clears alignment when no mapping."""
@@ -383,4 +385,4 @@ class TestAlignmentCoordination:
 
         helper.sync_canvas_alignment_from_model()
 
-        helper._alignment_canvas.clear_alignment.assert_called_once()  # type: ignore[union-attr]
+        assert helper._alignment_canvas.alignment_cleared is True

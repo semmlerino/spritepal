@@ -23,13 +23,15 @@ def palette_service():
 
 
 @pytest.fixture
-def mock_project():
-    """Create a mock FrameMappingProject."""
-    project = Mock(spec=FrameMappingProject)
-    project.sheet_palette = None
-    project.ai_frames = []
-    project.game_frames = []
-    project.get_game_frame_by_id = Mock(return_value=None)
+def mock_project(tmp_path):
+    """Create a real FrameMappingProject for testing."""
+    project = FrameMappingProject(
+        name="test",
+        ai_frames_dir=tmp_path,
+        ai_frames=[],
+        game_frames=[],
+        mappings=[],
+    )
     return project
 
 
@@ -224,15 +226,13 @@ class TestCopyGamePaletteToSheet:
 
     def test_returns_none_when_game_frame_not_found(self, palette_service, mock_project):
         """Should return None when game frame is not found."""
-        mock_project.get_game_frame_by_id.return_value = None
-
         result = palette_service.copy_game_palette_to_sheet(mock_project, "nonexistent")
         assert result is None
 
     def test_returns_none_when_no_capture_path(self, palette_service, mock_project):
         """Should return None when game frame has no capture path."""
         game_frame = GameFrame(id="frame1", capture_path=None)
-        mock_project.get_game_frame_by_id.return_value = game_frame
+        mock_project.add_game_frame(game_frame)
 
         result = palette_service.copy_game_palette_to_sheet(mock_project, "frame1")
         assert result is None
@@ -242,7 +242,7 @@ class TestCopyGamePaletteToSheet:
         capture_path = tmp_path / "capture.json"
         capture_path.touch()  # File must exist for repository mtime check
         game_frame = GameFrame(id="frame1", capture_path=capture_path, palette_index=0)
-        mock_project.get_game_frame_by_id.return_value = game_frame
+        mock_project.add_game_frame(game_frame)
 
         mock_capture = Mock(spec=CaptureResult)
         mock_capture.palettes = {0: [(31, 0, 0), (0, 31, 0)]}  # BGR555 format
@@ -281,7 +281,8 @@ class TestGetGamePalettes:
         game_frame1 = GameFrame(id="frame1", capture_path=capture1_path, palette_index=0)
         game_frame2 = GameFrame(id="frame2", capture_path=capture2_path, palette_index=1)
 
-        mock_project.game_frames = [game_frame1, game_frame2]
+        mock_project.add_game_frame(game_frame1)
+        mock_project.add_game_frame(game_frame2)
 
         mock_capture1 = Mock(spec=CaptureResult)
         mock_capture1.palettes = {0: [(31, 0, 0)]}
@@ -311,7 +312,7 @@ class TestGetGamePalettes:
         """Should skip game frames without capture paths."""
         game_frame = GameFrame(id="frame1", capture_path=None)
 
-        mock_project.game_frames = [game_frame]
+        mock_project.add_game_frame(game_frame)
 
         result = palette_service.get_game_palettes(mock_project)
         assert result == {}
