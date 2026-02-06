@@ -1167,13 +1167,15 @@ class WorkbenchCanvas(QWidget):
     def set_ingame_edited_path(self, path: str | None) -> None:
         """Set the saved in-game edit path, bypassing compositor for preview.
 
-        When set, transforms reset to neutral since the saved image becomes the
-        new reference. Flips, offset, and scale then apply relative to it.
+        When set, transforms reset to neutral since the saved image becomes
+        the new reference.  Offsets reset to (0, 0) — they now act as a
+        shift applied on top of the baked-in position.
         """
         if self._ingame_edited_path != path:
             self._ingame_edited_path = path
             if path is not None:
-                # Reset transforms — the saved image is the new baseline
+                # Reset transforms — the saved image is the new baseline.
+                # Offset (0, 0) = no shift from the baked position.
                 self.set_alignment(
                     offset_x=0,
                     offset_y=0,
@@ -1941,9 +1943,17 @@ class WorkbenchCanvas(QWidget):
                         Qt.TransformationMode.FastTransformation,
                     )
                     self._preview_item.setPixmap(QPixmap.fromImage(scaled))
+                    # Position preview at current offset — the in-game edit
+                    # has the original offset baked in, so additional offset
+                    # acts as a shift of the entire composited result.
+                    pos = self._ai_frame_item.pos()
+                    self._preview_item.setPos(pos.x(), pos.y())
                     self._preview_item.setVisible(True)
                     return
             # Fall through to compositor if file missing/invalid
+
+        # Normal compositor path — preview at origin (offset baked into composite)
+        self._preview_item.setPos(0, 0)
 
         # Use snapshot if available, otherwise use current values
         if self._preview_snapshot is not None:
@@ -2002,13 +2012,16 @@ class WorkbenchCanvas(QWidget):
             width: Original preview width.
             height: Original preview height.
         """
+        logger.debug("Canvas: _on_async_preview_ready %dx%d, preview_enabled=%s", width, height, self._preview_enabled)
         if not self._preview_enabled:
             return
 
         # Convert QImage to QPixmap on main thread (Qt requirement)
         scaled_pixmap = QPixmap.fromImage(qimage)
+        logger.debug("Canvas: QPixmap created %dx%d, setting on preview item", scaled_pixmap.width(), scaled_pixmap.height())
         self._preview_item.setPixmap(scaled_pixmap)
         self._preview_item.setVisible(True)
+        logger.debug("Canvas: preview item updated and visible")
 
     @signal_error_boundary()
     def _on_async_preview_failed(self, error_message: str) -> None:
