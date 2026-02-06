@@ -16,6 +16,7 @@ from ui.frame_mapping.services.async_injection_service import AsyncInjectionServ
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from core.frame_mapping_project import FrameMappingProject
     from core.services.injection_results import InjectionResult
     from core.services.palette_offset_calculator import PaletteOffsetCalculator
     from ui.frame_mapping.facades.controller_context import ControllerContext
@@ -81,6 +82,53 @@ class InjectionFacade:
         staging_manager = ROMStagingManager()
         return staging_manager.create_injection_copy(rom_path, None)
 
+    # ─── Helpers ──────────────────────────────────────────────────────────────
+
+    def _build_injection_request(
+        self,
+        project: FrameMappingProject,
+        ai_frame_id: str,
+        rom_path: Path,
+        output_path: Path | None,
+        create_backup: bool,
+        force_raw: bool,
+        preserve_sprite: bool,
+        emit_project_changed: bool,
+        allow_fallback: bool = False,
+    ) -> InjectionRequest:
+        """Build an InjectionRequest from mapping and frame data.
+
+        Args:
+            project: The frame mapping project.
+            ai_frame_id: ID of the AI frame to inject.
+            rom_path: Path to the ROM file.
+            output_path: Path for the output ROM.
+            create_backup: Whether to create a backup.
+            force_raw: Force RAW injection.
+            preserve_sprite: Preserve original sprite.
+            emit_project_changed: Whether to emit project_changed signal.
+            allow_fallback: If True, allow fallback to rom_offset filtering.
+
+        Returns:
+            Constructed InjectionRequest object.
+        """
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
+        palette_rom_offset: int | None = None
+        if mapping is not None:
+            palette_rom_offset = self._calculate_palette_rom_offset(rom_path, mapping.game_frame_id)
+
+        return InjectionRequest(
+            ai_frame_id=ai_frame_id,
+            rom_path=rom_path,
+            output_path=output_path,
+            create_backup=create_backup,
+            force_raw=force_raw,
+            allow_fallback=allow_fallback,
+            preserve_sprite=preserve_sprite,
+            emit_project_changed=emit_project_changed,
+            palette_rom_offset=palette_rom_offset,
+        )
+
     # ─── Sync Injection ───────────────────────────────────────────────────────
 
     def inject_mapping(
@@ -127,23 +175,16 @@ class InjectionFacade:
             self._signals.emit_error("No project loaded")
             return False
 
-        # Calculate palette ROM offset for injection
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        palette_rom_offset: int | None = None
-        if mapping is not None:
-            palette_rom_offset = self._calculate_palette_rom_offset(rom_path, mapping.game_frame_id)
-
-        # Build injection request
-        request = InjectionRequest(
+        request = self._build_injection_request(
+            project=project,
             ai_frame_id=ai_frame_id,
             rom_path=rom_path,
             output_path=output_path,
             create_backup=create_backup,
             force_raw=force_raw,
-            allow_fallback=allow_fallback,
             preserve_sprite=preserve_sprite,
             emit_project_changed=emit_project_changed,
-            palette_rom_offset=palette_rom_offset,
+            allow_fallback=allow_fallback,
         )
 
         # Progress callback wraps signal emission
@@ -194,14 +235,8 @@ class InjectionFacade:
             self._signals.emit_error("No project loaded")
             return
 
-        # Calculate palette ROM offset for injection
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        palette_rom_offset: int | None = None
-        if mapping is not None:
-            palette_rom_offset = self._calculate_palette_rom_offset(rom_path, mapping.game_frame_id)
-
-        # Build injection request
-        request = InjectionRequest(
+        request = self._build_injection_request(
+            project=project,
             ai_frame_id=ai_frame_id,
             rom_path=rom_path,
             output_path=output_path,
@@ -209,7 +244,6 @@ class InjectionFacade:
             force_raw=force_raw,
             preserve_sprite=preserve_sprite,
             emit_project_changed=emit_project_changed,
-            palette_rom_offset=palette_rom_offset,
         )
 
         # Queue for async processing
@@ -229,8 +263,6 @@ class InjectionFacade:
     def async_injection_pending_count(self) -> int:
         """Get the number of pending async injections."""
         return self._async_injection_service.pending_count
-
-    # ─── Helpers ──────────────────────────────────────────────────────────────
 
     def _handle_injection_result(
         self,
