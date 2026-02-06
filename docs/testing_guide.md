@@ -16,6 +16,27 @@
 ## Core Principles
 
 1. **Test behavior, not implementation** - Assert outcomes, not internal method calls
+
+#### Enforcement: No Implementation Coupling
+
+Tests must not depend on private implementation details:
+
+- **No assertions on `_`-prefixed attributes** — test public API outcomes instead
+- **No strict call-count assertions** (`assert_called_once()`) unless the call is externally observable (e.g., a signal emission, a file write)
+- See `docs/ToDo/impl_coupling_test_audit.md` for known violations being tracked
+
+```python
+# Bad — coupled to internal state
+def test_color_set():
+    widget.set_color(Qt.red)
+    assert widget._current_color == Qt.red  # Private attribute
+
+# Good — tests observable outcome
+def test_color_set(qtbot):
+    with qtbot.waitSignal(widget.color_changed):
+        widget.set_color(Qt.red)
+```
+
 2. **Real components over mocks** - Mock only at system boundaries
 3. **Use `tmp_path` for file I/O** - Real filesystem, isolated per-test
 

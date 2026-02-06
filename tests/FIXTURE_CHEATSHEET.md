@@ -109,12 +109,11 @@ Almost never. Use `app_context` unless:
 
 | Testing... | Location |
 |------------|----------|
-| Core logic (extractor, palette, etc.) | `tests/test_<module>.py` |
-| Manager behavior | `tests/test_<manager>_manager.py` |
-| UI components | `tests/ui/test_<component>.py` |
-| End-to-end workflows | `tests/integration/` |
-| Controller logic | `tests/controllers/` |
+| Core logic (pure, no Qt) | `tests/unit/core/` |
+| UI controllers/services | `tests/unit/ui/` |
+| Manager + multi-component | `tests/integration/` |
+| Widget / Qt interaction | `tests/ui/` |
 
 ---
 
-*Last updated: December 27, 2025*
+*Last updated: February 6, 2026*

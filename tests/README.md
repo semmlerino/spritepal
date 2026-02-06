@@ -87,20 +87,19 @@ See [CLAUDE.md](../CLAUDE.md#running-tests) for test commands, flags, and debugg
 
 ## Manager Access Pattern
 
-**Use `get_app_context()` to access managers:**
+**Use the `app_context` fixture for test code:**
 ```python
-from core.app_context import get_app_context
-
-context = get_app_context()
-manager = context.core_operations_manager
+def test_something(app_context):
+    manager = app_context.core_operations_manager
+    state = app_context.application_state_manager
 ```
 
 Benefits:
+- Clean state and auto-reset per test
+- Test isolation (no cross-test contamination)
 - Explicit manager access via attributes (better IDE support)
-- Clearer dependency relationships
-- No need to import manager classes for type lookup
 
-**Note:** The `inject()` pattern has been removed. Use `get_app_context()` exclusively.
+**Note:** Use `get_app_context()` only in production code or when fixture injection isn't available. The `inject()` pattern has been removed.
 
 ---
 
