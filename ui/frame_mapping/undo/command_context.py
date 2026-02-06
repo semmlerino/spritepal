@@ -22,6 +22,11 @@ class CommandSignalEmitter(Protocol):
 
     Commands need to emit signals during undo operations to notify the UI
     of state changes. This protocol defines the minimal interface needed.
+
+    The wrapper methods (emit_*) are used exclusively by the command/undo-redo
+    system to decouple command execution from signal emission. Direct .emit()
+    calls to signals elsewhere in the codebase are normal operational code and
+    do not use this protocol.
     """
 
     def emit_mapping_created(self, ai_frame_id: str, game_frame_id: str) -> None:

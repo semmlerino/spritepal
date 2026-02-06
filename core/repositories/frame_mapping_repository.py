@@ -32,8 +32,7 @@ class FrameMappingRepository:
     Provides:
     - Atomic writes (temp file + rename)
     - Version detection and migration
-    - Backward compatibility with v1-v4 formats
-    - Forward compatibility (unknown fields preserved)
+    - Backward compatibility with v1-v4 formats (unknown fields are not preserved)
     """
 
     @staticmethod
@@ -98,7 +97,7 @@ class FrameMappingRepository:
         """Load project from JSON file.
 
         Supports v1-v4 formats with automatic migration. Unknown fields
-        are preserved for forward compatibility.
+        are not preserved (only known schema fields are serialized).
 
         Note: Stale entry detection is performed asynchronously by the
         controller after loading to avoid UI freezes on large projects.
