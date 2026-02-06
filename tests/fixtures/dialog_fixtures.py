@@ -26,7 +26,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PySide6.QtWidgets import QMessageBox
 
 
 @dataclass
@@ -51,6 +50,8 @@ class MockDialogs:
 
     def __post_init__(self) -> None:
         """Initialize default responses."""
+        from PySide6.QtWidgets import QMessageBox
+
         # Default responses that allow tests to proceed without dialogs blocking
         self._responses = {
             "warning": QMessageBox.StandardButton.Yes,
@@ -61,6 +62,8 @@ class MockDialogs:
 
     def _start_patches(self) -> None:
         """Start all QMessageBox patches."""
+        from PySide6.QtWidgets import QMessageBox
+
         dialog_methods = ["warning", "information", "critical", "question"]
 
         for method_name in dialog_methods:
@@ -233,6 +236,8 @@ def mock_dialogs_deny() -> MockDialogs:
             # ... trigger code that shows dialogs ...
             # Verify cancellation was handled correctly
     """
+    from PySide6.QtWidgets import QMessageBox
+
     dialogs = MockDialogs()
     dialogs._responses = {
         "warning": QMessageBox.StandardButton.No,
