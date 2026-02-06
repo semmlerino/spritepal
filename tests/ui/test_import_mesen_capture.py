@@ -41,13 +41,18 @@ def obsel_config() -> OBSELConfig:
 
 @pytest.fixture
 def sample_tile_data() -> TileData:
-    """Create sample tile data."""
+    """Create sample tile data with a non-white pattern."""
+    # SNES 2bpp tile format: 32 bytes (4 bytes per row, 8 rows)
+    # Create a simple pattern: alternating pixels to avoid all-white tile
+    # Row format: 2 bytes for bitplane 0, 2 bytes for bitplane 1
+    # This creates a checkerboard-like pattern
+    tile_data = "55AA" * 16  # Alternating pattern across all 8 rows
     return TileData(
         tile_index=10,
         vram_addr=0x6000,
         pos_x=0,
         pos_y=0,
-        data_hex="FF" * 32,
+        data_hex=tile_data,
     )
 
 
@@ -147,7 +152,7 @@ def capture_json_file(tmp_path: Path, sample_capture: CaptureResult) -> Path:
             "oam_base_addr": sample_capture.obsel.oam_base_addr,
             "oam_addr_offset": sample_capture.obsel.oam_addr_offset,
         },
-        "sprites": [
+        "entries": [
             {
                 "id": e.id,
                 "x": e.x,
@@ -167,7 +172,7 @@ def capture_json_file(tmp_path: Path, sample_capture: CaptureResult) -> Path:
                         "vram_addr": t.vram_addr,
                         "pos_x": t.pos_x,
                         "pos_y": t.pos_y,
-                        "data": t.data_hex,
+                        "data_hex": t.data_hex,
                     }
                     for t in e.tiles
                 ],
@@ -296,49 +301,47 @@ class TestImportMesenCapture:
     def test_import_status_message(
         self,
         dialog: GridArrangementDialog,
-        sample_arrangement_data: CaptureArrangementData,
+        capture_json_file: Path,
+        sample_capture: CaptureResult,
         qtbot: QtBot,
     ) -> None:
         """Import updates status bar with tile count."""
-        with patch.object(dialog, "_update_status") as mock_status:
-            # Mock the full import flow
-            with patch("PySide6.QtWidgets.QFileDialog.getOpenFileName") as mock_file_dialog:
-                mock_file_dialog.return_value = ("/test/capture.json", "")
+        from PySide6.QtWidgets import QMessageBox
 
-                with patch("core.mesen_integration.click_extractor.MesenCaptureParser") as mock_parser:
-                    mock_parser_instance = MagicMock()
-                    mock_parser_instance.parse_file.return_value = MagicMock(
-                        entries=[MagicMock(palette=0)],  # Non-empty entries
-                    )
-                    mock_parser.return_value = mock_parser_instance
+        from core.mesen_integration.capture_to_arrangement import SpriteCluster
 
-                    with patch("ui.dialogs.capture_import_dialog.CaptureImportDialog") as mock_dialog:
-                        mock_dialog_instance = MagicMock()
-                        mock_dialog_instance.exec.return_value = mock_dialog.DialogCode.Accepted
-                        # Use selected_clusters (new API) instead of selected_palettes
-                        mock_dialog_instance.selected_clusters = [MagicMock(id=0, palette_index=0)]
-                        mock_dialog_instance.filter_garbage_tiles = False
-                        mock_dialog.return_value = mock_dialog_instance
+        # Create a mock cluster with real entries from the capture
+        mock_cluster = SpriteCluster(
+            id=0,
+            entries=sample_capture.entries,
+            palette_index=0,
+            min_x=0,
+            min_y=0,
+            width=16,
+            height=8,
+        )
 
-                        with patch(
-                            "core.mesen_integration.capture_to_arrangement.CaptureToArrangementConverter"
-                        ) as mock_converter:
-                            mock_converter_instance = MagicMock()
-                            # Use convert_clusters (new API) instead of convert
-                            mock_converter_instance.convert_clusters.return_value = sample_arrangement_data
-                            mock_converter.return_value = mock_converter_instance
+        with patch("PySide6.QtWidgets.QFileDialog.getOpenFileName") as mock_file_dialog:
+            mock_file_dialog.return_value = (str(capture_json_file), "")
 
-                            with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question:
-                                from PySide6.QtWidgets import QMessageBox
+            with patch("ui.dialogs.capture_import_dialog.CaptureImportDialog") as mock_dialog_cls:
+                mock_dialog_instance = MagicMock()
+                mock_dialog_instance.exec.return_value = mock_dialog_cls.DialogCode.Accepted
+                mock_dialog_instance.selected_clusters = [mock_cluster]
+                mock_dialog_instance.filter_garbage_tiles = False
+                mock_dialog_cls.return_value = mock_dialog_instance
 
-                                mock_question.return_value = QMessageBox.StandardButton.No
-                                # Trigger import via button click
-                                qtbot.mouseClick(dialog.import_capture_btn, Qt.MouseButton.LeftButton)
+                with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question, patch(
+                    "PySide6.QtWidgets.QMessageBox.warning"
+                ):
+                    mock_question.return_value = QMessageBox.StandardButton.No
 
-            # Status should have been updated
-            mock_status.assert_called()
-            status_call = str(mock_status.call_args)
-            assert "Imported" in status_call or "tiles" in status_call.lower()
+                    # Trigger import via button click
+                    qtbot.mouseClick(dialog.import_capture_btn, Qt.MouseButton.LeftButton)
+
+        # Assert on actual status bar content instead of mocking _update_status
+        status_text = dialog.status_bar.currentMessage()
+        assert "Imported" in status_text or "tile" in status_text.lower()
 
 
 class TestImportMesenCaptureEdgeCases:
