@@ -248,7 +248,7 @@
     {
       "ai_frame_id": "character_2_edited.png",
       "game_frame_id": "capture_1769721724",
-      "status": "edited",
+      "status": "injected",
       "offset_x": 0,
       "offset_y": 0,
       "flip_h": true,

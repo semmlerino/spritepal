@@ -172,7 +172,6 @@ class AsyncStaleEntryDetector(AsyncServiceBase):
         frames_to_check = [gf for gf in game_frames if gf.selected_entry_ids and gf.capture_path is not None]
 
         if not frames_to_check:
-            self.stale_entries_detected.emit([])
             return
 
         # Create worker and thread

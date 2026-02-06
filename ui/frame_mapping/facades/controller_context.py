@@ -12,8 +12,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from core.frame_mapping_project import FrameMappingProject
-    from core.repositories.capture_result_repository import CaptureResultRepository
-    from ui.frame_mapping.undo.undo_stack import UndoRedoStack
 
 
 @dataclass
@@ -22,8 +20,6 @@ class ControllerContext:
 
     Provides access to shared state:
     - project: The current project (may be None)
-    - undo_stack: The undo/redo stack (may be None)
-    - capture_repository: The capture result repository (may be None)
 
     Facades receive this context rather than the full controller,
     enabling them to operate on shared state without circular dependencies.
@@ -33,8 +29,6 @@ class ControllerContext:
     """
 
     _project_holder: list[FrameMappingProject | None] = field(default_factory=lambda: [None])
-    undo_stack: UndoRedoStack | None = None
-    capture_repository: CaptureResultRepository | None = None
 
     @property
     def project(self) -> FrameMappingProject | None:

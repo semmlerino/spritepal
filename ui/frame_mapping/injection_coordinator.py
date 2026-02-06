@@ -369,6 +369,9 @@ class InjectionCoordinator:
             stale_frame_ids: Game frame IDs with mismatched entry IDs
         """
         count = len(stale_frame_ids)
+        if not stale_frame_ids:
+            return
+
         logger.warning("Project loaded with %d stale game frames: %s", count, stale_frame_ids)
 
         # Show status bar message
@@ -461,15 +464,13 @@ class InjectionCoordinator:
         # Build result message
         if target_rom is not None:
             if total_count == 1:
-                # Single frame injection
+                # Single frame injection — exactly one of these counts is 1
                 if success_count == 1:
                     msg = f"Injection successful: {target_rom.name}"
                 elif failed_stale_count == 1:
                     msg = "Injection failed due to stale entry selection"
-                elif failed_other_count == 1:
-                    msg = "Injection failed"
                 else:
-                    msg = "Injection complete"
+                    msg = "Injection failed"
             else:
                 # Batch injection
                 msg = f"Injected {success_count}/{total_count} frames into {target_rom.name}"

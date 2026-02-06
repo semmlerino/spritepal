@@ -634,8 +634,6 @@ class FrameMappingController(QObject):
         # Pass the project holder so context and controller share same reference
         self._controller_context = ControllerContext(
             _project_holder=self._project_holder,
-            undo_stack=self._undo_stack,
-            capture_repository=self._capture_repository,
         )
         # Domain facades (thin wrappers grouping related methods)
         self._ai_frames = AIFramesFacade(
