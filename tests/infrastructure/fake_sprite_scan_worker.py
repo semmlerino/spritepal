@@ -17,7 +17,7 @@ from typing import Any
 from PySide6.QtCore import QObject, Signal
 
 
-@dataclass
+@dataclass(eq=False)
 class FakeSpriteScanWorker(QObject):
     """
     Type-safe fake for SpriteScanWorker.
@@ -177,6 +177,34 @@ class FakeSpriteScanWorker(QObject):
     def isRunning(self) -> bool:
         """Check if worker is running (always False for fake)."""
         return False
+
+    def isFinished(self) -> bool:
+        """Check if worker is finished (always True for fake)."""
+        return True
+
+    def quit(self) -> None:
+        """Stop the worker (no-op for fake)."""
+        pass
+
+    def wait(self, timeout_ms: int = 5000) -> bool:
+        """Wait for worker to finish (always immediate for fake)."""
+        return True
+
+    def requestInterruption(self) -> None:
+        """Request worker interruption (marks as cancelled)."""
+        self._is_cancelled = True
+
+    def deleteLater(self) -> None:
+        """Schedule deletion (no-op for fake)."""
+        pass
+
+    def __hash__(self) -> int:
+        """Return hash based on object id for use in sets/dicts."""
+        return hash(id(self))
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality based on object identity."""
+        return self is other
 
     def get_found_sprites(self) -> list[dict[str, Any]]:
         """Return the seeded sprites (matches real worker interface)."""

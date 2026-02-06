@@ -172,6 +172,10 @@ class FakeThumbnailController(QObject):
         """Check if worker is running."""
         return self._is_running
 
+    def cleanup(self) -> None:
+        """Clean up the controller and stop worker."""
+        self.stop_worker()
+
     # ============ Test helper methods ============
 
     def get_queued_offsets(self) -> list[int]:
