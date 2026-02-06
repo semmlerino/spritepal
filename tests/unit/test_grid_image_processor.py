@@ -4,8 +4,6 @@ Unit tests for GridImageProcessor
 
 from __future__ import annotations
 
-from unittest.mock import Mock
-
 import pytest
 from PIL import Image
 
@@ -46,11 +44,6 @@ class TestGridImageProcessor:
 
         # Create a test image (16x16 pixels, 2x2 tiles of 8x8 each)
         test_image = Image.new("L", (16, 16))
-
-        # Mock the calculate_tile_dimensions method
-        processor.calculate_tile_dimensions = Mock(return_value=(8, 8))
-        processor.tile_width = 8
-        processor.tile_height = 8
 
         result = processor.extract_tiles_as_grid(test_image, 2)
 
@@ -108,20 +101,9 @@ class TestGridImageProcessor:
         processor = GridImageProcessor()
         test_image = Image.new("L", (16, 16))
 
-        # Mock calculate_tile_dimensions to return invalid dimensions
-        processor.calculate_tile_dimensions = Mock(return_value=(0, 8))
-        processor.tile_width = 0
-        processor.tile_height = 8
-
+        # tiles_per_row=20 on 16px image → tile_width = 16 // 20 = 0
         with pytest.raises(ValueError, match="Invalid tile dimensions"):
-            processor.extract_tiles_as_grid(test_image, 2)
-
-        # Test negative tile dimensions
-        processor.tile_width = -1
-        processor.tile_height = 8
-
-        with pytest.raises(ValueError, match="Invalid tile dimensions"):
-            processor.extract_tiles_as_grid(test_image, 2)
+            processor.extract_tiles_as_grid(test_image, 20)
 
     def test_get_tile_valid(self):
         """Test getting a specific tile"""
