@@ -197,7 +197,7 @@ class SpriteScanWorker(BaseWorker):
         logger.info(f"Starting parallel sprite scan: 0x{start_offset:X} to 0x{end_offset:X}")
 
         # Progress callback to handle results as they come in
-        def progress_callback(current_progress: int, total_progress: int) -> None:
+        def progress_callback(current_progress: int, _total_progress: int) -> None:
             # Check cancellation before any work to prevent race condition with cache save
             if self.is_cancelled or (self._cancellation_token and self._cancellation_token.is_set()):
                 return

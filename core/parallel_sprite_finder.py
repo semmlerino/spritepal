@@ -90,7 +90,7 @@ class ParallelSpriteFinder:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object) -> None:
+    def __exit__(self, exc_type: type | None, exc_val: BaseException | None, _exc_tb: object) -> None:
         """Context manager exit - ensures cleanup."""
         self.shutdown()
 

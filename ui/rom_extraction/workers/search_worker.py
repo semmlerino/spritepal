@@ -111,7 +111,7 @@ class SpriteSearchWorker(BaseWorker):
             logger.debug(f"Searching range 0x{search_start:X} to 0x{search_end:X} (direction: {self.direction})")
 
             # Progress callback
-            def progress_callback(current_progress: int, total_progress: int):
+            def progress_callback(current_progress: int, _total_progress: int):
                 # Simple progress mapping
                 search_range = search_end - search_start
                 current_step = int((current_progress / 100) * (search_range // self.step))

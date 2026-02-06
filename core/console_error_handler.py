@@ -24,7 +24,7 @@ class ConsoleErrorHandler:
     properly logged instead of silently ignored.
     """
 
-    def __init__(self, show_dialogs: bool = False) -> None:
+    def __init__(self, _show_dialogs: bool = False) -> None:
         """
         Initialize the console error handler.
 

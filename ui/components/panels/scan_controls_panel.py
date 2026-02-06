@@ -202,7 +202,7 @@ class ScanControlsPanel(QWidget):
     def _scan_range(self) -> None:
         """Scan a range around current offset"""
         # Quick check if managers exist (safe under short lock)
-        has_managers = self._with_managers_safely(lambda em, re: True)
+        has_managers = self._with_managers_safely(lambda _em, re: True)
         if not self.rom_path or not has_managers:
             self.scan_status_changed.emit("No ROM loaded")
             return
@@ -247,7 +247,7 @@ class ScanControlsPanel(QWidget):
     def _scan_all(self) -> None:
         """Scan entire ROM"""
         # Quick check if managers exist (safe under short lock)
-        has_managers = self._with_managers_safely(lambda em, re: True)
+        has_managers = self._with_managers_safely(lambda _em, re: True)
         if not self.rom_path or not has_managers:
             self.scan_status_changed.emit("No ROM loaded")
             return
@@ -313,7 +313,7 @@ class ScanControlsPanel(QWidget):
     def _start_range_scan_worker(self, start_offset: int, end_offset: int) -> None:
         """Start the worker thread for range scanning with enhanced error recovery"""
         # Extract necessary data under mutex protection
-        rom_extractor = self._with_managers_safely(lambda em, re: re)
+        rom_extractor = self._with_managers_safely(lambda _em, re: re)
         if not rom_extractor:
             self.scan_status_changed.emit("ROM extractor not available")
             self._finish_scan()  # Reset UI state

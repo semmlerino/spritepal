@@ -123,7 +123,7 @@ class InjectionDebugContext:
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
+        _exc_tb: TracebackType | None,
     ) -> None:
         """Exit debug context, cleaning up logging handlers."""
         if not self._enabled:
