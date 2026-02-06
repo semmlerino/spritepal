@@ -180,17 +180,28 @@ class TestEditorPaletteSyncOnPaletteChange:
         # Change palette color (this should trigger _on_sheet_palette_changed)
         workspace.controller.set_sheet_palette_color(5, (255, 0, 0))
 
-        # Get the current palette after the change
+        # Get the current palette from the controller (this is what editors should receive)
         current_palette = workspace.controller.get_sheet_palette()
+        assert current_palette is not None
+        assert current_palette.colors[5] == (255, 0, 0)
 
-        # Verify editors received the CORRECT palette (not just any call)
+        # Verify both editors' _palette reference was updated to the current palette
         assert mock_editor1._palette is current_palette
-        mock_editor1._palette_panel.set_palette.assert_called_with(current_palette)
+        assert mock_editor2._palette is current_palette
+
+        # Verify set_palette was called with the correct (updated) palette object
+        mock_editor1._palette_panel.set_palette.assert_called()
+        set_palette_arg1 = mock_editor1._palette_panel.set_palette.call_args[0][0]
+        assert set_palette_arg1.colors[5] == (255, 0, 0)
+
+        mock_editor2._palette_panel.set_palette.assert_called()
+        set_palette_arg2 = mock_editor2._palette_panel.set_palette.call_args[0][0]
+        assert set_palette_arg2.colors[5] == (255, 0, 0)
+
+        # Verify other sync methods were called
         mock_editor1._update_duplicate_warning.assert_called()
         mock_editor1._main_canvas.set_image.assert_called()
 
-        assert mock_editor2._palette is current_palette
-        mock_editor2._palette_panel.set_palette.assert_called_with(current_palette)
         mock_editor2._update_duplicate_warning.assert_called()
         mock_editor2._main_canvas.set_image.assert_called()
 

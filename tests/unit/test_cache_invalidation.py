@@ -190,89 +190,100 @@ class TestInjectionCacheIntegration:
         """_on_worker_finished calls cache invalidation on successful injection."""
         from core.managers.core_operations_manager import CoreOperationsManager
 
-        # Create manager with mocked dependencies
-        with patch.object(CoreOperationsManager, "__init__", lambda self: None):
-            manager = CoreOperationsManager()
-            manager._logger = MagicMock()
-            manager._current_worker = MagicMock()
-            manager._current_worker.params = {"mode": "rom", "output_rom": "/path/to/output.sfc"}
+        mock_rom_cache = MagicMock()
+        mock_rom_cache.invalidate_rom_cache.return_value = 5
 
-            # Mock the methods we don't want to test
-            manager._handle_worker_completion = MagicMock()
-            manager.injection_finished = MagicMock()
+        manager = CoreOperationsManager(
+            session_manager=MagicMock(),
+            rom_cache=mock_rom_cache,
+            rom_extractor=MagicMock(),
+        )
 
-            # Mock the cache (now accessed via _ensure_rom_cache)
-            mock_cache = MagicMock()
-            mock_cache.invalidate_rom_cache.return_value = 5
+        # Set up a mock worker with injection params
+        manager._current_worker = MagicMock()
+        manager._current_worker.params = {"mode": "rom", "output_rom": "/path/to/output.sfc"}
 
-            with patch.object(manager, "_ensure_rom_cache", return_value=mock_cache):
-                manager._on_worker_finished(success=True, message="OK")
+        # Mock _handle_worker_completion to isolate cache invalidation testing
+        # (BaseManager's completion logic may clear _current_worker)
+        manager._handle_worker_completion = MagicMock()
 
-            # Verify cache invalidation was called
-            mock_cache.invalidate_rom_cache.assert_called_once_with("/path/to/output.sfc")
+        manager._on_worker_finished(success=True, message="OK")
+
+        # Verify cache invalidation was called
+        mock_rom_cache.invalidate_rom_cache.assert_called_once_with("/path/to/output.sfc")
 
     def test_on_worker_finished_skips_invalidation_on_failure(self) -> None:
         """_on_worker_finished does not invalidate cache on failed injection."""
         from core.managers.core_operations_manager import CoreOperationsManager
 
-        with patch.object(CoreOperationsManager, "__init__", lambda self: None):
-            manager = CoreOperationsManager()
-            manager._logger = MagicMock()
-            manager._current_worker = MagicMock()
-            manager._current_worker.params = {"mode": "rom", "output_rom": "/path/to/output.sfc"}
+        mock_rom_cache = MagicMock()
 
-            manager._handle_worker_completion = MagicMock()
-            manager.injection_finished = MagicMock()
+        manager = CoreOperationsManager(
+            session_manager=MagicMock(),
+            rom_cache=mock_rom_cache,
+            rom_extractor=MagicMock(),
+        )
 
-            mock_cache = MagicMock()
+        manager._current_worker = MagicMock()
+        manager._current_worker.params = {"mode": "rom", "output_rom": "/path/to/output.sfc"}
 
-            with patch.object(manager, "_ensure_rom_cache", return_value=mock_cache):
-                manager._on_worker_finished(success=False, message="Error")
+        # Mock _handle_worker_completion to isolate cache invalidation testing
+        manager._handle_worker_completion = MagicMock()
 
-            # Verify cache invalidation was NOT called
-            mock_cache.invalidate_rom_cache.assert_not_called()
+        manager._on_worker_finished(success=False, message="Error")
+
+        # Verify cache invalidation was NOT called
+        mock_rom_cache.invalidate_rom_cache.assert_not_called()
 
     def test_invalidation_skipped_for_vram_mode(self) -> None:
         """_invalidate_injection_cache skips invalidation for VRAM injection."""
         from core.managers.core_operations_manager import CoreOperationsManager
 
-        with patch.object(CoreOperationsManager, "__init__", lambda self: None):
-            manager = CoreOperationsManager()
-            manager._logger = MagicMock()
-            manager._current_worker = MagicMock()
-            manager._current_worker.params = {
-                "mode": "vram",  # VRAM mode, not ROM
-                "output_vram": "/path/to/output.vram",
-            }
+        mock_rom_cache = MagicMock()
 
-            mock_cache = MagicMock()
+        manager = CoreOperationsManager(
+            session_manager=MagicMock(),
+            rom_cache=mock_rom_cache,
+            rom_extractor=MagicMock(),
+        )
 
-            with patch.object(manager, "_ensure_rom_cache", return_value=mock_cache):
-                manager._invalidate_injection_cache()
+        manager._current_worker = MagicMock()
+        manager._current_worker.params = {
+            "mode": "vram",  # VRAM mode, not ROM
+            "output_vram": "/path/to/output.vram",
+        }
 
-            # Verify cache invalidation was NOT called for VRAM
-            mock_cache.invalidate_rom_cache.assert_not_called()
+        manager._invalidate_injection_cache()
+
+        # Verify cache invalidation was NOT called for VRAM
+        mock_rom_cache.invalidate_rom_cache.assert_not_called()
 
     def test_invalidation_handles_missing_worker(self) -> None:
         """_invalidate_injection_cache handles case when worker is None."""
         from core.managers.core_operations_manager import CoreOperationsManager
 
-        with patch.object(CoreOperationsManager, "__init__", lambda self: None):
-            manager = CoreOperationsManager()
-            manager._logger = MagicMock()
-            manager._current_worker = None  # No worker
+        manager = CoreOperationsManager(
+            session_manager=MagicMock(),
+            rom_cache=MagicMock(),
+            rom_extractor=MagicMock(),
+        )
 
-            # Should not raise
-            manager._invalidate_injection_cache()
+        manager._current_worker = None  # No worker
+
+        # Should not raise
+        manager._invalidate_injection_cache()
 
     def test_invalidation_handles_missing_params(self) -> None:
         """_invalidate_injection_cache handles case when worker has no params."""
         from core.managers.core_operations_manager import CoreOperationsManager
 
-        with patch.object(CoreOperationsManager, "__init__", lambda self: None):
-            manager = CoreOperationsManager()
-            manager._logger = MagicMock()
-            manager._current_worker = MagicMock(spec=[])  # No params attribute
+        manager = CoreOperationsManager(
+            session_manager=MagicMock(),
+            rom_cache=MagicMock(),
+            rom_extractor=MagicMock(),
+        )
 
-            # Should not raise
-            manager._invalidate_injection_cache()
+        manager._current_worker = MagicMock(spec=[])  # No params attribute
+
+        # Should not raise
+        manager._invalidate_injection_cache()

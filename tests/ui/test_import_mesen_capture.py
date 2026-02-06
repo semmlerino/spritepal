@@ -331,8 +331,9 @@ class TestImportMesenCapture:
                 mock_dialog_instance.filter_garbage_tiles = False
                 mock_dialog_cls.return_value = mock_dialog_instance
 
-                with patch("PySide6.QtWidgets.QMessageBox.question") as mock_question, patch(
-                    "PySide6.QtWidgets.QMessageBox.warning"
+                with (
+                    patch("PySide6.QtWidgets.QMessageBox.question") as mock_question,
+                    patch("PySide6.QtWidgets.QMessageBox.warning"),
                 ):
                     mock_question.return_value = QMessageBox.StandardButton.No
 
