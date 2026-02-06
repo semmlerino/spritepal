@@ -214,8 +214,8 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             rom_cache=mock_rom_cache,
         )
 
-        # Load ROM file
-        self.window._set_rom_file(test_rom_file)
+        # Load ROM file using public API
+        self.window.load_rom(test_rom_file)
 
         # Verify ROM was loaded
         assert self.window.rom_path == test_rom_file
@@ -244,7 +244,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             settings_manager=mock_settings_manager,
             rom_cache=mock_rom_cache,
         )
-        self.window._set_rom_file(test_rom_file)
+        self.window.load_rom(test_rom_file)
 
         # Capture initial sprite count (may have cached sprites from prior ROM cache)
         initial_sprite_count = len(self.window.sprites_data)
@@ -304,7 +304,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             settings_manager=mock_settings_manager,
             rom_cache=mock_rom_cache,
         )
-        self.window._set_rom_file(test_rom_file)
+        self.window.load_rom(test_rom_file)
 
         # Set some sprite data
         self.window.sprites_data = [
@@ -475,7 +475,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             settings_manager=mock_settings_manager,
             rom_cache=mock_rom_cache,
         )
-        self.window._set_rom_file(test_rom_file)
+        self.window.load_rom(test_rom_file)
 
         # Start scan
         self.window._start_scan()
@@ -539,7 +539,7 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
             settings_manager=mock_settings_manager,
             rom_cache=mock_rom_cache,
         )
-        self.window._set_rom_file(test_rom_file)
+        self.window.load_rom(test_rom_file)
 
         # Set initial workers
         # Note: implementation uses thumbnail_controller not thumbnail_worker
