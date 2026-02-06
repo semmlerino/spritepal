@@ -43,6 +43,18 @@ class ConcreteManager(BaseManager):
     def cleanup(self) -> None:
         """Cleanup test resources"""
 
+    def trigger_error(self, error: Exception, operation_name: str | None = None) -> None:
+        """Public method to trigger an error (for testing signal emission)."""
+        self._handle_error(error, operation_name)
+
+    def trigger_warning(self, message: str) -> None:
+        """Public method to trigger a warning (for testing signal emission)."""
+        self._handle_warning(message)
+
+    def update_progress(self, operation: str, current: int, total: int) -> None:
+        """Public method to update progress (for testing signal emission)."""
+        self._update_progress(operation, current, total)
+
 
 class TestBaseManager:
     """Test BaseManager functionality"""
@@ -92,39 +104,58 @@ class TestBaseManager:
         # Test error signal with timeout to prevent hanging
         with qtbot.waitSignal(manager.error_occurred, timeout=signal_timeout()) as blocker:
             # Use QTimer.singleShot to ensure signal is emitted in next event loop iteration
-            QTimer.singleShot(0, lambda: manager._handle_error(Exception("Test error")))
+            QTimer.singleShot(0, lambda: manager.trigger_error(Exception("Test error")))
         assert "Test error" in blocker.args[0]
 
         # Test warning signal with timeout
         with qtbot.waitSignal(manager.warning_occurred, timeout=signal_timeout()) as blocker:
-            QTimer.singleShot(0, lambda: manager._handle_warning("Test warning"))
+            QTimer.singleShot(0, lambda: manager.trigger_warning("Test warning"))
         assert blocker.args[0] == "Test warning"
 
         # Test progress signal with timeout
         with qtbot.waitSignal(manager.progress_updated, timeout=signal_timeout()) as blocker:
-            QTimer.singleShot(0, lambda: manager._update_progress("test_op", 50, 100))
+            QTimer.singleShot(0, lambda: manager.update_progress("test_op", 50, 100))
         assert blocker.args == ["test_op", 50, 100]
 
     def test_operation_lock(self):
-        """Test operation-specific locking"""
+        """Test operation-specific locking prevents concurrent execution"""
         manager = ConcreteManager()
 
-        counter = 0
+        # Test that locking behavior prevents concurrent operations
+        # Start an operation
+        assert manager.simulate_operation_start("test_op"), "First operation should start successfully"
 
-        def increment():
-            nonlocal counter
-            counter += 1
-            return counter
+        # Attempt to start the same operation concurrently (should fail)
+        assert not manager.simulate_operation_start("test_op"), "Same operation should not start twice"
 
-        # Run with lock
-        result = manager._with_operation_lock("test_op", increment)
-        assert result == 1
-        assert counter == 1
+        # Finish the operation
+        manager.simulate_operation_finish("test_op")
 
-        # Run again with same lock
-        result = manager._with_operation_lock("test_op", increment)
-        assert result == 2
-        assert counter == 2
+        # Now it should be possible to start again
+        assert manager.simulate_operation_start("test_op"), "Operation should start after previous finished"
+        manager.simulate_operation_finish("test_op")
+
+        # Test concurrent access from threads
+        results = []
+        lock = threading.Lock()
+
+        def try_start_operation():
+            result = manager.simulate_operation_start("concurrent_op")
+            with lock:
+                results.append(result)
+            if result:
+                time.sleep(0.01)  # sleep-ok: race condition test
+                manager.simulate_operation_finish("concurrent_op")
+
+        # Create threads that try to start the same operation
+        threads = [threading.Thread(target=try_start_operation) for _ in range(5)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        # Exactly one thread should have succeeded in starting the operation
+        assert sum(results) == 1, f"Expected exactly 1 successful start, got {sum(results)}"
 
     @pytest.mark.qt_no_exception_capture
     def test_error_handling_with_operation(self, qtbot):
@@ -137,7 +168,7 @@ class TestBaseManager:
 
         # Handle error for that operation with timeout to prevent hanging
         with qtbot.waitSignal(manager.error_occurred, timeout=signal_timeout()) as blocker:
-            QTimer.singleShot(0, lambda: manager._handle_error(Exception("Operation failed"), "test_op"))
+            QTimer.singleShot(0, lambda: manager.trigger_error(Exception("Operation failed"), "test_op"))
 
         # Operation should be finished
         assert not manager.is_operation_active("test_op")
