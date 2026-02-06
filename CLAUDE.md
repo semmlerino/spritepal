@@ -142,6 +142,8 @@ Agents execute what you specify—vague prompts yield vague results.
 
 This prevents agents from reverting each other's uncommitted work.
 
+**Critical: No agent commits.** Always include `"Do NOT commit changes."` in agent prompts. The orchestrator owns all commits—agent commits interfere with parallel agents and the SubagentStop hook.
+
 ### Background and Resume
 
 - Use `run_in_background: true` for long-running verification (test suite, type checking) while continuing other work
@@ -156,10 +158,11 @@ This prevents agents from reverting each other's uncommitted work.
 **Automatic lint/typecheck:** A `SubagentStop` hook automatically runs `ruff` and `basedpyright` on changed files when agents complete. If issues are found, the agent receives feedback and fixes them before finishing. Manual lint/typecheck is only needed for final verification before committing.
 
 Verification steps (run directly, not delegated):
-1. **Verify change counts:** `grep -c "pattern" <file>` to confirm expected number of changes
-2. **Run targeted tests:** `pytest tests/path/to/relevant_tests.py -v --tb=short`
-3. **Spot-check critical changes:** Read key modified sections if the agent made judgment calls
-4. **Commit immediately:** If verification passes, commit before spawning the next agent
+1. **Verify file state:** `git diff --stat` to confirm expected files are modified—agent writes can silently fail or be overwritten by other agents/hooks
+2. **Verify change counts:** `grep -c "pattern" <file>` to confirm expected number of changes
+3. **Run targeted tests:** `pytest tests/path/to/relevant_tests.py -v --tb=short`
+4. **Spot-check critical changes:** Read key modified sections if the agent made judgment calls
+5. **Commit immediately:** If verification passes, commit before spawning the next agent
 
 Only proceed to the next phase after verification passes AND changes are committed. If issues found, either fix directly or re-prompt the agent with specific corrections.
 
