@@ -65,7 +65,7 @@ from core.services.content_bounds_analyzer import (
     get_content_bbox,
 )
 from core.services.image_utils import pil_to_qimage
-from core.services.rgb_to_indexed import load_image_preserving_indices
+from core.services.rgb_to_indexed import convert_indexed_to_rgb, load_image_preserving_indices
 from core.services.sprite_compositor import TransformParams
 from core.services.tile_sampling_service import TileSamplingService
 from core.types import CompressionType
@@ -1894,6 +1894,25 @@ class WorkbenchCanvas(QWidget):
         if self._ai_image is None or self._capture_result is None or self._game_pixmap is None:
             self._preview_item.setVisible(False)
             return
+
+        # If in-game edited path exists, show it directly (bypasses compositor)
+        if self._ingame_edited_path is not None and self._sheet_palette is not None:
+            ingame_path = Path(self._ingame_edited_path)
+            if ingame_path.exists():
+                ingame_index_map, _ = load_image_preserving_indices(ingame_path, sheet_palette=self._sheet_palette)
+                if ingame_index_map is not None:
+                    rgba_image = convert_indexed_to_rgb(ingame_index_map, self._sheet_palette)
+                    qimage = pil_to_qimage(rgba_image)
+                    scaled = qimage.scaled(
+                        qimage.width() * self._display_scale,
+                        qimage.height() * self._display_scale,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.FastTransformation,
+                    )
+                    self._preview_item.setPixmap(QPixmap.fromImage(scaled))
+                    self._preview_item.setVisible(True)
+                    return
+            # Fall through to compositor if file missing/invalid
 
         # Use snapshot if available, otherwise use current values
         if self._preview_snapshot is not None:

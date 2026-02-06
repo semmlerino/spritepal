@@ -255,6 +255,7 @@ class InjectionOrchestrator:
             scale=snapshot.mapping.scale,
             sharpen=snapshot.mapping.sharpen,
             resampling=snapshot.mapping.resampling,
+            ingame_edited_path=snapshot.mapping.ingame_edited_path,
         )
 
         ai_frame = AIFrame(
