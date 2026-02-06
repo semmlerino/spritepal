@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject
 
+from core.frame_mapping_project import MappingStatus
 from ui.frame_mapping.views.workbench_types import AlignmentState
 from utils.logging_config import get_logger
 
@@ -46,7 +47,7 @@ class AlignmentService(QObject):
         project: FrameMappingProject,
         ai_frame_id: str,
         drag_start_alignment: AlignmentState | None = None,
-    ) -> tuple[AlignmentState, str] | None:
+    ) -> tuple[AlignmentState, MappingStatus] | None:
         """Capture state needed for undo when updating alignment.
 
         Args:
@@ -67,15 +68,7 @@ class AlignmentService(QObject):
         if drag_start_alignment is not None:
             old_alignment = drag_start_alignment
         else:
-            old_alignment = AlignmentState(
-                offset_x=mapping.offset_x,
-                offset_y=mapping.offset_y,
-                flip_h=mapping.flip_h,
-                flip_v=mapping.flip_v,
-                scale=mapping.scale,
-                sharpen=mapping.sharpen,
-                resampling=mapping.resampling,
-            )
+            old_alignment = AlignmentState.from_mapping(mapping)
 
         return old_alignment, mapping.status
 
@@ -144,7 +137,7 @@ class AlignmentService(QObject):
             mapping.offset_x = offset_x
             mapping.offset_y = offset_y
             mapping.scale = clamped_scale
-            mapping.status = "edited"
+            mapping.status = MappingStatus.EDITED
             updated_count += 1
 
         if updated_count > 0:

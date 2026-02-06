@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QObject
 
+from core.frame_mapping_project import MappingStatus
 from ui.frame_mapping.views.workbench_types import AlignmentState
 from utils.logging_config import get_logger
 
@@ -133,25 +134,9 @@ class MappingService(QObject):
         prev_game_alignment: AlignmentState | None = None
 
         if prev_ai_mapping:
-            prev_ai_alignment = AlignmentState(
-                offset_x=prev_ai_mapping.offset_x,
-                offset_y=prev_ai_mapping.offset_y,
-                flip_h=prev_ai_mapping.flip_h,
-                flip_v=prev_ai_mapping.flip_v,
-                scale=prev_ai_mapping.scale,
-                sharpen=prev_ai_mapping.sharpen,
-                resampling=prev_ai_mapping.resampling,
-            )
+            prev_ai_alignment = AlignmentState.from_mapping(prev_ai_mapping)
         if prev_game_mapping and prev_game_ai_id != ai_frame_id:
-            prev_game_alignment = AlignmentState(
-                offset_x=prev_game_mapping.offset_x,
-                offset_y=prev_game_mapping.offset_y,
-                flip_h=prev_game_mapping.flip_h,
-                flip_v=prev_game_mapping.flip_v,
-                scale=prev_game_mapping.scale,
-                sharpen=prev_game_mapping.sharpen,
-                resampling=prev_game_mapping.resampling,
-            )
+            prev_game_alignment = AlignmentState.from_mapping(prev_game_mapping)
 
         return prev_ai_game_id, prev_game_ai_id, prev_ai_alignment, prev_game_alignment
 
@@ -159,7 +144,7 @@ class MappingService(QObject):
         self,
         project: FrameMappingProject,
         ai_frame_id: str,
-    ) -> tuple[str, AlignmentState, str] | None:
+    ) -> tuple[str, AlignmentState, MappingStatus] | None:
         """Capture state needed for undo when removing a mapping.
 
         Args:
@@ -173,14 +158,6 @@ class MappingService(QObject):
         if mapping is None:
             return None
 
-        alignment = AlignmentState(
-            offset_x=mapping.offset_x,
-            offset_y=mapping.offset_y,
-            flip_h=mapping.flip_h,
-            flip_v=mapping.flip_v,
-            scale=mapping.scale,
-            sharpen=mapping.sharpen,
-            resampling=mapping.resampling,
-        )
+        alignment = AlignmentState.from_mapping(mapping)
 
         return mapping.game_frame_id, alignment, mapping.status

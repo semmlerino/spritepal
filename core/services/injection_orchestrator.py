@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 from PIL import Image
 
+from core.frame_mapping_project import MappingStatus
 from core.mesen_integration.capture_renderer import CaptureRenderer
 from core.mesen_integration.click_extractor import CaptureResult, MesenCaptureParser
 from core.palette_utils import (
@@ -500,7 +501,7 @@ class InjectionOrchestrator:
                     tile_results=result.tile_results,
                     output_rom_path=injection_rom_path,
                     messages=tuple(messages),
-                    new_mapping_status="injected",
+                    new_mapping_status=MappingStatus.INJECTED,
                 )
             else:
                 self._staging_manager.cleanup_on_failure(session, injection_rom_path, using_existing_output)

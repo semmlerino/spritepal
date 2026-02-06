@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from core.frame_mapping_project import MappingStatus
 from ui.frame_mapping.views.workbench_types import AlignmentState
 from utils.logging_config import get_logger
 
@@ -43,8 +44,8 @@ class CreateMappingCommand:
     prev_game_mapping_ai_id: str | None = None  # AI frame previously linked to this game frame
     prev_ai_mapping_alignment: AlignmentState | None = None
     prev_game_mapping_alignment: AlignmentState | None = None
-    prev_ai_mapping_status: str | None = None
-    prev_game_mapping_status: str | None = None
+    prev_ai_mapping_status: MappingStatus | None = None
+    prev_game_mapping_status: MappingStatus | None = None
 
     @property
     def description(self) -> str:
@@ -101,7 +102,7 @@ class RemoveMappingCommand:
     # Previous state for undo
     removed_game_frame_id: str | None = None
     removed_alignment: AlignmentState | None = None
-    removed_status: str = "mapped"
+    removed_status: MappingStatus = MappingStatus.MAPPED
 
     @property
     def description(self) -> str:
@@ -134,7 +135,7 @@ class UpdateAlignmentCommand:
     ai_frame_id: str
     new_alignment: AlignmentState
     old_alignment: AlignmentState
-    old_status: str = "mapped"
+    old_status: MappingStatus = MappingStatus.MAPPED
 
     @property
     def description(self) -> str:
@@ -167,28 +168,20 @@ class ApplyTransformsToAllCommand:
     scale: float
     exclude_ai_frame_id: str | None = None
     # Captured prior state: ai_frame_id -> (AlignmentState, status)
-    prev_states: dict[str, tuple[AlignmentState, str]] | None = None
+    prev_states: dict[str, tuple[AlignmentState, MappingStatus]] | None = None
 
     @property
     def description(self) -> str:
         return "Apply alignment to all mappings"
 
-    def _capture_states(self) -> dict[str, tuple[AlignmentState, str]]:
+    def _capture_states(self) -> dict[str, tuple[AlignmentState, MappingStatus]]:
         """Capture current alignment states for all affected mappings."""
-        states: dict[str, tuple[AlignmentState, str]] = {}
+        states: dict[str, tuple[AlignmentState, MappingStatus]] = {}
         for mapping in self.ctx.project.mappings:
             if mapping.ai_frame_id == self.exclude_ai_frame_id:
                 continue
             states[mapping.ai_frame_id] = (
-                AlignmentState(
-                    offset_x=mapping.offset_x,
-                    offset_y=mapping.offset_y,
-                    flip_h=mapping.flip_h,
-                    flip_v=mapping.flip_v,
-                    scale=mapping.scale,
-                    sharpen=mapping.sharpen,
-                    resampling=mapping.resampling,
-                ),
+                AlignmentState.from_mapping(mapping),
                 mapping.status,
             )
         return states

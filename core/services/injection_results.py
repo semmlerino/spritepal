@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from core.frame_mapping_project import MappingStatus
+
 
 @dataclass(frozen=True)
 class InjectionRequest:
@@ -83,7 +85,7 @@ class InjectionResult:
     output_rom_path: Path | None = None
     messages: tuple[str, ...] = field(default_factory=tuple)
     error: str | None = None
-    new_mapping_status: Literal["injected"] | None = None
+    new_mapping_status: MappingStatus | None = None
     needs_fallback_confirmation: bool = False
     stale_frame_id: str | None = None
 

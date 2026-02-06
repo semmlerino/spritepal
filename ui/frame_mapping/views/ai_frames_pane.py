@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.frame_mapping_project import MappingStatus
 from ui.frame_mapping.services.thumbnail_service import (
     DEFAULT_THUMBNAIL_SIZE,
     AsyncThumbnailLoader,
@@ -526,7 +527,7 @@ class AIFramesPane(QWidget):
         for frame_id, status in changed:
             self.update_single_item_status(frame_id, status)
 
-    def update_single_item_status(self, ai_frame_id: str, status: str) -> None:
+    def update_single_item_status(self, ai_frame_id: str, status: MappingStatus | str) -> None:
         """Update status indicator for one AI frame without full refresh.
 
         This is more efficient than set_mapping_status() when only a single

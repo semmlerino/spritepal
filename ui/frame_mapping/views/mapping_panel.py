@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.frame_mapping_project import MappingStatus
 from ui.common.mime_constants import MIME_AI_FRAME_REORDER, MIME_GAME_FRAME
 from ui.frame_mapping.services.async_icon_quantizer import AsyncIconQuantizer
 from ui.frame_mapping.services.thumbnail_service import (
@@ -927,7 +928,7 @@ class MappingPanel(QWidget):
 
                 break
 
-    def update_row_status(self, ai_frame_id: str, status: str) -> None:
+    def update_row_status(self, ai_frame_id: str, status: MappingStatus | str) -> None:
         """Update only the status column for a specific row.
 
         This is more efficient than full refresh() and preserves checkbox state

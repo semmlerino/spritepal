@@ -439,7 +439,7 @@ class FrameMapping:
 
     ai_frame_id: str  # Stable identifier (filename)
     game_frame_id: str
-    status: str = "mapped"  # "unmapped", "mapped", "edited", "injected"
+    status: MappingStatus = MappingStatus.MAPPED
 
     # Alignment for overlay (AI frame relative to game frame)
     offset_x: int = 0
@@ -457,10 +457,12 @@ class FrameMapping:
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to dictionary for JSON storage."""
+        # MappingStatus is a str Enum; handle both enum and plain str for tests
+        status_value: str = self.status.value if hasattr(self.status, "value") else self.status
         return {
             "ai_frame_id": self.ai_frame_id,
             "game_frame_id": self.game_frame_id,
-            "status": self.status,
+            "status": status_value,
             "offset_x": self.offset_x,
             "offset_y": self.offset_y,
             "flip_h": self.flip_h,
@@ -485,7 +487,7 @@ class FrameMapping:
         return cls(
             ai_frame_id=cast(str, data.get("ai_frame_id", "")),
             game_frame_id=cast(str, data["game_frame_id"]),
-            status=cast(str, data.get("status", "mapped")),
+            status=MappingStatus(cast(str, data.get("status", "mapped"))),
             offset_x=cast(int, data.get("offset_x", 0)),
             offset_y=cast(int, data.get("offset_y", 0)),
             flip_h=cast(bool, data.get("flip_h", False)),
@@ -879,7 +881,7 @@ class FrameMappingProject:
         mapping = FrameMapping(
             ai_frame_id=ai_frame_id,
             game_frame_id=game_frame_id,
-            status="mapped",
+            status=MappingStatus.MAPPED,
         )
         self.mappings.append(mapping)
         self._invalidate_mapping_index()
@@ -928,7 +930,7 @@ class FrameMappingProject:
 
         # Phase 5 fix: Transition to "edited" when alignment changes (removed guard)
         if set_edited:
-            mapping.status = "edited"
+            mapping.status = MappingStatus.EDITED
 
         return True
 
