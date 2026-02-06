@@ -156,3 +156,58 @@ class TestInjectionStaleEntry:
         assert "sprite_01.png" not in state.batch_injection_failed_stale
         assert "sprite_01.png" not in state.batch_injection_pending
         assert "sprite_02.png" in state.batch_injection_pending  # Still pending
+
+    def test_batch_injection_multiple_stale_game_frames(
+        self,
+        controller: FrameMappingController,
+        state: WorkspaceStateManager,
+        coordinator: InjectionCoordinator,
+        tmp_path: Path,
+    ) -> None:
+        """Two AI frames mapped to different stale game frames should both be failed_stale.
+
+        This tests the fix: previously only one game frame ID could be tracked,
+        so the second frame's stale status would be misclassified.
+        """
+        project = controller.project
+        assert project is not None
+
+        # Create 3 AI frames (third keeps the batch alive so state isn't cleared)
+        for name in ("sprite_01.png", "sprite_02.png", "sprite_03.png"):
+            (tmp_path / name).write_bytes(b"PNG")
+        ai_frames = [
+            AIFrame(path=tmp_path / "sprite_01.png", index=0),
+            AIFrame(path=tmp_path / "sprite_02.png", index=1),
+            AIFrame(path=tmp_path / "sprite_03.png", index=2),
+        ]
+        project.replace_ai_frames(ai_frames, tmp_path)
+
+        # Create game frames
+        game_frame_a = GameFrame(id="capture_A", rom_offsets=[0x1000])
+        game_frame_b = GameFrame(id="capture_B", rom_offsets=[0x2000])
+        project.add_game_frame(game_frame_a)
+        project.add_game_frame(game_frame_b)
+
+        # Map each of first two AI frames to different game frames
+        controller.create_mapping("sprite_01.png", "capture_A")
+        controller.create_mapping("sprite_02.png", "capture_B")
+
+        # Start batch tracking with all 3 frames (third keeps batch active)
+        state.start_batch_injection(
+            ["sprite_01.png", "sprite_02.png", "sprite_03.png"],
+            Path("/tmp/test.sfc"),
+        )
+
+        # Both game frames are stale
+        state.add_stale_game_frame_id("capture_A")
+        state.add_stale_game_frame_id("capture_B")
+
+        # Process both stale frames
+        coordinator.handle_async_injection_finished("sprite_01.png", False, "stale entry")
+        coordinator.handle_async_injection_finished("sprite_02.png", False, "stale entry")
+
+        # Both should be classified as stale failures (batch still active due to sprite_03)
+        assert "sprite_01.png" in state.batch_injection_failed_stale
+        assert "sprite_02.png" in state.batch_injection_failed_stale
+        assert len(state.batch_injection_success) == 0
+        assert "sprite_03.png" in state.batch_injection_pending
