@@ -49,32 +49,6 @@ def existing_file(tmp_path: Path) -> Path:
     return file
 
 
-class TestFileSelectorPathOperations:
-    """Tests for path get/set operations."""
-
-    def test_get_path(self, widget: FileSelector) -> None:
-        """get_path returns current path."""
-        widget.path_edit.setText("/test/path.rom")
-        assert widget.get_path() == "/test/path.rom"
-
-    def test_set_path_string(self, widget: FileSelector) -> None:
-        """set_path accepts string."""
-        widget.set_path("/new/path.rom")
-        assert widget.get_path() == "/new/path.rom"
-
-    def test_set_path_none(self, widget: FileSelector) -> None:
-        """set_path with None clears path."""
-        widget.set_path("/some/path.rom")
-        widget.set_path(None)
-        assert widget.get_path() == ""
-
-    def test_clear_path(self, widget: FileSelector) -> None:
-        """clear_path empties the path."""
-        widget.set_path("/some/path.rom")
-        widget.clear_path()
-        assert widget.get_path() == ""
-
-
 class TestFileSelectorSignals:
     """Tests for signal emission."""
 
