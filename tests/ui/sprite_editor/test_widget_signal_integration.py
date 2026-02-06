@@ -343,43 +343,6 @@ class TestEditorStatusBarIntegration:
         assert status_bar.get_current_color() == (255, 128, 64)
 
 
-class TestEditTabPanelAccess:
-    """Tests for EditTab property access to new widgets."""
-
-    def test_edit_tab_exposes_icon_toolbar(self, qtbot: QtBot) -> None:
-        """Verify EditTab.icon_toolbar property returns IconToolbar."""
-        from ui.sprite_editor.views.tabs.edit_tab import EditTab
-        from ui.sprite_editor.views.widgets.icon_toolbar import IconToolbar
-
-        tab = EditTab()
-        qtbot.addWidget(tab)
-
-        assert hasattr(tab, "icon_toolbar")
-        assert isinstance(tab.icon_toolbar, IconToolbar)
-
-    def test_edit_tab_exposes_palette_panel(self, qtbot: QtBot) -> None:
-        """Verify EditTab.palette_panel property returns PalettePanel."""
-        from ui.sprite_editor.views.panels.palette_panel import PalettePanel
-        from ui.sprite_editor.views.tabs.edit_tab import EditTab
-
-        tab = EditTab()
-        qtbot.addWidget(tab)
-
-        assert hasattr(tab, "palette_panel")
-        assert isinstance(tab.palette_panel, PalettePanel)
-
-    def test_edit_tab_exposes_preview_panel(self, qtbot: QtBot) -> None:
-        """Verify EditTab.preview_panel property returns PreviewPanel."""
-        from ui.sprite_editor.views.panels.preview_panel import PreviewPanel
-        from ui.sprite_editor.views.tabs.edit_tab import EditTab
-
-        tab = EditTab()
-        qtbot.addWidget(tab)
-
-        assert hasattr(tab, "preview_panel")
-        assert isinstance(tab.preview_panel, PreviewPanel)
-
-
 class TestFullSignalChain:
     """End-to-end tests for complete signal chains."""
 

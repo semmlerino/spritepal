@@ -42,21 +42,6 @@ class TestBug2ModifiedItemRemoval:
         custom_exists_after = any(combo.itemData(i, selector._SOURCE_TYPE_ROLE) == "" for i in range(combo.count()))
         assert not custom_exists_after, "[Modified] item should be removed after selecting standard source"
 
-    def test_remove_custom_item_method_exists(self, qtbot) -> None:
-        """PaletteSourceSelector should have remove_custom_item method."""
-        selector = PaletteSourceSelector()
-        qtbot.addWidget(selector)
-
-        # Bug 2 fix requires this method to exist
-        assert hasattr(selector, "remove_custom_item"), "PaletteSourceSelector should have remove_custom_item method"
-
-    def test_clear_all_sources_method_exists(self, qtbot) -> None:
-        """PaletteSourceSelector should have clear_all_sources method."""
-        selector = PaletteSourceSelector()
-        qtbot.addWidget(selector)
-
-        # Bug 2 fix requires this method to exist
-        assert hasattr(selector, "clear_all_sources"), "PaletteSourceSelector should have clear_all_sources method"
 
 
 # =============================================================================
@@ -66,16 +51,6 @@ class TestBug2ModifiedItemRemoval:
 
 class TestBug4IncompleteClearingByType:
     """Bug 4: All source types should support clearing."""
-
-    def test_palette_source_selector_clear_sources_by_type_method_exists(self, qtbot) -> None:
-        """PaletteSourceSelector should have clear_sources_by_type method."""
-        selector = PaletteSourceSelector()
-        qtbot.addWidget(selector)
-
-        # Bug 4 fix requires this method to exist
-        assert hasattr(selector, "clear_sources_by_type"), (
-            "PaletteSourceSelector should have clear_sources_by_type method"
-        )
 
     def test_clear_sources_by_type_preset(self, qtbot) -> None:
         """Clearing 'preset' type should remove preset sources."""
