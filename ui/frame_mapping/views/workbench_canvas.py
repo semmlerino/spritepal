@@ -65,7 +65,7 @@ from core.services.content_bounds_analyzer import (
     get_content_bbox,
 )
 from core.services.image_utils import pil_to_qimage
-from core.services.rgb_to_indexed import convert_indexed_to_rgb, load_image_preserving_indices
+from core.services.rgb_to_indexed import load_image_preserving_indices
 from core.services.sprite_compositor import TransformParams
 from core.services.tile_sampling_service import TileSamplingService
 from core.types import CompressionType
@@ -1886,34 +1886,6 @@ class WorkbenchCanvas(QWidget):
         if self._ai_image is None or self._capture_result is None or self._game_pixmap is None:
             self._preview_item.setVisible(False)
             return
-
-        # If a saved in-game edit exists, show it directly (matches injection behavior)
-        if self._ingame_edited_path and self._sheet_palette is not None:
-            ingame_path = Path(self._ingame_edited_path)
-            if ingame_path.exists():
-                try:
-                    index_map, _ = load_image_preserving_indices(ingame_path, sheet_palette=self._sheet_palette)
-                    if index_map is not None:
-                        rgba_image = convert_indexed_to_rgb(index_map, self._sheet_palette)
-                        qimage = pil_to_qimage(rgba_image, with_alpha=True)
-                        # Apply current flip state to the saved image
-                        if self._preview_snapshot is not None:
-                            flip_h = self._preview_snapshot.flip_h
-                            flip_v = self._preview_snapshot.flip_v
-                        else:
-                            flip_h = self._flip_h_checkbox.isChecked()
-                            flip_v = self._flip_v_checkbox.isChecked()
-                        if flip_h or flip_v:
-                            qimage = qimage.mirrored(flip_h, flip_v)
-                        scaled = qimage.scaled(
-                            rgba_image.width * self._display_scale,
-                            rgba_image.height * self._display_scale,
-                        )
-                        self._preview_item.setPixmap(QPixmap.fromImage(scaled))
-                        self._preview_item.setVisible(True)
-                        return
-                except Exception as e:
-                    logger.warning("Failed to load in-game edit %s: %s", ingame_path, e)
 
         # Use snapshot if available, otherwise use current values
         if self._preview_snapshot is not None:
