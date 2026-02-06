@@ -228,6 +228,7 @@ class AsyncInjectionService(AsyncServiceBase):
         self._current_request_id = 0
         self._pending_queue: list[AsyncInjectionRequest] = []
         self._is_processing = False
+        self._queue_time_game_frame_ids: dict[int, str] = {}
 
     @override
     @Slot()
@@ -302,6 +303,9 @@ class AsyncInjectionService(AsyncServiceBase):
             debug=debug,
         )
 
+        # Store queue-time game frame ID for stale classification
+        self._queue_time_game_frame_ids[self._current_request_id] = snapshot.game_frame.id
+
         self._pending_queue.append(request)
         self.injection_started.emit(ai_frame_id)
 
@@ -352,11 +356,20 @@ class AsyncInjectionService(AsyncServiceBase):
 
         # Emit result
         if isinstance(result, InjectionResult):
+            # Populate queue-time game frame ID for stale classification
+            from dataclasses import replace
+
+            game_frame_id = self._queue_time_game_frame_ids.pop(request_id, None)
+            if game_frame_id is not None:
+                result = replace(result, queue_time_game_frame_id=game_frame_id)
+
             message = "\n".join(result.messages) if result.messages else ""
             if not result.success and result.error:
                 message = result.error
             self.injection_finished.emit(ai_frame_id, result.success, message, result)
         else:
+            # Clean up tracking dict even on non-InjectionResult (shouldn't happen normally)
+            self._queue_time_game_frame_ids.pop(request_id, None)
             self.injection_finished.emit(ai_frame_id, False, "Unknown error", None)
 
         # Process next in queue
@@ -371,6 +384,7 @@ class AsyncInjectionService(AsyncServiceBase):
         self._cleanup_current_work()
         self._cleanup_thread()
         self._is_processing = False
+        self._queue_time_game_frame_ids.clear()
 
     @property
     def is_busy(self) -> bool:

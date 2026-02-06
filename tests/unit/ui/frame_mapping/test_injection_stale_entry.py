@@ -69,6 +69,9 @@ class TestInjectionStaleEntry:
         state.start_batch_injection(["sprite_01.png", "sprite_02.png"], Path("/tmp/test.sfc"))
         state.add_stale_game_frame_id("capture_A")
 
+        # Simulate queue-time capture: set queue_time_game_frame_id to capture_A
+        controller._last_queue_time_game_frame_id = "capture_A"
+
         # Act - Handle injection completion for first frame (success=False, stale entry detected)
         coordinator.handle_async_injection_finished("sprite_01.png", False, "stale entry")
 
@@ -111,6 +114,9 @@ class TestInjectionStaleEntry:
         state.start_batch_injection(["sprite_01.png", "sprite_02.png"], Path("/tmp/test.sfc"))
         state.add_stale_game_frame_id("capture_B")  # Different game frame
 
+        # Simulate queue-time capture: set queue_time_game_frame_id to capture_A
+        controller._last_queue_time_game_frame_id = "capture_A"
+
         # Act - Handle injection completion (success=True, no stale entry match)
         coordinator.handle_async_injection_finished("sprite_01.png", True, "ok")
 
@@ -146,6 +152,9 @@ class TestInjectionStaleEntry:
         # Set up batch tracking with TWO frames (so batch doesn't complete and clear state)
         state.start_batch_injection(["sprite_01.png", "sprite_02.png"], Path("/tmp/test.sfc"))
         # stale_game_frame_ids is empty by default (cleared by start_batch_injection)
+
+        # Simulate queue-time capture: set queue_time_game_frame_id to capture_A
+        controller._last_queue_time_game_frame_id = "capture_A"
 
         # Act - Handle injection completion (success=True, no stale entry tracking)
         coordinator.handle_async_injection_finished("sprite_01.png", True, "ok")
@@ -203,7 +212,12 @@ class TestInjectionStaleEntry:
         state.add_stale_game_frame_id("capture_B")
 
         # Process both stale frames
+        # Simulate queue-time capture for sprite_01: set queue_time_game_frame_id to capture_A
+        controller._last_queue_time_game_frame_id = "capture_A"
         coordinator.handle_async_injection_finished("sprite_01.png", False, "stale entry")
+
+        # Simulate queue-time capture for sprite_02: set queue_time_game_frame_id to capture_B
+        controller._last_queue_time_game_frame_id = "capture_B"
         coordinator.handle_async_injection_finished("sprite_02.png", False, "stale entry")
 
         # Both should be classified as stale failures (batch still active due to sprite_03)

@@ -243,6 +243,8 @@ class AIFramesFacade:
         if removed_ids:
             self._signals.emit_ai_frames_removed_batch(removed_ids)
             self._signals.emit_save_requested()
+            # Clear undo stack to prevent stale references to deleted frames
+            self._undo_stack.clear()
             logger.info("Removed %d AI frames in batch", len(removed_ids))
 
         return removed_ids

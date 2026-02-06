@@ -210,3 +210,51 @@ class TestUndoRedoStackSignals:
 
         assert ("undo", False) in signals_received
         assert ("redo", False) in signals_received
+
+    def test_undo_returns_none_on_exception(self, qtbot: object) -> None:
+        """Undo returns None when command raises exception."""
+        stack = UndoRedoStack()
+
+        class FailingCommand:
+            """Command that fails on undo."""
+
+            description = "Failing"
+
+            def execute(self) -> None:
+                pass
+
+            def undo(self) -> None:
+                raise RuntimeError("undo failed")
+
+        cmd = FailingCommand()
+        stack.push(cmd)  # This calls execute(), which succeeds
+
+        result = stack.undo()
+        assert result is None
+
+    def test_redo_returns_none_on_exception(self, qtbot: object) -> None:
+        """Redo returns None when command raises exception."""
+        stack = UndoRedoStack()
+
+        class FailOnRedoCommand:
+            """Command that fails on second execute (redo)."""
+
+            description = "FailOnRedo"
+
+            def __init__(self) -> None:
+                self._call_count = 0
+
+            def execute(self) -> None:
+                self._call_count += 1
+                if self._call_count > 1:
+                    raise RuntimeError("redo failed")
+
+            def undo(self) -> None:
+                pass
+
+        cmd = FailOnRedoCommand()
+        stack.push(cmd)  # execute succeeds (call_count=1)
+        stack.undo()  # undo succeeds, moves to redo stack
+
+        result = stack.redo()  # execute fails (call_count=2)
+        assert result is None

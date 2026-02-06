@@ -1317,8 +1317,16 @@ class WorkbenchCanvas(QWidget):
         """Clear alignment values (reset to defaults)."""
         self.set_alignment(0, 0, False, False, 1.0, 0.0, "lanczos", has_mapping=False)
 
+    def cancel_async_operations(self) -> None:
+        """Cancel in-flight async preview and highlight operations."""
+        self._async_preview_service.cancel()
+        self._async_highlight_service.cancel()
+
     def clear(self) -> None:
         """Clear all content."""
+        # Cancel in-flight async operations
+        self.cancel_async_operations()
+
         # Cancel pending alignment
         self._pending_alignment_params = None
 

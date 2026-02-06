@@ -95,7 +95,7 @@ class UndoRedoStack(QObject):
         except Exception:
             logger.warning("Undo failed for '%s', discarding command", command.description, exc_info=True)
             self.can_undo_changed.emit(len(self._undo_stack) > 0)
-            return command.description
+            return None
         self._redo_stack.append(command)
 
         # Emit signals
@@ -119,7 +119,7 @@ class UndoRedoStack(QObject):
         except Exception:
             logger.warning("Redo failed for '%s', discarding command", command.description, exc_info=True)
             self.can_redo_changed.emit(len(self._redo_stack) > 0)
-            return command.description
+            return None
         self._undo_stack.append(command)
 
         # Emit signals

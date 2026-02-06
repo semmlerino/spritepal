@@ -427,15 +427,12 @@ class InjectionCoordinator:
             return
 
         # Track stale entry failures for batch reporting
-        # Note: stale_game_frame_ids stores GAME frame IDs, but ai_frame_id is an AI frame ID.
-        # We need to look up the game frame ID for this AI frame to compare correctly.
+        # Use queue-time game frame ID instead of current mapping to handle remap scenarios
         stale_entries = False
         if self._state.stale_game_frame_ids:
-            project = self._controller.project
-            if project is not None:
-                mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-                if mapping is not None:
-                    stale_entries = mapping.game_frame_id in self._state.stale_game_frame_ids
+            queue_time_game_frame_id = self._controller._last_queue_time_game_frame_id
+            if queue_time_game_frame_id is not None:
+                stale_entries = queue_time_game_frame_id in self._state.stale_game_frame_ids
 
         self._state.record_batch_injection_result(ai_frame_id, success, stale_entries)
 

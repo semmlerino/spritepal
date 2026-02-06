@@ -73,9 +73,9 @@ class TestBug2UndoAfterFrameDeletion:
         stack.push(FailingCommand())
         assert stack.can_undo()
 
-        # Undo should not raise
+        # Undo should not raise; returns None on failure (not description)
         result = stack.undo()
-        assert result == "Failing command"
+        assert result is None
         # Command should be discarded (not in redo stack)
         assert not stack.can_redo()
 
@@ -104,9 +104,9 @@ class TestBug2UndoAfterFrameDeletion:
         stack.undo()
         assert stack.can_redo()
 
-        # Redo should not raise
+        # Redo should not raise; returns None on failure (not description)
         result = stack.redo()
-        assert result == "Fail on redo"
+        assert result is None
         # Command should be discarded (not in undo stack beyond what was there)
         assert not stack.can_undo()
 

@@ -630,6 +630,8 @@ class FrameMappingController(QObject):
         self._undo_stack = UndoRedoStack(parent=self)
         self._undo_stack.can_undo_changed.connect(self.can_undo_changed)
         self._undo_stack.can_redo_changed.connect(self.can_redo_changed)
+        # Track queue-time game frame ID for stale classification
+        self._last_queue_time_game_frame_id: str | None = None
         # Controller context for facades (shared state)
         # Pass the project holder so context and controller share same reference
         self._controller_context = ControllerContext(
@@ -872,6 +874,8 @@ class FrameMappingController(QObject):
             name: Project name
         """
         self._project = FrameMappingProject(name=name)
+        self._async_injection_service.cancel_all()
+        self._async_preview_service.cancel()
         self._preview_service.invalidate_all()
         self._undo_stack.clear()  # Clear history on new project
         self.project_changed.emit()
@@ -888,6 +892,10 @@ class FrameMappingController(QObject):
         """
         try:
             self._project = FrameMappingRepository.load(path)
+
+            # Cancel in-flight async operations from previous project
+            self._async_injection_service.cancel_all()
+            self._async_preview_service.cancel()
 
             # Start async stale entry detection (UI won't freeze for large projects)
             # Signal will emit stale_entries_on_load when detection completes
@@ -1630,7 +1638,10 @@ class FrameMappingController(QObject):
         from core.services.injection_results import InjectionResult
 
         if isinstance(result, InjectionResult):
+            self._last_queue_time_game_frame_id = result.queue_time_game_frame_id
             self._injection._handle_injection_result(result, ai_frame_id)
+        else:
+            self._last_queue_time_game_frame_id = None
 
         # Emit the async_injection_finished signal
         self.async_injection_finished.emit(ai_frame_id, success, message)

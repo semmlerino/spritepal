@@ -406,8 +406,9 @@ class PaletteCoordinator:
             if self._state.selected_ai_frame_id == ai_frame_id:
                 self._state.selected_ai_frame_id = new_id
 
-        # Mark project as modified (will auto-save on next operation)
+        # Mark project as modified and trigger autosave
         self._controller.emit_project_changed()
+        self._controller.emit_save_requested()
 
         # Refresh the AI frames pane to show updated preview
         if self._ai_frames_pane:

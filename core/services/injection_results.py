@@ -88,6 +88,7 @@ class InjectionResult:
     new_mapping_status: MappingStatus | None = None
     needs_fallback_confirmation: bool = False
     stale_frame_id: str | None = None
+    queue_time_game_frame_id: str | None = None
 
     @staticmethod
     def failure(error: str) -> InjectionResult:
