@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from core.frame_mapping_project import AIFrame, FrameMapping, GameFrame, SheetPalette
+from core.frame_mapping_project import AIFrame, FrameMapping, FrameMappingProject, GameFrame, SheetPalette
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest, InjectionResult
@@ -202,25 +202,24 @@ class TestInjectionOrchestratorStaleEntries:
         """Returns stale entries result when allow_fallback=False."""
         rom_path = tmp_path / "game.sfc"
         rom_path.write_bytes(b"ROM")
-        ai_frame_path = tmp_path / "frame.png"
+        ai_frame_path = tmp_path / "frame_0.png"
         # Create valid PNG image
         img = Image.new("RGBA", (8, 8), (255, 0, 0, 255))
         img.save(ai_frame_path)
         capture_path = tmp_path / "capture.json"
         capture_path.write_text('{"frame": 1, "entries": [], "palettes": {}}')
 
-        project = MagicMock()
-        mapping = FrameMapping(ai_frame_id="frame_0.png", game_frame_id="test_frame")
-        project.get_mapping_for_ai_frame.return_value = mapping
-
+        # Create real project with AI frame and game frame
+        project = FrameMappingProject(name="test", ai_frames_dir=tmp_path)
         ai_frame = AIFrame(path=ai_frame_path, index=0)
-        project.get_ai_frame_by_id.return_value = ai_frame
+        project.ai_frames = [ai_frame]
+        project._rebuild_indices()
 
         game_frame = GameFrame(
             id="test_frame", rom_offsets=[0x10000], capture_path=capture_path, selected_entry_ids=[999]
         )
-        project.get_game_frame_by_id.return_value = game_frame
-        project.sheet_palette = None
+        project.add_game_frame(game_frame)
+        project.create_mapping("frame_0.png", "test_frame")
 
         orchestrator = InjectionOrchestrator()
         request = InjectionRequest(
@@ -355,14 +354,18 @@ class TestInjectionOrchestratorTilePadding:
         )
 
         # Create minimal project with sheet palette
-        project = MagicMock()
+        project = FrameMappingProject(name="test", ai_frames_dir=tmp_path)
         project.sheet_palette = SheetPalette(
             colors=[(0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)] + [(0, 0, 0)] * 12,
         )
 
         # Create minimal game frame with HAL compression
-        game_frame = MagicMock()
-        game_frame.compression_types = {0x50000: "hal"}  # Use HAL compression
+        game_frame = GameFrame(
+            id="test_frame",
+            rom_offsets=[0x50000],
+            capture_path=tmp_path / "capture.json",
+            compression_types={0x50000: "hal"},
+        )
 
         # Create debug context (disabled)
         debug = InjectionDebugContext(enabled=False)
@@ -463,14 +466,17 @@ class TestInjectionOrchestratorTilePadding:
             palettes={0: [(31, 0, 0)] * 16},
         )
 
-        project = MagicMock()
+        project = FrameMappingProject(name="test", ai_frames_dir=tmp_path)
         project.sheet_palette = SheetPalette(
             colors=[(0, 0, 0), (255, 0, 0)] + [(0, 0, 0)] * 14,
         )
 
-        game_frame = MagicMock()
-        # Mark this ROM offset as HAL compressed
-        game_frame.compression_types = {0x50000: "hal"}
+        game_frame = GameFrame(
+            id="test_frame",
+            rom_offsets=[0x50000],
+            capture_path=tmp_path / "capture.json",
+            compression_types={0x50000: "hal"},
+        )
 
         debug = InjectionDebugContext(enabled=False)
 
@@ -617,11 +623,15 @@ class TestInjectionOrchestratorColorFidelity:
             )
 
             # Project with non-SNES-valid palette colors
-            project = MagicMock()
+            project = FrameMappingProject(name="test", ai_frames_dir=tmp_path)
             project.sheet_palette = SheetPalette(colors=non_snes_colors)
 
-            game_frame = MagicMock()
-            game_frame.compression_types = {0x50000: "hal"}
+            game_frame = GameFrame(
+                id="test_frame",
+                rom_offsets=[0x50000],
+                capture_path=tmp_path / "capture.json",
+                compression_types={0x50000: "hal"},
+            )
 
             debug = InjectionDebugContext(enabled=False)
 
