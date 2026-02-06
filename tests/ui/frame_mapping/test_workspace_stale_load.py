@@ -42,18 +42,15 @@ class TestWorkspaceStaleLoad:
         assert timeout >= 5000  # At least 5 seconds for a warning
 
     def test_workspace_handler_handles_empty_list(self, app_context: object) -> None:
-        """Handler should handle empty stale list gracefully."""
+        """Handler should not show a warning for empty stale list."""
         mock_message_service = Mock()
         workspace = FrameMappingWorkspace(message_service=mock_message_service)
 
         # Call handler with empty list
         workspace._on_stale_entries_detected_on_load([])
 
-        # Message service should still be called
-        mock_message_service.show_message.assert_called_once()
-        call_args = mock_message_service.show_message.call_args
-        message_text = call_args.args[0]
-        assert "0" in message_text
+        # No message should be shown for empty list (no stale entries = no warning)
+        mock_message_service.show_message.assert_not_called()
 
     def test_workspace_handler_no_message_service(self, app_context: object) -> None:
         """Handler should not crash if message service is None."""
