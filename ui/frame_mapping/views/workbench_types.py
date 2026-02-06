@@ -7,6 +7,10 @@ and alignment state, providing self-documenting code and IDE assistance.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from core.frame_mapping_project import FrameMapping
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,3 +49,16 @@ class AlignmentState:
     scale: float
     sharpen: float
     resampling: str
+
+    @classmethod
+    def from_mapping(cls, mapping: FrameMapping) -> AlignmentState:
+        """Create AlignmentState from a FrameMapping's alignment fields."""
+        return cls(
+            offset_x=mapping.offset_x,
+            offset_y=mapping.offset_y,
+            flip_h=mapping.flip_h,
+            flip_v=mapping.flip_v,
+            scale=mapping.scale,
+            sharpen=mapping.sharpen,
+            resampling=mapping.resampling,
+        )
