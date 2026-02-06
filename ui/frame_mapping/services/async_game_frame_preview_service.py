@@ -185,14 +185,13 @@ class AsyncGameFramePreviewService(AsyncServiceBase):
 
     Signals:
         preview_ready: (frame_id, pixmap) - emitted for each completed preview
-        batch_finished: () - emitted when batch is complete
     """
 
     preview_ready = Signal(str, QPixmap)
     """Emitted when a game frame preview is ready for display.
 
     Part of batch async preview generation. Emitted incrementally for each
-    completed preview. Use with batch_finished to detect overall batch completion.
+    completed preview.
 
     Args:
         frame_id: ID of the game frame
@@ -205,22 +204,6 @@ class AsyncGameFramePreviewService(AsyncServiceBase):
         - FrameMappingController.game_frame_preview_ready
         - WorkbenchCanvas → updates frame display
         - CapturesLibraryPane → updates thumbnail
-    """
-
-    batch_finished = Signal()
-    """Emitted when batch async preview generation completes.
-
-    Signals completion of the entire batch. All requested previews have been
-    generated (or batch was cancelled). Use with preview_ready for progress tracking.
-
-    Args:
-        (none)
-
-    Emitted by:
-        - _on_batch_finished() → after all previews in batch are generated
-
-    Triggers:
-        - FrameMappingController._on_async_previews_finished (relay only)
     """
 
     def __init__(
@@ -275,7 +258,6 @@ class AsyncGameFramePreviewService(AsyncServiceBase):
         self.cancel()
 
         if not frame_ids:
-            self.batch_finished.emit()
             return
 
         # Build requests from frame IDs
@@ -295,7 +277,6 @@ class AsyncGameFramePreviewService(AsyncServiceBase):
             )
 
         if not requests:
-            self.batch_finished.emit()
             return
         # Create worker and thread
         self._worker = _GameFramePreviewWorker()
@@ -343,7 +324,6 @@ class AsyncGameFramePreviewService(AsyncServiceBase):
             return
 
         self._cleanup_thread()
-        self.batch_finished.emit()
 
     def cancel(self) -> None:
         """Cancel any in-progress batch."""

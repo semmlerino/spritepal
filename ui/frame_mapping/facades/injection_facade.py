@@ -171,7 +171,6 @@ class InjectionFacade:
         create_backup: bool = True,
         debug: bool = False,
         force_raw: bool = False,
-        allow_fallback: bool = False,
         emit_project_changed: bool = True,
         preserve_sprite: bool = False,
     ) -> None:
@@ -187,7 +186,6 @@ class InjectionFacade:
             create_backup: Whether to create a backup before injection.
             debug: Enable debug mode.
             force_raw: Force RAW (uncompressed) injection for all tiles.
-            allow_fallback: Allow fallback to rom_offset filtering.
             emit_project_changed: If True, emit project_changed after success.
             preserve_sprite: If True, original sprite remains visible.
         """
@@ -209,7 +207,6 @@ class InjectionFacade:
             output_path=output_path,
             create_backup=create_backup,
             force_raw=force_raw,
-            allow_fallback=allow_fallback,
             preserve_sprite=preserve_sprite,
             emit_project_changed=emit_project_changed,
             palette_rom_offset=palette_rom_offset,
