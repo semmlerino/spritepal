@@ -146,11 +146,11 @@ class CanvasConfigService:
             scale,
         )
 
-    def set_canvas_size(self, canvas_type: str, size: int) -> None:
+    def set_canvas_size(self, canvas_type: CanvasType, size: int) -> None:
         """Set canvas size for a specific canvas type.
 
         Args:
-            canvas_type: Canvas identifier
+            canvas_type: Canvas identifier (CanvasType enum)
             size: Canvas size in pixels (50-1000)
         """
         if size < 50 or size > 1000:
@@ -163,7 +163,7 @@ class CanvasConfigService:
         self._save_configs()
         logger.debug("Updated canvas size for %s to %dpx", canvas_type, size)
 
-    def _load_configs(self) -> dict[str, CanvasConfig]:
+    def _load_configs(self) -> dict[CanvasType, CanvasConfig]:
         """Load canvas configurations from ApplicationStateManager.
 
         Returns:
@@ -182,21 +182,28 @@ class CanvasConfigService:
             # canvas_configs should be a dict[str, dict] but stored as object
             canvas_configs_obj = frame_mapping_settings.get("canvas_configs", {})
 
-            configs: dict[str, CanvasConfig] = {}
+            configs: dict[CanvasType, CanvasConfig] = {}
             # Runtime check: is canvas_configs_obj actually a dict?
             if isinstance(canvas_configs_obj, dict):
-                for canvas_type, config_dict in canvas_configs_obj.items():
+                for canvas_type_str, config_dict in canvas_configs_obj.items():
                     if isinstance(config_dict, dict):
                         try:
+                            # Convert string key to enum
+                            canvas_type = CanvasType(canvas_type_str)
                             configs[canvas_type] = CanvasConfig(**config_dict)
-                        except TypeError as e:
+                        except (ValueError, TypeError) as e:
                             logger.warning(
                                 "Failed to load config for %s: %s, using default",
-                                canvas_type,
+                                canvas_type_str,
                                 e,
                             )
-                            if canvas_type in self._DEFAULT_CONFIGS:
-                                configs[canvas_type] = self._DEFAULT_CONFIGS[canvas_type]
+                            # Try to match to a known type
+                            try:
+                                canvas_type = CanvasType(canvas_type_str)
+                                if canvas_type in self._DEFAULT_CONFIGS:
+                                    configs[canvas_type] = self._DEFAULT_CONFIGS[canvas_type]
+                            except ValueError:
+                                pass  # Unknown type, skip it
 
             # Fill in missing defaults (as copies)
             for canvas_type, default_config in self._DEFAULT_CONFIGS.items():
@@ -217,8 +224,8 @@ class CanvasConfigService:
             return
 
         try:
-            # Convert configs to dict format
-            canvas_configs_data = {canvas_type: asdict(config) for canvas_type, config in self._configs.items()}
+            # Convert configs to dict format - use .value for string keys
+            canvas_configs_data = {canvas_type.value: asdict(config) for canvas_type, config in self._configs.items()}
 
             # Update settings["frame_mapping"]["canvas_configs"]
             settings = self._state_manager._settings

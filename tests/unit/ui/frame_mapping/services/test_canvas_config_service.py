@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ui.frame_mapping.services.canvas_config_service import CanvasConfig, CanvasConfigService
+from ui.frame_mapping.services.canvas_config_service import CanvasConfig, CanvasConfigService, CanvasType
 
 
 class TestCanvasConfig:
@@ -48,34 +48,34 @@ class TestCanvasConfigService:
         service = CanvasConfigService(state_manager=None)
 
         # Verify workbench defaults
-        workbench = service.get_config("workbench")
+        workbench = service.get_config(CanvasType.WORKBENCH)
         assert workbench.size == 300
         assert workbench.display_scale == 2
 
         # Verify alignment defaults
-        alignment = service.get_config("alignment")
+        alignment = service.get_config(CanvasType.ALIGNMENT)
         assert alignment.size == 320
         assert alignment.display_scale == 4
 
         # Verify comparison defaults
-        comparison = service.get_config("comparison")
+        comparison = service.get_config(CanvasType.COMPARISON)
         assert comparison.size == 350
         assert comparison.display_scale == 4
 
-    def test_unknown_canvas_type_returns_workbench_defaults(self) -> None:
-        """Test unknown canvas type returns workbench defaults."""
-        service = CanvasConfigService(state_manager=None)
-        config = service.get_config("unknown_type")
-        assert config.size == 300
-        assert config.display_scale == 2
+    def test_enum_values_match_strings(self) -> None:
+        """Test that enum values are the expected strings (for backward compat)."""
+        # Since CanvasType uses str mixin, values can be used as strings
+        assert CanvasType.WORKBENCH == "workbench"
+        assert CanvasType.ALIGNMENT == "alignment"
+        assert CanvasType.COMPARISON == "comparison"
 
     def test_set_display_scale_updates_config(self) -> None:
         """Test setting display scale updates configuration."""
         service = CanvasConfigService(state_manager=None)
 
         # Update workbench scale
-        service.set_display_scale("workbench", 4)
-        config = service.get_config("workbench")
+        service.set_display_scale(CanvasType.WORKBENCH, 4)
+        config = service.get_config(CanvasType.WORKBENCH)
         assert config.display_scale == 4
 
     def test_set_display_scale_clamps_to_valid_range(self) -> None:
@@ -83,20 +83,20 @@ class TestCanvasConfigService:
         service = CanvasConfigService(state_manager=None)
 
         # Too small - clamp to 1
-        service.set_display_scale("workbench", 0)
-        assert service.get_config("workbench").display_scale == 1
+        service.set_display_scale(CanvasType.WORKBENCH, 0)
+        assert service.get_config(CanvasType.WORKBENCH).display_scale == 1
 
         # Too large - clamp to 8
-        service.set_display_scale("workbench", 10)
-        assert service.get_config("workbench").display_scale == 8
+        service.set_display_scale(CanvasType.WORKBENCH, 10)
+        assert service.get_config(CanvasType.WORKBENCH).display_scale == 8
 
     def test_set_canvas_size_updates_config(self) -> None:
         """Test setting canvas size updates configuration."""
         service = CanvasConfigService(state_manager=None)
 
         # Update alignment size
-        service.set_canvas_size("alignment", 400)
-        config = service.get_config("alignment")
+        service.set_canvas_size(CanvasType.ALIGNMENT, 400)
+        config = service.get_config(CanvasType.ALIGNMENT)
         assert config.size == 400
 
     def test_set_canvas_size_clamps_to_valid_range(self) -> None:
@@ -104,12 +104,12 @@ class TestCanvasConfigService:
         service = CanvasConfigService(state_manager=None)
 
         # Too small - clamp to 50
-        service.set_canvas_size("comparison", 10)
-        assert service.get_config("comparison").size == 50
+        service.set_canvas_size(CanvasType.COMPARISON, 10)
+        assert service.get_config(CanvasType.COMPARISON).size == 50
 
         # Too large - clamp to 1000
-        service.set_canvas_size("comparison", 2000)
-        assert service.get_config("comparison").size == 1000
+        service.set_canvas_size(CanvasType.COMPARISON, 2000)
+        assert service.get_config(CanvasType.COMPARISON).size == 1000
 
     def test_persistence_with_state_manager(self) -> None:
         """Test configuration persistence via ApplicationStateManager."""
@@ -122,12 +122,12 @@ class TestCanvasConfigService:
         service = CanvasConfigService(state_manager=mock_state)
 
         # Update a config
-        service.set_display_scale("workbench", 4)
+        service.set_display_scale(CanvasType.WORKBENCH, 4)
 
         # Verify save was called
         mock_state.save_settings.assert_called_once()
 
-        # Verify settings structure
+        # Verify settings structure - should be saved with string keys
         assert "frame_mapping" in mock_state._settings
         assert "canvas_configs" in mock_state._settings["frame_mapping"]
         assert "workbench" in mock_state._settings["frame_mapping"]["canvas_configs"]
@@ -159,7 +159,7 @@ class TestCanvasConfigService:
         service = CanvasConfigService(state_manager=mock_state)
 
         # Verify loaded config
-        workbench = service.get_config("workbench")
+        workbench = service.get_config(CanvasType.WORKBENCH)
         assert workbench.size == 400
         assert workbench.display_scale == 8
         assert workbench.tile_calc_debounce_ms == 200
@@ -188,11 +188,11 @@ class TestCanvasConfigService:
         service = CanvasConfigService(state_manager=mock_state)
 
         # Verify workbench is loaded from state
-        workbench = service.get_config("workbench")
+        workbench = service.get_config(CanvasType.WORKBENCH)
         assert workbench.size == 400
 
         # Verify alignment gets default (not in state)
-        alignment = service.get_config("alignment")
+        alignment = service.get_config(CanvasType.ALIGNMENT)
         assert alignment.size == 320
         assert alignment.display_scale == 4
 
@@ -216,7 +216,7 @@ class TestCanvasConfigService:
         service = CanvasConfigService(state_manager=mock_state)
 
         # Verify defaults are used for invalid entries
-        workbench = service.get_config("workbench")
+        workbench = service.get_config(CanvasType.WORKBENCH)
         assert workbench.size == 300  # Default
         assert workbench.display_scale == 2  # Default
 
@@ -229,13 +229,13 @@ class TestCanvasConfigService:
 
         # First service: set custom values
         service1 = CanvasConfigService(state_manager=mock_state)
-        service1.set_display_scale("workbench", 4)
-        service1.set_canvas_size("alignment", 400)
+        service1.set_display_scale(CanvasType.WORKBENCH, 4)
+        service1.set_canvas_size(CanvasType.ALIGNMENT, 400)
 
         # Second service: should load the saved values
         service2 = CanvasConfigService(state_manager=mock_state)
-        workbench = service2.get_config("workbench")
-        alignment = service2.get_config("alignment")
+        workbench = service2.get_config(CanvasType.WORKBENCH)
+        alignment = service2.get_config(CanvasType.ALIGNMENT)
 
         assert workbench.display_scale == 4
         assert alignment.size == 400
@@ -243,9 +243,9 @@ class TestCanvasConfigService:
     def test_no_state_manager_no_persistence(self) -> None:
         """Test that changes without state manager don't persist."""
         service1 = CanvasConfigService(state_manager=None)
-        service1.set_display_scale("workbench", 4)
+        service1.set_display_scale(CanvasType.WORKBENCH, 4)
 
         # New service without state manager gets defaults
         service2 = CanvasConfigService(state_manager=None)
-        workbench = service2.get_config("workbench")
+        workbench = service2.get_config(CanvasType.WORKBENCH)
         assert workbench.display_scale == 2  # Default, not 4
