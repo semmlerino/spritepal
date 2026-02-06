@@ -1016,7 +1016,7 @@ class WorkbenchCanvas(QWidget):
             # Update grid bounds
             self._grid_overlay_item.set_bounds(QRectF(0, 0, scaled.width(), scaled.height()))
 
-            # Center the view on the game frame
+            # Update scene rect for scrollbar bounds
             self._view.setSceneRect(
                 QRectF(
                     -50,
@@ -1025,7 +1025,10 @@ class WorkbenchCanvas(QWidget):
                     scaled.height() + 100,
                 )
             )
-            self._view.centerOn(scaled.width() / 2, scaled.height() / 2)
+            # Only re-center when not in preview mode — during preview,
+            # stable viewport allows visual comparison across frames
+            if not self._preview_enabled:
+                self._view.centerOn(scaled.width() / 2, scaled.height() / 2)
 
         # Update tile overlay from capture result
         self._update_tile_overlay()
