@@ -3,7 +3,12 @@
 # Mark intentional uses with: # sleep-ok
 set -eu
 
-violations=$(grep -rn "time\.sleep" tests/ --include="*.py" | grep -v "# sleep-ok" || true)
+# Match actual time.sleep() calls, not comments or mocks
+violations=$(grep -rn "time\.sleep" tests/ --include="*.py" \
+    | grep -v "# sleep-ok" \
+    | grep -v "#.*time\.sleep" \
+    | grep -v 'patch.*time\.sleep' \
+    || true)
 
 if [ -n "$violations" ]; then
     echo "ERROR: time.sleep() found in tests without '# sleep-ok' marker:"
