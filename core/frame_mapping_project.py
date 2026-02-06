@@ -973,8 +973,7 @@ class FrameMappingProject:
         frame = self.get_ai_frame_by_id(ai_frame_id)
         if frame is None:
             return False
-        # Dataclasses are mutable, we can update in place
-        object.__setattr__(frame, "display_name", display_name)
+        frame.display_name = display_name
         return True
 
     def add_frame_tag(self, ai_frame_id: str, tag: str) -> bool:
@@ -993,7 +992,7 @@ class FrameMappingProject:
         frame = self.get_ai_frame_by_id(ai_frame_id)
         if frame is None:
             return False
-        object.__setattr__(frame, "tags", frame.tags | {tag})
+        frame.tags = frame.tags | {tag}
         return True
 
     def remove_frame_tag(self, ai_frame_id: str, tag: str) -> bool:
@@ -1009,7 +1008,7 @@ class FrameMappingProject:
         frame = self.get_ai_frame_by_id(ai_frame_id)
         if frame is None:
             return False
-        object.__setattr__(frame, "tags", frame.tags - {tag})
+        frame.tags = frame.tags - {tag}
         return True
 
     def toggle_frame_tag(self, ai_frame_id: str, tag: str) -> bool:
@@ -1029,9 +1028,9 @@ class FrameMappingProject:
         if frame is None:
             return False
         if tag in frame.tags:
-            object.__setattr__(frame, "tags", frame.tags - {tag})
+            frame.tags = frame.tags - {tag}
         else:
-            object.__setattr__(frame, "tags", frame.tags | {tag})
+            frame.tags = frame.tags | {tag}
         return True
 
     def get_frames_with_tag(self, tag: str) -> list[AIFrame]:
@@ -1059,7 +1058,7 @@ class FrameMappingProject:
         if frame is None:
             return False
         valid_tags = frozenset(t for t in tags if t in FRAME_TAGS)
-        object.__setattr__(frame, "tags", valid_tags)
+        frame.tags = valid_tags
         return True
 
     # ─── Capture (GameFrame) Organization ──────────────────────────────────────
@@ -1077,5 +1076,5 @@ class FrameMappingProject:
         frame = self.get_game_frame_by_id(game_frame_id)
         if frame is None:
             return False
-        object.__setattr__(frame, "display_name", display_name)
+        frame.display_name = display_name
         return True

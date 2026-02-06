@@ -8,14 +8,28 @@ require app restart to take effect (no runtime updates).
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from utils.logging_config import get_logger
 
 if TYPE_CHECKING:
+    from typing import ClassVar
+
     from core.managers.application_state_manager import ApplicationStateManager
 
 logger = get_logger(__name__)
+
+
+class CanvasType(str, Enum):
+    """Canvas configuration type identifiers.
+
+    Uses str mixin so enum values can be used as dict keys and compared with strings.
+    """
+
+    WORKBENCH = "workbench"
+    ALIGNMENT = "alignment"
+    COMPARISON = "comparison"
 
 
 @dataclass
@@ -52,8 +66,8 @@ class CanvasConfigService:
     """
 
     # Default configurations per canvas type
-    _DEFAULT_CONFIGS = {
-        "workbench": CanvasConfig(
+    _DEFAULT_CONFIGS: ClassVar[dict[CanvasType, CanvasConfig]] = {
+        CanvasType.WORKBENCH: CanvasConfig(
             size=300,
             display_scale=2,
             tile_calc_debounce_ms=100,
@@ -61,7 +75,7 @@ class CanvasConfigService:
             pixel_hover_debounce_ms=50,
             pixel_highlight_debounce_ms=100,
         ),
-        "alignment": CanvasConfig(
+        CanvasType.ALIGNMENT: CanvasConfig(
             size=320,
             display_scale=4,
             tile_calc_debounce_ms=100,
@@ -69,7 +83,7 @@ class CanvasConfigService:
             pixel_hover_debounce_ms=50,
             pixel_highlight_debounce_ms=100,
         ),
-        "comparison": CanvasConfig(
+        CanvasType.COMPARISON: CanvasConfig(
             size=350,
             display_scale=4,
             tile_calc_debounce_ms=100,
@@ -89,11 +103,11 @@ class CanvasConfigService:
         self._state_manager = state_manager
         self._configs = self._load_configs()
 
-    def get_config(self, canvas_type: str) -> CanvasConfig:
+    def get_config(self, canvas_type: CanvasType) -> CanvasConfig:
         """Get configuration for a specific canvas type.
 
         Args:
-            canvas_type: Canvas identifier ("workbench", "alignment", "comparison")
+            canvas_type: Canvas identifier (CanvasType enum)
 
         Returns:
             CanvasConfig for the specified type, or default if not configured
@@ -106,16 +120,16 @@ class CanvasConfigService:
                     "Unknown canvas type '%s', using workbench defaults",
                     canvas_type,
                 )
-                return self._DEFAULT_CONFIGS["workbench"]
+                return self._DEFAULT_CONFIGS[CanvasType.WORKBENCH]
             return default
 
         return self._configs[canvas_type]
 
-    def set_display_scale(self, canvas_type: str, scale: int) -> None:
+    def set_display_scale(self, canvas_type: CanvasType, scale: int) -> None:
         """Set display scale for a specific canvas type.
 
         Args:
-            canvas_type: Canvas identifier
+            canvas_type: Canvas identifier (CanvasType enum)
             scale: Display scale factor (1-8)
         """
         if scale < 1 or scale > 8:
