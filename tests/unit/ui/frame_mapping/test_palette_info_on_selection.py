@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from core.frame_mapping_project import FrameMapping, GameFrame
 from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 
 
@@ -15,24 +16,23 @@ class TestPaletteInfoOnSelection:
     @pytest.fixture
     def helper_with_mocks(self):
         """Create a WorkspaceLogicHelper with mocked dependencies."""
-        helper = WorkspaceLogicHelper.__new__(WorkspaceLogicHelper)
+        helper = WorkspaceLogicHelper()
 
         # Mock controller
-        helper._controller = MagicMock()
+        controller = MagicMock()
         project = MagicMock()
-        helper._controller.project = project
+        controller.project = project
+        helper.set_controller(controller)
 
         # Mock state
-        helper._state = MagicMock()
+        state = MagicMock()
+        helper.set_state(state)
         helper._state.selected_ai_frame_id = None
         helper._state.selected_game_id = None
         helper._state.current_canvas_game_id = None
 
         # Mock panes
-        helper._ai_frames_pane = MagicMock()
-        helper._captures_pane = MagicMock()
-        helper._alignment_canvas = MagicMock()
-        helper._mapping_panel = MagicMock()
+        helper.set_panes(MagicMock(), MagicMock(), MagicMock(), MagicMock())
 
         return helper, project
 
@@ -41,19 +41,20 @@ class TestPaletteInfoOnSelection:
         helper, project = helper_with_mocks
 
         # Set up mapping and game frame
-        mapping = MagicMock()
-        mapping.game_frame_id = "game_001"
-        mapping.offset_x = 0
-        mapping.offset_y = 0
-        mapping.flip_h = False
-        mapping.flip_v = False
-        mapping.scale = 1.0
-        mapping.sharpen = False
-        mapping.resampling = "nearest"
+        mapping = FrameMapping(
+            ai_frame_id="ai_frame_001",
+            game_frame_id="game_001",
+            offset_x=0,
+            offset_y=0,
+            flip_h=False,
+            flip_v=False,
+            scale=1.0,
+            sharpen=0.0,
+            resampling="nearest"
+        )
         project.get_mapping_for_ai_frame.return_value = mapping
 
-        game_frame = MagicMock()
-        game_frame.palette_index = 5
+        game_frame = GameFrame(id="game_001", palette_index=5)
         project.get_game_frame_by_id.return_value = game_frame
         project.get_ai_frame_by_id.return_value = MagicMock()
 
@@ -90,8 +91,7 @@ class TestPaletteInfoOnSelection:
         helper, project = helper_with_mocks
         helper._state.selected_ai_frame_id = "some_ai_frame"
 
-        game_frame = MagicMock()
-        game_frame.palette_index = 3
+        game_frame = GameFrame(id="game_001", palette_index=3)
         project.get_game_frame_by_id.return_value = game_frame
 
         capture_result = MagicMock()

@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from core.frame_mapping_project import SheetPalette
+from core.frame_mapping_project import AIFrame, FrameMapping, GameFrame, SheetPalette
 from core.services.injection_debug_context import InjectionDebugContext
 from core.services.injection_orchestrator import InjectionOrchestrator
 from core.services.injection_results import InjectionRequest, InjectionResult
@@ -153,12 +153,9 @@ class TestInjectionOrchestratorValidation:
 
         project = MagicMock()
         project.get_mapping_for_ai_frame.return_value = MagicMock()
-        ai_frame = MagicMock()
-        ai_frame.path = ai_frame_path
+        ai_frame = AIFrame(path=ai_frame_path, index=0)
         project.get_ai_frame_by_id.return_value = ai_frame
-        game_frame = MagicMock()
-        game_frame.rom_offsets = [0x10000]
-        game_frame.capture_path = tmp_path / "nonexistent_capture.json"
+        game_frame = GameFrame(id="test_frame", rom_offsets=[0x10000], capture_path=tmp_path / "nonexistent_capture.json")
         project.get_game_frame_by_id.return_value = game_frame
 
         orchestrator = InjectionOrchestrator()
@@ -211,23 +208,13 @@ class TestInjectionOrchestratorStaleEntries:
         capture_path.write_text('{"frame": 1, "entries": [], "palettes": {}}')
 
         project = MagicMock()
-        mapping = MagicMock()
-        mapping.offset_x = 0
-        mapping.offset_y = 0
-        mapping.flip_h = False
-        mapping.flip_v = False
-        mapping.scale = 1.0
+        mapping = FrameMapping(ai_frame_id="frame_0.png", game_frame_id="test_frame")
         project.get_mapping_for_ai_frame.return_value = mapping
 
-        ai_frame = MagicMock()
-        ai_frame.path = ai_frame_path
+        ai_frame = AIFrame(path=ai_frame_path, index=0)
         project.get_ai_frame_by_id.return_value = ai_frame
 
-        game_frame = MagicMock()
-        game_frame.id = "test_frame"
-        game_frame.rom_offsets = [0x10000]
-        game_frame.capture_path = capture_path
-        game_frame.selected_entry_ids = [999]  # Non-existent IDs
+        game_frame = GameFrame(id="test_frame", rom_offsets=[0x10000], capture_path=capture_path, selected_entry_ids=[999])
         project.get_game_frame_by_id.return_value = game_frame
         project.sheet_palette = None
 

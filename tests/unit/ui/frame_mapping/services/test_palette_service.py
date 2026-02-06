@@ -231,8 +231,7 @@ class TestCopyGamePaletteToSheet:
 
     def test_returns_none_when_no_capture_path(self, palette_service, mock_project):
         """Should return None when game frame has no capture path."""
-        game_frame = Mock(spec=GameFrame)
-        game_frame.capture_path = None
+        game_frame = GameFrame(id="frame1", capture_path=None)
         mock_project.get_game_frame_by_id.return_value = game_frame
 
         result = palette_service.copy_game_palette_to_sheet(mock_project, "frame1")
@@ -242,9 +241,7 @@ class TestCopyGamePaletteToSheet:
         """Should copy palette from game frame capture."""
         capture_path = tmp_path / "capture.json"
         capture_path.touch()  # File must exist for repository mtime check
-        game_frame = Mock(spec=GameFrame)
-        game_frame.capture_path = capture_path
-        game_frame.palette_index = 0
+        game_frame = GameFrame(id="frame1", capture_path=capture_path, palette_index=0)
         mock_project.get_game_frame_by_id.return_value = game_frame
 
         mock_capture = Mock(spec=CaptureResult)
@@ -281,15 +278,8 @@ class TestGetGamePalettes:
         capture1_path.touch()
         capture2_path.touch()
 
-        game_frame1 = Mock(spec=GameFrame)
-        game_frame1.id = "frame1"
-        game_frame1.capture_path = capture1_path
-        game_frame1.palette_index = 0
-
-        game_frame2 = Mock(spec=GameFrame)
-        game_frame2.id = "frame2"
-        game_frame2.capture_path = capture2_path
-        game_frame2.palette_index = 1
+        game_frame1 = GameFrame(id="frame1", capture_path=capture1_path, palette_index=0)
+        game_frame2 = GameFrame(id="frame2", capture_path=capture2_path, palette_index=1)
 
         mock_project.game_frames = [game_frame1, game_frame2]
 
@@ -319,9 +309,7 @@ class TestGetGamePalettes:
 
     def test_skips_frames_without_captures(self, palette_service, mock_project):
         """Should skip game frames without capture paths."""
-        game_frame = Mock(spec=GameFrame)
-        game_frame.id = "frame1"
-        game_frame.capture_path = None
+        game_frame = GameFrame(id="frame1", capture_path=None)
 
         mock_project.game_frames = [game_frame]
 
