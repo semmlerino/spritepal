@@ -13,14 +13,6 @@ import pytest
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
 
 
-@pytest.fixture
-def controller(qtbot: object) -> FrameMappingController:
-    """Create a controller with a test project."""
-    ctrl = FrameMappingController()
-    ctrl.new_project("Test Project")
-    return ctrl
-
-
 class TestInjectionUndoGuard:
     """Tests for undo/redo blocking during injection."""
 

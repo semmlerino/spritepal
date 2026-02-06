@@ -11,17 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from core.frame_mapping_project import AIFrame, GameFrame
 from core.mesen_integration.click_extractor import OAMEntry
 from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingController
-
-
-@pytest.fixture
-def controller(qtbot: object) -> FrameMappingController:
-    """Create a controller with a test project."""
-    ctrl = FrameMappingController()
-    ctrl.new_project("Test Project")
-    return ctrl
 
 
 @pytest.fixture

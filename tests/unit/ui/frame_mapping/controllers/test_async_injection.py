@@ -19,14 +19,6 @@ from ui.frame_mapping.services.async_injection_service import AsyncInjectionServ
 
 
 @pytest.fixture
-def controller(qtbot: object) -> FrameMappingController:
-    """Create a controller with a test project."""
-    ctrl = FrameMappingController()
-    ctrl.new_project("Test Project")
-    return ctrl
-
-
-@pytest.fixture
 def populated_controller(controller: FrameMappingController, tmp_path: Path) -> FrameMappingController:
     """Create a controller with AI frames, game frames, and mappings."""
     project = controller.project

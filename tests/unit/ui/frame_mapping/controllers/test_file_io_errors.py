@@ -18,14 +18,6 @@ from ui.frame_mapping.controllers.frame_mapping_controller import FrameMappingCo
 
 
 @pytest.fixture
-def controller(qtbot: object) -> FrameMappingController:
-    """Create a controller with a test project."""
-    ctrl = FrameMappingController()
-    ctrl.new_project("Test Project")
-    return ctrl
-
-
-@pytest.fixture
 def populated_controller(controller: FrameMappingController, tmp_path: Path) -> FrameMappingController:
     """Create a controller with AI frames and game frames."""
     project = controller.project
