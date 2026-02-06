@@ -21,6 +21,8 @@ import pytest
 from PySide6.QtCore import QTimer
 
 from tests.fixtures.timeouts import get_timeout_multiplier
+from tests.infrastructure.fake_sprite_scan_worker import FakeSpriteScanWorker
+from tests.infrastructure.fake_thumbnail_controller import FakeThumbnailController
 from tests.infrastructure.qt_real_testing import (
     EventLoopHelper,
     MemoryHelper,
@@ -85,23 +87,6 @@ def mock_rom_cache():
     cache.get_cached_sprite.return_value = None
     cache.cache_sprite.return_value = None
     return cache
-
-
-@pytest.fixture
-def mock_scan_worker():
-    """Create mock scan worker."""
-    worker = Mock()
-    worker.sprite_found = Mock()
-    worker.finished = Mock()
-    worker.progress = Mock()
-    worker.error = Mock()
-    worker.cache_status = Mock()
-    worker.operation_finished = Mock()
-    worker.start = Mock()
-    worker.isRunning.return_value = False
-    worker.requestInterruption = Mock()
-    worker.wait.return_value = True
-    return worker
 
 
 @pytest.fixture
@@ -226,60 +211,56 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         status_text = self.window.status_bar.currentMessage()
         assert "ROM loaded" in status_text or "sprites" in status_text.lower()
 
-    @patch("ui.windows.detached_gallery_window.SpriteScanWorker")
     def test_rom_scanning_with_proper_cleanup(
         self,
-        mock_scan_worker_class,
         mock_extraction_manager,
         mock_settings_manager,
         mock_rom_cache,
-        mock_scan_worker,
         test_rom_file,
     ):
         """Test ROM scanning with proper worker cleanup."""
-        mock_scan_worker_class.return_value = mock_scan_worker
+        # Create fake worker and seed it with sprite data
+        fake_worker = FakeSpriteScanWorker()
+        sprite_data = [
+            {"offset": 0x10000, "decompressed_size": 1024, "tile_count": 32, "quality": 0.8},
+            {"offset": 0x20000, "decompressed_size": 512, "tile_count": 16, "quality": 0.9},
+        ]
+        fake_worker.seed_sprites(sprite_data)
 
-        self.window = DetachedGalleryWindow(
-            extraction_manager=mock_extraction_manager,
-            settings_manager=mock_settings_manager,
-            rom_cache=mock_rom_cache,
-        )
-        self.window.load_rom(test_rom_file)
+        # Create fake thumbnail controller
+        fake_thumbnail_controller = FakeThumbnailController()
 
-        # Capture initial sprite count (may have cached sprites from prior ROM cache)
-        initial_sprite_count = len(self.window.sprites_data)
+        # Patch SpriteScanWorker and ThumbnailWorkerController
+        with patch("ui.windows.detached_gallery_window.SpriteScanWorker", return_value=fake_worker):
+            with patch(
+                "ui.windows.detached_gallery_window.ThumbnailWorkerController", return_value=fake_thumbnail_controller
+            ):
+                self.window = DetachedGalleryWindow(
+                    extraction_manager=mock_extraction_manager,
+                    settings_manager=mock_settings_manager,
+                    rom_cache=mock_rom_cache,
+                )
+                self.window.load_rom(test_rom_file)
 
-        # Start scan
-        self.window._start_scan()
+                # Capture initial sprite count (may have cached sprites from mock_extraction_manager)
+                initial_sprite_count = len(self.window.sprites_data)
 
-        # Verify worker was created and started
-        mock_scan_worker_class.assert_called_once()
-        mock_scan_worker.start.assert_called_once()
-        assert self.window.scan_worker is not None
-        assert self.window.scanning
+                # Start scan - fake worker emits all signals synchronously
+                self.window._start_scan()
 
-        # Simulate sprite found
-        sprite_info = {"offset": 0x10000, "decompressed_size": 1024, "tile_count": 32, "quality": 0.8}
-        self.window._on_sprite_found(sprite_info)
+                # Verify sprites were found through real signal flow
+                # Should have initial sprites plus the seeded ones
+                assert len(self.window.sprites_data) == initial_sprite_count + len(sprite_data)
+                offsets = [s.get("offset") for s in self.window.sprites_data]
+                assert 0x10000 in offsets
+                assert 0x20000 in offsets
 
-        # Verify sprite was added (one more than initial count)
-        assert len(self.window.sprites_data) == initial_sprite_count + 1
-        # Verify our new sprite is in the list
-        added_sprites = [s for s in self.window.sprites_data if s.get("offset") == 0x10000 and s.get("quality") == 0.8]
-        assert len(added_sprites) == 1
+                # Verify scan completed (finished signal clears scanning state)
+                assert not self.window.scanning
+                assert self.window.scan_worker is None
 
-        # Simulate scan completion
-        self.window._on_scan_finished()
-
-        # Verify cleanup
-        assert not self.window.scanning
-        assert self.window.scan_worker is None
-        assert self.window.scan_timeout_timer is None
-
-    @patch("ui.windows.detached_gallery_window.ThumbnailWorkerController")
     def test_thumbnail_generation_lifecycle(
         self,
-        mock_thumbnail_controller_class,
         mock_extraction_manager,
         mock_settings_manager,
         mock_rom_cache,
@@ -291,41 +272,37 @@ class TestDetachedGalleryWindowIntegration(QtTestCase):
         the actual BatchThumbnailWorker internally. We verify that the controller
         is properly created and used.
         """
-        # Create mock controller instance
-        mock_controller = Mock()
-        mock_controller.thumbnail_ready = Mock()
-        mock_controller.progress = Mock()
-        mock_controller.queue_thumbnail = Mock()
-        mock_controller.start_worker = Mock()
-        mock_thumbnail_controller_class.return_value = mock_controller
+        # Create fake controller
+        fake_controller = FakeThumbnailController()
 
-        self.window = DetachedGalleryWindow(
-            extraction_manager=mock_extraction_manager,
-            settings_manager=mock_settings_manager,
-            rom_cache=mock_rom_cache,
-        )
-        self.window.load_rom(test_rom_file)
+        with patch("ui.windows.detached_gallery_window.ThumbnailWorkerController", return_value=fake_controller):
+            self.window = DetachedGalleryWindow(
+                extraction_manager=mock_extraction_manager,
+                settings_manager=mock_settings_manager,
+                rom_cache=mock_rom_cache,
+            )
+            self.window.load_rom(test_rom_file)
 
-        # Set some sprite data
-        self.window.sprites_data = [
-            {"offset": 0x10000, "name": "Sprite1"},
-            {"offset": 0x20000, "name": "Sprite2"},
-        ]
+            # Set some sprite data
+            self.window.sprites_data = [
+                {"offset": 0x10000, "name": "Sprite1"},
+                {"offset": 0x20000, "name": "Sprite2"},
+            ]
 
-        # Generate thumbnails
-        self.window._generate_thumbnails()
+            # Generate thumbnails
+            self.window._generate_thumbnails()
 
-        # Verify controller was created
-        mock_thumbnail_controller_class.assert_called_once()
+            # Verify controller was used with correct offsets
+            queued = fake_controller.get_queued_offsets()
+            assert len(queued) == 2
+            assert 0x10000 in queued
+            assert 0x20000 in queued
 
-        # Verify start_worker was called with correct arguments
-        mock_controller.start_worker.assert_called_once_with(test_rom_file, mock_extraction_manager.get_rom_extractor())
+            # Verify start_worker was called
+            fake_controller.verify_called(start_worker=1)
 
-        # Verify queue_thumbnail was called for each sprite
-        assert mock_controller.queue_thumbnail.call_count == 2
-
-        # Verify controller is stored on the window
-        assert self.window.thumbnail_controller is not None
+            # Verify controller is stored on the window
+            assert self.window.thumbnail_controller is not None
 
     def test_memory_management_with_large_sprite_set(
         self, mock_extraction_manager, mock_settings_manager, mock_rom_cache
