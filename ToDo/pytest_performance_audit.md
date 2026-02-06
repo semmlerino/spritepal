@@ -1,6 +1,20 @@
 # Pytest Performance Audit & Optimization Plan
 
-## Findings: What is slow and why
+## Status (2026-02-06)
+
+| Finding | Status | Notes |
+|---------|--------|-------|
+| Eager PySide6 imports in fixtures | **Fixed** | `dialog_fixtures.py` was the last offender — deferred in d7531d7f. All 7 fixture modules now use lazy imports. |
+| pytest-qt plugin overhead | **Won't fix** | Plugin hooks run during config phase, not code-controllable. Measured `-p no:qt` vs normal for core tests: ~1s difference (9.0s vs 10.0s) — not worth special-casing. |
+| Thread cleanup overhead | **Already optimized** | `cleanup_workers` has early exits: skips non-Qt tests, skips when `_worker_registry` is empty. No further action needed. |
+| Redundant import cascades | **Already fixed** | `core_fixtures.py` imports only `is_headless` (no PySide6 chain). |
+| `norecursedirs` missing | **Already configured** | `pyproject.toml` has entries; no interfering dirs exist. |
+
+**Collection time (post-fix):** ~21–28s for 3928 tests (WSL2, varies with filesystem caching).
+
+---
+
+## Findings: What is slow and why (original audit)
 
 1. **Massive Collection Overhead (The #1 Bottleneck)**
    - **Measurement:** Collecting 3,924 tests takes **~76 seconds**.
