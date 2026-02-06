@@ -79,7 +79,7 @@ class PreviewRenderer:
         rom_offsets: list[int],
         frame_id: str,
         capture_repository: CaptureResultRepository,
-    ) -> tuple[CaptureResult | None, bool]:
+    ) -> tuple[CaptureResult | None, bool, bool]:
         """Parse a capture file and filter its entries.
 
         Args:
@@ -90,17 +90,18 @@ class PreviewRenderer:
             capture_repository: Shared repository for caching
 
         Returns:
-            Tuple of (filtered CaptureResult or None, used_fallback flag)
+            Tuple of (filtered CaptureResult or None, used_fallback flag, is_stale flag).
+            is_stale indicates stored entry IDs no longer exist in capture file.
         """
         if not capture_path.exists():
-            return (None, False)
+            return (None, False, False)
 
         try:
             # Parse capture (use repository for caching)
             capture_result = capture_repository.get_or_parse(capture_path)
 
             if not capture_result.has_entries:
-                return (None, False)
+                return (None, False, False)
 
             # Apply filtering if entry IDs specified
             from core.mesen_integration.entry_filtering import (
@@ -119,8 +120,8 @@ class PreviewRenderer:
             if filtering.has_entries:
                 capture_result = create_filtered_capture(capture_result, filtering.entries)
 
-            return (capture_result, filtering.used_fallback)
+            return (capture_result, filtering.used_fallback, filtering.is_stale)
 
         except Exception as e:
             logger.warning("Error parsing capture for %s: %s", frame_id, e)
-            return (None, False)
+            return (None, False, False)

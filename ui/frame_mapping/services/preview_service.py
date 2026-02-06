@@ -172,37 +172,24 @@ class PreviewService(QObject):
             # Cache miss due to mtime or entry change - will re-parse below
 
         try:
-            # Use shared repository
-            capture_result = self._capture_repository.get_or_parse(capture_path)
+            from ui.frame_mapping.services.preview_renderer import PreviewRenderer
 
-            if not capture_result.has_entries:
-                return (None, False)
-
-            # Use shared filtering utility
-            from core.mesen_integration.entry_filtering import (
-                create_filtered_capture,
-                filter_capture_entries,
-            )
-
-            filtering = filter_capture_entries(
-                capture_result,
+            capture_result, used_fallback, is_stale = PreviewRenderer.parse_and_filter_capture(
+                capture_path=capture_path,
                 selected_entry_ids=list(game_frame.selected_entry_ids),
                 rom_offsets=game_frame.rom_offsets,
-                allow_all_entries_fallback=False,
-                context_label=frame_id,
+                frame_id=frame_id,
+                capture_repository=self._capture_repository,
             )
 
-            if filtering.is_stale:
+            if is_stale:
                 self.stale_entries_warning.emit(frame_id)
 
-            if filtering.has_entries:
-                capture_result = create_filtered_capture(capture_result, filtering.entries)
-
             # Cache the result (only cache if not using fallback to avoid caching stale state)
-            if not filtering.used_fallback:
+            if not used_fallback and capture_result is not None:
                 self._capture_result_cache[frame_id] = (capture_result, current_mtime, current_entry_ids)
 
-            return (capture_result, filtering.used_fallback)
+            return (capture_result, used_fallback)
 
         except (OSError, JSONDecodeError, KeyError, ValueError, CaptureParseError, Exception) as e:
             logger.warning("Failed to get capture result for game frame %s: %s", frame_id, e)

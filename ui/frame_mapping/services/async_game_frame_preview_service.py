@@ -153,7 +153,7 @@ class _GameFramePreviewWorker(QObject):
         from ui.frame_mapping.services.preview_renderer import PreviewRenderer
 
         # Parse and filter capture using shared utility
-        capture_result, _ = PreviewRenderer.parse_and_filter_capture(
+        capture_result, _, _ = PreviewRenderer.parse_and_filter_capture(
             capture_path=req.capture_path,
             selected_entry_ids=req.selected_entry_ids,
             rom_offsets=req.rom_offsets,
