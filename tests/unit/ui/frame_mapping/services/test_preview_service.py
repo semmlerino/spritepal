@@ -1,5 +1,6 @@
 """Tests for PreviewService."""
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -74,78 +75,97 @@ def mock_capture_result():
     return capture
 
 
+@dataclass
+class RenderingPatchContext:
+    """Provides pre-configured rendering pipeline patches for preview service tests."""
+
+    mock_get_or_parse: MagicMock
+    mock_renderer_class: MagicMock
+    mock_renderer_inst: MagicMock
+    mock_pil_to_qimage: MagicMock
+    _qimage: QImage = field(default_factory=lambda: QImage(100, 100, QImage.Format.Format_RGBA8888))
+
+    def set_qimage(self, width: int, height: int) -> None:
+        """Set custom QImage dimensions for this test."""
+        self._qimage = QImage(width, height, QImage.Format.Format_RGBA8888)
+        self.mock_pil_to_qimage.return_value = self._qimage
+
+
+@pytest.fixture
+def rendering_patches(preview_service, mock_capture_result):
+    """Apply the 3-layer rendering pipeline patches and yield a context object.
+
+    Patches:
+    - capture_repository.get_or_parse → returns mock_capture_result
+    - CaptureRenderer → returns mock with render_selection
+    - pil_to_qimage → returns QImage(100, 100)
+    """
+    with patch.object(
+        preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result
+    ) as mock_get_or_parse:
+        with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
+            renderer_inst = MockRenderer.return_value
+            mock_pil_img = Mock()
+            renderer_inst.render_selection.return_value = mock_pil_img
+
+            with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
+                qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
+                mock_pil_to_qimage.return_value = qimage
+
+                yield RenderingPatchContext(
+                    mock_get_or_parse=mock_get_or_parse,
+                    mock_renderer_class=MockRenderer,
+                    mock_renderer_inst=renderer_inst,
+                    mock_pil_to_qimage=mock_pil_to_qimage,
+                    _qimage=qimage,
+                )
+
+
 class TestPreviewServiceCaching:
     """Test preview cache hit/miss behavior."""
 
-    def test_cache_miss_generates_preview(self, preview_service, mock_project, mock_capture_result, qtbot):
+    def test_cache_miss_generates_preview(self, preview_service, mock_project, rendering_patches, qtbot):
         """Test that cache miss generates preview from capture file."""
         project, game_frame = mock_project
 
-        # Patch the repository's get_or_parse to return mock capture
-        with patch.object(
-            preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result
-        ) as mock_get_or_parse:
-            with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
-                renderer_inst = MockRenderer.return_value
-                mock_pil_img = Mock()
-                renderer_inst.render_selection.return_value = mock_pil_img
+        # First call - cache miss (should return None)
+        result = preview_service.get_cached_preview("frame1", project)
+        assert result is None, "Cache miss should return None"
 
-                with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
-                    # Create QImage with specific dimensions (pil_to_qimage returns QImage, not QPixmap)
-                    expected_width, expected_height = 100, 100
-                    mock_qimage = QImage(expected_width, expected_height, QImage.Format.Format_RGBA8888)
-                    mock_pil_to_qimage.return_value = mock_qimage
+        # Generate preview via force_regenerate_preview
+        result = preview_service.force_regenerate_preview("frame1", project)
 
-                    # First call - cache miss (should return None)
-                    result = preview_service.get_cached_preview("frame1", project)
-                    assert result is None, "Cache miss should return None"
+        # Verify result type and content
+        expected_width, expected_height = 100, 100
+        assert result is not None
+        assert isinstance(result, QPixmap)
+        assert result.width() == expected_width, "Returned pixmap should have expected width"
+        assert result.height() == expected_height, "Returned pixmap should have expected height"
 
-                    # Generate preview via force_regenerate_preview
-                    result = preview_service.force_regenerate_preview("frame1", project)
+        # Verify rendering pipeline was invoked
+        rendering_patches.mock_get_or_parse.assert_called_once()
+        rendering_patches.mock_renderer_class.assert_called_once()
 
-                    # Verify result type and content
-                    assert result is not None
-                    assert isinstance(result, QPixmap)
-                    assert result.width() == expected_width, "Returned pixmap should have expected width"
-                    assert result.height() == expected_height, "Returned pixmap should have expected height"
+        # Verify cache was populated (this is the key verification)
+        assert "frame1" in preview_service._game_frame_previews, "Preview should be cached"
+        cached_pixmap, cached_mtime, cached_entry_ids = preview_service._game_frame_previews["frame1"]
+        assert cached_pixmap is result, "Cached pixmap should be the same as returned"
 
-                    # Verify rendering pipeline was invoked
-                    mock_get_or_parse.assert_called_once()
-                    MockRenderer.assert_called_once()
-
-                    # Verify cache was populated (this is the key verification)
-                    assert "frame1" in preview_service._game_frame_previews, "Preview should be cached"
-                    cached_pixmap, cached_mtime, cached_entry_ids = preview_service._game_frame_previews["frame1"]
-                    assert cached_pixmap is result, "Cached pixmap should be the same as returned"
-
-    def test_cache_hit_returns_cached_pixmap(self, preview_service, mock_project, mock_capture_result, qtbot):
+    def test_cache_hit_returns_cached_pixmap(self, preview_service, mock_project, rendering_patches, qtbot):
         """Test that cache hit returns cached pixmap without regeneration."""
         project, game_frame = mock_project
 
-        # Patch the repository's get_or_parse to return mock capture
-        with patch.object(
-            preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result
-        ) as mock_get_or_parse:
-            with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
-                renderer_inst = MockRenderer.return_value
-                mock_pil_img = Mock()
-                renderer_inst.render_selection.return_value = mock_pil_img
+        # First call - generate and cache
+        result1 = preview_service.force_regenerate_preview("frame1", project)
 
-                with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
-                    mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
-                    mock_pil_to_qimage.return_value = mock_qimage
+        # Second call - cache hit
+        result2 = preview_service.get_cached_preview("frame1", project)
 
-                    # First call - generate and cache
-                    result1 = preview_service.force_regenerate_preview("frame1", project)
+        assert result1 == result2
+        # Repository should only be called once (first time)
+        assert rendering_patches.mock_get_or_parse.call_count == 1
 
-                    # Second call - cache hit
-                    result2 = preview_service.get_cached_preview("frame1", project)
-
-                    assert result1 == result2
-                    # Repository should only be called once (first time)
-                    assert mock_get_or_parse.call_count == 1
-
-    def test_mtime_change_invalidates_cache(self, preview_service, mock_project, mock_capture_result, qtbot, tmp_path):
+    def test_mtime_change_invalidates_cache(self, preview_service, mock_project, rendering_patches, qtbot, tmp_path):
         """Test that file mtime change invalidates cache."""
         project, game_frame = mock_project
 
@@ -154,76 +174,50 @@ class TestPreviewServiceCaching:
         capture_path.write_text('{"frame": 100}')
         game_frame.capture_path = capture_path
 
-        # Patch the repository's get_or_parse to return mock capture
-        with patch.object(
-            preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result
-        ) as mock_get_or_parse:
-            with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
-                renderer_inst = MockRenderer.return_value
-                mock_pil_img = Mock()
-                renderer_inst.render_selection.return_value = mock_pil_img
+        # First call - cache population
+        preview_service.force_regenerate_preview("frame1", project)
 
-                with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
-                    mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
-                    mock_pil_to_qimage.return_value = mock_qimage
+        # Ensure mtime actually changes (some filesystems have 1-second resolution)
+        import os
 
-                    # First call - cache population
-                    preview_service.force_regenerate_preview("frame1", project)
+        original_mtime = capture_path.stat().st_mtime
+        # Explicitly set mtime to 1 second in the future to guarantee change
+        new_mtime = original_mtime + 1.0
+        capture_path.write_text('{"frame": 101}')
+        os.utime(capture_path, (new_mtime, new_mtime))
+        # Update cached_mtime to simulate detection of file change
+        # (In production, this would happen via file watcher or manual refresh)
+        game_frame.cached_mtime = new_mtime
 
-                    # Ensure mtime actually changes (some filesystems have 1-second resolution)
-                    import os
+        # Second call - cache invalidated due to mtime change (returns None)
+        cached = preview_service.get_cached_preview("frame1", project)
+        assert cached is None, "Cache should be invalid after mtime change"
 
-                    original_mtime = capture_path.stat().st_mtime
-                    # Explicitly set mtime to 1 second in the future to guarantee change
-                    new_mtime = original_mtime + 1.0
-                    capture_path.write_text('{"frame": 101}')
-                    os.utime(capture_path, (new_mtime, new_mtime))
-                    # Update cached_mtime to simulate detection of file change
-                    # (In production, this would happen via file watcher or manual refresh)
-                    game_frame.cached_mtime = new_mtime
+        # Force regeneration
+        preview_service.force_regenerate_preview("frame1", project)
 
-                    # Second call - cache invalidated due to mtime change (returns None)
-                    cached = preview_service.get_cached_preview("frame1", project)
-                    assert cached is None, "Cache should be invalid after mtime change"
+        # Repository called twice (cache invalidated)
+        assert rendering_patches.mock_get_or_parse.call_count == 2
 
-                    # Force regeneration
-                    preview_service.force_regenerate_preview("frame1", project)
-
-                    # Repository called twice (cache invalidated)
-                    assert mock_get_or_parse.call_count == 2
-
-    def test_entry_ids_change_invalidates_cache(self, preview_service, mock_project, mock_capture_result, qtbot):
+    def test_entry_ids_change_invalidates_cache(self, preview_service, mock_project, rendering_patches, qtbot):
         """Test that entry IDs change invalidates cache."""
         project, game_frame = mock_project
 
-        # Patch the repository's get_or_parse to return mock capture
-        with patch.object(
-            preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result
-        ) as mock_get_or_parse:
-            with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
-                renderer_inst = MockRenderer.return_value
-                mock_pil_img = Mock()
-                renderer_inst.render_selection.return_value = mock_pil_img
+        # First call - generate and cache
+        preview_service.force_regenerate_preview("frame1", project)
 
-                with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
-                    mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
-                    mock_pil_to_qimage.return_value = mock_qimage
+        # Change selected entry IDs
+        game_frame.selected_entry_ids = [1, 2]  # Changed from [1, 2, 3]
 
-                    # First call - generate and cache
-                    preview_service.force_regenerate_preview("frame1", project)
+        # Second call - cache invalidated due to entry ID change (returns None)
+        cached = preview_service.get_cached_preview("frame1", project)
+        assert cached is None, "Cache should be invalid after entry ID change"
 
-                    # Change selected entry IDs
-                    game_frame.selected_entry_ids = [1, 2]  # Changed from [1, 2, 3]
+        # Force regeneration
+        preview_service.force_regenerate_preview("frame1", project)
 
-                    # Second call - cache invalidated due to entry ID change (returns None)
-                    cached = preview_service.get_cached_preview("frame1", project)
-                    assert cached is None, "Cache should be invalid after entry ID change"
-
-                    # Force regeneration
-                    preview_service.force_regenerate_preview("frame1", project)
-
-                    # Repository called twice (cache invalidated)
-                    assert mock_get_or_parse.call_count == 2
+        # Repository called twice (cache invalidated)
+        assert rendering_patches.mock_get_or_parse.call_count == 2
 
 
 class TestPreviewServiceInvalidation:
@@ -267,104 +261,83 @@ class TestPreviewServiceStaleEntries:
     """Test stale entry ID fallback behavior."""
 
     def test_stale_previews_return_none_after_mark_all_stale(
-        self, preview_service, mock_project, mock_capture_result, qtbot
+        self, preview_service, mock_project, rendering_patches, qtbot
     ):
         """Test that stale previews return None after mark_all_stale()."""
         project, game_frame = mock_project
 
-        # First, generate and cache a preview
-        with patch.object(preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result):
-            with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
-                renderer_inst = MockRenderer.return_value
-                mock_pil_img = Mock()
-                renderer_inst.render_selection.return_value = mock_pil_img
+        # Generate and cache preview
+        preview1 = preview_service.force_regenerate_preview("frame1", project)
+        assert preview1 is not None, "Initial preview should be generated"
 
-                with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
-                    mock_qimage = QImage(100, 100, QImage.Format.Format_RGBA8888)
-                    mock_pil_to_qimage.return_value = mock_qimage
+        # Verify it's cached and can be retrieved
+        cached = preview_service.get_cached_preview("frame1", project)
+        assert cached is not None, "Preview should be cached"
+        assert cached == preview1, "Cached preview should match original"
 
-                    # Generate and cache preview
-                    preview1 = preview_service.force_regenerate_preview("frame1", project)
-                    assert preview1 is not None, "Initial preview should be generated"
+        # Mark all previews as stale (simulating palette change)
+        preview_service.mark_all_stale()
 
-                    # Verify it's cached and can be retrieved
-                    cached = preview_service.get_cached_preview("frame1", project)
-                    assert cached is not None, "Preview should be cached"
-                    assert cached == preview1, "Cached preview should match original"
+        # Verify frame is in stale set
+        assert "frame1" in preview_service._stale_previews, "Frame should be marked stale"
 
-                    # Mark all previews as stale (simulating palette change)
-                    preview_service.mark_all_stale()
+        # Now get_cached_preview should return None
+        cached_after_stale = preview_service.get_cached_preview("frame1", project)
+        assert cached_after_stale is None, "Stale preview should return None"
 
-                    # Verify frame is in stale set
-                    assert "frame1" in preview_service._stale_previews, "Frame should be marked stale"
+        # Verify stale flag still persists (not yet cleared)
+        # Stale flag is only cleared when set_preview_cache is called (regeneration succeeds)
+        assert "frame1" in preview_service._stale_previews, (
+            "Stale flag should persist until set_preview_cache clears it"
+        )
 
-                    # Now get_cached_preview should return None
-                    cached_after_stale = preview_service.get_cached_preview("frame1", project)
-                    assert cached_after_stale is None, "Stale preview should return None"
+        # Subsequent calls should also return None while stale flag persists
+        # This ensures caller knows to regenerate async
+        cached_second_call = preview_service.get_cached_preview("frame1", project)
+        assert cached_second_call is None, "Should return None while stale flag persists"
 
-                    # Verify stale flag still persists (not yet cleared)
-                    # Stale flag is only cleared when set_preview_cache is called (regeneration succeeds)
-                    assert "frame1" in preview_service._stale_previews, (
-                        "Stale flag should persist until set_preview_cache clears it"
-                    )
+        # Only when set_preview_cache is called (regeneration succeeds) is stale flag cleared
+        new_pixmap = QImage(100, 100, QImage.Format.Format_RGBA8888)
+        new_qpixmap = QPixmap.fromImage(new_pixmap)
+        # Use game_frame.cached_mtime to match the current state
+        preview_service.set_preview_cache("frame1", new_qpixmap, game_frame.cached_mtime, (1, 2, 3))
 
-                    # Subsequent calls should also return None while stale flag persists
-                    # This ensures caller knows to regenerate async
-                    cached_second_call = preview_service.get_cached_preview("frame1", project)
-                    assert cached_second_call is None, "Should return None while stale flag persists"
+        # After set_preview_cache, stale flag should be cleared
+        assert "frame1" not in preview_service._stale_previews, (
+            "Stale flag should be cleared after set_preview_cache"
+        )
 
-                    # Only when set_preview_cache is called (regeneration succeeds) is stale flag cleared
-                    new_pixmap = QImage(100, 100, QImage.Format.Format_RGBA8888)
-                    new_qpixmap = QPixmap.fromImage(new_pixmap)
-                    # Use game_frame.cached_mtime to match the current state
-                    preview_service.set_preview_cache("frame1", new_qpixmap, game_frame.cached_mtime, (1, 2, 3))
-
-                    # After set_preview_cache, stale flag should be cleared
-                    assert "frame1" not in preview_service._stale_previews, (
-                        "Stale flag should be cleared after set_preview_cache"
-                    )
-
-                    # Now get_cached_preview should return the new pixmap
-                    cached_after_regen = preview_service.get_cached_preview("frame1", project)
-                    assert cached_after_regen is not None, "Should return pixmap after regen"
-                    assert cached_after_regen == new_qpixmap, "Should return regenerated pixmap"
+        # Now get_cached_preview should return the new pixmap
+        cached_after_regen = preview_service.get_cached_preview("frame1", project)
+        assert cached_after_regen is not None, "Should return pixmap after regen"
+        assert cached_after_regen == new_qpixmap, "Should return regenerated pixmap"
 
     def test_force_regenerate_after_stale_returns_new_pixmap(
-        self, preview_service, mock_project, mock_capture_result, qtbot
+        self, preview_service, mock_project, rendering_patches, qtbot
     ):
         """Test that force_regenerate_preview returns new pixmap after stale."""
         project, game_frame = mock_project
 
-        with patch.object(preview_service._capture_repository, "get_or_parse", return_value=mock_capture_result):
-            with patch("ui.frame_mapping.services.preview_renderer.CaptureRenderer") as MockRenderer:
-                renderer_inst = MockRenderer.return_value
-                mock_pil_img = Mock()
-                renderer_inst.render_selection.return_value = mock_pil_img
+        # First generation
+        _ = preview_service.force_regenerate_preview("frame1", project)
 
-                with patch("ui.frame_mapping.services.preview_renderer.pil_to_qimage") as mock_pil_to_qimage:
-                    # First generation
-                    mock_qimage1 = QImage(100, 100, QImage.Format.Format_RGBA8888)
-                    mock_pil_to_qimage.return_value = mock_qimage1
-                    _ = preview_service.force_regenerate_preview("frame1", project)
+        # Mark stale
+        preview_service.mark_all_stale()
 
-                    # Mark stale
-                    preview_service.mark_all_stale()
+        # get_cached_preview returns None
+        assert preview_service.get_cached_preview("frame1", project) is None
 
-                    # get_cached_preview returns None
-                    assert preview_service.get_cached_preview("frame1", project) is None
+        # Force regeneration should return new pixmap
+        rendering_patches.set_qimage(200, 200)
+        preview2 = preview_service.force_regenerate_preview("frame1", project)
 
-                    # Force regeneration should return new pixmap
-                    mock_qimage2 = QImage(200, 200, QImage.Format.Format_RGBA8888)
-                    mock_pil_to_qimage.return_value = mock_qimage2
-                    preview2 = preview_service.force_regenerate_preview("frame1", project)
+        assert preview2 is not None, "Regenerated preview should not be None"
+        assert preview2.width() == 200, "New pixmap should have updated dimensions"
 
-                    assert preview2 is not None, "Regenerated preview should not be None"
-                    assert preview2.width() == 200, "New pixmap should have updated dimensions"
-
-                    # Now get_cached_preview should return the new one
-                    cached_new = preview_service.get_cached_preview("frame1", project)
-                    assert cached_new is not None
-                    assert cached_new == preview2, "Cached preview should be the regenerated one"
+        # Now get_cached_preview should return the new one
+        cached_new = preview_service.get_cached_preview("frame1", project)
+        assert cached_new is not None
+        assert cached_new == preview2, "Cached preview should be the regenerated one"
 
     def test_stale_entries_fallback_to_rom_offset(self, preview_service, mock_project, qtbot):
         """Test that stale entry IDs fall back to rom_offset filtering."""
