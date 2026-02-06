@@ -453,7 +453,8 @@ class InjectionCoordinator:
 
         success_count = len(self._state.batch_injection_success)
         failed_stale_count = len(self._state.batch_injection_failed_stale)
-        total_count = success_count + failed_stale_count
+        failed_other_count = len(self._state.batch_injection_failed_other)
+        total_count = success_count + failed_stale_count + failed_other_count
         target_rom = self._state.batch_injection_target_rom
 
         # Update last injected ROM if any succeeded
@@ -466,13 +467,19 @@ class InjectionCoordinator:
                 # Single frame injection
                 if success_count == 1:
                     msg = f"Injection successful: {target_rom.name}"
-                else:
+                elif failed_stale_count == 1:
                     msg = "Injection failed due to stale entry selection"
+                elif failed_other_count == 1:
+                    msg = "Injection failed"
+                else:
+                    msg = "Injection complete"
             else:
                 # Batch injection
                 msg = f"Injected {success_count}/{total_count} frames into {target_rom.name}"
                 if failed_stale_count > 0:
                     msg += f"\n{failed_stale_count} frame(s) skipped due to outdated entry selection."
+                if failed_other_count > 0:
+                    msg += f"\n{failed_other_count} frame(s) failed."
         else:
             msg = f"Injection complete: {success_count}/{total_count} frames"
 

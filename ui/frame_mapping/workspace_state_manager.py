@@ -73,6 +73,7 @@ class WorkspaceStateManager:
         self._batch_injection_pending: set[str] = set()
         self._batch_injection_success: set[str] = set()
         self._batch_injection_failed_stale: set[str] = set()
+        self._batch_injection_failed_other: set[str] = set()
 
         # Dirty flag for unsaved changes tracking
         self._dirty: bool = False
@@ -277,6 +278,11 @@ class WorkspaceStateManager:
         """Get the set of frame IDs that failed due to stale entries."""
         return self._batch_injection_failed_stale
 
+    @property
+    def batch_injection_failed_other(self) -> set[str]:
+        """Get the set of frame IDs that failed for non-stale reasons."""
+        return self._batch_injection_failed_other
+
     def start_batch_injection(self, frame_ids: list[str], target_rom: Path) -> None:
         """Start tracking a batch injection.
 
@@ -288,6 +294,7 @@ class WorkspaceStateManager:
         self._batch_injection_pending = set(frame_ids)
         self._batch_injection_success = set()
         self._batch_injection_failed_stale = set()
+        self._batch_injection_failed_other = set()
 
     def clear_batch_injection(self) -> None:
         """Clear batch injection tracking state."""
@@ -295,6 +302,7 @@ class WorkspaceStateManager:
         self._batch_injection_pending = set()
         self._batch_injection_success = set()
         self._batch_injection_failed_stale = set()
+        self._batch_injection_failed_other = set()
 
     def is_batch_injection_active(self) -> bool:
         """Check if a batch injection is in progress."""
@@ -313,6 +321,8 @@ class WorkspaceStateManager:
             self._batch_injection_success.add(ai_frame_id)
         elif stale_entries:
             self._batch_injection_failed_stale.add(ai_frame_id)
+        else:
+            self._batch_injection_failed_other.add(ai_frame_id)
 
     def validate_selection_sync(
         self,
