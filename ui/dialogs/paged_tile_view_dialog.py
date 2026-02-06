@@ -305,24 +305,6 @@ class PagedTileViewDialog(CleanupDialog):
         """
         return self._go_to_btn.isEnabled()
 
-    def simulate_tile_selection(self, offset: int) -> None:
-        """Simulate tile selection (for testing).
-
-        Args:
-            offset: Tile offset to select.
-        """
-        self._on_tile_clicked(offset)
-
-    def is_cache_cleared(self) -> bool:
-        """Check if dialog's tile cache is cleared.
-
-        Returns:
-            True if the tile view cache is empty or tile view is None.
-        """
-        if self._tile_view is None:
-            return True
-        return len(self._tile_view._cache) == 0
-
     @override
     def closeEvent(self, event: QCloseEvent | None) -> None:
         """Handle dialog close."""

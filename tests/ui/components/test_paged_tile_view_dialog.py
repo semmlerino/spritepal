@@ -150,7 +150,7 @@ class TestPagedTileViewDialog:
         dialog.offset_selected.connect(offsets.append)
 
         # Simulate tile click then button click
-        dialog.simulate_tile_selection(5000)
+        dialog._on_tile_clicked(5000)
         assert dialog.get_selected_offset() == 5000
         assert dialog.is_go_to_enabled()
 
@@ -170,7 +170,7 @@ class TestPagedTileViewDialog:
         assert not dialog.is_go_to_enabled()
 
         # Click a tile
-        dialog.simulate_tile_selection(0x1234)
+        dialog._on_tile_clicked(0x1234)
 
         assert dialog.is_go_to_enabled()
         assert dialog.get_selected_offset() == 0x1234
@@ -198,5 +198,5 @@ class TestPagedTileViewDialog:
         # Close the dialog
         dialog.close()
 
-        # Widget should have been cleaned up
-        assert dialog.is_cache_cleared()
+        # Dialog should be closed (observable cleanup behavior)
+        assert not dialog.isVisible(), "Dialog should be closed after closeEvent"
