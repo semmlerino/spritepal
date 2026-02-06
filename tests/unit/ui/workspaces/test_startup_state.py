@@ -1,6 +1,6 @@
 import pytest
 
-pytestmark = [pytest.mark.integration]
+pytestmark = [pytest.mark.unit]
 """Integration tests for startup state consistency.
 
 Verifies that UI state is correctly synchronized at startup:

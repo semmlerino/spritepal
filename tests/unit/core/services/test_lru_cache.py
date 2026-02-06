@@ -281,7 +281,7 @@ class TestBaseLRUCacheThreadSafety:
             """Periodically clear the cache."""
             for _ in range(10):
                 try:
-                    time.sleep(0.001)
+                    time.sleep(0.001)  # sleep-ok
                     cache.clear()
                 except Exception as e:
                     errors.append(f"Clearer error: {e}")
