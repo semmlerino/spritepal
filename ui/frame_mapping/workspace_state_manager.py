@@ -62,8 +62,8 @@ class WorkspaceStateManager:
         # Auto-advance toggle state (default: OFF per UX spec)
         self._auto_advance_enabled = False
 
-        # Track stale entry warnings during injection (stores game frame ID)
-        self._stale_entry_game_frame_id: str | None = None
+        # Track stale entry warnings during injection (stores game frame IDs)
+        self._stale_game_frame_ids: set[str] = set()
 
         # Track project identity for canvas state preservation
         self._previous_project_id: int | None = None
@@ -226,14 +226,21 @@ class WorkspaceStateManager:
     # -------------------------------------------------------------------------
 
     @property
-    def stale_entry_game_frame_id(self) -> str | None:
-        """Get the game frame ID with stale entry warning."""
-        return self._stale_entry_game_frame_id
+    def stale_game_frame_ids(self) -> frozenset[str]:
+        """Get a read-only view of stale game frame IDs."""
+        return frozenset(self._stale_game_frame_ids)
 
-    @stale_entry_game_frame_id.setter
-    def stale_entry_game_frame_id(self, frame_id: str | None) -> None:
-        """Set the game frame ID with stale entry warning."""
-        self._stale_entry_game_frame_id = frame_id
+    def add_stale_game_frame_id(self, frame_id: str) -> None:
+        """Add a game frame ID to the stale tracking set.
+
+        Args:
+            frame_id: Game frame ID with stale entry warning
+        """
+        self._stale_game_frame_ids.add(frame_id)
+
+    def clear_stale_game_frame_ids(self) -> None:
+        """Clear all stale game frame IDs."""
+        self._stale_game_frame_ids = set()
 
     # -------------------------------------------------------------------------
     # Project Identity Properties
@@ -290,6 +297,7 @@ class WorkspaceStateManager:
             frame_ids: List of AI frame IDs to inject
             target_rom: Target ROM path for injection
         """
+        self._stale_game_frame_ids = set()
         self._batch_injection_target_rom = target_rom
         self._batch_injection_pending = set(frame_ids)
         self._batch_injection_success = set()

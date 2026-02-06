@@ -1,7 +1,7 @@
-"""Tests for stale-entry batch accounting fix in InjectionCoordinator.
+"""Tests for stale-entry batch accounting in InjectionCoordinator.
 
-Tests the fix for comparing stale_entry_game_frame_id (a game frame ID like "capture_A")
-against the correct game frame ID looked up from the mapping, not the ai_frame_id directly.
+Tests that stale_game_frame_ids (a set of game frame IDs like {"capture_A", "capture_B"})
+is correctly compared against game frame IDs looked up from mappings during batch injection.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ class TestInjectionStaleEntry:
         coordinator: InjectionCoordinator,
         tmp_path: Path,
     ) -> None:
-        """Set stale_entry_game_frame_id = "capture_A", mapping "sprite_01.png" -> "capture_A".
+        """Add stale game frame ID "capture_A", mapping "sprite_01.png" -> "capture_A".
 
         Call handle_async_injection_finished("sprite_01.png", False, "stale").
         Verify batch_injection_failed_stale contains "sprite_01.png".
@@ -67,7 +67,7 @@ class TestInjectionStaleEntry:
 
         # Set up batch tracking with TWO frames (so batch doesn't complete and clear state)
         state.start_batch_injection(["sprite_01.png", "sprite_02.png"], Path("/tmp/test.sfc"))
-        state.stale_entry_game_frame_id = "capture_A"
+        state.add_stale_game_frame_id("capture_A")
 
         # Act - Handle injection completion for first frame (success=False, stale entry detected)
         coordinator.handle_async_injection_finished("sprite_01.png", False, "stale entry")
@@ -86,7 +86,7 @@ class TestInjectionStaleEntry:
         coordinator: InjectionCoordinator,
         tmp_path: Path,
     ) -> None:
-        """Set stale_entry_game_frame_id = "capture_B", mapping "sprite_01.png" -> "capture_A".
+        """Add stale game frame ID "capture_B", mapping "sprite_01.png" -> "capture_A".
 
         Call handler. Verify batch_injection_failed_stale is empty and batch_injection_success
         contains "sprite_01.png".
@@ -109,7 +109,7 @@ class TestInjectionStaleEntry:
 
         # Set up batch tracking with TWO frames (so batch doesn't complete and clear state)
         state.start_batch_injection(["sprite_01.png", "sprite_02.png"], Path("/tmp/test.sfc"))
-        state.stale_entry_game_frame_id = "capture_B"  # Different game frame
+        state.add_stale_game_frame_id("capture_B")  # Different game frame
 
         # Act - Handle injection completion (success=True, no stale entry match)
         coordinator.handle_async_injection_finished("sprite_01.png", True, "ok")
@@ -128,7 +128,7 @@ class TestInjectionStaleEntry:
         coordinator: InjectionCoordinator,
         tmp_path: Path,
     ) -> None:
-        """stale_entry_game_frame_id = None. Call handler. Verify no stale entries recorded."""
+        """stale_game_frame_ids empty. Call handler. Verify no stale entries recorded."""
         # Arrange - Create AI frames and game frame
         project = controller.project
         assert project is not None
@@ -145,7 +145,7 @@ class TestInjectionStaleEntry:
 
         # Set up batch tracking with TWO frames (so batch doesn't complete and clear state)
         state.start_batch_injection(["sprite_01.png", "sprite_02.png"], Path("/tmp/test.sfc"))
-        state.stale_entry_game_frame_id = None
+        # stale_game_frame_ids is empty by default (cleared by start_batch_injection)
 
         # Act - Handle injection completion (success=True, no stale entry tracking)
         coordinator.handle_async_injection_finished("sprite_01.png", True, "ok")

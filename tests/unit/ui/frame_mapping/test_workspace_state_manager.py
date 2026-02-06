@@ -31,8 +31,8 @@ class TestWorkspaceStateManagerInit:
         # Auto-advance should be disabled
         assert manager.auto_advance_enabled is False
 
-        # Stale entry tracking should be None
-        assert manager.stale_entry_game_frame_id is None
+        # Stale game frame IDs should be empty
+        assert manager.stale_game_frame_ids == frozenset()
 
         # Project identity tracking should be None
         assert manager.previous_project_id is None
@@ -173,21 +173,28 @@ class TestAutoAdvanceState:
 class TestStaleEntryTracking:
     """Test stale entry tracking."""
 
-    def test_set_and_get_stale_entry_game_frame_id(self) -> None:
-        """Should set and get stale entry frame ID."""
+    def test_stale_game_frame_ids_initially_empty(self) -> None:
+        """Should start with empty stale game frame IDs."""
         manager = WorkspaceStateManager()
-        frame_id = "capture_003"
+        assert manager.stale_game_frame_ids == frozenset()
 
-        manager.stale_entry_game_frame_id = frame_id
-        assert manager.stale_entry_game_frame_id == frame_id
-
-    def test_clear_stale_entry_game_frame_id(self) -> None:
-        """Should allow clearing stale entry frame ID."""
+    def test_add_stale_game_frame_id(self) -> None:
+        """Should accumulate stale game frame IDs."""
         manager = WorkspaceStateManager()
-        manager.stale_entry_game_frame_id = "capture_003"
+        manager.add_stale_game_frame_id("capture_A")
+        assert "capture_A" in manager.stale_game_frame_ids
 
-        manager.stale_entry_game_frame_id = None
-        assert manager.stale_entry_game_frame_id is None
+        manager.add_stale_game_frame_id("capture_B")
+        assert manager.stale_game_frame_ids == frozenset({"capture_A", "capture_B"})
+
+    def test_clear_stale_game_frame_ids(self) -> None:
+        """Should clear all stale game frame IDs."""
+        manager = WorkspaceStateManager()
+        manager.add_stale_game_frame_id("capture_A")
+        manager.add_stale_game_frame_id("capture_B")
+
+        manager.clear_stale_game_frame_ids()
+        assert manager.stale_game_frame_ids == frozenset()
 
 
 class TestProjectIdentityTracking:
