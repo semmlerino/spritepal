@@ -266,6 +266,67 @@ widget.setStyleSheet('QWidget { border: 1px solid red; }')
 
 ---
 
+## Frame Mapping Test Patterns
+
+Guidelines specific to the frame mapping subsystem (`tests/unit/ui/frame_mapping/`).
+
+### Data Models Are Real
+
+Never mock data-holder dataclasses. Use real constructors:
+
+```python
+# Bad - hides bugs, masks type errors
+game_frame = Mock(spec=GameFrame)
+game_frame.palette_index = 5
+
+# Good - validates field types, catches API changes
+game_frame = GameFrame(id="game_001", palette_index=5)
+mapping = FrameMapping(ai_frame_id="ai_001", game_frame_id="game_001")
+ai_frame = AIFrame(path=tmp_path / "frame.png", index=0)
+```
+
+Applies to: `GameFrame`, `AIFrame`, `FrameMapping`, `SheetPalette`. Keep mocks for `CaptureResult` (heavier construction with JSON parsing).
+
+### No `__new__` Bypass for DI
+
+Use setter injection, never `__new__`:
+
+```python
+# Bad - skips __init__, fragile if constructor changes
+helper = WorkspaceLogicHelper.__new__(WorkspaceLogicHelper)
+helper._controller = MagicMock()
+
+# Good - uses designed DI pattern
+helper = WorkspaceLogicHelper()
+helper.set_controller(MagicMock())
+helper.set_state(MagicMock())
+helper.set_panes(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+```
+
+### Use Existing Test Helpers
+
+Before writing test setup, check `tests/fixtures/frame_mapping_helpers.py`:
+
+| Helper | Creates |
+|--------|---------|
+| `create_test_project(tmp_path)` | `FrameMappingProject` with AI frames on disk |
+| `create_ai_frames(tmp_path, n)` | List of `AIFrame` with minimal PNGs |
+| `create_test_capture(entry_ids)` | Capture dict matching Mesen JSON format |
+| `MINIMAL_PNG_DATA` | Bytes for a 1x1 transparent PNG |
+
+### Fakes Over MagicMock for Workers/Signals
+
+Use fake implementations for components that emit signals or run threads:
+
+| Fake | Replaces | Location |
+|------|----------|----------|
+| `FakeSpriteScanWorker` | `SpriteScanWorker` | `tests/infrastructure/` |
+| `FakeThumbnailController` | `ThumbnailController` | `tests/infrastructure/` |
+
+Fakes preserve signal contracts while eliminating timing issues.
+
+---
+
 ## Key Test Infrastructure
 
 | Class | Location | Purpose |
