@@ -50,7 +50,7 @@ class TestPaletteInfoOnSelection:
             flip_v=False,
             scale=1.0,
             sharpen=0.0,
-            resampling="nearest"
+            resampling="nearest",
         )
         project.get_mapping_for_ai_frame.return_value = mapping
 

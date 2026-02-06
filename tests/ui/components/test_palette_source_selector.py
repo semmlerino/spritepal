@@ -43,7 +43,6 @@ class TestBug2ModifiedItemRemoval:
         assert not custom_exists_after, "[Modified] item should be removed after selecting standard source"
 
 
-
 # =============================================================================
 # Bug 4: Incomplete clearing for preset/file/custom types
 # =============================================================================

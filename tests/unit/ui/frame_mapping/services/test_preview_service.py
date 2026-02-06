@@ -303,9 +303,7 @@ class TestPreviewServiceStaleEntries:
         preview_service.set_preview_cache("frame1", new_qpixmap, game_frame.cached_mtime, (1, 2, 3))
 
         # After set_preview_cache, stale flag should be cleared
-        assert "frame1" not in preview_service._stale_previews, (
-            "Stale flag should be cleared after set_preview_cache"
-        )
+        assert "frame1" not in preview_service._stale_previews, "Stale flag should be cleared after set_preview_cache"
 
         # Now get_cached_preview should return the new pixmap
         cached_after_regen = preview_service.get_cached_preview("frame1", project)

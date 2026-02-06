@@ -47,9 +47,7 @@ class TestAIFramesFacadeSaveRequested:
         clear_undo = MagicMock()
 
         # Create facade
-        facade = AIFramesFacade(
-            context, signals, ai_frame_service, org_service, undo_stack, get_cmd_ctx
-        )
+        facade = AIFramesFacade(context, signals, ai_frame_service, org_service, undo_stack, get_cmd_ctx)
 
         # Execute
         facade.load_from_directory(directory, clear_undo=clear_undo)
@@ -83,9 +81,7 @@ class TestAIFramesFacadeSaveRequested:
         file_path.suffix = ".png"
 
         # Create facade
-        facade = AIFramesFacade(
-            context, signals, ai_frame_service, org_service, undo_stack, get_cmd_ctx
-        )
+        facade = AIFramesFacade(context, signals, ai_frame_service, org_service, undo_stack, get_cmd_ctx)
 
         # Execute
         facade.add_from_file(file_path)
@@ -112,9 +108,7 @@ class TestAIFramesFacadeSaveRequested:
         get_cmd_ctx = MagicMock()
 
         # Create facade
-        facade = AIFramesFacade(
-            context, signals, ai_frame_service, org_service, undo_stack, get_cmd_ctx
-        )
+        facade = AIFramesFacade(context, signals, ai_frame_service, org_service, undo_stack, get_cmd_ctx)
 
         # Execute
         facade.remove("frame_id_to_remove")
@@ -141,9 +135,7 @@ class TestAIFramesFacadeSaveRequested:
         get_cmd_ctx = MagicMock()
 
         # Create facade
-        facade = AIFramesFacade(
-            context, signals, ai_frame_service, org_service, undo_stack, get_cmd_ctx
-        )
+        facade = AIFramesFacade(context, signals, ai_frame_service, org_service, undo_stack, get_cmd_ctx)
 
         # Execute
         facade.remove_batch(["frame_id_1", "frame_id_2"])
@@ -174,9 +166,7 @@ class TestAIFramesFacadeSaveRequested:
         get_cmd_ctx = MagicMock()
 
         # Create facade
-        facade = AIFramesFacade(
-            context, signals, ai_frame_service, org_service, undo_stack, get_cmd_ctx
-        )
+        facade = AIFramesFacade(context, signals, ai_frame_service, org_service, undo_stack, get_cmd_ctx)
 
         # Execute
         facade.reorder(0, 1)
@@ -209,9 +199,7 @@ class TestGameFramesFacadeSaveRequested:
         get_cmd_ctx = MagicMock()
 
         # Create facade
-        facade = GameFramesFacade(
-            context, signals, preview_service, org_service, undo_stack, get_cmd_ctx
-        )
+        facade = GameFramesFacade(context, signals, preview_service, org_service, undo_stack, get_cmd_ctx)
 
         # Execute
         facade.remove("game_frame_id")
