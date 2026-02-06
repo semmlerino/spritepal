@@ -180,12 +180,17 @@ class TestEditorPaletteSyncOnPaletteChange:
         # Change palette color (this should trigger _on_sheet_palette_changed)
         workspace.controller.set_sheet_palette_color(5, (255, 0, 0))
 
-        # Verify both editors were synced
-        mock_editor1._palette_panel.set_palette.assert_called()
+        # Get the current palette after the change
+        current_palette = workspace.controller.get_sheet_palette()
+
+        # Verify editors received the CORRECT palette (not just any call)
+        assert mock_editor1._palette is current_palette
+        mock_editor1._palette_panel.set_palette.assert_called_with(current_palette)
         mock_editor1._update_duplicate_warning.assert_called()
         mock_editor1._main_canvas.set_image.assert_called()
 
-        mock_editor2._palette_panel.set_palette.assert_called()
+        assert mock_editor2._palette is current_palette
+        mock_editor2._palette_panel.set_palette.assert_called_with(current_palette)
         mock_editor2._update_duplicate_warning.assert_called()
         mock_editor2._main_canvas.set_image.assert_called()
 
