@@ -99,13 +99,11 @@ class _GameFramePreviewWorker(QObject):
         super().__init__()
         self._state_mutex = QMutex()
         self._target_request_id = 0
-        self._stop_requested = False
 
     def set_target_request_id(self, req_id: int) -> None:
         """Update target request ID and request stop of current work."""
         with QMutexLocker(self._state_mutex):
             self._target_request_id = req_id
-            self._stop_requested = True
 
     def init_target_request_id(self, req_id: int) -> None:
         """Initialize target request ID for new work (does not set stop flag)."""
@@ -117,11 +115,6 @@ class _GameFramePreviewWorker(QObject):
         with QMutexLocker(self._state_mutex):
             return request_id != self._target_request_id
 
-    def _clear_stop_flag(self) -> None:
-        """Clear stop flag at start of valid request processing."""
-        with QMutexLocker(self._state_mutex):
-            self._stop_requested = False
-
     @Slot(BatchPreviewRequest)
     def process_batch(self, batch: BatchPreviewRequest) -> None:
         """Process batch of preview requests."""
@@ -130,8 +123,6 @@ class _GameFramePreviewWorker(QObject):
         # Fast rejection if already stale
         if self._should_cancel(request_id):
             return
-
-        self._clear_stop_flag()
 
         for req in batch.requests:
             # Check for cancellation between frames

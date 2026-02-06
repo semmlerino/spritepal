@@ -498,7 +498,7 @@ class CapturesLibraryPane(QWidget):
 
         menu.exec(self._list.mapToGlobal(pos))
 
-    def _start_drag(self, supported_actions: Qt.DropAction) -> None:
+    def _start_drag(self, _supported_actions: Qt.DropAction) -> None:
         """Start a drag operation with custom MIME data."""
         item = self._list.currentItem()
         if item is None:  # type: ignore[reportUnnecessaryComparison]

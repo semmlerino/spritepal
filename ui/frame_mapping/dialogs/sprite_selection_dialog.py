@@ -198,7 +198,7 @@ class SpriteSelectionDialog(DialogBase):
 
             # Add all entries as top-level items
             for entry in self._capture.entries:
-                item = self._create_entry_item(entry, is_child=False)
+                item = self._create_entry_item(entry)
                 self._sprite_tree.addTopLevelItem(item)
 
     def _populate_tree_grouped(self, palette_index: int) -> None:
@@ -231,7 +231,7 @@ class SpriteSelectionDialog(DialogBase):
             for cluster in self._clusters:
                 if cluster.entry_count == 1:
                     # Single entry - show as flat item
-                    item = self._create_entry_item(cluster.entries[0], is_child=False)
+                    item = self._create_entry_item(cluster.entries[0])
                     item.setData(0, ROLE_CLUSTER_ID, cluster.id)
                     self._sprite_tree.addTopLevelItem(item)
                 else:
@@ -264,17 +264,16 @@ class SpriteSelectionDialog(DialogBase):
 
         # Add child items for each entry
         for entry in cluster.entries:
-            child_item = self._create_entry_item(entry, is_child=True)
+            child_item = self._create_entry_item(entry)
             item.addChild(child_item)
 
         return item
 
-    def _create_entry_item(self, entry: OAMEntry, is_child: bool = False) -> QTreeWidgetItem:
+    def _create_entry_item(self, entry: OAMEntry) -> QTreeWidgetItem:
         """Create a tree item for an OAM entry.
 
         Args:
             entry: OAM entry to create item for
-            is_child: Whether this is a child of a group item
 
         Returns:
             Configured QTreeWidgetItem
