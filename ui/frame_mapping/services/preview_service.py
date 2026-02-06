@@ -112,9 +112,8 @@ class PreviewService(QObject):
 
         # Check if preview is marked stale (e.g., after palette change)
         if frame_id in self._stale_previews:
-            # Clear stale flag immediately to prevent repeated None returns
-            self._stale_previews.discard(frame_id)
-            # Return None to trigger async regeneration by caller
+            # Return None to trigger async regeneration by caller.
+            # Stale flag persists until regen succeeds (set_preview_cache clears it).
             return None
 
         return cached_pixmap
@@ -326,3 +325,4 @@ class PreviewService(QObject):
             entry_ids: Tuple of selected entry IDs
         """
         self._game_frame_previews[frame_id] = (pixmap, mtime, entry_ids)
+        self._stale_previews.discard(frame_id)

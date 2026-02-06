@@ -22,6 +22,7 @@ class PaletteSignals(Protocol):
     """Protocol for palette-related signal emissions."""
 
     def emit_project_changed(self) -> None: ...
+    def emit_save_requested(self) -> None: ...
 
 
 class PaletteFacade:
@@ -65,6 +66,7 @@ class PaletteFacade:
         """
         self._palette_service.set_sheet_palette(self._context.project, palette)
         self._signals.emit_project_changed()
+        self._signals.emit_save_requested()
 
     def set_sheet_palette_color(self, index: int, rgb: tuple[int, int, int]) -> None:
         """Update a single color in the sheet palette.
@@ -75,6 +77,7 @@ class PaletteFacade:
         """
         self._palette_service.set_sheet_palette_color(self._context.project, index, rgb)
         self._signals.emit_project_changed()
+        self._signals.emit_save_requested()
 
     # ─── Color Extraction ─────────────────────────────────────────────────────
 

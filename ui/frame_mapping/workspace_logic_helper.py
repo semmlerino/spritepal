@@ -345,6 +345,7 @@ class WorkspaceLogicHelper:
 
         mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         if mapping is None:
+            self._mapping_panel.clear_row_mapping(ai_frame_id)
             return
 
         # Update alignment and flip columns

@@ -99,6 +99,7 @@ class GameFramesFacade:
                 self._signals.emit_mapping_removed(ai_id, frame_id)
 
             self._signals.emit_game_frame_removed(frame_id)
+            self._signals.emit_save_requested()
             # Clear undo stack to prevent stale references to deleted frames
             self._undo_stack.clear()
             logger.info("Removed game frame %s", frame_id)

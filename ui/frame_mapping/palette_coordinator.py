@@ -459,8 +459,9 @@ class PaletteCoordinator:
 
         Updates the workbench preview to show the saved in-game edit.
         """
-        if self._alignment_canvas is not None:
-            self._alignment_canvas.set_ingame_edited_path(ingame_edited_path)
+        if self._state is not None and self._state.selected_ai_frame_id == ai_frame_id:
+            if self._alignment_canvas is not None:
+                self._alignment_canvas.set_ingame_edited_path(ingame_edited_path)
 
     # -------------------------------------------------------------------------
     # Helper Methods

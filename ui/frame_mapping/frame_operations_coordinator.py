@@ -254,13 +254,14 @@ class FrameOperationsCoordinator:
         # That handler already does: map button state, AI frame status, game frame link status,
         # and mapping panel row clear. We only need the canvas/state cleanup here.
         self._controller.remove_mapping(ai_frame_id)
-        if self._alignment_canvas:
-            self._alignment_canvas.clear_alignment()
-            self._alignment_canvas.set_game_frame(None)
-        if self._captures_pane:
-            self._captures_pane.clear_selection()
-        self._state.selected_game_id = None
-        self._state.current_canvas_game_id = None
+        if ai_frame_id == self._state.selected_ai_frame_id:
+            if self._alignment_canvas:
+                self._alignment_canvas.clear_alignment()
+                self._alignment_canvas.set_game_frame(None)
+            if self._captures_pane:
+                self._captures_pane.clear_selection()
+            self._state.selected_game_id = None
+            self._state.current_canvas_game_id = None
 
     def handle_edit_frame(self, ai_frame_id: str) -> None:
         """Handle edit AI frame request.

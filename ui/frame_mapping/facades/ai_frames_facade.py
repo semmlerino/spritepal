@@ -120,6 +120,7 @@ class AIFramesFacade:
 
         self._signals.emit_ai_frames_loaded(len(frames))
         self._signals.emit_project_changed()
+        self._signals.emit_save_requested()
         logger.info("Loaded %d AI frames from %s", len(frames), directory)
         return len(frames)
 
@@ -162,6 +163,7 @@ class AIFramesFacade:
 
         # Emit targeted signal - handlers will add to AI pane and mapping panel
         self._signals.emit_ai_frame_added(frame.id)
+        self._signals.emit_save_requested()
         logger.info("Added AI frame: %s", file_path)
         return True
 
@@ -198,6 +200,7 @@ class AIFramesFacade:
                 self._signals.emit_mapping_removed(frame_id, mapping.game_frame_id)
 
             self._signals.emit_ai_frame_removed(frame_id)
+            self._signals.emit_save_requested()
             # Clear undo stack to prevent stale references to deleted frames
             self._undo_stack.clear()
             logger.info("Removed AI frame %s", frame_id)
@@ -239,6 +242,7 @@ class AIFramesFacade:
         # Emit batch removal signal if any frames were removed
         if removed_ids:
             self._signals.emit_ai_frames_removed_batch(removed_ids)
+            self._signals.emit_save_requested()
             logger.info("Removed %d AI frames in batch", len(removed_ids))
 
         return removed_ids
@@ -274,6 +278,7 @@ class AIFramesFacade:
         self._undo_stack.push(command)
         # Emit signal for UI update (command emits in undo)
         self._signals.emit_ai_frame_moved(ai_frame_id, current_index, clamped_index)
+        self._signals.emit_save_requested()
         return True
 
     def get_frames(self) -> list[AIFrame]:
