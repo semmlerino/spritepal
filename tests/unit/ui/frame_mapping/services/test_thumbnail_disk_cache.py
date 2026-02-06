@@ -1,8 +1,8 @@
 """Unit tests for ThumbnailDiskCache."""
 
 import json
+import os
 import threading
-import time
 from pathlib import Path
 from typing import Any
 
@@ -102,17 +102,24 @@ def test_eviction_removes_lru_entries(tmp_path: Path) -> None:
     entry3_bytes = VALID_PNG_BYTES + b"\x00" * 200
     entry4_bytes = VALID_PNG_BYTES + b"\x00" * 200
 
-    # Put entries with small delays to ensure different timestamps
+    # Put entries and set explicit mtimes for deterministic LRU ordering
+    base_time = 1000000.0
+
     cache.put("entry1", entry1_bytes, create_metadata("/path1.png"))
-    time.sleep(0.01)
+    for f in tmp_path.glob("*entry1*"):
+        os.utime(f, (base_time, base_time))
 
     cache.put("entry2", entry2_bytes, create_metadata("/path2.png"))
-    time.sleep(0.01)
+    for f in tmp_path.glob("*entry2*"):
+        os.utime(f, (base_time + 1, base_time + 1))
 
     cache.put("entry3", entry3_bytes, create_metadata("/path3.png"))
-    time.sleep(0.01)
+    for f in tmp_path.glob("*entry3*"):
+        os.utime(f, (base_time + 2, base_time + 2))
 
     cache.put("entry4", entry4_bytes, create_metadata("/path4.png"))
+    for f in tmp_path.glob("*entry4*"):
+        os.utime(f, (base_time + 3, base_time + 3))
 
     # Verify all entries exist
     assert cache.get("entry1") is not None
@@ -121,10 +128,13 @@ def test_eviction_removes_lru_entries(tmp_path: Path) -> None:
     assert cache.get("entry4") is not None
 
     # Access entry2 and entry4 to update their last_access
-    time.sleep(0.01)
     cache.get("entry2")
-    time.sleep(0.01)
+    for f in tmp_path.glob("*entry2*"):
+        os.utime(f, (base_time + 10, base_time + 10))
+
     cache.get("entry4")
+    for f in tmp_path.glob("*entry4*"):
+        os.utime(f, (base_time + 11, base_time + 11))
 
     # Check size before eviction
     stats_before = cache.get_stats()

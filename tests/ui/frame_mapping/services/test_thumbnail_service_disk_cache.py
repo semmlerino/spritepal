@@ -6,7 +6,7 @@ create_quantized_thumbnail and AsyncThumbnailLoader for performance optimization
 
 from __future__ import annotations
 
-import time
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -165,15 +165,13 @@ class TestDiskCacheInvalidationOnMtimeChange:
         entries1 = stats1["entries"]
         assert entries1 >= 1
 
-        # Wait briefly to ensure mtime changes
-        time.sleep(0.1)
-
         # Modify image file (change color)
         modified_img = Image.new("RGBA", (64, 64), (0, 128, 255, 255))
         modified_img.save(image_path)
 
-        # Ensure mtime changed
-        time.sleep(0.1)
+        # Force distinct mtime (1 hour ahead of original)
+        original_mtime = image_path.stat().st_mtime
+        os.utime(image_path, (original_mtime + 3600, original_mtime + 3600))
 
         # Clear in-memory caches to force disk lookup
         from ui.frame_mapping.services.thumbnail_service import _cached_quantized_thumbnail_bytes, _pixmap_cache

@@ -6,6 +6,7 @@ Covers preview cache invalidation, file change detection, and filtering behavior
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -162,8 +163,6 @@ class TestPreviewCacheInvalidation:
 
     def test_preview_cache_invalidates_on_file_change(self, tmp_path: Path, qtbot) -> None:
         """Preview regenerates when source capture file is modified."""
-        import time
-
         # Create initial capture
         capture_data = create_test_capture([0, 1])
         capture_path = tmp_path / "capture.json"
@@ -183,12 +182,13 @@ class TestPreviewCacheInvalidation:
         preview1 = controller._preview_service.force_regenerate_preview("F001", project)
         assert preview1 is not None
 
-        # Ensure mtime changes (some filesystems have second-level precision)
-        time.sleep(0.1)
-
         # Modify the capture file
         capture_data2 = create_test_capture([0, 1, 2])  # Add a third entry
         capture_path.write_text(json.dumps(capture_data2))
+
+        # Force distinct mtime
+        original_mtime = capture_path.stat().st_mtime
+        os.utime(capture_path, (original_mtime + 3600, original_mtime + 3600))
 
         # Update cached_mtime to trigger invalidation
         game_frame.cached_mtime = capture_path.stat().st_mtime
