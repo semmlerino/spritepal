@@ -2427,6 +2427,8 @@ class WorkbenchCanvas(QWidget):
 
     def _emit_alignment_changed(self) -> None:
         """Emit alignment_changed signal with current values."""
+        # User changed transforms → in-game edit is stale, fall back to compositor
+        self._ingame_edited_path = None
         self.alignment_changed.emit(self.get_alignment())
 
     def _update_scene_for_alignment(self) -> None:
