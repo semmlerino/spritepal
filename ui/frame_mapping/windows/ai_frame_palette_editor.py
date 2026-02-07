@@ -977,6 +977,11 @@ class AIFramePaletteEditorWindow(QMainWindow):
             self._status_bar.showMessage("Failed to generate in-game index map", 3000)
             return
 
+        # Compositor uses 255 as "no AI data" marker; IndexedCanvas only handles
+        # 0-15, so convert 255 → 0 (transparent) to avoid rendering as color 15.
+        index_map = index_map.copy()
+        index_map[index_map == 255] = 0
+
         self._setup_ingame_canvas(index_map)
 
     def _load_ingame_from_file(self, path: Path) -> None:
