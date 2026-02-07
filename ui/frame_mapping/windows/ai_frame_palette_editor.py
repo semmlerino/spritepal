@@ -93,7 +93,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._palette = palette
         self._main_controller = PaletteEditorController(self)
         self._frame_controller = controller
-        self._preview_enabled = False
         self._ingame_controller: PaletteEditorController | None = None
         self._ingame_canvas: IndexedCanvas | None = None
         self._active_canvas: str = "main"  # "main" or "ingame"
@@ -166,9 +165,9 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._palette_panel.set_active_index(1)
         right_layout.addWidget(self._palette_panel)
 
-        # In-game preview panel (collapsible)
+        # In-game preview panel (always visible)
         self._preview_panel = self._create_preview_panel()
-        self._preview_panel.setVisible(False)  # Hidden by default
+        self._preview_panel.setVisible(True)
         right_layout.addWidget(self._preview_panel, 1)
 
         # Use QSplitter so user can resize center vs right
@@ -326,24 +325,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._highlight_checkbox.toggled.connect(self._on_highlight_toggled)
         layout.addWidget(self._highlight_checkbox)
 
-        # Preview section
-        layout.addSpacing(16)
-        preview_label = QLabel("Preview")
-        preview_label.setStyleSheet("font-weight: bold; color: #AAA;")
-        layout.addWidget(preview_label)
-
-        self._preview_checkbox = QCheckBox("In-Game")
-        self._preview_checkbox.setToolTip(
-            "Show preview (quantized to sheet palette)\nWith mapping: shows in-game composite"
-        )
-        self._preview_checkbox.toggled.connect(self._on_preview_toggled)
-        layout.addWidget(self._preview_checkbox)
-
-        # Disable if no controller
-        if self._frame_controller is None:
-            self._preview_checkbox.setEnabled(False)
-            self._preview_checkbox.setToolTip("Preview unavailable (no frame mapping context)")
-
         layout.addStretch()
 
         # Zoom controls
@@ -391,7 +372,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._swap_checkbox = QCheckBox("Swap to Center")
         self._swap_checkbox.setToolTip("Swap in-game canvas to center position")
         self._swap_checkbox.setFixedHeight(28)
-        self._swap_checkbox.setEnabled(False)  # Enabled when preview is active
         self._swap_checkbox.toggled.connect(self._on_swap_toggled)
         layout.addWidget(self._swap_checkbox)
 
@@ -616,6 +596,9 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
             # Check for duplicate colors in palette and show warning if found
             self._update_duplicate_warning()
+
+            # Auto-initialize in-game preview
+            self._init_ingame_preview()
         else:
             QMessageBox.warning(
                 self,
@@ -623,6 +606,49 @@ class AIFramePaletteEditorWindow(QMainWindow):
                 f"Failed to load image: {path}",
             )
             self.close()
+
+    def _init_ingame_preview(self) -> None:
+        """Auto-initialize the in-game preview canvas if mapping is available."""
+        if self._frame_controller is None:
+            self._preview_info_label.setText("Preview unavailable (no frame mapping context)")
+            if self._ingame_canvas is not None:
+                self._ingame_canvas.setEnabled(False)
+            self._refresh_ingame_btn.setEnabled(False)
+            self._swap_checkbox.setEnabled(False)
+            return
+
+        project = self._frame_controller.project
+        if project is None:
+            self._preview_info_label.setText("No project loaded")
+            if self._ingame_canvas is not None:
+                self._ingame_canvas.setEnabled(False)
+            self._refresh_ingame_btn.setEnabled(False)
+            self._swap_checkbox.setEnabled(False)
+            return
+
+        mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
+        if mapping is None:
+            self._preview_info_label.setText("No mapping - in-game canvas unavailable")
+            if self._ingame_canvas is not None:
+                self._ingame_canvas.setEnabled(False)
+            self._refresh_ingame_btn.setEnabled(False)
+            self._save_ingame_btn.setEnabled(False)
+            self._swap_checkbox.setEnabled(False)
+            return
+
+        # Check for saved in-game edits
+        if mapping.ingame_edited_path:
+            ingame_path = Path(mapping.ingame_edited_path)
+            if ingame_path.exists():
+                self._load_ingame_from_file(ingame_path)
+                self._preview_info_label.setText("Loaded saved in-game edits")
+                self._swap_checkbox.setChecked(True)  # Default: ingame in center
+                return
+
+        # Generate from compositor
+        self._generate_ingame_canvas(mapping)
+        self._preview_info_label.setText("Edit the composited in-game result")
+        self._swap_checkbox.setChecked(True)  # Default: ingame in center
 
     def _update_duplicate_warning(self) -> None:
         """Update the duplicate color warning visibility based on palette."""
@@ -742,8 +768,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _schedule_ingame_refresh(self) -> None:
         """Schedule debounced auto-refresh of in-game canvas."""
-        if not self._preview_enabled:
-            return
         if self._ingame_controller is None:
             return
         if self._ingame_controller.is_dirty:
@@ -979,67 +1003,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
             # Restore labels
             self._center_header.setText("Main Canvas")
             self._preview_header.setText("In-Game Canvas")
-
-    def _on_preview_toggled(self, checked: bool) -> None:
-        """Handle preview toggle."""
-        self._preview_enabled = checked
-
-        if checked:
-            if self._frame_controller is None:
-                self._preview_checkbox.setChecked(False)
-                return
-
-            project = self._frame_controller.project
-            if project is None:
-                QMessageBox.warning(self, "No Project", "No project loaded.")
-                self._preview_checkbox.setChecked(False)
-                return
-
-            mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
-
-            # Show preview panel
-            self._preview_panel.setVisible(True)
-            self._swap_checkbox.setEnabled(True)
-
-            if mapping is None:
-                self._preview_info_label.setText("No mapping - in-game canvas unavailable")
-                if self._ingame_canvas is not None:
-                    self._ingame_canvas.setEnabled(False)
-                self._refresh_ingame_btn.setEnabled(False)
-                self._save_ingame_btn.setEnabled(False)
-                return
-
-            # Check for saved in-game edits
-            if mapping.ingame_edited_path:
-                ingame_path = Path(mapping.ingame_edited_path)
-                if ingame_path.exists():
-                    self._load_ingame_from_file(ingame_path)
-                    self._preview_info_label.setText("Loaded saved in-game edits")
-                    return
-
-            # Generate from compositor
-            self._generate_ingame_canvas(mapping)
-            self._preview_info_label.setText("Edit the composited in-game result")
-        else:
-            # Check for unsaved in-game edits
-            if self._ingame_controller is not None and self._ingame_controller.is_dirty:
-                result = QMessageBox.question(
-                    self,
-                    "Unsaved In-Game Edits",
-                    "You have unsaved in-game edits. Discard?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                )
-                if result == QMessageBox.StandardButton.No:
-                    self._preview_checkbox.setChecked(True)
-                    return
-
-            # Restore swap before hiding
-            if self._canvas_swapped:
-                self._swap_checkbox.setChecked(False)  # Triggers _on_swap_toggled → restore
-            self._swap_checkbox.setEnabled(False)
-
-            # Hide preview panel
-            self._preview_panel.setVisible(False)
 
     def _generate_ingame_canvas(self, mapping: FrameMapping) -> None:
         """Generate in-game canvas from current AI frame via compositor."""
