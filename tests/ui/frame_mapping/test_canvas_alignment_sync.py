@@ -104,7 +104,7 @@ class TestCanvasAlignmentSync:
         wait_for_signal_processed()
 
         # Select the AI frame (this should load the mapping into the canvas)
-        workspace._ai_frames_pane.select_frame(ai_frame.index)
+        workspace._ai_frames_pane.select_frame_by_id(ai_frame.id)
         workspace._on_ai_frame_selected(ai_frame.id)
         wait_for_signal_processed()
 
@@ -214,7 +214,7 @@ class TestCanvasAlignmentSync:
         wait_for_signal_processed()
 
         # Select frame 0
-        workspace._ai_frames_pane.select_frame(0)
+        workspace._ai_frames_pane.select_frame_by_id(ai_frame_0.id)
         workspace._on_ai_frame_selected(ai_frame_0.id)
         wait_for_signal_processed()
 

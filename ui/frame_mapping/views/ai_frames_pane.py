@@ -1098,6 +1098,8 @@ class AIFramesPane(QWidget):
             self._list.insertItem(to_index, item)
 
             # Update ID-to-row lookup for affected range
+            start = min(from_index, to_index)
+            end = max(from_index, to_index)
             for row in range(start, end + 1):
                 affected_item = self._list.item(row)
                 if affected_item is not None:  # type: ignore[reportUnnecessaryComparison]
@@ -1157,7 +1159,6 @@ class AIFramesPane(QWidget):
             item.setToolTip(f"File: {frame.path.name}")
 
         item.setData(Qt.ItemDataRole.UserRole, frame.id)
-        item.setData(Qt.ItemDataRole.UserRole + 1, frame.index)
 
         color = get_status_color(status)
         item.setForeground(QBrush(color))

@@ -30,8 +30,8 @@ class TestRefreshPreservesSelection:
 
         frames = create_ai_frames(tmp_path, num_frames=5)
         pane.set_ai_frames(frames)
-        pane.select_frame(2)
-        assert pane.get_selected_index() == 2
+        pane.select_frame_by_id("frame_002.png")
+        assert pane.get_selected_id() == "frame_002.png"
 
         signal_emissions: list[str] = []
         pane.ai_frame_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
@@ -40,7 +40,7 @@ class TestRefreshPreservesSelection:
         status_map = {f"frame_{i:03d}.png": "mapped" for i in range(5)}
         pane.set_mapping_status(status_map)
 
-        assert pane.get_selected_index() == 2
+        assert pane.get_selected_id() == "frame_002.png"
         assert signal_emissions == []
 
     def test_set_ai_frames_preserves_selection(self, qtbot: QtBot, tmp_path: Path) -> None:
@@ -50,15 +50,15 @@ class TestRefreshPreservesSelection:
 
         frames = create_ai_frames(tmp_path, num_frames=5)
         pane.set_ai_frames(frames)
-        pane.select_frame(3)
-        assert pane.get_selected_index() == 3
+        pane.select_frame_by_id("frame_003.png")
+        assert pane.get_selected_id() == "frame_003.png"
 
         signal_emissions: list[str] = []
         pane.ai_frame_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
 
         pane.set_ai_frames(frames)
 
-        assert pane.get_selected_index() == 3
+        assert pane.get_selected_id() == "frame_003.png"
         assert signal_emissions == []
 
 
@@ -94,8 +94,8 @@ class TestFilterClearsSelectionSignal:
         )
 
         # Select the mapped frame
-        pane.select_frame(2)
-        assert pane.get_selected_index() == 2
+        pane.select_frame_by_id("frame_002.png")
+        assert pane.get_selected_id() == "frame_002.png"
 
         # Now listen for signals
         signal_emissions: list[str] = []
@@ -105,7 +105,7 @@ class TestFilterClearsSelectionSignal:
         pane._unmapped_filter.setChecked(True)
 
         # Selection should be cleared in the pane (item hidden)
-        assert pane.get_selected_index() is None
+        assert pane.get_selected_id() is None
         # But NO signal should be emitted - workspace state manager retains selection
         assert signal_emissions == [], f"Expected no emissions, got {signal_emissions}"
 
@@ -121,8 +121,8 @@ class TestFilterClearsSelectionSignal:
         pane.set_ai_frames(frames)
 
         # Select frame_002.png
-        pane.select_frame(2)
-        assert pane.get_selected_index() == 2
+        pane.select_frame_by_id("frame_002.png")
+        assert pane.get_selected_id() == "frame_002.png"
 
         # Now listen for signals
         signal_emissions: list[str] = []
@@ -132,7 +132,7 @@ class TestFilterClearsSelectionSignal:
         pane._search_box.setText("frame_004")
 
         # Selection should be cleared in the pane (item hidden)
-        assert pane.get_selected_index() is None
+        assert pane.get_selected_id() is None
         # But NO signal should be emitted - workspace state manager retains selection
         assert signal_emissions == [], f"Expected no emissions, got {signal_emissions}"
 
@@ -156,8 +156,8 @@ class TestFilterClearsSelectionSignal:
         )
 
         # Select an unmapped frame
-        pane.select_frame(0)
-        assert pane.get_selected_index() == 0
+        pane.select_frame_by_id("frame_000.png")
+        assert pane.get_selected_id() == "frame_000.png"
 
         # Now listen for signals
         signal_emissions: list[str] = []
@@ -167,7 +167,7 @@ class TestFilterClearsSelectionSignal:
         pane._unmapped_filter.setChecked(True)
 
         # Selection should be preserved and no signal emitted
-        assert pane.get_selected_index() == 0
+        assert pane.get_selected_id() == "frame_000.png"
         assert signal_emissions == []
 
 
@@ -190,7 +190,7 @@ class TestProjectReloadSignaling:
         # Initial project with 5 frames
         frames_v1 = create_ai_frames(tmp_path / "v1", num_frames=5)
         pane.set_ai_frames(frames_v1)
-        pane.select_frame(2)
+        pane.select_frame_by_id("frame_002.png")
 
         # Set up signal listener
         signal_emissions: list[str] = []
@@ -205,7 +205,7 @@ class TestProjectReloadSignaling:
         pane.set_ai_frames(frames_v2)
 
         # Selection should still be at frame 2
-        assert pane.get_selected_index() == 2
+        assert pane.get_selected_id() == "frame_002.png"
 
         # BUG: signal_emissions is empty - workspace never syncs canvas
         # FIX: Should emit frame ID to notify workspace canvas to update
@@ -231,7 +231,7 @@ class TestProjectReloadSignaling:
         # Initial project with 5 frames
         frames_v1 = create_ai_frames(tmp_path / "v1", num_frames=5)
         pane.set_ai_frames(frames_v1)
-        pane.select_frame(2)
+        pane.select_frame_by_id("frame_002.png")
 
         # Set up signal listener
         signal_emissions: list[str] = []
@@ -242,7 +242,7 @@ class TestProjectReloadSignaling:
         pane.set_ai_frames(frames_v2)
 
         # Selection should be cleared in pane (frame doesn't exist)
-        assert pane.get_selected_index() is None
+        assert pane.get_selected_id() is None
 
         # Empty string should be emitted to notify workspace to clear stale state
         assert signal_emissions == [""], (
@@ -261,7 +261,7 @@ class TestIDBasedSelectionMethods:
 
         frames = create_ai_frames(tmp_path, num_frames=5)
         pane.set_ai_frames(frames)
-        pane.select_frame(2)
+        pane.select_frame_by_id("frame_002.png")
 
         assert pane.get_selected_id() == "frame_002.png"
 
@@ -289,7 +289,6 @@ class TestIDBasedSelectionMethods:
 
         pane.select_frame_by_id("frame_003.png")
 
-        assert pane.get_selected_index() == 3
         assert pane.get_selected_id() == "frame_003.png"
 
     def test_select_frame_by_id_does_not_emit_signal(self, qtbot: QtBot, tmp_path: Path) -> None:
@@ -345,9 +344,9 @@ class TestEmitSignalParameter:
         signal_emissions: list[str] = []
         pane.ai_frame_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
 
-        pane.select_frame(2, emit_signal=True)
+        pane.select_frame_by_id("frame_002.png", emit_signal=True)
 
-        assert pane.get_selected_index() == 2
+        assert pane.get_selected_id() == "frame_002.png"
         assert signal_emissions == ["frame_002.png"], (
             f"Expected signal emission ['frame_002.png'], got {signal_emissions}. "
             "emit_signal=True should emit the signal after selection."
@@ -384,9 +383,9 @@ class TestEmitSignalParameter:
         pane.ai_frame_selected.connect(lambda frame_id: signal_emissions.append(frame_id))
 
         # Without emit_signal parameter, should not emit (backward compatible)
-        pane.select_frame(2)
+        pane.select_frame_by_id("frame_002.png")
 
-        assert pane.get_selected_index() == 2
+        assert pane.get_selected_id() == "frame_002.png"
         assert signal_emissions == [], (
             f"Expected no signal emission, got {signal_emissions}. "
             "Default behavior (emit_signal=False) should not emit."
