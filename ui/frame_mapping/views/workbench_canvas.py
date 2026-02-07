@@ -1177,9 +1177,7 @@ class WorkbenchCanvas(QWidget):
         ingame_path = Path(path)
         if not ingame_path.exists():
             return
-        canvas_index_map, _ = load_image_preserving_indices(
-            ingame_path, sheet_palette=self._sheet_palette
-        )
+        canvas_index_map, _ = load_image_preserving_indices(ingame_path, sheet_palette=self._sheet_palette)
         if canvas_index_map is None:
             return
         extracted = self._extract_ai_indices_from_composite(canvas_index_map)
@@ -1195,9 +1193,7 @@ class WorkbenchCanvas(QWidget):
             logger.warning("Could not delete composite file: %s", ingame_path)
         self._schedule_preview_update()
 
-    def _extract_ai_indices_from_composite(
-        self, canvas_index_map: np.ndarray
-    ) -> np.ndarray | None:
+    def _extract_ai_indices_from_composite(self, canvas_index_map: np.ndarray) -> np.ndarray | None:
         """Reverse-extract AI frame indices from a baked composite.
 
         The in-game edit has transforms (flip, scale, offset) baked in at
@@ -1268,21 +1264,46 @@ class WorkbenchCanvas(QWidget):
         embedded) so that any future reload from disk — whether from
         cache eviction, frame re-selection, or app restart — gets the
         edited data.
+
+        After successful save, rebuilds all in-memory state (RGBA image,
+        pixmap, content bbox) and updates the cache to ensure complete
+        consistency without relying on disk roundtrip.
         """
         if self._current_ai_frame is None or self._sheet_palette is None:
             return
         frame_path = self._current_ai_frame.path
         try:
-            pil_indexed = convert_indexed_to_pil_indexed(
-                index_map, self._sheet_palette
-            )
+            pil_indexed = convert_indexed_to_pil_indexed(index_map, self._sheet_palette)
             pil_indexed.save(frame_path)
             logger.info("Persisted edited indices to %s", frame_path.name)
         except Exception:
             logger.exception("Failed to persist indices to %s", frame_path)
             return
-        # Evict cache — mtime changed, next set_ai_frame reloads fresh
-        self._ai_frame_cache.pop(frame_path, None)
+
+        # Rebuild all in-memory state from the saved index map
+        # This ensures the preview stays in sync without relying on disk reload
+        self._ai_image = pil_indexed.convert("RGBA")
+        qimage = pil_to_qimage(self._ai_image, with_alpha=True)
+        self._ai_pixmap = QPixmap.fromImage(qimage)
+        self._cached_content_bbox = get_content_bbox(self._ai_image)
+
+        # Update the display item with the new pixmap
+        scaled = self._ai_pixmap.scaled(
+            self._ai_pixmap.width() * self._display_scale,
+            self._ai_pixmap.height() * self._display_scale,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation,
+        )
+        self._ai_frame_item.set_pixmap(scaled)
+
+        # Update cache entry with the new data instead of just evicting
+        self._add_ai_frame_to_cache(
+            frame_path,
+            self._ai_pixmap,
+            self._ai_image,
+            index_map,
+            self._cached_content_bbox,
+        )
 
     def _get_ai_frame_from_cache(self, path: Path) -> _AIFrameCacheEntry | None:
         """Get AI frame from cache if valid (exists and mtime matches).
@@ -2071,7 +2092,9 @@ class WorkbenchCanvas(QWidget):
 
         # Convert QImage to QPixmap on main thread (Qt requirement)
         scaled_pixmap = QPixmap.fromImage(qimage)
-        logger.debug("Canvas: QPixmap created %dx%d, setting on preview item", scaled_pixmap.width(), scaled_pixmap.height())
+        logger.debug(
+            "Canvas: QPixmap created %dx%d, setting on preview item", scaled_pixmap.width(), scaled_pixmap.height()
+        )
         self._preview_item.setPixmap(scaled_pixmap)
         self._preview_item.setVisible(True)
         logger.debug("Canvas: preview item updated and visible")

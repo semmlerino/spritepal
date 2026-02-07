@@ -16,7 +16,10 @@ from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
 
-def create_indexed_image(path: Path, size: tuple[int, int], palette_colors: list[tuple[int, int, int]], fill_index: int = 1) -> None:
+
+def create_indexed_image(
+    path: Path, size: tuple[int, int], palette_colors: list[tuple[int, int, int]], fill_index: int = 1
+) -> None:
     """Create a real indexed PNG file for in-game edit."""
     img = Image.new("P", size)
     flat_palette = []
@@ -28,10 +31,12 @@ def create_indexed_image(path: Path, size: tuple[int, int], palette_colors: list
 
     # Fill with specified index
     import numpy as np
+
     pixels = np.full((size[1], size[0]), fill_index, dtype=np.uint8)
     img_indexed = Image.fromarray(pixels, mode="P")
     img_indexed.putpalette(flat_palette)
     img_indexed.save(path)
+
 
 class TestIngameEditExtraction:
     """Tests for in-game edit extraction and AI frame overwriting."""
@@ -105,12 +110,13 @@ class TestIngameEditExtraction:
         # Assert: The ingame composite file has been deleted
         assert not ingame_path.exists(), "Ingame composite should be deleted after extraction"
 
-    def test_set_ingame_edited_path_evicts_cache(self, setup_canvas):
-        """Setting ingame edited path should evict the AI frame cache entry."""
+    def test_set_ingame_edited_path_refreshes_cache(self, setup_canvas):
+        """Setting ingame edited path should refresh the AI frame cache with new data."""
         canvas, ai_image_path, palette_colors, tmp_path = setup_canvas
 
         # Put a dummy entry in the AI frame cache (keyed by Path, not str)
-        canvas._ai_frame_cache[ai_image_path] = MagicMock()
+        dummy = MagicMock()
+        canvas._ai_frame_cache[ai_image_path] = dummy
         assert ai_image_path in canvas._ai_frame_cache
 
         # Create ingame composite
@@ -120,8 +126,9 @@ class TestIngameEditExtraction:
         # Call set_ingame_edited_path
         canvas.set_ingame_edited_path(str(ingame_path))
 
-        # Assert: cache entry has been evicted
-        assert ai_image_path not in canvas._ai_frame_cache, "AI frame cache should be evicted"
+        # Assert: cache entry has been refreshed (not the dummy)
+        assert ai_image_path in canvas._ai_frame_cache, "AI frame cache should have refreshed entry"
+        assert canvas._ai_frame_cache[ai_image_path] is not dummy, "Cache entry should be replaced with fresh data"
 
     def test_set_ingame_edited_path_none_is_noop(self, setup_canvas):
         """Setting ingame edited path to None should be a no-op."""
