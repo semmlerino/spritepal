@@ -98,6 +98,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._active_canvas: str = "main"  # "main" or "ingame"
         self._ingame_refresh_timer: QTimer | None = None
         self._canvas_swapped = False
+        self._preview_enabled: bool = True
 
         self._setup_ui()
         self._setup_menu()
@@ -768,6 +769,9 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _schedule_ingame_refresh(self) -> None:
         """Schedule debounced auto-refresh of in-game canvas."""
+        if not getattr(self, "_preview_enabled", True):
+            return
+
         if self._ingame_controller is None:
             return
         if self._ingame_controller.is_dirty:

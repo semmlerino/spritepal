@@ -1035,17 +1035,6 @@ class FrameMappingProject:
             frame.tags = frame.tags | {tag}
         return True
 
-    def get_frames_with_tag(self, tag: str) -> list[AIFrame]:
-        """Get all AI frames with a specific tag.
-
-        Args:
-            tag: Tag to filter by
-
-        Returns:
-            List of AIFrame objects with the tag
-        """
-        return [f for f in self.ai_frames if tag in f.tags]
-
     def set_frame_tags(self, ai_frame_id: str, tags: frozenset[str]) -> bool:
         """Set all tags for an AI frame (replace existing).
 

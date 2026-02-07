@@ -189,22 +189,6 @@ class TestFrameMappingProjectOrganization:
         assert frame is not None
         assert "keep" not in frame.tags
 
-    def test_get_frames_with_tag(self) -> None:
-        """get_frames_with_tag returns matching frames."""
-        project = FrameMappingProject(name="test")
-        project.ai_frames = [
-            AIFrame(path=Path("frame_001.png"), index=0, tags=frozenset({"keep"})),
-            AIFrame(path=Path("frame_002.png"), index=1, tags=frozenset({"discard"})),
-            AIFrame(path=Path("frame_003.png"), index=2, tags=frozenset({"keep", "final"})),
-        ]
-        project._rebuild_indices()
-
-        keep_frames = project.get_frames_with_tag("keep")
-
-        assert len(keep_frames) == 2
-        ids = {f.id for f in keep_frames}
-        assert ids == {"frame_001.png", "frame_003.png"}
-
     def test_set_frame_tags_replaces_all(self) -> None:
         """set_frame_tags replaces all existing tags."""
         project = FrameMappingProject(name="test")

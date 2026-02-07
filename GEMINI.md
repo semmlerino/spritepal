@@ -84,7 +84,11 @@ Commands should be executed from the `spritepal/` root directory.
 - `SPRITE_LEARNINGS_DO_NOT_DELETE.md`: Domain-specific knowledge about SNES formats.
 
 ## Search & Tooling Guidelines
+- **Always Exclude Noisy Folders:** Strictly avoid searching within `__pycache__`, `.venv`, `.git`, `.ruff_cache`, and `.pytest_cache` directories.
 - **Prefer Internal Tools:** Always use `search_file_content` or `search_for_pattern` instead of `run_shell_command("grep ...")`. These tools are optimized and automatically respect `.gitignore` and `.geminiignore`.
-- **Exclude Noisy Folders:** When forced to use shell commands (`grep`, `find`, `ls`), always exclude metadata and environment folders: `.git`, `.serena`, `.venv`, `.ruff_cache`, `.pytest_cache`, and `__pycache__`.
-- **Shell Example:** Use `rg` (ripgrep) which respects ignores by default, or `grep -r --exclude-dir={.git,.serena,.venv,__pycache__} "pattern" .`.
-- **ripgrep:** `rg` is available in this environment.
+- **Exclude Noisy Folders & Binaries:** When forced to use shell commands (`grep`, `find`, `ls`, `rg`), always exclude binary files and metadata/environment folders: `.git`, `.serena`, `.venv`, `.ruff_cache`, `.pytest_cache`, and `__pycache__`.
+- **Exclude Hidden Directories:** Always exclude hidden directories (those starting with `.`) unless specifically searching configuration files.
+- **Shell Examples:**
+  - **ripgrep:** `rg --glob '!.*' "pattern" .` (automatically ignores binaries and respects gitignore).
+  - **grep:** `grep -r -I --exclude-dir={.git,.serena,.venv,__pycache__} --exclude-dir=".*" "pattern" .`
+- **ripgrep:** `rg` is available in this environment and is the preferred shell search tool.

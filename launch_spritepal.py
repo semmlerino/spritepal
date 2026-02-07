@@ -6,6 +6,7 @@ SpritePal - Modern Sprite Extraction Tool
 Simplifies sprite extraction with automatic palette association
 """
 
+import faulthandler
 import sys
 from types import TracebackType
 
@@ -145,6 +146,9 @@ class SpritePalApp:
 
 def main():
     """Main entry point"""
+    # Enable faulthandler early (stderr) — upgraded to log file after logging init
+    faulthandler.enable()
+
     # Create ConfigurationService FIRST - single source of truth for paths
     from core.configuration_service import ConfigurationService
 
@@ -155,6 +159,13 @@ def main():
 
     # Initialize logging with path from ConfigurationService
     logger = setup_logging(log_dir=config_service.log_directory)
+
+    # Redirect faulthandler to a dedicated crash file so segfaults are captured
+    # even when stderr is not visible (e.g. launched from .bat / explorer)
+    _crash_log_path = config_service.log_directory / "crash_fault.log"
+    _crash_log_file = open(_crash_log_path, "w")
+    faulthandler.enable(file=_crash_log_file)
+    logger.info("Faulthandler enabled, crash log: %s", _crash_log_path)
     logger.info(f"Python version: {sys.version}")
     logger.info(f"Platform: {sys.platform}")
     logger.info(f"App root: {config_service.app_root}")

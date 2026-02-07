@@ -138,9 +138,16 @@ class _PreviewWorker(QObject):
                 return
 
             preview_img = result.composited_image
+            logger.debug(
+                "Worker: composite done, size=%dx%d, mode=%s",
+                preview_img.width,
+                preview_img.height,
+                preview_img.mode,
+            )
 
             # Convert PIL image to QImage (thread-safe)
             qimage = pil_to_qimage(preview_img, thread_safe=True)
+            logger.debug("Worker: pil_to_qimage done, null=%s", qimage.isNull())
 
             if qimage.isNull():
                 if not self._should_cancel(request_id):
@@ -151,6 +158,11 @@ class _PreviewWorker(QObject):
                     preview_img.width * request.display_scale,
                     preview_img.height * request.display_scale,
                 )
+                logger.debug(
+                    "Worker: scaled qimage %dx%d, emitting preview_ready",
+                    scaled_qimage.width(),
+                    scaled_qimage.height(),
+                )
                 if not self._should_cancel(request_id):
                     self.preview_ready.emit(
                         request_id,
@@ -158,6 +170,7 @@ class _PreviewWorker(QObject):
                         preview_img.width,
                         preview_img.height,
                     )
+                    logger.debug("Worker: preview_ready emitted for request %d", request_id)
 
         except Exception as e:
             logger.exception("Preview worker error")
@@ -351,12 +364,16 @@ class AsyncPreviewService(QObject):
     def _on_preview_ready(self, request_id: int, qimage: QImage, width: int, height: int) -> None:
         """Handle preview ready from worker."""
         if self._destroyed:
+            logger.debug("Service: _on_preview_ready ignored (destroyed)")
             return
         # Only emit if this is the current request (not stale) - mutex-protected read
         with QMutexLocker(self._request_id_mutex):
             is_current = request_id == self._current_request_id
         if is_current:
+            logger.debug("Service: forwarding preview_ready (request %d, %dx%d)", request_id, width, height)
             self.preview_ready.emit(qimage, width, height)
+        else:
+            logger.debug("Service: discarding stale preview (request %d, current %d)", request_id, self._current_request_id)
 
     def _on_error(self, request_id: int, error_message: str) -> None:
         """Handle error from worker."""

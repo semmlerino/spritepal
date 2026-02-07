@@ -577,16 +577,6 @@ class AIFramesPane(QWidget):
         color = get_status_color(status)
         item.setForeground(QBrush(color))
 
-    def get_selected_index(self) -> int | None:
-        """Get the currently selected AI frame index.
-
-        Note: Prefer get_selected_id() for stable references across reloads.
-        """
-        current = self._list.currentItem()
-        if current is None:  # type: ignore[reportUnnecessaryComparison]
-            return None
-        return current.data(Qt.ItemDataRole.UserRole + 1)
-
     def get_selected_id(self) -> str | None:
         """Get the currently selected AI frame ID (filename).
 
@@ -611,34 +601,6 @@ class AIFramesPane(QWidget):
             if frame_id is not None:
                 ids.append(frame_id)
         return ids
-
-    def select_frame(self, index: int, *, emit_signal: bool = False) -> None:
-        """Programmatically select an AI frame by index.
-
-        Blocks signals during selection to prevent feedback loops.
-        Note: Prefer select_frame_by_id() for stable references across reloads.
-
-        Args:
-            index: The AI frame index to select
-            emit_signal: If True, emit ai_frame_selected after selection.
-                        This provides a unified pattern for callers that need
-                        the handler to run (instead of manually calling it).
-        """
-        self._list.blockSignals(True)
-        selected_id: str | None = None
-        try:
-            for row in range(self._list.count()):
-                item = self._list.item(row)
-                if item is not None and item.data(Qt.ItemDataRole.UserRole + 1) == index:  # type: ignore[reportUnnecessaryComparison]
-                    self._list.setCurrentRow(row)
-                    self._list.scrollToItem(item)
-                    selected_id = item.data(Qt.ItemDataRole.UserRole)
-                    break
-        finally:
-            self._list.blockSignals(False)
-
-        if emit_signal and selected_id is not None:
-            self.ai_frame_selected.emit(selected_id)
 
     def select_frame_by_id(self, frame_id: str, *, emit_signal: bool = False) -> None:
         """Programmatically select an AI frame by ID (filename).
@@ -956,9 +918,8 @@ class AIFramesPane(QWidget):
                 if frame.display_name:
                     item.setToolTip(f"File: {frame.path.name}")
 
-                # Store frame ID in UserRole (primary), index in UserRole+1 (backward compat)
+                # Store frame ID in UserRole
                 item.setData(Qt.ItemDataRole.UserRole, frame.id)
-                item.setData(Qt.ItemDataRole.UserRole + 1, frame.index)
 
                 # Apply status color
                 color = get_status_color(status)
@@ -1135,15 +1096,6 @@ class AIFramesPane(QWidget):
 
             # Insert at the new position
             self._list.insertItem(to_index, item)
-
-            # Update index metadata for all affected items
-            # After move, positions between min/max indices have shifted
-            start = min(from_index, to_index)
-            end = max(from_index, to_index)
-            for row in range(start, end + 1):
-                affected_item = self._list.item(row)
-                if affected_item is not None:  # type: ignore[reportUnnecessaryComparison]
-                    affected_item.setData(Qt.ItemDataRole.UserRole + 1, row)
 
             # Update ID-to-row lookup for affected range
             for row in range(start, end + 1):

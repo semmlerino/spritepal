@@ -250,6 +250,8 @@ tail -100 logs/spritepal.log
 
 The log includes timestamps, log levels, and module names for tracing signal/event flow.
 
+**If the log doesn't have enough detail to diagnose the issue,** proactively add targeted `logger.debug()` calls along the suspected code path, then ask the user to reproduce the bug. Read the new log output to pinpoint the root cause before attempting a fix.
+
 ### Environment Variables
 
 | Variable | Purpose |
