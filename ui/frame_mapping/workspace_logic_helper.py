@@ -831,6 +831,14 @@ class WorkspaceLogicHelper:
                 )
             return False
 
+        # User changed transforms — clear in-game edit from the model.
+        # The canvas already cleared its local _ingame_edited_path in
+        # _emit_alignment_changed(), but the model must also be cleared so
+        # that _sync_canvas_alignment_from_model() doesn't restore it later.
+        # The baked transforms in the saved in-game image are now stale.
+        if mapping.ingame_edited_path is not None:
+            mapping.ingame_edited_path = None
+
         # Get drag start alignment for single undo command (if from drag operation)
         drag_start = self._alignment_canvas.get_drag_start_alignment()
         self._alignment_canvas.clear_drag_start_alignment()  # Consume it

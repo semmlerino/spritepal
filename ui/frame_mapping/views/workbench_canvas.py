@@ -1167,26 +1167,15 @@ class WorkbenchCanvas(QWidget):
     def set_ingame_edited_path(self, path: str | None) -> None:
         """Set the saved in-game edit path, bypassing compositor for preview.
 
-        When set, transforms reset to neutral since the saved image becomes
-        the new reference.  Offsets reset to (0, 0) — they now act as a
-        shift applied on top of the baked-in position.
+        The in-game image has the current transforms (offset, flip, scale)
+        baked in.  We keep the alignment unchanged so the AI frame overlay
+        stays at its current position (matching the baked-in content) and
+        the compositor retains the original offset for when user-initiated
+        transform changes clear this path and fall back to the compositor.
         """
         if self._ingame_edited_path != path:
             self._ingame_edited_path = path
-            if path is not None:
-                # Reset transforms — the saved image is the new baseline.
-                # Offset (0, 0) = no shift from the baked position.
-                self.set_alignment(
-                    offset_x=0,
-                    offset_y=0,
-                    flip_h=False,
-                    flip_v=False,
-                    scale=1.0,
-                    sharpen=0.0,
-                    resampling="lanczos",
-                )
-            else:
-                self._schedule_preview_update()
+            self._schedule_preview_update()
 
     def _get_ai_frame_from_cache(self, path: Path) -> _AIFrameCacheEntry | None:
         """Get AI frame from cache if valid (exists and mtime matches).
