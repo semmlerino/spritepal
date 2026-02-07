@@ -1175,23 +1175,95 @@ class WorkbenchCanvas(QWidget):
         """
         if self._ingame_edited_path != path:
             self._ingame_edited_path = path
-            # When in-game edits are saved, update the cached AI index map
-            # so the compositor uses edited indices when _ingame_edited_path
-            # is later cleared by user-initiated transform changes.
+            # When in-game edits are saved, reverse-extract the AI frame
+            # indices from the composite so the compositor uses edited
+            # indices when _ingame_edited_path is later cleared by
+            # user-initiated transform changes (e.g. alignment drag).
             if path is not None and self._sheet_palette is not None:
                 ingame_path = Path(path)
                 if ingame_path.exists():
-                    index_map, _ = load_image_preserving_indices(
+                    canvas_index_map, _ = load_image_preserving_indices(
                         ingame_path, sheet_palette=self._sheet_palette
                     )
-                    if index_map is not None:
-                        self._ai_index_map = index_map
-                        # Invalidate the frame cache so stale data isn't reloaded
-                        if self._current_ai_frame is not None:
-                            self._ai_frame_cache.pop(
-                                self._current_ai_frame.path, None
-                            )
+                    if canvas_index_map is not None:
+                        extracted = self._extract_ai_indices_from_composite(
+                            canvas_index_map
+                        )
+                        if extracted is not None:
+                            self._ai_index_map = extracted
+                            # Invalidate the frame cache so stale data
+                            # isn't reloaded on frame re-selection
+                            if self._current_ai_frame is not None:
+                                self._ai_frame_cache.pop(
+                                    self._current_ai_frame.path, None
+                                )
             self._schedule_preview_update()
+
+    def _extract_ai_indices_from_composite(
+        self, canvas_index_map: np.ndarray
+    ) -> np.ndarray | None:
+        """Reverse-extract AI frame indices from a baked composite.
+
+        The in-game edit has transforms (flip, scale, offset) baked in at
+        game-canvas dimensions.  This reverses those transforms to recover
+        an index map at the original AI frame size so the compositor can
+        re-apply transforms at a different alignment.
+        """
+        # Determine original AI frame dimensions
+        if self._ai_index_map is not None:
+            orig_h, orig_w = self._ai_index_map.shape
+        elif self._ai_image is not None:
+            orig_w, orig_h = self._ai_image.size
+        else:
+            return None
+
+        canvas_h, canvas_w = canvas_index_map.shape
+
+        # Current transforms at save time
+        pos = self._ai_frame_item.pos()
+        offset_x = int(pos.x() / self._display_scale)
+        offset_y = int(pos.y() / self._display_scale)
+        scale = self._ai_frame_item.scale_factor()
+        flip_h = self._flip_h_checkbox.isChecked()
+        flip_v = self._flip_v_checkbox.isChecked()
+
+        # Scaled dimensions (AI frame footprint on the canvas)
+        scaled_w = max(1, int(orig_w * scale))
+        scaled_h = max(1, int(orig_h * scale))
+
+        # Calculate overlap region (mirrors _transform_index_map logic)
+        src_x = max(0, -offset_x)
+        src_y = max(0, -offset_y)
+        dst_x = max(0, offset_x)
+        dst_y = max(0, offset_y)
+        copy_w = min(scaled_w - src_x, canvas_w - dst_x)
+        copy_h = min(scaled_h - src_y, canvas_h - dst_y)
+
+        if copy_w <= 0 or copy_h <= 0:
+            return None
+
+        # Extract the AI frame footprint from the canvas
+        scaled_indices = np.full((scaled_h, scaled_w), 255, dtype=np.uint8)
+        scaled_indices[
+            src_y : src_y + copy_h,
+            src_x : src_x + copy_w,
+        ] = canvas_index_map[
+            dst_y : dst_y + copy_h,
+            dst_x : dst_x + copy_w,
+        ]
+
+        # Reverse scale → original AI frame dimensions
+        img = Image.fromarray(scaled_indices, mode="L")
+        if abs(scale - 1.0) > 0.01:
+            img = img.resize((orig_w, orig_h), Image.Resampling.NEAREST)
+
+        # Reverse flips
+        if flip_h:
+            img = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+        if flip_v:
+            img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+
+        return np.array(img, dtype=np.uint8)
 
     def _get_ai_frame_from_cache(self, path: Path) -> _AIFrameCacheEntry | None:
         """Get AI frame from cache if valid (exists and mtime matches).
