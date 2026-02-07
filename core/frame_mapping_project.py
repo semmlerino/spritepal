@@ -434,7 +434,6 @@ class FrameMapping:
     """Links an AI frame to a game frame.
 
     Uses `ai_frame_id` (filename) as the stable identifier for AI frames.
-    The `ai_frame_index` field is deprecated and only kept for v1 migration.
     """
 
     ai_frame_id: str  # Stable identifier (filename)
@@ -478,11 +477,7 @@ class FrameMapping:
         """Deserialize from dictionary.
 
         Args:
-            data: Dictionary data (must be v2+ format with ai_frame_id).
-
-        Note:
-            V1 format (ai_frame_index) is converted to V2 (ai_frame_id)
-            by FrameMappingRepository._migrate_v1_to_v2 before this is called.
+            data: Dictionary data with ai_frame_id and game_frame_id keys.
         """
         return cls(
             ai_frame_id=cast(str, data.get("ai_frame_id", "")),
