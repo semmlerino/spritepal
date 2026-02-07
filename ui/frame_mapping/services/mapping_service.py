@@ -42,24 +42,6 @@ class MappingService(QObject):
         """
         super().__init__(parent)
 
-    def get_link_for_game_frame(
-        self,
-        project: FrameMappingProject | None,
-        game_frame_id: str,
-    ) -> str | None:
-        """Get the AI frame ID currently linked to a game frame.
-
-        Args:
-            project: The frame mapping project
-            game_frame_id: ID of the game frame to check
-
-        Returns:
-            AI frame ID if game frame is linked, None otherwise
-        """
-        if project is None:
-            return None
-        return project.get_ai_frame_linked_to_game_frame(game_frame_id)
-
     def get_link_for_ai_frame(
         self,
         project: FrameMappingProject | None,

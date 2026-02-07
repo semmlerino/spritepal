@@ -180,32 +180,9 @@ class AIFramesFacade:
         Returns:
             True if the frame was found and removed.
         """
-        project = self._context.project
-        if project is None:
-            logger.warning("remove: project is None")
-            return False
-
-        # Capture mapping before removal (will be deleted along with frame)
-        mapping = project.get_mapping_for_ai_frame(frame_id)
-        had_mapping = mapping is not None
-        logger.info(
-            "remove: frame_id=%s, had_mapping=%s, ai_frames_count=%d", frame_id, had_mapping, len(project.ai_frames)
-        )
-
-        result = project.remove_ai_frame(frame_id)
-        logger.info("remove: project.remove_ai_frame returned %s, ai_frames_count=%d", result, len(project.ai_frames))
-        if result:
-            # Emit mapping_removed if the frame was mapped (mapping was deleted)
-            if had_mapping:
-                self._signals.emit_mapping_removed(frame_id, mapping.game_frame_id)
-
-            self._signals.emit_ai_frame_removed(frame_id)
-            self._signals.emit_save_requested()
-            # Clear undo stack to prevent stale references to deleted frames
-            self._undo_stack.clear()
-            logger.info("Removed AI frame %s", frame_id)
-            return True
-        return False
+        # Delegate to batch removal
+        removed_ids = self.remove_batch([frame_id])
+        return len(removed_ids) > 0
 
     def remove_batch(self, frame_ids: list[str]) -> list[str]:
         """Remove multiple AI frames from the project.
@@ -285,7 +262,10 @@ class AIFramesFacade:
 
     def get_frames(self) -> list[AIFrame]:
         """Get all AI frames from the current project."""
-        return self._ai_frame_service.get_frames(self._context.project)
+        project = self._context.project
+        if project is None:
+            return []
+        return project.ai_frames
 
     # ─── Frame Renaming ───────────────────────────────────────────────────────
 

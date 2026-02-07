@@ -130,19 +130,6 @@ class AIFrameService(QObject):
             height=height,
         )
 
-    def get_frames(self, project: FrameMappingProject | None) -> list[AIFrame]:
-        """Get all AI frames from the project.
-
-        Args:
-            project: The frame mapping project
-
-        Returns:
-            List of AI frames, empty if no project
-        """
-        if project is None:
-            return []
-        return project.ai_frames
-
     def find_frame_index(self, project: FrameMappingProject, frame_id: str) -> int:
         """Find the index of a frame by its ID.
 
