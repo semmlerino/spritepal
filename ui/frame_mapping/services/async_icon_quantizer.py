@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, override
 
 from PIL import Image
 from PySide6.QtCore import QMutex, QMutexLocker, QObject, QThread, Signal, Slot
 from PySide6.QtGui import QImage, QPixmap
 
 from core.services.image_utils import pil_to_qimage
+from ui.frame_mapping.services.async_service_base import AsyncServiceBase
 from ui.frame_mapping.services.thumbnail_service import quantize_pil_image
 from utils.logging_config import get_logger
 
@@ -139,7 +140,7 @@ class _QuantizeWorker(QObject):
                 self.error.emit(request_id, request.game_frame_id, str(e))
 
 
-class AsyncIconQuantizer(QObject):
+class AsyncIconQuantizer(AsyncServiceBase):
     """Main-thread coordinator for async icon quantization.
 
     Manages a background worker thread for quantizing game frame icons.
@@ -156,20 +157,11 @@ class AsyncIconQuantizer(QObject):
     # Internal signal to trigger worker
     _start_worker = Signal(QuantizeRequest)
 
-    # Keep orphaned threads alive to avoid QThread GC while running
-    _orphaned_threads: set[QThread] = set()
-
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._request_id = 0
-        self._thread: QThread | None = None
-        self._worker: _QuantizeWorker | None = None
         # Pending requests: game_frame_id -> request_id (for deduplication)
         self._pending_requests: dict[str, int] = {}
-
-        # Clean up thread when parent is destroyed
-        if parent is not None:
-            parent.destroyed.connect(self._on_parent_destroyed)
 
     def _setup_worker(self) -> None:
         """Set up the background worker thread."""
@@ -186,9 +178,22 @@ class AsyncIconQuantizer(QObject):
 
         self._thread.start()
 
-    def _on_parent_destroyed(self) -> None:
-        """Clean up when parent widget is destroyed."""
-        self.shutdown()
+    @override
+    def _disconnect_worker_signals(self) -> None:
+        """Disconnect quantize worker signals."""
+        if self._worker is not None:
+            worker = cast(_QuantizeWorker, self._worker)
+            try:
+                self._start_worker.disconnect()
+                worker.result_ready.disconnect()
+                worker.error.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+
+    @override
+    def _cleanup_current_work(self) -> None:
+        """Cancel pending quantization requests."""
+        self._pending_requests.clear()
 
     def quantize_icon(
         self,
@@ -236,7 +241,8 @@ class AsyncIconQuantizer(QObject):
         self._request_id += 1
         request_id = self._request_id
 
-        self._worker.set_target_request_id(request_id)
+        worker = cast(_QuantizeWorker, self._worker)
+        worker.set_target_request_id(request_id)
         self._pending_requests[game_frame_id] = request_id
 
         request = QuantizeRequest(
@@ -330,52 +336,11 @@ class AsyncIconQuantizer(QObject):
         """Cancel all pending quantization requests."""
         self._request_id += 1
         if self._worker:
-            self._worker.set_target_request_id(self._request_id)
+            worker = cast(_QuantizeWorker, self._worker)
+            worker.set_target_request_id(self._request_id)
         self._pending_requests.clear()
 
     def shutdown(self) -> None:
         """Shut down the background thread."""
-        # Block signals first to prevent emission during cleanup
-        if self._worker is not None:
-            try:
-                self._worker.blockSignals(True)
-                try:
-                    self._start_worker.disconnect()
-                    self._worker.result_ready.disconnect()
-                    self._worker.error.disconnect()
-                except (RuntimeError, TypeError):
-                    pass  # Already disconnected
-            except (RuntimeError, TypeError):
-                # Worker object already deleted (C++ side)
-                logger.debug("AsyncIconQuantizer: worker already deleted during shutdown")
-                self._worker = None
-
-        # Schedule worker deletion when thread stops
-        if self._worker is not None and self._thread is not None:
-            try:
-                self._thread.finished.connect(self._worker.deleteLater)
-            except (RuntimeError, TypeError):
-                pass
-
-        if self._thread is not None:
-            self._thread.quit()
-            if self._thread.wait(3000):
-                # Thread stopped cleanly, safe to schedule deletion
-                self._thread.deleteLater()
-                self._thread = None
-            else:
-                # Thread did not stop in time - do NOT call deleteLater()
-                # which would crash with "QThread: Destroyed while thread is still running"
-                # Keep reference to prevent GC (leak is better than crash)
-                logger.warning("Icon quantizer thread did not stop in time, keeping reference to prevent crash")
-                AsyncIconQuantizer._orphaned_threads.add(self._thread)
-                try:
-                    self._thread.finished.connect(
-                        lambda t=self._thread: AsyncIconQuantizer._orphaned_threads.discard(t)
-                    )
-                except (RuntimeError, TypeError):
-                    pass
-                self._thread = None
-
-        self._worker = None
-        self._pending_requests.clear()
+        self._cleanup_current_work()
+        self._cleanup_thread()
