@@ -720,6 +720,11 @@ class FrameMappingController(QObject):
             # AppContext not initialized (common in tests)
             return None
 
+    @property
+    def last_queue_time_game_frame_id(self) -> str | None:
+        """Queue-time game frame ID from the last completed async injection."""
+        return self._last_queue_time_game_frame_id
+
     # ─── Command Context (for undo commands) ───────────────────────────────────
 
     def _get_command_context(self) -> CommandContext:
@@ -1389,10 +1394,6 @@ class FrameMappingController(QObject):
         """Get all AI frames from the current project."""
         return self._ai_frames.get_frames()
 
-    def get_game_frames(self) -> list[GameFrame]:
-        """Get all game frames from the current project."""
-        return self._game_frames.get_frames()
-
     # --- Sheet Palette Methods ---
 
     def get_sheet_palette(self) -> SheetPalette | None:
@@ -1583,6 +1584,9 @@ class FrameMappingController(QObject):
 
         Returns:
             True if injection was successful.
+
+        Note: This synchronous entry point is primarily used by tests and
+        external scripts. Production UI uses ``inject_mapping_async`` instead.
         """
         return self._injection.inject_mapping(
             ai_frame_id=ai_frame_id,

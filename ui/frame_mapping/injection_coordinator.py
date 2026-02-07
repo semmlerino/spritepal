@@ -430,7 +430,7 @@ class InjectionCoordinator:
         # Use queue-time game frame ID instead of current mapping to handle remap scenarios
         stale_entries = False
         if self._state.stale_game_frame_ids:
-            queue_time_game_frame_id = self._controller._last_queue_time_game_frame_id
+            queue_time_game_frame_id = self._controller.last_queue_time_game_frame_id
             if queue_time_game_frame_id is not None:
                 stale_entries = queue_time_game_frame_id in self._state.stale_game_frame_ids
 

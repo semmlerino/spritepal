@@ -239,7 +239,11 @@ class WorkspaceStateManager:
         self._stale_game_frame_ids.add(frame_id)
 
     def clear_stale_game_frame_ids(self) -> None:
-        """Clear all stale game frame IDs."""
+        """Clear all tracked stale game frame IDs.
+
+        Test helper — production code resets stale state directly in
+        ``start_batch_injection``.
+        """
         self._stale_game_frame_ids = set()
 
     # -------------------------------------------------------------------------

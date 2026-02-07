@@ -85,7 +85,6 @@ class CaptureImportService(QObject):
     import_requested = Signal(object, object)  # (CaptureResult, capture_path: Path)
 
     # Completion signals
-    import_completed = Signal(str)  # game_frame_id
     import_failed = Signal(str)  # error message
 
     # Directory import progress signals
@@ -268,7 +267,6 @@ class CaptureImportService(QObject):
                 cached_mtime=cached_mtime,
             )
 
-            self.import_completed.emit(frame_id)
             logger.info(
                 "Imported game frame %s from %s (%d of %d entries selected, palette=%d)",
                 frame_id,
@@ -400,6 +398,3 @@ class CaptureImportService(QObject):
         self._single_file_error_emitted = False
         self._capture_parse_worker = None
 
-    def cancel_directory_import(self) -> None:
-        """Cancel any ongoing directory import operation."""
-        self._cancel_existing_worker()
