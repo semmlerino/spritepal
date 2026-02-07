@@ -606,7 +606,6 @@ class WorkspaceLogicHelper:
                 self._ai_frames_pane.set_current_frame_palette_index(None)
 
             self._alignment_canvas.set_game_frame(game_frame, preview, capture_result, used_fallback)
-            self._alignment_canvas.set_ingame_edited_path(mapping.ingame_edited_path)
             self._alignment_canvas.set_alignment(
                 mapping.offset_x,
                 mapping.offset_y,
@@ -621,7 +620,6 @@ class WorkspaceLogicHelper:
             self._state.selected_game_id = mapping.game_frame_id
             self._state.current_canvas_game_id = mapping.game_frame_id
         else:
-            self._alignment_canvas.set_ingame_edited_path(None)
             self._alignment_canvas.set_game_frame(None)
             self._alignment_canvas.clear_alignment()
             self._captures_pane.clear_selection()
@@ -839,14 +837,6 @@ class WorkspaceLogicHelper:
                 )
             return False
 
-        # User changed transforms — clear in-game edit from the model.
-        # The canvas already cleared its local _ingame_edited_path in
-        # _emit_alignment_changed(), but the model must also be cleared so
-        # that _sync_canvas_alignment_from_model() doesn't restore it later.
-        # The baked transforms in the saved in-game image are now stale.
-        if mapping.ingame_edited_path is not None:
-            mapping.ingame_edited_path = None
-
         # Get drag start alignment for single undo command (if from drag operation)
         drag_start = self._alignment_canvas.get_drag_start_alignment()
         self._alignment_canvas.clear_drag_start_alignment()  # Consume it
@@ -902,7 +892,6 @@ class WorkspaceLogicHelper:
 
         mapping = project.get_mapping_for_ai_frame(ai_frame_id)
         if mapping is not None:
-            self._alignment_canvas.set_ingame_edited_path(mapping.ingame_edited_path)
             # Update canvas with restored alignment values
             self._alignment_canvas.set_alignment(
                 mapping.offset_x,

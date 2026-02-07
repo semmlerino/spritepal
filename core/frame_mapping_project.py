@@ -469,7 +469,6 @@ class FrameMapping:
             "scale": self.scale,
             "sharpen": self.sharpen,
             "resampling": self.resampling,
-            "ingame_edited_path": self.ingame_edited_path,
         }
 
     @classmethod

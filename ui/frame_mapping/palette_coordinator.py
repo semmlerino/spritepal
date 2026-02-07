@@ -458,11 +458,15 @@ class PaletteCoordinator:
     def _handle_ingame_saved(self, ai_frame_id: str, ingame_edited_path: str) -> None:
         """Handle in-game edit saved from palette editor.
 
-        Updates the workbench preview to show the saved in-game edit.
+        Forwards composite path to canvas for index extraction and AI frame
+        overwrite, then triggers project save (AI frame file changed on disk).
         """
         if self._state is not None and self._state.selected_ai_frame_id == ai_frame_id:
             if self._alignment_canvas is not None:
                 self._alignment_canvas.set_ingame_edited_path(ingame_edited_path)
+        # AI frame file was updated — persist project
+        if self._controller is not None:
+            self._controller.emit_save_requested()
 
     # -------------------------------------------------------------------------
     # Helper Methods

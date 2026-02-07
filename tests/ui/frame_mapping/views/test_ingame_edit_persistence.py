@@ -1,4 +1,4 @@
-"""Tests for in-game edit persistence and clearance on transform changes."""
+"""Tests for in-game edit extraction and AI frame file overwriting."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot
 
-def create_indexed_image(path: Path, size: tuple[int, int], palette_colors: list[tuple[int, int, int]]) -> None:
+def create_indexed_image(path: Path, size: tuple[int, int], palette_colors: list[tuple[int, int, int]], fill_index: int = 1) -> None:
     """Create a real indexed PNG file for in-game edit."""
     img = Image.new("P", size)
     flat_palette = []
@@ -26,15 +26,15 @@ def create_indexed_image(path: Path, size: tuple[int, int], palette_colors: list
     flat_palette.extend([0] * (768 - len(flat_palette)))
     img.putpalette(flat_palette)
 
-    # Fill with index 1
+    # Fill with specified index
     import numpy as np
-    pixels = np.full((size[1], size[0]), 1, dtype=np.uint8)
+    pixels = np.full((size[1], size[0]), fill_index, dtype=np.uint8)
     img_indexed = Image.fromarray(pixels, mode="P")
     img_indexed.putpalette(flat_palette)
     img_indexed.save(path)
 
-class TestIngameEditPersistence:
-    """Tests for in-game edit persistence and clearance."""
+class TestIngameEditExtraction:
+    """Tests for in-game edit extraction and AI frame overwriting."""
 
     @pytest.fixture
     def setup_canvas(self, qtbot: QtBot, tmp_path: Path):
@@ -42,7 +42,7 @@ class TestIngameEditPersistence:
         canvas = WorkbenchCanvas()
         qtbot.addWidget(canvas)
 
-        # Create test AI image file
+        # Create test AI image file (RGBA)
         ai_image_path = tmp_path / "test_ai_frame.png"
         ai_img = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
         ai_img.save(ai_image_path)
@@ -75,65 +75,84 @@ class TestIngameEditPersistence:
             capture_result=mock_capture,
         )
 
-        # Set sheet palette
+        # Set sheet palette with known colors
         palette_colors = [(0, 0, 0), (248, 0, 0), (0, 248, 0), (0, 0, 248)] + [(128, 128, 128)] * 12
         palette = SheetPalette(colors=palette_colors)
         canvas.set_sheet_palette(palette)
 
-        # Create and set in-game edited path
+        return canvas, ai_image_path, palette_colors, tmp_path
+
+    def test_set_ingame_edited_path_overwrites_ai_frame_file(self, setup_canvas):
+        """Setting ingame edited path should overwrite the AI frame file with extracted indices."""
+        canvas, ai_image_path, palette_colors, tmp_path = setup_canvas
+
+        # Verify AI frame is initially RGBA
+        original_ai = Image.open(ai_image_path)
+        assert original_ai.mode == "RGBA"
+
+        # Create an ingame composite PNG with distinctive index value (index 2)
         ingame_path = tmp_path / "ingame_edit.png"
-        create_indexed_image(ingame_path, (32, 32), palette_colors)
+        create_indexed_image(ingame_path, (32, 32), palette_colors, fill_index=2)
+
+        # Call set_ingame_edited_path
         canvas.set_ingame_edited_path(str(ingame_path))
 
-        return canvas, ingame_path
+        # Assert: The original AI frame file has been overwritten with indexed PNG
+        overwritten_ai = Image.open(ai_image_path)
+        assert overwritten_ai.mode == "P", "AI frame should be overwritten as indexed PNG"
+        assert overwritten_ai.size == (32, 32), "AI frame dimensions should match"
 
-    def test_ingame_edit_cleared_on_transform_move(self, setup_canvas):
-        """Moving the AI frame should clear the in-game edited path."""
-        canvas, _ = setup_canvas
-        assert canvas._ingame_edited_path is not None
+        # Assert: The ingame composite file has been deleted
+        assert not ingame_path.exists(), "Ingame composite should be deleted after extraction"
 
-        # Simulate transform change via signal handler
-        canvas._on_ai_frame_transform_changed(10, 10, 1.0)
+    def test_set_ingame_edited_path_evicts_cache(self, setup_canvas):
+        """Setting ingame edited path should evict the AI frame cache entry."""
+        canvas, ai_image_path, palette_colors, tmp_path = setup_canvas
 
-        # Should be cleared because the baked-in image is no longer valid for new offset
-        assert canvas._ingame_edited_path is None
+        # Put a dummy entry in the AI frame cache (keyed by Path, not str)
+        canvas._ai_frame_cache[ai_image_path] = MagicMock()
+        assert ai_image_path in canvas._ai_frame_cache
 
-    def test_ingame_edit_cleared_on_scale_change(self, setup_canvas):
-        """Changing scale should clear the in-game edited path."""
-        canvas, _ = setup_canvas
-        assert canvas._ingame_edited_path is not None
+        # Create ingame composite
+        ingame_path = tmp_path / "ingame_edit.png"
+        create_indexed_image(ingame_path, (32, 32), palette_colors, fill_index=2)
 
-        # Change scale slider (triggers _on_scale_slider_changed)
-        canvas._scale_slider.setValue(800) # 0.8x
+        # Call set_ingame_edited_path
+        canvas.set_ingame_edited_path(str(ingame_path))
 
-        assert canvas._ingame_edited_path is None
+        # Assert: cache entry has been evicted
+        assert ai_image_path not in canvas._ai_frame_cache, "AI frame cache should be evicted"
 
-    def test_ingame_edit_cleared_on_flip_change(self, setup_canvas):
-        """Changing flip should clear the in-game edited path."""
-        canvas, _ = setup_canvas
-        assert canvas._ingame_edited_path is not None
+    def test_set_ingame_edited_path_none_is_noop(self, setup_canvas):
+        """Setting ingame edited path to None should be a no-op."""
+        canvas, ai_image_path, palette_colors, tmp_path = setup_canvas
 
-        # Toggle flip (triggers _on_flip_changed)
-        canvas._flip_h_checkbox.setChecked(True)
+        # Store original AI frame content
+        original_ai = Image.open(ai_image_path)
+        original_mode = original_ai.mode
+        original_size = original_ai.size
 
-        assert canvas._ingame_edited_path is None
+        # Call with None
+        canvas.set_ingame_edited_path(None)
 
-    def test_ingame_edit_cleared_on_sharpen_change(self, setup_canvas):
-        """Changing sharpen should clear the in-game edited path."""
-        canvas, _ = setup_canvas
-        assert canvas._ingame_edited_path is not None
+        # Assert: AI frame unchanged
+        unchanged_ai = Image.open(ai_image_path)
+        assert unchanged_ai.mode == original_mode
+        assert unchanged_ai.size == original_size
 
-        # Change sharpen (triggers _on_sharpen_changed)
-        canvas._sharpen_slider.setValue(20) # 2.0
+    def test_set_ingame_edited_path_nonexistent_file_is_noop(self, setup_canvas):
+        """Setting ingame edited path to nonexistent file should be a no-op."""
+        canvas, ai_image_path, palette_colors, tmp_path = setup_canvas
 
-        assert canvas._ingame_edited_path is None
+        # Store original AI frame content
+        original_ai = Image.open(ai_image_path)
+        original_mode = original_ai.mode
+        original_size = original_ai.size
 
-    def test_ingame_edit_cleared_on_resampling_change(self, setup_canvas):
-        """Changing resampling should clear the in-game edited path."""
-        canvas, _ = setup_canvas
-        assert canvas._ingame_edited_path is not None
+        # Call with nonexistent path
+        canvas.set_ingame_edited_path("/nonexistent/path.png")
 
-        # Change resampling (triggers _on_resampling_changed)
-        canvas._resampling_combo.setCurrentIndex(1) # Nearest
-
-        assert canvas._ingame_edited_path is None
+        # Assert: AI frame unchanged
+        unchanged_ai = Image.open(ai_image_path)
+        assert unchanged_ai.mode == original_mode
+        assert unchanged_ai.size == original_size

@@ -637,15 +637,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
             self._swap_checkbox.setEnabled(False)
             return
 
-        # Check for saved in-game edits
-        if mapping.ingame_edited_path:
-            ingame_path = Path(mapping.ingame_edited_path)
-            if ingame_path.exists():
-                self._load_ingame_from_file(ingame_path)
-                self._preview_info_label.setText("Loaded saved in-game edits")
-                self._swap_checkbox.setChecked(True)  # Default: ingame in center
-                return
-
         # Generate from compositor
         self._generate_ingame_canvas(mapping)
         self._preview_info_label.setText("Edit the composited in-game result")
@@ -1122,13 +1113,6 @@ class AIFramePaletteEditorWindow(QMainWindow):
         output_path = original.parent / f"{original.stem}_ingame.png"
 
         if self._ingame_controller.save(output_path):
-            if self._frame_controller is not None:
-                project = self._frame_controller.project
-                if project is not None:
-                    mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
-                    if mapping is not None:
-                        mapping.ingame_edited_path = str(output_path)
-                        self._frame_controller.save_requested.emit()
             self.ingame_saved.emit(self._ai_frame.id, str(output_path))
             logger.info("Saved in-game edits: %s", output_path)
             self._status_bar.showMessage(f"Saved: {output_path.name}", 3000)

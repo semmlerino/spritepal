@@ -29,7 +29,6 @@ class MappingSnapshot:
     scale: float
     sharpen: float
     resampling: str
-    ingame_edited_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -120,7 +119,6 @@ class InjectionSnapshot:
             scale=mapping.scale,
             sharpen=mapping.sharpen,
             resampling=mapping.resampling,
-            ingame_edited_path=mapping.ingame_edited_path,
         )
 
         # Snapshot AI frame

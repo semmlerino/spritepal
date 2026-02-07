@@ -255,7 +255,6 @@ class InjectionOrchestrator:
             scale=snapshot.mapping.scale,
             sharpen=snapshot.mapping.sharpen,
             resampling=snapshot.mapping.resampling,
-            ingame_edited_path=snapshot.mapping.ingame_edited_path,
         )
 
         ai_frame = AIFrame(
@@ -569,64 +568,6 @@ class InjectionOrchestrator:
         BUG-1 FIX: Also returns ai_index_map (palette indices) if the AI frame is an
         indexed PNG, enabling index-preserving injection that avoids re-quantization.
         """
-        # Check for in-game edited image (bypasses compositor)
-        if mapping.ingame_edited_path and sheet_palette is not None:
-            ingame_path = Path(mapping.ingame_edited_path)
-            if ingame_path.exists():
-                ingame_index_map, _ = load_image_preserving_indices(ingame_path, sheet_palette=sheet_palette)
-                if ingame_index_map is not None:
-                    logger.info(
-                        "Using in-game edited image: %s (shape: %s)",
-                        ingame_path.name,
-                        ingame_index_map.shape,
-                    )
-
-                    # Still need capture parsing and filtering for tile layout
-                    assert game_frame.capture_path is not None
-                    parser = MesenCaptureParser()
-                    capture_result = parser.parse_file(game_frame.capture_path)
-
-                    from core.mesen_integration.entry_filtering import (
-                        create_filtered_capture,
-                        filter_capture_entries,
-                    )
-
-                    filtering = filter_capture_entries(
-                        capture_result,
-                        selected_entry_ids=list(game_frame.selected_entry_ids),
-                        rom_offsets=game_frame.rom_offsets,
-                        allow_rom_offset_fallback=request.allow_fallback,
-                        allow_all_entries_fallback=request.allow_fallback,
-                        context_label=game_frame.id,
-                    )
-
-                    if not filtering.has_entries:
-                        if not request.allow_fallback:
-                            return InjectionResult.stale_entries(
-                                frame_id=game_frame.id,
-                                error=f"No valid entries found for '{game_frame.id}'.",
-                            )
-                        relevant_entries = list(capture_result.entries)
-                    else:
-                        relevant_entries = filtering.entries
-
-                    filtered_capture = create_filtered_capture(capture_result, relevant_entries)
-
-                    # Convert index map to RGBA for tile extraction
-                    from core.services.rgb_to_indexed import convert_indexed_to_rgb
-
-                    masked_canvas = convert_indexed_to_rgb(ingame_index_map, sheet_palette)
-
-                    # NOTE: No content-region flip needed here. The composite
-                    # already has the mapping flip baked in from the compositor.
-                    # Per-tile OAM counter-flip (in _inject_tile_group) handles
-                    # hardware flip compensation independently.
-
-                    if debug.enabled and debug.debug_dir:
-                        debug.save_debug_image("ingame_edited_canvas", masked_canvas)
-
-                    return masked_canvas, filtered_capture, relevant_entries, ingame_index_map
-
         # Load AI image, preserving palette indices if indexed PNG
         ai_index_map, ai_img = load_image_preserving_indices(
             ai_frame.path,

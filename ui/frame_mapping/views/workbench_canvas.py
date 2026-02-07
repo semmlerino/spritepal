@@ -67,7 +67,6 @@ from core.services.content_bounds_analyzer import (
 from core.services.image_utils import pil_to_qimage
 from core.services.rgb_to_indexed import (
     convert_indexed_to_pil_indexed,
-    convert_indexed_to_rgb,
     load_image_preserving_indices,
 )
 from core.services.sprite_compositor import TransformParams
@@ -477,7 +476,6 @@ class WorkbenchCanvas(QWidget):
         self._ai_pixmap: QPixmap | None = None
         self._ai_image: Image.Image | None = None  # PIL image for auto-alignment
         self._ai_index_map: np.ndarray | None = None  # Original palette indices for indexed PNGs
-        self._ingame_edited_path: str | None = None  # Saved in-game edit overrides compositor
         self._has_mapping = False
         self._updating_from_external = False
 
@@ -1090,7 +1088,6 @@ class WorkbenchCanvas(QWidget):
             self._ai_pixmap = None
             self._ai_image = None
             self._ai_index_map = None
-            self._ingame_edited_path = None
             self._cached_content_bbox = None
             self._ai_frame_item.set_pixmap(None)
             self._update_auto_align_button_state()
@@ -1169,34 +1166,34 @@ class WorkbenchCanvas(QWidget):
         self._schedule_preview_update()
 
     def set_ingame_edited_path(self, path: str | None) -> None:
-        """Set the saved in-game edit path, bypassing compositor for preview.
+        """Process saved in-game composite: extract indices, overwrite AI frame, clean up.
 
-        The in-game image has the current transforms (offset, flip, scale)
-        baked in.  We keep the alignment unchanged so the AI frame overlay
-        stays at its current position (matching the baked-in content) and
-        the compositor retains the original offset for when user-initiated
-        transform changes clear this path and fall back to the compositor.
+        When path is not None, reverse-extracts AI frame indices from the composite,
+        overwrites the AI frame file, evicts cache, deletes the composite file,
+        and schedules a preview update. When path is None, no-op.
         """
-        if self._ingame_edited_path != path:
-            self._ingame_edited_path = path
-            # When in-game edits are saved, reverse-extract the AI frame
-            # indices from the composite and overwrite the original AI frame
-            # file. This persists edited indices to disk so they survive
-            # alignment drags, frame re-selection, and app restarts.
-            if path is not None and self._sheet_palette is not None:
-                ingame_path = Path(path)
-                if ingame_path.exists():
-                    canvas_index_map, _ = load_image_preserving_indices(
-                        ingame_path, sheet_palette=self._sheet_palette
-                    )
-                    if canvas_index_map is not None:
-                        extracted = self._extract_ai_indices_from_composite(
-                            canvas_index_map
-                        )
-                        if extracted is not None:
-                            self._ai_index_map = extracted
-                            self._persist_extracted_indices(extracted)
-            self._schedule_preview_update()
+        if path is None or self._sheet_palette is None:
+            return
+        ingame_path = Path(path)
+        if not ingame_path.exists():
+            return
+        canvas_index_map, _ = load_image_preserving_indices(
+            ingame_path, sheet_palette=self._sheet_palette
+        )
+        if canvas_index_map is None:
+            return
+        extracted = self._extract_ai_indices_from_composite(canvas_index_map)
+        if extracted is None:
+            return
+        self._ai_index_map = extracted
+        self._persist_extracted_indices(extracted)
+        # Delete the composite file — AI frame file is now the single source of truth
+        try:
+            ingame_path.unlink()
+            logger.debug("Deleted composite file: %s", ingame_path.name)
+        except OSError:
+            logger.warning("Could not delete composite file: %s", ingame_path)
+        self._schedule_preview_update()
 
     def _extract_ai_indices_from_composite(
         self, canvas_index_map: np.ndarray
@@ -2008,31 +2005,6 @@ class WorkbenchCanvas(QWidget):
             self._preview_item.setVisible(False)
             return
 
-        # If in-game edited path exists, show it directly (bypasses compositor)
-        if self._ingame_edited_path is not None and self._sheet_palette is not None:
-            ingame_path = Path(self._ingame_edited_path)
-            if ingame_path.exists():
-                ingame_index_map, _ = load_image_preserving_indices(ingame_path, sheet_palette=self._sheet_palette)
-                if ingame_index_map is not None:
-                    rgba_image = convert_indexed_to_rgb(ingame_index_map, self._sheet_palette)
-                    qimage = pil_to_qimage(rgba_image)
-                    scaled = qimage.scaled(
-                        qimage.width() * self._display_scale,
-                        qimage.height() * self._display_scale,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.FastTransformation,
-                    )
-                    self._preview_item.setPixmap(QPixmap.fromImage(scaled))
-                    # Always position at origin — the in-game edit has the
-                    # original offset baked into the image.  Any user-initiated
-                    # transform change clears _ingame_edited_path and falls
-                    # back to the compositor, so non-zero pos here would only
-                    # come from a stale model re-sync (double-offset bug).
-                    self._preview_item.setPos(0, 0)
-                    self._preview_item.setVisible(True)
-                    return
-            # Fall through to compositor if file missing/invalid
-
         # Normal compositor path — preview at origin (offset baked into composite)
         self._preview_item.setPos(0, 0)
 
@@ -2526,8 +2498,6 @@ class WorkbenchCanvas(QWidget):
         if self._updating_from_external:
             return
 
-        self._ingame_edited_path = None  # Baked values stale during drag
-
         # Convert from display scale to actual coordinates
         # Use int() for truncation toward zero (not floor division)
         # This ensures consistent behavior for negative offsets
@@ -2554,7 +2524,6 @@ class WorkbenchCanvas(QWidget):
 
     def _emit_alignment_changed(self) -> None:
         """Emit alignment_changed signal with current values."""
-        self._ingame_edited_path = None  # User changed transforms — baked values stale
         self.alignment_changed.emit(self.get_alignment())
 
     def _update_scene_for_alignment(self) -> None:
