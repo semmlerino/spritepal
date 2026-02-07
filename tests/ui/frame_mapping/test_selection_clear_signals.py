@@ -186,7 +186,7 @@ class TestHandleMappingSelectedClearPath:
 
     def test_handle_mapping_selected_clears_state_on_empty_id(self, qtbot: QtBot) -> None:
         """handle_mapping_selected should clear state when ai_frame_id is empty."""
-        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
+        from ui.frame_mapping.selection_coordinator import SelectionCoordinator
         from ui.workspaces.frame_mapping_workspace import WorkspaceStateManager
 
         state = WorkspaceStateManager()
@@ -199,7 +199,7 @@ class TestHandleMappingSelectedClearPath:
         captures_pane = MagicMock()
         mapping_panel = MagicMock()
 
-        logic = WorkspaceLogicHelper()
+        logic = SelectionCoordinator()
         logic.set_controller(controller)
         logic.set_state(state)
         logic.set_panes(ai_frames_pane, captures_pane, mapping_panel, alignment_canvas)
@@ -216,7 +216,7 @@ class TestHandleMappingSelectedClearPath:
 
     def test_handle_mapping_selected_updates_button_state_on_clear(self, qtbot: QtBot) -> None:
         """handle_mapping_selected should update button state when cleared."""
-        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
+        from ui.frame_mapping.selection_coordinator import SelectionCoordinator
         from ui.workspaces.frame_mapping_workspace import WorkspaceStateManager
 
         state = WorkspaceStateManager()
@@ -228,7 +228,7 @@ class TestHandleMappingSelectedClearPath:
         captures_pane = MagicMock()
         mapping_panel = MagicMock()
 
-        logic = WorkspaceLogicHelper()
+        logic = SelectionCoordinator()
         logic.set_controller(controller)
         logic.set_state(state)
         logic.set_panes(ai_frames_pane, captures_pane, mapping_panel, alignment_canvas)

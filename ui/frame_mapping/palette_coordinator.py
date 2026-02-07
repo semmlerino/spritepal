@@ -95,13 +95,26 @@ class PaletteCoordinator:
         """
         self._on_ai_frame_selected = on_ai_frame_selected
 
+    def _require_initialized(self) -> None:
+        """Raise if core dependencies haven't been set via setters."""
+        missing = []
+        if self._controller is None:
+            missing.append("controller (call set_controller())")
+        if self._state is None:
+            missing.append("state (call set_state())")
+        if missing:
+            raise RuntimeError(f"{type(self).__name__} not fully initialized: missing {', '.join(missing)}")
+
     # -------------------------------------------------------------------------
     # Sheet Palette Dialog Operations
     # -------------------------------------------------------------------------
 
     def handle_palette_edit_requested(self) -> None:
         """Handle request to edit the sheet palette."""
-        if self._controller is None or self._parent_widget is None:
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
+        if self._parent_widget is None:
             return
 
         from ui.frame_mapping.dialogs.sheet_palette_mapping_dialog import SheetPaletteMappingDialog
@@ -143,7 +156,10 @@ class PaletteCoordinator:
 
     def handle_palette_extract_requested(self) -> None:
         """Handle request to extract palette from AI sheet."""
-        if self._controller is None or self._parent_widget is None:
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
+        if self._parent_widget is None:
             return
 
         from ui.frame_mapping.dialogs.sheet_palette_mapping_dialog import SheetPaletteMappingDialog
@@ -185,7 +201,10 @@ class PaletteCoordinator:
 
     def handle_palette_clear_requested(self) -> None:
         """Handle request to clear the sheet palette."""
-        if self._controller is None or self._parent_widget is None:
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
+        if self._parent_widget is None:
             return
 
         if self._controller.get_sheet_palette() is None:
@@ -211,8 +230,9 @@ class PaletteCoordinator:
         editor's _on_external_palette_changed uses identity check (is not)
         which fails when the same palette object is modified in-place.
         """
-        if self._controller is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
 
         palette = self._controller.get_sheet_palette()
 
@@ -285,8 +305,9 @@ class PaletteCoordinator:
             index: Palette index that changed
             rgb: New RGB color tuple
         """
-        if self._controller is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
 
         if isinstance(rgb, tuple) and len(rgb) >= 3:
             rgb_tuple = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
@@ -317,7 +338,10 @@ class PaletteCoordinator:
         Args:
             ai_frame_id: AI frame ID (filename)
         """
-        if self._controller is None or self._parent_widget is None:
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
+        if self._parent_widget is None:
             return
 
         from ui.frame_mapping.windows import AIFramePaletteEditorWindow
@@ -382,8 +406,9 @@ class PaletteCoordinator:
             indexed_data: Numpy array of indexed pixel data (unused here)
             output_path: Path to the saved edited PNG
         """
-        if self._controller is None or self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
 
         project = self._controller.project
         if project is None:
@@ -461,12 +486,14 @@ class PaletteCoordinator:
         Forwards composite path to canvas for index extraction and AI frame
         overwrite, then triggers project save (AI frame file changed on disk).
         """
-        if self._state is not None and self._state.selected_ai_frame_id == ai_frame_id:
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
+        if self._state.selected_ai_frame_id == ai_frame_id:
             if self._alignment_canvas is not None:
                 self._alignment_canvas.set_ingame_edited_path(ingame_edited_path)
         # AI frame file was updated — persist project
-        if self._controller is not None:
-            self._controller.emit_save_requested()
+        self._controller.emit_save_requested()
 
     # -------------------------------------------------------------------------
     # Helper Methods

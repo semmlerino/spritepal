@@ -210,10 +210,10 @@ class TestAutoAlignOnMappingCreation:
         """
         from unittest.mock import MagicMock
 
-        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
+        from ui.frame_mapping.selection_coordinator import SelectionCoordinator
 
-        # Create WorkspaceLogicHelper with mocked dependencies
-        helper = WorkspaceLogicHelper()
+        # Create SelectionCoordinator with mocked dependencies
+        helper = SelectionCoordinator()
 
         # Mock controller
         mock_controller = MagicMock()

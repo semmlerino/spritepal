@@ -87,8 +87,8 @@ class TestAIFrameDeletionClearsSelection:
         After removing an AI frame that was selected, the state manager should
         have its selected_ai_frame_id set to None.
         """
+        from ui.frame_mapping.selection_coordinator import SelectionCoordinator
         from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
-        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
         from ui.frame_mapping.workspace_state_manager import WorkspaceStateManager
 
         project, frames = mock_project_with_frames
@@ -105,7 +105,7 @@ class TestAIFrameDeletionClearsSelection:
         pane.select_frame_by_id(frame_to_delete.id)
 
         # Create logic helper with mocked dependencies
-        helper = WorkspaceLogicHelper()
+        helper = SelectionCoordinator()
         helper.set_state(state)
 
         # Mock canvas and other components
@@ -138,8 +138,8 @@ class TestAIFrameDeletionClearsSelection:
         When the selected AI frame is deleted, clear_alignment should be called
         on the canvas.
         """
+        from ui.frame_mapping.selection_coordinator import SelectionCoordinator
         from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
-        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
         from ui.frame_mapping.workspace_state_manager import WorkspaceStateManager
 
         project, frames = mock_project_with_frames
@@ -156,7 +156,7 @@ class TestAIFrameDeletionClearsSelection:
         pane.select_frame_by_id(frame_to_delete.id)
 
         # Create logic helper with mocked dependencies
-        helper = WorkspaceLogicHelper()
+        helper = SelectionCoordinator()
         helper.set_state(state)
 
         # Mock canvas and other components

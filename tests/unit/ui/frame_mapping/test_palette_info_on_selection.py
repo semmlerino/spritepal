@@ -8,7 +8,7 @@ import pytest
 
 from core.frame_mapping_project import FrameMapping, GameFrame
 from tests.infrastructure.fake_panes import FakeAIFramesPane
-from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
+from ui.frame_mapping.selection_coordinator import SelectionCoordinator
 
 
 class TestPaletteInfoOnSelection:
@@ -16,8 +16,8 @@ class TestPaletteInfoOnSelection:
 
     @pytest.fixture
     def helper_with_mocks(self):
-        """Create a WorkspaceLogicHelper with mocked dependencies."""
-        helper = WorkspaceLogicHelper()
+        """Create a SelectionCoordinator with mocked dependencies."""
+        helper = SelectionCoordinator()
 
         # Mock controller
         controller = MagicMock()

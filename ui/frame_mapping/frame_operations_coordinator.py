@@ -78,14 +78,25 @@ class FrameOperationsCoordinator:
         self._update_map_button_state = update_map_button_state
         self._request_edit_in_sprite_editor = request_edit_in_sprite_editor
 
+    def _require_initialized(self) -> None:
+        """Raise if core dependencies haven't been set via setters."""
+        missing = []
+        if self._controller is None:
+            missing.append("controller (call set_controller())")
+        if self._state is None:
+            missing.append("state (call set_state())")
+        if missing:
+            raise RuntimeError(f"{type(self).__name__} not fully initialized: missing {', '.join(missing)}")
+
     def handle_delete_capture(self, frame_id: str) -> None:
         """Handle delete capture request.
 
         Args:
             frame_id: Game frame ID to delete
         """
-        if self._controller is None or self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         project = self._controller.project
         if project is None:
             return
@@ -137,8 +148,9 @@ class FrameOperationsCoordinator:
         Args:
             ai_frame_id: AI frame ID to remove
         """
-        if self._controller is None or self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         project = self._controller.project
         if project is None:
             return
@@ -190,8 +202,9 @@ class FrameOperationsCoordinator:
         Args:
             ai_frame_ids: List of AI frame IDs to remove
         """
-        if self._controller is None or self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         project = self._controller.project
         if project is None:
             return
@@ -247,8 +260,9 @@ class FrameOperationsCoordinator:
         Args:
             ai_frame_id: AI frame ID (filename)
         """
-        if self._controller is None or self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
 
         # remove_mapping() emits mapping_removed signal which triggers _on_mapping_removed()
         # That handler already does: map button state, AI frame status, game frame link status,
@@ -269,8 +283,8 @@ class FrameOperationsCoordinator:
         Args:
             ai_frame_id: AI frame ID (filename)
         """
-        if self._controller is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
         project = self._controller.project
         if project is None:
             return
@@ -291,8 +305,8 @@ class FrameOperationsCoordinator:
 
     def handle_edit_game_frame(self, frame_id: str) -> None:
         """Handle edit game frame request from captures library."""
-        if self._controller is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
         project = self._controller.project
         if project is None:
             return
@@ -315,8 +329,8 @@ class FrameOperationsCoordinator:
 
     def handle_show_capture_details(self, frame_id: str) -> None:
         """Handle show details request for capture."""
-        if self._controller is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
         project = self._controller.project
         if project is None:
             return

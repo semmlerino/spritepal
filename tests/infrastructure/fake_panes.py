@@ -1,4 +1,4 @@
-"""Fake pane implementations for WorkspaceLogicHelper tests.
+"""Fake pane implementations for SelectionCoordinator tests.
 
 These fakes store received values as public attributes, enabling
 state-based assertions instead of brittle interaction assertions.

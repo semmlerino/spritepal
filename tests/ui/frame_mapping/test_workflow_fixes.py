@@ -344,7 +344,11 @@ class TestIngameSavedFrameGuard:
         # Create coordinator
         coordinator = PaletteCoordinator()
 
-        # Set up dependencies
+        # Set up dependencies (controller + state required by _require_initialized)
+        mock_controller = MagicMock()
+        mock_controller.project = None
+        coordinator.set_controller(mock_controller)
+
         mock_state = MagicMock()
         mock_state.selected_ai_frame_id = "frame_A"
         coordinator.set_state(mock_state)

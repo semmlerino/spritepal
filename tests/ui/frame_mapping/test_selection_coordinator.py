@@ -1,4 +1,4 @@
-"""Tests for WorkspaceLogicHelper.
+"""Tests for SelectionCoordinator.
 
 Tests the business logic extracted from FrameMappingWorkspace.
 """
@@ -16,14 +16,14 @@ from tests.infrastructure.fake_panes import (
     FakeMappingPanel,
     FakeWorkbenchCanvas,
 )
+from ui.frame_mapping.selection_coordinator import SelectionCoordinator
 from ui.frame_mapping.views.workbench_types import AlignmentState
-from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 
 
 @pytest.fixture
-def helper() -> WorkspaceLogicHelper:
-    """Create a WorkspaceLogicHelper with mocked dependencies."""
-    h = WorkspaceLogicHelper()
+def helper() -> SelectionCoordinator:
+    """Create a SelectionCoordinator with mocked dependencies."""
+    h = SelectionCoordinator()
 
     # Mock controller
     controller = MagicMock()
@@ -59,7 +59,7 @@ def helper() -> WorkspaceLogicHelper:
 class TestSelectionHelpers:
     """Test Phase 2a: Selection helpers."""
 
-    def test_get_selected_ai_frame_id_returns_state_value(self, helper: WorkspaceLogicHelper) -> None:
+    def test_get_selected_ai_frame_id_returns_state_value(self, helper: SelectionCoordinator) -> None:
         """get_selected_ai_frame_id returns value from state manager."""
         helper._state.selected_ai_frame_id = "frame_001.png"  # type: ignore[union-attr]
 
@@ -69,13 +69,13 @@ class TestSelectionHelpers:
 
     def test_get_selected_ai_frame_id_returns_none_when_no_state(self) -> None:
         """get_selected_ai_frame_id returns None when state not set."""
-        helper = WorkspaceLogicHelper()
+        helper = SelectionCoordinator()
 
         result = helper.get_selected_ai_frame_id()
 
         assert result is None
 
-    def test_get_selected_game_id_returns_state_value(self, helper: WorkspaceLogicHelper) -> None:
+    def test_get_selected_game_id_returns_state_value(self, helper: SelectionCoordinator) -> None:
         """get_selected_game_id returns value from state manager."""
         helper._state.selected_game_id = "capture_123"  # type: ignore[union-attr]
 
@@ -83,7 +83,7 @@ class TestSelectionHelpers:
 
         assert result == "capture_123"
 
-    def test_update_map_button_state_enables_when_both_selected(self, helper: WorkspaceLogicHelper) -> None:
+    def test_update_map_button_state_enables_when_both_selected(self, helper: SelectionCoordinator) -> None:
         """update_map_button_state enables button when both frames selected and visible."""
         helper._state.selected_ai_frame_id = "frame.png"  # type: ignore[union-attr]
         helper._state.selected_game_id = "capture_1"  # type: ignore[union-attr]
@@ -93,7 +93,7 @@ class TestSelectionHelpers:
 
         assert helper._ai_frames_pane.map_button_enabled is True
 
-    def test_update_map_button_state_disables_when_ai_not_selected(self, helper: WorkspaceLogicHelper) -> None:
+    def test_update_map_button_state_disables_when_ai_not_selected(self, helper: SelectionCoordinator) -> None:
         """update_map_button_state disables button when AI frame not selected."""
         helper._state.selected_ai_frame_id = None  # type: ignore[union-attr]
         helper._state.selected_game_id = "capture_1"  # type: ignore[union-attr]
@@ -102,7 +102,7 @@ class TestSelectionHelpers:
 
         assert helper._ai_frames_pane.map_button_enabled is False
 
-    def test_update_map_button_state_disables_when_ai_frame_filtered(self, helper: WorkspaceLogicHelper) -> None:
+    def test_update_map_button_state_disables_when_ai_frame_filtered(self, helper: SelectionCoordinator) -> None:
         """update_map_button_state disables button when selected AI frame is hidden by filter."""
         helper._state.selected_ai_frame_id = "frame.png"  # type: ignore[union-attr]
         helper._state.selected_game_id = "capture_1"  # type: ignore[union-attr]
@@ -113,7 +113,7 @@ class TestSelectionHelpers:
 
         assert helper._ai_frames_pane.map_button_enabled is False
 
-    def test_update_map_button_state_enables_when_ai_frame_visible(self, helper: WorkspaceLogicHelper) -> None:
+    def test_update_map_button_state_enables_when_ai_frame_visible(self, helper: SelectionCoordinator) -> None:
         """update_map_button_state enables button when selected AI frame is visible."""
         helper._state.selected_ai_frame_id = "frame.png"  # type: ignore[union-attr]
         helper._state.selected_game_id = "capture_1"  # type: ignore[union-attr]
@@ -128,7 +128,7 @@ class TestSelectionHelpers:
 class TestRefreshHelpers:
     """Test Phase 2b: Refresh helpers."""
 
-    def test_refresh_mapping_status_updates_pane(self, helper: WorkspaceLogicHelper) -> None:
+    def test_refresh_mapping_status_updates_pane(self, helper: SelectionCoordinator) -> None:
         """refresh_mapping_status updates AI frames pane with status map."""
         # Setup mock project
         project = MagicMock()
@@ -144,7 +144,7 @@ class TestRefreshHelpers:
 
         assert helper._ai_frames_pane.mapping_status == {"frame_001.png": "injected"}
 
-    def test_refresh_mapping_status_clears_when_no_project(self, helper: WorkspaceLogicHelper) -> None:
+    def test_refresh_mapping_status_clears_when_no_project(self, helper: SelectionCoordinator) -> None:
         """refresh_mapping_status clears status when no project."""
         helper._controller.project = None  # type: ignore[union-attr]
 
@@ -152,7 +152,7 @@ class TestRefreshHelpers:
 
         assert helper._ai_frames_pane.mapping_status == {}
 
-    def test_refresh_game_frame_link_status_updates_pane(self, helper: WorkspaceLogicHelper) -> None:
+    def test_refresh_game_frame_link_status_updates_pane(self, helper: SelectionCoordinator) -> None:
         """refresh_game_frame_link_status updates captures pane."""
         project = MagicMock()
         game_frame = MagicMock()
@@ -169,7 +169,7 @@ class TestRefreshHelpers:
 class TestSelectionHandlers:
     """Test Phase 2c: Selection handlers."""
 
-    def test_handle_ai_frame_selected_clears_on_empty(self, helper: WorkspaceLogicHelper) -> None:
+    def test_handle_ai_frame_selected_clears_on_empty(self, helper: SelectionCoordinator) -> None:
         """handle_ai_frame_selected clears state on empty frame_id."""
         project = MagicMock()
         helper._controller.project = project  # type: ignore[union-attr]
@@ -180,7 +180,7 @@ class TestSelectionHandlers:
         assert helper._alignment_canvas.alignment_cleared is True
         assert helper._mapping_panel.selection_cleared is True
 
-    def test_handle_ai_frame_selected_updates_state(self, helper: WorkspaceLogicHelper) -> None:
+    def test_handle_ai_frame_selected_updates_state(self, helper: SelectionCoordinator) -> None:
         """handle_ai_frame_selected updates state and syncs panes."""
         project = MagicMock()
         frame = MagicMock()
@@ -195,7 +195,7 @@ class TestSelectionHandlers:
         assert helper._mapping_panel.selected_ai_id == "frame_001.png"
         assert helper._alignment_canvas.ai_frame is frame
 
-    def test_handle_game_frame_selected_updates_state(self, helper: WorkspaceLogicHelper) -> None:
+    def test_handle_game_frame_selected_updates_state(self, helper: SelectionCoordinator) -> None:
         """handle_game_frame_selected updates state."""
         project = MagicMock()
         project.get_game_frame_by_id.return_value = MagicMock()
@@ -209,7 +209,7 @@ class TestSelectionHandlers:
 
         assert helper._state.selected_game_id == "capture_1"  # type: ignore[union-attr]
 
-    def test_handle_game_frame_selected_clears_on_empty(self, helper: WorkspaceLogicHelper) -> None:
+    def test_handle_game_frame_selected_clears_on_empty(self, helper: SelectionCoordinator) -> None:
         """handle_game_frame_selected clears state on empty frame_id."""
         project = MagicMock()
         helper._controller.project = project  # type: ignore[union-attr]
@@ -223,7 +223,7 @@ class TestSelectionHandlers:
 class TestLinkingLogic:
     """Test Phase 2d: Linking logic."""
 
-    def test_attempt_link_creates_mapping(self, helper: WorkspaceLogicHelper) -> None:
+    def test_attempt_link_creates_mapping(self, helper: SelectionCoordinator) -> None:
         """attempt_link creates a mapping and triggers auto-align with scale."""
         project = MagicMock()
         ai_frame = MagicMock()
@@ -250,7 +250,7 @@ class TestLinkingLogic:
         assert helper._alignment_canvas.auto_aligned is True
         assert helper._alignment_canvas.auto_align_with_scale is True
 
-    def test_attempt_link_same_pair_shows_message(self, helper: WorkspaceLogicHelper) -> None:
+    def test_attempt_link_same_pair_shows_message(self, helper: SelectionCoordinator) -> None:
         """attempt_link shows message when linking same pair."""
         project = MagicMock()
         ai_frame = MagicMock()
@@ -264,7 +264,7 @@ class TestLinkingLogic:
         helper._message_service.show_message.assert_called_once()  # type: ignore[union-attr]
         helper._controller.create_mapping.assert_not_called()  # type: ignore[union-attr]
 
-    def test_find_next_unmapped_ai_frame_returns_next(self, helper: WorkspaceLogicHelper) -> None:
+    def test_find_next_unmapped_ai_frame_returns_next(self, helper: SelectionCoordinator) -> None:
         """find_next_unmapped_ai_frame returns next unmapped frame."""
         project = MagicMock()
         frame1 = MagicMock()
@@ -281,7 +281,7 @@ class TestLinkingLogic:
 
         assert result == "frame_002.png"
 
-    def test_find_next_unmapped_ai_frame_returns_none_when_all_mapped(self, helper: WorkspaceLogicHelper) -> None:
+    def test_find_next_unmapped_ai_frame_returns_none_when_all_mapped(self, helper: SelectionCoordinator) -> None:
         """find_next_unmapped_ai_frame returns None when all frames mapped."""
         project = MagicMock()
         frame1 = MagicMock()
@@ -299,7 +299,7 @@ class TestLinkingLogic:
 class TestMappingPanelRowUpdate:
     """Test Bug 2: Mapping panel row update when mapping is removed."""
 
-    def test_update_single_mapping_panel_row_clears_on_no_mapping(self, helper: WorkspaceLogicHelper) -> None:
+    def test_update_single_mapping_panel_row_clears_on_no_mapping(self, helper: SelectionCoordinator) -> None:
         """update_single_mapping_panel_row should clear row when mapping is None."""
         # Setup: Project where get_mapping_for_ai_frame returns None
         project = MagicMock()
@@ -316,7 +316,7 @@ class TestMappingPanelRowUpdate:
 class TestAlignmentCoordination:
     """Test Phase 2e: Alignment coordination."""
 
-    def test_handle_alignment_changed_updates_controller(self, helper: WorkspaceLogicHelper) -> None:
+    def test_handle_alignment_changed_updates_controller(self, helper: SelectionCoordinator) -> None:
         """handle_alignment_changed updates alignment via controller."""
         project = MagicMock()
         mapping = MagicMock()
@@ -335,7 +335,7 @@ class TestAlignmentCoordination:
         assert result is True
         helper._controller.update_mapping_alignment.assert_called_once()  # type: ignore[union-attr]
 
-    def test_handle_alignment_changed_blocked_when_canvas_differs(self, helper: WorkspaceLogicHelper) -> None:
+    def test_handle_alignment_changed_blocked_when_canvas_differs(self, helper: SelectionCoordinator) -> None:
         """handle_alignment_changed blocked when canvas shows different capture."""
         project = MagicMock()
         mapping = MagicMock()
@@ -354,7 +354,7 @@ class TestAlignmentCoordination:
         helper._controller.update_mapping_alignment.assert_not_called()  # type: ignore[union-attr]
         helper._message_service.show_message.assert_called_once()  # type: ignore[union-attr]
 
-    def test_sync_canvas_alignment_from_model_updates_canvas(self, helper: WorkspaceLogicHelper) -> None:
+    def test_sync_canvas_alignment_from_model_updates_canvas(self, helper: SelectionCoordinator) -> None:
         """sync_canvas_alignment_from_model updates canvas with mapping values."""
         project = MagicMock()
         mapping = MagicMock()
@@ -376,7 +376,7 @@ class TestAlignmentCoordination:
         assert helper._alignment_canvas.alignment == (5, 10, True, False, 1.5, 0.0, "lanczos")
         assert helper._alignment_canvas.alignment_has_mapping is True
 
-    def test_sync_canvas_alignment_from_model_clears_when_no_mapping(self, helper: WorkspaceLogicHelper) -> None:
+    def test_sync_canvas_alignment_from_model_clears_when_no_mapping(self, helper: SelectionCoordinator) -> None:
         """sync_canvas_alignment_from_model clears alignment when no mapping."""
         project = MagicMock()
         project.get_mapping_for_ai_frame.return_value = None

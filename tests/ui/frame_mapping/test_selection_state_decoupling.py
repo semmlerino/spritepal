@@ -123,7 +123,7 @@ class TestSelectionGetterBehavior:
 
         Even when pane returns None (item filtered), the state value is returned.
         """
-        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
+        from ui.frame_mapping.selection_coordinator import SelectionCoordinator
         from ui.workspaces.frame_mapping_workspace import (
             FrameMappingWorkspace,
             WorkspaceStateManager,
@@ -134,7 +134,7 @@ class TestSelectionGetterBehavior:
         state.selected_ai_frame_id = "test_frame.png"
 
         # Create logic helper with state
-        logic = WorkspaceLogicHelper()
+        logic = SelectionCoordinator()
         logic.set_state(state)
 
         # Create workspace and inject mocked state and logic
@@ -156,7 +156,7 @@ class TestSelectionGetterBehavior:
 
         Even when pane returns None, the state value is returned.
         """
-        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
+        from ui.frame_mapping.selection_coordinator import SelectionCoordinator
         from ui.workspaces.frame_mapping_workspace import (
             FrameMappingWorkspace,
             WorkspaceStateManager,
@@ -167,7 +167,7 @@ class TestSelectionGetterBehavior:
         state.selected_game_id = "game_capture_001"
 
         # Create logic helper with state
-        logic = WorkspaceLogicHelper()
+        logic = SelectionCoordinator()
         logic.set_state(state)
 
         # Create workspace and inject mocked state and logic

@@ -10,13 +10,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
+from ui.frame_mapping.selection_coordinator import SelectionCoordinator
 
 
 @pytest.fixture
-def helper() -> WorkspaceLogicHelper:
-    """Create a WorkspaceLogicHelper with mocked dependencies."""
-    h = WorkspaceLogicHelper()
+def helper() -> SelectionCoordinator:
+    """Create a SelectionCoordinator with mocked dependencies."""
+    h = SelectionCoordinator()
 
     # Mock controller
     controller = MagicMock()
@@ -52,7 +52,7 @@ def helper() -> WorkspaceLogicHelper:
 class TestUndoRedoSelectionSync:
     """Test undo/redo synchronization of selection state."""
 
-    def test_sync_canvas_alignment_after_undo_syncs_selected_game_id(self, helper: WorkspaceLogicHelper) -> None:
+    def test_sync_canvas_alignment_after_undo_syncs_selected_game_id(self, helper: SelectionCoordinator) -> None:
         """Sync canvas after undo/redo restores mapping and syncs selected_game_id.
 
         When user undoes a mapping deletion:
@@ -110,7 +110,7 @@ class TestUndoRedoSelectionSync:
         # VERIFY: CapturesLibraryPane.select_frame was called (this was the bug)
         helper._captures_pane.select_frame.assert_called_once_with("capture_1")  # type: ignore[union-attr]
 
-    def test_sync_canvas_alignment_respects_block_signals_on_select_frame(self, helper: WorkspaceLogicHelper) -> None:
+    def test_sync_canvas_alignment_respects_block_signals_on_select_frame(self, helper: SelectionCoordinator) -> None:
         """Ensure select_frame is called even when captures_pane exists.
 
         Regression check: previously, if captures_pane existed but wasn't properly
@@ -147,7 +147,7 @@ class TestUndoRedoSelectionSync:
         helper._captures_pane.select_frame.assert_called_once_with("capture_1")  # type: ignore[union-attr]
 
     def test_sync_canvas_alignment_when_no_captures_pane_still_updates_state(
-        self, helper: WorkspaceLogicHelper
+        self, helper: SelectionCoordinator
     ) -> None:
         """State is updated even if captures_pane is not available.
 
@@ -185,7 +185,7 @@ class TestUndoRedoSelectionSync:
         assert helper._state.selected_game_id == "capture_1"  # type: ignore[union-attr]
         assert helper._state.current_canvas_game_id == "capture_1"  # type: ignore[union-attr]
 
-    def test_sync_canvas_alignment_no_sync_when_canvas_unchanged(self, helper: WorkspaceLogicHelper) -> None:
+    def test_sync_canvas_alignment_no_sync_when_canvas_unchanged(self, helper: SelectionCoordinator) -> None:
         """Skip pane sync if canvas already shows correct game frame.
 
         Optimization: only sync pane when canvas changes. If canvas already

@@ -66,8 +66,8 @@ class TestBrowsingModeWhenMappedCaptureDeleted:
         3. User deletes capture A (the mapped capture)
         4. Mapping is removed, browsing mode should be cleared
         """
+        from ui.frame_mapping.selection_coordinator import SelectionCoordinator
         from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
-        from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
         from ui.frame_mapping.workspace_state_manager import WorkspaceStateManager
 
         project, ai_frame_id, mapped_id, browsed_id = project_with_mapping
@@ -82,7 +82,7 @@ class TestBrowsingModeWhenMappedCaptureDeleted:
         canvas = MagicMock(spec=WorkbenchCanvas)
 
         # Create logic helper
-        helper = WorkspaceLogicHelper()
+        helper = SelectionCoordinator()
         helper.set_state(state)
 
         controller = MagicMock()

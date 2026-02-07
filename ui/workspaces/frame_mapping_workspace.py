@@ -52,13 +52,13 @@ from ui.frame_mapping.dialog_coordinator import CaptureImportCoordinator
 from ui.frame_mapping.frame_operations_coordinator import FrameOperationsCoordinator
 from ui.frame_mapping.injection_coordinator import InjectionCoordinator
 from ui.frame_mapping.palette_coordinator import PaletteCoordinator
+from ui.frame_mapping.selection_coordinator import SelectionCoordinator
 from ui.frame_mapping.signal_error_handling import signal_error_boundary
 from ui.frame_mapping.views.ai_frames_pane import AIFramesPane
 from ui.frame_mapping.views.captures_library_pane import CapturesLibraryPane
 from ui.frame_mapping.views.mapping_panel import MappingPanel
 from ui.frame_mapping.views.workbench_canvas import WorkbenchCanvas
 from ui.frame_mapping.views.workbench_types import AlignmentState
-from ui.frame_mapping.workspace_logic_helper import WorkspaceLogicHelper
 from ui.frame_mapping.workspace_state_manager import WorkspaceStateManager
 from utils.logging_config import get_logger
 
@@ -113,7 +113,7 @@ class FrameMappingWorkspace(QWidget):
         self._auto_save_timer.timeout.connect(self._auto_save_manager.perform_save)
 
         # Logic helper handles operations spanning multiple panes
-        self._logic = WorkspaceLogicHelper()
+        self._logic = SelectionCoordinator()
         self._logic.set_controller(self._controller)
         self._logic.set_state(self._state)
         self._logic.set_parent_widget(self)
@@ -1208,7 +1208,7 @@ class FrameMappingWorkspace(QWidget):
         self._palette.handle_palette_swatch_hovered(index)
 
     # -------------------------------------------------------------------------
-    # Helper Methods (delegated to WorkspaceLogicHelper)
+    # Helper Methods (delegated to SelectionCoordinator)
     # -------------------------------------------------------------------------
 
     def _update_map_button_state(self) -> None:

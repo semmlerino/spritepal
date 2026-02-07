@@ -1,6 +1,7 @@
-"""Business logic extracted from FrameMappingWorkspace.
+"""SelectionCoordinator: Coordinates selection state sync across workspace panes.
 
-Handles operations spanning multiple panes. Dependencies injected via setters.
+Extracted from FrameMappingWorkspace, handles operations spanning multiple panes.
+Dependencies injected via setters.
 """
 
 from __future__ import annotations
@@ -38,18 +39,18 @@ logger = get_logger(__name__)
 _PREVIEW_DEBOUNCE_MS = 100
 
 
-class WorkspaceLogicHelper:
+class SelectionCoordinator:
     """Business logic extracted from FrameMappingWorkspace.
 
     Handles operations spanning multiple panes. Dependencies injected via setters
     to support Qt's UI creation order (UI before services).
 
     Usage:
-        helper = WorkspaceLogicHelper()
-        helper.set_controller(controller)
-        helper.set_state(state_manager)
-        helper.set_panes(ai_pane, captures_pane, mapping_panel, canvas)
-        # Optional: helper.set_message_service(service)
+        coordinator = SelectionCoordinator()
+        coordinator.set_controller(controller)
+        coordinator.set_state(state_manager)
+        coordinator.set_panes(ai_pane, captures_pane, mapping_panel, canvas)
+        # Optional: coordinator.set_message_service(service)
     """
 
     def __init__(self) -> None:
@@ -99,6 +100,16 @@ class WorkspaceLogicHelper:
     def set_parent_widget(self, widget: QWidget) -> None:
         """Set the parent widget for dialogs."""
         self._parent_widget = widget
+
+    def _require_initialized(self) -> None:
+        """Raise if core dependencies haven't been set via setters."""
+        missing = []
+        if self._controller is None:
+            missing.append("controller (call set_controller())")
+        if self._state is None:
+            missing.append("state (call set_state())")
+        if missing:
+            raise RuntimeError(f"{type(self).__name__} not fully initialized: missing {', '.join(missing)}")
 
     # ===== Phase 2a: Selection helpers =====
 
@@ -407,8 +418,9 @@ class WorkspaceLogicHelper:
         Args:
             frame_id: The AI frame ID (filename), or empty string for cleared selection.
         """
-        if self._controller is None or self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         if self._alignment_canvas is None or self._mapping_panel is None:
             return
         if self._captures_pane is None or self._ai_frames_pane is None:
@@ -495,8 +507,9 @@ class WorkspaceLogicHelper:
         Updates preview in canvas if an AI frame is selected.
         Note: No longer auto-links - linking requires explicit user action.
         """
-        if self._controller is None or self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         if self._alignment_canvas is None:
             return
 
@@ -552,8 +565,9 @@ class WorkspaceLogicHelper:
         Args:
             ai_frame_id: AI frame ID (filename)
         """
-        if self._controller is None or self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         if self._alignment_canvas is None or self._ai_frames_pane is None:
             return
         if self._captures_pane is None:
@@ -665,6 +679,9 @@ class WorkspaceLogicHelper:
             ai_frame_id: AI frame ID (filename)
             game_frame_id: Game frame ID
         """
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         self.attempt_link(ai_frame_id, game_frame_id)
 
     def attempt_link(self, ai_frame_id: str, game_frame_id: str) -> None:
@@ -678,8 +695,9 @@ class WorkspaceLogicHelper:
             ai_frame_id: AI frame ID (filename)
             game_frame_id: Game frame ID
         """
-        if self._controller is None or self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         if self._alignment_canvas is None or self._ai_frames_pane is None:
             return
 
@@ -806,8 +824,9 @@ class WorkspaceLogicHelper:
         Returns:
             True if alignment was applied, False if blocked
         """
-        if self._controller is None or self._state is None:
-            return False
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         if self._alignment_canvas is None:
             return False
 
@@ -877,8 +896,9 @@ class WorkspaceLogicHelper:
         # float-precision position, syncing would overwrite with truncated int
         if self._canvas_change_in_progress:
             return
-        if self._controller is None or self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         if self._alignment_canvas is None:
             return
 

@@ -41,6 +41,11 @@ class TestStaleEntriesOnLoadGuard:
     def test_handle_stale_entries_on_load_empty_list_no_message(self) -> None:
         """Calling handle_stale_entries_on_load([]) should not show a message."""
         coordinator = InjectionCoordinator()
+        # Set required deps (controller + state) for _require_initialized
+        mock_controller = MagicMock()
+        mock_state = MagicMock()
+        coordinator.set_controller(mock_controller)
+        coordinator.set_state(mock_state)
         message_service = MagicMock()
         coordinator.set_message_service(message_service)
 

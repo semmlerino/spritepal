@@ -28,6 +28,11 @@ class ControllerContext:
     are provided as facades handle nullable properties.
     """
 
+    # Uses a mutable list wrapper so that facades sharing this context object
+    # see project changes immediately.  A plain attribute on a @dataclass would
+    # require every facade to re-read the context; with the list indirection,
+    # ``context.project = new_proj`` mutates the *same* list object that all
+    # facades already reference.
     _project_holder: list[FrameMappingProject | None] = field(default_factory=lambda: [None])
 
     @property

@@ -91,6 +91,16 @@ class InjectionCoordinator:
         self._get_reuse_rom_enabled = get_reuse_rom_enabled
         self._update_frame_status = update_frame_status
 
+    def _require_initialized(self) -> None:
+        """Raise if core dependencies haven't been set via setters."""
+        missing = []
+        if self._controller is None:
+            missing.append("controller (call set_controller())")
+        if self._state is None:
+            missing.append("state (call set_state())")
+        if missing:
+            raise RuntimeError(f"{type(self).__name__} not fully initialized: missing {', '.join(missing)}")
+
     # -------------------------------------------------------------------------
     # ROM Validation
     # -------------------------------------------------------------------------
@@ -137,7 +147,10 @@ class InjectionCoordinator:
         Args:
             ai_frame_id: AI frame ID (filename)
         """
-        if self._controller is None or self._state is None or self._parent_widget is None:
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
+        if self._parent_widget is None:
             return
 
         project = self._controller.project
@@ -170,7 +183,10 @@ class InjectionCoordinator:
         Args:
             selected_ids: List of AI frame IDs to inject
         """
-        if self._controller is None or self._state is None or self._parent_widget is None:
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
+        if self._parent_widget is None:
             return
 
         if not selected_ids:
@@ -197,7 +213,10 @@ class InjectionCoordinator:
 
         Uses background thread to avoid UI freeze during batch ROM I/O.
         """
-        if self._controller is None or self._state is None or self._parent_widget is None:
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
+        if self._parent_widget is None:
             return
 
         project = self._controller.project
@@ -334,6 +353,7 @@ class InjectionCoordinator:
             ai_frame_id: The AI frame ID that was injected
             message: Success message from controller
         """
+        self._require_initialized()
         if self._message_service:
             self._message_service.show_message(f"Injection successful for frame {ai_frame_id}")
 
@@ -352,8 +372,9 @@ class InjectionCoordinator:
         Args:
             frame_id: Game frame ID with stale entries
         """
-        if self._state is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
 
         logger.info("Stale entries detected for frame '%s'", frame_id)
         self._state.add_stale_game_frame_id(frame_id)
@@ -368,6 +389,7 @@ class InjectionCoordinator:
         Args:
             stale_frame_ids: Game frame IDs with mismatched entry IDs
         """
+        self._require_initialized()
         count = len(stale_frame_ids)
         if not stale_frame_ids:
             return
@@ -395,9 +417,9 @@ class InjectionCoordinator:
         Args:
             ai_frame_id: The AI frame ID being injected
         """
-        if self._state is None:
-            return
-
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
         logger.debug("Async injection started for frame '%s'", ai_frame_id)
         # Update status message to show progress
         pending = len(self._state.batch_injection_pending)
@@ -411,6 +433,7 @@ class InjectionCoordinator:
             ai_frame_id: The AI frame ID being injected
             message: Progress message
         """
+        self._require_initialized()
         logger.debug("Async injection progress for '%s': %s", ai_frame_id, message)
 
     def handle_async_injection_finished(self, ai_frame_id: str, success: bool, message: str) -> None:
@@ -423,8 +446,9 @@ class InjectionCoordinator:
             success: Whether the injection succeeded
             message: Result message
         """
-        if self._state is None or self._controller is None:
-            return
+        self._require_initialized()
+        assert self._controller is not None
+        assert self._state is not None
 
         # Track stale entry failures for batch reporting
         # Use queue-time game frame ID instead of current mapping to handle remap scenarios

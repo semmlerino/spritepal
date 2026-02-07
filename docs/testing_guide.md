@@ -314,11 +314,11 @@ Use setter injection, never `__new__`:
 
 ```python
 # Bad - skips __init__, fragile if constructor changes
-helper = WorkspaceLogicHelper.__new__(WorkspaceLogicHelper)
+helper = SelectionCoordinator.__new__(SelectionCoordinator)
 helper._controller = MagicMock()
 
 # Good - uses designed DI pattern
-helper = WorkspaceLogicHelper()
+helper = SelectionCoordinator()
 helper.set_controller(MagicMock())
 helper.set_state(MagicMock())
 helper.set_panes(MagicMock(), MagicMock(), MagicMock(), MagicMock())
