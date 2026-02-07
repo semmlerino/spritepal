@@ -20,7 +20,7 @@ from utils.logging_config import get_logger
 if TYPE_CHECKING:
     from PySide6.QtWidgets import QWidget
 
-    from core.frame_mapping_project import GameFrame
+    from core.frame_mapping_project import FrameMappingProject, GameFrame
     from ui.frame_mapping.controllers.frame_mapping_controller import (
         FrameMappingController,
     )
@@ -181,13 +181,22 @@ class WorkspaceLogicHelper:
         # Use ID-keyed status map (stable across reloads/reordering)
         status_map: dict[str, str] = {}
         for ai_frame in project.ai_frames:
-            mapping = project.get_mapping_for_ai_frame(ai_frame.id)
-            if mapping:
-                status_map[ai_frame.id] = mapping.status
-            else:
-                status_map[ai_frame.id] = "unmapped"
+            status_map[ai_frame.id] = self._get_ai_frame_status(project, ai_frame.id)
 
         self._ai_frames_pane.set_mapping_status(status_map)
+
+    def _get_ai_frame_status(self, project: FrameMappingProject, ai_frame_id: str) -> str:
+        """Get the mapping status for an AI frame.
+
+        Args:
+            project: The frame mapping project
+            ai_frame_id: The AI frame ID to look up
+
+        Returns:
+            The status string: "linked", "unmapped", "in_progress", etc., or "unmapped" if no mapping
+        """
+        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
+        return mapping.status if mapping else "unmapped"
 
     def refresh_game_frame_link_status(self) -> None:
         """Refresh the game frame link status indicators."""
@@ -304,8 +313,7 @@ class WorkspaceLogicHelper:
         if project is None:
             return
 
-        mapping = project.get_mapping_for_ai_frame(ai_frame_id)
-        status = mapping.status if mapping else "unmapped"
+        status = self._get_ai_frame_status(project, ai_frame_id)
         self._ai_frames_pane.update_single_item_status(ai_frame_id, status)
 
     def update_single_game_frame_link_status(self, game_frame_id: str) -> None:
