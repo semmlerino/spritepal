@@ -1904,25 +1904,6 @@ class WorkbenchCanvas(QWidget):
             if ingame_path.exists():
                 ingame_index_map, _ = load_image_preserving_indices(ingame_path, sheet_palette=self._sheet_palette)
                 if ingame_index_map is not None:
-                    # Apply flips in-place within the content region so the
-                    # sprite stays within tile bounds (flipping the whole canvas
-                    # would mirror content to the wrong side).
-                    flip_h = self._flip_h_checkbox.isChecked()
-                    flip_v = self._flip_v_checkbox.isChecked()
-                    if flip_h or flip_v:
-                        content_mask = ingame_index_map != 255
-                        rows = np.any(content_mask, axis=1)
-                        cols = np.any(content_mask, axis=0)
-                        if rows.any() and cols.any():
-                            r0, r1 = int(np.argmax(rows)), int(len(rows) - np.argmax(rows[::-1]))
-                            c0, c1 = int(np.argmax(cols)), int(len(cols) - np.argmax(cols[::-1]))
-                            region = ingame_index_map[r0:r1, c0:c1]
-                            if flip_h:
-                                region = np.fliplr(region)
-                            if flip_v:
-                                region = np.flipud(region)
-                            ingame_index_map = ingame_index_map.copy()
-                            ingame_index_map[r0:r1, c0:c1] = region
                     rgba_image = convert_indexed_to_rgb(ingame_index_map, self._sheet_palette)
                     qimage = pil_to_qimage(rgba_image)
                     scaled = qimage.scaled(
@@ -2435,6 +2416,8 @@ class WorkbenchCanvas(QWidget):
         if self._updating_from_external:
             return
 
+        self._ingame_edited_path = None  # Baked values stale during drag
+
         # Convert from display scale to actual coordinates
         # Use int() for truncation toward zero (not floor division)
         # This ensures consistent behavior for negative offsets
@@ -2461,6 +2444,7 @@ class WorkbenchCanvas(QWidget):
 
     def _emit_alignment_changed(self) -> None:
         """Emit alignment_changed signal with current values."""
+        self._ingame_edited_path = None  # User changed transforms — baked values stale
         self.alignment_changed.emit(self.get_alignment())
 
     def _update_scene_for_alignment(self) -> None:
