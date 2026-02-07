@@ -674,6 +674,10 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _on_tool_changed(self, tool: EditorTool) -> None:
         """Handle tool change from controller (e.g., auto-switch after pick)."""
+        # Sync both controllers (signal may come from either one)
+        self._main_controller.set_tool(tool)
+        if self._ingame_controller is not None:
+            self._ingame_controller.set_tool(tool)
         self._tool_buttons[tool].setChecked(True)
         suffix = " [Constrained]" if self._main_controller.constrain_to_index else ""
         self._tool_label.setText(f"Tool: {tool.name.replace('_', ' ').title()}{suffix}")
@@ -837,6 +841,8 @@ class AIFramePaletteEditorWindow(QMainWindow):
 
     def _on_active_index_changed(self, index: int) -> None:
         """Handle active index change from controller (e.g., right-click pick)."""
+        # Sync both controllers (signal may come from either one)
+        self._main_controller.set_active_index(index)
         self._palette_panel.set_active_index(index)
         if self._ingame_controller is not None:
             self._ingame_controller.set_active_index(index)
@@ -1115,6 +1121,7 @@ class AIFramePaletteEditorWindow(QMainWindow):
             self._ingame_controller.pixel_info.connect(self._on_pixel_info)
             self._ingame_controller.active_index_changed.connect(self._on_active_index_changed)
             self._ingame_controller.undo_state_changed.connect(self._on_undo_state_changed)
+            self._ingame_controller.tool_changed.connect(self._on_tool_changed)
             if self._ingame_canvas is not None:
                 self._ingame_canvas.drag_ended.connect(self._ingame_controller.finish_stroke)
 
@@ -1132,6 +1139,9 @@ class AIFramePaletteEditorWindow(QMainWindow):
         self._ingame_controller.set_constrain_to_index(self._main_controller.constrain_to_index)
         if self._ingame_canvas is not None:
             self._ingame_canvas.set_brush_size(self._main_controller.brush_size)
+
+        # Set tool cursors on the ingame canvas
+        self._update_canvas_cursors()
 
         self._refresh_ingame_btn.setEnabled(True)
         self._save_ingame_btn.setEnabled(False)  # Not dirty yet
