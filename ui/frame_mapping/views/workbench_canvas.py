@@ -1191,12 +1191,9 @@ class WorkbenchCanvas(QWidget):
                         )
                         if extracted is not None:
                             self._ai_index_map = extracted
-                            # Invalidate the frame cache so stale data
-                            # isn't reloaded on frame re-selection
-                            if self._current_ai_frame is not None:
-                                self._ai_frame_cache.pop(
-                                    self._current_ai_frame.path, None
-                                )
+                            # Update cache entry so re-selection of this
+                            # frame doesn't reload stale indices from disk
+                            self._update_ai_frame_cache_index_map(extracted)
             self._schedule_preview_update()
 
     def _extract_ai_indices_from_composite(
@@ -1264,6 +1261,21 @@ class WorkbenchCanvas(QWidget):
             img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
         return np.array(img, dtype=np.uint8)
+
+    def _update_ai_frame_cache_index_map(self, index_map: np.ndarray) -> None:
+        """Replace the index_map in the current AI frame's cache entry.
+
+        Keeps the pixmap, PIL image, bbox, and mtime intact so that
+        re-selecting this frame returns the edited indices instead of
+        reloading stale data from the original file on disk.
+        """
+        if self._current_ai_frame is None:
+            return
+        frame_path = self._current_ai_frame.path
+        entry = self._ai_frame_cache.get(frame_path)
+        if entry is None:
+            return
+        self._ai_frame_cache[frame_path] = entry._replace(index_map=index_map)
 
     def _get_ai_frame_from_cache(self, path: Path) -> _AIFrameCacheEntry | None:
         """Get AI frame from cache if valid (exists and mtime matches).
