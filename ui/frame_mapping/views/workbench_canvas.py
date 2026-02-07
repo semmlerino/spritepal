@@ -1175,6 +1175,22 @@ class WorkbenchCanvas(QWidget):
         """
         if self._ingame_edited_path != path:
             self._ingame_edited_path = path
+            # When in-game edits are saved, update the cached AI index map
+            # so the compositor uses edited indices when _ingame_edited_path
+            # is later cleared by user-initiated transform changes.
+            if path is not None and self._sheet_palette is not None:
+                ingame_path = Path(path)
+                if ingame_path.exists():
+                    index_map, _ = load_image_preserving_indices(
+                        ingame_path, sheet_palette=self._sheet_palette
+                    )
+                    if index_map is not None:
+                        self._ai_index_map = index_map
+                        # Invalidate the frame cache so stale data isn't reloaded
+                        if self._current_ai_frame is not None:
+                            self._ai_frame_cache.pop(
+                                self._current_ai_frame.path, None
+                            )
             self._schedule_preview_update()
 
     def _get_ai_frame_from_cache(self, path: Path) -> _AIFrameCacheEntry | None:
