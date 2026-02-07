@@ -1048,6 +1048,18 @@ class AIFramePaletteEditorWindow(QMainWindow):
                     mapping = project.get_mapping_for_ai_frame(self._ai_frame.id)
                     if mapping is not None:
                         mapping.ingame_edited_path = str(output_path)
+                        # Reset alignment to neutral — transforms are now
+                        # baked into the in-game image.  Without this, any
+                        # re-sync from model (re-select, undo/redo) would
+                        # re-apply the original offset on top of the
+                        # baked-in position, causing a double-offset shift.
+                        mapping.offset_x = 0
+                        mapping.offset_y = 0
+                        mapping.flip_h = False
+                        mapping.flip_v = False
+                        mapping.scale = 1.0
+                        mapping.sharpen = 0.0
+                        mapping.resampling = "lanczos"
                         self._frame_controller.save_requested.emit()
             self.ingame_saved.emit(self._ai_frame.id, str(output_path))
             logger.info("Saved in-game edits: %s", output_path)

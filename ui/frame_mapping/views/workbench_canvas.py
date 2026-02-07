@@ -1943,11 +1943,12 @@ class WorkbenchCanvas(QWidget):
                         Qt.TransformationMode.FastTransformation,
                     )
                     self._preview_item.setPixmap(QPixmap.fromImage(scaled))
-                    # Position preview at current offset — the in-game edit
-                    # has the original offset baked in, so additional offset
-                    # acts as a shift of the entire composited result.
-                    pos = self._ai_frame_item.pos()
-                    self._preview_item.setPos(pos.x(), pos.y())
+                    # Always position at origin — the in-game edit has the
+                    # original offset baked into the image.  Any user-initiated
+                    # transform change clears _ingame_edited_path and falls
+                    # back to the compositor, so non-zero pos here would only
+                    # come from a stale model re-sync (double-offset bug).
+                    self._preview_item.setPos(0, 0)
                     self._preview_item.setVisible(True)
                     return
             # Fall through to compositor if file missing/invalid
